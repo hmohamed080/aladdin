@@ -1,9 +1,36 @@
 [project]
-name = "document-copilot-backend"
+name = "aladdin-backend"
 version = "0.1.0"
+description = "Aladdin specialized AI/document service (FastAPI). Not the product CRUD backend."
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "sqlalchemy>=2.0",
+    "httpx>=0.28",
+    "structlog>=24.4",
+    "openai>=1.59",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.9",
+]
 
 [tool.uv]
-add-bounds = "exact"
-exclude-newer = "7 days"
+# Application project (not a distributable package) — do not build it.
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
