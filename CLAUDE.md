@@ -9,11 +9,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is right now
 
-**A design-first project in its design phase.** The real work product is a single encrypted Pencil design file: `UI-UX/design.pen`. There is no running application yet.
+**Design-led, with the architecture foundation now scaffolded.** The primary design work product is the encrypted Pencil file `UI-UX/design.pen`. As of the repository-architecture-foundation task, the code foundation exists but **no product features are implemented yet**.
 
-- `backend/` and `frontend/` exist but every file in them (`AGENTS.md`, setup guides, `README.md`, `docs/architecture.md`) is currently **empty (0 bytes)**. Do not assume a codebase exists — there are no build/lint/test commands yet. Do not invent them.
-- `AGENTS.md` (root) is the **source of truth for coding conventions** once real code is written. Per-stack rules will live in `backend/AGENTS.md` and `frontend/AGENTS.md`. Read `AGENTS.md` before writing any code.
-- `docs/design_idea.txt` is the original product brief (Arabic). `UI-UX/design.*.BACKUP-*.pen` are frozen backups — **never delete or overwrite them.**
+- `AGENTS.md` (root) is the **source of truth for coding conventions**, backed by a scoped hierarchy: `frontend/AGENTS.md`, `backend/AGENTS.md`, `supabase/AGENTS.md`, `docs/AGENTS.md`, `data/AGENTS.md`, `UI-UX/AGENTS.md`. **Read the root `AGENTS.md` and every applicable scoped one before touching a file.**
+- Architecture is fixed in ADRs under `docs/decisions/` (ADR-0001 approved architecture, ADR-0002 migrations, ADR-0003 agent-instruction hierarchy, ADR-0004 deployment). Product scope: `docs/product/mvp-scope.md`.
+- `frontend/` is a Next.js App Router scaffold (typecheck/lint/tests green); `backend/` is a specialized FastAPI service scaffold; `supabase/` holds migrations (schema source of truth). Commands live in each service's README and `docs/guides/`.
+- `docs/product/design-idea.md` is the original founder brief (Arabic). `UI-UX/design.*.BACKUP-*.pen` are frozen backups — **never delete or overwrite them.** All `.pen` files are gitignored and must never be edited by a coding task.
 
 ## The product: Aladdin
 
@@ -52,6 +53,8 @@ Build inner workflows **before** dashboards. Order: **05C** B2B Sales workflow (
 
 This file was built by a prior AI agent across sessions 01–04D, then taken over for context recovery. **Do not trust prior session summaries, QA boards, or "complete/ready" labels** — independently review each screen's full rendered UI. The consumer/business/admin home frames (Rows 09/10/11) are single rich frames, not stubs; much of the core value journey (05A–05E workflows) does not exist yet.
 
-## Intended stack (from AGENTS.md, not yet implemented)
+## Approved stack (see ADR-0001)
 
-FastAPI (backend) · React + Vite (frontend) · Supabase · OpenAI/LLM SDK. Config is centralized per service (`backend/app/config.py`, `frontend/lib/env.ts`) — never read `process.env` / `os.getenv` directly in app code, and don't call `load_dotenv`. Fail fast on missing config. Default to writing code yourself; justify every runtime dependency in the commit message (see `AGENTS.md` "Dependency policy").
+**Next.js App Router** + React + TypeScript strict + Tailwind (frontend, `pnpm`) · **Supabase** Postgres/Auth/Storage/RLS/Realtime/pgvector (schema via `supabase/migrations`, ADR-0002) · **specialized FastAPI** service for AI/OCR/RAG/documents/workers only — *not* the CRUD backend (`uv`) · OpenAI. Hosting: Vercel + Railway + Supabase (ADR-0004). **Not Vite, not a React SPA.**
+
+Config is centralized per service (`frontend/src/lib/env`, `backend/app/config.py`) — never read `process.env` / `os.getenv` directly in app code, and don't call `load_dotenv`. Fail fast on missing config; no silent defaults for secrets. Default to writing code yourself; justify every runtime dependency (see `AGENTS.md` "Dependency policy"). `pnpm` only for Node, `uv` only for Python.
