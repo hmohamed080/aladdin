@@ -46,7 +46,7 @@ class Settings(BaseSettings):
         return self.app_env in {"staging", "production"}
 
     @model_validator(mode="after")
-    def _require_secrets_outside_local(self) -> "Settings":
+    def _require_secrets_outside_local(self) -> Settings:
         """Fail fast in staging/production if security-sensitive config is missing.
 
         No silent defaults for secrets in deployed environments; local/dev may
