@@ -1,0 +1,25 @@
+# Normalize line endings: text files LF in the repo, checked out native.
+* text=auto eol=lf
+
+# Windows-native and shell scripts keep their expected endings.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.sh  text eol=lf
+
+# Pencil design files are opaque binaries (encrypted). Never diff/merge them.
+# (They are gitignored; this guards against accidental force-add.)
+*.pen binary
+
+# Lockfiles: treat as generated in language stats, but keep tracked.
+pnpm-lock.yaml linguist-generated=true
+uv.lock        linguist-generated=true
+
+# Common binary asset types (brand/runtime exports).
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.ico  binary
+*.woff  binary
+*.woff2 binary
+*.pdf  binary
