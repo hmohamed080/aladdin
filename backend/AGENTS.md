@@ -15,12 +15,12 @@ FastAPI here is a **specialized service**, not the product's CRUD backend. It ex
 
 ## Stack (locked — see ADR-0001)
 
-Python 3.12+ · FastAPI · Uvicorn · Pydantic v2 · pydantic-settings · SQLAlchemy (typed read/query access) · OpenAI SDK · httpx · structlog · pytest. Dependency + venv management: **`uv` only** (no pip `requirements*.txt`, no Poetry).
+Python 3.12+ · FastAPI · Uvicorn · Pydantic v2 · pydantic-settings · **`supabase-py`** (data access) · OpenAI SDK · httpx · structlog · pytest. Dependency + venv management: **`uv` only** (no pip `requirements*.txt`, no Poetry). **SQLAlchemy is deferred** (not a dependency) — see ADR-0005.
 
 ## Database boundary (critical — see ADR-0002)
 
-- **Supabase SQL migrations are the only schema source of truth.** SQLAlchemy may **map and query** tables created by those migrations.
-- SQLAlchemy must **never** own or modify the shared schema. **No `Base.metadata.create_all()` in Staging/Production.** No Alembic.
+- **Supabase SQL migrations are the only schema source of truth.** Python data access is via **`supabase-py`** (ADR-0005): user-facing operations preserve the caller's JWT so **RLS applies**; service-role access is limited to trusted workers and explicitly authorized operations. Complex operations use PostgreSQL functions/RPC.
+- No Python component may **own or modify** the shared schema. **No `Base.metadata.create_all()` in Staging/Production.** No Alembic. **SQLAlchemy is deferred** until an evidenced need (ADR-0005); if reintroduced it would be Core, read-only, mapping migration-owned tables — never creating them.
 
 ## Organization
 

@@ -79,8 +79,8 @@ Do **not** introduce Kubernetes, Kafka, RabbitMQ, Redis, Elasticsearch/OpenSearc
 **Default: write it yourself. Reach for a library only when the alternative would be non-trivial, error-prone, or reinvention of a standard.** Every dependency is a liability — bundle size, supply-chain risk, upgrade work.
 
 OK to depend on:
-- Things genuinely hard to get right (HTTP clients, ASGI servers, SQL drivers, parsers, LLM SDKs, ORM, migrations, auth SDKs).
-- The declared stack (Next.js, React, Supabase clients, FastAPI, Pydantic, SQLAlchemy, OpenAI SDK, etc.).
+- Things genuinely hard to get right (HTTP clients, ASGI servers, SQL drivers, parsers, LLM SDKs, auth SDKs).
+- The declared stack (Next.js, React, Supabase clients — `supabase-js` / `supabase-py`, FastAPI, Pydantic, OpenAI SDK, etc.). SQLAlchemy is **deferred**, not part of the current stack — see ADR-0005.
 
 Not OK:
 - Helper libraries that wrap 5–20 lines of stdlib or platform APIs.

@@ -13,7 +13,7 @@ Extends the root `AGENTS.md`. Read that first. This file governs `supabase/`.
 
 - No Alembic. No ORM-driven schema creation (`Base.metadata.create_all()`) in Staging/Production.
 - **Production schema changes are never performed manually** through the dashboard. The dashboard is read/inspect only once the migration workflow is established.
-- SQLAlchemy (in `backend/`) may map and query these tables but must never own or alter the schema.
+- Trusted Python workers (in `backend/`) query these tables via **`supabase-py`** (ADR-0005), never owning or altering the schema. SQLAlchemy is deferred; Alembic is excluded.
 
 ## Security & tenancy (mandatory)
 
