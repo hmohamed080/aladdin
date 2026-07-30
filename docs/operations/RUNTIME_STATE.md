@@ -7,13 +7,13 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | | |
 |---|---|
 | **Last updated** | 2026-07-30 |
-| **Updated by** | Claude Code (Opus 4.8) — memory-consolidation session |
-| **Current focus** | Core project-memory consolidation & documentation reconciliation. **No product feature in progress.** |
+| **Updated by** | Claude Code (Opus 4.8) — foundation review / hardening / validation session |
+| **Current focus** | Pre-merge foundation verification (review, hardening, full local validation). **No product feature in progress.** |
 
 ## Git & branch
 
 - **Branch:** `chore/repository-architecture-foundation`
-- **Commits ahead of `main`:** 14 (this snapshot's commit included; was 13 before it)
+- **Commits ahead of `main`:** 18 (this snapshot's commit included)
 - **Baseline:** `main` @ `643eb61` (repo as-found)
 - **Remote:** none — **local-only**, not pushed
 - **Working tree:** clean at session end (verify with `git status`)
@@ -61,8 +61,8 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 
 ## Current blockers
 
-- **None blocking documentation work.**
-- To run the full Supabase stack / RLS tests: Docker image pull required (deferred).
+- **None blocking the foundation.** Code/docs verification is complete and green.
+- **Environment-only (not a code defect):** this sandbox cannot reach the container registries (`ghcr.io` TLS handshake timeout; `public.ecr.aws` Supabase images uncached and unpullable). Reproduced 3× on `docker build` and on `docker pull`. Consequence: the backend **Docker image build** and the **Supabase local stack** (`start`/`db reset`/`db lint`) could not be executed here. Both are statically verified (Dockerfile correct; `config.toml` valid TOML; extensions migration correct; no product tables) and should run in CI / a stable network.
 
 ## Known warnings (benign)
 
@@ -73,12 +73,19 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 
 Core-memory files created/promoted: `PRODUCT_DIRECTION_GUIDE.md`, `ARCHITECTURE_GUIDE.md`, `UI-UX/UI_UX_SYSTEM_GUIDE.md`, `AGENT_WORK_LOG.md`, this `RUNTIME_STATE.md`; plus `docs/README.md`, `ADR-0005`, and reconciled AGENTS/README/CLAUDE.
 
+## Validation status (2026-07-30 foundation review)
+
+- **Frontend — GREEN (fully re-run):** `pnpm install --frozen-lockfile`, `typecheck`, `lint`, `test` (3 passed), and `build` (production build succeeds; routes `/`, `/_not-found`, `/api/health`).
+- **Backend — GREEN (fully re-run):** `uv sync --frozen`, `ruff check` (clean), `pytest` (3 passed). Fail-fast verified (staging + missing secrets → `ValidationError`); `/health` → `200 {"status":"ok"}`.
+- **Docker image build — BLOCKED (environment):** registry unreachable (see blockers). Dockerfile statically correct (multi-stage, non-root uid 10001, HEALTHCHECK, copies only `pyproject.toml`/`uv.lock`/`app`).
+- **Supabase full stack — BLOCKED (environment):** `--version` OK (2.110.0); `config.toml` valid TOML; `start`/`db reset`/`db lint` not executable here (image pull blocked).
+
 ## Deferred validation
 
-- `supabase db reset` + RLS/organization-isolation tests (needs Docker).
-- Frontend full validation was **not** re-run this session (no frontend source changed — only Markdown docs); last known green from the foundation session.
+- `supabase db reset` + RLS/organization-isolation tests (needs Docker + registry access; no product tables/policies exist yet).
+- Backend `docker build` end-to-end (needs registry access).
 - Git remote + push (none configured).
-- CI/CD pipeline.
+- CI/CD pipeline (commands documented in README; not wired).
 
 ## Next planned work
 

@@ -4,6 +4,61 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Foundation Review, Hardening & Pre-Merge Validation
+**Date/time:** 2026-07-30 (single session)
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `chore/repository-architecture-foundation` (off baseline `main` @ `643eb61`)
+
+### Objective
+Independently verify the architecture foundation is correct, clean, executable, internally consistent, and merge-ready — review generated docs, run full local validation (frontend/backend/Supabase), security + repo-quality review, and confirm the canonical memory system. **No product feature.**
+
+### Starting state
+HEAD `18dc7f5`, 14 commits ahead of `main`, working tree carried one pre-existing generated diff (`frontend/next-env.d.ts`).
+
+### Findings & fixes
+- **3 stale SQLAlchemy references (genuine defect):** `docs/database/migration-strategy.md`, `docs/database/naming-conventions.md`, `docs/guides/backend-setup.md` still described SQLAlchemy as the current data-access mechanism — contradicting ADR-0005. **Fixed** to `supabase-py` + PostgreSQL RPC (RLS/JWT preserved).
+- **gitignore gap:** no generic `logs/`, `*.log`, `*.transcript`. **Added.**
+- **Generated file drift:** committed the Next-regenerated `next-env.d.ts` (typed-routes reference) so the tree is clean.
+- **CI readiness:** added a documented recommended CI command sequence to `README.md`.
+- **No other defects:** no duplicate headings/paragraphs, no truncation/garble, no broken links (152 checked, 0 broken), no competing lockfiles, empty files are only legitimate `__init__.py`/`.gitkeep`.
+
+### Stale-term classification (section 11)
+- `active profile` / `Use As` / `Profile Switcher`: all remaining hits are **valid current rules** (the "no profile switcher" rule) or **intentional historical** (verbatim founder brief `design-idea.md`, covered by a supersession note). No stale conflicts.
+- `SQLAlchemy` / `Alembic`: after the 3 fixes, remaining hits are **ADR/deferred/historical** (ADR-0005 defining the decision, "deferred" statements, append-only log, the non-authoritative `agents/commands/db-migrate.md` marked superseded). No stale current-tense claims.
+- `WCAG 2.1`: only **supersession/log records** ("2.1 → 2.2"); active target is **WCAG 2.2 AA**.
+- `product-direction.md` / `agent-work-log.md`: only in **historical log + change-history** entries (the `git mv` records). Valid.
+
+### Tests & validation (commands + results)
+- Frontend: `pnpm install --frozen-lockfile` ✅ · `typecheck` ✅ · `lint` ✅ · `test` 3 passed ✅ · `build` ✅ (production build; `/`, `/_not-found`, `/api/health`).
+- Backend: `uv sync --frozen` ✅ · `ruff check .` ✅ · `pytest` 3 passed ✅ · fail-fast (staging+missing secrets → `ValidationError`) ✅ · `/health` → `200 {"status":"ok","service":"backend","env":"local"}` ✅.
+- Backend **Docker build BLOCKED** — `ghcr.io` TLS handshake timeout / `tls: bad record MAC` (reproduced 3× incl. `docker pull`). Dockerfile statically correct (non-root uid 10001, healthcheck, minimal COPY).
+- Supabase: `--version` 2.110.0 ✅ · `config.toml` valid TOML ✅ · **full stack BLOCKED** — required images (Postgres 17 etc.) uncached and unpullable in this environment. Partial state cleaned via `supabase stop`.
+- Extensions migration reviewed ✅ (pgcrypto/pg_trgm/vector/postgis into `extensions` schema); seed empty; **no `CREATE TABLE` anywhere** ✅.
+- Security: no `.env`/secrets tracked ✅ · `.env.example` placeholders only ✅ · no service-role in `frontend/src` ✅ · browser client uses anon key only ✅ · `.pen` untracked + hashes unchanged ✅ · tracked-file secret scan clean ✅.
+
+### Commits
+- `7d3c280` docs: correct three stale SQLAlchemy data-access references to supabase-py
+- `f6ad9d6` chore: harden ignore rules for logs/transcripts; sync generated next-env.d.ts
+- `adbea03` docs: add recommended CI command sequence to README
+- (this entry) docs: refresh runtime state and record foundation-review session
+
+### Unfinished / blocked
+- **Environment-only:** backend Docker image build and Supabase local stack (`start`/`db reset`/`db lint`) not executable here (registry unreachable). Run in CI / stable network. No code change required.
+- Git remote + push — none configured (branch stays local; not pushed).
+- CI/CD pipeline — commands documented; not wired.
+- First product migration + RLS + isolation tests — the next authorized step (not started).
+
+### Blockers
+Container registry unreachable in this sandbox (`ghcr.io` TLS timeout; `public.ecr.aws` Supabase images uncached). Not a foundation defect.
+
+### Rollback notes
+All on `chore/repository-architecture-foundation`; baseline `main` @ `643eb61` untouched. Revert a slice with `git revert <sha>`. No `.pen` modified; no live DB touched.
+
+### Next recommended action
+Foundation is verified merge-ready (with the two registry-dependent checks to be run in CI). Await explicit direction to merge or to begin the implementation roadmap (identity & multi-tenancy → orgs/memberships/branches → RLS + isolation tests → 05C Sales).
+
+---
+
 ## Session — Core Project-Memory Consolidation
 **Date/time:** 2026-07-30 (single session)
 **Agent/tool:** Claude Code (Opus 4.8)
