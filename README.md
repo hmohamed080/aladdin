@@ -95,6 +95,33 @@ cd backend && uv run pytest && uv run ruff check .
 pnpm supabase db lint                              # migration lint (RLS/isolation tests once tables exist)
 ```
 
+## Continuous integration (recommended sequence)
+
+No CI pipeline is wired yet (deferred), but the foundation exposes stable commands ready to drop into CI. Recommended gate, in order:
+
+```bash
+# Frontend
+pnpm install --frozen-lockfile
+pnpm --filter frontend typecheck
+pnpm --filter frontend lint
+pnpm --filter frontend test
+pnpm --filter frontend build
+
+# Backend (uv-managed Python 3.12)
+cd backend
+uv sync --frozen
+uv run ruff check .
+uv run pytest
+docker build -t aladdin-backend ./backend   # from repo root
+cd ..
+
+# Supabase (requires Docker; validates config + clean migration apply)
+pnpm exec supabase start
+pnpm exec supabase db reset                  # applies all migrations + seed from clean
+pnpm exec supabase db lint
+pnpm exec supabase stop
+```
+
 ## Migration workflow
 
 Supabase SQL migrations are the **only** schema source of truth (ADR-0002).
