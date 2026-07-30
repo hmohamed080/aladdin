@@ -4,6 +4,73 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Core Project-Memory Consolidation
+**Date/time:** 2026-07-30 (single session)
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `chore/repository-architecture-foundation` (off baseline `main` @ `643eb61`)
+
+### Objective
+Establish four canonical persistent project-memory files + a live runtime-state file, reconcile all documentation/ADRs with them, defer the unused SQLAlchemy dependency, and add session-hygiene rules — **without** implementing any product feature, editing any `.pen` file, merging, or pushing.
+
+### Starting state
+10 commits ahead of `main`, working tree clean, HEAD `6f63867`. Existing memory docs: `product-direction.md`, `agent-work-log.md`. Contradictions present: profile-switching model in 6 files; WCAG 2.1; hardcoded component count; SQLAlchemy listed as a dependency but unused.
+
+### Files moved (history preserved via `git mv`)
+- `docs/product/product-direction.md` → `docs/product/PRODUCT_DIRECTION_GUIDE.md`
+- `docs/operations/agent-work-log.md` → `docs/operations/AGENT_WORK_LOG.md`
+
+### Files created
+- `docs/architecture/ARCHITECTURE_GUIDE.md` (core memory — current-state architecture)
+- `UI-UX/UI_UX_SYSTEM_GUIDE.md` (core memory — design system moved out of `UI-UX/AGENTS.md`)
+- `docs/operations/RUNTIME_STATE.md` (core memory — mutable live snapshot)
+- `docs/README.md` (documentation index)
+- `docs/decisions/ADR-0005-python-data-access.md`
+
+### Files modified
+- Rewritten: `docs/product/PRODUCT_DIRECTION_GUIDE.md` (metadata, dual roadmap, decision process, change history, account-model correction); `UI-UX/AGENTS.md` (slimmed to operational).
+- Reconciled: root `AGENTS.md` (reading order + persistent-memory policy + dependency policy), `CLAUDE.md`, `README.md`, `docs/AGENTS.md` (layout + end-of-session checklist), `docs/architecture/system-context.md`, `docs/product/mvp-scope.md`, `frontend/AGENTS.md`, `backend/AGENTS.md`, `supabase/AGENTS.md`, `docs/decisions/ADR-0002` (cross-ref) and `ADR-0003` (reading order).
+- Backend (SQLAlchemy defer): `backend/pyproject.toml`, `backend/uv.lock`, `backend/app/database/__init__.py`, `backend/.env.example`.
+
+### Decisions made
+- **Account/navigation model corrected** from "active-profile switching" to canonical **one current primary account type / no Profile Switcher / derived navigation** across all product, architecture, and UI docs. This is a wording/consistency correction of the identity model, **not** a product-strategy change.
+- **ADR-0005:** Python data access uses **`supabase-py`**; **SQLAlchemy deferred** (was an unused scaffold dependency), **Alembic** stays excluded, complex ops via **PostgreSQL RPC**, user-facing ops preserve the caller JWT so **RLS applies**, service-role limited to trusted workers.
+- **Accessibility target** raised WCAG 2.1 AA → **WCAG 2.2 AA**; removed the hardcoded "~127 components" count (design.pen is the source of truth).
+- **Reading order** now mandates the four core-memory files + `RUNTIME_STATE.md` before scoped AGENTS/ADRs.
+
+### Tests & validation
+- `uv sync --python 3.12` → `sqlalchemy` removed, `supabase` 2.31.0 added, `uv.lock` regenerated. ✅
+- `uv run ruff check .` → All checks passed. ✅
+- `uv run pytest` → 3 passed, 1 benign warning. ✅
+- Residual `sqlalchemy` in source: only the intentional "deferred" note in `app/database/__init__.py`. ✅
+- Documentation-link validation and `.pen` hash re-check: run at session end (see final report). 
+- Frontend suite **not** re-run — no frontend source changed (Markdown docs only).
+
+### Commits
+- `cf1e0cc` docs: establish canonical project-memory files
+- `d4a52dc` docs: reconcile product, architecture, and UI guidance with core memory
+- `da6c69a` refactor: defer unused SQLAlchemy; adopt supabase-py for Python data access
+- (this entry) docs: add runtime state and session hygiene
+
+### Unfinished work
+- Supabase local stack + `db reset` + RLS/organization-isolation tests (needs Docker) — still pending.
+- Git remote + push — none configured (branch is local-only; not pushed per task).
+- CI/CD pipeline — deferred.
+- design.pen → Tailwind token bridge — deferred to first UI feature.
+
+### Blockers
+None for documentation/memory work. Docker required for the full Supabase RLS test pass.
+
+### Known warnings (benign)
+Frontend pnpm peer-dep warning (`unrs-resolver`/`@emnapi`); backend `StarletteDeprecationWarning` under pytest. No functional impact.
+
+### Rollback notes
+All changes are on `chore/repository-architecture-foundation`; baseline `main` @ `643eb61` is untouched. Revert a slice with `git revert <sha>` (commits are focused: memory files / reconciliation / SQLAlchemy / runtime+hygiene). `git mv` renames are reversible via `git mv` back. No `.pen` file was modified. No live DB/migration was applied.
+
+### Next recommended action
+Await explicit authorization to begin the implementation roadmap: **architecture hardening → identity & multi-tenancy → organizations/memberships/branches/permissions → RLS + tenant-isolation tests → 05C B2B Sales**. Do not start product implementation autonomously.
+
+---
+
 ## Session — Repository Architecture Foundation
 **Date:** 2026-07-29 → 2026-07-30
 **Agent:** Claude Code (Opus 4.8)

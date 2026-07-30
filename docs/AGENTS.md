@@ -38,3 +38,18 @@ The **canonical project-memory files** (`product/PRODUCT_DIRECTION_GUIDE.md`, `a
 ## ADR numbering
 
 `ADR-000N-title.md`, zero-padded, monotonically increasing. Each ADR states **Status** (Proposed / Accepted / Superseded by ADR-XXXX).
+
+## End-of-session checklist (required)
+
+A session is **not complete** until the documentation state matches the implementation state. After every substantive session:
+
+1. **Update [`operations/RUNTIME_STATE.md`](operations/RUNTIME_STATE.md)** with verified current values (branch, commit count, routes, migrations, blockers).
+2. **Append [`operations/AGENT_WORK_LOG.md`](operations/AGENT_WORK_LOG.md)** (newest-first) with a full structured entry.
+3. **Update [`product/PRODUCT_DIRECTION_GUIDE.md`](product/PRODUCT_DIRECTION_GUIDE.md)** if product direction changed (requires explicit approval + a change-history entry).
+4. **Update [`architecture/ARCHITECTURE_GUIDE.md`](architecture/ARCHITECTURE_GUIDE.md) and add/supersede an ADR** if architecture changed.
+5. **Update [`../UI-UX/UI_UX_SYSTEM_GUIDE.md`](../UI-UX/UI_UX_SYSTEM_GUIDE.md)** if approved UI/UX rules changed.
+6. **Update affected feature/product specifications.**
+7. **Run documentation-link validation** (internal relative links resolve).
+8. **Record validation results** (commands run + outcomes) in the work-log entry.
+9. **Ensure unfinished work is explicit** — no "should work" / "mostly done" without evidence.
+10. **Confirm `git status`** contains only intentional changes.
