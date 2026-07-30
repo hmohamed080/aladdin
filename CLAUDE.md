@@ -12,7 +12,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Design-led, with the architecture foundation now scaffolded.** The primary design work product is the encrypted Pencil file `UI-UX/design.pen`. As of the repository-architecture-foundation task, the code foundation exists but **no product features are implemented yet**.
 
 - `AGENTS.md` (root) is the **source of truth for coding conventions**, backed by a scoped hierarchy: `frontend/AGENTS.md`, `backend/AGENTS.md`, `supabase/AGENTS.md`, `docs/AGENTS.md`, `data/AGENTS.md`, `UI-UX/AGENTS.md`. **Read the root `AGENTS.md` and every applicable scoped one before touching a file.**
-- Architecture is fixed in ADRs under `docs/decisions/` (ADR-0001 approved architecture, ADR-0002 migrations, ADR-0003 agent-instruction hierarchy, ADR-0004 deployment). Product scope: `docs/product/mvp-scope.md`.
+- Architecture is fixed in ADRs under `docs/decisions/` (ADR-0001 approved architecture, ADR-0002 migrations, ADR-0003 agent-instruction hierarchy, ADR-0004 deployment, ADR-0005 Python data access). Product scope: `docs/product/mvp-scope.md`.
+
+## Project Memory — Read First
+
+Five files are **persistent project memory and part of the core architecture**, not optional docs. Product, architecture, UI, and unfinished-work decisions must **not** live only in prompts or chat history — they live here, and agents read them before making changes:
+
+1. [`docs/product/PRODUCT_DIRECTION_GUIDE.md`](docs/product/PRODUCT_DIRECTION_GUIDE.md) — product direction & guardrails.
+2. [`docs/architecture/ARCHITECTURE_GUIDE.md`](docs/architecture/ARCHITECTURE_GUIDE.md) — currently active architecture (complements the ADRs).
+3. [`UI-UX/UI_UX_SYSTEM_GUIDE.md`](UI-UX/UI_UX_SYSTEM_GUIDE.md) — design system, tokens, UX rules.
+4. [`docs/operations/AGENT_WORK_LOG.md`](docs/operations/AGENT_WORK_LOG.md) — append-only session log & unfinished work.
+5. [`docs/operations/RUNTIME_STATE.md`](docs/operations/RUNTIME_STATE.md) — current live repository state.
+
+Full authority rules and the end-of-session checklist: root [`AGENTS.md`](AGENTS.md) and [`docs/AGENTS.md`](docs/AGENTS.md). Documentation map: [`docs/README.md`](docs/README.md).
 - `frontend/` is a Next.js App Router scaffold (typecheck/lint/tests green); `backend/` is a specialized FastAPI service scaffold; `supabase/` holds migrations (schema source of truth). Commands live in each service's README and `docs/guides/`.
 - `docs/product/design-idea.md` is the original founder brief (Arabic). `UI-UX/design.*.BACKUP-*.pen` are frozen backups — **never delete or overwrite them.** All `.pen` files are gitignored and must never be edited by a coding task.
 
@@ -22,7 +34,7 @@ AI-first operating system / digital infrastructure for Egypt's finishing, constr
 
 - Three surfaces: **B2C**, **B2B** (Sales is the key daily-active user), **Admin**.
 - Core value chain: Need → Advice → Discovery → Trusted Match → RFQ → Quote → Decision → Execution → Follow-up. It is a **consultation-first** platform, **not** an add-to-cart / price-war marketplace.
-- Multi-role accounts: one account can hold several roles (End Consumer, Installer/Technician, Engineer, Interior Designer, Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, Sales, Contractor, Trainer, Trainee, Admin) with active-profile switching. Keep roles **separate** even when behavior overlaps — do not merge them.
+- Multi-role taxonomy, **one canonical identity**: the roles (End Consumer, Installer/Technician, Engineer, Interior Designer, Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, Sales, Contractor, Trainer, Trainee, Admin) are kept **separate** even when behavior overlaps — do not merge them. A user has **one current primary account type** at a time; there is **no Profile Switcher / "Use As" mode / role-switching UI**. Navigation and access are **derived** from primary account type, organization membership, branch assignment, permission capabilities, verification state, and subscription state. See [`docs/product/PRODUCT_DIRECTION_GUIDE.md`](docs/product/PRODUCT_DIRECTION_GUIDE.md).
 - Egyptian context: real locality data (Cairo, New Cairo, Sheikh Zayed), EGP. English-first release, but components must support **Arabic RTL** from day one; Arabic version is part of the MVP. **Light + Dark** from the first design system.
 
 ### Authentication model (canonical)

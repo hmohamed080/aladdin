@@ -8,6 +8,18 @@ Value chain: **Need → Advice → Discovery → Trusted Match → RFQ → Quote
 
 Ship the core value journey with **Sales-first sequencing** (05C → 05A → 05B → 05D → 05E). Full scope and ordering: [`docs/product/mvp-scope.md`](docs/product/mvp-scope.md).
 
+## Project Memory — Read First
+
+Five files are **persistent project memory and part of the core architecture**, not optional docs. Product, architecture, UI, and unfinished-work decisions must **not** live only in prompts or chat history — they live here. Read them before making changes:
+
+1. [`docs/product/PRODUCT_DIRECTION_GUIDE.md`](docs/product/PRODUCT_DIRECTION_GUIDE.md) — product direction & guardrails
+2. [`docs/architecture/ARCHITECTURE_GUIDE.md`](docs/architecture/ARCHITECTURE_GUIDE.md) — currently active architecture (complements the ADRs)
+3. [`UI-UX/UI_UX_SYSTEM_GUIDE.md`](UI-UX/UI_UX_SYSTEM_GUIDE.md) — design system, tokens, UX rules
+4. [`docs/operations/AGENT_WORK_LOG.md`](docs/operations/AGENT_WORK_LOG.md) — append-only session log & unfinished work
+5. [`docs/operations/RUNTIME_STATE.md`](docs/operations/RUNTIME_STATE.md) — current live repository state
+
+Authority rules and the end-of-session checklist live in root [`AGENTS.md`](AGENTS.md) and [`docs/AGENTS.md`](docs/AGENTS.md). Full documentation map: [`docs/README.md`](docs/README.md).
+
 > **Status:** Architecture foundation established. **No product features are implemented yet.** Authentication, catalog, sales, RFQ, quotations, projects, and AI features are scaffolded as boundaries only. See [Current status](#current-status).
 
 ## Approved stack
@@ -20,7 +32,7 @@ Ship the core value journey with **Sales-first sequencing** (05C → 05A → 05B
 | Specialized service | Python 3.12+ / FastAPI — AI, OCR, RAG, documents, embeddings, workers (**not** the CRUD backend) |
 | Hosting | Vercel (web) · Railway (FastAPI + workers, Docker) · Supabase (data) · OpenAI · Sentry |
 
-Rationale is recorded in ADRs: [ADR-0001](docs/decisions/ADR-0001-approved-architecture.md) · [ADR-0002](docs/decisions/ADR-0002-database-migrations.md) · [ADR-0003](docs/decisions/ADR-0003-agent-instruction-hierarchy.md) · [ADR-0004](docs/decisions/ADR-0004-deployment-platforms.md).
+Rationale is recorded in ADRs: [ADR-0001](docs/decisions/ADR-0001-approved-architecture.md) · [ADR-0002](docs/decisions/ADR-0002-database-migrations.md) · [ADR-0003](docs/decisions/ADR-0003-agent-instruction-hierarchy.md) · [ADR-0004](docs/decisions/ADR-0004-deployment-platforms.md) · [ADR-0005](docs/decisions/ADR-0005-python-data-access.md).
 
 ## Architecture overview
 
@@ -96,7 +108,7 @@ Never edit Production schema by hand; never use Alembic or `Base.metadata.create
 
 ## Agent-instruction reading order
 
-1. Root [`AGENTS.md`](AGENTS.md) → 2. nearest scoped `AGENTS.md` → 3. relevant [ADRs](docs/decisions/) → 4. relevant [product spec](docs/product/) → 5. existing tests/conventions → 6. run validation before reporting done.
+1. Root [`AGENTS.md`](AGENTS.md) → 2. the four [core-memory files](#project-memory--read-first) + [`RUNTIME_STATE.md`](docs/operations/RUNTIME_STATE.md) → 3. nearest scoped `AGENTS.md` → 4. relevant [ADRs](docs/decisions/) → 5. relevant [product spec](docs/product/) → 6. existing tests/conventions → 7. run validation before reporting done.
 
 > Before touching any file, read the root `AGENTS.md` and every applicable scoped `AGENTS.md` between the repo root and the target file.
 

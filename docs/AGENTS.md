@@ -5,22 +5,26 @@ alwaysApply: true
 
 # Docs — Agent Instructions
 
-Extends the root `AGENTS.md`. Read that first. This file governs `docs/`.
+Extends the root `AGENTS.md` and the four core-memory files. Read those first (see the root reading order). This file governs `docs/`.
 
 ## Layout
 
 ```
 docs/
-  architecture/   # overview, system-context, module-boundaries, data-flow,
-                  # realtime-and-background-jobs, scaling-strategy
-  product/        # mvp-scope, client-brief, design-idea
+  README.md       # documentation map / index
+  architecture/   # ARCHITECTURE_GUIDE (core memory) + overview, system-context,
+                  # module-boundaries, data-flow, realtime-and-background-jobs, scaling-strategy
+  product/        # PRODUCT_DIRECTION_GUIDE (core memory) + mvp-scope, client-brief, design-idea
   decisions/      # ADRs (immutable once accepted) + agent-instruction-migration
   database/       # migration-strategy, naming-conventions
   security/       # security-model, secrets-and-environments, rls-strategy
   api/            # API/contract docs (added as endpoints stabilize)
-  operations/     # deployment-overview, monitoring-and-observability
+  operations/     # AGENT_WORK_LOG + RUNTIME_STATE (core memory) + deployment-overview,
+                  # monitoring-and-observability
   guides/         # setup guides (frontend, backend, supabase)
 ```
+
+The **canonical project-memory files** (`product/PRODUCT_DIRECTION_GUIDE.md`, `architecture/ARCHITECTURE_GUIDE.md`, `../UI-UX/UI_UX_SYSTEM_GUIDE.md`, `operations/AGENT_WORK_LOG.md`, `operations/RUNTIME_STATE.md`) are part of the core architecture — keep them current per the root `AGENTS.md` "Persistent project memory" rules and the [end-of-session checklist](#end-of-session-checklist-required).
 
 ## Rules
 

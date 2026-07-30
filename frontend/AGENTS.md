@@ -49,7 +49,7 @@ src/
 
 ## Design fidelity
 
-Implement against approved screens in `UI-UX/design.pen` (see `UI-UX/AGENTS.md`). Never edit `.pen` files from a coding task. Internal session labels / design-agent notes must never appear in production UI.
+Implement against approved screens in `UI-UX/design.pen`, following [`UI-UX/UI_UX_SYSTEM_GUIDE.md`](../UI-UX/UI_UX_SYSTEM_GUIDE.md) (tokens, components, UX rules — a core-memory file) and the operational rules in [`UI-UX/AGENTS.md`](../UI-UX/AGENTS.md). Never edit `.pen` files from a coding task. Internal session labels / design-agent notes must never appear in production UI.
 
 ## Testing & quality (see `docs/` for strategy)
 

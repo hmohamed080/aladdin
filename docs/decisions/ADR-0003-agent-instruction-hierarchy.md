@@ -9,7 +9,7 @@ Define where AI-agent coding instructions live and how they compose, so rules ar
 ## Current decision
 
 - A **root `AGENTS.md`** is the universal source of truth. **Scoped `AGENTS.md`** files exist where a directory needs its own rules: `frontend/`, `backend/`, `supabase/`, `docs/`, `data/`, `UI-UX/`. No AGENTS.md is created for tiny/empty folders.
-- **Reading order:** root `AGENTS.md` → nearest scoped `AGENTS.md` → relevant ADRs → relevant product/feature spec → existing tests/conventions → run validation before reporting done.
+- **Reading order:** root `AGENTS.md` → the **four core-memory files** (`PRODUCT_DIRECTION_GUIDE`, `ARCHITECTURE_GUIDE`, `UI_UX_SYSTEM_GUIDE`, `AGENT_WORK_LOG`) → `RUNTIME_STATE` → nearest scoped `AGENTS.md` → relevant ADRs → relevant product/feature spec → existing tests/conventions → run validation before reporting done. *(Core-memory files inserted 2026-07-30 — see ADR-0005 context and the memory-consolidation work-log entry.)*
 - **Rule:** *Before touching any file, read the root `AGENTS.md` and every applicable scoped `AGENTS.md` between the repository root and the target file.*
 - Nested files **extend** the root; they **do not silently override** security, data, or architecture rules. A conflict must be reported and resolved explicitly (update the ADR or scoped file).
 - **Product/architecture decisions live in `docs/` and ADRs, not only in chat prompts.**

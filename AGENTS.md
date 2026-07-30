@@ -12,18 +12,45 @@ This file is the **universal source of truth** for any coding agent (Claude Code
 ## Reading order (follow every time)
 
 1. Read this root `AGENTS.md`.
-2. Read the nearest scoped `AGENTS.md` for the files you are changing (`frontend/`, `backend/`, `supabase/`, `docs/`, `data/`, `UI-UX/`).
-3. Read the relevant Architecture Decision Records in `docs/decisions/`.
-4. Read the relevant product or feature specification in `docs/product/`.
-5. Inspect existing tests and code conventions in the area you are touching.
-6. Run validation (typecheck / lint / tests) **before** reporting completion.
+2. Read the **four core-memory files** (see [Persistent project memory](#persistent-project-memory)) — no agent may skip these:
+   1. [`docs/product/PRODUCT_DIRECTION_GUIDE.md`](docs/product/PRODUCT_DIRECTION_GUIDE.md)
+   2. [`docs/architecture/ARCHITECTURE_GUIDE.md`](docs/architecture/ARCHITECTURE_GUIDE.md)
+   3. [`UI-UX/UI_UX_SYSTEM_GUIDE.md`](UI-UX/UI_UX_SYSTEM_GUIDE.md)
+   4. [`docs/operations/AGENT_WORK_LOG.md`](docs/operations/AGENT_WORK_LOG.md)
+3. Read [`docs/operations/RUNTIME_STATE.md`](docs/operations/RUNTIME_STATE.md) to understand the current live repository state before beginning work.
+4. Read the nearest applicable scoped `AGENTS.md` for the files you are changing (`frontend/`, `backend/`, `supabase/`, `docs/`, `data/`, `UI-UX/`).
+5. Read the relevant Architecture Decision Records in `docs/decisions/`.
+6. Read the relevant product or feature specification in `docs/product/`.
+7. Inspect existing tests and code conventions in the area you are touching.
+8. Run validation (typecheck / lint / tests) **before** reporting completion.
 
 ### How the hierarchy composes
 
-- Nested `AGENTS.md` files **extend** these root instructions with scope-specific detail.
-- They **do not silently override** security, data-ownership, or architecture rules defined here or in an ADR.
-- A genuine conflict must be **reported and resolved explicitly** — update the ADR or the scoped file; do not quietly follow the narrower rule.
-- **Product and architecture decisions live in `docs/` and `docs/decisions/` (ADRs), not only inside chat prompts or an agent's memory.** If a decision only exists in a conversation, write it down before acting on it.
+- **No agent may skip the four core-memory files.** They are read before any change.
+- Nested `AGENTS.md` files **extend** these root instructions with scope-specific detail. They **do not override** product, architecture, security, or memory rules defined here, in a core-memory file, or in an ADR.
+- A genuine conflict must be **reported and resolved explicitly** — update the ADR, the core-memory file, or the scoped file; do not quietly follow the narrower rule.
+- **Product and architecture decisions live in `docs/` and `docs/decisions/` (ADRs), not only inside chat prompts or an agent's memory.** A conversation-only decision must be written into the appropriate memory file (and an ADR, when architectural) **before** implementation.
+
+## Persistent project memory
+
+These five files are **persistent project memory and part of the core architecture** — not optional docs. Treat them as authoritative and keep them current:
+
+| File | Owns |
+|---|---|
+| [`docs/product/PRODUCT_DIRECTION_GUIDE.md`](docs/product/PRODUCT_DIRECTION_GUIDE.md) | Product vision, positioning, priority rules, "never do" guardrails. |
+| [`docs/architecture/ARCHITECTURE_GUIDE.md`](docs/architecture/ARCHITECTURE_GUIDE.md) | The currently active architecture (complements the ADRs). |
+| [`UI-UX/UI_UX_SYSTEM_GUIDE.md`](UI-UX/UI_UX_SYSTEM_GUIDE.md) | Design system, tokens, and UX rules. |
+| [`docs/operations/AGENT_WORK_LOG.md`](docs/operations/AGENT_WORK_LOG.md) | Append-only, newest-first record of substantive sessions and unfinished work. |
+| [`docs/operations/RUNTIME_STATE.md`](docs/operations/RUNTIME_STATE.md) | Mutable snapshot of the current live repository state. |
+
+Rules:
+
+- **Update them continuously after major changes.** Never leave architecture changes undocumented.
+- **Never change product direction** without updating `PRODUCT_DIRECTION_GUIDE.md` (and getting explicit approval + a change-history entry).
+- **Any UI change must comply with** `UI_UX_SYSTEM_GUIDE.md`.
+- **Any unfinished work must be documented in** `AGENT_WORK_LOG.md`.
+- **Read `RUNTIME_STATE.md`** to understand current live state before beginning work, and refresh it at the end of every substantive session (see the end-of-session checklist in [`docs/AGENTS.md`](docs/AGENTS.md)).
+- Prefer documentation **clarity over brevity**; avoid vague statements; keep entries chronological and structured; use Markdown consistently.
 
 ## The product
 

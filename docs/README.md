@@ -1,0 +1,78 @@
+# Aladdin Documentation
+
+The documentation map for the Aladdin repository. All links are relative.
+
+## Start here
+
+Read these in order before making any change (this mirrors the reading order in the root [`AGENTS.md`](../AGENTS.md)):
+
+1. [`product/PRODUCT_DIRECTION_GUIDE.md`](product/PRODUCT_DIRECTION_GUIDE.md) — product direction & guardrails
+2. [`architecture/ARCHITECTURE_GUIDE.md`](architecture/ARCHITECTURE_GUIDE.md) — currently active architecture
+3. [`../UI-UX/UI_UX_SYSTEM_GUIDE.md`](../UI-UX/UI_UX_SYSTEM_GUIDE.md) — design system, tokens, UX rules
+4. [`operations/AGENT_WORK_LOG.md`](operations/AGENT_WORK_LOG.md) — append-only session log & unfinished work
+5. [`operations/RUNTIME_STATE.md`](operations/RUNTIME_STATE.md) — current live repository state
+6. Root [`AGENTS.md`](../AGENTS.md) — universal coding rules & reading order
+
+## Core project memory
+
+The five files above are **persistent project memory and part of the core architecture** — not optional docs. Their authority rules live in the root [`AGENTS.md`](../AGENTS.md) ("Persistent project memory") and the end-of-session checklist in [`AGENTS.md`](AGENTS.md) (docs scope).
+
+## Product
+
+- [`product/PRODUCT_DIRECTION_GUIDE.md`](product/PRODUCT_DIRECTION_GUIDE.md) — **canonical** product direction
+- [`product/mvp-scope.md`](product/mvp-scope.md) — MVP scope & ordering (authoritative for sequencing)
+- [`product/client-brief.md`](product/client-brief.md) — client brief
+- [`product/design-idea.md`](product/design-idea.md) — original founder brief (Arabic)
+
+## Architecture
+
+- [`architecture/ARCHITECTURE_GUIDE.md`](architecture/ARCHITECTURE_GUIDE.md) — **canonical** current-state architecture
+- [`architecture/overview.md`](architecture/overview.md)
+- [`architecture/system-context.md`](architecture/system-context.md)
+- [`architecture/module-boundaries.md`](architecture/module-boundaries.md)
+- [`architecture/data-flow.md`](architecture/data-flow.md)
+- [`architecture/realtime-and-background-jobs.md`](architecture/realtime-and-background-jobs.md)
+- [`architecture/scaling-strategy.md`](architecture/scaling-strategy.md)
+
+## Decisions (ADRs)
+
+- [`decisions/ADR-0001-approved-architecture.md`](decisions/ADR-0001-approved-architecture.md)
+- [`decisions/ADR-0002-database-migrations.md`](decisions/ADR-0002-database-migrations.md)
+- [`decisions/ADR-0003-agent-instruction-hierarchy.md`](decisions/ADR-0003-agent-instruction-hierarchy.md)
+- [`decisions/ADR-0004-deployment-platforms.md`](decisions/ADR-0004-deployment-platforms.md)
+- [`decisions/ADR-0005-python-data-access.md`](decisions/ADR-0005-python-data-access.md)
+- [`decisions/agent-instruction-migration.md`](decisions/agent-instruction-migration.md) — source→destination map
+
+## Security
+
+- [`security/security-model.md`](security/security-model.md)
+- [`security/secrets-and-environments.md`](security/secrets-and-environments.md)
+- [`security/rls-strategy.md`](security/rls-strategy.md)
+
+## Database
+
+- [`database/migration-strategy.md`](database/migration-strategy.md)
+- [`database/naming-conventions.md`](database/naming-conventions.md)
+
+## Operations
+
+- [`operations/AGENT_WORK_LOG.md`](operations/AGENT_WORK_LOG.md) — **canonical** append-only session log
+- [`operations/RUNTIME_STATE.md`](operations/RUNTIME_STATE.md) — **canonical** live-state snapshot
+- [`operations/deployment-overview.md`](operations/deployment-overview.md)
+- [`operations/monitoring-and-observability.md`](operations/monitoring-and-observability.md)
+
+## Guides
+
+- [`guides/frontend-setup.md`](guides/frontend-setup.md)
+- [`guides/backend-setup.md`](guides/backend-setup.md)
+- [`guides/supabase-setup.md`](guides/supabase-setup.md)
+
+## UI/UX
+
+- [`../UI-UX/UI_UX_SYSTEM_GUIDE.md`](../UI-UX/UI_UX_SYSTEM_GUIDE.md) — **canonical** design system & UX rules
+- [`../UI-UX/AGENTS.md`](../UI-UX/AGENTS.md) — operational `.pen` handling rules
+
+## Historical / source material
+
+- [`../agents/README.md`](../agents/README.md) — reusable agent personas (non-authoritative source material)
+- `../UI-UX/design.pen` — canonical Pencil design file (gitignored, private; never opened by coding tasks)
