@@ -49,4 +49,4 @@ docker build -t aladdin-backend ./backend
 ## Notes
 
 - FastAPI is **not** the CRUD backend — it handles AI, OCR, RAG, documents, and workers only.
-- No Alembic. SQLAlchemy maps/queries Supabase-migrated tables read-side; it never owns the schema (ADR-0002).
+- No Alembic. Python data access uses **`supabase-py`** (ADR-0005) against Supabase-migrated tables — preserving the caller's JWT/RLS context, with complex operations via PostgreSQL functions/RPC; it never owns the schema (ADR-0002). SQLAlchemy is deferred.

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Keep the schema predictable so migrations, RLS policies, and SQLAlchemy mappings read consistently.
+Keep the schema predictable so migrations, RLS policies, and `supabase-py` / RPC access read consistently.
 
 ## Current decision
 
@@ -22,7 +22,7 @@ Keep the schema predictable so migrations, RLS policies, and SQLAlchemy mappings
 
 ## Rationale
 
-Consistency makes RLS policies auditable at a glance and keeps hand-written SQLAlchemy models mechanical.
+Consistency makes RLS policies auditable at a glance and keeps `supabase-py` queries and PostgreSQL RPC definitions mechanical.
 
 ## Scope
 

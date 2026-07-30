@@ -19,7 +19,7 @@ Define the one workflow for changing the shared database schema (supersedes the 
 
 **Forbidden:** Alembic; `Base.metadata.create_all()` in Staging/Production; manual production schema edits; ORM-owned schema.
 
-**SQLAlchemy** in `backend/` maps/queries these tables read-side only.
+Python data access in `backend/` reads/writes these tables via **`supabase-py`** (ADR-0005), preserving the caller's JWT/RLS context; complex operations use PostgreSQL functions/RPC. SQLAlchemy is deferred and does not own the schema.
 
 ## Rationale
 
@@ -35,7 +35,7 @@ Product tables. The foundation ships only `0000_extensions.sql` (extensions) + c
 
 ## Consequences
 
-Backend models track migrations, never define them. CI gates on migration lint + RLS tests.
+Backend data access reads migration-owned tables via `supabase-py`, never defining schema. CI gates on migration lint + RLS tests.
 
 ## Related files
 
