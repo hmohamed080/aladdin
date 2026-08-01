@@ -4,6 +4,34 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Architecture-Review Resolution + Phase 0.8 Engineering Setup
+**Date/time:** 2026-08-01
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `docs/technical-finalization` (continued; no new branch)
+
+### Objective
+Resolve the architecture-review comments on the documentation-finalization work, then create the Phase 0.8 engineering standards. **Documentation only — no feature implementation, no code/migration/API/table, no `.pen` edit, no GitHub resources auto-created.**
+
+### Part 1 — Review comments resolved
+- **Runtime State:** added a *Live engineering state* block — Current Sprint, Epic, Feature, UI Status, Backend Status, Database Status, Design System Version, Documentation Version, Deployment Status.
+- **Repository standards:** [`docs/development/git-workflow.md`](../development/git-workflow.md) (branch/commit/merge/release/tagging conventions).
+- **GitHub standards:** `.github/PULL_REQUEST_TEMPLATE.md` + `.github/ISSUE_TEMPLATE/{bug_report,feature_request,task}.md`.
+- **Project management:** [`docs/development/github-workflow.md`](../development/github-workflow.md) — recommended labels, milestones, and project board (**documented, not created**).
+- **Release strategy:** [`docs/development/release-strategy.md`](../development/release-strategy.md) — process + the `v0.7.0-foundation` first release (purpose/scope/contents/criteria; tag command documented, not executed).
+- **Docs synchronized:** RUNTIME_STATE, this log, the documentation index, and the Architecture Guide (pointer to engineering standards). Previous history preserved.
+
+### Part 2 — Phase 0.8 engineering standards
+- Added [`docs/engineering/`](../engineering/README.md): a README index (topic→doc map for all 25 brief items) + 12 grouped standards docs: project structure & layers & DI · coding & naming · API + shared response/error models · error/logging/observability · validation + shared rules · testing · feature workflow (checklist + Definition of Done) · migration workflow · PR + code-review checklist · environment + CI/CD · performance + security · AI-agent rules.
+- Standards **reuse and cross-reference** existing docs (ADRs, technical spec, scoped `AGENTS.md`, design GOVERNANCE, security/ops docs) — no duplication; every rule links its authoritative source.
+
+### Validation
+- All 25 brief topics covered (mapped in the engineering README). Internal markdown links re-checked (see final report); no duplicated or contradictory standards introduced; documentation hierarchy: `docs/development` (process), `docs/engineering` (how to build), `docs/technical` (what to build), `docs/decisions` (why).
+
+### Out of scope (confirmed not done)
+No product feature/screen/table/API/migration; no architecture/product-direction change; no `.pen` edit; no GitHub labels/milestones/board/releases auto-created (documented only); no history rewrite.
+
+---
+
 ## Session — Documentation & Repository Finalization
 **Date/time:** 2026-08-01
 **Agent/tool:** Claude Code (Opus 4.8)

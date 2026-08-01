@@ -179,4 +179,4 @@ Newest first.
 - **Why:** Stop re-deciding the stack per task; establish the isolation and migration spine before features.
 
 ## Related files
-[`overview.md`](./overview.md) · [`system-context.md`](./system-context.md) · [`module-boundaries.md`](./module-boundaries.md) · [`data-flow.md`](./data-flow.md) · [`realtime-and-background-jobs.md`](./realtime-and-background-jobs.md) · [`scaling-strategy.md`](./scaling-strategy.md) · [`../product/PRODUCT_DIRECTION_GUIDE.md`](../product/PRODUCT_DIRECTION_GUIDE.md) · [`../../AGENTS.md`](../../AGENTS.md)
+[`../engineering/README.md`](../engineering/README.md) (engineering standards) · [`../development/git-workflow.md`](../development/git-workflow.md) · [`overview.md`](./overview.md) · [`system-context.md`](./system-context.md) · [`module-boundaries.md`](./module-boundaries.md) · [`data-flow.md`](./data-flow.md) · [`realtime-and-background-jobs.md`](./realtime-and-background-jobs.md) · [`scaling-strategy.md`](./scaling-strategy.md) · [`../product/PRODUCT_DIRECTION_GUIDE.md`](../product/PRODUCT_DIRECTION_GUIDE.md) · [`../../AGENTS.md`](../../AGENTS.md)

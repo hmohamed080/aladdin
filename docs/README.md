@@ -100,6 +100,19 @@ The five files above are **persistent project memory and part of the core archit
 - [`../design/GOVERNANCE.md`](../design/GOVERNANCE.md) — source-of-truth, versioning, component & AI-agent rules
 - [`../design/COMPONENT_INVENTORY.md`](../design/COMPONENT_INVENTORY.md) · [`../design/icons/README.md`](../design/icons/README.md) · [`../design/CHANGELOG.md`](../design/CHANGELOG.md)
 
+## Engineering standards (Phase 0.8)
+
+The engineering reference every implementation task and AI agent follows. Index: [`engineering/README.md`](engineering/README.md).
+
+- Structure/layers/DI · coding/naming · API + shared response/error models · error/logging/observability · validation · testing · feature workflow (DoD/checklist) · migration workflow · PR/review · env + CI/CD · performance + security · AI-agent rules.
+
+## Development & repository standards
+
+- [`development/git-workflow.md`](development/git-workflow.md) — branch/commit/merge/release/tagging conventions
+- [`development/github-workflow.md`](development/github-workflow.md) — recommended labels, milestones, project board
+- [`development/release-strategy.md`](development/release-strategy.md) — release process + the `v0.7.0-foundation` release
+- GitHub community files: [`../.github/PULL_REQUEST_TEMPLATE.md`](../.github/PULL_REQUEST_TEMPLATE.md), [`../.github/ISSUE_TEMPLATE/`](../.github/ISSUE_TEMPLATE/)
+
 ## Technical Specification (Phase 0.7 — MVP blueprint)
 
 The engineering blueprint every implementation task follows. **Specification only** (no code/migrations/APIs). See [`technical/README.md`](technical/README.md) for the index.

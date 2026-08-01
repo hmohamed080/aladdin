@@ -25,6 +25,22 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | **Next Planned Phase** | Implementation Phase 1 — Identity & multi-tenancy (canonical identity, orgs/branches/memberships/capabilities, RLS helpers + isolation tests) |
 | **Next Planned Branch** | `feat/identity-multitenancy` (proposed) |
 
+## Live engineering state
+
+Always reflects the current live engineering state of the project. Overwrite each session with verified values.
+
+| Field | Value |
+|---|---|
+| **Current Sprint** | none — pre-implementation (Foundation & Engineering-Standards) |
+| **Current Epic** | Documentation & Engineering Foundation (Phase 0.7 → 0.8) |
+| **Current Feature** | none — no product feature started |
+| **Current UI Status** | Design system **v1.0.0** ("The Aperture") finalized + implemented as tokens; only the Next.js scaffold page exists — **no product screens** |
+| **Current Backend Status** | FastAPI scaffold — `GET /health` only; **no product endpoints**; `supabase-py` data access (ADR-0005) |
+| **Current Database Status** | one migration (`20260729000000_extensions.sql`); **0 product tables**; **0 RLS policies** (none to protect yet); schema source = `supabase/migrations/*.sql` |
+| **Current Design System Version** | **1.0.0** (`DESIGN.md` / `design/tokens/*`) |
+| **Current Documentation Version** | Technical spec **1.0.0** (Phase 0.7); docs index **1.0.0**; engineering standards **1.0.0** (Phase 0.8) |
+| **Current Deployment Status** | **not deployed** — no Vercel/Railway/Supabase cloud project connected; **no CI/CD**; repository published to GitHub (`origin`) only |
+
 ## Git & branch
 
 - **Baseline:** `main` @ `643eb61` (repo as-found).
