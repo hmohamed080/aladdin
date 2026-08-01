@@ -80,6 +80,40 @@ The Codex pnpm wrapper repeatedly attempted a non-interactive dependency reinsta
 
 ---
 
+## Session — Approved Missing Variant Completion Pass
+**Date/time:** 2026-08-01
+**Agent/tool:** Pi design/coding agent
+**Branch:** `chore/repository-architecture-foundation`
+
+### Objective
+Complete faithfully derivable missing device/theme variants in the live `design.pen` using copied canonical screens and locked reusable components only; replace ambiguous missing placeholders with validated screens or precise decision blockers.
+
+### Completed
+- Added 87 product-screen variants, increasing the live product-screen count from 120 to 207.
+- Completed Sign In Tablet Dark and the OTP main flow across Desktop Light/Dark, Tablet Light/Dark, and Mobile Dark.
+- Completed Mobile Dark registration, Desktop Dark Basic Profile, Mobile Light Consent, Mobile Dark Basic Profile, Desktop/Mobile Dark Account Type, Mobile Dark Consumer Onboarding, Desktop/Mobile Dark Professional Onboarding, Mobile Dark Business Onboarding, Mobile Dark Verification, and faithful Dark mirrors of existing Subscription screens.
+- Added workspace-only traceability notes recording source, reused hierarchy/components, target, content changes, and unresolved items.
+- Replaced every generic `MISSING —` placeholder: current count is 0. Forty-eight remaining gaps are explicitly labelled Partial, Blocked, Responsive Decision, Unresolved Product Requirement, or Not Required.
+- Updated `00I — Current Design Status Report` with actual per-device/theme completion, partial, blocked, needs-review, and not-required status.
+
+### Validation
+- 207 product screens; 8 top-level groups; 0 top-level overlaps; 0 organizational sibling overlaps.
+- Representative new screens visually compared with their sources after each family pass.
+- Existing source screens and component masters were not modified.
+- Newly copied screens retain canonical dimensions, token bindings, RTL behavior, hierarchy, and component instances.
+- Known layout warnings reproduced from locked source screens are documented as inherited and were not repaired inside product UI.
+
+### Backup
+`UI-UX/design.BACKUP-BEFORE-MISSING-VARIANT-COMPLETION-20260801-143042.pen`
+
+### Remaining decisions
+- Consumer Experience and Business Operations require approved workflow behavior before screen production.
+- Admin Tablet/Mobile needs an approved responsive shell; Admin Light is not required in current scope.
+- Tablet onboarding/profile variants require responsive composition approval despite the general responsive specification.
+- Several Desktop onboarding sequences remain partial; Subscription pricing/payment and omitted product-step scope remain unresolved.
+
+---
+
 ## Session — Permanent Device/Theme Canvas Governance
 **Date/time:** 2026-08-01
 **Agent/tool:** Pi design/coding agent
