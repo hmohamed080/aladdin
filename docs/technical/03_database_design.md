@@ -1,5 +1,14 @@
 # 03 — Database Design
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | 02_domain_model.md, ../database/naming-conventions.md, ../decisions/ADR-0002-database-migrations.md |
+| **Related** | 04_relationships.md, 06_rls_strategy.md, 12_validation_rules.md |
+
 Complete database **specification** for the MVP. **No migrations are created here** (ADR-0002 — schema is owned only by `supabase/migrations/*.sql`, authored with each approved feature). This document is the target schema a senior engineer implements migration-by-migration.
 
 Follows [naming-conventions.md](../database/naming-conventions.md). Entities are defined in [02](02_domain_model.md); relationships in [04](04_relationships.md).

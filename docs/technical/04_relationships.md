@@ -1,5 +1,14 @@
 # 04 — Relationships (ERD)
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | 02_domain_model.md, 03_database_design.md |
+| **Related** | 06_rls_strategy.md |
+
 Cardinality, cascade, delete, and ownership rules for the [domain model](02_domain_model.md) / [schema](03_database_design.md).
 
 ## 1. ERD — core clusters

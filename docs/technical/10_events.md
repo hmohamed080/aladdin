@@ -1,5 +1,14 @@
 # 10 — Domain Events
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | 09_background_jobs.md, 11_state_machines.md |
+| **Related** | 08_api_contracts.md |
+
 The domain-event catalog for the MVP. Events are the seam between contexts: a context emits an event; notifications, analytics, workers, and Realtime react. **Specification only.**
 
 ## 1. Model

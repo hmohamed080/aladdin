@@ -1,5 +1,14 @@
 # 02 — Domain Model
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | 01_system_overview.md, ../product/PRODUCT_DIRECTION_GUIDE.md |
+| **Related** | 03_database_design.md, 04_relationships.md, 11_state_machines.md |
+
 Every MVP business entity: purpose, responsibilities, relationships, lifecycle, ownership, and constraints. Physical columns/types are in [03_database_design.md](03_database_design.md); cardinality/cascade in [04_relationships.md](04_relationships.md).
 
 **Ownership legend:** `USER` = personal (owned by `user_id`); `ORG` = tenant-owned (`organization_id`); `ORG+BRANCH` = branch-scoped; `PLATFORM` = platform-level/reference (admin-owned or global). Every entity has `created_at`, `updated_at`, and (where noted) soft-delete `deleted_at`.

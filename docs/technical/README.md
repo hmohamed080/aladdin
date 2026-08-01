@@ -1,5 +1,14 @@
 # Aladdin — MVP Technical Specification (Phase 0.7)
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | ../product/PRODUCT_DIRECTION_GUIDE.md, ../decisions/ |
+| **Related** | all 01–14 technical documents |
+
 The complete engineering blueprint for the Aladdin Private Pilot MVP. A senior engineer should be able to build the MVP from these documents without re-deriving product or architecture decisions.
 
 **Status:** Specification only · 2026-08-01 · No code, migrations, APIs, or tables are created in this phase.

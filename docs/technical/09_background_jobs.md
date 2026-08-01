@@ -1,5 +1,14 @@
 # 09 — Background Jobs
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | ../architecture/realtime-and-background-jobs.md, 10_events.md |
+| **Related** | 08_api_contracts.md, 13_integrations.md |
+
 All asynchronous work for the MVP. **Specification only.** Per [realtime-and-background-jobs.md](../architecture/realtime-and-background-jobs.md): anything slow, expensive, or external runs **off the request path** via **Supabase Queues → Railway workers** (in `backend/app/workers/`). Request handlers stay fast; the UI reflects progress via Realtime ([10](10_events.md)).
 
 ## 1. Principles

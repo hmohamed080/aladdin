@@ -6,17 +6,31 @@ This is a **mutable snapshot** of the current live repository state — not an a
 
 | | |
 |---|---|
+| **Version** | Runtime snapshot · 2026-08-01 |
+| **Owner** | Foundation / Operations |
 | **Last updated** | 2026-08-01 |
-| **Updated by** | Claude Code (Opus 4.8) — Phase 0.7 MVP technical specification |
-| **Current focus** | **Phase 0.7 complete: the MVP engineering blueprint is authored under `docs/technical/` (15 docs).** Architecture + infrastructure foundation validation is complete (Docker + Supabase pass); the Aperture design system is finalized at `1.0.0`. Specification only — no product code/migration/table/API. Next step is product-owner sign-off on the `⚑ OPEN` items, then implementation. |
+| **Updated by** | Claude Code (Opus 4.8) — documentation & repository finalization |
+| **Current focus** | **Documentation & repository finalization.** The MVP engineering blueprint (`docs/technical/`, 15 docs) and the finalized Aperture design system (`1.0.0`) are complete; architecture + infrastructure validation passed (Docker + Supabase). The project is being published to its canonical GitHub remote. Specification/documentation only — no product code/migration/table/API. |
+
+## Phase & repository
+
+| Field | Value |
+|---|---|
+| **Current Phase** | Phase 0.7 complete → Documentation & Repository Finalization |
+| **Current Branch** | `docs/technical-finalization` (created from `chore/repository-architecture-foundation`) |
+| **Current Milestone** | MVP technical blueprint finalized; documentation standardized; repository published to GitHub |
+| **Current Remote Repository** | `origin` = `https://github.com/hmohamed080/aladdin.git` |
+| **Last Stable Commit** | `7499ab1` — *docs: add MVP technical specification blueprint (Phase 0.7)* (finalization commits land on top of this) |
+| **Last Stable Tag** | none yet — ⚑ recommend tagging `v0.7.0-foundation` at the finalized foundation |
+| **Next Planned Phase** | Implementation Phase 1 — Identity & multi-tenancy (canonical identity, orgs/branches/memberships/capabilities, RLS helpers + isolation tests) |
+| **Next Planned Branch** | `feat/identity-multitenancy` (proposed) |
 
 ## Git & branch
 
-- **Branch:** `chore/repository-architecture-foundation`
-- **Commits ahead of `main`:** 26 after the approved missing-variant completion log commit
-- **Baseline:** `main` @ `643eb61` (repo as-found)
-- **Remote:** none — **local-only**, not pushed
-- **Working tree:** clean at session end; all approved design-token extraction changes committed together
+- **Baseline:** `main` @ `643eb61` (repo as-found).
+- **Architecture branch:** `chore/repository-architecture-foundation` @ `7499ab1` — the validated foundation + Phase 0.7 spec (left untouched by this task).
+- **Finalization branch:** `docs/technical-finalization` — documentation consistency + repository finalization commits.
+- **Remote:** `origin` → `https://github.com/hmohamed080/aladdin.git` (push preserves full history; no squash, no force).
 
 > HEAD moves with each commit; this file trails HEAD by its own commit. Re-derive live values with the [resume commands](#exact-resume-commands) below rather than trusting a pasted hash.
 

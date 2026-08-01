@@ -1,5 +1,14 @@
 # 11 — State Machines
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | 02_domain_model.md, 03_database_design.md, 10_events.md |
+| **Related** | 12_validation_rules.md |
+
 Every stateful workflow in the MVP: states, transitions, guards (validation), failure cases, and recovery. Enum values are in [03](03_database_design.md); transitions emit events ([10](10_events.md)). **Specification only.**
 
 **Rules for all machines:** transitions are validated server-side (never trust the client's requested target); illegal transitions return `CONFLICT (409)`; every transition is atomic with its event/outbox row; security-relevant transitions write `audit_log`.

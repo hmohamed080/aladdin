@@ -1,6 +1,26 @@
 # Aladdin Documentation
 
-The documentation map for the Aladdin repository. All links are relative.
+| | |
+|---|---|
+| **Status** | Living document — canonical documentation index |
+| **Version** | 1.0.0 |
+| **Owner** | Foundation / Documentation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | Root [`AGENTS.md`](../AGENTS.md) |
+| **Related** | [`technical/README.md`](technical/README.md), [`../design/README.md`](../design/README.md) |
+
+The documentation map for the Aladdin repository — the single place to discover every document. All links are relative.
+
+## Documentation standard
+
+Every **major document** carries a metadata block near its title with: **Status · Version · Owner · Last Updated · Depends On · Related**. Conventions by family:
+
+- **Canonical memory** (`PRODUCT_DIRECTION_GUIDE`, `ARCHITECTURE_GUIDE`, `UI_UX_SYSTEM_GUIDE`, `RUNTIME_STATE`, `AGENT_WORK_LOG`) — a metadata table + `Update triggers`; these are always kept in sync when architecture/product/design changes.
+- **Technical spec** (`docs/technical/*`) — the full 6-field block; versioned `1.0.0` (Phase 0.7).
+- **Design system** (`DESIGN.md`, `design/*`) — semantic-versioned block (Version/Status/Owner-or-Maintainer/Last Updated); authority chain in [`../design/GOVERNANCE.md`](../design/GOVERNANCE.md).
+- **ADRs** (`docs/decisions/ADR-*`) — the ADR convention (`Status` + date); immutable/append-only.
+
+**Sync rule:** an architecture/product/design change updates, in the same change, the relevant canonical-memory file(s), the affected technical doc(s), the relevant ADR (when architectural), `RUNTIME_STATE.md`, and `AGENT_WORK_LOG.md`. See root [`AGENTS.md`](../AGENTS.md) "Persistent project memory".
 
 ## Start here
 

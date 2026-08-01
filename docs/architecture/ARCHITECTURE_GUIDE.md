@@ -5,6 +5,8 @@
 | | |
 |---|---|
 | **Status** | Living document (canonical project memory) |
+| **Version** | Living (canonical) · rev 2026-08-01 |
+| **Owner** | Architecture |
 | **Last updated** | 2026-07-30 |
 | **Scope** | The **currently active** architecture of Aladdin — what is decided and in effect right now. |
 | **Authority** | Authoritative for the current architecture state. It **does not replace ADRs**: [ADRs](../decisions/) explain *why* a decision was made and are append-only; this guide explains *what is active now* and is updated continuously. On conflict, the newest **Accepted** ADR wins and this guide must be reconciled to it. |

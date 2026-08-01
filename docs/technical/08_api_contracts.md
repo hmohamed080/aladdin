@@ -1,5 +1,14 @@
 # 08 — API Contracts
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | 02_domain_model.md, 07_permissions_matrix.md, 12_validation_rules.md, ../decisions/ADR-0001-approved-architecture.md |
+| **Related** | 09_background_jobs.md, 10_events.md |
+
 Every API surface that will exist in the MVP. **Specification only — no implementation.**
 
 ## 0. Surface model (important)

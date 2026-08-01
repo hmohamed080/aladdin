@@ -5,6 +5,8 @@
 | | |
 |---|---|
 | **Status** | Living document (canonical project memory) |
+| **Version** | Living (canonical) · rev 2026-08-01 |
+| **Owner** | Design System / UX |
 | **Last updated** | 2026-08-01 |
 | **Scope** | The design system and UX rules that govern **both** design work in `design.pen` **and** its frontend implementation. |
 | **Authority** | Authoritative for UI/UX policy. `UI-UX/design.pen` is the **visual source of truth** for screens/components; root [`DESIGN.md`](../DESIGN.md) is the approved brand-token and design-rule record; frontend semantic CSS variables and Tailwind mappings mirror those approved values. Operational rules for handling `.pen` files live in [`AGENTS.md`](./AGENTS.md). |

@@ -1,5 +1,14 @@
 # 01 — System Overview
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | ../product/PRODUCT_DIRECTION_GUIDE.md, ../architecture/ARCHITECTURE_GUIDE.md, ../decisions/ADR-0001-approved-architecture.md |
+| **Related** | 02_domain_model.md, 03_database_design.md, 13_integrations.md |
+
 Complete system architecture for the Aladdin MVP. Complements (does not replace) [`ARCHITECTURE_GUIDE.md`](../architecture/ARCHITECTURE_GUIDE.md) and the ADRs; here it is expressed as an implementation blueprint.
 
 ## 1. Architecture at a glance

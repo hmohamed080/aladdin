@@ -5,6 +5,8 @@
 | | |
 |---|---|
 | **Status** | Living document (canonical project memory) |
+| **Version** | Living (canonical) · rev 2026-08-01 |
+| **Owner** | Product |
 | **Last updated** | 2026-07-30 |
 | **Scope** | The durable *why and where* of Aladdin — vision, positioning, priority rules, and the guardrails agents use to decide what to build and what to refuse. |
 | **Authority** | Authoritative for **product direction**. Sits above [`mvp-scope.md`](./mvp-scope.md) (the *what and in what order*) and the [ADRs](../decisions/) (the *how*). Where this guide and `mvp-scope.md` disagree on sequencing, `mvp-scope.md` wins for the current cycle. |

@@ -1,5 +1,14 @@
 # 07 — Permissions Matrix
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | 02_domain_model.md, 06_rls_strategy.md, ../product/PRODUCT_DIRECTION_GUIDE.md |
+| **Related** | 06_rls_strategy.md, 08_api_contracts.md |
+
 The complete permission model for the MVP. Access is **capability-based and derived** (PRODUCT_DIRECTION_GUIDE): what a user can do = f(primary account type, org membership, branch, granted capabilities, verification state, subscription state, platform role). There is **no role toggle / profile switcher**.
 
 ## 1. Audiences (reconciled)

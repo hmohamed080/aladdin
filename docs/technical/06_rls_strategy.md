@@ -1,5 +1,14 @@
 # 06 — RLS Strategy
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | 03_database_design.md, ../security/rls-strategy.md, ../decisions/ADR-0002-database-migrations.md |
+| **Related** | 07_permissions_matrix.md, 05_storage_design.md |
+
 Row Level Security design for the MVP. **Specification only — no policies are implemented here** (ADR-0002: policies ship *with* each table's migration, each with organization-isolation tests). This document defines the patterns every table migration must follow. Extends [`security/rls-strategy.md`](../security/rls-strategy.md) and [`security-model.md`](../security/security-model.md).
 
 ## 1. Principles

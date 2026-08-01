@@ -1,5 +1,14 @@
 # 12 — Validation Rules
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | 02_domain_model.md, 03_database_design.md |
+| **Related** | 08_api_contracts.md, 11_state_machines.md |
+
 Every business validation for the MVP. **Validation is Zod-first** (`frontend/src/features/*/schemas` and `lib/validation`): one schema shared client + server; validate at boundaries (HTTP input, external APIs, DB writes), trust internal state ([`AGENTS.md`](../../AGENTS.md) code style). DB `CHECK`/`unique` constraints ([03](03_database_design.md)) are the last line. Error messages are **localizable keys** (AR/EN), inline and non-blaming ([UI_UX_SYSTEM_GUIDE](../../UI-UX/UI_UX_SYSTEM_GUIDE.md)).
 
 **Conventions:** `required`, `optional`, ranges are `[min,max]`. All string inputs are trimmed; user HTML is escaped/sanitized; no raw HTML stored.

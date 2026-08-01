@@ -1,5 +1,14 @@
 # 13 — Integrations
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | ../decisions/ADR-0001-approved-architecture.md, ../decisions/ADR-0004-deployment-platforms.md, ../security/security-model.md |
+| **Related** | 09_background_jobs.md, 05_storage_design.md |
+
 Every external system the MVP touches. Only the **approved stack** (ADR-0001/0004, [`security-model.md`](../security/security-model.md)) is built in MVP. All third-party credentials are **server-side only**; the browser gets only `NEXT_PUBLIC_*` validated config. Each integration is wrapped behind a small internal adapter so a provider can be swapped without touching feature code.
 
 ## Common rules

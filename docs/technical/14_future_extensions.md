@@ -1,5 +1,14 @@
 # 14 — Future Extensions
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | ../product/PRODUCT_DIRECTION_GUIDE.md, ../product/mvp-scope.md |
+| **Related** | 01_system_overview.md |
+
 What is **in the MVP** vs **deferred**, with rationale. This separates scope so implementation tasks never accidentally build a post-MVP feature. Sources: [`PRODUCT_DIRECTION_GUIDE.md`](../product/PRODUCT_DIRECTION_GUIDE.md) (Deferred Scope, non-goals), [`mvp-scope.md`](../product/mvp-scope.md), the ADRs.
 
 ## 1. In MVP (build these)

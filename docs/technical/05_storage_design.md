@@ -1,5 +1,14 @@
 # 05 — Storage Design
 
+| | |
+|---|---|
+| **Status** | Specification · Phase 0.7 (pre-implementation) |
+| **Version** | 1.0.0 |
+| **Owner** | Architecture / Foundation |
+| **Last Updated** | 2026-08-01 |
+| **Depends On** | 02_domain_model.md, ../decisions/ADR-0004-deployment-platforms.md |
+| **Related** | 06_rls_strategy.md, 13_integrations.md |
+
 Every Supabase Storage bucket for the MVP. **Supabase Storage is the only media/file store** (ADR-0001/0004) — **not** Cloudinary. Buckets are **private by default**; public read is the explicit exception. Bucket policies mirror table RLS ([06](06_rls_strategy.md)) and are security-reviewed like DB policies.
 
 ## Conventions
