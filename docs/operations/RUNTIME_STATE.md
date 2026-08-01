@@ -7,16 +7,16 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | | |
 |---|---|
 | **Last updated** | 2026-08-01 |
-| **Updated by** | Pi design/coding agent — permanent device/theme canvas governance session |
-| **Current focus** | Design workspace governance completed. `design.pen` now permanently follows Product Surface → Flow → Device → Theme → Sequence; missing approved variants remain explicit placeholders. |
+| **Updated by** | Codex — Impeccable brand-token extraction session |
+| **Current focus** | The founder-approved **Aperture** identity is now recorded in `DESIGN.md` and extracted into the frontend's bilingual light/dark token foundation. Product workflows remain unstarted. |
 
 ## Git & branch
 
 - **Branch:** `chore/repository-architecture-foundation`
-- **Commits ahead of `main`:** 19 after the device/theme-governance documentation commit
+- **Commits ahead of `main`:** 20 after the approved brand-token extraction commit
 - **Baseline:** `main` @ `643eb61` (repo as-found)
 - **Remote:** none — **local-only**, not pushed
-- **Working tree:** contains pre-existing unrelated frontend/design-document changes; this session commits only `PRODUCT.md`, `UI_UX_SYSTEM_GUIDE.md`, and operations-memory updates
+- **Working tree:** clean at session end; all approved design-token extraction changes committed together
 
 > HEAD moves with each commit; this file trails HEAD by its own commit. Re-derive live values with the [resume commands](#exact-resume-commands) below rather than trusting a pasted hash.
 
@@ -71,12 +71,11 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 
 ## Active files (this session)
 
-- Private visual source: `UI-UX/design.pen` — 8 top-level product/resource groups, 120 existing product screens, 56 workspace-only missing-coverage placeholders, and `00I` device/theme status report.
-- Policy: root `PRODUCT.md` — mandatory Screen Organization and Variant Governance.
-- UI core memory: `UI-UX/UI_UX_SYSTEM_GUIDE.md` — matching canvas-organization rule.
+- Approved design record: root `DESIGN.md` — The Aperture concept, exact brand/token values, typography, component defaults, and usage rules.
+- Frontend token bridge: `frontend/src/styles/tokens.css`, `frontend/tailwind.config.ts`, `frontend/src/app/globals.css`, and `frontend/src/app/layout.tsx`.
+- Product/UI memory: root `PRODUCT.md` and `UI-UX/UI_UX_SYSTEM_GUIDE.md` now record the approved identity and artifact-authority chain.
+- Local tooling sidecar: `.impeccable/design.json` is synchronized but remains intentionally ignored; `DESIGN.md` is the versioned durable record.
 - Operations memory: `docs/operations/AGENT_WORK_LOG.md` and this file.
-
-Pre-existing unrelated working-tree changes (`frontend/src/app/globals.css`, `frontend/src/styles/tokens.css`, `DESIGN.md`) were not modified by this session.
 
 ## Design validation status (2026-08-01)
 
@@ -84,7 +83,16 @@ Pre-existing unrelated working-tree changes (`frontend/src/app/globals.css`, `fr
 - 120 existing product-screen frames preserved; internal UI unchanged.
 - 56 missing-coverage placeholders remain documentation-only.
 - Known inherited product-screen warnings remain untouched because product screens are locked.
-- Root `PRODUCT.md` and `UI_UX_SYSTEM_GUIDE.md` now encode the permanent governance rule.
+- Root `PRODUCT.md` and `UI_UX_SYSTEM_GUIDE.md` encode the permanent governance rule and the approved Aperture identity.
+- Frontend primitives and light/dark semantic aliases mirror `DESIGN.md`; Impeccable detector returned 0 findings.
+- Semantic normal-size text clears WCAG AA in both themes (minimum measured ratios: light 4.76:1; dark 5.40:1).
+
+## Validation status (2026-08-01 brand-token extraction)
+
+- **Frontend — GREEN:** TypeScript ✅ · ESLint ✅ · Vitest 3 passed ✅ · Next.js 15.5.22 production build ✅.
+- **Generated routes:** `/`, `/_not-found`, `/api/health`.
+- **Repository checks:** `git diff --check` ✅; 154 internal Markdown links checked with 0 broken; no dependency or lockfile change.
+- **Tooling note:** Codex's pnpm wrapper required a one-time locked dependency relink after its bundled runtime changed; validation ran successfully through the restored local binaries.
 
 ## Validation status (2026-07-30 foundation review)
 
@@ -102,9 +110,10 @@ Pre-existing unrelated working-tree changes (`frontend/src/app/globals.css`, `fr
 
 ## Next planned work
 
-1. **Architecture hardening** (implementation roadmap step 1) — confirm the reconciled foundation.
-2. **Identity & multi-tenancy**, then organizations/memberships/branches/permissions, then **RLS + tenant-isolation tests**.
-3. **05C — B2B Sales operating workflow** (design roadmap first), starting with the first authenticated tenant table migration + its RLS + isolation tests.
+1. Merge/rebase the foundation branch when explicitly requested; no remote is currently configured.
+2. If product implementation is authorized: **Identity & multi-tenancy**, then organizations/memberships/branches/permissions, then **RLS + tenant-isolation tests**.
+3. Build **05C — B2B Sales operating workflow** after its prerequisites, starting with the first authenticated tenant table migration + RLS + isolation tests.
+4. During the first approved frontend feature, consume the new semantic tokens and wire the product's theme-selection/persistence behavior.
 
 **Not yet authorized to start product implementation** — awaiting explicit direction.
 

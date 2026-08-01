@@ -67,7 +67,7 @@ It is deliberately **not**:
 
 **AI (hard constraint):** AI-first, tenant-scoped, human-reviewable. It drafts, explains, and ranks (intent extraction, consultation, match explanation, follow-up drafting, document RAG, evaluations); **humans decide and send.** AI never auto-sends or takes irreversible action silently. Retrieval applies authorization filters before returning content — no cross-organization leakage, ever.
 
-**Cross-cutting requirements:** English (LTR) + Arabic (RTL) from day one; Light + Dark as first-class designed themes; responsive Desktop / Tablet / Mobile (PWA); token-driven design (no raw hex/final brand values hardcoded).
+**Cross-cutting requirements:** English (LTR) + Arabic (RTL) from day one; Light + Dark as first-class designed themes; responsive Desktop / Tablet / Mobile (PWA); token-driven design (components consume semantic tokens rather than raw brand values).
 
 **Deferred / never:** Payments, escrow, milestones, disputes are designed later, **not** MVP. Add-to-cart/checkout commerce, price-war reverse-auction bidding, and a generic horizontal CRM are **never** built.
 
@@ -144,7 +144,9 @@ This validation is mandatory before reporting a design task complete.
 - **Name:** Aladdin (confirmed).
 - **Personality / voice:** "calm authority" — confident, uncluttered, expert; a premium professional tool, not a flashy consumer marketplace. Consultation-first, trust signals over hype.
 - **No technical leakage in copy** (never surface "WhatsApp Business API", "reCAPTCHA verified", "canonical account", stack/schema jargon in the UI).
-- **Not yet approved (do not treat as final):** logo, typeface, and brand color *values*. Build against semantic tokens so approved values drop in without refactors. The chosen typeface must have first-class Arabic + Latin coverage with matching metrics/weights.
+- **Approved identity direction (2026-08-01):** **The Aperture — a point of intelligent light in precise architectural structure.** The mark is a chamfered architectural opening focused on one warm Lumen core; never a literal lamp, genie, or ornamental heritage motif.
+- **Approved type system:** Archivo for Latin brand/display, Reem Kufi for Arabic brand/display, Readex Pro for bilingual product UI, and JetBrains Mono for EGP figures, RFQ/quote codes, and quantities.
+- **Approved color system:** Basalt and Limestone are the two authored grounds; Lumen is reserved for brand/AI/focus, Bronze for trust/verification, Lapis for data/information, and Ink/Limestone carry primary actions. Exact values and semantic theme mappings live in root `DESIGN.md` and are mirrored into frontend tokens.
 
 ## Evidence on Hand
 

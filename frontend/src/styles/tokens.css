@@ -1,0 +1,107 @@
+/**
+ * Aladdin design tokens — extracted from DESIGN.md ("The Aperture").
+ *
+ * Two layers:
+ *   1. Primitives  — fixed hex, identical in both themes. Exposed in Tailwind as `brand.*`
+ *                    for brand artwork, the Aperture mark, and verification seals.
+ *   2. Semantics   — theme-aware. Light values live on :root; `.dark` overrides them.
+ *                    Components consume ONLY semantics (bg-canvas, text-fg, text-accent…)
+ *                    so light/dark parity is automatic (the Both-Themes Rule).
+ *
+ * DESIGN.md is the source of truth for these values; keep them in sync.
+ */
+
+:root {
+  /* ---- Primitives (fixed in both themes) ---- */
+  --basalt: #0e1113;
+  --basalt-2: #1b2226;
+  --basalt-3: #232b30;
+  --limestone: #f4f1ea;
+  --plaster: #fbf9f4;
+  --sand: #eae5db;
+  --ink: #17191a;
+  --lumen: #f3ab3e;
+  --lumen-deep: #c77f1c;
+  --lumen-ink: #855a15;
+  --lumen-soft: #f7c674;
+  --bronze: #c79a5e;
+  --bronze-deep: #96703f;
+  --bronze-ink: #6e5230;
+  --lapis: #2f6088;
+  --lapis-bright: #6fa8d2;
+  --verdigris: #2f7d5b;
+  --verdigris-deep: #205a42;
+  --ochre: #b26b12;
+  --ochre-deep: #6e4810;
+  --oxide: #b23a22;
+  --stone: #5c6066;
+  --stone-muted: #676b70;
+  --graphite: #39444b;
+  --line-dark: #262e33;
+  --line-light: #ded8cc;
+  --line-light-strong: #c7beae;
+  --on-dark: #f2efe9;
+  --on-dark-secondary: #b8bec2;
+  --on-dark-muted: #828a90;
+  --verdigris-bright: #58c08e;
+  --ochre-bright: #e0a54a;
+  --oxide-bright: #e27159;
+
+  /* ---- Semantics · LIGHT theme (default) ---- */
+  --canvas: var(--limestone);
+  --surface: var(--plaster);
+  --surface-2: var(--sand);
+
+  --fg: var(--ink);
+  --fg-secondary: var(--stone);
+  --fg-muted: var(--stone-muted);
+
+  --border: var(--line-light);
+  --border-strong: var(--line-light-strong);
+
+  --primary: var(--ink);
+  --primary-foreground: var(--limestone);
+
+  --accent: var(--lumen-ink); /* AA-safe Lumen tone for text/strokes */
+  --accent-solid: var(--lumen); /* the light itself — glows & fills */
+
+  --bronze-sem: var(--bronze-ink);
+  --lapis-sem: var(--lapis);
+
+  --success: var(--verdigris-deep);
+  --warning: var(--ochre-deep);
+  --danger: var(--oxide);
+  --info: var(--lapis);
+
+  --focus: var(--lumen-ink);
+}
+
+.dark {
+  /* ---- Semantics · DARK theme ---- */
+  --canvas: var(--basalt);
+  --surface: var(--basalt-2);
+  --surface-2: var(--basalt-3);
+
+  --fg: var(--on-dark);
+  --fg-secondary: var(--on-dark-secondary);
+  --fg-muted: var(--on-dark-muted);
+
+  --border: var(--line-dark);
+  --border-strong: var(--graphite);
+
+  --primary: var(--lime);
+  --primary-foreground: var(--basalt);
+
+  --accent: var(--lumen); /* bright Lumen reads fine on Basalt */
+  --accent-solid: var(--lumen);
+
+  --bronze-sem: var(--bronze);
+  --lapis-sem: var(--lapis-bright);
+
+  --success: var(--verdigris-bright);
+  --warning: var(--ochre-bright);
+  --danger: var(--oxide-bright);
+  --info: var(--lapis-bright);
+
+  --focus: var(--lumen);
+}

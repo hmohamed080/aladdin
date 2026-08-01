@@ -4,6 +4,42 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Approved Aperture Brand Token Extraction
+**Date/time:** 2026-08-01
+**Agent/tool:** Codex with Impeccable (`extract` playbook)
+**Branch:** `chore/repository-architecture-foundation`
+
+### Objective
+Turn the founder-approved Brand Toolkit v1 plate into a durable root design record and a production-ready frontend token foundation, while keeping the canonical UI/product memory consistent and without starting product workflows.
+
+### Changes
+- Added root `DESIGN.md` as the approved token/rule record for **The Aperture** identity: exact palette, bilingual typography, spacing, radii, component defaults, elevation, mark rules, and do/don't constraints.
+- Added `frontend/src/styles/tokens.css` with fixed brand primitives and light/dark semantic aliases; components can consume semantic values without hardcoding hex.
+- Mapped the complete approved foundation into `frontend/tailwind.config.ts`: semantic and brand colors, bilingual font families, typography roles, spacing, radii, shadows, and easing.
+- Loaded Archivo, Reem Kufi, Readex Pro, and JetBrains Mono through `next/font/google` in the root layout; established Readex Pro and semantic canvas/foreground/focus defaults globally.
+- Added accessible light-theme semantic tones from the approved tonal ramps. Brand primitives remain unchanged; normal-size text/focus/status tokens now clear WCAG AA rather than incorrectly treating every display primitive as text-safe.
+- Reconciled `PRODUCT.md` and `UI_UX_SYSTEM_GUIDE.md`: removed the obsolete “brand not approved” state and documented the authority chain (`UI_UX_SYSTEM_GUIDE.md` policy → `DESIGN.md` approved token/rule record → `design.pen` visual source → frontend token mirror).
+- Kept `.impeccable/design.json` as the existing ignored local tooling sidecar and synchronized its accessible semantic metadata; the committed durable record is `DESIGN.md`.
+
+### Validation
+- Impeccable detector on all changed frontend targets: `[]` (0 findings).
+- Contrast calculation for semantic normal-size text: minimum light-theme ratio **4.76:1**; dark-theme semantic text/status ratios remain **≥5.40:1**. Primary action contrast is **15.64:1**.
+- Frontend TypeScript: `tsc --noEmit` ✅.
+- Frontend lint: `eslint .` ✅.
+- Frontend tests: Vitest **3 passed** ✅.
+- Frontend production build: Next.js **15.5.22** build ✅; `/`, `/_not-found`, and `/api/health` generated successfully.
+- Repository checks: `git diff --check` ✅; **154** internal Markdown links checked, **0 broken** ✅.
+
+### Environment note
+The Codex pnpm wrapper repeatedly attempted a non-interactive dependency reinstall after its bundled runtime changed. A single approved `pnpm install --frozen-lockfile --ignore-scripts --child-concurrency=1` restored the locked workspace from cache (402 packages reused, 0 downloaded); validation then ran through the same local package binaries. No dependency or lockfile changed.
+
+### Unfinished / intentionally out of scope
+- Theme-selection UI/persistence is not wired yet; the token contract and `.dark` override are ready for it.
+- Runtime logo/app-icon exports and reusable Aperture React components have not been created yet.
+- No auth, database table, RLS policy, or B2B/B2C/Admin workflow was implemented. This session is frontend design-system foundation, not product-feature implementation.
+
+---
+
 ## Session — Permanent Device/Theme Canvas Governance
 **Date/time:** 2026-08-01
 **Agent/tool:** Pi design/coding agent

@@ -7,16 +7,17 @@
 | **Status** | Living document (canonical project memory) |
 | **Last updated** | 2026-08-01 |
 | **Scope** | The design system and UX rules that govern **both** design work in `design.pen` **and** its frontend implementation. |
-| **Authority** | Authoritative for UI/UX. `UI-UX/design.pen` is the **visual source of truth**; the frontend design system (Tailwind theme + semantic CSS variables) must **extract** these tokens from approved screens, not re-invent them. Operational rules for handling `.pen` files live in [`AGENTS.md`](./AGENTS.md). |
+| **Authority** | Authoritative for UI/UX policy. `UI-UX/design.pen` is the **visual source of truth** for screens/components; root [`DESIGN.md`](../DESIGN.md) is the approved brand-token and design-rule record; frontend semantic CSS variables and Tailwind mappings mirror those approved values. Operational rules for handling `.pen` files live in [`AGENTS.md`](./AGENTS.md). |
 | **Update triggers** | Any change to approved tokens, component rules, accessibility target, navigation/account model, or the anti-patterns list. UI/UX changes are recorded here and in `docs/operations/AGENT_WORK_LOG.md`. |
 
-This is **core architecture**, not optional documentation. Where a concrete value (hex, typeface, spacing) is a **design token**, it is defined in `design.pen` and mirrored into `frontend/src/styles` + Tailwind theme — this document names the tokens and the rules, not ad-hoc values.
+This is **core architecture**, not optional documentation. Concrete brand values and named design rules are recorded in root [`DESIGN.md`](../DESIGN.md), visually embodied in `design.pen`, and mirrored into `frontend/src/styles/tokens.css` + the Tailwind theme. If those artifacts drift, stop and reconcile them here rather than silently choosing one.
 
-> **Approval reality:** final logo, typeface, and brand color *values* are **not approved yet** (founder brief). Do not hardcode a "final" brand. Build against **semantic tokens** so approved values drop in later without refactors.
+> **Approval reality:** the founder approved **The Aperture** identity, type system, and palette on 2026-08-01 from the Brand Toolkit v1 plate. Product components still consume **semantic tokens**; raw brand values belong only in the canonical token definition, not scattered through components.
 
 ## Brand Vision
 - Aladdin is a **premium, trustworthy, AI-first operating system** for Egypt's finishing, construction, interior design, furnishing, and supply sector — **B2B-first** with a connected B2C consultation layer.
 - The feel is **calm authority**: confident, uncluttered, expert — a professional tool, not a flashy consumer marketplace.
+- The approved creative north star is **“The Aperture — a point of intelligent light in precise architectural structure.”** Its chamfered opening and one warm Lumen core abstract guidance and mastery without depicting a lamp, genie, or ornamental heritage motif.
 - The **canonical premium direction** is the phone/OTP verification screen family. The old flat "Basic Information / Contact Information" look is the **rejected** direction — do not reproduce it.
 
 ## Design Philosophy
@@ -43,9 +44,10 @@ This is **core architecture**, not optional documentation. Where a concrete valu
 - Content max-widths keep line lengths readable; workspace/dashboard uses a consistent content column beside the sidebar.
 
 ## Typography
-- Type scale is **token-driven**: `$fs-label` (≈13), `$fs-body` (≈14), `$fs-body-lg` (≈16), plus heading steps — all from `design.pen`.
+- Approved families: **Archivo** for Latin brand/display, **Reem Kufi** for Arabic brand/display, **Readex Pro** for bilingual product UI, and **JetBrains Mono** for EGP figures, RFQ/quote codes, and quantities.
+- Type scale is **token-driven**: `$fs-label` (≈13), `$fs-body` (≈14), `$fs-body-lg` (≈16), plus heading steps — exact values are recorded in `DESIGN.md` and mirrored into the frontend theme.
 - Field pattern: **label `$fs-label`**, **value `$fs-body-lg`**, leading icon `20`.
-- The chosen typeface **must have first-class Arabic + Latin coverage** and matching metrics/weights across both scripts. Until a face is approved, use the design token family; never commit a "final" font choice here.
+- Product UI stays in Readex Pro so Arabic and Latin share first-class coverage and matched metrics; Archivo/Reem Kufi are reserved for brand and headline moments.
 - Never encode meaning with italics in Arabic; use weight/size/color tokens instead.
 
 ## Spacing Rules
@@ -54,7 +56,8 @@ This is **core architecture**, not optional documentation. Where a concrete valu
 - Group related fields with tighter gaps; separate sections with larger gaps — spacing, not dividers, is the first grouping tool.
 
 ## Color System
-- **Semantic tokens only** in UI and code: `$text` / `$text-secondary`, surface/background, `$border` / `$border-strong`, primary/accent, and status (success/warning/danger/info). Concrete values live in `design.pen` tokens and map to CSS variables + Tailwind theme.
+- **Semantic tokens only** in UI and code: `$text` / `$text-secondary`, surface/background, `$border` / `$border-strong`, primary/accent, and status (success/warning/danger/info). Concrete values are recorded in `DESIGN.md`, embodied in `design.pen`, and mapped to CSS variables + the Tailwind theme.
+- Approved roles: Basalt/Limestone are authored grounds; Ink/Limestone carry primary actions; Lumen is reserved for brand, AI, and focus; Bronze means trust/verification; Lapis carries data/information. Normal-size text uses accessible semantic tones from their approved ramps rather than assuming every brand primitive is text-safe.
 - **Every color exists in both light and dark** with adequate contrast in each — a token is incomplete if only one theme is defined.
 - Color is a **reinforcement**, never the sole signal (pair with icon/label/shape) — required for accessibility and RTL parity.
 - Do **not** introduce raw hex in components; add/adjust a token instead.
@@ -165,13 +168,17 @@ This is **core architecture**, not optional documentation. Where a concrete valu
 - **Technical copy in UI:** "WhatsApp Business API", "reCAPTCHA verified on server", "canonical account", schema/stack jargon.
 - **Design-scaffolding in production:** QA labels, "SAMPLE/DEMO" ribbons, session/agent tags, placeholder lorem.
 - **Merging roles** because they look similar — roles stay separate (End Consumer, Installer, Engineer, Interior Designer, Showroom, Supplier, Manufacturer, Importer, Wholesaler, Sales, Contractor, Trainer, Trainee, Admin).
-- **Inventing an approved brand** (final logo/font/hex) before sign-off; hardcoding raw hex/fonts instead of tokens.
+- **Diverging from the approved Aperture identity** or scattering its raw logo/font/hex values through components instead of semantic tokens.
 - **The rejected flat direction** ("Basic/Contact Information" old look) instead of the premium OTP direction.
 - **Color-only signaling**, single-theme tokens, non-mirrored RTL, dead-end dashboard tiles, hover-only actions on touch, native `alert/confirm` dialogs, unbounded tables, and full-screen blocking spinners for partial updates.
 - **UI implying access it can't grant** — authorization is enforced server-side (RLS); never show data or actions a user isn't entitled to.
 
 ## Change History
 Newest first.
+
+### 2026-08-01 — Approved The Aperture identity and extracted frontend tokens
+- **What:** Recorded the founder-approved Aperture mark, Basalt/Limestone/Lumen/Bronze/Lapis palette, Archivo/Reem Kufi/Readex Pro/JetBrains Mono type system, and the authority chain between `DESIGN.md`, `design.pen`, and frontend semantic tokens. Added accessible semantic tones for normal-size text without changing the approved brand primitives.
+- **Why:** Turn the approved brand-world plate into one durable, bilingual, light/dark implementation contract and remove the former “brand not approved” placeholder.
 
 ### 2026-08-01 — Made device/theme canvas organization permanent
 - **What:** Established Product Surface → Flow → Device → Theme → Sequence as the mandatory `design.pen` hierarchy, including explicit missing-coverage, responsive-test, supporting-state, and validation rules.
