@@ -47,6 +47,28 @@
   --ochre-bright: #e0a54a;
   --oxide-bright: #e27159;
 
+  /* ---- Motion (theme-independent) ---- */
+  --duration-instant: 100ms;
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ---- Z-index scale (theme-independent) ---- */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 100;
+  --z-header: 200;
+  --z-drawer: 300;
+  --z-overlay: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-toast: 700;
+  --z-tooltip: 800;
+
   /* ---- Semantics · LIGHT theme (default) ---- */
   --canvas: var(--limestone);
   --surface: var(--plaster);
@@ -89,7 +111,7 @@
   --border: var(--line-dark);
   --border-strong: var(--graphite);
 
-  --primary: var(--lime);
+  --primary: var(--on-dark);
   --primary-foreground: var(--basalt);
 
   --accent: var(--lumen); /* bright Lumen reads fine on Basalt */

@@ -136,8 +136,36 @@ export default {
         glow: "0 0 60px rgba(243,171,62,0.18)",
       },
       transitionTimingFunction: {
-        standard: "cubic-bezier(0.4,0,0.2,1)",
-        "out-expo": "cubic-bezier(0.16,1,0.3,1)",
+        standard: "var(--ease-standard)",
+        "out-expo": "var(--ease-out-expo)",
+        "in-out": "var(--ease-in-out)",
+      },
+      transitionDuration: {
+        instant: "var(--duration-instant)",
+        fast: "var(--duration-fast)",
+        base: "var(--duration-base)",
+        slow: "var(--duration-slow)",
+        slower: "var(--duration-slower)",
+      },
+      zIndex: {
+        base: "0",
+        raised: "10",
+        sticky: "100",
+        header: "200",
+        drawer: "300",
+        overlay: "400",
+        modal: "500",
+        popover: "600",
+        toast: "700",
+        tooltip: "800",
+      },
+      // Canonical breakpoints (min-width). Reconciled to UI_UX_SYSTEM_GUIDE.md
+      // viewports: Mobile 390 (base) · Tablet 768 · Desktop 1024 · Wide 1440.
+      // 360/430 are device test widths, not breakpoints.
+      screens: {
+        tablet: "768px",
+        desktop: "1024px",
+        wide: "1440px",
       },
     },
   },
