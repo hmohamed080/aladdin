@@ -153,6 +153,40 @@ components:
      record the .pen file and the frontend Tailwind theme both extract from. Product truth
      lives in PRODUCT.md — do not duplicate it here. -->
 
+## Design System Metadata
+
+| | |
+|---|---|
+| **Design System** | Aladdin — "The Aperture" |
+| **Version** | `1.0.0` |
+| **Status** | Approved · foundation hardened (pre-feature). Ready to build product UI against. |
+| **Last updated** | 2026-08-01 |
+| **Maintainer** | Design-system foundation (agent-maintained under founder approval) |
+| **Changelog** | [`design/CHANGELOG.md`](design/CHANGELOG.md) |
+| **Governance** | [`design/GOVERNANCE.md`](design/GOVERNANCE.md) — source-of-truth, versioning, component & AI-agent rules |
+| **Machine tokens** | [`design/tokens/`](design/tokens/) — canonical machine-readable values |
+| **Component inventory** | [`design/COMPONENT_INVENTORY.md`](design/COMPONENT_INVENTORY.md) |
+| **Icon policy** | [`design/icons/README.md`](design/icons/README.md) |
+
+### Source-of-truth hierarchy
+
+No lower source may contradict a higher one; on conflict, reconcile downward.
+
+1. [`docs/product/PRODUCT_DIRECTION_GUIDE.md`](docs/product/PRODUCT_DIRECTION_GUIDE.md) — product truth & constraints.
+2. **`DESIGN.md`** (this file) — normative brand & visual-design language.
+3. [`design/tokens/*.json`](design/tokens/) — canonical machine-readable token *values*.
+4. [`UI-UX/UI_UX_SYSTEM_GUIDE.md`](UI-UX/UI_UX_SYSTEM_GUIDE.md) — UI behavior, UX rules, component usage, accessibility, responsive.
+5. `UI-UX/design.pen` — canonical approved screens & component compositions (private/gitignored).
+6. Frontend CSS variables (`frontend/src/styles/tokens.css`) + Tailwind config — implement the canonical tokens.
+
+**Edit order when a token changes:** `design/tokens/*.json` → `DESIGN.md` frontmatter → `frontend/src/styles/tokens.css` → `frontend/tailwind.config.ts`, in one commit. The same hex intentionally appears in the token JSON, this frontmatter, and `tokens.css` — three mirrors of one value (documented duplication, not drift). `.impeccable/design.json` is a gitignored local sidecar and is never authoritative.
+
+### Compatibility notes
+
+- **Semantic versioning:** MAJOR = breaking visual/component-contract change · MINOR = new tokens/components/states/theme behavior · PATCH = non-breaking corrections, docs, contrast fixes. Policy in [`design/GOVERNANCE.md`](design/GOVERNANCE.md#versioning).
+- `1.0.0` is the first approved, hardened foundation. **No product components are implemented yet** — the token contract and `.dark` override are ready for the first product feature to consume.
+- Themes: Light + Dark are both first-class; `.dark` class on `<html>` (`darkMode: "class"`). Both AA-verified.
+
 ## Overview
 
 **Creative North Star: "The Aperture — a point of intelligent light in precise architectural structure."**
@@ -209,6 +243,12 @@ Architectural stone grounds, one warm point of light, a crafted metal, and a qui
 
 **The Reinforced-Signal Rule.** Color never carries meaning alone; pair it with an icon, label, or shape. Required for accessibility and for AR/EN parity.
 
+**The Muted-On-Sand Rule.** `fg-muted` clears AA on the canvas/surface (4.76:1 on Limestone) but **not on the Sand fill** (4.27:1). On Sand (chips, tags, secondary fills) use `fg-secondary` or `fg` for any normal-size text — never `fg-muted`.
+
+### Contrast (measured 2026-08-01, WCAG 2.2 AA)
+
+All semantic text/status tokens were computed against their real backgrounds. Minimum passing ratios: **light 4.76:1** (`fg-muted` on canvas), **dark 5.40:1** (`fg-muted` on canvas); primary-action text **15.64:1**. The one sub-AA pairing (`fg-muted` on Sand, 4.27:1) is governed by the Muted-On-Sand Rule above. Full per-pair table: [`design/GOVERNANCE.md`](design/GOVERNANCE.md#accessibility). UI-component/large-text pairs all clear the 3:1 threshold.
+
 ## Typography
 
 **Display Font (Latin):** Archivo (with system-ui, sans-serif) — a geometric, architectural grotesque with a point of view.
@@ -230,6 +270,13 @@ Architectural stone grounds, one warm point of light, a crafted metal, and a qui
 ### Named Rules
 **The Matched-Script Rule.** Product UI is set in Readex Pro so Arabic and Latin share metrics and weight; the Archivo/Reem Kufi display pair is reserved for brand and headline moments. Never mix a Latin-only face into Arabic UI.
 **The Figures-Are-Mono Rule.** Prices (EGP), RFQ/quote IDs, and quantities are JetBrains Mono — for alignment and legibility, not decoration. Prose is never set in mono.
+
+### Loading, license & PDF strategy
+
+- **Loading:** all four families are self-hosted via `next/font/google` (`display: "swap"`), exposed as CSS variables (`--font-readex`, `--font-archivo`, `--font-reem-kufi`, `--font-jetbrains-mono`). Arabic + Latin subsets are requested for Readex Pro and Reem Kufi. No runtime request to a font CDN.
+- **License:** Archivo, Reem Kufi, Readex Pro, and JetBrains Mono are distributed on Google Fonts under the **SIL Open Font License 1.1**. **This is not yet a formal license-file audit** — treat OFL verification of the exact self-hosted files as a **pending, unverified** pre-ship item (do not claim "license verified").
+- **PDF/document fonts (open item):** quote/RFQ PDFs are generated in the FastAPI service. The web font stack does **not** automatically apply there; a PDF font strategy with **first-class Arabic shaping** (embed Readex Pro + JetBrains Mono, or a shaping-capable engine) must be chosen when document generation is built. Recorded here so a later task does not silently fall back to a non-Arabic PDF default.
+- **Assets not yet produced (do not fabricate):** finalized Reem Kufi Arabic wordmark lockup, the bespoke Latin "dd" aperture ligature, and the auth-panel 3D/WebGL Aperture artwork. These require approved source files that do not exist yet.
 
 ## Layout
 
