@@ -4,6 +4,42 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Final Network-Dependent Foundation Gate (Docker + Supabase)
+**Date/time:** 2026-08-01
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `chore/repository-architecture-foundation`
+
+### Objective
+Run the network-dependent pre-merge gate that prior sessions had to defer: Docker image build/inspection/run and the Supabase local stack (start / db reset ×2 / db lint / extension inspection). **No product feature, no product table, no `.pen` edit, no merge/push.**
+
+### Baseline (re-run, GREEN)
+- Frontend: `pnpm install --frozen-lockfile` ✅ · `typecheck` ✅ · `lint` ✅ · `test` 3 passed ✅ · `build` (Next 15.5.22) ✅ (`/`, `/_not-found`, `/api/health`).
+- Backend: `uv sync --frozen --python 3.12` ✅ · `ruff check .` ✅ · `pytest` 3 passed ✅ (1 benign `StarletteDeprecationWarning`).
+
+### Docker validation — PASSED
+- `docker version` server **29.6.2**. Pulls: `python:3.12-slim` ✅ (Docker Hub); `ghcr.io/astral-sh/uv:latest` ✅ (after retries — intermittent `ghcr.io` TLS-handshake timeouts).
+- `docker build --no-cache -t aladdin-backend-foundation ./backend` ✅ (multi-stage; `uv sync --frozen --no-dev` resolved 53 packages from PyPI).
+- Inspect: runtime **Python 3.12.13**; user **appuser (uid 10001)** — non-root; **HEALTHCHECK** configured; `Cmd=uvicorn app.main:app`.
+- No `.env`/`.pen`/PDF/customer-data/`.git`/app-logs in image (only base-image `apt/dpkg` logs). **No Alembic, no SQLAlchemy** (`find_spec` False; no site-packages).
+- `docker run` + `curl --fail /health` → **HTTP 200 `{"status":"ok","service":"backend","env":"local"}`**; running process **uid 10001**; container **health=healthy**. Test container stopped and removed.
+- Hygiene note (not a defect): no `.dockerignore` → the whole `backend/` context (incl. `.venv/`) is sent to the daemon, and 3 local `app/**/__pycache__` dirs are copied in. Selective `COPY` keeps the image itself clean.
+
+### Supabase local stack — PASSED
+- `supabase --version` 2.110.0. `supabase start` ✅ (exit 0) after several retries — Docker Hub and `public.ecr.aws` reachable; `ghcr.io` TLS-handshake timeouts repeatedly slowed the multi-image pull (Docker Desktop also flapped once and recovered). Migration `20260729000000_extensions.sql` applied; `seed.sql` applied.
+- Services healthy: **db, kong (API), auth, storage, realtime, studio** (+ rest, analytics, inbucket, pg_meta, edge_runtime). `imgproxy` + `pooler` intentionally disabled in `config.toml`. `vector` (log router) flaps on restart — benign, unrelated to Postgres/schema.
+- **First `db reset`** ✅ (exit 0). **First `db lint`** ✅ (exit 0) — all findings are inside bundled `extensions.*` PostGIS/pgcrypto functions; **zero** in our migration or `public`.
+- Extensions (name | schema | version): **pgcrypto | extensions | 1.3**, **pg_trgm | extensions | 1.6**, **vector | extensions | 0.8.2**, **postgis | extensions | 3.3.7**. `extensions` schema present. **0 product tables in `public`.** Migration recorded: `20260729000000`.
+- **Second `db reset`** ✅ (repeatable, no manual intervention) — identical extensions/versions, still 0 public tables, no drift, seed repeatable. **Second `db lint`** ✅ — 16 finding-groups, all in `extensions`, none in our code.
+- Cleanup: `supabase stop` ✅.
+
+### `.pen` integrity
+- **This session modified no `.pen` file.** All 16 backup snapshots are byte-identical before/after. The canonical `UI-UX/design.pen` **changed on disk during this window** (`ca54598…d581c` → `f1756cd…b7402`, mtime 14:51) because a **concurrent design agent ("Pi")** flushed its "missing-variant completion" Pencil edits and wrote one new gitignored backup. `.pen` files are **gitignored**, so this is outside the git tree and does not affect the commit or merge — and it was not caused by this task.
+
+### Result
+**Full architecture and infrastructure foundation validation complete.** No product feature/table/screen; no `.pen` modified; no live cloud/production service used; Docker + Supabase ran locally only.
+
+---
+
 ## Session — Design System Finalization & Hardening (v1.0.0)
 **Date/time:** 2026-08-01
 **Agent/tool:** Claude Code (Opus 4.8) with Impeccable

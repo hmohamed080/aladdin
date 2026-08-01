@@ -7,8 +7,8 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | | |
 |---|---|
 | **Last updated** | 2026-08-01 |
-| **Updated by** | Pi design/coding agent — approved missing-variant completion pass |
-| **Current focus** | The Aperture design system remains finalized at `1.0.0`. Faithfully derivable `design.pen` device/theme variants are now completed; remaining design gaps are explicit product or responsive decisions rather than generic missing placeholders. |
+| **Updated by** | Claude Code (Opus 4.8) — final network-dependent foundation gate (Docker + Supabase) |
+| **Current focus** | **Full architecture and infrastructure foundation validation complete.** The backend Docker image and the Supabase local stack now build / run / reset cleanly with the extensions migration; the Aperture design system remains finalized at `1.0.0`. No product workflow started. |
 
 ## Git & branch
 
@@ -56,7 +56,7 @@ None running as part of this session. Local dev is manual:
 
 - Frontend dev → `http://localhost:3000`
 - Backend API → `http://localhost:8000` (`/health`)
-- Supabase local stack → Docker (not started this session)
+- Supabase local stack → Docker — started, validated (reset ×2 + lint + extension inspection), and **stopped** this session (not left running).
 
 ## Deployment state
 
@@ -70,8 +70,8 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 
 ## Current blockers
 
-- **None blocking the foundation.** Code/docs verification is complete and green.
-- **Environment-only (not a code defect):** this sandbox cannot reach the container registries (`ghcr.io` TLS handshake timeout; `public.ecr.aws` Supabase images uncached and unpullable). Reproduced 3× on `docker build` and on `docker pull`. Consequence: the backend **Docker image build** and the **Supabase local stack** (`start`/`db reset`/`db lint`) could not be executed here. Both are statically verified (Dockerfile correct; `config.toml` valid TOML; extensions migration correct; no product tables) and should run in CI / a stable network.
+- **None.** The previously environment-blocked network checks are now **executed and passing** (2026-08-01): the backend Docker image builds/runs (non-root, healthy `/health`), and the Supabase local stack starts, resets (×2), and lints cleanly with the extensions migration applied. See *Infrastructure validation status* below.
+- **Residual environment note (not a code defect):** `ghcr.io` still shows intermittent TLS-handshake timeouts that **slow** (no longer block) multi-image pulls; retries succeed. Docker Hub and `public.ecr.aws` are reachable.
 
 ## Known warnings (benign)
 
@@ -97,6 +97,13 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 - Frontend primitives and light/dark semantic aliases mirror `DESIGN.md`; Impeccable detector returned 0 findings.
 - Semantic normal-size text clears WCAG AA in both themes (minimum measured ratios: light 4.76:1; dark 5.40:1).
 
+## Infrastructure validation status (2026-08-01 — Docker + Supabase gate)
+
+- **Docker — PASSED:** server 29.6.2; `docker build --no-cache -t aladdin-backend-foundation ./backend` ✅. Image: Python **3.12.13**, user **appuser (uid 10001)**, HEALTHCHECK **healthy**; `docker run` → `curl --fail /health` **200 `{"status":"ok","service":"backend","env":"local"}`**; process **uid 10001**. No `.env`/`.pen`/PDF/customer-data/`.git`/app-logs (only base-image `apt/dpkg` logs); **no Alembic, no SQLAlchemy**. Test container removed.
+- **Supabase — PASSED:** `start` ✅ (db/kong-API/auth/storage/realtime/studio healthy; imgproxy+pooler disabled in config; `vector` log-router flaps benignly). `db reset` ✅ ×2 (repeatable, no drift). `db lint` ✅ ×2 (all findings in bundled `extensions.*` PostGIS/pgcrypto functions; **zero** in our migration or `public`).
+- **Extensions:** pgcrypto 1.3 · pg_trgm 1.6 · vector 0.8.2 · postgis 3.3.7 — all in the `extensions` schema. **0 product tables in `public`.** Applied migration: `20260729000000`.
+- **Cleanup:** `supabase stop` ✅; backend test container removed; no repo artifact added. This gate modified **no `.pen` file**; the canonical `design.pen` changed on disk only via a concurrent design-agent flush (gitignored — outside the git tree, no merge impact).
+
 ## Validation status (2026-08-01 brand-token extraction)
 
 - **Frontend — GREEN:** TypeScript ✅ · ESLint ✅ · Vitest 3 passed ✅ · Next.js 15.5.22 production build ✅.
@@ -108,13 +115,12 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 
 - **Frontend — GREEN (fully re-run):** `pnpm install --frozen-lockfile`, `typecheck`, `lint`, `test` (3 passed), and `build` (production build succeeds; routes `/`, `/_not-found`, `/api/health`).
 - **Backend — GREEN (fully re-run):** `uv sync --frozen`, `ruff check` (clean), `pytest` (3 passed). Fail-fast verified (staging + missing secrets → `ValidationError`); `/health` → `200 {"status":"ok"}`.
-- **Docker image build — BLOCKED (environment):** registry unreachable (see blockers). Dockerfile statically correct (multi-stage, non-root uid 10001, HEALTHCHECK, copies only `pyproject.toml`/`uv.lock`/`app`).
-- **Supabase full stack — BLOCKED (environment):** `--version` OK (2.110.0); `config.toml` valid TOML; `start`/`db reset`/`db lint` not executable here (image pull blocked).
+- **Docker image build — PASSED (2026-08-01):** `docker build --no-cache` ✅; runtime Python 3.12.13, non-root appuser (uid 10001), HEALTHCHECK healthy, `/health` → 200; no `.env`/`.pen`/SQLAlchemy/Alembic in image. See *Infrastructure validation status*.
+- **Supabase full stack — PASSED (2026-08-01):** `start` ✅, `db reset` ✅ ×2 (repeatable, no drift), `db lint` ✅ (findings only in bundled `extensions.*`); extensions installed in the `extensions` schema; 0 product tables.
 
 ## Deferred validation
 
-- `supabase db reset` + RLS/organization-isolation tests (needs Docker + registry access; no product tables/policies exist yet).
-- Backend `docker build` end-to-end (needs registry access).
+- RLS / organization-isolation tests — deferred until the first product tables + policies exist (none yet).
 - Git remote + push (none configured).
 - CI/CD pipeline (commands documented in README; not wired).
 
