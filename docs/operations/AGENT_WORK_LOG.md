@@ -4,6 +4,30 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 0.7: MVP Technical Specification & System Blueprint
+**Date/time:** 2026-08-01
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `chore/repository-architecture-foundation`
+
+### Objective
+Produce the complete engineering blueprint for the MVP under `docs/technical/` — detailed enough for a senior engineer to build the MVP without further questions. **Specification only: no product feature, code, migration, API, table, UI, or architecture change; no `.pen` edit.**
+
+### Deliverables (15 files under `docs/technical/`)
+`README.md` (index + authority) · `01_system_overview` · `02_domain_model` · `03_database_design` · `04_relationships` (ERD) · `05_storage_design` · `06_rls_strategy` · `07_permissions_matrix` · `08_api_contracts` · `09_background_jobs` · `10_events` · `11_state_machines` · `12_validation_rules` · `13_integrations` · `14_future_extensions`. Linked from `docs/README.md`.
+
+### Key reconciliations (authority hierarchy applied)
+- **Integrations:** documented the **approved stack only** (Supabase Storage, OpenAI, Azure Document Intelligence [OCR candidate], WhatsApp Business API, Email provider [⚑ OPEN], Sentry, Excel/PDF libraries). The task's examples **Cloudinary / Firebase-push / Google Maps-Places / payments** are **not approved** → substitutes documented (Supabase Storage; Realtime+email+WhatsApp; internal localities + PostGIS; deferred) and flagged.
+- **Roles:** used the canonical account-type + capability + platform-role model (no profile switcher); mapped the task's generic role names (Guest/Company/Exhibition/Support/Moderator/Super Admin) onto it.
+- **Undecided items** (pricing/tiers, OCR provider finalization, email provider, retention windows, verification doc sets, product attribute schemas, media/OTP caps) recorded as `⚑ OPEN` inline, not invented.
+
+### Validation
+- 123 internal markdown links across `docs/technical/` checked, **0 broken**. Working tree otherwise clean before commit.
+
+### Out of scope (confirmed not done)
+No product feature/screen/table/API/migration; no architecture or UI change; no `.pen` edit. Specification documents only.
+
+---
+
 ## Session — Final Network-Dependent Foundation Gate (Docker + Supabase)
 **Date/time:** 2026-08-01
 **Agent/tool:** Claude Code (Opus 4.8)

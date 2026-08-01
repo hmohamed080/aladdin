@@ -7,8 +7,8 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | | |
 |---|---|
 | **Last updated** | 2026-08-01 |
-| **Updated by** | Claude Code (Opus 4.8) — final network-dependent foundation gate (Docker + Supabase) |
-| **Current focus** | **Full architecture and infrastructure foundation validation complete.** The backend Docker image and the Supabase local stack now build / run / reset cleanly with the extensions migration; the Aperture design system remains finalized at `1.0.0`. No product workflow started. |
+| **Updated by** | Claude Code (Opus 4.8) — Phase 0.7 MVP technical specification |
+| **Current focus** | **Phase 0.7 complete: the MVP engineering blueprint is authored under `docs/technical/` (15 docs).** Architecture + infrastructure foundation validation is complete (Docker + Supabase pass); the Aperture design system is finalized at `1.0.0`. Specification only — no product code/migration/table/API. Next step is product-owner sign-off on the `⚑ OPEN` items, then implementation. |
 
 ## Git & branch
 
@@ -25,6 +25,7 @@ This is a **mutable snapshot** of the current live repository state — not an a
 - **Foundation:** scaffolded and validated. Modular monolith per ADR-0001 (Next.js + Supabase + specialized FastAPI + workers).
 - **Python data access:** `supabase-py` (ADR-0005); SQLAlchemy deferred/removed; Alembic excluded.
 - **No product features, product tables, or production connections exist.**
+- **MVP technical blueprint:** authored under [`../technical/`](../technical/) (Phase 0.7) — system overview, domain model, database design, ERD, storage, RLS, permissions, API contracts, jobs, events, state machines, validation, integrations, future scope. Specification only; open decisions marked `⚑ OPEN`.
 
 ## Design system state
 

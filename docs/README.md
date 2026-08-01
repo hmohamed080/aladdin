@@ -80,6 +80,15 @@ The five files above are **persistent project memory and part of the core archit
 - [`../design/GOVERNANCE.md`](../design/GOVERNANCE.md) — source-of-truth, versioning, component & AI-agent rules
 - [`../design/COMPONENT_INVENTORY.md`](../design/COMPONENT_INVENTORY.md) · [`../design/icons/README.md`](../design/icons/README.md) · [`../design/CHANGELOG.md`](../design/CHANGELOG.md)
 
+## Technical Specification (Phase 0.7 — MVP blueprint)
+
+The engineering blueprint every implementation task follows. **Specification only** (no code/migrations/APIs). See [`technical/README.md`](technical/README.md) for the index.
+
+- [`technical/01_system_overview.md`](technical/01_system_overview.md) · [`02_domain_model.md`](technical/02_domain_model.md) · [`03_database_design.md`](technical/03_database_design.md) · [`04_relationships.md`](technical/04_relationships.md)
+- [`05_storage_design.md`](technical/05_storage_design.md) · [`06_rls_strategy.md`](technical/06_rls_strategy.md) · [`07_permissions_matrix.md`](technical/07_permissions_matrix.md) · [`08_api_contracts.md`](technical/08_api_contracts.md)
+- [`09_background_jobs.md`](technical/09_background_jobs.md) · [`10_events.md`](technical/10_events.md) · [`11_state_machines.md`](technical/11_state_machines.md) · [`12_validation_rules.md`](technical/12_validation_rules.md)
+- [`13_integrations.md`](technical/13_integrations.md) · [`14_future_extensions.md`](technical/14_future_extensions.md)
+
 ## Historical / source material
 
 - [`../agents/README.md`](../agents/README.md) — reusable agent personas (non-authoritative source material)
