@@ -1,0 +1,18 @@
+{
+  "name": "aladdin.z-index",
+  "version": "1.0.0",
+  "description": "Canonical stacking layers. Use named layers, never arbitrary z-index values.",
+  "maintenance": "Manually maintained. Edit here first, then frontend/src/styles/tokens.css (--z-*) and frontend/tailwind.config.ts (theme.extend.zIndex).",
+  "layers": {
+    "base": { "value": 0, "usage": "Default in-flow content." },
+    "raised": { "value": 10, "usage": "Cards/menus lifted within a surface." },
+    "sticky": { "value": 100, "usage": "Sticky table headers / sticky action bars." },
+    "header": { "value": 200, "usage": "App header / top navigation." },
+    "drawer": { "value": 300, "usage": "Side drawers / off-canvas navigation." },
+    "overlay": { "value": 400, "usage": "Scrim behind modal/drawer." },
+    "modal": { "value": 500, "usage": "Modal dialogs / bottom sheets." },
+    "popover": { "value": 600, "usage": "Popovers, dropdowns, selects." },
+    "toast": { "value": 700, "usage": "Transient toasts." },
+    "tooltip": { "value": 800, "usage": "Tooltips (top of the stack)." }
+  }
+}
