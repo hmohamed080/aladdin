@@ -6,17 +6,17 @@ This is a **mutable snapshot** of the current live repository state — not an a
 
 | | |
 |---|---|
-| **Last updated** | 2026-07-30 |
-| **Updated by** | Claude Code (Opus 4.8) — foundation review / hardening / validation session |
-| **Current focus** | Pre-merge foundation verification (review, hardening, full local validation). **No product feature in progress.** |
+| **Last updated** | 2026-08-01 |
+| **Updated by** | Pi design/coding agent — permanent device/theme canvas governance session |
+| **Current focus** | Design workspace governance completed. `design.pen` now permanently follows Product Surface → Flow → Device → Theme → Sequence; missing approved variants remain explicit placeholders. |
 
 ## Git & branch
 
 - **Branch:** `chore/repository-architecture-foundation`
-- **Commits ahead of `main`:** 18 (this snapshot's commit included)
+- **Commits ahead of `main`:** 19 after the device/theme-governance documentation commit
 - **Baseline:** `main` @ `643eb61` (repo as-found)
 - **Remote:** none — **local-only**, not pushed
-- **Working tree:** clean at session end (verify with `git status`)
+- **Working tree:** contains pre-existing unrelated frontend/design-document changes; this session commits only `PRODUCT.md`, `UI_UX_SYSTEM_GUIDE.md`, and operations-memory updates
 
 > HEAD moves with each commit; this file trails HEAD by its own commit. Re-derive live values with the [resume commands](#exact-resume-commands) below rather than trusting a pasted hash.
 
@@ -71,7 +71,20 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 
 ## Active files (this session)
 
-Core-memory files created/promoted: `PRODUCT_DIRECTION_GUIDE.md`, `ARCHITECTURE_GUIDE.md`, `UI-UX/UI_UX_SYSTEM_GUIDE.md`, `AGENT_WORK_LOG.md`, this `RUNTIME_STATE.md`; plus `docs/README.md`, `ADR-0005`, and reconciled AGENTS/README/CLAUDE.
+- Private visual source: `UI-UX/design.pen` — 8 top-level product/resource groups, 120 existing product screens, 56 workspace-only missing-coverage placeholders, and `00I` device/theme status report.
+- Policy: root `PRODUCT.md` — mandatory Screen Organization and Variant Governance.
+- UI core memory: `UI-UX/UI_UX_SYSTEM_GUIDE.md` — matching canvas-organization rule.
+- Operations memory: `docs/operations/AGENT_WORK_LOG.md` and this file.
+
+Pre-existing unrelated working-tree changes (`frontend/src/app/globals.css`, `frontend/src/styles/tokens.css`, `DESIGN.md`) were not modified by this session.
+
+## Design validation status (2026-08-01)
+
+- `design.pen`: 8 top-level groups; 0 top-level overlaps; 0 organizational sibling overlaps; 0 device/theme/responsive-lane ancestry mismatches.
+- 120 existing product-screen frames preserved; internal UI unchanged.
+- 56 missing-coverage placeholders remain documentation-only.
+- Known inherited product-screen warnings remain untouched because product screens are locked.
+- Root `PRODUCT.md` and `UI_UX_SYSTEM_GUIDE.md` now encode the permanent governance rule.
 
 ## Validation status (2026-07-30 foundation review)
 

@@ -4,6 +4,37 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Permanent Device/Theme Canvas Governance
+**Date/time:** 2026-08-01
+**Agent/tool:** Pi design/coding agent
+**Branch:** `chore/repository-architecture-foundation`
+
+### Objective
+Reorganize the live private `UI-UX/design.pen` workspace into a permanent Product Surface → Flow → Device → Theme → Sequence hierarchy without changing any existing product-screen internals, document missing coverage explicitly, add a device/theme status matrix, and make the rule durable in project policy.
+
+### Changes
+- Reparented 120 existing product-screen frames intact into eight top-level areas: Authentication, Consumer, Professional/Talent, B2B/Business, Admin, Shared/System, Foundation/Components/Documentation, and Archive.
+- Added explicit Desktop → Tablet → Mobile and Light → Dark lanes, with separate Main Flow, Supporting States, Error States, Responsive Test Variants, and Specifications/Annotations lanes.
+- Kept 360px/430px responsive tests separate from canonical Mobile 390px.
+- Added 56 workspace-only missing-coverage placeholders; no missing UI was fabricated.
+- Added `00I — Current Design Status Report` with per-flow Desktop Light/Desktop Dark/Tablet Light/Tablet Dark/Mobile Light/Mobile Dark status.
+- Added the permanent policy to root `PRODUCT.md` and mirrored the operational UI rule into `UI-UX/UI_UX_SYSTEM_GUIDE.md`.
+
+### Validation
+- Live tree: 8 top-level groups, 120 product-screen frames, 56 missing-coverage placeholders.
+- Variant ancestry audit: 0 device/theme/responsive-lane mismatches.
+- Canvas audit: 0 top-level overlaps and 0 organizational sibling overlaps.
+- Product screen internals, dimensions, names, content, components, and styling were not edited; only complete frames were repositioned/reparented.
+- Existing inherited product-screen layout warnings remain intentionally untouched because those screens are locked.
+
+### Backup
+`UI-UX/design.BACKUP-BEFORE-PERMANENT-VARIANT-ORGANIZATION-20260801-104124.pen`
+
+### Unfinished / blocked
+None for workspace organization. Missing variants remain explicit placeholders and require separately approved screen-design tasks.
+
+---
+
 ## Session — Foundation Review, Hardening & Pre-Merge Validation
 **Date/time:** 2026-07-30 (single session)
 **Agent/tool:** Claude Code (Opus 4.8)

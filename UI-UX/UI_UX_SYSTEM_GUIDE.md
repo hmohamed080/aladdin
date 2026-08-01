@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Status** | Living document (canonical project memory) |
-| **Last updated** | 2026-07-30 |
+| **Last updated** | 2026-08-01 |
 | **Scope** | The design system and UX rules that govern **both** design work in `design.pen` **and** its frontend implementation. |
 | **Authority** | Authoritative for UI/UX. `UI-UX/design.pen` is the **visual source of truth**; the frontend design system (Tailwind theme + semantic CSS variables) must **extract** these tokens from approved screens, not re-invent them. Operational rules for handling `.pen` files live in [`AGENTS.md`](./AGENTS.md). |
 | **Update triggers** | Any change to approved tokens, component rules, accessibility target, navigation/account model, or the anti-patterns list. UI/UX changes are recorded here and in `docs/operations/AGENT_WORK_LOG.md`. |
@@ -142,6 +142,16 @@ This is **core architecture**, not optional documentation. Where a concrete valu
 - Test every breakpoint in **both** LTR and RTL and **both** themes. Touch targets and gutters follow the spacing tokens.
 - The page body never scrolls horizontally; wide content (tables, wide cards) scrolls within its own container.
 
+## Canvas Screen Organization
+- `design.pen` permanently follows **Product Surface → Flow → Device → Theme → Sequence**.
+- Product-surface areas remain separate: Authentication, B2C/Consumer, Professional/Talent, B2B/Business, Admin, Shared/System, Foundation/Components/Documentation, and Archive.
+- Device order is always **Desktop → Tablet → Mobile**. Theme order inside every device is always **Light → Dark**.
+- Main-path screens follow screen-ID and user-flow order. Supporting states, errors/exceptions, responsive tests, and specifications use separate labelled lanes and never interrupt the happy path.
+- Canonical viewport lanes are Desktop `1440 × 1024`, Tablet `768 × 1024`, and Mobile `390 × 844`. The `360px` and `430px` frames are responsive tests in a separate lane, never substitutes for Mobile 390px.
+- Missing approved coverage remains visible through workspace-only placeholders in the correct device/theme lane. Coverage is tracked independently for Desktop Light, Desktop Dark, Tablet Light, Tablet Dark, Mobile Light, and Mobile Dark; one existing variant never implies full completion.
+- Existing product screens are locked during organization work. Only complete screen frames may be repositioned or reparented; internal UI is not changed for canvas organization.
+- Every design task must validate hierarchy, sequence, lane assignment, and independent-frame overlap before completion. New screens are placed directly in their permanent lane, never left in temporary nearby space.
+
 ## Component Consistency Rules
 - **Reuse the component library first.** The canonical component library lives in `design.pen`; do not create a near-duplicate — extend or add a variant to the existing master. (Do not hardcode a component count here; the library in `design.pen` is the source of truth.)
 - One canonical component per concept (one field, one button system, one alert, one progress header). Prefer instance overrides (`descendants`) over forked copies.
@@ -162,6 +172,10 @@ This is **core architecture**, not optional documentation. Where a concrete valu
 
 ## Change History
 Newest first.
+
+### 2026-08-01 — Made device/theme canvas organization permanent
+- **What:** Established Product Surface → Flow → Device → Theme → Sequence as the mandatory `design.pen` hierarchy, including explicit missing-coverage, responsive-test, supporting-state, and validation rules.
+- **Why:** Prevent mixed device/theme rows, preserve readable user-flow order, and make variant coverage independently auditable.
 
 ### 2026-07-30 — Extracted into canonical guide; account model + a11y corrected
 - **What:** Moved the Design System & UX rules out of `UI-UX/AGENTS.md` into this canonical guide. Corrected the navigation/account model from "active-profile switching" to the **derived-navigation / one-current-primary-account-type / no-profile-switcher** model. Updated the accessibility target from **WCAG 2.1 AA → WCAG 2.2 AA** (including target-size guidance). Removed the hardcoded component count; the canonical component library in `design.pen` is the source of truth.
