@@ -31,6 +31,16 @@ One well-structured monolith with clean module boundaries — not premature micr
 - Owns i18n (AR-RTL / EN-LTR), theming (light/dark), and PWA/responsive behavior.
 - Holds no service-role secret in client code — only validated `NEXT_PUBLIC_*` values reach the browser.
 
+## Design System (frontend)
+
+The Aladdin Design System — **"The Aperture"** — is part of the architecture, not incidental styling. It is **finalized and semantically versioned** (`1.0.0`, approved/hardened, pre-feature):
+
+- **Authority chain:** [`../product/PRODUCT_DIRECTION_GUIDE.md`](../product/PRODUCT_DIRECTION_GUIDE.md) → root [`../../DESIGN.md`](../../DESIGN.md) → [`../../design/tokens/*.json`](../../design/tokens/) (canonical machine tokens) → [`../../UI-UX/UI_UX_SYSTEM_GUIDE.md`](../../UI-UX/UI_UX_SYSTEM_GUIDE.md) → `UI-UX/design.pen` → frontend CSS variables + Tailwind config.
+- **Governance:** [`../../design/GOVERNANCE.md`](../../design/GOVERNANCE.md) (versioning, synchronization, component & AI-agent rules); changelog [`../../design/CHANGELOG.md`](../../design/CHANGELOG.md).
+- **Implementation:** `frontend/src/styles/tokens.css` (CSS vars, light/dark), `frontend/tailwind.config.ts` (theme), `next/font` in `frontend/src/app/layout.tsx`. Frontend code consumes **semantic** tokens; it never invents values outside the canonical tokens.
+
+Token/brand changes follow the design-system edit-order (token JSON first) and update the design-system memory files in the same change — analogous to the [Architecture-Change Process](#architecture-change-process) for architecture.
+
 ## FastAPI Service Responsibilities
 - **Specialized workloads only:** AI orchestration, OCR, document processing/chunking, embeddings, RAG, AI evaluations, NLP, large-Excel processing, and background/queue handlers.
 - **Does not recreate application CRUD.** If a feature can be a Server Action / Route Handler against Supabase, it belongs in the web app, not here.
@@ -152,6 +162,10 @@ Every architecture change must, in the same session:
 
 ## Architecture Change History
 Newest first.
+
+### 2026-08-01 — Design System finalized & hardened (v1.0.0)
+- **What:** Recorded the versioned Aladdin Design System ("The Aperture") as part of the architecture: added the *Design System (frontend)* section and the authority chain (`DESIGN.md` → `design/tokens/*.json` → `UI_UX_SYSTEM_GUIDE.md` → `design.pen` → frontend). Canonical machine tokens, governance, component inventory, and icon policy added under `design/`.
+- **Why:** The token/brand system is durable architecture; agents must consume canonical tokens rather than invent values. **No product feature, table, or connection was added.**
 
 ### 2026-07-30 — Architecture guide created; Python data access reconciled
 - **What:** Created this current-state architecture guide. Reconciled the Python data-access approach to **`supabase-py`** and **deferred SQLAlchemy** (new ADR-0005 refining ADR-0002); SQLAlchemy removed from the backend scaffold as an unused dependency.

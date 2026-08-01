@@ -4,6 +4,46 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Design System Finalization & Hardening (v1.0.0)
+**Date/time:** 2026-08-01
+**Agent/tool:** Claude Code (Opus 4.8) with Impeccable
+**Branch:** `chore/repository-architecture-foundation`
+
+### Objective
+Finalize and harden the Aladdin Design System before any product-feature work: audit, source-of-truth reconciliation, machine-readable token architecture, component governance, and implementation validation. **No product feature, no new screen, no journey redesign, no `.pen` edit.**
+
+### Pre-edit audit — key findings
+- **Defect (theme):** `frontend/src/styles/tokens.css` `.dark { --primary: var(--lime) }` referenced an **undefined** variable (primitive is `--on-dark`) — dark-theme primary action color broken at runtime; production build did not catch it.
+- **Missing:** no canonical machine-readable tokens; no design-system versioning/changelog; no component inventory; no icon policy; no motion-duration/z-index tokens; no canonical named breakpoints; no `prefers-reduced-motion`.
+- **Source-of-truth ambiguity:** color hex duplicated across `DESIGN.md` frontmatter, `tokens.css`, and the *gitignored* `.impeccable/design.json` with no documented canonical source or edit-order.
+- **Accessibility:** measured 22 semantic pairs — one sub-AA pairing (`fg-muted` on Sand = 4.27:1); all others pass.
+- **Breakpoint conflict:** UI guide (1440/768/390) vs sidecar (1080/1360) — reconciled to the guide.
+
+### Changes
+- **Fixed** the dark-theme `--primary` (`--lime` → `--on-dark`).
+- **Added canonical machine tokens** `design/tokens/{colors,typography,spacing,radii,shadows,motion,breakpoints,z-index}.json` + README (manually maintained; documented sync edit-order).
+- **Added** `design/GOVERNANCE.md` (source-of-truth hierarchy, semantic versioning, synchronization, new-component governance, component-state matrix, motion, measured-AA accessibility, responsive, RTL, light/dark, enforceable AI-agent rules), `design/COMPONENT_INVENTORY.md` (28 families, all `Proposed`/`Draft`), `design/icons/README.md` (Lucide default; custom-icon process), `design/CHANGELOG.md`, `design/README.md`.
+- **DESIGN.md:** added versioning metadata, source-of-truth hierarchy, compatibility notes, honest font-license/PDF-strategy record, measured-contrast + Muted-On-Sand rule.
+- **Frontend:** added motion (duration/easing) + z-index tokens to `tokens.css`; canonical `tablet/desktop/wide` screens, `transitionDuration`, `zIndex`, and CSS-var easings to `tailwind.config.ts`; `prefers-reduced-motion` to `globals.css`.
+- **Memory reconciled:** `UI_UX_SYSTEM_GUIDE.md`, `ARCHITECTURE_GUIDE.md`, root/`frontend`/`UI-UX` `AGENTS.md`, `docs/README.md`, `RUNTIME_STATE.md`. **`PRODUCT_DIRECTION_GUIDE.md` untouched** (no product-direction change).
+
+### Validation (commands + results)
+- Frontend: `typecheck` ✅ · `lint` ✅ · `test` **3 passed** ✅ · `build` (Next 15.5.22) ✅ (`/`, `/_not-found`, `/api/health`).
+- Tokens: all 9 JSON files parse ✅; 33/33 color primitive names unique ✅; **no dangling `var(--x)`** references in `tokens.css` ✅.
+- Docs: **192 internal relative links, 0 broken** ✅; no duplicate H1/H2 headings in new design docs ✅.
+- **`.pen` unchanged:** `UI-UX/design.pen` sha256 `ca54598…d581c` identical before/after ✅.
+
+### Unverified / open items
+- Formal OFL license-file audit of the four self-hosted fonts (marked pending, not claimed verified).
+- PDF/Arabic document-font strategy (FastAPI quote/RFQ PDFs) — recorded as an open item.
+- Component-level a11y (keyboard, focus-trap, SR labels, tab order, touch targets) — cannot be verified before components exist; gated in the inventory `Ready` criteria.
+- Lucide icon library decided but **not installed** (deferred to first real need).
+
+### Out of scope (confirmed not done)
+No product feature, no product screen, no journey redesign, no `.pen` edit, no unapproved brand asset created, no auth/Sales/Catalog/RFQ/Projects/Admin/AI flow started.
+
+---
+
 ## Session — Approved Aperture Brand Token Extraction
 **Date/time:** 2026-08-01
 **Agent/tool:** Codex with Impeccable (`extract` playbook)

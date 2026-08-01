@@ -32,6 +32,10 @@ Extends the root `AGENTS.md`. This file governs `UI-UX/`. It is intentionally co
 
 `.pen` files are large private design IP. They are **gitignored** (`*.pen`) and **must remain private and untracked** — never in public Git history. Keep them in private storage (private object storage / a private design vault / Git LFS on a **private** remote), and retain the `BACKUP-*` snapshots as the recovery trail.
 
+## Design System authority
+
+The token/brand *record* and *process* are versioned outside the `.pen` file: root [`../DESIGN.md`](../DESIGN.md) (normative brand + tokens), [`../design/tokens/`](../design/tokens/) (canonical machine tokens), and [`../design/GOVERNANCE.md`](../design/GOVERNANCE.md) (versioning, component & AI-agent rules). `design.pen` is the visual source for *screens/compositions*; when a design change alters a token or rule, reconcile it into `DESIGN.md` and the token files too — the `.pen` file is not the sole record.
+
 ## Related files
 
-[`UI_UX_SYSTEM_GUIDE.md`](./UI_UX_SYSTEM_GUIDE.md) · root [`AGENTS.md`](../AGENTS.md) · [`../docs/README.md`](../docs/README.md)
+[`UI_UX_SYSTEM_GUIDE.md`](./UI_UX_SYSTEM_GUIDE.md) · [`../DESIGN.md`](../DESIGN.md) · [`../design/README.md`](../design/README.md) · root [`AGENTS.md`](../AGENTS.md) · [`../docs/README.md`](../docs/README.md)

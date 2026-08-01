@@ -51,6 +51,15 @@ src/
 
 Implement against approved screens in `UI-UX/design.pen`, following [`UI-UX/UI_UX_SYSTEM_GUIDE.md`](../UI-UX/UI_UX_SYSTEM_GUIDE.md) (tokens, components, UX rules — a core-memory file) and the operational rules in [`UI-UX/AGENTS.md`](../UI-UX/AGENTS.md). Never edit `.pen` files from a coding task. Internal session labels / design-agent notes must never appear in production UI.
 
+### Consume the Design System (v1.0.0 — "The Aperture")
+
+The token system is finalized. Concrete values live in [`../design/tokens/`](../design/tokens/) and are implemented as CSS variables (`src/styles/tokens.css`) + the Tailwind theme (`tailwind.config.ts`); fonts are self-hosted via `next/font` (`src/app/layout.tsx`).
+
+- **Consume semantic utilities** so Light/Dark and RTL parity are automatic: `bg-canvas`, `bg-surface`, `text-fg`/`text-fg-secondary`/`text-fg-muted`, `border`/`border-strong`, `bg-primary text-primary-foreground`, `text-accent`, `text-bronze`, `text-success|warning|danger|info`, `ring` (focus). Use fixed `brand.*` primitives only for the Aperture mark / brand artwork / seals.
+- **Never hardcode** a hex/px, and **never invent** a color, spacing, type role, shadow, radius, breakpoint, z-index, component, or icon library. Add it through the design-system process ([`../design/GOVERNANCE.md`](../design/GOVERNANCE.md)) — token JSON first, then propagate.
+- **Icons:** Lucide is the single default library (not yet installed — add on first real need); custom brand/domain icons follow [`../design/icons/README.md`](../design/icons/README.md).
+- Before building a component, search [`../design/COMPONENT_INVENTORY.md`](../design/COMPONENT_INVENTORY.md); satisfy its required states, both themes, RTL, and a11y before calling it done.
+
 ## Testing & quality (see `docs/` for strategy)
 
 - TypeScript strict, ESLint clean — both must pass before "done".

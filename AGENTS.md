@@ -52,6 +52,10 @@ Rules:
 - **Read `RUNTIME_STATE.md`** to understand current live state before beginning work, and refresh it at the end of every substantive session (see the end-of-session checklist in [`docs/AGENTS.md`](docs/AGENTS.md)).
 - Prefer documentation **clarity over brevity**; avoid vague statements; keep entries chronological and structured; use Markdown consistently.
 
+### Design System authority (UI work)
+
+The Aladdin Design System — **"The Aperture"** — is finalized and semantically versioned (`1.0.0`). Before any UI/token change, read root [`DESIGN.md`](DESIGN.md) and [`design/GOVERNANCE.md`](design/GOVERNANCE.md). Authority order: `PRODUCT_DIRECTION_GUIDE.md` → `DESIGN.md` → [`design/tokens/*.json`](design/tokens/) → [`UI-UX/UI_UX_SYSTEM_GUIDE.md`](UI-UX/UI_UX_SYSTEM_GUIDE.md) → `UI-UX/design.pen` → frontend code. Consume **semantic tokens**; **never invent** a color, spacing, type, shadow, radius, breakpoint, z-index, component, or second icon library — add it through the design-system process instead. The enforceable AI-agent design rules are in [`design/GOVERNANCE.md`](design/GOVERNANCE.md#ai-agent-design-rules-enforceable).
+
 ## The product
 
 Aladdin is an **AI-first operating system / digital infrastructure** for Egypt's finishing, construction, interior design, furnishing, supply, and professional-services sector. It is **B2B-first**, with a connected B2C consultation/discovery/project layer. Three surfaces: **B2C**, **B2B** (Sales is the key daily-active user), and **Admin**.

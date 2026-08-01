@@ -72,6 +72,14 @@ The five files above are **persistent project memory and part of the core archit
 - [`../UI-UX/UI_UX_SYSTEM_GUIDE.md`](../UI-UX/UI_UX_SYSTEM_GUIDE.md) — **canonical** design system & UX rules
 - [`../UI-UX/AGENTS.md`](../UI-UX/AGENTS.md) — operational `.pen` handling rules
 
+## Design System ("The Aperture", v1.0.0)
+
+- [`../DESIGN.md`](../DESIGN.md) — **normative** brand & visual-design language (token frontmatter + rules)
+- [`../design/README.md`](../design/README.md) — design-system index
+- [`../design/tokens/`](../design/tokens/) — **canonical** machine-readable tokens
+- [`../design/GOVERNANCE.md`](../design/GOVERNANCE.md) — source-of-truth, versioning, component & AI-agent rules
+- [`../design/COMPONENT_INVENTORY.md`](../design/COMPONENT_INVENTORY.md) · [`../design/icons/README.md`](../design/icons/README.md) · [`../design/CHANGELOG.md`](../design/CHANGELOG.md)
+
 ## Historical / source material
 
 - [`../agents/README.md`](../agents/README.md) — reusable agent personas (non-authoritative source material)

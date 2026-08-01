@@ -7,8 +7,8 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | | |
 |---|---|
 | **Last updated** | 2026-08-01 |
-| **Updated by** | Codex — Impeccable brand-token extraction session |
-| **Current focus** | The founder-approved **Aperture** identity is now recorded in `DESIGN.md` and extracted into the frontend's bilingual light/dark token foundation. Product workflows remain unstarted. |
+| **Updated by** | Claude Code (Opus 4.8) — Design System finalization & hardening session |
+| **Current focus** | The Aladdin Design System ("The Aperture") is **finalized, versioned (`1.0.0`), and hardened**: canonical machine tokens, governance, component inventory, and icon policy added under `design/`; a broken dark-theme primary token fixed; frontend motion/z-index/breakpoint tokens + reduced-motion added. Product workflows remain unstarted. |
 
 ## Git & branch
 
@@ -25,6 +25,15 @@ This is a **mutable snapshot** of the current live repository state — not an a
 - **Foundation:** scaffolded and validated. Modular monolith per ADR-0001 (Next.js + Supabase + specialized FastAPI + workers).
 - **Python data access:** `supabase-py` (ADR-0005); SQLAlchemy deferred/removed; Alembic excluded.
 - **No product features, product tables, or production connections exist.**
+
+## Design system state
+
+- **Version `1.0.0`** — approved, hardened, pre-feature. North star: **"The Aperture."**
+- **Authority chain:** `PRODUCT_DIRECTION_GUIDE.md` → `DESIGN.md` → `design/tokens/*.json` → `UI-UX/UI_UX_SYSTEM_GUIDE.md` → `design.pen` → frontend code.
+- **Canonical machine tokens:** `design/tokens/{colors,typography,spacing,radii,shadows,motion,breakpoints,z-index}.json` (+ README). Governance: `design/GOVERNANCE.md`; changelog: `design/CHANGELOG.md`; inventory: `design/COMPONENT_INVENTORY.md`; icons: `design/icons/README.md`.
+- **Frontend implementation:** `frontend/src/styles/tokens.css` (primitives + light/dark semantics + motion + z-index), `frontend/tailwind.config.ts` (semantic/brand colors, type roles, spacing, radii, shadows, motion, z-index, canonical `tablet`/`desktop`/`wide` screens), `frontend/src/app/globals.css` (base + `prefers-reduced-motion`), `frontend/src/app/layout.tsx` (four self-hosted fonts).
+- **Defect fixed this session:** dark-theme `--primary` referenced an undefined `--lime` → corrected to `--on-dark`.
+- **Components implemented:** none yet — inventory entries are `Proposed`/`Draft`. Icon library (Lucide) decided but not installed. PDF/Arabic font strategy is an open item.
 
 ## Implemented routes
 

@@ -14,6 +14,19 @@ This is **core architecture**, not optional documentation. Concrete brand values
 
 > **Approval reality:** the founder approved **The Aperture** identity, type system, and palette on 2026-08-01 from the Brand Toolkit v1 plate. Product components still consume **semantic tokens**; raw brand values belong only in the canonical token definition, not scattered through components.
 
+## Design System Authority (v1.0.0)
+
+The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pre-feature). This guide owns UI/UX *policy*; the token/brand *record* and *process* live in dedicated, versioned files:
+
+- **Brand & token record:** root [`../DESIGN.md`](../DESIGN.md) (semantic version + source-of-truth hierarchy in its metadata block).
+- **Canonical machine tokens:** [`../design/tokens/`](../design/tokens/) — colors, typography, spacing, radii, shadows, motion, breakpoints, z-index.
+- **Governance:** [`../design/GOVERNANCE.md`](../design/GOVERNANCE.md) — source-of-truth hierarchy, versioning, synchronization edit-order, new-component governance, component-state matrix, motion, **measured AA contrast table**, responsive, RTL, themes, and enforceable **AI-agent design rules**.
+- **Component inventory:** [`../design/COMPONENT_INVENTORY.md`](../design/COMPONENT_INVENTORY.md) — search before creating any component.
+- **Icon policy:** [`../design/icons/README.md`](../design/icons/README.md) — Lucide default; one library; custom-icon process.
+- **Changelog:** [`../design/CHANGELOG.md`](../design/CHANGELOG.md).
+
+**Source-of-truth order:** `PRODUCT_DIRECTION_GUIDE.md` → `DESIGN.md` → `design/tokens/*.json` → **this guide** → `design.pen` → frontend code. No lower source may contradict a higher one. When a token changes, edit `design/tokens/*.json` first, then propagate (see governance edit-order). Any design-system addition must also update `DESIGN.md`, the token file, this guide, the component inventory, `CHANGELOG.md`, and the operations memory in the same change.
+
 ## Brand Vision
 - Aladdin is a **premium, trustworthy, AI-first operating system** for Egypt's finishing, construction, interior design, furnishing, and supply sector — **B2B-first** with a connected B2C consultation layer.
 - The feel is **calm authority**: confident, uncluttered, expert — a professional tool, not a flashy consumer marketplace.
@@ -127,7 +140,9 @@ This is **core architecture**, not optional documentation. Concrete brand values
 - Never block the whole screen for a partial update. Long/expensive work (OCR, imports, embeddings) runs in the background with progress + Realtime status, not a frozen UI.
 
 ## Accessibility
-- Target **WCAG 2.2 AA**. Contrast verified in **both** light and dark.
+- Target **WCAG 2.2 AA**. Contrast verified in **both** light and dark — semantic token pairs were **measured** (min light 4.76:1, min dark 5.40:1; primary-action 15.64:1). Full table: [`../design/GOVERNANCE.md`](../design/GOVERNANCE.md#accessibility).
+- **Muted-On-Sand exception:** `fg-muted` clears AA on the canvas/surface but **not on the Sand fill** (4.27:1) — on Sand use `fg-secondary`/`fg` for normal-size text.
+- Component-level a11y (keyboard traversal, focus trapping, SR labels, tab order, touch targets) is **verified per component at implementation**, not claimed up front — it is a `Ready` gate in the component inventory.
 - Full **keyboard** operability; visible focus states (token-based); logical tab order; focus management in modals/drawers/route changes.
 - Semantic HTML + ARIA only where semantics fall short; all interactive controls have accessible names; icons-only buttons carry labels.
 - Respect `prefers-reduced-motion`; never convey meaning by **color alone**; hit targets meet the WCAG 2.2 target-size guidance (≥ 24px minimum; ≥ 44px preferred on touch).
@@ -175,6 +190,10 @@ This is **core architecture**, not optional documentation. Concrete brand values
 
 ## Change History
 Newest first.
+
+### 2026-08-01 — Finalized & hardened the Design System (v1.0.0)
+- **What:** Established the design system as a **versioned** system (`1.0.0`). Added canonical machine-readable tokens (`design/tokens/*.json`), `design/GOVERNANCE.md` (source-of-truth, versioning, component & AI-agent rules, measured AA contrast), `design/COMPONENT_INVENTORY.md`, `design/icons/README.md`, and `design/CHANGELOG.md`. Added the Design System Authority section and the measured-contrast + Muted-On-Sand accessibility notes here. Fixed a broken dark-theme primary token in the frontend and added motion/z-index/breakpoint tokens + `prefers-reduced-motion`.
+- **Why:** Make the approved brand a governed, enforceable, versioned system before any product-feature work — one authority chain, no invented values.
 
 ### 2026-08-01 — Approved The Aperture identity and extracted frontend tokens
 - **What:** Recorded the founder-approved Aperture mark, Basalt/Limestone/Lumen/Bronze/Lapis palette, Archivo/Reem Kufi/Readex Pro/JetBrains Mono type system, and the authority chain between `DESIGN.md`, `design.pen`, and frontend semantic tokens. Added accessible semantic tones for normal-size text without changing the approved brand primitives.
