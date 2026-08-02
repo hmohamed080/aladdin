@@ -20,10 +20,10 @@ type Membership = Database["public"]["Tables"]["memberships"]["Row"];
 /** Active memberships for the current caller (RLS scopes this to their own rows). */
 export async function getMyActiveMemberships(
   supabase: SupabaseClient<Database>,
-): Promise<Pick<Membership, "id" | "organization_id" | "branch_id" | "status">[]> {
+): Promise<Pick<Membership, "id" | "organization_id" | "primary_branch_id" | "status">[]> {
   const { data, error } = await supabase
     .from("memberships")
-    .select("id, organization_id, branch_id, status")
+    .select("id, organization_id, primary_branch_id, status")
     .eq("status", "active");
   if (error) throw error;
   return data ?? [];

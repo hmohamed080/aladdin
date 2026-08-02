@@ -55,6 +55,13 @@ export type Database = {
             foreignKeyName: "audit_log_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
@@ -92,6 +99,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "branches_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "branches_organization_id_fkey"
             columns: ["organization_id"]
@@ -213,45 +227,38 @@ export type Database = {
       memberships: {
         Row: {
           accepted_at: string | null
-          branch_id: string | null
           created_at: string
           id: string
           invited_by: string | null
           organization_id: string
+          primary_branch_id: string | null
           status: Database["public"]["Enums"]["membership_status"]
           updated_at: string
           user_id: string
         }
         Insert: {
           accepted_at?: string | null
-          branch_id?: string | null
           created_at?: string
           id?: string
           invited_by?: string | null
           organization_id: string
+          primary_branch_id?: string | null
           status?: Database["public"]["Enums"]["membership_status"]
           updated_at?: string
           user_id: string
         }
         Update: {
           accepted_at?: string | null
-          branch_id?: string | null
           created_at?: string
           id?: string
           invited_by?: string | null
           organization_id?: string
+          primary_branch_id?: string | null
           status?: Database["public"]["Enums"]["membership_status"]
           updated_at?: string
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "memberships_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "memberships_invited_by_fkey"
             columns: ["invited_by"]
@@ -263,7 +270,21 @@ export type Database = {
             foreignKeyName: "memberships_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_primary_branch_id_fkey"
+            columns: ["primary_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
             referencedColumns: ["id"]
           },
           {
@@ -452,7 +473,51 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      organization_public_directory: {
+        Row: {
+          id: string | null
+          is_verified: boolean | null
+          locality_id: string | null
+          logo_media_id: string | null
+          name: string | null
+          org_type: Database["public"]["Enums"]["account_type"] | null
+          primary_locale: string | null
+          slug: string | null
+        }
+        Insert: {
+          id?: string | null
+          is_verified?: boolean | null
+          locality_id?: string | null
+          logo_media_id?: string | null
+          name?: string | null
+          org_type?: Database["public"]["Enums"]["account_type"] | null
+          primary_locale?: string | null
+          slug?: string | null
+        }
+        Update: {
+          id?: string | null
+          is_verified?: boolean | null
+          locality_id?: string | null
+          logo_media_id?: string | null
+          name?: string | null
+          org_type?: Database["public"]["Enums"]["account_type"] | null
+          primary_locale?: string | null
+          slug?: string | null
+        }
+        Relationships: []
+      }
+      profile_public_directory: {
+        Row: {
+          avatar_media_id: string | null
+          bio: string | null
+          display_name: string | null
+          headline: string | null
+          id: string | null
+          languages: string[] | null
+          locality_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
@@ -472,7 +537,6 @@ export type Database = {
         | "contractor"
         | "trainer"
         | "trainee"
-        | "administrator"
       contact_channel: "whatsapp" | "email"
       membership_status: "invited" | "active" | "suspended" | "revoked"
       org_status:
@@ -628,7 +692,6 @@ export const Constants = {
         "contractor",
         "trainer",
         "trainee",
-        "administrator",
       ],
       contact_channel: ["whatsapp", "email"],
       membership_status: ["invited", "active", "suspended", "revoked"],

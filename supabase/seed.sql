@@ -45,7 +45,9 @@ update public.users set primary_account_type = 'supplier',          status = 'ac
 update public.users set primary_account_type = 'sales',             status = 'active' where id = '22222222-2222-4222-8222-222222222222';
 update public.users set primary_account_type = 'interior_designer', status = 'active' where id = '33333333-3333-4333-8333-333333333333';
 update public.users set primary_account_type = 'end_consumer',      status = 'active' where id = '44444444-4444-4444-8444-444444444444';
-update public.users set primary_account_type = 'administrator',     status = 'active' where id = '55555555-5555-4555-8555-555555555555';
+-- Platform staff hold a NORMAL account type; their authority comes solely from
+-- the platform_role_grant below, never from primary_account_type (review B4).
+update public.users set primary_account_type = 'end_consumer',      status = 'active' where id = '55555555-5555-4555-8555-555555555555';
 
 -- ---------------------------------------------------------------------------
 -- Organizations
@@ -70,10 +72,11 @@ values
 -- ---------------------------------------------------------------------------
 -- Memberships
 --   A-owner    -> Org A, active, org-wide (org.manage etc.)
---   A-branch   -> Org A, active, branch-limited to Cairo only
+--   A-branch   -> Org A, active, branch-limited to Cairo only (primary_branch_id
+--                 is descriptive; access comes from membership_branch_access below)
 --   B-owner    -> Org B, active, org-wide
 -- ---------------------------------------------------------------------------
-insert into public.memberships (id, user_id, organization_id, branch_id, status, accepted_at)
+insert into public.memberships (id, user_id, organization_id, primary_branch_id, status, accepted_at)
 values
   ('e1111111-eeee-4eee-8eee-eeeeeeeeeee1', '11111111-1111-4111-8111-111111111111',
    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', null, 'active', now()),

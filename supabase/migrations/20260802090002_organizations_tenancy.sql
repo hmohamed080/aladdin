@@ -32,7 +32,11 @@ create table public.organizations (
   deleted_at    timestamptz,
   constraint ck_organizations_name_len check (char_length(name) between 2 and 120),
   constraint ck_organizations_type_not_consumer check (org_type <> 'end_consumer'),
-  constraint ck_organizations_locale check (primary_locale in ('en', 'ar'))
+  constraint ck_organizations_locale check (primary_locale in ('en', 'ar')),
+  -- Slug is a public identifier — enforce a normalized, url-safe lowercase form
+  -- so case/format variants cannot create near-duplicate public handles (H3).
+  constraint ck_organizations_slug_format
+    check (slug is null or slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$')
 );
 comment on table public.organizations is 'The tenant. Every org-owned row carries organization_id and is isolated by RLS. An end-consumer identity is not an org (ck_organizations_type_not_consumer).';
 
@@ -71,22 +75,25 @@ create trigger set_branches_updated_at
 -- 4. memberships — canonical user<->organization relationship
 -- ---------------------------------------------------------------------------
 create table public.memberships (
-  id              uuid primary key default extensions.gen_random_uuid(),
-  user_id         uuid not null references public.users (id) on delete cascade,
-  organization_id uuid not null references public.organizations (id) on delete cascade,
-  branch_id       uuid references public.branches (id) on delete set null,  -- optional home branch
-  status          public.membership_status not null default 'invited',
-  invited_by      uuid references public.users (id) on delete set null,
-  accepted_at     timestamptz,
-  created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now(),
+  id                uuid primary key default extensions.gen_random_uuid(),
+  user_id           uuid not null references public.users (id) on delete cascade,
+  organization_id   uuid not null references public.organizations (id) on delete cascade,
+  -- DESCRIPTIVE default/home branch only — it does NOT grant branch access.
+  -- Actual branch authorization comes solely from membership_branch_access
+  -- (or an org-wide capability). Sprint 1.1 review B3 / ADR-0007 D2.
+  primary_branch_id uuid references public.branches (id) on delete set null,
+  status            public.membership_status not null default 'invited',
+  invited_by        uuid references public.users (id) on delete set null,
+  accepted_at       timestamptz,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
   constraint uq_memberships_user_org unique (user_id, organization_id)
 );
-comment on table public.memberships is 'The canonical link between one identity and one organization. Never forks the identity. uq prevents duplicate active membership. Tenant access derives from active memberships, not from a role on the user profile.';
+comment on table public.memberships is 'The canonical link between one identity and one organization. Never forks the identity. uq_memberships_user_org allows only one membership row per (user, org). Tenant access derives from active memberships (not from a role on the profile); branch access derives from membership_branch_access, not primary_branch_id.';
 
 create index ix_memberships_org on public.memberships (organization_id);
 create index ix_memberships_user on public.memberships (user_id);
-create index ix_memberships_branch on public.memberships (branch_id);
+create index ix_memberships_primary_branch on public.memberships (primary_branch_id);
 
 create trigger set_memberships_updated_at
   before update on public.memberships
@@ -207,8 +214,11 @@ as $$
   );
 $$;
 
--- Branch ids the caller can access within an org. Org-wide members
--- (org.manage/branch.manage) see every branch; others see assigned + home branch.
+-- Branch ids the caller can access within an org. There is ONE source of branch
+-- authority (Sprint 1.1 review B3): an org-wide capability (org.manage/
+-- branch.manage) grants every branch; otherwise only branches explicitly assigned
+-- via membership_branch_access. `memberships.primary_branch_id` is descriptive
+-- default context and deliberately grants NO access here.
 create or replace function app.current_branch_ids(p_org_id uuid)
 returns setof uuid
 language sql
@@ -225,7 +235,7 @@ as $$
       or app.has_capability(p_org_id, 'branch.manage')
     )
   union
-  -- Branch-limited: explicitly assigned branches.
+  -- Branch-limited: explicitly assigned branches only.
   select mba.branch_id
   from public.memberships m
   join public.membership_branch_access mba on mba.membership_id = m.id
@@ -233,15 +243,7 @@ as $$
   where m.user_id = (select auth.uid())
     and m.organization_id = p_org_id
     and m.status = 'active'
-    and b.organization_id = p_org_id
-  union
-  -- Home branch on the membership, if set.
-  select m.branch_id
-  from public.memberships m
-  where m.user_id = (select auth.uid())
-    and m.organization_id = p_org_id
-    and m.status = 'active'
-    and m.branch_id is not null;
+    and b.organization_id = p_org_id;
 $$;
 
 -- True if the caller holds the given platform role (or a higher one).
@@ -275,21 +277,21 @@ alter table public.membership_branch_access enable row level security;
 alter table public.platform_role_grants    enable row level security;
 
 -- organizations -------------------------------------------------------------
--- Members see their org; platform admins read cross-tenant; the public sees
--- active+verified orgs (B2C discovery).
+-- The base table is PRIVATE: members see their own org; platform admins read
+-- cross-tenant. Public B2C discovery is served ONLY by the
+-- `organization_public_directory` view (approved columns), so non-members and
+-- anon never read internal columns like created_by/status (Sprint 1.1 review B1).
 create policy organizations_select_member on public.organizations
   for select to authenticated
   using (deleted_at is null and app.is_org_member(id));
-
-create policy organizations_select_public on public.organizations
-  for select to anon, authenticated
-  using (deleted_at is null and status = 'active' and is_verified);
 
 create policy organizations_select_platform on public.organizations
   for select to authenticated
   using (app.is_platform('support'));
 
--- Any authenticated user may create an org; they must be the recorded creator.
+-- Any authenticated user may create an org; they must be the recorded creator,
+-- and it always starts unverified/draft (status & is_verified are withheld from
+-- the INSERT column grant below, so a client cannot self-verify — review B2).
 -- (Per-user creation caps are an anti-abuse concern for the write path — deferred.)
 create policy organizations_insert_creator on public.organizations
   for insert to authenticated
@@ -441,27 +443,76 @@ create policy profiles_select_platform on public.profiles
   using (app.is_platform('support'));
 
 -- ---------------------------------------------------------------------------
--- 10. Grants (deny-by-default Data API)
+-- 10. Public discovery view (approved organization columns only)
 -- ---------------------------------------------------------------------------
+-- Curated PUBLIC projection for B2C discovery. Runs with the view owner's rights
+-- (security_invoker off) so it presents a fixed, minimal column set instead of
+-- exposing the tenant table. It NEVER reveals created_by, deleted_at, timestamps,
+-- or other operational metadata, and only lists active + verified organizations.
+create view public.organization_public_directory
+  with (security_invoker = false) as
+  select id, name, slug, org_type, is_verified, primary_locale, locality_id, logo_media_id
+  from public.organizations
+  where status = 'active' and is_verified and deleted_at is null;
+comment on view public.organization_public_directory is 'Approved PUBLIC projection of organizations for B2C discovery (Sprint 1.1 review B1). Only public columns; never created_by/status/deleted_at/timestamps. Base organizations table stays private (member/platform only).';
+
+-- ---------------------------------------------------------------------------
+-- 11. Grants (deny-by-default Data API)
+-- ---------------------------------------------------------------------------
+-- Security-definer helpers: revoke default PUBLIC execute; grant only to
+-- authenticated (anon never needs tenancy helpers) — Sprint 1.1 review H1.
+revoke execute on function app.current_org_ids() from public;
+revoke execute on function app.is_org_member(uuid) from public;
+revoke execute on function app.has_capability(uuid, text) from public;
+revoke execute on function app.current_branch_ids(uuid) from public;
+revoke execute on function app.is_platform(public.platform_role) from public;
 grant execute on function app.current_org_ids() to authenticated;
 grant execute on function app.is_org_member(uuid) to authenticated;
 grant execute on function app.has_capability(uuid, text) to authenticated;
 grant execute on function app.current_branch_ids(uuid) to authenticated;
 grant execute on function app.is_platform(public.platform_role) to authenticated;
 
-grant select on public.organizations to anon, authenticated;
-grant insert on public.organizations to authenticated;
+-- CRITICAL (Sprint 1.1 review): strip Supabase's default TRUNCATE/REFERENCES/
+-- TRIGGER privileges from the client roles (a TRUNCATE bypasses RLS and could
+-- destroy tenant data), then grant back only the intended access. service_role is
+-- the trusted RLS-bypassing backend path and needs explicit DML.
+revoke all on
+  public.organizations, public.branches, public.memberships,
+  public.membership_capabilities, public.membership_branch_access,
+  public.platform_role_grants
+  from anon, authenticated, service_role;
+
+-- organizations: base table readable only by authenticated (RLS = member/platform);
+-- the public view is granted separately below. INSERT is column-scoped so a
+-- client cannot set status/is_verified (no self-verification — review B2).
+grant select on public.organizations to authenticated;
+grant insert (name, slug, org_type, primary_locale, locality_id, logo_media_id, created_by)
+  on public.organizations to authenticated;
 grant update (name, slug, org_type, primary_locale, locality_id, logo_media_id, deleted_at)
   on public.organizations to authenticated;
+grant select, insert, update, delete on public.organizations to service_role;
+grant select on public.organization_public_directory to anon, authenticated, service_role;
 
 grant select, insert on public.branches to authenticated;
 grant update (name, locality_id, is_active, deleted_at) on public.branches to authenticated;
+grant select, insert, update, delete on public.branches to service_role;
 
-grant select, insert on public.memberships to authenticated;
-grant update (branch_id, status, accepted_at) on public.memberships to authenticated;
+-- memberships: INSERT is column-scoped so status/accepted_at fall to their
+-- defaults (invited / null) — a client cannot forge a pre-activated membership;
+-- activation is an UPDATE by a member-manager (invitation flow is Sprint 2).
+grant select on public.memberships to authenticated;
+grant insert (user_id, organization_id, primary_branch_id, invited_by)
+  on public.memberships to authenticated;
+grant update (primary_branch_id, status, accepted_at) on public.memberships to authenticated;
+grant select, insert, update, delete on public.memberships to service_role;
 
 grant select, insert, delete on public.membership_capabilities to authenticated;
+grant select, insert, update, delete on public.membership_capabilities to service_role;
 grant select, insert, delete on public.membership_branch_access to authenticated;
+grant select, insert, update, delete on public.membership_branch_access to service_role;
 
--- platform_role_grants: read only for authenticated (writes are service-role only).
+-- platform_role_grants: authenticated may only READ (own/admin via RLS). Writes
+-- are the trusted provisioning path — service_role (or DBA) only. No ordinary-user
+-- write grant exists, so an org admin can never escalate to platform admin.
 grant select on public.platform_role_grants to authenticated;
+grant select, insert, delete on public.platform_role_grants to service_role;
