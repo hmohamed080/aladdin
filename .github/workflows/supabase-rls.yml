@@ -1,0 +1,72 @@
+# Aladdin — Supabase RLS / tenant-isolation security gate.
+#
+# Starts the local Supabase stack, applies every migration from a clean database,
+# runs the seed, lints the public/app schemas, and executes the full pgTAP suite
+# (tenant isolation, membership lifecycle, branch isolation, public-discovery
+# projection safety, platform-admin boundary, audit immutability, privilege
+# hardening). Any migration, lint, or test failure fails the PR.
+#
+# Stable status-check name for branch protection: `supabase-rls`.
+#
+# Runner assumptions:
+#   - ubuntu-latest ships Docker; `supabase start` runs the stack in containers.
+#   - The Supabase CLI is the repo-pinned devDependency (package.json: supabase
+#     2.110.0), invoked via `pnpm exec supabase` — no third-party action to vet.
+#   - No cloud credentials and no live Supabase project are used; everything is
+#     local to the runner. The stack is always stopped in cleanup.
+#   - Expected duration ~5-9 min (most of it the one-time Docker image pulls).
+
+name: supabase-rls
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: supabase-rls-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: read-only checkout, no secrets.
+permissions:
+  contents: read
+
+jobs:
+  supabase-rls:
+    name: supabase-rls
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable pnpm (corepack, pinned to packageManager)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+
+      # Installs the repo-pinned Supabase CLI (devDependency) into the workspace.
+      - run: pnpm install --frozen-lockfile
+
+      - name: Start local Supabase stack
+        run: pnpm exec supabase start
+
+      - name: Apply all migrations from a clean database (+ seed)
+        run: pnpm exec supabase db reset
+
+      - name: Lint public/app schemas
+        run: pnpm exec supabase db lint --schema public,app
+
+      - name: Run pgTAP tenant-isolation / RLS tests
+        run: pnpm exec supabase test db
+
+      - name: Prove repeatability (second clean reset + tests)
+        run: |
+          pnpm exec supabase db reset
+          pnpm exec supabase test db
+
+      # Always stop the stack, even if an earlier step failed.
+      - name: Stop local Supabase stack
+        if: always()
+        run: pnpm exec supabase stop --no-backup || true
