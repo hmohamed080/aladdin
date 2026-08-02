@@ -60,7 +60,8 @@ Follow [`../database/naming-conventions.md`](../database/naming-conventions.md) 
 | Python class | `PascalCase` | `OcrProvider` |
 | Event | `PascalCase` past-tense | `QuoteAccepted` |
 | Domain event/job payload key | `camelCase` | `organizationId` |
-| Branch / commit type | `feat/fix/db/…` | see [`git-workflow`](../development/git-workflow.md) |
+| Branch prefix | `feature/bugfix/hotfix/chore/docs/release` | `feature/identity-multitenancy` |
+| Commit-message type | `feat/fix/db/deploy/test/refactor/style/docs/chore` | `feat: …` — see [`git-workflow`](../development/git-workflow.md) |
 | Realtime channel | `<scope>:{id}` | `pipeline:{orgId}` |
 
 **Prohibited names:** `Button2`, `NewX`, `UpdatedX`, `FinalX`, `XCopy`, `utils2`, version-suffixed identifiers ([`../../design/GOVERNANCE.md`](../../design/GOVERNANCE.md) new-component governance).

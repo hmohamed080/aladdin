@@ -28,8 +28,8 @@ Full list + rationale in [`14_future_extensions.md`](14_future_extensions.md) an
 
 | Item | Impact | Fix |
 |---|---|---|
-| **No `.dockerignore`** in `backend/` | full build context (incl. `.venv/`) sent to daemon; 3 local `__pycache__` dirs copied into image | add `.dockerignore`; image is otherwise clean (selective `COPY`) |
-| **No `CODEOWNERS`** | review routing is manual | add when a team exists (ADR-0006) |
+| ~~No `.dockerignore` in `backend/`~~ | — | **Resolved 2026-08-01** — `backend/.dockerignore` added; image rebuild verified |
+| ~~No `CODEOWNERS`~~ | — | **Resolved 2026-08-01** — `.github/CODEOWNERS` added (single-owner map; enforcement needs branch-protection setting) |
 | **`.impeccable/design.json` breakpoints** (430/1080/1360) differ from canonical (768/1024/1440) | none (gitignored local sidecar, non-authoritative) | reconcile if the sidecar is ever promoted |
 | **Vector (logflare) container flaps** on local Supabase | benign; unrelated to Postgres/schema | ignore locally; monitor in staging |
 | **Font OFL formal license audit** pending | low | verify OFL files before production ship |
@@ -62,8 +62,8 @@ The RLS/isolation spine, passwordless model, and tenant filtering are **not** de
 
 | Item | Trigger |
 |---|---|
-| **CI/CD pipeline** (documented in [`10_environment_and_cicd`](../engineering/10_environment_and_cicd.md), not wired) | before/at Phase 1 |
-| Branch protection on `main` (requires CI) | with CI (ADR-0006) |
+| **Minimum PR CI** (`.github/workflows/ci.yml`: `frontend`/`backend`/`docs`) added 2026-08-01 | **CD**, Docker-image + Supabase RLS/isolation CI jobs, and **SHA-pinning of actions** remain deferred ([`10_environment_and_cicd`](../engineering/10_environment_and_cicd.md)) |
+| Branch protection required-checks selection | after CI runs once, select `frontend`/`backend`/`docs` in `main` protection (ADR-0006) |
 | Staging/Production cloud provisioning (Vercel/Railway/Supabase) | first deploy |
 | `docker build` in CI + image scanning | with CI |
 | Preview-environment automation | later |

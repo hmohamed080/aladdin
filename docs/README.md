@@ -123,7 +123,7 @@ The engineering reference every implementation task and AI agent follows. Index:
 
 - [`development/git-workflow.md`](development/git-workflow.md) — branch/commit/merge/release/tagging conventions
 - [`development/github-workflow.md`](development/github-workflow.md) — recommended labels, milestones, project board
-- [`development/release-strategy.md`](development/release-strategy.md) — release process + the `v0.7.0-foundation` release
+- [`development/release-strategy.md`](development/release-strategy.md) — release process + the `v0.1.0-foundation` release (repo `0.1.0`; Design System stays `1.0.0`)
 - GitHub community files: [`../.github/PULL_REQUEST_TEMPLATE.md`](../.github/PULL_REQUEST_TEMPLATE.md), [`../.github/ISSUE_TEMPLATE/`](../.github/ISSUE_TEMPLATE/)
 
 ## Technical Specification (Phase 0.7 — MVP blueprint)

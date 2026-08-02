@@ -14,7 +14,7 @@ Covers **Feature Development Workflow (10)**, **Feature Checklist (15)**, **Defi
 ## 1. Feature development workflow
 
 1. **Confirm scope & authority.** The feature exists in [`mvp-scope.md`](../product/mvp-scope.md)/roadmap and has a technical-spec home ([`../technical/`](../technical/)). Resolve any `⚑ OPEN` product decision first (label `needs-product-decision`) — do not invent it.
-2. **Branch** from `main`: `feat/<summary>` ([`git-workflow`](../development/git-workflow.md)).
+2. **Branch** from `main`: `feature/<summary>` ([`git-workflow`](../development/git-workflow.md) §1 — canonical prefixes `feature/bugfix/hotfix/chore/docs/release`).
 3. **Read the spec slice:** domain ([`02`](../technical/02_domain_model.md)), DB ([`03`](../technical/03_database_design.md)), RLS ([`06`](../technical/06_rls_strategy.md)), permissions ([`07`](../technical/07_permissions_matrix.md)), API ([`08`](../technical/08_api_contracts.md)), validation ([`12`](../technical/12_validation_rules.md)), state ([`11`](../technical/11_state_machines.md)), events ([`10`](../technical/10_events.md)).
 4. **Database first (if new data):** write the migration + RLS policies + **organization-isolation tests** ([`08_database_migration_workflow.md`](08_database_migration_workflow.md)); `db reset` green.
 5. **Schemas:** Zod (+ Pydantic if FastAPI) from the validation rules.

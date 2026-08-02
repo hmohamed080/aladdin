@@ -21,8 +21,8 @@ Documentation coverage by area. **Coverage %** = how completely the area is docu
 | **API** | 100% | Stable (contracts) | Engineering | 2026-08-01 | Contracts complete; realized endpoints land with features |
 | **Engineering standards** | 100% | Stable (Phase 0.8) | Engineering | 2026-08-01 | — (12 docs + index; all 25 topics covered) |
 | **Testing** | 90% | Stable (strategy) | Engineering | 2026-08-01 | Strategy set; concrete test suites land with features/migrations |
-| **Development / Repo governance** | 100% | Stable (Phase 0.9) | Foundation | 2026-08-01 | `CODEOWNERS` recommended, not yet created (ADR-0006) |
-| **Operations** | 85% | Stable | Ops | 2026-08-01 | CI/CD not wired; deployment provisioning + metrics/alerting deferred |
+| **Development / Repo governance** | 100% | Stable (Phase 0 closeout) | Foundation | 2026-08-01 | `CODEOWNERS` + minimum PR CI added; branch-protection required-check selection is a maintainer follow-up |
+| **Operations** | 88% | Stable | Ops | 2026-08-01 | Minimum PR CI present; **CD**, cloud provisioning, Docker/Supabase CI jobs, and metrics/alerting deferred |
 | **Design system** | 100% | Stable (`v1.0.0`) | Design System | 2026-08-01 | Runtime asset exports (logo/app-icon/WebGL); theme toggle wiring (tracked in debt) |
 | **Governance / planning** | 100% | Stable (Phase 0.9) | Foundation | 2026-08-01 | GitHub labels/milestones/board are documented, not yet applied in GitHub |
 

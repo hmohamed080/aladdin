@@ -61,35 +61,35 @@ The phase plan for Aladdin. **Source of truth for scope/order is [`mvp-scope.md`
 - **Deliverables:** `users/profiles/contacts`; orgs/branches/memberships/capabilities; passwordless OTP (WhatsApp/Email) auth; RLS helper functions + JWT claims; **organization-isolation tests**; account-type + platform-role model.
 - **Dependencies:** Phase 0.9; product sign-off on auth/verification `⚑ OPEN` items.
 - **Success criteria:** two orgs fully isolated (all four verbs) with passing tests; passwordless sign-in works Local; capability-derived access; 0 cross-tenant leakage.
-- **Estimate:** ~2–3 sprints. **Branch:** `feat/identity-multitenancy`.
+- **Estimate:** ~2–3 sprints. **Branch:** `feature/identity-multitenancy`.
 
 ### Phase 2 — Core Marketplace (Sales-first discovery + catalog)
 - **Objective:** the core value-chain surfaces — **05C B2B Sales workflow first (the wedge)**, then **05A B2C value journey** — on catalog + discovery.
 - **Deliverables:** catalog (products/brands/categories/media) + inventory/availability; smart search (FTS/`pg_trgm`); verification gating; Sales pipeline (Opportunity → Need → Match → Smart Share → Follow-up → Task) with Realtime; B2C discovery + AI consult entry.
 - **Dependencies:** Phase 1; matching needs identity + catalog liquidity.
 - **Success criteria:** a Sales user runs a real pipeline; a need becomes a trusted match; discovery/search work bilingually + both themes; RLS holds.
-- **Estimate:** ~4–6 sprints. **Branch:** `feat/sales-workflow` then `feat/b2c-discovery`.
+- **Estimate:** ~4–6 sprints. **Branch:** `feature/sales-workflow` then `feature/b2c-discovery`.
 
 ### Phase 3 — Projects & Quotations (05B)
 - **Objective:** RFQ → quote comparison → decision → project follow-up.
 - **Deliverables:** RFQ/RfqItem; Quote/QuoteItem/QuoteDecision (anti-auction visibility); quote comparison; Project/ProjectActivity tracking; PDF quote generation (Arabic-shaping).
 - **Dependencies:** Phase 2 (needs/opportunities + catalog).
 - **Success criteria:** comparable quotes without leaving the system; no responder sees another's pricing; accepted quote → project; state machines enforced.
-- **Estimate:** ~3–4 sprints. **Branch:** `feat/rfq-quotations`.
+- **Estimate:** ~3–4 sprints. **Branch:** `feature/rfq-quotations`.
 
 ### Phase 4 — AI Assistant
 - **Objective:** mature the FastAPI AI service — consultation, intent extraction, match explanation, follow-up drafting, RAG — human-in-the-loop.
 - **Deliverables:** `/v1/ai/*` + `/v1/retrieval` endpoints; embeddings/OCR pipelines (workers); tenant-filtered retrieval; AI evaluations. (AI is threaded through Phases 2–3; this phase deepens it.)
 - **Dependencies:** Phases 1–3 (data to reason over); OpenAI; OCR provider finalized.
 - **Success criteria:** retrieval never crosses orgs; AI drafts/ranks with explanations; humans decide/send; graceful degradation.
-- **Estimate:** ~3–4 sprints. **Branch:** `feat/ai-assistant`.
+- **Estimate:** ~3–4 sprints. **Branch:** `feature/ai-assistant`.
 
 ### Phase 5 — Advertisements, Supplier Ops & Cockpits (05D + 05E)
 - **Objective:** promoted placements + supplier/product operations, then dashboards.
 - **Deliverables:** advertisements (moderated) + placements; supplier/showroom product ops (05D); B2B cockpit + admin completion + analytics (05E, dashboards last); subscription state gating; notifications maturity.
 - **Dependencies:** Phases 2–4 (inner workflows exist before dashboards summarize them).
 - **Success criteria:** ads moderated before live; cockpits are action surfaces (not vanity); analytics derived; admin governance + audit complete.
-- **Estimate:** ~3–5 sprints. **Branch:** `feat/ads-supplier-ops`, `feat/cockpit-admin`.
+- **Estimate:** ~3–5 sprints. **Branch:** `feature/ads-supplier-ops`, `feature/cockpit-admin`.
 
 ---
 
