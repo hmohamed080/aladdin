@@ -9,21 +9,24 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | **Version** | Runtime snapshot · 2026-08-01 |
 | **Owner** | Foundation / Operations |
 | **Last updated** | 2026-08-01 |
-| **Updated by** | Claude Code (Opus 4.8) — documentation & repository finalization |
-| **Current focus** | **Documentation & repository finalization.** The MVP engineering blueprint (`docs/technical/`, 15 docs) and the finalized Aperture design system (`1.0.0`) are complete; architecture + infrastructure validation passed (Docker + Supabase). The project is being published to its canonical GitHub remote. Specification/documentation only — no product code/migration/table/API. |
+| **Updated by** | Claude Code (Opus 4.8) — Phase 0.9 repository governance |
+| **Current focus** | **Phase 0.9 (Governance) complete.** Repository governance (ADR-0006), roadmap, MoSCoW backlog, technical-debt register, documentation-status tracker, and the ADR decision-log are authored and cross-referenced; the docs index is updated with no orphan documents. All pre-implementation documentation phases (0 → 0.9) are done. Specification/documentation only — no product code/migration/table/API. **Next: Phase 1 implementation.** |
 
 ## Phase & repository
 
 | Field | Value |
 |---|---|
-| **Current Phase** | Phase 0.7 complete → Documentation & Repository Finalization |
+| **Current Phase** | **Phase 0.9 — Governance (complete)**; all pre-implementation phases (0 → 0.9) done |
+| **Next Phase** | **Phase 1 — Identity & Multi-tenancy** (canonical identity, orgs/branches/memberships/capabilities, RLS helpers + organization-isolation tests) |
 | **Current Branch** | `docs/technical-finalization` (created from `chore/repository-architecture-foundation`) |
-| **Current Milestone** | MVP technical blueprint finalized; documentation standardized; repository published to GitHub |
+| **Recommended Next Branch** | `feat/identity-multitenancy` (cut from `main` after this branch merges) |
+| **Current Milestone** | Repository governance + planning artifacts (roadmap, backlog, tech-debt, doc-status, decision-log) |
 | **Current Remote Repository** | `origin` = `https://github.com/hmohamed080/aladdin.git` |
-| **Last Stable Commit** | `7499ab1` — *docs: add MVP technical specification blueprint (Phase 0.7)* (finalization commits land on top of this) |
-| **Last Stable Tag** | none yet — ⚑ recommend tagging `v0.7.0-foundation` at the finalized foundation |
-| **Next Planned Phase** | Implementation Phase 1 — Identity & multi-tenancy (canonical identity, orgs/branches/memberships/capabilities, RLS helpers + isolation tests) |
-| **Next Planned Branch** | `feat/identity-multitenancy` (proposed) |
+| **Last Stable Commit** | `7499ab1` — *docs: add MVP technical specification blueprint (Phase 0.7)* (Phase 0.8/0.9 doc commits land on top of this on the finalization branch) |
+| **Last Stable Tag** | none yet — ⚑ recommend tagging `v0.7.0-foundation` at `7499ab1` (see [`release-strategy.md`](../development/release-strategy.md)) |
+| **Repository Status** | Published to GitHub (`origin`, full history, no squash/force); `main` protection recommended (ADR-0006), not yet applied |
+| **Documentation Status** | Complete for pre-implementation — see [`../DOCUMENTATION_STATUS.md`](../DOCUMENTATION_STATUS.md); 0 broken links; no orphan docs |
+| **Implementation Status** | **Not started** — 0 product features/tables/endpoints/screens; ready to begin Phase 1 |
 
 ## Live engineering state
 
@@ -32,13 +35,13 @@ Always reflects the current live engineering state of the project. Overwrite eac
 | Field | Value |
 |---|---|
 | **Current Sprint** | none — pre-implementation (Foundation & Engineering-Standards) |
-| **Current Epic** | Documentation & Engineering Foundation (Phase 0.7 → 0.8) |
+| **Current Epic** | Documentation, Engineering & Governance Foundation (Phase 0.7 → 0.9) |
 | **Current Feature** | none — no product feature started |
 | **Current UI Status** | Design system **v1.0.0** ("The Aperture") finalized + implemented as tokens; only the Next.js scaffold page exists — **no product screens** |
 | **Current Backend Status** | FastAPI scaffold — `GET /health` only; **no product endpoints**; `supabase-py` data access (ADR-0005) |
 | **Current Database Status** | one migration (`20260729000000_extensions.sql`); **0 product tables**; **0 RLS policies** (none to protect yet); schema source = `supabase/migrations/*.sql` |
 | **Current Design System Version** | **1.0.0** (`DESIGN.md` / `design/tokens/*`) |
-| **Current Documentation Version** | Technical spec **1.0.0** (Phase 0.7); docs index **1.0.0**; engineering standards **1.0.0** (Phase 0.8) |
+| **Current Documentation Version** | Technical spec **1.0.0** (Phase 0.7); engineering standards **1.0.0** (Phase 0.8); governance/planning **1.0.0** (Phase 0.9 — ADR-0006, ROADMAP, BACKLOG, TECHNICAL_DEBT, DOCUMENTATION_STATUS, DECISION_LOG); docs index **1.0.0** |
 | **Current Deployment Status** | **not deployed** — no Vercel/Railway/Supabase cloud project connected; **no CI/CD**; repository published to GitHub (`origin`) only |
 
 ## Git & branch

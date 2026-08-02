@@ -4,6 +4,41 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 0.9: Repository Governance & Planning
+**Date/time:** 2026-08-01
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `docs/technical-finalization` (continued; no new branch)
+
+### Objectives
+Extend repository governance to production-grade and implementation-ready: add the missing governance/planning documents and connect them to the existing hierarchy, without duplicating or rewriting existing docs. **Documentation only — no product feature, code, migration, API, table, UI, architecture, product-direction, or `.pen` change.**
+
+### Documents added
+- [`decisions/ADR-0006-repository-governance.md`](../decisions/ADR-0006-repository-governance.md) — branch strategy/naming, protected branches, merge strategy, PR policy, SemVer, release workflow, GitHub flow, commit conventions, code & documentation ownership (cross-references the development docs).
+- [`roadmap/ROADMAP.md`](../roadmap/ROADMAP.md) — Phase 0 → 5 + future, each with objective/deliverables/dependencies/success-criteria/estimate; mapped to the Sales-first design roadmap and reconciled with MVP scope (no "marketplace/commerce" contradiction).
+- [`product/BACKLOG.md`](../product/BACKLOG.md) — MoSCoW backlog (priority/phase/dependencies/status/owner/notes) sourced from MVP scope.
+- [`technical/TECHNICAL_DEBT.md`](../technical/TECHNICAL_DEBT.md) — deferred features, known compromises, performance/security/infra improvements, future refactoring, and consolidated `⚑ OPEN` decisions.
+- [`DOCUMENTATION_STATUS.md`](../DOCUMENTATION_STATUS.md) — coverage by area (%/status/owner/last-updated/missing).
+- [`decisions/DECISION_LOG.md`](../decisions/DECISION_LOG.md) — one-screen index of ADR-0001…0006 (title/status/date/summary/current-state).
+
+### Files updated
+- [`README.md`](../README.md) (docs index) — new **Planning & governance** section; ADR-0006 + DECISION_LOG added to Decisions; BACKLOG in Product; TECHNICAL_DEBT in Technical. No orphan documents.
+- [`RUNTIME_STATE.md`](RUNTIME_STATE.md) — Current/Next Phase, Current/Recommended-Next Branch, Repository Status, Documentation Status, Implementation Status; live-state Epic + Documentation Version updated to Phase 0.9.
+- This log.
+
+### Validation
+- Internal markdown links re-checked (see final report); no duplicated documentation (new docs cross-reference existing ones); no conflicts with ADRs, Product Direction, or MVP Scope (roadmap/backlog explicitly reconciled and preserve the "never build" list and Sales-first order); metadata blocks consistent; work log chronological (newest first).
+
+### Known remaining work
+`⚑ OPEN` product decisions (subscription tiers, verification doc sets, email/OCR/PDF providers, retention windows, product attribute schemas, media/OTP caps) — tracked in [`TECHNICAL_DEBT.md`](../technical/TECHNICAL_DEBT.md) §7; `CODEOWNERS` + CI branch-protection recommended (ADR-0006); tag `v0.7.0-foundation`; apply GitHub labels/milestones/board.
+
+### Next recommended phase
+**Phase 1 — Identity & Multi-tenancy** on `feat/identity-multitenancy` (cut from `main` after this branch merges).
+
+### Out of scope (confirmed not done)
+No product feature/screen/table/API/migration; no architecture/product-direction/UI change; no `.pen` edit; no GitHub resources auto-created (documented only); no history rewrite; existing documentation not rewritten (only extended/indexed).
+
+---
+
 ## Session — Architecture-Review Resolution + Phase 0.8 Engineering Setup
 **Date/time:** 2026-08-01
 **Agent/tool:** Claude Code (Opus 4.8)

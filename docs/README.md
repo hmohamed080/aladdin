@@ -37,10 +37,21 @@ Read these in order before making any change (this mirrors the reading order in 
 
 The five files above are **persistent project memory and part of the core architecture** — not optional docs. Their authority rules live in the root [`AGENTS.md`](../AGENTS.md) ("Persistent project memory") and the end-of-session checklist in [`AGENTS.md`](AGENTS.md) (docs scope).
 
+## Planning & governance
+
+- [`roadmap/ROADMAP.md`](roadmap/ROADMAP.md) — phase plan (Phase 0 → 5 + future)
+- [`product/BACKLOG.md`](product/BACKLOG.md) — MoSCoW product backlog
+- [`technical/TECHNICAL_DEBT.md`](technical/TECHNICAL_DEBT.md) — deferred features, compromises, improvements
+- [`DOCUMENTATION_STATUS.md`](DOCUMENTATION_STATUS.md) — documentation coverage by area
+- [`decisions/DECISION_LOG.md`](decisions/DECISION_LOG.md) — one-screen ADR index
+- [`decisions/ADR-0006-repository-governance.md`](decisions/ADR-0006-repository-governance.md) — repository governance (branch/merge/release/ownership)
+- Repo/process: [`development/git-workflow.md`](development/git-workflow.md) · [`development/github-workflow.md`](development/github-workflow.md) · [`development/release-strategy.md`](development/release-strategy.md)
+
 ## Product
 
 - [`product/PRODUCT_DIRECTION_GUIDE.md`](product/PRODUCT_DIRECTION_GUIDE.md) — **canonical** product direction
 - [`product/mvp-scope.md`](product/mvp-scope.md) — MVP scope & ordering (authoritative for sequencing)
+- [`product/BACKLOG.md`](product/BACKLOG.md) — prioritized backlog (MoSCoW)
 - [`product/client-brief.md`](product/client-brief.md) — client brief
 - [`product/design-idea.md`](product/design-idea.md) — original founder brief (Arabic)
 
@@ -61,6 +72,8 @@ The five files above are **persistent project memory and part of the core archit
 - [`decisions/ADR-0003-agent-instruction-hierarchy.md`](decisions/ADR-0003-agent-instruction-hierarchy.md)
 - [`decisions/ADR-0004-deployment-platforms.md`](decisions/ADR-0004-deployment-platforms.md)
 - [`decisions/ADR-0005-python-data-access.md`](decisions/ADR-0005-python-data-access.md)
+- [`decisions/ADR-0006-repository-governance.md`](decisions/ADR-0006-repository-governance.md)
+- [`decisions/DECISION_LOG.md`](decisions/DECISION_LOG.md) — **one-screen index of all ADRs**
 - [`decisions/agent-instruction-migration.md`](decisions/agent-instruction-migration.md) — source→destination map
 
 ## Security
@@ -121,6 +134,7 @@ The engineering blueprint every implementation task follows. **Specification onl
 - [`05_storage_design.md`](technical/05_storage_design.md) · [`06_rls_strategy.md`](technical/06_rls_strategy.md) · [`07_permissions_matrix.md`](technical/07_permissions_matrix.md) · [`08_api_contracts.md`](technical/08_api_contracts.md)
 - [`09_background_jobs.md`](technical/09_background_jobs.md) · [`10_events.md`](technical/10_events.md) · [`11_state_machines.md`](technical/11_state_machines.md) · [`12_validation_rules.md`](technical/12_validation_rules.md)
 - [`13_integrations.md`](technical/13_integrations.md) · [`14_future_extensions.md`](technical/14_future_extensions.md)
+- [`technical/TECHNICAL_DEBT.md`](technical/TECHNICAL_DEBT.md) — deferred features, compromises, and improvements
 
 ## Historical / source material
 
