@@ -4,6 +4,113 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 1: Sprint 1.2 (Account-Type & Public-Profile Authorization Fix)
+**Date/time:** 2026-08-02
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `feature/identity-multitenancy` (continued; not merged)
+
+### Objective
+Narrow merge-blocking correction to the identity model: make `primary_account_type` and public-profile eligibility server-controlled. No new feature; no auth UI; no upgrade workflow build.
+
+### Vulnerability (confirmed empirically, then fixed)
+The committed migration granted `authenticated` a column UPDATE on `users.primary_account_type`, and `profile_public_directory` treated any `primary_account_type <> 'end_consumer'` as public. Verified: the seeded consumer ran `update users set primary_account_type='engineer'` (succeeded) and then appeared in the public directory — bypassing the upgrade workflow, verification, and future subscription gates.
+
+### Fix
+- **`primary_account_type` server-controlled:** removed from the `authenticated` update grant (only `locale` self-editable now); `is_verified`/`status` were already withheld. `service_role` keeps full `users` DML for the future upgrade/admin RPC. No client write path exists (verified: none in `frontend/`/`backend/` app code).
+- **Public eligibility field:** added `profiles.public_profile_status` enum (`hidden` default / `listed`), **not** in the `authenticated` update grant (server-controlled). `profile_public_directory` now requires `public_profile_status='listed'` AND professional account type AND active AND not deleted.
+- **Six concepts kept distinct** (ADR-0007 D10/D11): identity · account type (server-controlled) · membership · platform role · professional verification (future `Verification` entity, drives `listed`) · public visibility (`public_profile_status`). `users.is_verified` (identity) not reused.
+- Seed lists the two org owners (trusted path) and leaves the sales staff `hidden` as a negative fixture.
+
+### Catalog verification
+`role_column_grants`: `authenticated` UPDATE on `users` = `locale` only; on `profiles` = display columns only (no `public_profile_status`). `service_role` retains `users` UPDATE. Empirical consumer self-promote → **denied (42501)**.
+
+### Tests / validation
+New `10_account_type_eligibility` (12 assertions: self-promote denied, self-verify denied, self-list denied, locale still editable, hidden professional invisible, listed professional visible, service_role transition works); expanded `08` (listed-only discovery, hidden-professional negative, suspended-user exclusion). pgTAP **98 → 112**; two clean `db reset` + `test db` cycles → **112/112 PASS**; `db lint` clean. Frontend typecheck/lint/test(3)/build GREEN (types regenerated with `public_profile_status`); backend ruff + **pytest 10**. CI: existing `supabase-rls` runs the expanded suite (no duplicate workflow). **No `.pen` modified.**
+
+### Docs
+ADR-0007 Sprint 1.2 amendments (D10/D11); DECISION_LOG; phase1 review §7; domain model (User/Profile), 03/06/11/12 specs; TECHNICAL_DEBT (account-upgrade write path); DOCUMENTATION_STATUS; RUNTIME_STATE; this log.
+
+### Remaining (Sprint 2)
+Transactional, auditable account-upgrade write path (account-type transition + set `listed` on approval) driven by the professional `Verification` feature.
+
+---
+
+## Session — Phase 1: Sprint 1.1 (Independent Identity & RLS Security Review)
+**Date/time:** 2026-08-02
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `feature/identity-multitenancy` (continued; not merged)
+
+### Objective
+Independent security/correctness/schema audit of the unmerged Sprint 1 migrations, grants, policies, functions, triggers, clients, tests, and seeds — fixing findings in the still-unmerged migration set (no history rewrite). No new product feature.
+
+### Two CRITICAL findings (fixed + verified)
+- **CRIT-1 (data destruction):** Supabase's default privileges grant `anon`/`authenticated` **`TRUNCATE`** (+ REFERENCES/TRIGGER/MAINTAIN) on every new table; `TRUNCATE` bypasses RLS **and** the row-level immutability trigger, so a client could wipe any table incl. `audit_log`. Confirmed empirically (`anon TRUNCATE audit_log` → succeeded). Fixed: every migration now `revoke all … from anon, authenticated, service_role` then grants back only intended access. Re-verified: `anon TRUNCATE` → denied (42501).
+- **CRIT-2 (broken trusted path):** `service_role` had **no DML** on the tables (this CLI version doesn't auto-grant it), so audit inserts / worker outputs would fail in production; local tests passed only as `postgres`. Confirmed (`service_role INSERT audit_log` → denied). Fixed: explicit `service_role` grants (`audit_log`: select+insert; others: full DML, never truncate). Re-verified: `service_role INSERT` → ok.
+
+### Other findings fixed
+- **B1** public discovery exposed whole tenant rows → curated `organization_public_directory` / `profile_public_directory` views (approved columns only); base tables private.
+- **B2** all-column insert allowed self-verification → column-scoped inserts (status/is_verified/accepted_at withheld → safe defaults).
+- **B3** `memberships.branch_id` silently granted access → renamed `primary_branch_id` (descriptive); branch authority solely from `membership_branch_access` + org-wide capability.
+- **B4** `administrator` removed from `account_type`; platform authority only via `platform_role_grants`.
+- **H1** `PUBLIC` execute revoked on all `app.*` helpers. **H2** audit metadata (object, ≤8KB) + subject_type bounds + trigger `search_path`; `record_audit_event()` RPC deferred. **H3** org-slug format CHECK. **H4** `SUPABASE_ANON_KEY` documented in `backend/.env.example`.
+
+### Verified PASS (unchanged)
+`handle_new_user` ignores hostile `raw_user_meta_data` (adversarial test: injected account_type/platform role/verification all ignored; locale validated; name truncated). Clients: fresh instance per call, user client uses anon key (asserted), **RLS proven end-to-end via signed-JWT REST round-trip**.
+
+### CI
+Added `.github/workflows/supabase-rls.yml` (stable check `supabase-rls`): start → `db reset` → `db lint --schema public,app` → `supabase test db` → repeat → always `stop`. Runs on PRs to `main`.
+
+### Tests / validation
+pgTAP **58 → 98** (added `08_public_discovery`, `09_privilege_hardening`; expanded `05`, `07`). Two clean `db reset` + `test db` cycles → **98/98 PASS**; `db lint` clean. Backend `ruff` clean + **pytest 10 passed**. Frontend typecheck/lint/test(3)/build GREEN; DB types regenerated. Catalog inspection (pg_class/pg_policy/role_table_grants/routine_privileges/pg_proc) confirms RLS on all tables, PUBLIC execute absent, definer search_path pinned. **No `.pen` modified.**
+
+### Docs
+ADR-0007 amendments (+ platform-admin provisioning procedure), DECISION_LOG, phase1 review §6, specs 03/06 banners + grant convention, TECHNICAL_DEBT, DOCUMENTATION_STATUS, RUNTIME_STATE, this log.
+
+### Remaining (Sprint 2 / debt)
+`record_audit_event()` RPC + automated audit emission; membership write-path invariants (last-owner, invitation flow, no-escalation); org-orphaning; live RLS backend integration test; repo-wide default-privilege CI check.
+
+---
+
+## Session — Phase 1: Identity & Multi-Tenancy (Sprint 1 — Tenant Isolation Foundation)
+**Date/time:** 2026-08-02
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `feature/identity-multitenancy` (created from merged `main` @ `64e68d6`, tagged `v0.1.0-foundation`)
+
+### Objectives
+Implement the Phase 1 identity & multi-tenancy foundation only: canonical single identity, organizations/branches, memberships/capabilities/branch-access, platform-admin boundary, RLS spine + helpers, append-only audit, seed fixtures, tenant-isolation tests, and minimal tenant-aware data-access foundations. **No other product feature; no `.pen` edit; no direct push to `main`.**
+
+### Repository state verified
+- `main` @ `64e68d6` = merged PR #2 (foundation closeout); tag `v0.1.0-foundation` peels to that same commit. Working tree clean; no prior product feature. Cut `feature/identity-multitenancy` from `main`.
+
+### Pre-implementation spec review
+- Independent review of the Phase 0.7 spec (docs/technical/02–07, 11, 12) → [`../database/phase1-identity-tenancy-review.md`](../database/phase1-identity-tenancy-review.md). Findings resolved: table name `memberships` (not the charter's descriptive `organization_memberships`); branch access needs a set (added `membership_branch_access`, not a single `branch_id`); helper strategy (`security definer`, avoids RLS recursion); server-side profile bootstrap; platform-admin isolation; `org_type <> end_consumer`. **No blocking product decision.** Genuine architecture choices recorded in **[ADR-0007](../decisions/ADR-0007-identity-and-tenancy-model.md)**.
+
+### Migrations added (schema is the only source of truth — ADR-0002)
+- `20260802090001_identity_core.sql` — `app` schema + `set_updated_at`; enums; `users`/`profiles`/`contacts`; `app.handle_new_user()` bootstrap trigger on `auth.users`; identity RLS + column-scoped grants.
+- `20260802090002_organizations_tenancy.sql` — `organizations`/`branches`/`memberships`/`membership_capabilities`/`membership_branch_access`/`platform_role_grants`; tenancy helpers `current_org_ids`/`is_org_member`/`has_capability`/`current_branch_ids`/`is_platform`; RLS + grants.
+- `20260802090003_audit_foundation.sql` — append-only `audit_log` (immutability trigger; service-role insert; admin-only read).
+
+### Data-access & types
+- Frontend: `lib/supabase/server.ts` (caller-scoped client preserving JWT → RLS), typed `client.ts`, `server/queries/tenancy.ts` (org access derived from active memberships). Generated `types/database.types.ts`.
+- Backend: `app/database` — `create_user_client` (preserves caller JWT) + `create_service_client` (trusted-path, bypasses RLS); added `supabase_anon_key` to config. New `tests/test_database_clients.py`.
+
+### Seed & tests
+- `supabase/seed.sql` — synthetic fixtures (Org A + 2 branches, Org B + 1 branch, 5 users incl. branch-limited member + platform admin). Clearly marked synthetic.
+- `supabase/tests/01–07_*.sql` — **58 pgTAP tests**: profile uniqueness/bootstrap, cross-tenant isolation (all verbs), membership lifecycle, branch isolation, unauthorized (anon/non-member), platform-admin boundary, audit immutability.
+
+### Validation
+- Supabase: `db reset` (4 migrations + seed) clean; **repeated** (reset → tests → reset → tests); `db lint --schema public,app` → **No schema errors**; `supabase test db` → **58/58 pass** on both resets.
+- Frontend **GREEN** (`install --frozen-lockfile`/`typecheck`/`lint`/`test` 3/`build`); Backend **GREEN** (`uv sync --frozen`/`ruff`/`pytest` **8 passed**).
+- **No `.pen` modified.** No service-role in client code.
+
+### Docs updated
+- `RUNTIME_STATE.md` (Phase 1/Sprint 1 state), this log, `DECISION_LOG.md` (+ADR-0007), `DOCUMENTATION_STATUS.md`, `TECHNICAL_DEBT.md`; new `docs/database/phase1-identity-tenancy-review.md` + `docs/decisions/ADR-0007-…`.
+
+### Known remaining work (Phase 1 follow-ups)
+Membership/org **write-path** feature (creation, invites, capability no-escalation, last-owner protection) with authz tests; wire Docker/Supabase RLS CI jobs; JWT custom-claim helper optimization (ADR-0007 D1); org-visible audit scope; org-creation cap; storage buckets when a feature uploads.
+
+---
+
 ## Session — Phase 0: Foundation Closeout
 **Date/time:** 2026-08-01
 **Agent/tool:** Claude Code (Opus 4.8)

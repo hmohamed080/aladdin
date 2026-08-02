@@ -31,13 +31,14 @@ The product model (PRODUCT_DIRECTION_GUIDE) is **capability-based derived access
 - **Relationships:** 1–1 `Profile`; 1–* `Contact`; 0–* `Membership`; 0–* personal records (needs, conversations, notifications).
 - **Lifecycle:** `pending_verification` → `active` → (`suspended`) → (`deactivated`). Created at first successful OTP; never duplicated per channel.
 - **Ownership:** `USER`. Mirrors `auth.users` (Supabase); app-level `users` row keyed by `auth.uid()`.
-- **Constraints:** exactly **one** verified primary contact at creation; passwordless (no password fields ever); one primary account type at a time.
+- **Constraints:** exactly **one** verified primary contact at creation; passwordless (no password fields ever); one primary account type at a time. **`primary_account_type` is server-controlled** — it is not directly user-editable; it changes only through the approved account-upgrade / admin workflow (transactional + auditable), which *extends* the one identity (no second user/profile, no profile switcher). See [ADR-0007 D10](../decisions/ADR-0007-identity-and-tenancy-model.md).
 
 ### Profile
 - **Purpose:** display and professional information for a user (name, headline, bio, avatar, locality, languages).
 - **Relationships:** 1–1 `User`; references `Locality`; 0–* `Media` (portfolio) for professional account types.
 - **Lifecycle:** created with the user (progressive disclosure — minimal at signup, enriched in settings).
 - **Ownership:** `USER`. **Constraints:** avatar via `avatars/` bucket; portfolio only for professional types.
+- **Public visibility (server-controlled):** `public_profile_status` (`hidden`/`listed`) gates appearance in public professional discovery. It is **not** user-editable and is distinct from identity verification (`User.is_verified`), account type, and the `Verification` decision entity; the approved professional-upgrade/verification workflow sets it to `listed` (Phase 1 implements the gate; the workflow is deferred). A professional **account type alone never makes a profile public** — see [ADR-0007 D11](../decisions/ADR-0007-identity-and-tenancy-model.md).
 
 ### Contact
 - **Purpose:** a verified or pending contact channel (phone via WhatsApp, or email).
