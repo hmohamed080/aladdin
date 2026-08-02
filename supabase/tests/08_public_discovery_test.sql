@@ -5,7 +5,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(12);
+select plan(14);
 
 -- The public views expose ONLY the approved column set (adversarial: no
 -- created_by, status, deleted_at, timestamps on orgs; no user_id/timestamps on profiles).
@@ -23,8 +23,14 @@ set local role anon;
 set local request.jwt.claims = '';
 select is((select count(*)::int from public.organization_public_directory), 2,
   'anon sees the two active+verified orgs via the org directory view');
-select is((select count(*)::int from public.profile_public_directory), 3,
-  'anon sees the three active professional profiles via the profile directory view');
+-- Only the two LISTED professionals appear; the seeded sales professional (Karim)
+-- is a professional account type left `hidden`, so eligibility — not account type
+-- — gates discovery (Sprint 1.2).
+select is((select count(*)::int from public.profile_public_directory), 2,
+  'anon sees only the two LISTED professional profiles');
+select is(
+  (select count(*)::int from public.profile_public_directory where display_name like 'Karim%'),
+  0, 'a professional account type left hidden does NOT appear in public discovery');
 
 -- Base tables remain private to anon (hard permission denial).
 select throws_ok('select count(*) from public.organizations', '42501', null,
@@ -63,8 +69,17 @@ update public.profiles set deleted_at = now()
   where user_id = '11111111-1111-4111-8111-111111111111';
 set local role anon;
 set local request.jwt.claims = '';
-select is((select count(*)::int from public.profile_public_directory), 2,
-  'soft-deleting a professional profile removes it from public discovery');
+select is((select count(*)::int from public.profile_public_directory), 1,
+  'soft-deleting a listed professional profile removes it from public discovery');
+
+-- A suspended user's listed profile is not publicly discoverable.
+reset role;
+update public.users set status = 'suspended'
+  where id = '33333333-3333-4333-8333-333333333333';
+set local role anon;
+set local request.jwt.claims = '';
+select is((select count(*)::int from public.profile_public_directory), 0,
+  'a suspended user never appears publicly even when listed');
 
 -- A logged-in non-member also only gets the projection, never base columns.
 set local role authenticated;
