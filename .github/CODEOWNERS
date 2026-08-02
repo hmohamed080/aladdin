@@ -1,0 +1,30 @@
+# Aladdin — CODEOWNERS
+#
+# Default and per-area code ownership. With a single maintainer today, every
+# path resolves to @hmohamed080; the per-area entries below are the ownership
+# map for when a team exists (reassign a line, not the whole file).
+#
+# NOTE: CODEOWNERS *enforcement* (auto-requested / required reviews) depends on
+# GitHub branch-protection ("Require review from Code Owners") and the
+# repository plan. Without that setting it is advisory. See ADR-0006 and
+# docs/development/github-workflow.md.
+
+# Default owner for everything not matched below.
+*                       @hmohamed080
+
+# Governance, CI, and agent instructions
+/.github/               @hmohamed080
+/AGENTS.md              @hmohamed080
+/CLAUDE.md              @hmohamed080
+
+# Documentation
+/docs/                  @hmohamed080
+
+# Application code
+/frontend/              @hmohamed080
+/backend/               @hmohamed080
+/supabase/              @hmohamed080
+
+# Design system (brand/tokens + Pencil design source)
+/design/                @hmohamed080
+/UI-UX/                 @hmohamed080

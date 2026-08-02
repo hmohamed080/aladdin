@@ -1,0 +1,95 @@
+# Aladdin — minimum PR validation CI.
+#
+# Runs on pull requests into the protected `main` and on pushes to `main`.
+# Uses ONLY official GitHub actions (checkout / setup-node / setup-python),
+# with corepack (bundled with Node) for pnpm and pipx (preinstalled on runners)
+# for the uv tool — so there are no third-party actions to vet.
+#
+# Stable status-check job names for branch protection: `frontend`, `backend`, `docs`.
+# Hardening follow-ups (documented in docs/technical/TECHNICAL_DEBT.md):
+#   - pin actions to full commit SHAs;
+#   - add Docker image build + Supabase RLS/isolation jobs once reliable in CI.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: read-only, no secrets used.
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Enable pnpm (corepack, pinned to packageManager)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter frontend typecheck
+      - run: pnpm --filter frontend lint
+      - run: pnpm --filter frontend test
+      - run: pnpm --filter frontend build
+
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install uv (tool bootstrap; project deps stay uv-managed)
+        run: pipx install uv
+      - run: uv sync --frozen --python 3.12
+      - run: uv run ruff check .
+      - run: uv run pytest
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Internal markdown link check
+        run: python scripts/check_doc_links.py
+      - name: No tracked dependency/build/secret files
+        run: |
+          if git ls-files \
+            | grep -E '(^|/)(node_modules|\.next|out|dist|build|coverage|\.turbo|\.cache|\.venv|__pycache__|\.pytest_cache|\.ruff_cache|\.mypy_cache)/|(^|/)\.env($|\.)' \
+            | grep -v '\.env\.example'; then
+            echo "::error::tracked dependency/build/secret file(s) found"; exit 1
+          fi
+          echo "no tracked dependency/build/secret files"
+      - name: No .pen file tracked
+        run: |
+          if git ls-files | grep -E '\.pen$'; then
+            echo "::error::a .pen file is tracked (must be gitignored)"; exit 1
+          fi
+          echo "no .pen files tracked"
+      - name: No merge-conflict markers
+        run: |
+          if git grep -nE '^(<<<<<<< |>>>>>>> )' -- . ; then
+            echo "::error::merge-conflict markers found"; exit 1
+          fi
+          echo "no conflict markers"
