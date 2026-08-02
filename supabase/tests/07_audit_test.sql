@@ -5,7 +5,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(7);
+select plan(11);
 
 -- Seed one audit row via the trusted (service-role/DBA) path — here as postgres.
 insert into public.audit_log (actor_user_id, actor_role, action, subject_type, subject_id, organization_id, metadata)
@@ -40,6 +40,27 @@ select throws_ok(
   $$ delete from public.audit_log where subject_type = 'membership' $$,
   '42501', null,
   'platform admin has no DELETE grant on the audit log');
+
+-- TRUNCATE must NOT be a back door (Sprint 1.1 CRITICAL-1): TRUNCATE bypasses RLS
+-- and the row-level immutability trigger, so anon/authenticated must not hold it.
+set local role anon;
+set local request.jwt.claims = '';
+select throws_ok('truncate public.audit_log', '42501', null,
+  'anon cannot TRUNCATE the audit log');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
+select throws_ok('truncate public.audit_log', '42501', null,
+  'a platform admin (authenticated) cannot TRUNCATE the audit log');
+
+-- The trusted service_role IS the writer path (Sprint 1.1 CRITICAL-2): it can
+-- INSERT, but cannot TRUNCATE (append-only preserved for the backend too).
+set local role service_role;
+select lives_ok(
+  $$ insert into public.audit_log (action, subject_type, subject_id)
+     values ('branch.created', 'branch', 'c1111111-cccc-4ccc-8ccc-cccccccccccc') $$,
+  'service_role (trusted writer) can insert an audit record');
+select throws_ok('truncate public.audit_log', '42501', null,
+  'service_role cannot TRUNCATE the audit log');
 
 -- Immutability trigger: even a privileged path (postgres) cannot mutate history.
 reset role;

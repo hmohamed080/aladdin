@@ -34,6 +34,21 @@ def test_user_client_forwards_caller_jwt() -> None:
     assert headers.get("Authorization") == "Bearer caller-jwt-token"
 
 
+def test_user_client_uses_anon_key_not_service_role() -> None:
+    # A user-scoped client must authenticate with the PUBLIC anon key and never
+    # silently fall back to the service role (which would bypass RLS).
+    client = create_user_client("caller-jwt-token", settings=_CONFIGURED)
+    assert client.supabase_key == "anon-key"
+    assert client.supabase_key != _CONFIGURED.supabase_service_role_key
+
+
+def test_service_client_uses_service_role_key() -> None:
+    # The service client is the only place the service-role key is used, and only
+    # via explicit create_service_client() invocation (trusted server path).
+    client = create_service_client(settings=_CONFIGURED)
+    assert client.supabase_key == "service-role-key"
+
+
 def test_user_client_fails_fast_without_config() -> None:
     unconfigured = Settings(_env_file=None)
     with pytest.raises(RuntimeError, match="anon key"):

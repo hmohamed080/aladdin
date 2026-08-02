@@ -6,7 +6,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(9);
+select plan(12);
 
 -- Anonymous: private tables are not even granted to anon → hard permission denial.
 set local role anon;
@@ -19,14 +19,21 @@ select throws_ok('select count(*) from public.contacts', '42501', null,
   'anon is denied any access to contacts');
 select throws_ok('select count(*) from public.audit_log', '42501', null,
   'anon is denied any access to the audit log');
--- Public discovery IS allowed for active+verified orgs (product feature 06 §3.6).
-select is((select count(*)::int from public.organizations), 2,
-  'anon sees only active+verified orgs (public discovery)');
+-- The base organizations table is PRIVATE — anon has no grant on it at all.
+select throws_ok('select count(*) from public.organizations', '42501', null,
+  'anon is denied access to the base organizations table');
+-- Public discovery happens ONLY via the curated view (active+verified orgs).
+select is((select count(*)::int from public.organization_public_directory), 2,
+  'anon sees active+verified orgs via the public directory view only');
 -- Anonymous writes are rejected.
 select throws_ok(
   $$ insert into public.organizations (name, org_type, created_by)
      values ('Anon Co', 'supplier', '11111111-1111-4111-8111-111111111111') $$,
   '42501', null, 'anon cannot insert an organization');
+-- TRUNCATE must not be a data-destruction back door for any client role
+-- (Sprint 1.1 CRITICAL-1): TRUNCATE bypasses RLS entirely.
+select throws_ok('truncate public.organizations cascade', '42501', null,
+  'anon cannot TRUNCATE a tenant table');
 
 -- Authenticated non-member (the end consumer) is denied Org A's private data.
 set local role authenticated;
@@ -38,6 +45,9 @@ select is((select count(*)::int from public.memberships where organization_id = 
 -- A non-member cannot read another user's contacts.
 select is((select count(*)::int from public.contacts where user_id = '11111111-1111-4111-8111-111111111111'), 0,
   'a user cannot read another user''s contacts');
+-- An authenticated client also cannot TRUNCATE a tenant table.
+select throws_ok('truncate public.organizations cascade', '42501', null,
+  'an authenticated client cannot TRUNCATE a tenant table');
 
 reset role;
 select * from finish();
