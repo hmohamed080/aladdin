@@ -9,7 +9,9 @@
 | **Depends On** | 03_database_design.md, ../security/rls-strategy.md, ../decisions/ADR-0002-database-migrations.md |
 | **Related** | 07_permissions_matrix.md, 05_storage_design.md |
 
-Row Level Security design for the MVP. **Specification only — no policies are implemented here** (ADR-0002: policies ship *with* each table's migration, each with organization-isolation tests). This document defines the patterns every table migration must follow. Extends [`security/rls-strategy.md`](../security/rls-strategy.md) and [`security-model.md`](../security/security-model.md).
+Row Level Security design for the MVP. Policies ship *with* each table's migration, each with organization-isolation tests (ADR-0002). This document defines the patterns every table migration must follow. Extends [`security/rls-strategy.md`](../security/rls-strategy.md) and [`security-model.md`](../security/security-model.md).
+
+> **Implementation status (Phase 1, 2026-08-02):** the §2 identity helpers are implemented as `security definer` functions in the `app` schema — `current_org_ids`, `current_branch_ids(org)`, `has_capability(org,key)`, `is_platform(role)`, plus `is_org_member(org)` (migrations `20260802090001–2`). The tenant-owned (§3.1), personal (§3.2), reference/public-discovery (§3.6), and audit (§3.7) patterns are enforced on the identity/tenancy tables and covered by 58 pgTAP tests. Rationale and the claim-vs-lookup decision: **[ADR-0007](../decisions/ADR-0007-identity-and-tenancy-model.md)**. RFQ/quote/conversation patterns land with those features.
 
 ## 1. Principles
 

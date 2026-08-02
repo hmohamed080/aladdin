@@ -11,6 +11,8 @@
 
 Complete database **specification** for the MVP. **No migrations are created here** (ADR-0002 — schema is owned only by `supabase/migrations/*.sql`, authored with each approved feature). This document is the target schema a senior engineer implements migration-by-migration.
 
+> **Implementation status (Phase 1, 2026-08-02):** §1 Identity, §2 Organizations & access, and §12 `audit_log` are **implemented** (migrations `20260802090001–3`). Deltas from this spec are recorded in **[ADR-0007](../decisions/ADR-0007-identity-and-tenancy-model.md)** and [`../database/phase1-identity-tenancy-review.md`](../database/phase1-identity-tenancy-review.md): a `membership_branch_access` join table was added for multi-branch assignment; `organizations` gained `slug`/`primary_locale`. Remaining sections stay specification until their feature migration lands.
+
 Follows [naming-conventions.md](../database/naming-conventions.md). Entities are defined in [02](02_domain_model.md); relationships in [04](04_relationships.md).
 
 ## 0. Global conventions

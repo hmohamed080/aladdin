@@ -16,11 +16,11 @@ Documentation coverage by area. **Coverage %** = how completely the area is docu
 | **Product** | 95% | Stable | Product | 2026-08-01 | Commercial/pricing model, pilot success metrics (`⚑ OPEN`); `client-brief.md` is a placeholder |
 | **Architecture** | 100% | Stable | Architecture | 2026-08-01 | — (ADR-0001…0006 + guide; revisit on measured scaling need) |
 | **Technical spec** | 100% | Stable (Phase 0.7) | Architecture | 2026-08-01 | Per-category product attribute schemas; several `⚑ OPEN` product decisions flagged inline |
-| **Database** | 95% | Stable (spec) | Engineering/Data | 2026-08-01 | Only extensions migration exists; product tables authored per feature (by design); AR FTS stemming config `⚑ OPEN` |
+| **Database** | 96% | Stable (spec + Phase 1 impl) | Engineering/Data | 2026-08-02 | Phase 1 identity/tenancy tables + RLS + audit implemented (migrations `2026080209000x`, ADR-0007, `database/phase1-identity-tenancy-review.md`); remaining product tables authored per feature (by design); AR FTS stemming config `⚑ OPEN` |
 | **Security** | 95% | Stable | Security | 2026-08-01 | Formal threat model, pen-test, per-feature authz matrices (deferred, tracked in debt) |
 | **API** | 100% | Stable (contracts) | Engineering | 2026-08-01 | Contracts complete; realized endpoints land with features |
 | **Engineering standards** | 100% | Stable (Phase 0.8) | Engineering | 2026-08-01 | — (12 docs + index; all 25 topics covered) |
-| **Testing** | 90% | Stable (strategy) | Engineering | 2026-08-01 | Strategy set; concrete test suites land with features/migrations |
+| **Testing** | 91% | Stable (strategy + Phase 1 RLS suite) | Engineering | 2026-08-02 | Strategy set; first concrete suite landed — 58 pgTAP tenant-isolation tests (`supabase/tests/*`) + backend data-access tests; further suites land with features |
 | **Development / Repo governance** | 100% | Stable (Phase 0 closeout) | Foundation | 2026-08-01 | `CODEOWNERS` + minimum PR CI added; branch-protection required-check selection is a maintainer follow-up |
 | **Operations** | 88% | Stable | Ops | 2026-08-01 | Minimum PR CI present; **CD**, cloud provisioning, Docker/Supabase CI jobs, and metrics/alerting deferred |
 | **Design system** | 100% | Stable (`v1.0.0`) | Design System | 2026-08-01 | Runtime asset exports (logo/app-icon/WebGL); theme toggle wiring (tracked in debt) |

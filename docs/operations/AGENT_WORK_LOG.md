@@ -4,6 +4,46 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 1: Identity & Multi-Tenancy (Sprint 1 — Tenant Isolation Foundation)
+**Date/time:** 2026-08-02
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `feature/identity-multitenancy` (created from merged `main` @ `64e68d6`, tagged `v0.1.0-foundation`)
+
+### Objectives
+Implement the Phase 1 identity & multi-tenancy foundation only: canonical single identity, organizations/branches, memberships/capabilities/branch-access, platform-admin boundary, RLS spine + helpers, append-only audit, seed fixtures, tenant-isolation tests, and minimal tenant-aware data-access foundations. **No other product feature; no `.pen` edit; no direct push to `main`.**
+
+### Repository state verified
+- `main` @ `64e68d6` = merged PR #2 (foundation closeout); tag `v0.1.0-foundation` peels to that same commit. Working tree clean; no prior product feature. Cut `feature/identity-multitenancy` from `main`.
+
+### Pre-implementation spec review
+- Independent review of the Phase 0.7 spec (docs/technical/02–07, 11, 12) → [`../database/phase1-identity-tenancy-review.md`](../database/phase1-identity-tenancy-review.md). Findings resolved: table name `memberships` (not the charter's descriptive `organization_memberships`); branch access needs a set (added `membership_branch_access`, not a single `branch_id`); helper strategy (`security definer`, avoids RLS recursion); server-side profile bootstrap; platform-admin isolation; `org_type <> end_consumer`. **No blocking product decision.** Genuine architecture choices recorded in **[ADR-0007](../decisions/ADR-0007-identity-and-tenancy-model.md)**.
+
+### Migrations added (schema is the only source of truth — ADR-0002)
+- `20260802090001_identity_core.sql` — `app` schema + `set_updated_at`; enums; `users`/`profiles`/`contacts`; `app.handle_new_user()` bootstrap trigger on `auth.users`; identity RLS + column-scoped grants.
+- `20260802090002_organizations_tenancy.sql` — `organizations`/`branches`/`memberships`/`membership_capabilities`/`membership_branch_access`/`platform_role_grants`; tenancy helpers `current_org_ids`/`is_org_member`/`has_capability`/`current_branch_ids`/`is_platform`; RLS + grants.
+- `20260802090003_audit_foundation.sql` — append-only `audit_log` (immutability trigger; service-role insert; admin-only read).
+
+### Data-access & types
+- Frontend: `lib/supabase/server.ts` (caller-scoped client preserving JWT → RLS), typed `client.ts`, `server/queries/tenancy.ts` (org access derived from active memberships). Generated `types/database.types.ts`.
+- Backend: `app/database` — `create_user_client` (preserves caller JWT) + `create_service_client` (trusted-path, bypasses RLS); added `supabase_anon_key` to config. New `tests/test_database_clients.py`.
+
+### Seed & tests
+- `supabase/seed.sql` — synthetic fixtures (Org A + 2 branches, Org B + 1 branch, 5 users incl. branch-limited member + platform admin). Clearly marked synthetic.
+- `supabase/tests/01–07_*.sql` — **58 pgTAP tests**: profile uniqueness/bootstrap, cross-tenant isolation (all verbs), membership lifecycle, branch isolation, unauthorized (anon/non-member), platform-admin boundary, audit immutability.
+
+### Validation
+- Supabase: `db reset` (4 migrations + seed) clean; **repeated** (reset → tests → reset → tests); `db lint --schema public,app` → **No schema errors**; `supabase test db` → **58/58 pass** on both resets.
+- Frontend **GREEN** (`install --frozen-lockfile`/`typecheck`/`lint`/`test` 3/`build`); Backend **GREEN** (`uv sync --frozen`/`ruff`/`pytest` **8 passed**).
+- **No `.pen` modified.** No service-role in client code.
+
+### Docs updated
+- `RUNTIME_STATE.md` (Phase 1/Sprint 1 state), this log, `DECISION_LOG.md` (+ADR-0007), `DOCUMENTATION_STATUS.md`, `TECHNICAL_DEBT.md`; new `docs/database/phase1-identity-tenancy-review.md` + `docs/decisions/ADR-0007-…`.
+
+### Known remaining work (Phase 1 follow-ups)
+Membership/org **write-path** feature (creation, invites, capability no-escalation, last-owner protection) with authz tests; wire Docker/Supabase RLS CI jobs; JWT custom-claim helper optimization (ADR-0007 D1); org-visible audit scope; org-creation cap; storage buckets when a feature uploads.
+
+---
+
 ## Session — Phase 0: Foundation Closeout
 **Date/time:** 2026-08-01
 **Agent/tool:** Claude Code (Opus 4.8)
