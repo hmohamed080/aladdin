@@ -1,0 +1,20 @@
+{
+  "name": "aladdin.spacing",
+  "version": "1.0.0",
+  "description": "Canonical 4-based spacing scale. Use tokens, never arbitrary pixel values.",
+  "maintenance": "Manually maintained. Edit here first, then DESIGN.md frontmatter and frontend/tailwind.config.ts (theme.extend.spacing).",
+  "base": "4px",
+  "scale": {
+    "xs": { "value": "4px", "usage": "Tightest grouping; icon-to-label micro-gaps." },
+    "sm": { "value": "8px", "usage": "Related items within a group." },
+    "md": { "value": "16px", "usage": "Default inter-field / inter-element gap." },
+    "lg": { "value": "24px", "usage": "Mobile body gutter; separation between groups." },
+    "xl": { "value": "32px", "usage": "Section separation within a surface." },
+    "section": { "value": "104px", "usage": "Rhythm between major page bands." }
+  },
+  "rules": {
+    "grouping": "Spacing, not dividers, is the first grouping tool: tight within a group, generous between groups.",
+    "heading": "More space sits above a heading than below it.",
+    "canonical-rhythm": "Mobile body gutter 24; flow-header padding [16,20]; inter-field gap 16; field height ~64."
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "name": "aladdin.typography",
+  "version": "1.0.0",
+  "description": "Canonical Aladdin typography tokens. Mirrored in DESIGN.md frontmatter and the Tailwind fontFamily/fontSize theme.",
+  "maintenance": "Manually maintained. Edit here first, then DESIGN.md frontmatter and frontend/tailwind.config.ts + layout.tsx.",
+  "families": {
+    "display-latin": {
+      "family": "Archivo",
+      "role": "Latin brand & display (wordmark, hero headlines)",
+      "fallback": ["system-ui", "sans-serif"],
+      "scripts": ["latin"],
+      "weights": [400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "source": "Google Fonts (self-hosted via next/font)",
+      "license": "SIL Open Font License 1.1 (per Google Fonts distribution; formal OFL file verification pending — see DESIGN.md)"
+    },
+    "display-arabic": {
+      "family": "Reem Kufi",
+      "role": "Arabic brand & display (geometric Kufic)",
+      "fallback": ["Readex Pro", "sans-serif"],
+      "scripts": ["arabic", "latin"],
+      "weights": [400, 500, 600, 700],
+      "variable": true,
+      "source": "Google Fonts (self-hosted via next/font)",
+      "license": "SIL Open Font License 1.1 (verification pending)"
+    },
+    "text": {
+      "family": "Readex Pro",
+      "role": "Bilingual product-UI workhorse (AR + EN, matched metrics); the default body font",
+      "fallback": ["system-ui", "sans-serif"],
+      "scripts": ["arabic", "latin"],
+      "weights": [200, 300, 400, 500, 600, 700],
+      "variable": true,
+      "source": "Google Fonts (self-hosted via next/font)",
+      "license": "SIL Open Font License 1.1 (verification pending)"
+    },
+    "mono": {
+      "family": "JetBrains Mono",
+      "role": "EGP figures, RFQ/quote codes, quantities, technical metadata",
+      "fallback": ["ui-monospace", "monospace"],
+      "scripts": ["latin"],
+      "weights": [400, 500, 600, 700],
+      "variable": true,
+      "source": "Google Fonts (self-hosted via next/font)",
+      "license": "SIL Open Font License 1.1 (verification pending)"
+    }
+  },
+  "roles": {
+    "display": { "family": "{families.display-latin}", "fontSize": "clamp(2rem, 4vw, 3.25rem)", "fontWeight": 800, "lineHeight": 1.02, "letterSpacing": "-0.03em", "usage": "Brand wordmark, hero headlines." },
+    "display-arabic": { "family": "{families.display-arabic}", "fontSize": "clamp(2rem, 4vw, 3rem)", "fontWeight": 600, "lineHeight": 1.2, "letterSpacing": "0", "usage": "Arabic brand/headline moments." },
+    "headline": { "family": "{families.display-latin}", "fontSize": "2rem", "fontWeight": 800, "lineHeight": 1.1, "letterSpacing": "-0.03em", "usage": "Section titles." },
+    "title": { "family": "{families.text}", "fontSize": "1.25rem", "fontWeight": 600, "lineHeight": 1.3, "letterSpacing": "-0.01em", "usage": "Card and screen titles." },
+    "body-lg": { "family": "{families.text}", "fontSize": "1rem", "fontWeight": 400, "lineHeight": 1.5, "letterSpacing": "0", "usage": "Field values, lead paragraphs. Measure 65-75ch." },
+    "body": { "family": "{families.text}", "fontSize": "0.875rem", "fontWeight": 300, "lineHeight": 1.5, "letterSpacing": "0", "usage": "Default UI text and supporting copy." },
+    "label": { "family": "{families.text}", "fontSize": "0.8125rem", "fontWeight": 500, "lineHeight": 1.2, "letterSpacing": "0.02em", "usage": "Field labels, small headers." },
+    "mono": { "family": "{families.mono}", "fontSize": "0.8125rem", "fontWeight": 500, "lineHeight": 1.4, "letterSpacing": "0.02em", "usage": "Figures, codes, quantities, EGP." }
+  },
+  "rules": {
+    "matched-script": "Product UI uses Readex Pro so Arabic and Latin share metrics; Archivo/Reem Kufi are brand/headline only. Never mix a Latin-only face into Arabic UI.",
+    "figures-are-mono": "EGP, RFQ/quote IDs, and quantities use JetBrains Mono; prose is never mono.",
+    "arabic-emphasis": "Never encode meaning with italics in Arabic; use weight/size/color tokens."
+  }
+}

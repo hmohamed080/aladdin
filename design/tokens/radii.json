@@ -1,0 +1,16 @@
+{
+  "name": "aladdin.radii",
+  "version": "1.0.0",
+  "description": "Canonical corner-radius scale. Gently rounded, chamfer-adjacent — never soft/pill-heavy except seals and tags.",
+  "maintenance": "Manually maintained. Edit here first, then DESIGN.md frontmatter (rounded) and frontend/tailwind.config.ts (theme.extend.borderRadius).",
+  "scale": {
+    "xs": { "value": "8px", "usage": "Chips, tags, small inline controls." },
+    "sm": { "value": "10px", "usage": "Buttons, inputs." },
+    "md": { "value": "12px", "usage": "Nested surfaces, medium containers." },
+    "lg": { "value": "14px", "usage": "Cards and primary containers." },
+    "pill": { "value": "999px", "usage": "Verification seals and status pills only." }
+  },
+  "rules": {
+    "border-weight": "Borders are 1px hairlines; a colored border heavier than 1px is not part of the language."
+  }
+}

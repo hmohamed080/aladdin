@@ -1,0 +1,23 @@
+{
+  "name": "aladdin.motion",
+  "version": "1.0.0",
+  "description": "Motion tokens. Motion is functional (orient, show relationships, confirm state) — never decorative filler. All motion honors prefers-reduced-motion.",
+  "maintenance": "Manually maintained. Edit here first, then frontend/src/styles/tokens.css (--duration-*/--ease-*) and frontend/tailwind.config.ts (transitionDuration/transitionTimingFunction).",
+  "duration": {
+    "instant": { "value": "100ms", "usage": "Pressed/active feedback." },
+    "fast": { "value": "150ms", "usage": "Hover, small state changes; floor of UI transitions." },
+    "base": { "value": "200ms", "usage": "Default control/state transitions." },
+    "slow": { "value": "300ms", "usage": "Dialog/drawer enter-exit; larger surface changes." },
+    "slower": { "value": "500ms", "usage": "Rare, orchestrated entrances (e.g. the Aperture opening)." }
+  },
+  "easing": {
+    "standard": { "value": "cubic-bezier(0.4, 0, 0.2, 1)", "usage": "Default easing for state transitions." },
+    "out-expo": { "value": "cubic-bezier(0.16, 1, 0.3, 1)", "usage": "Entrances from an already-visible default; the aperture-opening feel." },
+    "in-out": { "value": "cubic-bezier(0.65, 0, 0.35, 1)", "usage": "Symmetric enter/exit for reversible surfaces (drawers)." }
+  },
+  "rules": {
+    "functional-only": "Animate to communicate hierarchy or state; never delay a user task with decorative animation.",
+    "cheap-properties": "Prefer transform/opacity/filter; avoid animating layout properties.",
+    "reduced-motion": "Every animation/transition collapses to near-instant under prefers-reduced-motion (enforced globally in globals.css)."
+  }
+}

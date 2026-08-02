@@ -1,0 +1,23 @@
+{
+  "name": "aladdin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Aladdin — AI-first operating system for Egypt's finishing, construction, interior design, furnishing, and supply sector. Monorepo root.",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter frontend dev",
+    "build": "pnpm --filter frontend build",
+    "start": "pnpm --filter frontend start",
+    "lint": "pnpm --filter frontend lint",
+    "typecheck": "pnpm --filter frontend typecheck",
+    "test": "pnpm --filter frontend test",
+    "supabase": "supabase"
+  },
+  "devDependencies": {
+    "supabase": "2.110.0"
+  }
+}

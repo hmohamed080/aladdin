@@ -1,0 +1,8 @@
+-- Supabase seed data — applied locally by `supabase db reset`.
+--
+-- Rules:
+-- - Local development only. Synthetic, non-sensitive data ONLY (this file may
+--   live in a public repo). No real customers, no PII.
+-- - Use realistic Egyptian conventions (localities, EGP) with invented entities.
+-- - The foundation ships no product tables, so there is nothing to seed yet.
+--   Add seed rows alongside the migration that creates the table they populate.

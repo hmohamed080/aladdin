@@ -1,3 +1,24 @@
+# Design Idea — Founder Brief (original)
+
+**Status:** Source document (verbatim) · captured 2026-07-29
+
+> This is the original founder design brief for Aladdin, preserved in the
+> author's Arabic. It records the Q&A that fixed early scope, journeys, roles,
+> branding direction, and responsive/RTL/dark-mode decisions. The distilled,
+> English product scope derived from it lives in [`mvp-scope.md`](./mvp-scope.md).
+>
+> **Editorial note (2026-07-30):** kept verbatim, including the early phrasing
+> "Active Profile Switching". The account model has since been made canonical as
+> **one canonical identity with one current primary account type at a time — no
+> Profile Switcher / "Use As" / role-switching UI**; navigation is *derived* from
+> account type, org membership, branch, capabilities, verification, and
+> subscription. See [`PRODUCT_DIRECTION_GUIDE.md`](./PRODUCT_DIRECTION_GUIDE.md).
+> This note supersedes the phrasing below without altering the source text.
+> Treat this file as the historical source of intent; where it and `mvp-scope.md`
+> differ, `mvp-scope.md` is the current working scope.
+
+---
+
 1. هنصمم أنهي Scope؟
 
 A — MVP فقط

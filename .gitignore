@@ -23,6 +23,10 @@ secrets/
 *.agent.log
 agent-logs/
 transcripts/
+# Generic logs & session transcripts (agent output must never enter history)
+logs/
+*.log
+*.transcript
 
 # --- Pencil design files ----------------------------------------------------
 # Canonical + backups are large private design IP. They live on disk and are

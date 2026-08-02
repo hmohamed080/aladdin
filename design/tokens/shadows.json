@@ -1,0 +1,21 @@
+{
+  "name": "aladdin.shadows",
+  "version": "1.0.0",
+  "description": "Elevation is primarily tonal layering; shadow is restrained. Only two shadow tokens exist by design.",
+  "maintenance": "Manually maintained. Edit here first, then DESIGN.md (Elevation & Depth) and frontend/tailwind.config.ts (theme.extend.boxShadow).",
+  "tokens": {
+    "card": {
+      "value": "0 1px 2px rgba(20,16,10,0.04), 0 8px 24px rgba(20,16,10,0.05)",
+      "type": "box-shadow",
+      "usage": "Raised cards on the light (Limestone/Plaster) theme; real offset + blur."
+    },
+    "glow": {
+      "value": "0 0 60px rgba(243,171,62,0.18)",
+      "type": "box-shadow | filter drop-shadow",
+      "usage": "The Lumen bloom at the Aperture focal point and AI moments ONLY. Never a flat zero-offset halo on generic elements."
+    }
+  },
+  "rules": {
+    "tonal-first": "On dark, build depth with layered stone surfaces (Basalt -> Basalt 2 -> Basalt 3) and border shifts before reaching for shadow. Reserve glow for Lumen focal moments."
+  }
+}

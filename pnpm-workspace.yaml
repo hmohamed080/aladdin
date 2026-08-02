@@ -1,0 +1,5 @@
+# pnpm workspace — Node/TypeScript packages only.
+# The FastAPI service (backend/) and Supabase (supabase/) are NOT pnpm
+# packages; they are managed by uv and the Supabase CLI respectively.
+packages:
+  - "frontend"
