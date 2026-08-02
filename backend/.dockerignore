@@ -1,0 +1,43 @@
+# Backend Docker build-context excludes.
+#
+# The Dockerfile copies ONLY `pyproject.toml`, `uv.lock`, and `app/` (selective
+# COPY), so the runtime image is already clean. This file additionally keeps the
+# build *context* sent to the daemon small and free of local/dev artifacts.
+# Do NOT exclude anything the build needs: pyproject.toml, uv.lock, app/, Dockerfile.
+
+# Python virtualenvs, bytecode & tool caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Secrets / environment (never in the build context or image)
+.env
+.env.*
+
+# Tests are not part of the runtime image (Dockerfile copies only app/)
+tests/
+
+# Coverage / local outputs
+.coverage
+htmlcov/
+coverage/
+
+# VCS / IDE / OS metadata
+.git/
+.gitignore
+.dockerignore
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Agent-local / logs / scratch
+*.log
+scratchpad/
+
+# Docs not needed at build time
+README.md
