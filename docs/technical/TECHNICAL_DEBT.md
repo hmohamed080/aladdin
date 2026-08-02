@@ -63,7 +63,7 @@ The RLS/isolation spine, passwordless model, and tenant filtering are **not** de
 | Item | Trigger |
 |---|---|
 | **Minimum PR CI** (`.github/workflows/ci.yml`: `frontend`/`backend`/`docs`) added 2026-08-01 | **CD**, Docker-image + Supabase RLS/isolation CI jobs, and **SHA-pinning of actions** remain deferred ([`10_environment_and_cicd`](../engineering/10_environment_and_cicd.md)) |
-| **Supabase RLS/isolation CI job** — the Phase 1 pgTAP suite (`supabase/tests/*`, 58 tests) is CI-ready but not yet wired | wire a `supabase db reset` + `supabase test db` job (needs Docker in CI) so tenant-isolation tests gate merges |
+| ~~**Supabase RLS/isolation CI job**~~ | **Resolved 2026-08-02** — `.github/workflows/supabase-rls.yml` (check `supabase-rls`) starts the stack, resets, lints public/app, and runs the 98-test pgTAP suite twice on PRs to `main`. Owner to add `supabase-rls` to required branch-protection checks after first run. |
 | Branch protection required-checks selection | after CI runs once, select `frontend`/`backend`/`docs` in `main` protection (ADR-0006) |
 | Staging/Production cloud provisioning (Vercel/Railway/Supabase) | first deploy |
 | `docker build` in CI + image scanning | with CI |
@@ -79,6 +79,9 @@ The RLS/isolation spine, passwordless model, and tenant filtering are **not** de
 | Shared component/service extraction | on genuine 2nd consumer (never preemptive) |
 | **JWT custom-claim optimization** for `app` RLS helpers (org/role in `custom_access_token`) instead of table lookups | measured RLS read-path cost (ADR-0007 D1); helper API is claim-agnostic, so no policy rewrite |
 | **Last `org.manage` owner cannot be revoked** invariant | implement in the membership write-path feature (multi-row invariant, not a single CHECK) — [12 §4](12_validation_rules.md) |
+| **Constrained `record_audit_event()` RPC** so trusted writers cannot record an inconsistent actor/tenant (Sprint 1.1 review H2); automated audit emission from write paths | Sprint 2 (audit currently: table + immutability + service_role insert only) |
+| **Live RLS integration test** in the backend suite (a real user JWT round-trip); the header approach is verified manually + by REST round-trip, unit tests assert the header | when a shared local-Supabase CI fixture exists |
+| **Repo-wide default-privileges enforcement** — a CI/lint check that every new tenant table `revoke`s the Supabase default `TRUNCATE`/`REFERENCES`/`TRIGGER` from client roles (Sprint 1.1 CRIT-1 convention in [06](../engineering/../technical/06_rls_strategy.md)) | as feature migrations grow |
 
 ## 7. Open product/engineering decisions (`⚑ OPEN` — block dependent work)
 

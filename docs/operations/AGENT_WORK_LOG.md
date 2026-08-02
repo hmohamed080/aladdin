@@ -4,6 +4,42 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 1: Sprint 1.1 (Independent Identity & RLS Security Review)
+**Date/time:** 2026-08-02
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `feature/identity-multitenancy` (continued; not merged)
+
+### Objective
+Independent security/correctness/schema audit of the unmerged Sprint 1 migrations, grants, policies, functions, triggers, clients, tests, and seeds — fixing findings in the still-unmerged migration set (no history rewrite). No new product feature.
+
+### Two CRITICAL findings (fixed + verified)
+- **CRIT-1 (data destruction):** Supabase's default privileges grant `anon`/`authenticated` **`TRUNCATE`** (+ REFERENCES/TRIGGER/MAINTAIN) on every new table; `TRUNCATE` bypasses RLS **and** the row-level immutability trigger, so a client could wipe any table incl. `audit_log`. Confirmed empirically (`anon TRUNCATE audit_log` → succeeded). Fixed: every migration now `revoke all … from anon, authenticated, service_role` then grants back only intended access. Re-verified: `anon TRUNCATE` → denied (42501).
+- **CRIT-2 (broken trusted path):** `service_role` had **no DML** on the tables (this CLI version doesn't auto-grant it), so audit inserts / worker outputs would fail in production; local tests passed only as `postgres`. Confirmed (`service_role INSERT audit_log` → denied). Fixed: explicit `service_role` grants (`audit_log`: select+insert; others: full DML, never truncate). Re-verified: `service_role INSERT` → ok.
+
+### Other findings fixed
+- **B1** public discovery exposed whole tenant rows → curated `organization_public_directory` / `profile_public_directory` views (approved columns only); base tables private.
+- **B2** all-column insert allowed self-verification → column-scoped inserts (status/is_verified/accepted_at withheld → safe defaults).
+- **B3** `memberships.branch_id` silently granted access → renamed `primary_branch_id` (descriptive); branch authority solely from `membership_branch_access` + org-wide capability.
+- **B4** `administrator` removed from `account_type`; platform authority only via `platform_role_grants`.
+- **H1** `PUBLIC` execute revoked on all `app.*` helpers. **H2** audit metadata (object, ≤8KB) + subject_type bounds + trigger `search_path`; `record_audit_event()` RPC deferred. **H3** org-slug format CHECK. **H4** `SUPABASE_ANON_KEY` documented in `backend/.env.example`.
+
+### Verified PASS (unchanged)
+`handle_new_user` ignores hostile `raw_user_meta_data` (adversarial test: injected account_type/platform role/verification all ignored; locale validated; name truncated). Clients: fresh instance per call, user client uses anon key (asserted), **RLS proven end-to-end via signed-JWT REST round-trip**.
+
+### CI
+Added `.github/workflows/supabase-rls.yml` (stable check `supabase-rls`): start → `db reset` → `db lint --schema public,app` → `supabase test db` → repeat → always `stop`. Runs on PRs to `main`.
+
+### Tests / validation
+pgTAP **58 → 98** (added `08_public_discovery`, `09_privilege_hardening`; expanded `05`, `07`). Two clean `db reset` + `test db` cycles → **98/98 PASS**; `db lint` clean. Backend `ruff` clean + **pytest 10 passed**. Frontend typecheck/lint/test(3)/build GREEN; DB types regenerated. Catalog inspection (pg_class/pg_policy/role_table_grants/routine_privileges/pg_proc) confirms RLS on all tables, PUBLIC execute absent, definer search_path pinned. **No `.pen` modified.**
+
+### Docs
+ADR-0007 amendments (+ platform-admin provisioning procedure), DECISION_LOG, phase1 review §6, specs 03/06 banners + grant convention, TECHNICAL_DEBT, DOCUMENTATION_STATUS, RUNTIME_STATE, this log.
+
+### Remaining (Sprint 2 / debt)
+`record_audit_event()` RPC + automated audit emission; membership write-path invariants (last-owner, invitation flow, no-escalation); org-orphaning; live RLS backend integration test; repo-wide default-privilege CI check.
+
+---
+
 ## Session — Phase 1: Identity & Multi-Tenancy (Sprint 1 — Tenant Isolation Foundation)
 **Date/time:** 2026-08-02
 **Agent/tool:** Claude Code (Opus 4.8)

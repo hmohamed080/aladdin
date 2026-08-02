@@ -9,15 +9,15 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | **Version** | Runtime snapshot · 2026-08-02 |
 | **Owner** | Foundation / Operations |
 | **Last updated** | 2026-08-02 |
-| **Updated by** | Claude Code (Opus 4.8) — Phase 1, Sprint 1 (Tenant Isolation Foundation) |
-| **Current focus** | **Phase 1 — Identity & Multi-Tenancy · Sprint 1 (Tenant Isolation Foundation).** Implemented the canonical single-identity + multi-tenant schema: `users`/`profiles`/`contacts`, `organizations`/`branches`, `memberships`/`membership_capabilities`/`membership_branch_access`, `platform_role_grants`, append-only `audit_log`, the `app` RLS helper functions, RLS policies on every table, a server-side profile-bootstrap trigger, seed fixtures, and 58 pgTAP tenant-isolation tests (repeatable across `db reset`). Plus tenant-aware data-access foundations (frontend server client + tenancy queries; backend user/service `supabase-py` client boundaries) and generated DB types. See [ADR-0007](../decisions/ADR-0007-identity-and-tenancy-model.md) and [`../database/phase1-identity-tenancy-review.md`](../database/phase1-identity-tenancy-review.md). |
+| **Updated by** | Claude Code (Opus 4.8) — Phase 1, Sprint 1.1 (Independent Identity & RLS Security Review) |
+| **Current focus** | **Phase 1 — Identity & Multi-Tenancy · Sprint 1.1 (Independent Identity & RLS Security Review).** Audited the (unmerged) Sprint 1 migrations and hardened them: fixed **two criticals** — Supabase's default `TRUNCATE` grant to client roles (could wipe RLS-protected tables incl. `audit_log`) and missing `service_role` DML (trusted-writer paths would fail in prod) — plus removed `administrator` from `account_type`, made public discovery use curated views (base tables private), column-scoped inserts (no self-verification), renamed `memberships.branch_id`→`primary_branch_id` (one source of branch authority), revoked `PUBLIC` execute on helpers, bounded audit metadata, and documented platform-admin provisioning. Added a `supabase-rls` CI gate. pgTAP suite grew 58→**98** tests. See [ADR-0007 §Amendments](../decisions/ADR-0007-identity-and-tenancy-model.md#amendments--sprint-11-independent-security-review-2026-08-02) and [`../database/phase1-identity-tenancy-review.md`](../database/phase1-identity-tenancy-review.md#6-independent-security-review-sprint-11-2026-08-02). |
 
 ## Phase & repository
 
 | Field | Value |
 |---|---|
 | **Current Phase** | **Phase 1 — Identity & Multi-Tenancy** (canonical identity, orgs/branches/memberships/capabilities, RLS helpers + organization-isolation tests) |
-| **Current Sprint** | **Sprint 1 — Tenant Isolation Foundation** |
+| **Current Sprint** | **Sprint 1.1 — Independent Identity & RLS Security Review** |
 | **Current Feature** | Identity, Organizations, Memberships, Branches, RLS, Audit Foundation |
 | **Next Phase** | **Phase 2** — first product workflow (per [`ROADMAP`](../roadmap/ROADMAP.md); design order starts at 05C B2B Sales) once identity/tenancy merges |
 | **Current Branch** | `feature/identity-multitenancy` (created from `main` @ `64e68d6`) |
@@ -41,7 +41,7 @@ Always reflects the current live engineering state of the project. Overwrite eac
 | **Current Feature** | Identity, Organizations, Memberships, Branches, RLS, Audit Foundation |
 | **Current UI Status** | Design system **v1.0.0** ("The Aperture") finalized + implemented as tokens; only the Next.js scaffold page exists — **no product screens** (Phase 1 is schema/RLS/data-access only) |
 | **Current Backend Status** | FastAPI scaffold — `GET /health` only; **no product endpoints**. Data-access boundaries added: `app.database.create_user_client` (preserves caller JWT → RLS) + `create_service_client` (trusted-path, bypasses RLS) — `supabase-py`, ADR-0005 |
-| **Current Database Status** | 4 migrations; **Phase 1 identity/tenancy tables implemented** (`users`, `profiles`, `contacts`, `organizations`, `branches`, `memberships`, `membership_capabilities`, `membership_branch_access`, `platform_role_grants`, `audit_log`); `app` helper schema (tenancy/identity functions); **RLS enabled + explicit policies on every table**; 58 pgTAP isolation tests; schema source = `supabase/migrations/*.sql` |
+| **Current Database Status** | 4 migrations; **Phase 1 identity/tenancy tables implemented** (`users`, `profiles`, `contacts`, `organizations`, `branches`, `memberships`, `membership_capabilities`, `membership_branch_access`, `platform_role_grants`, `audit_log`) + public-discovery views (`organization_public_directory`, `profile_public_directory`); `app` helper schema; **RLS + explicit policies on every table**, default `TRUNCATE` privileges stripped from client roles, explicit `service_role` DML; **98 pgTAP** isolation/privilege tests; schema source = `supabase/migrations/*.sql` |
 | **Current Design System Version** | **1.0.0** (`DESIGN.md` / `design/tokens/*`) |
 | **Current Documentation Version** | Technical spec **1.0.0** (Phase 0.7); engineering standards **1.0.0** (Phase 0.8); governance/planning **1.0.0** (Phase 0.9 — ADR-0006, ROADMAP, BACKLOG, TECHNICAL_DEBT, DOCUMENTATION_STATUS, DECISION_LOG); docs index **1.0.0** |
 | **Current Deployment Status** | **not deployed** — no Vercel/Railway/Supabase cloud project connected; **no CD**; a minimum **PR-validation CI** workflow (`.github/workflows/ci.yml`: `frontend`/`backend`/`docs`) is present (must run once, then be selected as required checks in branch protection); repository published to GitHub (`origin`) |
@@ -86,7 +86,8 @@ Passwordless model (WhatsApp/Email OTP) is specified; **no auth UI/OTP/session h
   - `20260802090001_identity_core.sql` — `app` helper schema + `set_updated_at`; enums (`account_type`, `platform_role`, `contact_channel`, `user_status`); `users`, `profiles`, `contacts`; profile-bootstrap trigger; identity RLS + grants.
   - `20260802090002_organizations_tenancy.sql` — enums (`org_status`, `membership_status`); `organizations`, `branches`, `memberships`, `membership_capabilities`, `membership_branch_access`, `platform_role_grants`; tenancy helpers (`current_org_ids`, `is_org_member`, `has_capability`, `current_branch_ids`, `is_platform`); RLS + grants.
   - `20260802090003_audit_foundation.sql` — append-only `audit_log` (immutability trigger; service-role insert; admin read).
-- **RLS:** enabled with explicit policies on **every** table. Tenant isolation, membership lifecycle, branch isolation, platform-admin boundary, and audit immutability are covered by **58 pgTAP tests** in `supabase/tests/` (repeatable across `db reset`).
+- **Public discovery:** curated views `organization_public_directory` / `profile_public_directory` expose only approved columns; base tables are private (Sprint 1.1 review B1).
+- **RLS + privileges:** enabled with explicit policies on **every** table; Supabase's default `TRUNCATE`/`REFERENCES`/`TRIGGER` grants are **revoked** from `anon`/`authenticated`/`service_role` and re-granted intentionally; `service_role` has explicit DML (append-only preserved for `audit_log`). Covered by **98 pgTAP tests** in `supabase/tests/` (repeatable across `db reset`) and gated by the `supabase-rls` CI workflow.
 - **Seed:** synthetic local fixtures (2 orgs, 3 branches, 5 users incl. a branch-limited member and a platform admin) in `supabase/seed.sql` — clearly marked synthetic; no real data.
 - **Generated types:** `frontend/src/types/database.types.ts` (from the local schema).
 - **Schema source of truth:** `supabase/migrations/*.sql` only (ADR-0002). Design decisions: [ADR-0007](../decisions/ADR-0007-identity-and-tenancy-model.md).
@@ -159,12 +160,14 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 - **Docker image build — PASSED (2026-08-01):** `docker build --no-cache` ✅; runtime Python 3.12.13, non-root appuser (uid 10001), HEALTHCHECK healthy, `/health` → 200; no `.env`/`.pen`/SQLAlchemy/Alembic in image. See *Infrastructure validation status*.
 - **Supabase full stack — PASSED (2026-08-01):** `start` ✅, `db reset` ✅ ×2 (repeatable, no drift), `db lint` ✅ (findings only in bundled `extensions.*`); extensions installed in the `extensions` schema; 0 product tables.
 
-## Phase 1 validation status (2026-08-02 — Sprint 1)
+## Phase 1 validation status (2026-08-02 — Sprint 1.1 security review)
 
-- **Supabase — PASSED:** `db reset` applies all 4 migrations + seed cleanly; **repeated** (reset → tests → reset → tests). `db lint --schema public,app` → **"No schema errors found"** (only bundled PostGIS `extensions.*` advisories otherwise). `supabase test db` → **58/58 pgTAP tests pass** across two clean resets.
-- **Isolation proven:** cross-tenant read/write denied (org A ⟂ org B on orgs/branches/memberships/capabilities); membership lifecycle (active grants, invited/revoked deny); branch-limited vs org-wide visibility; anon + non-member denial; platform-admin boundary (org admin ≠ platform admin, no self-grant); audit append-only (no user read/insert; no update/delete even for a superuser path).
-- **Frontend — GREEN:** `pnpm install --frozen-lockfile` · `typecheck` · `lint` · `test` (3 passed) · `build` (routes `/`, `/_not-found`, `/api/health`).
-- **Backend — GREEN:** `uv sync --frozen` · `ruff check` (clean) · `pytest` (**8 passed** — 3 health/config + 5 new data-access client boundary tests).
+- **Supabase — PASSED:** `db reset` applies all 4 migrations + seed cleanly; **repeated** (reset → tests → reset → tests). `db lint --schema public,app` → **"No schema errors found"**. `supabase test db` → **98/98 pgTAP tests pass** across two clean resets.
+- **Criticals fixed + verified:** (1) `anon`/`authenticated` default `TRUNCATE` stripped — verified via catalog acl + empirical `anon TRUNCATE audit_log` → denied; (2) `service_role` DML granted — verified `service_role INSERT audit_log` → ok. RLS scoping verified **end-to-end via a signed-JWT REST round-trip** (A-owner sees only Org A; anon denied base org table but reads the view without `created_by`).
+- **Isolation/hardening proven:** cross-tenant read/write denial; membership lifecycle; single-source branch authority (primary_branch_id grants nothing); public-discovery views expose only approved columns; no self-verification on insert; account type ≠ platform authority; `PUBLIC` execute revoked on helpers; audit metadata bounds; append-only under TRUNCATE.
+- **Frontend — GREEN:** `install --frozen-lockfile` · `typecheck` · `lint` · `test` (3) · `build`. Types regenerated (`primary_branch_id`, directory views; `administrator` gone from `account_type`).
+- **Backend — GREEN:** `uv sync --frozen` · `ruff` (clean) · `pytest` (**10 passed** — health/config + 7 data-access client boundary tests incl. anon-key/no-service-role-fallback).
+- **CI:** new `supabase-rls` workflow gates PRs to `main` (start → reset → lint → pgTAP ×2 → stop).
 - **No `.pen` file modified.** No service-role key in client code. No duplicate base profile possible.
 
 ## Deferred validation / follow-ups

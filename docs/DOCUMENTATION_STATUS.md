@@ -17,12 +17,12 @@ Documentation coverage by area. **Coverage %** = how completely the area is docu
 | **Architecture** | 100% | Stable | Architecture | 2026-08-01 | — (ADR-0001…0006 + guide; revisit on measured scaling need) |
 | **Technical spec** | 100% | Stable (Phase 0.7) | Architecture | 2026-08-01 | Per-category product attribute schemas; several `⚑ OPEN` product decisions flagged inline |
 | **Database** | 96% | Stable (spec + Phase 1 impl) | Engineering/Data | 2026-08-02 | Phase 1 identity/tenancy tables + RLS + audit implemented (migrations `2026080209000x`, ADR-0007, `database/phase1-identity-tenancy-review.md`); remaining product tables authored per feature (by design); AR FTS stemming config `⚑ OPEN` |
-| **Security** | 95% | Stable | Security | 2026-08-01 | Formal threat model, pen-test, per-feature authz matrices (deferred, tracked in debt) |
+| **Security** | 96% | Stable | Security | 2026-08-02 | Phase 1 identity/tenancy independently security-reviewed (Sprint 1.1: TRUNCATE/default-privilege hardening, public-view projections, service_role grants — ADR-0007 amendments); formal threat model, pen-test, per-feature authz matrices still deferred |
 | **API** | 100% | Stable (contracts) | Engineering | 2026-08-01 | Contracts complete; realized endpoints land with features |
 | **Engineering standards** | 100% | Stable (Phase 0.8) | Engineering | 2026-08-01 | — (12 docs + index; all 25 topics covered) |
-| **Testing** | 91% | Stable (strategy + Phase 1 RLS suite) | Engineering | 2026-08-02 | Strategy set; first concrete suite landed — 58 pgTAP tenant-isolation tests (`supabase/tests/*`) + backend data-access tests; further suites land with features |
+| **Testing** | 92% | Stable (strategy + Phase 1 RLS suite) | Engineering | 2026-08-02 | Strategy set; concrete suite landed — **98 pgTAP** tenant-isolation/privilege tests (`supabase/tests/*`, incl. adversarial public-discovery, TRUNCATE, self-verification, bootstrap-injection) gated in CI (`supabase-rls`) + backend data-access tests; further suites land with features |
 | **Development / Repo governance** | 100% | Stable (Phase 0 closeout) | Foundation | 2026-08-01 | `CODEOWNERS` + minimum PR CI added; branch-protection required-check selection is a maintainer follow-up |
-| **Operations** | 88% | Stable | Ops | 2026-08-01 | Minimum PR CI present; **CD**, cloud provisioning, Docker/Supabase CI jobs, and metrics/alerting deferred |
+| **Operations** | 89% | Stable | Ops | 2026-08-02 | PR CI present (`frontend`/`backend`/`docs`) + **`supabase-rls`** RLS/isolation gate; **CD**, cloud provisioning, Docker-image CI job, and metrics/alerting deferred |
 | **Design system** | 100% | Stable (`v1.0.0`) | Design System | 2026-08-01 | Runtime asset exports (logo/app-icon/WebGL); theme toggle wiring (tracked in debt) |
 | **Governance / planning** | 100% | Stable (Phase 0.9) | Foundation | 2026-08-01 | GitHub labels/milestones/board are documented, not yet applied in GitHub |
 

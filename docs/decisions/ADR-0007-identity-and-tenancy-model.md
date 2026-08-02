@@ -1,6 +1,6 @@
 # ADR-0007 — Identity & Tenancy Implementation Model (Phase 1)
 
-**Status:** Accepted · 2026-08-02
+**Status:** Accepted · 2026-08-02 (amended 2026-08-02 — Sprint 1.1 security review; see Amendments below)
 
 ## Purpose
 
@@ -47,6 +47,34 @@ The Phase 1 tables: `users`, `profiles`, `contacts`, `organizations`, `branches`
 - The tenant-isolation spine is enforced by Postgres RLS from the first product migration, with pgTAP isolation tests as the gate ([06 §7](../technical/06_rls_strategy.md)).
 - Helpers are the single choke point for tenancy logic; policy files stay readable (`<table>_<action>_<audience>`).
 - A future claims-based optimization or enterprise org-group model ([14](../technical/14_future_extensions.md)) fits without a schema rewrite.
+
+## Amendments — Sprint 1.1 independent security review (2026-08-02)
+
+An independent security/correctness review of the (unmerged) Phase 1 migrations produced the following binding refinements. They are applied by editing the still-unmerged migration set (no new migration), and are proven by the expanded pgTAP suite.
+
+- **D2 refined — one source of branch authority.** `memberships.branch_id` is renamed **`primary_branch_id`** and is now purely descriptive default context. It grants **no** access: `app.current_branch_ids` derives authority solely from `membership_branch_access` (explicit assignment) plus an org-wide capability (`org.manage`/`branch.manage`). This removes the earlier dual-source ambiguity.
+- **D4 reinforced — account type is never authority.** `administrator` is **removed from the `account_type` enum**. Platform staff hold a normal account type plus a `platform_role_grant`; no policy, helper, or bootstrap path may infer platform authority from `primary_account_type`. Proven by tests.
+- **D6 (new) — public discovery uses curated views, not the base tables.** Anonymous/non-member B2C discovery is served only by `organization_public_directory` and `profile_public_directory`, which expose an explicit approved column set (never `created_by`, `user_id`, `status`, `deleted_at`, or timestamps). The base `organizations`/`profiles` tables are private (member/self/platform only) — the anon SELECT policy and grant were removed.
+- **D7 (new) — no trust forgery on insert.** Client INSERT grants are column-scoped: a client cannot set `organizations.status`/`is_verified` (they default to `draft`/`false`, so no self-verification) nor `memberships.status`/`accepted_at` (default `invited`).
+- **D8 (new, CRITICAL) — strip Supabase default table privileges.** Supabase grants `anon`/`authenticated` `TRUNCATE`/`REFERENCES`/`TRIGGER`/`MAINTAIN` on every new `public` table; `TRUNCATE` bypasses RLS **and** row-level triggers (it would wipe even the append-only `audit_log`). Every Phase 1 migration now `revoke all … from anon, authenticated, service_role` before granting back only the intended access. **Convention:** every future feature migration must do the same (documented in [06](../technical/06_rls_strategy.md)).
+- **D9 (new, CRITICAL) — explicit `service_role` grants.** This Supabase version does not auto-grant DML to `service_role`, so the trusted-writer paths (audit inserts, worker outputs) would have failed in a real project. `service_role` is now granted the DML it needs (`audit_log`: `select, insert` only — append-only preserved; other tables: `select, insert, update, delete`; never `truncate`).
+- **H1 — helper execute privileges.** `PUBLIC` execute is revoked on all `app.*` security-definer functions; execute is granted only to `authenticated` (tenancy helpers) — `anon` cannot invoke them.
+- **H2 — audit hardening.** `audit_log.metadata` must be a bounded JSON object (`jsonb_typeof = 'object'`, ≤ 8 KB); `subject_type` ≤ 64 chars; `forbid_mutation` gains a pinned `search_path`. A constrained `record_audit_event()` RPC (so trusted callers cannot set an inconsistent actor) is deferred to Sprint 2.
+
+### Platform-admin provisioning procedure (pilot)
+
+Because there is deliberately **no** ordinary-user write path to `platform_role_grants` (D4), platform authority is provisioned out-of-band:
+
+- **Who:** a repository maintainer / DBA with the project's Supabase **service-role** key or direct database (DBA) access — never an application user.
+- **Environment:** a trusted server context (Supabase SQL editor as the service role, a one-off migration, or a `service_role` backend admin task). The service-role key lives only server-side and is never shipped to a browser.
+- **Grant (exact):**
+  ```sql
+  insert into public.platform_role_grants (user_id, role, granted_by)
+  values ('<auth-user-uuid>', 'administrator', '<granting-admin-uuid-or-null>');
+  ```
+- **Revoke:** `delete from public.platform_role_grants where user_id = '<uuid>' and role = '<role>';`
+- **Audit:** each grant/revoke must also write an `audit_log` row (`platform_role.granted` / `platform_role.revoked`) via the service role. Automating this inside a `record_audit_event()`/grant RPC is the Sprint 2 requirement; until then it is a documented manual step.
+- **Emergency recovery:** if all administrators are lost, a maintainer with the service-role key (or DBA access) re-inserts a grant using the statement above; RLS never blocks the service role. The service-role key and DB credentials are the root of trust and are rotated per the secrets policy.
 
 ## Related files
 

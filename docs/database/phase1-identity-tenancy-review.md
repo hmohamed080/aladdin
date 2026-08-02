@@ -78,6 +78,29 @@ None of these block the tenant-isolation foundation; they are `⚑ OPEN` product
 - `ix_platform_role_grants_user` for the hot `app.is_platform` lookup.
 - `ix_audit_actor` in addition to the spec's subject/org indexes.
 
-## 5. Conclusion
+## 5. Conclusion (initial implementation)
 
 The specification is internally consistent and implementable with **no blocking product decision outstanding**. The only genuine architectural choices not fully pinned by the spec — the branch-access model (F2), the helper-function strategy (F3), the bootstrap trigger (F4), and the platform-admin boundary (F5) — are recorded in **[ADR-0007](../decisions/ADR-0007-identity-and-tenancy-model.md)**. Implementation proceeds on that basis.
+
+---
+
+## 6. Independent security review (Sprint 1.1, 2026-08-02)
+
+A second, independent security/correctness/schema audit of the implemented (unmerged) migrations. Findings were fixed by editing the unmerged migration set; each is covered by an expanded pgTAP suite (98 tests) and, for the two criticals, verified directly against the live database catalog and a REST round-trip. Decisions are recorded in [ADR-0007 §Amendments](../decisions/ADR-0007-identity-and-tenancy-model.md#amendments--sprint-11-independent-security-review-2026-08-02).
+
+### Merge-blocking findings (fixed)
+
+| # | Finding | Resolution | Proof |
+|---|---|---|---|
+| **CRIT-1** | Supabase's default privileges grant `anon`/`authenticated` **`TRUNCATE`** on every table; `TRUNCATE` bypasses RLS and the row-level immutability trigger — a client could wipe any table incl. `audit_log`. | `revoke all … from anon, authenticated, service_role` in every migration, then grant back only intended access. | catalog acl; empirical `anon TRUNCATE` → denied; pgTAP truncate-denial tests |
+| **CRIT-2** | `service_role` had **no DML** on the tables (this Supabase version doesn't auto-grant it), so the documented trusted-writer paths (audit inserts, worker outputs) would fail in production; local tests passed only as `postgres`. | Explicit `service_role` grants (`audit_log`: select+insert; others: full DML, never truncate). | empirical `service_role INSERT` → ok; pgTAP service-role writer test |
+| **B1** | Anon/non-member discovery exposed the **entire** `organizations`/`profiles` rows (incl. `created_by`, `user_id`, `status`, timestamps). | Base tables made private; curated `organization_public_directory` / `profile_public_directory` views expose only approved columns. | `columns_are` tests; REST round-trip |
+| **B2** | All-column INSERT grant let a client self-set `status='active'`/`is_verified=true` (forged verification). | Column-scoped INSERT grant excludes `status`/`is_verified`; they default to `draft`/`false`. | pgTAP: insert-with-`is_verified` denied; defaults asserted |
+| **B3** | `memberships.branch_id` ("home") silently granted branch access alongside `membership_branch_access` — two sources of authority. | Renamed `primary_branch_id` (descriptive only); removed from `current_branch_ids`. | pgTAP: primary-branch-only member sees 0 branches |
+| **B4** | `administrator` in the `account_type` enum invited treating account type as privilege. | Removed from the enum; platform authority solely via `platform_role_grants`. | pgTAP: enum cast fails; account-type change grants no platform authority |
+
+### Hardening (fixed): H1 `PUBLIC` execute revoked on `app.*`; H2 audit metadata/subject-type bounds + trigger `search_path`; H3 org-slug format `CHECK`; H4 `SUPABASE_ANON_KEY` documented in `backend/.env.example`.
+
+### PASS (verified, unchanged): `handle_new_user` ignores hostile `raw_user_meta_data` (no injected account type / platform role / verification; locale validated; name truncated; idempotent, `security definer`, pinned `search_path`, schema-qualified). Helpers are `stable security definer` with `search_path=''`. Client construction creates a fresh instance per call (no global token leakage); the user client uses the **anon** key + caller JWT (RLS verified end-to-end via REST); the service client is the only service-role user.
+
+### Deferred (documented debt): constrained `record_audit_event()` RPC; automated audit emission from write paths; last-owner protection; org-orphaning on create; live RLS integration test in the backend suite; repo-wide default-privileges convention enforcement in CI. See [`../technical/TECHNICAL_DEBT.md`](../technical/TECHNICAL_DEBT.md).
