@@ -1,6 +1,6 @@
 # ADR-0007 — Identity & Tenancy Implementation Model (Phase 1)
 
-**Status:** Accepted · 2026-08-02 (amended 2026-08-02 — Sprint 1.1 security review; see Amendments below)
+**Status:** Accepted · 2026-08-02 (amended 2026-08-02 — Sprint 1.1 security review and Sprint 1.2 account-type/eligibility fix; see Amendments below)
 
 ## Purpose
 
@@ -60,6 +60,15 @@ An independent security/correctness review of the (unmerged) Phase 1 migrations 
 - **D9 (new, CRITICAL) — explicit `service_role` grants.** This Supabase version does not auto-grant DML to `service_role`, so the trusted-writer paths (audit inserts, worker outputs) would have failed in a real project. `service_role` is now granted the DML it needs (`audit_log`: `select, insert` only — append-only preserved; other tables: `select, insert, update, delete`; never `truncate`).
 - **H1 — helper execute privileges.** `PUBLIC` execute is revoked on all `app.*` security-definer functions; execute is granted only to `authenticated` (tenancy helpers) — `anon` cannot invoke them.
 - **H2 — audit hardening.** `audit_log.metadata` must be a bounded JSON object (`jsonb_typeof = 'object'`, ≤ 8 KB); `subject_type` ≤ 64 chars; `forbid_mutation` gains a pinned `search_path`. A constrained `record_audit_event()` RPC (so trusted callers cannot set an inconsistent actor) is deferred to Sprint 2.
+
+## Amendments — Sprint 1.2 account-type & public-eligibility fix (2026-08-02)
+
+A merge-blocking authorization gap was found and closed: `authenticated` held a column UPDATE grant on `users.primary_account_type`, and `profile_public_directory` treated *any* non-consumer account type as publicly discoverable. Together an end consumer could self-promote to a professional type and immediately appear in public discovery — bypassing the approved account-upgrade workflow, verification, and future subscription gates. Confirmed empirically before the fix.
+
+- **D10 — `primary_account_type` is server-controlled.** Removed from the `authenticated` update grant; only `locale` remains self-editable on `users` (`is_verified`/`status` were already withheld). It changes **only** via the approved account-upgrade / admin workflow (`service_role` or a future constrained RPC — Sprint 2). No browser update path exists. This enforces the canonical rule: *account upgrade extends the one identity through a trusted server-side workflow; it is not a user-editable profile field.*
+- **D11 — public discovery requires explicit, server-controlled eligibility.** Added `profiles.public_profile_status` (`public.public_profile_status` enum: `hidden` default / `listed`), **not** in the `authenticated` update grant (server-controlled). `profile_public_directory` now requires `public_profile_status = 'listed'` **and** a professional (non-consumer) account type **and** active user **and** not soft-deleted. Selecting a professional account type no longer makes a profile public.
+- **Six concepts kept distinct:** (1) identity = `users`+`profiles`; (2) `primary_account_type` = approved primary product experience (server-controlled); (3) organization membership = tenant access/capabilities; (4) platform role = `platform_role_grants`; (5) **professional verification** = the domain `Verification` request/decision entity (its feature is deferred — it is the workflow that will set `public_profile_status = 'listed'`); (6) **public-profile visibility** = `profiles.public_profile_status`. No single field represents more than one concept; `users.is_verified` (identity verification) is deliberately **not** reused for public eligibility.
+- **Deferred:** the transactional, auditable account-upgrade write path (account-type transition + optional `listed` on approval), and the professional `Verification` feature that drives it — Sprint 2. `service_role` retains full DML on `users`/`profiles` so that workflow can be built without a schema change.
 
 ### Platform-admin provisioning procedure (pilot)
 

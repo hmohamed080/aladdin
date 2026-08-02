@@ -37,6 +37,8 @@ Every business validation for the MVP. **Validation is Zod-first** (`frontend/sr
 | avatar | image rules (§8); `avatars/` bucket |
 | locality | valid `locality_id` (exists, leaf/any level) |
 | portfolio | professional account types only |
+| **account type** | `primary_account_type` is **server-controlled** — never accepted from a client profile edit; changes only via the approved upgrade/admin workflow ([ADR-0007 D10](../decisions/ADR-0007-identity-and-tenancy-model.md)) |
+| **public visibility** | `public_profile_status` (`hidden`/`listed`) is **server-controlled** — set by the approved professional-verification/upgrade workflow, never self-listed; public discovery requires `listed` + professional type + active + not deleted |
 
 ## 3. Organization
 

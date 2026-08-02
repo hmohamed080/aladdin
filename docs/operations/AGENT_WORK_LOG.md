@@ -4,6 +4,37 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 1: Sprint 1.2 (Account-Type & Public-Profile Authorization Fix)
+**Date/time:** 2026-08-02
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `feature/identity-multitenancy` (continued; not merged)
+
+### Objective
+Narrow merge-blocking correction to the identity model: make `primary_account_type` and public-profile eligibility server-controlled. No new feature; no auth UI; no upgrade workflow build.
+
+### Vulnerability (confirmed empirically, then fixed)
+The committed migration granted `authenticated` a column UPDATE on `users.primary_account_type`, and `profile_public_directory` treated any `primary_account_type <> 'end_consumer'` as public. Verified: the seeded consumer ran `update users set primary_account_type='engineer'` (succeeded) and then appeared in the public directory — bypassing the upgrade workflow, verification, and future subscription gates.
+
+### Fix
+- **`primary_account_type` server-controlled:** removed from the `authenticated` update grant (only `locale` self-editable now); `is_verified`/`status` were already withheld. `service_role` keeps full `users` DML for the future upgrade/admin RPC. No client write path exists (verified: none in `frontend/`/`backend/` app code).
+- **Public eligibility field:** added `profiles.public_profile_status` enum (`hidden` default / `listed`), **not** in the `authenticated` update grant (server-controlled). `profile_public_directory` now requires `public_profile_status='listed'` AND professional account type AND active AND not deleted.
+- **Six concepts kept distinct** (ADR-0007 D10/D11): identity · account type (server-controlled) · membership · platform role · professional verification (future `Verification` entity, drives `listed`) · public visibility (`public_profile_status`). `users.is_verified` (identity) not reused.
+- Seed lists the two org owners (trusted path) and leaves the sales staff `hidden` as a negative fixture.
+
+### Catalog verification
+`role_column_grants`: `authenticated` UPDATE on `users` = `locale` only; on `profiles` = display columns only (no `public_profile_status`). `service_role` retains `users` UPDATE. Empirical consumer self-promote → **denied (42501)**.
+
+### Tests / validation
+New `10_account_type_eligibility` (12 assertions: self-promote denied, self-verify denied, self-list denied, locale still editable, hidden professional invisible, listed professional visible, service_role transition works); expanded `08` (listed-only discovery, hidden-professional negative, suspended-user exclusion). pgTAP **98 → 112**; two clean `db reset` + `test db` cycles → **112/112 PASS**; `db lint` clean. Frontend typecheck/lint/test(3)/build GREEN (types regenerated with `public_profile_status`); backend ruff + **pytest 10**. CI: existing `supabase-rls` runs the expanded suite (no duplicate workflow). **No `.pen` modified.**
+
+### Docs
+ADR-0007 Sprint 1.2 amendments (D10/D11); DECISION_LOG; phase1 review §7; domain model (User/Profile), 03/06/11/12 specs; TECHNICAL_DEBT (account-upgrade write path); DOCUMENTATION_STATUS; RUNTIME_STATE; this log.
+
+### Remaining (Sprint 2)
+Transactional, auditable account-upgrade write path (account-type transition + set `listed` on approval) driven by the professional `Verification` feature.
+
+---
+
 ## Session — Phase 1: Sprint 1.1 (Independent Identity & RLS Security Review)
 **Date/time:** 2026-08-02
 **Agent/tool:** Claude Code (Opus 4.8)

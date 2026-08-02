@@ -155,6 +155,13 @@ stateDiagram-v2
 ```
 - Revoked (not deleted) to preserve attribution. Capability changes are audited.
 
+## 8a. Account upgrade & public-profile eligibility (foundation note)
+
+Not a per-row lifecycle enum yet, but a server-controlled transition recorded for Phase 1:
+
+- **Account type:** `primary_account_type` transitions (e.g. `end_consumer → engineer`) happen **only** through the approved upgrade/admin workflow — a trusted, **transactional and auditable** server path (`service_role` / future constrained RPC). It **extends** the one identity (no second user/profile). A direct client update is impossible (the column is withheld from the `authenticated` grant). The workflow itself is deferred to Sprint 2.
+- **Public-profile visibility:** `profiles.public_profile_status`: `hidden → listed` is set by the approved professional-verification/upgrade workflow (server-controlled); `listed → hidden` on suspension/withdrawal. Public discovery requires `listed` + professional account type + active user + not soft-deleted. See [ADR-0007 D10/D11](../decisions/ADR-0007-identity-and-tenancy-model.md).
+
 ## 9. Subscription
 
 ```mermaid

@@ -104,3 +104,17 @@ A second, independent security/correctness/schema audit of the implemented (unme
 ### PASS (verified, unchanged): `handle_new_user` ignores hostile `raw_user_meta_data` (no injected account type / platform role / verification; locale validated; name truncated; idempotent, `security definer`, pinned `search_path`, schema-qualified). Helpers are `stable security definer` with `search_path=''`. Client construction creates a fresh instance per call (no global token leakage); the user client uses the **anon** key + caller JWT (RLS verified end-to-end via REST); the service client is the only service-role user.
 
 ### Deferred (documented debt): constrained `record_audit_event()` RPC; automated audit emission from write paths; last-owner protection; org-orphaning on create; live RLS integration test in the backend suite; repo-wide default-privileges convention enforcement in CI. See [`../technical/TECHNICAL_DEBT.md`](../technical/TECHNICAL_DEBT.md).
+
+---
+
+## 7. Account-type & public-eligibility fix (Sprint 1.2, 2026-08-02)
+
+A second merge-blocking authorization gap, independent of Sprint 1.1, in the committed migrations. Fixed in the unmerged migration set; proven by pgTAP (98 → **112** tests) and catalog inspection.
+
+| # | Finding | Resolution | Proof |
+|---|---|---|---|
+| **SELF-PROMO (merge-blocking)** | `authenticated` had a column UPDATE grant on `users.primary_account_type`, and `profile_public_directory` treated any non-consumer account type as public. An end consumer could self-promote to a professional type and appear in public discovery, bypassing the upgrade workflow, verification, and future subscription gates. **Confirmed empirically** (`update … set primary_account_type='engineer'` as the consumer succeeded → then appeared in the directory). | (1) `primary_account_type` removed from the `authenticated` update grant → server-controlled (only `locale` self-editable); `service_role` retains the trusted transition path. (2) Added server-controlled `profiles.public_profile_status` (`hidden`/`listed`); the directory now requires `listed` **and** professional type **and** active **and** not deleted. | catalog: `authenticated` UPDATE on `users` = `locale` only; empirical self-promote → denied; pgTAP `10_account_type_eligibility` (12 assertions) + expanded `08` |
+
+**Six concepts separated** (ADR-0007 D10/D11): identity · `primary_account_type` (server-controlled) · membership · platform role · professional verification (future `Verification` entity) · public visibility (`public_profile_status`). `users.is_verified` (identity) is **not** reused for public eligibility.
+
+**Deferred:** the transactional/auditable account-upgrade write path and the professional `Verification` feature that sets `listed` — Sprint 2.
