@@ -118,3 +118,31 @@ A second merge-blocking authorization gap, independent of Sprint 1.1, in the com
 **Six concepts separated** (ADR-0007 D10/D11): identity · `primary_account_type` (server-controlled) · membership · platform role · professional verification (future `Verification` entity) · public visibility (`public_profile_status`). `users.is_verified` (identity) is **not** reused for public eligibility.
 
 **Deferred:** the transactional/auditable account-upgrade write path and the professional `Verification` feature that sets `listed` — Sprint 2.
+
+---
+
+## 8. Sprint 2 — trusted write paths (2026-08-03)
+
+Implements the account-upgrade, verification, membership, and branch write paths on top of the validated foundation. Migrations `20260803090001` (verification + upgrade + `record_audit_event`) and `20260803090002` (membership/branch RPCs). All decisions in [ADR-0007 §Amendments — Sprint 2](../decisions/ADR-0007-identity-and-tenancy-model.md). Covered by pgTAP suites `11`/`12`/`13` (suite grew 112 → **169**, repeatable across two clean resets).
+
+### What was built
+| Area | Path | Key guarantees |
+|---|---|---|
+| Account upgrade (self-service) | `public.request_account_upgrade` | caller-scoped (`user_id = auth.uid()`); one open request/user; never mutates privileged fields; idempotent |
+| Verification review | `public.review_start` / `review_request_changes` / `review_reject` / `review_approve` | platform-only (`app.is_platform`); no self-approval; reason required on reject/changes; reviewer_id unspoofable |
+| Apply upgrade | `public.apply_account_upgrade` | only path that writes `primary_account_type` + (if granted) `public_profile_status='listed'`; idempotent (`applied_at` + `FOR UPDATE`) |
+| Public listing | `apply_account_upgrade` / `public.set_profile_hidden` | listed only when `grants_public_listing`; account type alone never lists; user can never self-list |
+| Membership | `public.membership_invite/activate/set_capabilities/suspend/revoke` | capability-gated; **no-escalation**; **last-owner protected**; duplicates rejected |
+| Branches | `public.branch_assign/unassign` | tenant-matched (cross-tenant impossible); duplicates idempotent; `primary_branch_id` grants nothing |
+| Audit | `app.record_audit_event` (internal-only) | actor = `auth.uid()` (unspoofable); append-only; every sensitive path emits an event |
+
+### Catalog verification (post-migration)
+- All 16 new functions: `security definer` + `search_path=""` (confirmed via `pg_proc`).
+- `app.record_audit_event` and `app.assert_not_last_owner`: **not** executable by `anon`/`authenticated` (internal-only).
+- `verifications`: `authenticated` = SELECT only (writes via RPC); `service_role` = select/insert/update (no delete/truncate). RLS enabled on `verifications` + `verification_documents`.
+
+### Verified behaviours (pgTAP)
+Self-promote still denied; approved upgrade transitions exactly once; double-apply idempotent; rejected request unchanged; unapproved profile not listed / approved profile listed / user cannot self-list; org admin ≠ platform verifier; no-escalation; cross-tenant branch denied; last-owner suspend/revoke blocked; audit actor unspoofable + append-only under UPDATE/DELETE.
+
+### Deferred (Sprint 3+)
+Verification document storage upload + OCR (placeholder table only); org-subject verification UX; subscription/package gates (clean insertion point before `apply_account_upgrade`); notification/Realtime fan-out; transactional outbox.

@@ -4,6 +4,35 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 1: Sprint 2 (Account Upgrade, Verification & Membership Write Paths)
+**Date/time:** 2026-08-03
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `feature/account-upgrade-verification` (cut from merged `main` @ `a3d7526`; not merged)
+
+### Objective
+Implement the trusted write paths on top of the validated Sprint 1 identity/RLS foundation: account upgrade, professional verification, membership lifecycle, branch assignment, and constrained audit emission. No UI/OTP/products/sales; server-controlled fields stay server-controlled.
+
+### Migrations added
+- `20260803090001_verification_and_upgrade.sql` — `verification_subject`/`verification_type`/`verification_status` enums; `verifications` (+ minimal `verification_documents`); internal `app.record_audit_event()` (Sprint 1.1 H2 deferral resolved); widened audit action allow-list; account-upgrade RPCs: `request_account_upgrade` (self-service), `review_start`/`review_request_changes`/`review_reject`/`review_approve`, `apply_account_upgrade`, `set_profile_hidden`; RLS (RPC-only writes) + grants.
+- `20260803090002_membership_branch_write_paths.sql` — `membership_invite`/`activate`/`set_capabilities`/`suspend`/`revoke` (+ `app.assert_not_last_owner`); `branch_assign`/`unassign`.
+
+### Design (ADR-0007 §Amendments — Sprint 2, D12–D16)
+Workflow split so submission ≠ approval; all state changes are `security definer` RPCs (`search_path=''`, schema-qualified) deriving authority from `auth.uid()` (no spoofable params). `apply_account_upgrade` is the only path that changes `primary_account_type`/`public_profile_status` (idempotent via `applied_at`+`FOR UPDATE`). Verification decisions platform-only (`app.is_platform`), no self-approval. Membership: no-escalation (grant only held caps) + last-owner protection (row-locked). Branch: cross-tenant impossible. `record_audit_event` internal-only, actor = `auth.uid()`. RPC placement in `public` (PostgREST-exposed) with internal gating.
+
+### Data-access helpers
+Frontend server-action wrappers only: `server/actions/account-upgrade.ts` + `membership.ts` (thin `.rpc()` calls over the caller-scoped server client; no privileged logic; no service-role). No backend helper — these are Next.js write paths, not the FastAPI AI service (ADR-0001). Regenerated `database.types.ts`.
+
+### Tests / validation
+pgTAP **112 → 169** (new `11_account_upgrade`, `12_membership_write_paths`, `13_audit_emission`). Two clean `db reset` + `test db` cycles → **169/169 PASS**; `db lint --schema public,app` clean. Catalog audit: 16 functions `security definer`+`search_path=""`; internal writers not client-executable; `verifications` SELECT-only for clients. Frontend typecheck/lint/test(6)/build GREEN; backend ruff + pytest(10). **No `.pen` modified.**
+
+### Docs
+ADR-0007 (Sprint 2 amendments D12–D16), DECISION_LOG, phase1 review §8, domain model §C, specs 03/06/10/11/12, TECHNICAL_DEBT (record_audit_event / account-upgrade / last-owner resolved), DOCUMENTATION_STATUS, RUNTIME_STATE, this log.
+
+### Remaining (Sprint 3+)
+Verification document storage upload + OCR (placeholder table only); org-subject verification UX; subscription/package gate before `apply_account_upgrade`; notification/Realtime fan-out; transactional outbox.
+
+---
+
 ## Session — Phase 1: Sprint 1.2 (Account-Type & Public-Profile Authorization Fix)
 **Date/time:** 2026-08-02
 **Agent/tool:** Claude Code (Opus 4.8)

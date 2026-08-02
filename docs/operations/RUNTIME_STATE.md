@@ -6,29 +6,29 @@ This is a **mutable snapshot** of the current live repository state — not an a
 
 | | |
 |---|---|
-| **Version** | Runtime snapshot · 2026-08-02 |
+| **Version** | Runtime snapshot · 2026-08-03 |
 | **Owner** | Foundation / Operations |
-| **Last updated** | 2026-08-02 |
-| **Updated by** | Claude Code (Opus 4.8) — Phase 1, Sprint 1.2 (Account-Type & Public-Profile Authorization Fix) |
-| **Current focus** | **Phase 1 — Identity & Multi-Tenancy · Sprint 1.2 (Account-Type & Public-Profile Authorization Fix).** Closed a merge-blocking self-promotion path: `authenticated` had a column UPDATE grant on `users.primary_account_type` and `profile_public_directory` treated any non-consumer account type as public — so an end consumer could self-promote to a professional type and appear in public discovery (confirmed empirically). Fix: `primary_account_type` is now **server-controlled** (removed from the authenticated update grant; `service_role`/future RPC only), and a server-controlled `profiles.public_profile_status` (`hidden`/`listed`) gates discovery (professional type alone is not enough). pgTAP grew 98→**112**. Prior Sprint 1.1 (default-privilege/TRUNCATE + view hardening) remains in place. See [ADR-0007 §Amendments](../decisions/ADR-0007-identity-and-tenancy-model.md) and [`../database/phase1-identity-tenancy-review.md`](../database/phase1-identity-tenancy-review.md#7-account-type--public-eligibility-fix-sprint-12-2026-08-02). |
+| **Last updated** | 2026-08-03 |
+| **Updated by** | Claude Code (Opus 4.8) — Phase 1, Sprint 2 (Account Upgrade, Verification & Membership Write Paths) |
+| **Current focus** | **Phase 1 — Identity & Multi-Tenancy · Sprint 2 (Account Upgrade, Verification & Membership Write Paths).** Implemented the trusted write paths on the validated identity/RLS foundation: the `verifications` entity + account-upgrade workflow (`request → review → approve → apply`, idempotent; the only path that changes `primary_account_type`/listing; platform-only decisions, no self-approval); membership RPCs (invite/activate/set-capabilities/suspend/revoke with **no-escalation** + **last-owner protection**); branch assign/unassign (cross-tenant impossible); and the constrained internal `app.record_audit_event()` (unspoofable actor) with audit emission on every sensitive path. All state changes are `security definer` RPCs (`search_path=''`, schema-qualified, `auth.uid()`-derived authority). pgTAP grew 112→**169**. See [ADR-0007 §Amendments — Sprint 2](../decisions/ADR-0007-identity-and-tenancy-model.md) and [`../database/phase1-identity-tenancy-review.md`](../database/phase1-identity-tenancy-review.md#8-sprint-2--trusted-write-paths-2026-08-03). |
 
 ## Phase & repository
 
 | Field | Value |
 |---|---|
 | **Current Phase** | **Phase 1 — Identity & Multi-Tenancy** (canonical identity, orgs/branches/memberships/capabilities, RLS helpers + organization-isolation tests) |
-| **Current Sprint** | **Sprint 1.2 — Account-Type & Public-Profile Authorization Fix** |
-| **Current Feature** | Identity, Organizations, Memberships, Branches, RLS, Audit Foundation |
+| **Current Sprint** | **Sprint 2 — Account Upgrade, Verification & Membership Write Paths** |
+| **Current Feature** | Account Upgrade, Verification, Membership & Branch Write Paths (trusted RPCs + audit) |
 | **Next Phase** | **Phase 2** — first product workflow (per [`ROADMAP`](../roadmap/ROADMAP.md); design order starts at 05C B2B Sales) once identity/tenancy merges |
-| **Current Branch** | `feature/identity-multitenancy` (created from `main` @ `64e68d6`) |
-| **Current Milestone** | Phase 1 tenant-isolation foundation — schema, RLS spine, audit, tenant-aware clients, isolation tests |
+| **Current Branch** | `feature/account-upgrade-verification` (created from `main` @ `a3d7526`) |
+| **Current Milestone** | Sprint 2 — account-upgrade/verification + membership/branch write-path RPCs, constrained audit emission, adversarial tests |
 | **Current Remote Repository** | `origin` = `https://github.com/hmohamed080/aladdin.git` |
-| **Last Stable Commit** | `64e68d6` — merged `main` (PR #2: foundation closeout); tagged `v0.1.0-foundation`. Phase 1 commits land on `feature/identity-multitenancy` and merge into `main` via PR |
+| **Last Stable Commit** | `a3d7526` — merged `main` (PR #3: Sprint 1 identity & tenancy); tagged `v0.1.0-foundation`. Sprint 2 commits land on `feature/account-upgrade-verification` and merge into `main` via PR |
 | **Last Stable Tag** | `v0.1.0-foundation` (repo `0.1.0`) — created on merged `main` after the closeout PR; Design System stays independently at `1.0.0` |
 | **Foundation Release** | Tagged `v0.1.0-foundation` on `main` @ `64e68d6` |
 | **Repository Status** | Published to GitHub (`origin`, full history, no squash/force); `main` protection recommended (ADR-0006), not yet applied |
 | **Documentation Status** | Updated for Phase 1 — see [`../DOCUMENTATION_STATUS.md`](../DOCUMENTATION_STATUS.md); 0 broken links; no orphan docs |
-| **Implementation Status** | **In progress** — Phase 1 identity & tenancy foundation implemented (schema + RLS + audit + tests + tenant-aware clients); no other product features/endpoints/screens |
+| **Implementation Status** | **In progress** — Sprint 2 trusted write paths implemented (verification + account-upgrade + membership/branch RPCs + audit emission); no product UI/endpoints/screens |
 
 ## Live engineering state
 
@@ -36,20 +36,20 @@ Always reflects the current live engineering state of the project. Overwrite eac
 
 | Field | Value |
 |---|---|
-| **Current Sprint** | **Sprint 1.2 — Account-Type & Public-Profile Authorization Fix** (Phase 1) |
+| **Current Sprint** | **Sprint 2 — Account Upgrade, Verification & Membership Write Paths** (Phase 1) |
 | **Current Epic** | Identity & Multi-Tenancy (canonical identity, organizations, memberships, branches, RLS spine, audit) |
-| **Current Feature** | Identity, Organizations, Memberships, Branches, RLS, Audit Foundation |
+| **Current Feature** | Account Upgrade, Verification, Membership & Branch Write Paths (trusted RPCs + audit) |
 | **Current UI Status** | Design system **v1.0.0** ("The Aperture") finalized + implemented as tokens; only the Next.js scaffold page exists — **no product screens** (Phase 1 is schema/RLS/data-access only) |
 | **Current Backend Status** | FastAPI scaffold — `GET /health` only; **no product endpoints**. Data-access boundaries added: `app.database.create_user_client` (preserves caller JWT → RLS) + `create_service_client` (trusted-path, bypasses RLS) — `supabase-py`, ADR-0005 |
-| **Current Database Status** | 4 migrations; **Phase 1 identity/tenancy tables implemented** (`users`, `profiles`, `contacts`, `organizations`, `branches`, `memberships`, `membership_capabilities`, `membership_branch_access`, `platform_role_grants`, `audit_log`) + public-discovery views (`organization_public_directory`, `profile_public_directory`); `app` helper schema; **RLS + explicit policies on every table**, default `TRUNCATE` privileges stripped from client roles, explicit `service_role` DML; **112 pgTAP** isolation/privilege tests; schema source = `supabase/migrations/*.sql` |
+| **Current Database Status** | **6 migrations**; Phase 1 identity/tenancy tables + **Sprint 2 `verifications`/`verification_documents`** and **16 security-definer write-path RPCs** (account-upgrade/verification/membership/branch + internal `record_audit_event`); public-discovery views; `app` helper schema; **RLS + explicit policies on every table**, default `TRUNCATE` stripped from client roles, explicit `service_role` DML; **169 pgTAP** tests; schema source = `supabase/migrations/*.sql` |
 | **Current Design System Version** | **1.0.0** (`DESIGN.md` / `design/tokens/*`) |
 | **Current Documentation Version** | Technical spec **1.0.0** (Phase 0.7); engineering standards **1.0.0** (Phase 0.8); governance/planning **1.0.0** (Phase 0.9 — ADR-0006, ROADMAP, BACKLOG, TECHNICAL_DEBT, DOCUMENTATION_STATUS, DECISION_LOG); docs index **1.0.0** |
 | **Current Deployment Status** | **not deployed** — no Vercel/Railway/Supabase cloud project connected; **no CD**; a minimum **PR-validation CI** workflow (`.github/workflows/ci.yml`: `frontend`/`backend`/`docs`) is present (must run once, then be selected as required checks in branch protection); repository published to GitHub (`origin`) |
 
 ## Git & branch
 
-- **Baseline:** `main` @ `64e68d6` — foundation merged (PR #2) and tagged `v0.1.0-foundation`.
-- **Current work branch:** `feature/identity-multitenancy` (cut from `main` @ `64e68d6`) — Phase 1 identity & tenancy foundation.
+- **Baseline:** `main` @ `a3d7526` — Sprint 1 identity/tenancy merged (PR #3); foundation tag `v0.1.0-foundation`.
+- **Current work branch:** `feature/account-upgrade-verification` (cut from `main` @ `a3d7526`) — Sprint 2 trusted write paths.
 - **Remote:** `origin` → `https://github.com/hmohamed080/aladdin.git` (push preserves full history; no squash, no force). Phase 1 merges into `main` via PR; direct pushes to `main` are prohibited.
 
 > HEAD moves with each commit; this file trails HEAD by its own commit. Re-derive live values with the [resume commands](#exact-resume-commands) below rather than trusting a pasted hash.
@@ -81,13 +81,15 @@ Passwordless model (WhatsApp/Email OTP) is specified; **no auth UI/OTP/session h
 
 ## Database & migration state
 
-- **Migrations (4):**
+- **Migrations (6):**
   - `20260729000000_extensions.sql` — `pgcrypto`, `pg_trgm`, `vector`/pgvector, `postgis` (in the `extensions` schema).
   - `20260802090001_identity_core.sql` — `app` helper schema + `set_updated_at`; enums (`account_type`, `platform_role`, `contact_channel`, `user_status`, `public_profile_status`); `users`, `profiles` (incl. server-controlled `public_profile_status`), `contacts`; profile-bootstrap trigger; identity RLS + grants (`primary_account_type` server-controlled).
   - `20260802090002_organizations_tenancy.sql` — enums (`org_status`, `membership_status`); `organizations`, `branches`, `memberships`, `membership_capabilities`, `membership_branch_access`, `platform_role_grants`; tenancy helpers (`current_org_ids`, `is_org_member`, `has_capability`, `current_branch_ids`, `is_platform`); RLS + grants.
   - `20260802090003_audit_foundation.sql` — append-only `audit_log` (immutability trigger; service-role insert; admin read).
+  - `20260803090001_verification_and_upgrade.sql` **(Sprint 2)** — enums (`verification_subject`/`verification_type`/`verification_status`); `verifications` + `verification_documents`; internal `app.record_audit_event()`; account-upgrade RPCs (`request_account_upgrade` self-service; `review_start`/`review_request_changes`/`review_reject`/`review_approve`; `apply_account_upgrade`; `set_profile_hidden`); widened audit action allow-list; RLS + grants.
+  - `20260803090002_membership_branch_write_paths.sql` **(Sprint 2)** — membership RPCs (`membership_invite`/`activate`/`set_capabilities`/`suspend`/`revoke`, `app.assert_not_last_owner`) + branch RPCs (`branch_assign`/`unassign`).
 - **Public discovery:** curated views `organization_public_directory` / `profile_public_directory` expose only approved columns; base tables are private (Sprint 1.1 B1). Professional discovery requires server-controlled `profiles.public_profile_status='listed'` (Sprint 1.2) — a professional account type alone is not enough; `users.primary_account_type` is server-controlled (not client-updatable).
-- **RLS + privileges:** enabled with explicit policies on **every** table; Supabase's default `TRUNCATE`/`REFERENCES`/`TRIGGER` grants are **revoked** from `anon`/`authenticated`/`service_role` and re-granted intentionally; `service_role` has explicit DML (append-only preserved for `audit_log`). Covered by **112 pgTAP tests** in `supabase/tests/` (repeatable across `db reset`) and gated by the `supabase-rls` CI workflow.
+- **RLS + privileges:** enabled with explicit policies on **every** table; Supabase's default `TRUNCATE`/`REFERENCES`/`TRIGGER` grants are **revoked** from `anon`/`authenticated`/`service_role` and re-granted intentionally; `service_role` has explicit DML (append-only preserved for `audit_log`). Covered by **169 pgTAP tests** in `supabase/tests/` (repeatable across `db reset`) and gated by the `supabase-rls` CI workflow.
 - **Seed:** synthetic local fixtures (2 orgs, 3 branches, 5 users incl. a branch-limited member and a platform admin) in `supabase/seed.sql` — clearly marked synthetic; no real data.
 - **Generated types:** `frontend/src/types/database.types.ts` (from the local schema).
 - **Schema source of truth:** `supabase/migrations/*.sql` only (ADR-0002). Design decisions: [ADR-0007](../decisions/ADR-0007-identity-and-tenancy-model.md).
@@ -160,15 +162,15 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 - **Docker image build — PASSED (2026-08-01):** `docker build --no-cache` ✅; runtime Python 3.12.13, non-root appuser (uid 10001), HEALTHCHECK healthy, `/health` → 200; no `.env`/`.pen`/SQLAlchemy/Alembic in image. See *Infrastructure validation status*.
 - **Supabase full stack — PASSED (2026-08-01):** `start` ✅, `db reset` ✅ ×2 (repeatable, no drift), `db lint` ✅ (findings only in bundled `extensions.*`); extensions installed in the `extensions` schema; 0 product tables.
 
-## Phase 1 validation status (2026-08-02 — Sprint 1.2 account-type/eligibility fix)
+## Phase 1 validation status (2026-08-03 — Sprint 2 trusted write paths)
 
-- **Supabase — PASSED:** `db reset` applies all 4 migrations + seed cleanly; **repeated** (reset → tests → reset → tests). `db lint --schema public,app` → **"No schema errors found"**. `supabase test db` → **112/112 pgTAP tests pass** across two clean resets.
-- **Sprint 1.2 fix verified:** `authenticated` column UPDATE grant on `users` is now **`locale` only** (no `primary_account_type`/`is_verified`/`status`); `profiles` update grant excludes `public_profile_status` — confirmed via `information_schema.role_column_grants` + empirical consumer self-promote → **denied**. `service_role` retains full `users` DML (trusted transition path). Public directory requires `public_profile_status='listed'` + professional type + active + not deleted.
-- **Sprint 1.1 hardening still in place + verified:** `anon`/`authenticated` default `TRUNCATE` stripped (empirical `anon TRUNCATE audit_log` → denied); `service_role` audit insert → ok; RLS scoping proven end-to-end via signed-JWT REST round-trip; public views expose only approved columns; account type ≠ platform authority; single-source branch authority.
-- **Frontend — GREEN:** `install --frozen-lockfile` · `typecheck` · `lint` · `test` (3) · `build`. Types regenerated (`public_profile_status` present; no client write path to it or `primary_account_type`).
-- **Backend — GREEN:** `uv sync --frozen` · `ruff` (clean) · `pytest` (**10 passed**).
-- **CI:** `supabase-rls` workflow (existing, not duplicated) runs the expanded 112-test suite on PRs to `main`.
-- **No `.pen` file modified.** No service-role key in client code. No duplicate base profile possible.
+- **Supabase — PASSED:** `db reset` applies all **6 migrations** + seed cleanly; **repeated** (reset → tests → reset → tests). `db lint --schema public,app` → **"No schema errors found"**. `supabase test db` → **169/169 pgTAP tests pass** across two clean resets.
+- **Sprint 2 verified (catalog + pgTAP):** all 16 new functions are `security definer` + `search_path=""`; `app.record_audit_event`/`assert_not_last_owner` are **not** client-executable; `verifications` has no client DML grant (RPC-only writes); self-promote still denied; approved upgrade transitions exactly once + idempotent double-apply; rejection unchanged; unapproved profile not listed / approved listed / user cannot self-list; org admin ≠ platform verifier; no-escalation; cross-tenant branch denied; last-owner suspend/revoke blocked; audit actor unspoofable + append-only under UPDATE/DELETE.
+- **Sprint 1.x hardening intact:** default `TRUNCATE` stripped; server-controlled `primary_account_type`/`public_profile_status`; public views expose only approved columns; single-source branch authority.
+- **Frontend — GREEN:** `install --frozen-lockfile` · `typecheck` · `lint` · `test` (6 — incl. new account-upgrade helper tests) · `build`. Types regenerated (RPCs present; no client write path to privileged columns).
+- **Backend — GREEN:** `uv sync --frozen` · `ruff` (clean) · `pytest` (**10 passed**). No backend helper added — the write paths are Next.js server actions, not the FastAPI AI service (ADR-0001).
+- **CI:** `supabase-rls` workflow (existing, not duplicated) runs the 169-test suite on PRs to `main`.
+- **No `.pen` file modified.** No service-role key in client code. No duplicate base profile/identity possible.
 
 ## Deferred validation / follow-ups
 

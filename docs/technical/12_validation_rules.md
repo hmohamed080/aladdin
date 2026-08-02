@@ -64,10 +64,12 @@ Every business validation for the MVP. **Validation is Zod-first** (`frontend/sr
 
 | Rule | Validation |
 |---|---|
-| subject | exactly one of user/org per `subject_type` |
-| documents | ≥1 doc to submit; each doc passes document rules (§7) |
+| subject | exactly one of user/org per `subject_type` (DB CHECK) |
+| documents | ≥1 doc to submit *(deferred — enforced when storage/OCR lands; Sprint 2 allows doc-less submit, table is a placeholder)* |
 | doc types | required set per subject/account type (⚑ e.g. Engineer → syndicate card; Company → commercial register — exact list OPEN with product) |
-| decision | reviewer is platform role, **not** the subject; reason required on reject/needs_more_info |
+| decision | reviewer is a **platform role**, **not** the subject (no self-approval — enforced in the RPC); reason required on reject/needs_more_info (DB CHECK + RPC) |
+| account-upgrade request | self-service; caller-derived (`auth.uid()`, no user_id param); target is a professional type ≠ current, ≠ `end_consumer`; one open request per user (partial unique index); never mutates account type/listing |
+| apply | only an `approved` verification applies; idempotent (`applied_at`); lists the profile only when `grants_public_listing`; platform-only |
 | expiry | optional `expires_at` in the future |
 
 ## 6. Catalog (products)

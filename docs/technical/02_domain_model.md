@@ -91,10 +91,11 @@ The product model (PRODUCT_DIRECTION_GUIDE) is **capability-based derived access
 
 ### Verification
 - **Purpose:** a request+decision record proving identity/organization/professional legitimacy (trust is core to the product).
-- **Responsibilities:** drive the trust badge; gate certain capabilities/visibility.
+- **Responsibilities:** drive the trust badge; gate certain capabilities/visibility; a professional verification is the workflow that transitions `primary_account_type` and sets `public_profile_status = 'listed'` on approval.
 - **Relationships:** *–1 subject (`User` **or** `Organization`); 1–* `VerificationDocument`; reviewed by a `PlatformRole` actor.
 - **Lifecycle:** `draft` → `submitted` → `under_review` → `approved` | `rejected` | `needs_more_info` → (`expired`). See [11](11_state_machines.md).
 - **Ownership:** `USER` or `ORG` (subject). **Constraints:** no self-approval; decision + reviewer + timestamp are auditable; rejection carries a reason.
+- **Implemented (Sprint 2):** the `verifications` table + the `request → review → approve/reject → apply` RPCs (migration `20260803090001`). Extensions beyond the base spec: `requested_account_type` (the account type an approval grants), `grants_public_listing` (reviewer-set; keeps public visibility separate from account type and from identity `is_verified`), and `applied_at` (idempotent single apply). Written only via the security-definer RPCs; decisions are platform-only. See [ADR-0007 §Amendments — Sprint 2](../decisions/ADR-0007-identity-and-tenancy-model.md).
 
 ### VerificationDocument
 - **Purpose:** an uploaded evidence file (commercial register, ID, license) + OCR-derived text.

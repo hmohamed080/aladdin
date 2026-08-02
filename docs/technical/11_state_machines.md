@@ -155,6 +155,8 @@ stateDiagram-v2
 ```
 - Revoked (not deleted) to preserve attribution. Capability changes are audited.
 
+> **Implementation status (Sprint 2, 2026-08-03):** the **Verification** machine (§2) and **Membership** machine (§8) are implemented as `security definer` RPCs (migrations `2026080309000x`). Verification uses the exact states here (`draft/submitted/under_review/approved/rejected/needs_more_info/expired`); the account-upgrade flow is `request → review_start → review_approve → apply_account_upgrade` (apply is idempotent and the only path that changes `primary_account_type`/listing). Membership: `invite → activate → suspend/revoke` with last-owner protection. Illegal transitions raise `22023`; every transition emits an `audit_log` event. See [ADR-0007 §Amendments — Sprint 2](../decisions/ADR-0007-identity-and-tenancy-model.md).
+
 ## 8a. Account upgrade & public-profile eligibility (foundation note)
 
 Not a per-row lifecycle enum yet, but a server-controlled transition recorded for Phase 1:
