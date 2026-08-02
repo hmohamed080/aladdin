@@ -17,7 +17,7 @@ The repository is now the canonical Git remote (`https://github.com/hmohamed080/
 - No long-lived `develop`/`release` branches (avoids merge drift for a small team).
 
 ### Branch naming conventions
-`<type>/<short-kebab-summary>` where `<type> ∈ feat · fix · db · refactor · docs · chore · test · deploy` (optional `-#<issue>` suffix). Full table: [`../development/git-workflow.md`](../development/git-workflow.md) §1.
+`<prefix>/<short-kebab-summary>` where `<prefix> ∈ feature · bugfix · hotfix · chore · docs · release` (optional `-#<issue>` suffix). **`feat/` is not a branch prefix** — it is a Conventional-Commit *message* type only. Full table: [`../development/git-workflow.md`](../development/git-workflow.md) §1. *(See the 2026-08-01 amendment below.)*
 
 ### Protected branches
 - **`main` is protected:** no direct pushes; merge only via PR; requires ≥1 review + green CI (once CI is wired — [`../engineering/10_environment_and_cicd.md`](../engineering/10_environment_and_cicd.md)); linear-enough history preserved (no force-push, no history rewrite).
@@ -33,7 +33,7 @@ The repository is now the canonical Git remote (`https://github.com/hmohamed080/
 - Repo/product version `vMAJOR.MINOR.PATCH[-label]` (MAJOR=breaking, MINOR=capability/phase, PATCH=fix/docs). The **Design System** (`DESIGN.md`) and **Technical Spec** are versioned **independently** and not renumbered by a repo release. Rules: [`../development/git-workflow.md`](../development/git-workflow.md) §5.
 
 ### Release workflow
-- Releases cut from `main`, marked with an **annotated tag**, promoted Local → Staging → Production per [ADR-0004](ADR-0004-deployment-platforms.md). First release `v0.7.0-foundation`. Process + criteria: [`../development/release-strategy.md`](../development/release-strategy.md).
+- Releases cut from `main`, marked with an **annotated tag**, promoted Local → Staging → Production per [ADR-0004](ADR-0004-deployment-platforms.md). First release **`v0.1.0-foundation`** (repo version `0.1.0`; the Design System is versioned independently and stays `1.0.0`). Process + criteria: [`../development/release-strategy.md`](../development/release-strategy.md).
 
 ### Commit conventions
 - `<type>: <what>` + `Why:` body; same `<type>` set as branches; small focused commits; no secrets; dependency additions justified in the body (root [`AGENTS.md`](../../AGENTS.md) Git discipline). Detail: [`../development/git-workflow.md`](../development/git-workflow.md) §2.
@@ -57,6 +57,10 @@ All repository process. Does **not** change architecture, product direction, or 
 - `main` gains branch protection; contributors branch + PR for every change.
 - A `CODEOWNERS` file and CI branch-protection checks are follow-ups ([`../engineering/10_environment_and_cicd.md`](../engineering/10_environment_and_cicd.md)).
 - Deviations from this governance require a superseding ADR.
+
+## Amendments
+
+- **2026-08-01 (Phase 0 Foundation Closeout):** the **branch naming convention** was reconciled to the canonical prefix set **`feature · bugfix · hotfix · chore · docs · release`**. The original draft listed commit-message types (`feat · fix · db · refactor · docs · chore · test · deploy`) as branch prefixes; **`feat/` is no longer a branch prefix** (it remains a Conventional-Commit message type). The recommended first implementation branch is therefore **`feature/identity-multitenancy`** (superseding earlier `feat/identity-multitenancy` references). Merge strategy, protection, and ownership are unchanged. **Version reconciliation:** the first repository/foundation release is **`v0.1.0-foundation`** (repo `0.1.0`, pre-MVP) — not `v0.7.0`; phase numbers (0.7/0.8/0.9) are delivery labels, not release versions, and the Design System stays independently at `1.0.0`. Recorded in [`DECISION_LOG.md`](DECISION_LOG.md).
 
 ## Related files
 

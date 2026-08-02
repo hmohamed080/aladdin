@@ -20,18 +20,20 @@ The canonical Git workflow for the Aladdin repository. Extends — never contrad
 
 `<type>/<short-kebab-summary>` — lowercase, hyphenated, no spaces.
 
-| Type | Use | Example |
-|---|---|---|
-| `feat` | a product feature / capability | `feat/identity-multitenancy` |
-| `fix` | a bug fix | `fix/otp-rate-limit` |
-| `db` | migrations / schema | `db/organizations-rls` |
-| `refactor` | non-behavioral restructuring | `refactor/sales-queries` |
-| `docs` | documentation only | `docs/technical-finalization` |
-| `chore` | tooling / repo maintenance | `chore/repository-architecture-foundation` |
-| `test` | tests only | `test/rls-isolation` |
-| `deploy` | deployment/config | `deploy/railway-worker` |
+**Canonical branch prefixes** (use exactly these — **not** `feat/`):
 
-Optionally suffix a tracking id: `feat/identity-multitenancy-#42`.
+| Prefix | Use | Example |
+|---|---|---|
+| `feature/` | a product feature / capability (incl. its migrations, tests, UI) | `feature/identity-multitenancy` |
+| `bugfix/` | a bug fix | `bugfix/otp-rate-limit` |
+| `hotfix/` | an urgent production fix off the latest release | `hotfix/quote-total-rounding` |
+| `chore/` | tooling, deps, infra, refactor, or stand-alone migrations/tests | `chore/foundation-closeout` |
+| `docs/` | documentation only | `docs/technical-finalization` |
+| `release/` | release preparation | `release/v0.1.0` |
+
+Optionally suffix a tracking id: `feature/identity-multitenancy-#42`.
+
+> **Branch prefix vs. commit type:** the six prefixes above name *branches*. The Conventional-Commit *message* types (`feat · fix · db · …`, §2) are a **separate** vocabulary used in commit subjects. Do not use a commit type (`feat/`) as a branch prefix.
 
 ## 2. Commits
 
@@ -43,7 +45,7 @@ Follow the root [`AGENTS.md`](../../AGENTS.md) format exactly:
 Why: <the reason or intent behind this change>
 ```
 
-- **Types:** `feat · fix · db · deploy · test · refactor · style · docs · chore` (same set as branches).
+- **Commit-message types** (Conventional Commits, per root `AGENTS.md`): `feat · fix · db · deploy · test · refactor · style · docs · chore`. These are **commit subject** types, **distinct from the branch prefixes** in §1 (e.g. a `feat:` commit lands on a `feature/…` branch).
 - Small, focused commits; never batch unrelated changes. Never commit broken code (use a `wip:` prefix + note only if genuinely incomplete).
 - Never commit with just `fix`/`update`/`changes`.
 - Add a runtime dependency only with the dependency-policy justification in the commit body (root `AGENTS.md`).
@@ -72,7 +74,7 @@ Why: <the reason or intent behind this change>
 - **Format:** `v<MAJOR>.<MINOR>.<PATCH>[-<label>]`. A `-<label>` marks a milestone flavor (e.g. `-foundation`, `-pilot`, `-rc.1`).
 - **Bump rules (repo/product):** `MAJOR` = breaking product/contract change · `MINOR` = new capability/phase · `PATCH` = fixes/docs.
 - Tags are immutable — never move or delete a published tag; supersede with a new one.
-- **Planned first tag:** `v0.7.0-foundation` at the validated foundation commit (`7499ab1`) — see [`release-strategy.md`](release-strategy.md).
+- **Planned first tag:** `v0.1.0-foundation` (repo version `0.1.0`), created on **merged `main`** after the foundation-closeout PR — see [`release-strategy.md`](release-strategy.md). (The Design System is versioned independently and stays `1.0.0`.)
 
 ## 6. Do / Don't
 

@@ -42,8 +42,7 @@ Mirror the design/implementation roadmap ([`../product/PRODUCT_DIRECTION_GUIDE.m
 
 | Milestone | Covers |
 |---|---|
-| **v0.7.0 — Foundation** | Architecture, design system, infra validation, technical spec (**done**; see [`release-strategy.md`](release-strategy.md)) |
-| **v0.8.0 — Engineering Standards** | This phase — engineering reference for implementation |
+| **Foundation — release `v0.1.0`** | Phases 0 → 0.9: architecture, design system (`1.0.0`), infra validation, technical spec, engineering standards, governance (**done**; tag `v0.1.0-foundation` after closeout merge — [`release-strategy.md`](release-strategy.md)) |
 | **Phase 1 — Identity & Multi-tenancy** | canonical identity, orgs/branches/memberships/capabilities, RLS helpers + isolation tests |
 | **05C — B2B Sales Workflow** | the wedge (Opportunity→Quote→Pipeline→Task) |
 | **05A — Core B2C Value Journey** | AI consult → discovery → matching → RFQ |
