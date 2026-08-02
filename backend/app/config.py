@@ -25,6 +25,10 @@ class Settings(BaseSettings):
 
     # --- Supabase ---
     supabase_url: str = ""
+    # Public anon key — used for USER-scoped clients that preserve the caller JWT
+    # (RLS applies). Public by exposure level, but read here like any other config.
+    supabase_anon_key: str = ""
+    # Service-role key — BYPASSES RLS. Trusted server/worker paths only.
     supabase_service_role_key: str = ""
     supabase_jwt_secret: str = ""
     database_url: str = ""

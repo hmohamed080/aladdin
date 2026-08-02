@@ -1,14 +1,19 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readPublicEnv } from "@/lib/env";
+import type { Database } from "@/types/database.types";
 
 /**
  * Browser Supabase client (anon key, constrained by RLS).
  *
- * Server-side access (Server Actions / Route Handlers) and auth session
- * handling are added by the `auth` feature; the service-role key is NEVER
- * used here — it is server-only. See docs/security/rls-strategy.md.
+ * Server-side access with the caller's session (Server Actions / Route Handlers)
+ * is provided by {@link createServerSupabaseClient} in `./server`. The
+ * service-role key is NEVER used in either — it is server-only and trusted-path
+ * only. See docs/security/rls-strategy.md and ADR-0007.
  */
-export function createBrowserSupabaseClient(): SupabaseClient {
+export function createBrowserSupabaseClient(): SupabaseClient<Database> {
   const env = readPublicEnv();
-  return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return createClient<Database>(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  );
 }
