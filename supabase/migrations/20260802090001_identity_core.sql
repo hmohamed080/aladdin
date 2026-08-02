@@ -42,6 +42,13 @@ create type public.account_type as enum (
 create type public.platform_role as enum ('support', 'moderator', 'administrator');
 create type public.contact_channel as enum ('whatsapp', 'email');
 create type public.user_status as enum ('pending_verification', 'active', 'suspended', 'deactivated');
+-- Public-profile visibility (concept 6, distinct from identity verification and
+-- from account type). SERVER-CONTROLLED: a profile is publicly discoverable only
+-- when the platform has approved it (`listed`); `hidden` is the safe default.
+-- Selecting a professional account type does NOT make a profile public — the
+-- approved account-upgrade/verification workflow flips this to `listed`
+-- (Sprint 1.2 fix; the workflow itself is deferred to Sprint 2).
+create type public.public_profile_status as enum ('hidden', 'listed');
 
 -- ---------------------------------------------------------------------------
 -- 2. users — the single canonical identity (id = auth.uid())
@@ -77,6 +84,10 @@ create table public.profiles (
   avatar_media_id uuid,   -- FK to media added by the media migration (later phase)
   locality_id     uuid,   -- FK to localities added by the locality migration (later phase)
   languages       text[],
+  -- SERVER-CONTROLLED public-visibility gate. Not in the authenticated update
+  -- grant, so a user can never self-list; the approved professional-upgrade/
+  -- verification workflow (service_role / future RPC) sets it. Default hidden.
+  public_profile_status public.public_profile_status not null default 'hidden',
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
   deleted_at      timestamptz,
@@ -201,6 +212,12 @@ create policy profiles_update_self on public.profiles
 -- Runs with the view owner's rights (security_invoker off) so it presents a
 -- fixed, minimal projection instead of exposing the base table to anon. It never
 -- reveals user_id, contact linkage, timestamps, or soft-delete state.
+-- Public discovery requires an EXPLICIT approved eligibility state, not merely a
+-- non-consumer account type (Sprint 1.2 fix). All must hold: the platform has
+-- listed the profile (`public_profile_status = 'listed'`), the account type is a
+-- professional (non-consumer) type, the user is active, and the profile is not
+-- soft-deleted. public_profile_status is server-controlled, so a user cannot
+-- self-publish by changing their own row.
 create view public.profile_public_directory
   with (security_invoker = false) as
   select p.id, p.display_name, p.headline, p.bio,
@@ -208,9 +225,10 @@ create view public.profile_public_directory
   from public.profiles p
   join public.users u on u.id = p.user_id
   where p.deleted_at is null
+    and p.public_profile_status = 'listed'
     and u.status = 'active'
     and u.primary_account_type <> 'end_consumer';
-comment on view public.profile_public_directory is 'Approved PUBLIC projection of professional profiles for B2C discovery (Sprint 1.1 review). Only display columns; never user_id/timestamps/deleted_at. The base profiles table stays private.';
+comment on view public.profile_public_directory is 'Approved PUBLIC projection of professional profiles for B2C discovery (Sprint 1.1 review + Sprint 1.2 eligibility fix). Requires public_profile_status = listed (server-controlled) AND a professional account type AND active AND not deleted. Only display columns; never user_id/timestamps/deleted_at. The base profiles table stays private.';
 
 -- contacts: strictly self-owned.
 create policy contacts_select_self on public.contacts
@@ -242,10 +260,14 @@ revoke execute on function app.handle_new_user() from public;
 revoke all on public.users, public.profiles, public.contacts
   from anon, authenticated, service_role;
 
--- users: read own; update only non-privileged columns (is_verified/status are
--- server-controlled — withheld via column-level grant).
+-- users: read own; update only SAFE self-editable preferences. is_verified,
+-- status, and primary_account_type are SERVER-CONTROLLED — withheld from the
+-- column grant. primary_account_type must change only via the approved
+-- account-upgrade / admin workflow (service_role or a future constrained RPC),
+-- never a direct browser update: promoting oneself to a professional type would
+-- bypass upgrade, verification, and subscription gates (Sprint 1.2 fix).
 grant select on public.users to authenticated;
-grant update (primary_account_type, locale) on public.users to authenticated;
+grant update (locale) on public.users to authenticated;
 grant select, insert, update, delete on public.users to service_role;
 
 -- profiles: base table is PRIVATE (self + platform only). No anon grant — public

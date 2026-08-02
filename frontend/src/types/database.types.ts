@@ -402,6 +402,7 @@ export type Database = {
           id: string
           languages: string[] | null
           locality_id: string | null
+          public_profile_status: Database["public"]["Enums"]["public_profile_status"]
           updated_at: string
           user_id: string
         }
@@ -415,6 +416,7 @@ export type Database = {
           id?: string
           languages?: string[] | null
           locality_id?: string | null
+          public_profile_status?: Database["public"]["Enums"]["public_profile_status"]
           updated_at?: string
           user_id: string
         }
@@ -428,6 +430,7 @@ export type Database = {
           id?: string
           languages?: string[] | null
           locality_id?: string | null
+          public_profile_status?: Database["public"]["Enums"]["public_profile_status"]
           updated_at?: string
           user_id?: string
         }
@@ -546,6 +549,7 @@ export type Database = {
         | "suspended"
         | "archived"
       platform_role: "support" | "moderator" | "administrator"
+      public_profile_status: "hidden" | "listed"
       user_status:
         | "pending_verification"
         | "active"
@@ -703,6 +707,7 @@ export const Constants = {
         "archived",
       ],
       platform_role: ["support", "moderator", "administrator"],
+      public_profile_status: ["hidden", "listed"],
       user_status: [
         "pending_verification",
         "active",

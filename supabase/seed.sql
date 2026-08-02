@@ -49,6 +49,16 @@ update public.users set primary_account_type = 'end_consumer',      status = 'ac
 -- the platform_role_grant below, never from primary_account_type (review B4).
 update public.users set primary_account_type = 'end_consumer',      status = 'active' where id = '55555555-5555-4555-8555-555555555555';
 
+-- Public-profile visibility is SERVER-CONTROLLED (Sprint 1.2). The seed runs as
+-- the trusted (postgres) path, standing in for the approved upgrade/verification
+-- workflow: it lists the two org owners as publicly discoverable professionals.
+-- The Cairo sales staff (a professional account type) is deliberately left
+-- `hidden` — a negative fixture proving that a non-consumer account type alone
+-- does NOT make a profile publicly discoverable.
+update public.profiles set public_profile_status = 'listed'
+  where user_id in ('11111111-1111-4111-8111-111111111111',   -- A-owner (supplier)
+                    '33333333-3333-4333-8333-333333333333');  -- B-owner (interior designer)
+
 -- ---------------------------------------------------------------------------
 -- Organizations
 -- ---------------------------------------------------------------------------
