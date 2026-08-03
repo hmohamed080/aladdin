@@ -5,7 +5,7 @@
 | **Status** | Living document (documentation coverage tracker) |
 | **Version** | 1.0.0 |
 | **Owner** | Foundation / Documentation |
-| **Last Updated** | 2026-08-01 |
+| **Last Updated** | 2026-08-03 |
 | **Depends On** | [`README.md`](README.md) (index) |
 | **Related** | [`decisions/DECISION_LOG.md`](decisions/DECISION_LOG.md), [`technical/TECHNICAL_DEBT.md`](technical/TECHNICAL_DEBT.md), [`roadmap/ROADMAP.md`](roadmap/ROADMAP.md) |
 
@@ -16,11 +16,11 @@ Documentation coverage by area. **Coverage %** = how completely the area is docu
 | **Product** | 95% | Stable | Product | 2026-08-01 | Commercial/pricing model, pilot success metrics (`⚑ OPEN`); `client-brief.md` is a placeholder |
 | **Architecture** | 100% | Stable | Architecture | 2026-08-01 | — (ADR-0001…0006 + guide; revisit on measured scaling need) |
 | **Technical spec** | 100% | Stable (Phase 0.7) | Architecture | 2026-08-01 | Per-category product attribute schemas; several `⚑ OPEN` product decisions flagged inline |
-| **Database** | 97% | Stable (spec + Phase 1 impl) | Engineering/Data | 2026-08-03 | Phase 1 identity/tenancy + Sprint 2 verification & write-path RPCs implemented (migrations `2026080209000x`, `2026080309000x`; ADR-0007, `database/phase1-identity-tenancy-review.md`); remaining product tables authored per feature (by design); AR FTS stemming config `⚑ OPEN` |
-| **Security** | 96% | Stable | Security | 2026-08-02 | Phase 1 identity/tenancy independently security-reviewed (Sprint 1.1: TRUNCATE/default-privilege hardening, public-view projections, service_role grants; Sprint 1.2: `primary_account_type` + `public_profile_status` made server-controlled, closing a self-promotion path — ADR-0007 amendments); formal threat model, pen-test, per-feature authz matrices still deferred |
+| **Database** | 98% | Stable (spec + Phase 1 impl) | Engineering/Data | 2026-08-03 | Phase 1 identity/tenancy + Sprint 2/2.1 constrained write paths implemented through migration `20260804090001`; direct privileged/service-role and membership-table DML bypasses closed; remaining product tables authored per feature; AR FTS stemming config `⚑ OPEN` |
+| **Security** | 98% | Stable | Security | 2026-08-03 | Independent Sprint 2.1 catalog/behavior review completed: one privileged RPC boundary, exact role/table/function ACLs, verification immutability, audit rollback, and real last-owner/approval concurrency gates. Formal threat model, pen-test, and future-feature authz matrices remain deferred. |
 | **API** | 100% | Stable (contracts) | Engineering | 2026-08-01 | Contracts complete; realized endpoints land with features |
 | **Engineering standards** | 100% | Stable (Phase 0.8) | Engineering | 2026-08-01 | — (12 docs + index; all 25 topics covered) |
-| **Testing** | 93% | Stable (strategy + Phase 1 RLS suite) | Engineering | 2026-08-03 | Strategy set; concrete suite landed — **169 pgTAP** tests (`supabase/tests/*`, incl. adversarial public-discovery, TRUNCATE, self-promotion, account-upgrade/verification, membership no-escalation/last-owner, cross-tenant branch, audit-actor-forgery) gated in CI (`supabase-rls`) + frontend/backend helper tests; further suites land with features |
+| **Testing** | 96% | Stable (strategy + Phase 1 RLS suite) | Engineering | 2026-08-03 | **254 pgTAP** assertions across 14 files plus two real-session race tests (last-owner and conflicting approval), gated by `supabase-rls`; frontend 7 tests and backend 10 tests pass. Further suites land with features. |
 | **Development / Repo governance** | 100% | Stable (Phase 0 closeout) | Foundation | 2026-08-01 | `CODEOWNERS` + minimum PR CI added; branch-protection required-check selection is a maintainer follow-up |
 | **Operations** | 89% | Stable | Ops | 2026-08-02 | PR CI present (`frontend`/`backend`/`docs`) + **`supabase-rls`** RLS/isolation gate; **CD**, cloud provisioning, Docker-image CI job, and metrics/alerting deferred |
 | **Design system** | 100% | Stable (`v1.0.0`) | Design System | 2026-08-01 | Runtime asset exports (logo/app-icon/WebGL); theme toggle wiring (tracked in debt) |

@@ -79,6 +79,8 @@ Platform capabilities (from `platform_role_grants`, not memberships): `platform.
 | Sales / other members | tenant | — | — | — | — |
 | Administrator | xt | — | xt status | suspend/archive | org govern |
 
+> **Implemented Phase 1 boundary:** “invite/member-caps/revoke” means the constrained membership RPCs, not direct table DML. `authenticated` and `service_role` have no membership/capability/branch-assignment write grant. Capability setters enforce active caller membership, tenant match, no-escalation, and concurrency-safe last-owner protection.
+
 ### Verification
 | Audience | R | W(submit) | Ap(decide) | V | Notes |
 |---|---|---|---|---|---|
@@ -86,6 +88,8 @@ Platform capabilities (from `platform_role_grants`, not memberships): `platform.
 | Support | xt | — | decide (cap) | ✔ | audited |
 | Moderator | xt | — | decide (cap) | ✔ | audited |
 | Administrator | xt | — | decide | ✔ | audited |
+
+> **Implemented Phase 1 boundary:** submission/review/apply are caller-attributed RPCs. Direct verification DML is denied to browser and service roles; reviewer authority derives only from `platform_role_grants`.
 
 ### Catalog (products, brands, categories, media)
 | Audience | R | W | U | D(soft) | Ap(publish) |

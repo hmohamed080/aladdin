@@ -57,8 +57,9 @@ Every business validation for the MVP. **Validation is Zod-first** (`frontend/sr
 |---|---|
 | invite | valid contact; not already an active member (`uq` user+org) |
 | capabilities | each key ∈ fixed catalog ([07](07_permissions_matrix.md)); inviter can grant only capabilities they hold (no escalation) |
-| branch assignment | branch belongs to the same org |
-| revoke | cannot revoke the **last** `org.manage` owner |
+| branch assignment | active membership + active branch; both belong to the same org; duplicate assignment is an idempotent no-op; `primary_branch_id` grants no access |
+| revoke / capability removal | cannot remove the **last** active `org.manage` owner; every protected mutation locks the stable organization row before recheck/change |
+| write boundary | direct membership/capability/branch-assignment DML denied to `authenticated` and `service_role`; RPC audit failure rolls back the mutation |
 
 ## 5. Verification & professional
 
@@ -67,10 +68,12 @@ Every business validation for the MVP. **Validation is Zod-first** (`frontend/sr
 | subject | exactly one of user/org per `subject_type` (DB CHECK) |
 | documents | ≥1 doc to submit *(deferred — enforced when storage/OCR lands; Sprint 2 allows doc-less submit, table is a placeholder)* |
 | doc types | required set per subject/account type (⚑ e.g. Engineer → syndicate card; Company → commercial register — exact list OPEN with product) |
-| decision | reviewer is a **platform role**, **not** the subject (no self-approval — enforced in the RPC); reason required on reject/needs_more_info (DB CHECK + RPC) |
-| account-upgrade request | self-service; caller-derived (`auth.uid()`, no user_id param); target is a professional type ≠ current, ≠ `end_consumer`; one open request per user (partial unique index); never mutates account type/listing |
-| apply | only an `approved` verification applies; idempotent (`applied_at`); lists the profile only when `grants_public_listing`; platform-only |
-| expiry | optional `expires_at` in the future |
+| decision | reviewer authority only from `platform_role_grants`; assigned reviewer is sticky; reviewer is not the user subject nor a member of the organization subject; reason required on reject/needs_more_info |
+| account-upgrade request | self-service; caller-derived (`auth.uid()`, no user_id param); target is a professional type ≠ current, ≠ `end_consumer`; one open request per user (partial unique index); same-target `needs_more_info` call resubmits, clears the prior claim/reason, and requires fresh `review_start`; never mutates account type/listing |
+| apply | only an unexpired, approved, professional user verification applies; target user comes from the immutable verification; idempotent (`applied_at`); lists only when the immutable approved `grants_public_listing` flag is true |
+| immutability | subject/type/target/submission metadata cannot change; terminal/applied decisions cannot change; listing flag changes only during approval |
+| write boundary | direct privileged identity/verification DML denied to browser and `service_role`; audit failure rolls back account/listing/applied_at |
+| expiry | optional `expires_at > submitted_at`; expired approval cannot apply |
 
 ## 6. Catalog (products)
 

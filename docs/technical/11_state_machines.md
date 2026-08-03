@@ -155,13 +155,13 @@ stateDiagram-v2
 ```
 - Revoked (not deleted) to preserve attribution. Capability changes are audited.
 
-> **Implementation status (Sprint 2, 2026-08-03):** the **Verification** machine (§2) and **Membership** machine (§8) are implemented as `security definer` RPCs (migrations `2026080309000x`). Verification uses the exact states here (`draft/submitted/under_review/approved/rejected/needs_more_info/expired`); the account-upgrade flow is `request → review_start → review_approve → apply_account_upgrade` (apply is idempotent and the only path that changes `primary_account_type`/listing). Membership: `invite → activate → suspend/revoke` with last-owner protection. Illegal transitions raise `22023`; every transition emits an `audit_log` event. See [ADR-0007 §Amendments — Sprint 2](../decisions/ADR-0007-identity-and-tenancy-model.md).
+> **Implementation status (Sprint 2.1 hardened, 2026-08-03):** the **Verification** (§2) and **Membership** (§8) machines are mandatory `security definer` RPC boundaries (migrations `2026080309000x` + `20260804090001`); browser and service roles have no direct DML bypass. Verification decisions serialize on the row, preserve the assigned reviewer, and become immutable; apply is expiry/subject/type checked and idempotent. Membership transitions serialize on the stable organization row for concurrency-safe last-owner protection. Illegal transitions raise `22023`; real transitions emit an in-transaction `audit_log` event.
 
 ## 8a. Account upgrade & public-profile eligibility (foundation note)
 
 Not a per-row lifecycle enum yet, but a server-controlled transition recorded for Phase 1:
 
-- **Account type:** `primary_account_type` transitions (e.g. `end_consumer → engineer`) happen **only** through the approved upgrade/admin workflow — a trusted, **transactional and auditable** server path (`service_role` / future constrained RPC). It **extends** the one identity (no second user/profile). A direct client update is impossible (the column is withheld from the `authenticated` grant). The workflow itself is deferred to Sprint 2.
+- **Account type:** `primary_account_type` transitions (e.g. `end_consumer → engineer`) happen **only** through the implemented approved-verification `apply_account_upgrade` RPC. It is transactional, auditable, caller-authorized from `platform_role_grants`, and extends the one identity. Direct browser and `service_role` table UPDATE are both denied.
 - **Public-profile visibility:** `profiles.public_profile_status`: `hidden → listed` is set by the approved professional-verification/upgrade workflow (server-controlled); `listed → hidden` on suspension/withdrawal. Public discovery requires `listed` + professional account type + active user + not soft-deleted. See [ADR-0007 D10/D11](../decisions/ADR-0007-identity-and-tenancy-model.md).
 
 ## 9. Subscription

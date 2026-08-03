@@ -63,7 +63,7 @@ The RLS/isolation spine, passwordless model, and tenant filtering are **not** de
 | Item | Trigger |
 |---|---|
 | **Minimum PR CI** (`.github/workflows/ci.yml`: `frontend`/`backend`/`docs`) added 2026-08-01 | **CD**, Docker-image + Supabase RLS/isolation CI jobs, and **SHA-pinning of actions** remain deferred ([`10_environment_and_cicd`](../engineering/10_environment_and_cicd.md)) |
-| ~~**Supabase RLS/isolation CI job**~~ | **Resolved 2026-08-02** — `.github/workflows/supabase-rls.yml` (check `supabase-rls`) starts the stack, resets, lints public/app, and runs the 112-test pgTAP suite twice on PRs to `main`. Owner to add `supabase-rls` to required branch-protection checks after first run. |
+| ~~**Supabase RLS/isolation CI job**~~ | **Resolved; expanded 2026-08-03** — `.github/workflows/supabase-rls.yml` (check `supabase-rls`) resets/lints and runs **254 pgTAP** assertions plus real two-session last-owner and approval races, then repeats reset+pgTAP. Owner must retain `supabase-rls` as a required check. |
 | Branch protection required-checks selection | after CI runs once, select `frontend`/`backend`/`docs` in `main` protection (ADR-0006) |
 | Staging/Production cloud provisioning (Vercel/Railway/Supabase) | first deploy |
 | `docker build` in CI + image scanning | with CI |
@@ -78,12 +78,13 @@ The RLS/isolation spine, passwordless model, and tenant filtering are **not** de
 | Event payload schema versioning (`version` field) | from first event |
 | Shared component/service extraction | on genuine 2nd consumer (never preemptive) |
 | **JWT custom-claim optimization** for `app` RLS helpers (org/role in `custom_access_token`) instead of table lookups | measured RLS read-path cost (ADR-0007 D1); helper API is claim-agnostic, so no policy rewrite |
-| ~~**Last `org.manage` owner cannot be revoked** invariant~~ | **Resolved 2026-08-03 (Sprint 2)** — implemented in the membership write path via `app.assert_not_last_owner` (row-locked; not a single CHECK) — [12 §4](12_validation_rules.md) |
-| ~~**Constrained `record_audit_event()` RPC**~~ | **Resolved 2026-08-03 (Sprint 2)** — `app.record_audit_event()` (internal-only, actor forced to `auth.uid()`); every sensitive write path emits an audit row in-transaction (ADR-0007 D16). |
+| ~~**Last `org.manage` owner cannot be revoked** invariant~~ | **Resolved and concurrency-hardened 2026-08-03 (Sprint 2.1)** — every protected membership/capability mutation locks the stable organization row; a two-session test proves competing owner removals serialize and leave one owner — [12 §4](12_validation_rules.md) |
+| ~~**Constrained `record_audit_event()` RPC**~~ | **Resolved/hardened 2026-08-03 (Sprint 2.1)** — internal writer forces actor from `auth.uid()`; direct application-role audit/business DML is denied, so every allowed sensitive production path emits its audit row in-transaction (ADR-0007 D16–D20). |
 | ~~**Account-upgrade write path**~~ | **Resolved 2026-08-03 (Sprint 2)** — transactional `request → review → approve → apply` RPCs; `apply_account_upgrade` is the only path that changes `primary_account_type`/listing, idempotent (ADR-0007 D12–D14). |
-| ~~**Last `org.manage` owner cannot be revoked**~~ | **Resolved 2026-08-03 (Sprint 2)** — `app.assert_not_last_owner` (row-locked count) blocks suspend/revoke of the last active owner (ADR-0007 D15). |
 | **Verification document storage + OCR** — Sprint 2 ships only a placeholder `verification_documents` table (no upload/OCR); doc-required-to-submit is deferred | when the storage/documents feature + private bucket land (05_storage_design.md) |
 | **Subscription/package gate** in the account-upgrade flow (a gate step before `apply_account_upgrade`) | when subscriptions are implemented; the workflow has a clean insertion point (ADR-0007 Sprint 2 deferred) |
+| **Platform-role grant/revoke RPC** — direct `service_role` DML is now denied; pilot provisioning is a reviewed migration/DBA owner transaction with an audit row | before platform-role administration becomes an application feature; build a constrained, attributed RPC rather than restoring table DML |
+| **Verification expiry materialization** — `apply_account_upgrade` enforces `expires_at` immediately, but no scheduler currently changes an un-applied approved row's status to `expired` | when scheduled jobs land; use a constrained/audited worker RPC |
 | **Live RLS integration test** in the backend suite (a real user JWT round-trip); the header approach is verified manually + by REST round-trip, unit tests assert the header | when a shared local-Supabase CI fixture exists |
 | **Repo-wide default-privileges enforcement** — a CI/lint check that every new tenant table `revoke`s the Supabase default `TRUNCATE`/`REFERENCES`/`TRIGGER` from client roles (Sprint 1.1 CRIT-1 convention in [06](../engineering/../technical/06_rls_strategy.md)) | as feature migrations grow |
 

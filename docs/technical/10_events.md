@@ -11,7 +11,7 @@
 
 The domain-event catalog for the MVP. Events are the seam between contexts: a context emits an event; notifications, analytics, workers, and Realtime react. **Specification only.**
 
-> **Implementation status (Sprint 2, 2026-08-03):** the **audit** consumer is implemented ahead of the full event bus. Sensitive write paths emit `audit_log` rows through the constrained `app.record_audit_event()` writer (unspoofable actor) — covering `account.upgrade_requested`, `verification.review_started/changes_requested/approved/rejected`, `account.type_changed`, `profile.listed/hidden`, and `membership.granted/activated/role_changed/suspended/revoked`, `branch.assignment_changed`. The transactional outbox, Realtime channels, and notification fan-out remain specification (⚑ outbox recommended). Audit is emitted **inside** the same transaction as the state change, so a rolled-back change emits no audit row.
+> **Implementation status (Sprint 2.1 review, 2026-08-03):** the **audit** consumer is implemented ahead of the full event bus. Sensitive production paths emit `audit_log` rows through the internal `app.record_audit_event()` writer, covering account-upgrade, verification-review, profile-visibility, membership/capability, and branch-assignment transitions. Direct client/`service_role` DML on those tables and direct audit INSERT are prohibited, so there is no unaudited application bypass. Audit is emitted **inside** the protected transaction; insertion failure rolls the business change back. The transactional outbox, Realtime channels, and notification fan-out remain specification (⚑ outbox recommended).
 
 ## 1. Model
 
