@@ -4,7 +4,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(83);
+select plan(85);
 
 -- ===== Direct service-role bypasses are prohibited =========================
 set local role service_role;
@@ -329,6 +329,10 @@ select lives_ok(
   $$ select public.review_start((select id from public.verifications
        where user_id='22222222-2222-4222-8222-222222222222' and status='submitted')) $$,
   'reviewer claims the resubmission fixture');
+select throws_ok(
+  $$ select public.review_request_changes((select id from public.verifications
+       where user_id='22222222-2222-4222-8222-222222222222' and status='under_review'),repeat('x',2001)) $$,
+  '22023', null, 'change-request reason is bounded before audit metadata insertion');
 select lives_ok(
   $$ select public.review_request_changes((select id from public.verifications
        where user_id='22222222-2222-4222-8222-222222222222' and status='under_review'),'more evidence') $$,
@@ -336,6 +340,16 @@ select lives_ok(
 set local request.jwt.claims = '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}';
 select lives_ok($$ select public.request_account_upgrade('engineer') $$,
   'same self-service RPC resubmits a needs-more-info request');
+reset role;
+select is(
+  (select metadata->>'reason' from public.audit_log
+   where action='verification.changes_requested'
+     and subject_id=(select id from public.verifications
+       where user_id='22222222-2222-4222-8222-222222222222' and status='submitted')
+   order by created_at desc limit 1),
+  'more evidence', 'resubmission preserves the cleared change-request reason in audit history');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}';
 select is(
   (select status::text from public.verifications
    where user_id='22222222-2222-4222-8222-222222222222' and status='submitted'),
