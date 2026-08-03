@@ -4,6 +4,94 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 1: Sprint 2.1 (Independent Trusted Write-Path Security Review)
+**Date/time:** 2026-08-03
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `feature/account-upgrade-verification` (continued; **not merged** — PR #4)
+
+### Objective
+Independently review the committed Sprint 2 write paths against the live catalog and real behavior (not the prior completion report), close any merge-blocking bypass, and prove the final state with clean resets and real two-session concurrency tests. No new feature; no `.pen` edit; nothing pushed to `main`.
+
+### Original bypasses discovered (confirmed empirically, then fixed)
+1. **Direct `service_role` privileged-identity bypass** — `service_role` held full DML on the identity/verification tables (a Sprint 1 "trusted-writer" grant), so `update public.users set primary_account_type=…` (and verification/audit writes) succeeded with **no** verification, approval, `applied_at`, listing check, concurrency lock, or audit — bypassing the entire account-upgrade workflow.
+2. **Direct membership/capability/branch bypass** — `authenticated` and `service_role` could DML `memberships`/`membership_capabilities`/`membership_branch_access` directly, bypassing no-escalation, last-owner, lifecycle, tenant-match, and audit.
+3. **Last-owner race** — protection locked only the changing membership/capability rows, so two transactions removing *different* owners could each pass its check and leave zero owners.
+4. **Stale/concurrent verification decisions** — reviewer ownership was not sticky and only sequential behavior was tested; terminal decisions were not provably immutable.
+5. **Unbounded decision reason** — reject/changes-requested reasons were unbounded and not preserved in audit across a resubmission.
+
+### Exact fixes (migration `20260804090001_write_path_security_hardening.sql`)
+- **Direct-DML boundary (D17).** `revoke insert,update,delete` from `service_role` on the ten reviewed tables and from `authenticated` on `memberships`/`membership_capabilities`/`membership_branch_access`/`branches`/`contacts`; dropped obsolete membership/branch write policies. Re-granted the minimum: `authenticated` self-service columns; the single non-privileged `users.locale` UPDATE for `authenticated` **and** `service_role` (asserted by test 14 as service_role's only column write — documented, not accidental). `anon` retains no privilege on any reviewed table.
+- **Verification lifecycle hardening (D18).** `app.guard_verification_update` trigger makes subject/type/target/submission metadata and terminal/applied rows immutable; reviewer assignment is sticky; only the assigned reviewer may decide/confirm; listing eligibility changes only during approval. `request_account_upgrade` resubmits a `needs_more_info` target, clears the prior claim/reason, emits audit, and requires a fresh `review_start`. `apply_account_upgrade` gates on unexpired + approved + professional **user** subject, takes the target from the immutable row, and is idempotent (`applied_at`). Reasons bounded to 1–2000 chars, trimmed, and preserved in audit metadata.
+- **Membership/capability hardening (D19).** The seven membership/branch RPCs are mandatory; each rechecks caller authority **after** taking the org lock, rejects invalid/duplicate capability keys, enforces no-escalation + last-owner + tenant match (a structural `enforce_membership_branch_tenant` trigger), rejects inactive membership/branch, and audits only real changes.
+- **Stable-lock design.** Every protected membership/capability mutation `SELECT … FOR UPDATE`s the stable `organizations` row before rechecking authority/status and mutating the owner set; verification decisions/apply lock the `verifications` row. Two transactions can no longer each remove a different last owner.
+- **Audit rollback.** `app.record_audit_event` stays internal-only (no role can execute; no direct `audit_log` INSERT for any app role); every allowed sensitive path emits its audit row **inside** the same transaction, so an audit failure rolls the business change back.
+
+### Verified final state (live catalog + empirical)
+- **Table privileges:** `anon` = none; `authenticated` = SELECT (+ self-service columns, + `contacts` delete); `service_role` = SELECT only, **plus `users.locale` UPDATE and nothing else**. No `TRUNCATE`/`REFERENCES`/`TRIGGER` for any app role. RLS enabled on all 12 tables.
+- **Empirical service-role DML:** `update primary_account_type` / `update public_profile_status` / `insert audit_log` / `insert platform_role_grants` / `insert membership_capabilities` / `execute apply_account_upgrade` → **all denied**; `update users.locale` → allowed (the one grant).
+- **Functions:** 14 `public` workflow RPCs — postgres-owned, `security definer`, `search_path=""`, volatile, **execute = `authenticated` only** (PUBLIC/anon/`service_role` = none), so `service_role` cannot invoke a caller-attributed workflow. Internal `app.record_audit_event`/`assert_not_last_owner` = executable by no role. App roles are not members of `postgres` and are not superusers → postgres ownership cannot be assumed. (`app.set_updated_at` is a Sprint 1 SECURITY INVOKER trigger without a pinned `search_path`; benign — INVOKER, references only `pg_catalog.now()` — noted, not changed.)
+
+### Concurrency proof (real two-session `docker exec` scripts, in CI)
+- `last_owner_concurrency_test.sh`: T1 holds the org row lock and revokes owner A; T2's revoke of owner B **blocks ≥2 s**, rechecks committed state, fails with `cannot remove the last active org.manage owner`, and exactly **one** active `org.manage` owner remains. Observed second-session waits: **2795 ms** and **2738 ms** across the two final cycles.
+- `account_approval_concurrency_test.sh`: two conflicting listing flags through the same assigned reviewer serialize on the verification row; the second call is an idempotent no-op — final `approved | grants_public_listing=t | reviewer preserved | one `verification.approved` audit row`. Observed second-session waits: **2700 ms** and **2708 ms**.
+
+### Tests / validation
+- pgTAP reconciled to the authoritative **254** assertions across 14 files (suite 14 grew 83→85 for the bounded-reason + resubmission-audit fixes; earlier records of 246/252 were an intermediate run and the pre-fix plan sum, now superseded). **Two fully completed clean cycles** — `db reset` → `db lint --schema public,app` (no findings) → `supabase test db` (**254/254 PASS**) → both concurrency scripts (PASS) — plus a third confirming reset of the exact committed tree (254/254). An early Sprint 2.1 reset had timed out during container restart (246 assertions at that point); the required clean cycles now complete normally.
+- Frontend: frozen install · typecheck · lint · **7 tests** · production build — GREEN. `account-upgrade.ts`/`membership.ts` import `server-only` (pinned `server-only@0.0.1`), take a caller-scoped client (no service-role client), reject malformed RPC UUID results, propagate errors, and hold no authorization logic. No client component imports them.
+- Backend: `uv sync --frozen` · ruff (clean) · **pytest 10** — GREEN. No backend write path added (ADR-0001).
+- Repo: `check_doc_links.py` → 805 links, 0 broken; `git diff --check` clean; no secrets/temp/test-output/Docker artifacts; workflow YAML valid; `supabase-rls` runs reset/lint/pgTAP + both races + repeat.
+
+### `.pen` integrity
+`UI-UX/design.pen` SHA-256 unchanged: `F1756CD38005F42C7A37EFE6E8ADB5FF4D92414F71D99AAF07B072C1168B7402`. No `.pen` file modified.
+
+### Remaining technical debt
+Platform-role grant/revoke remains a reviewed-migration/DBA owner transaction (constrained attributed RPC deferred — do **not** restore table DML); verification `expires_at` enforced at apply time but no scheduler materializes `expired`; verification document storage + OCR (placeholder table only); org-subject verification review UX; subscription/package gate before `apply_account_upgrade`; org-visible audit scope; JWT custom-claim optimization for RLS helpers; live backend RLS integration test; repo-wide default-privileges lint. `app.set_updated_at` pinned-`search_path` tidy-up (benign).
+
+### Rollback notes
+All Sprint 2.1 changes are additive and confined to this branch. Reverting migration `20260804090001` (and the two commits below) restores the Sprint 2 (pre-review) grants and behavior; no data migration is required — the reviewed tables carry no privileged rows written by the removed direct paths, and the RPCs are unchanged by rollback except for the reason bounds. `main` is untouched; PR #4 is the only integration path.
+
+### Commits created (this review; prior Sprint 2 commits not squashed)
+- `8e782e3` security: enforce constrained Phase 1 write boundaries (migration hardening: revokes, RPC-only, verification immutability, org-row locking)
+- `abea371` test: gate adversarial and concurrent write paths (suite 14 + both concurrency scripts + CI wiring)
+- `354cddd` security: harden trusted server action boundaries (`server-only`, caller-scoped clients, UUID guards)
+- `7168a3f` security: bound verification decision reasons and document the service-role locale grant
+- `0761f5f` test: assert bounded decision reasons and resubmission audit preservation
+- `docs: record the independent Sprint 2.1 security review` (this entry + ADR-0007 D17–D20, DECISION_LOG, review §9, specs 02/03/06/07/10/11/12, TECHNICAL_DEBT, DOCUMENTATION_STATUS, RUNTIME_STATE)
+
+### Remaining (next)
+Await explicit merge authorization on PR #4 (do not merge from this task); require `frontend`/`backend`/`docs`/`supabase-rls` green. Do not begin another sprint from this review.
+
+---
+
+## Session — Phase 1: Sprint 2 (Account Upgrade, Verification & Membership Write Paths)
+**Date/time:** 2026-08-03
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `feature/account-upgrade-verification` (cut from merged `main` @ `a3d7526`; not merged)
+
+### Objective
+Implement the trusted write paths on top of the validated Sprint 1 identity/RLS foundation: account upgrade, professional verification, membership lifecycle, branch assignment, and constrained audit emission. No UI/OTP/products/sales; server-controlled fields stay server-controlled.
+
+### Migrations added
+- `20260803090001_verification_and_upgrade.sql` — `verification_subject`/`verification_type`/`verification_status` enums; `verifications` (+ minimal `verification_documents`); internal `app.record_audit_event()` (Sprint 1.1 H2 deferral resolved); widened audit action allow-list; account-upgrade RPCs: `request_account_upgrade` (self-service), `review_start`/`review_request_changes`/`review_reject`/`review_approve`, `apply_account_upgrade`, `set_profile_hidden`; RLS (RPC-only writes) + grants.
+- `20260803090002_membership_branch_write_paths.sql` — `membership_invite`/`activate`/`set_capabilities`/`suspend`/`revoke` (+ `app.assert_not_last_owner`); `branch_assign`/`unassign`.
+
+### Design (ADR-0007 §Amendments — Sprint 2, D12–D16)
+Workflow split so submission ≠ approval; all state changes are `security definer` RPCs (`search_path=''`, schema-qualified) deriving authority from `auth.uid()` (no spoofable params). `apply_account_upgrade` is the only path that changes `primary_account_type`/`public_profile_status` (idempotent via `applied_at`+`FOR UPDATE`). Verification decisions platform-only (`app.is_platform`), no self-approval. Membership: no-escalation (grant only held caps) + last-owner protection (row-locked). Branch: cross-tenant impossible. `record_audit_event` internal-only, actor = `auth.uid()`. RPC placement in `public` (PostgREST-exposed) with internal gating.
+
+### Data-access helpers
+Frontend server-action wrappers only: `server/actions/account-upgrade.ts` + `membership.ts` (thin `.rpc()` calls over the caller-scoped server client; no privileged logic; no service-role). No backend helper — these are Next.js write paths, not the FastAPI AI service (ADR-0001). Regenerated `database.types.ts`.
+
+### Tests / validation
+pgTAP **112 → 169** (new `11_account_upgrade`, `12_membership_write_paths`, `13_audit_emission`). Two clean `db reset` + `test db` cycles → **169/169 PASS**; `db lint --schema public,app` clean. Catalog audit: 16 functions `security definer`+`search_path=""`; internal writers not client-executable; `verifications` SELECT-only for clients. Frontend typecheck/lint/test(6)/build GREEN; backend ruff + pytest(10). **No `.pen` modified.**
+
+### Docs
+ADR-0007 (Sprint 2 amendments D12–D16), DECISION_LOG, phase1 review §8, domain model §C, specs 03/06/10/11/12, TECHNICAL_DEBT (record_audit_event / account-upgrade / last-owner resolved), DOCUMENTATION_STATUS, RUNTIME_STATE, this log.
+
+### Remaining (Sprint 3+)
+Verification document storage upload + OCR (placeholder table only); org-subject verification UX; subscription/package gate before `apply_account_upgrade`; notification/Realtime fan-out; transactional outbox.
+
+---
+
 ## Session — Phase 1: Sprint 1.2 (Account-Type & Public-Profile Authorization Fix)
 **Date/time:** 2026-08-02
 **Agent/tool:** Claude Code (Opus 4.8)

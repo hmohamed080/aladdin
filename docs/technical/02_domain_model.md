@@ -38,7 +38,7 @@ The product model (PRODUCT_DIRECTION_GUIDE) is **capability-based derived access
 - **Relationships:** 1–1 `User`; references `Locality`; 0–* `Media` (portfolio) for professional account types.
 - **Lifecycle:** created with the user (progressive disclosure — minimal at signup, enriched in settings).
 - **Ownership:** `USER`. **Constraints:** avatar via `avatars/` bucket; portfolio only for professional types.
-- **Public visibility (server-controlled):** `public_profile_status` (`hidden`/`listed`) gates appearance in public professional discovery. It is **not** user-editable and is distinct from identity verification (`User.is_verified`), account type, and the `Verification` decision entity; the approved professional-upgrade/verification workflow sets it to `listed` (Phase 1 implements the gate; the workflow is deferred). A professional **account type alone never makes a profile public** — see [ADR-0007 D11](../decisions/ADR-0007-identity-and-tenancy-model.md).
+- **Public visibility (server-controlled):** `public_profile_status` (`hidden`/`listed`) gates appearance in public professional discovery. It is **not** directly writable by browser or service roles and is distinct from identity verification (`User.is_verified`), account type, and the `Verification` decision entity; the implemented professional-upgrade workflow sets it to `listed` only from an approved eligibility flag. A professional **account type alone never makes a profile public** — see [ADR-0007 D11/D17](../decisions/ADR-0007-identity-and-tenancy-model.md).
 
 ### Contact
 - **Purpose:** a verified or pending contact channel (phone via WhatsApp, or email).
@@ -91,10 +91,11 @@ The product model (PRODUCT_DIRECTION_GUIDE) is **capability-based derived access
 
 ### Verification
 - **Purpose:** a request+decision record proving identity/organization/professional legitimacy (trust is core to the product).
-- **Responsibilities:** drive the trust badge; gate certain capabilities/visibility.
+- **Responsibilities:** drive the trust badge; gate certain capabilities/visibility; a professional verification is the workflow that transitions `primary_account_type` and sets `public_profile_status = 'listed'` on approval.
 - **Relationships:** *–1 subject (`User` **or** `Organization`); 1–* `VerificationDocument`; reviewed by a `PlatformRole` actor.
 - **Lifecycle:** `draft` → `submitted` → `under_review` → `approved` | `rejected` | `needs_more_info` → (`expired`). See [11](11_state_machines.md).
 - **Ownership:** `USER` or `ORG` (subject). **Constraints:** no self-approval; decision + reviewer + timestamp are auditable; rejection carries a reason.
+- **Implemented (Sprint 2; hardened Sprint 2.1):** the `verifications` table + the `request → review → approve/reject → apply` RPCs (migrations `20260803090001` and `20260804090001`). Extensions beyond the base spec: `requested_account_type`, reviewer-set `grants_public_listing`, and `applied_at`. Direct application-role DML is revoked; subject/type/target and terminal decisions are immutable; assigned-reviewer and expiry checks are enforced. See [ADR-0007](../decisions/ADR-0007-identity-and-tenancy-model.md).
 
 ### VerificationDocument
 - **Purpose:** an uploaded evidence file (commercial register, ID, license) + OCR-derived text.
@@ -301,7 +302,7 @@ The product model (PRODUCT_DIRECTION_GUIDE) is **capability-based derived access
 ### AuditLog
 - **Purpose:** an append-only record of security-relevant and state-changing actions (who did what, when, to which entity).
 - **Relationships:** references any subject entity + actor `User`/`PlatformRole`.
-- **Ownership:** `PLATFORM` (write-once). **Constraints:** immutable; captures verification decisions, membership/capability changes, moderation, admin overrides, quote decisions; PII-minimized; retained per policy ([05](05_storage_design.md)/[14](14_future_extensions.md)).
+- **Ownership:** `PLATFORM` (write-once). **Constraints:** immutable; production inserts come only from constrained in-transaction workflow writers (not direct `service_role` DML); captures verification decisions, membership/capability changes, moderation, admin overrides, quote decisions; PII-minimized; retained per policy ([05](05_storage_design.md)/[14](14_future_extensions.md)).
 
 ---
 

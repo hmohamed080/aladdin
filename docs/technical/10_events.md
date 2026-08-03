@@ -11,6 +11,8 @@
 
 The domain-event catalog for the MVP. Events are the seam between contexts: a context emits an event; notifications, analytics, workers, and Realtime react. **Specification only.**
 
+> **Implementation status (Sprint 2.1 review, 2026-08-03):** the **audit** consumer is implemented ahead of the full event bus. Sensitive production paths emit `audit_log` rows through the internal `app.record_audit_event()` writer, covering account-upgrade, verification-review, profile-visibility, membership/capability, and branch-assignment transitions. Direct client/`service_role` DML on those tables and direct audit INSERT are prohibited, so there is no unaudited application bypass. Audit is emitted **inside** the protected transaction; insertion failure rolls the business change back. The transactional outbox, Realtime channels, and notification fan-out remain specification (⚑ outbox recommended).
+
 ## 1. Model
 
 - **Naming:** `PascalCase` past-tense (`QuoteAccepted`). Each event has a stable `type`, a tenant context (`organization_id`/`user_id`), a `subject` reference, an `actor`, `occurred_at`, and a small typed `payload`.

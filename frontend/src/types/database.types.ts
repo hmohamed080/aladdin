@@ -474,6 +474,133 @@ export type Database = {
         }
         Relationships: []
       }
+      verification_documents: {
+        Row: {
+          created_at: string
+          doc_type: string
+          id: string
+          storage_object_path: string | null
+          verification_id: string
+        }
+        Insert: {
+          created_at?: string
+          doc_type: string
+          id?: string
+          storage_object_path?: string | null
+          verification_id: string
+        }
+        Update: {
+          created_at?: string
+          doc_type?: string
+          id?: string
+          storage_object_path?: string | null
+          verification_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_documents_verification_id_fkey"
+            columns: ["verification_id"]
+            isOneToOne: false
+            referencedRelation: "verifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      verifications: {
+        Row: {
+          applied_at: string | null
+          created_at: string
+          decided_at: string | null
+          expires_at: string | null
+          grants_public_listing: boolean
+          id: string
+          metadata: Json
+          organization_id: string | null
+          reason: string | null
+          requested_account_type:
+            | Database["public"]["Enums"]["account_type"]
+            | null
+          reviewer_id: string | null
+          status: Database["public"]["Enums"]["verification_status"]
+          subject_type: Database["public"]["Enums"]["verification_subject"]
+          submitted_at: string
+          updated_at: string
+          user_id: string | null
+          verification_type: Database["public"]["Enums"]["verification_type"]
+        }
+        Insert: {
+          applied_at?: string | null
+          created_at?: string
+          decided_at?: string | null
+          expires_at?: string | null
+          grants_public_listing?: boolean
+          id?: string
+          metadata?: Json
+          organization_id?: string | null
+          reason?: string | null
+          requested_account_type?:
+            | Database["public"]["Enums"]["account_type"]
+            | null
+          reviewer_id?: string | null
+          status?: Database["public"]["Enums"]["verification_status"]
+          subject_type: Database["public"]["Enums"]["verification_subject"]
+          submitted_at?: string
+          updated_at?: string
+          user_id?: string | null
+          verification_type: Database["public"]["Enums"]["verification_type"]
+        }
+        Update: {
+          applied_at?: string | null
+          created_at?: string
+          decided_at?: string | null
+          expires_at?: string | null
+          grants_public_listing?: boolean
+          id?: string
+          metadata?: Json
+          organization_id?: string | null
+          reason?: string | null
+          requested_account_type?:
+            | Database["public"]["Enums"]["account_type"]
+            | null
+          reviewer_id?: string | null
+          status?: Database["public"]["Enums"]["verification_status"]
+          subject_type?: Database["public"]["Enums"]["verification_subject"]
+          submitted_at?: string
+          updated_at?: string
+          user_id?: string | null
+          verification_type?: Database["public"]["Enums"]["verification_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verifications_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verifications_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verifications_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       organization_public_directory: {
@@ -523,7 +650,62 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      apply_account_upgrade: {
+        Args: { p_verification_id: string }
+        Returns: undefined
+      }
+      branch_assign: {
+        Args: { p_branch_id: string; p_membership_id: string }
+        Returns: string
+      }
+      branch_unassign: {
+        Args: { p_branch_id: string; p_membership_id: string }
+        Returns: undefined
+      }
+      membership_activate: {
+        Args: { p_membership_id: string }
+        Returns: undefined
+      }
+      membership_invite: {
+        Args: {
+          p_org_id: string
+          p_primary_branch_id?: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      membership_revoke: {
+        Args: { p_membership_id: string }
+        Returns: undefined
+      }
+      membership_set_capabilities: {
+        Args: { p_capabilities: string[]; p_membership_id: string }
+        Returns: undefined
+      }
+      membership_suspend: {
+        Args: { p_membership_id: string }
+        Returns: undefined
+      }
+      request_account_upgrade: {
+        Args: {
+          p_requested_account_type: Database["public"]["Enums"]["account_type"]
+        }
+        Returns: string
+      }
+      review_approve: {
+        Args: { p_grant_public_listing?: boolean; p_verification_id: string }
+        Returns: undefined
+      }
+      review_reject: {
+        Args: { p_reason: string; p_verification_id: string }
+        Returns: undefined
+      }
+      review_request_changes: {
+        Args: { p_reason: string; p_verification_id: string }
+        Returns: undefined
+      }
+      review_start: { Args: { p_verification_id: string }; Returns: undefined }
+      set_profile_hidden: { Args: { p_user_id: string }; Returns: undefined }
     }
     Enums: {
       account_type:
@@ -555,6 +737,16 @@ export type Database = {
         | "active"
         | "suspended"
         | "deactivated"
+      verification_status:
+        | "draft"
+        | "submitted"
+        | "under_review"
+        | "approved"
+        | "rejected"
+        | "needs_more_info"
+        | "expired"
+      verification_subject: "user" | "organization"
+      verification_type: "identity" | "professional" | "organization"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -714,6 +906,17 @@ export const Constants = {
         "suspended",
         "deactivated",
       ],
+      verification_status: [
+        "draft",
+        "submitted",
+        "under_review",
+        "approved",
+        "rejected",
+        "needs_more_info",
+        "expired",
+      ],
+      verification_subject: ["user", "organization"],
+      verification_type: ["identity", "professional", "organization"],
     },
   },
 } as const

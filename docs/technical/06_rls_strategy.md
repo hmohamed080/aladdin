@@ -13,9 +13,11 @@ Row Level Security design for the MVP. Policies ship *with* each table's migrati
 
 > **Implementation status (Phase 1 + Sprint 1.1 security review, 2026-08-02):** the §2 identity helpers are implemented as `security definer` functions in the `app` schema — `current_org_ids`, `current_branch_ids(org)`, `has_capability(org,key)`, `is_platform(role)`, plus `is_org_member(org)` (migrations `20260802090001–2`), with `PUBLIC` execute revoked. The tenant-owned (§3.1), personal (§3.2), and audit (§3.7) patterns are enforced on the identity/tenancy tables and covered by **98 pgTAP tests**. Public discovery (§3.6) is served by curated **views** (`organization_public_directory`, `profile_public_directory`) exposing only approved columns — the base tables are private. Rationale: **[ADR-0007](../decisions/ADR-0007-identity-and-tenancy-model.md)**. RFQ/quote/conversation patterns land with those features.
 >
-> **Mandatory grant convention (Sprint 1.1 — every migration):** Supabase's default privileges grant `anon`/`authenticated` `TRUNCATE`/`REFERENCES`/`TRIGGER` on new `public` tables, and `service_role` gets **no** DML. `TRUNCATE` bypasses RLS and triggers, so **every table migration must `revoke all … from anon, authenticated, service_role` first, then grant back only the intended privileges** (client roles: scoped SELECT/INSERT/UPDATE; `service_role`: the DML the trusted backend needs, never `truncate`; append-only tables: `service_role` gets `select, insert` only). A migration that omits this is a release blocker.
+> **Mandatory grant convention (hardened Sprint 2.1 — every migration):** Supabase defaults are never trusted. Every table migration must `revoke all … from anon, authenticated, service_role` first, then grant back the minimum reviewed privileges. `TRUNCATE`/`REFERENCES`/`TRIGGER` are withheld from application roles. Sensitive business transitions use constrained, attributed RPCs; do not grant direct `service_role` DML merely because code is server-side. Any worker-specific write must be column/path scoped, documented, and audited. An omitted revoke or an unexplained privileged grant is a release blocker.
 >
 > **Server-controlled columns (Sprint 1.2):** RLS is **not** sufficient when a column grant still lets a user self-mutate a privileged field. Privilege/eligibility columns must be excluded from the `authenticated` **column** update grant (they change only via `service_role` / a future constrained RPC): `users.primary_account_type`, `users.is_verified`, `users.status`, and `profiles.public_profile_status`. A user editing their own row (RLS `*_update_self`) can still only touch the granted columns. Public professional discovery requires `profiles.public_profile_status = 'listed'` (server-set) — selecting a professional account type does not make a profile public.
+>
+> **Write-path RPCs (Sprint 2):** state-changing operations on privileged tables (`verifications`, account-type/listing transitions, membership/branch lifecycle) are **`security definer` RPCs** (`public.*`, `search_path=''`, schema-qualified), not direct table DML. `verifications` has **no** client INSERT/UPDATE/DELETE grant — it is written only through the RPCs. Each RPC derives authority from `auth.uid()` via `app.is_platform`/`app.has_capability` (never a spoofable parameter) and emits an `audit_log` row via the internal `app.record_audit_event()` (execute-revoked from clients; actor forced to `auth.uid()`). This is the canonical pattern for future feature write paths.
 
 ## 1. Principles
 
@@ -58,8 +60,8 @@ Tables: `users`, `profiles`, `contacts`, `needs`(consumer), `notifications`, `no
 Tables: `verifications`, `verification_documents`.
 
 - **SELECT:** the **subject** (owning user, or members of the owning org with `verification.read`) **or** a platform reviewer.
-- **INSERT/UPDATE(submit):** subject with `verification.submit`.
-- **Decision UPDATE** (`under_review`→approved/rejected/needs_more_info): **platform reviewer only** (`app.is_platform('support'|'moderator'|'administrator')`), and **not the subject** (no self-approval). Decisions are audited.
+- **INSERT/UPDATE(submit):** only through caller-attributed submission RPCs; no direct table DML grant.
+- **Decision UPDATE** (`under_review`→approved/rejected/needs_more_info): only through the assigned-reviewer RPCs, gated by `app.is_platform('support')`, never the subject or an organization member reviewing their own org. Decisions are immutable and audited.
 
 ### 3.4 RFQ / quote (cross-org, scoped views)
 - `rfq_requests`: **requester** side sees the full request; a **responder org** sees only requests addressed to it (via an `rfq_recipients` link — ⚑ add if fan-out is many providers) and only its own `quotes`.
@@ -75,7 +77,14 @@ Tables: `categories`, `brands`(global), `localities`, `plans`, account-type enum
 - Public **discovery** of `products`/`organizations`: a **published, verified** subset is world-readable (B2C discovery). Implemented as a dedicated policy `products_select_public` (`status = 'active' and deleted_at is null and <org verified>`), separate from the org-internal policy. Draft/archived products remain org-only.
 
 ### 3.7 Audit
-- `audit_log`: **INSERT** by `service_role` (server/worker) only; **SELECT** by platform admin (and org-scoped subset for org admins — ⚑ decide org-visible audit scope). Never UPDATE/DELETE.
+- `audit_log`: **INSERT** only by the internal postgres-owned `app.record_audit_event()` invoked from constrained workflow RPCs; direct application-role/`service_role` INSERT is denied. **SELECT** by platform administrator (org-scoped subset for org admins remains ⚑ open). Never UPDATE/DELETE/TRUNCATE.
+
+### 3.8 Privileged Phase 1 write boundary (implemented)
+
+- Direct `authenticated` and `service_role` DML is prohibited on privileged identity/verification fields and on `memberships`, `membership_capabilities`, `membership_branch_access`, `platform_role_grants`, and `audit_log`.
+- Normal trusted services preserve the caller JWT and invoke the constrained RPC; a server location or service-role key does not itself confer business authority.
+- Membership/capability mutations acquire a stable organization-row lock before authority/status recheck and mutation. Verification decisions/apply acquire the verification-row lock.
+- The postgres owner remains the migration/Auth-bootstrap/emergency root of trust. Emergency use is outside the normal production path and must follow ADR-0007's same-transaction mutation+audit procedure.
 
 ## 4. Admin & support access
 
