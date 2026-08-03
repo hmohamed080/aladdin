@@ -1,6 +1,6 @@
 # ADR-0008 — B2B Sales Domain Foundation (Phase 2, Sprint 3)
 
-**Status:** Accepted · 2026-08-03
+**Status:** Accepted · 2026-08-03 (amended 2026-08-03 — Sprint 3.1 independent review; see Amendment below)
 
 ## Purpose
 
@@ -55,6 +55,12 @@ Opportunity/Need/Match, RFQ, quotes, projects, products/inventory, orders, payme
 - Sales data is strictly tenant-isolated and branch-scoped, enforced in RLS **and** the RPCs (defense in depth), proven by pgTAP (`15`/`16`) and the existing isolation suite. Total suite: **337** assertions.
 - The workflow RPCs are the only production write path; a leaked service-role key cannot mutate sales data or bypass invariants.
 - Future features (RFQ, quotes, projects, notifications, import/export) attach to `leads`/`customers` without redesign.
+
+## Amendment — Sprint 3.1 independent review (2026-08-03)
+
+- **D5 hardening.** The assignment-visibility arm in the four `*_select_scope` policies correlated with an unqualified `organization_id`, which resolved to the subquery's `memberships` table (a tautology / dead org-filter). Not exploitable (each policy is gated by `app.is_org_member(organization_id)` and membership ids are org-unique), but the predicate is now explicitly correlated to the row's org (`<table>.organization_id`) so the policy is correct by itself, not by a second mechanism.
+- **D8 proof.** Optimistic-version pgTAP proves the version comparison but not `FOR UPDATE` serialization under true concurrency. A real two-session test (`supabase/tests/lead_transition_concurrency_test.sh`, gated by `supabase-rls`) now proves a concurrent transition **blocks** on the row lock, re-reads the committed version, and is rejected (`40001`) with no lost update.
+- **D9 limitation (documented).** `normalize_phone` on extension-bearing / non-standard-length numbers yields a non-E.164 `+<digits>` string; it stays deterministic (dedup unaffected). A full libphonenumber normalizer remains deferred (TECHNICAL_DEBT).
 
 ## Related files
 

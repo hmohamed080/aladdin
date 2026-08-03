@@ -4,6 +4,46 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 2: Sprint 3.1 (Independent B2B Sales Security & Correctness Review)
+**Date/time:** 2026-08-03
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `feature/b2b-sales-workflow` (continued; **not merged** — PR #5)
+
+### Objective
+Independently review the committed Sprint 3 sales implementation against the live catalog and real behavior (not the prior completion report): tenant/branch isolation, capability boundaries, direct-DML boundaries, the customer/phone model, lead lifecycle + concurrency, activities/follow-ups, dashboard read-models, the server-only helper, and test quality.
+
+### Independently verified (no defect)
+- **Direct-DML boundary:** live catalog shows `anon` = no privilege; `authenticated`/`service_role` = SELECT only on `customers`/`leads`/`sales_activities`/`follow_up_tasks`; no column INSERT/UPDATE/DELETE grants; no TRUNCATE/REFERENCES/TRIGGER; RLS enabled on all four; only SELECT policies exist (writes are RPC-only).
+- **Functions:** all 13 sales RPCs are postgres-owned, `security definer`, `search_path=""`, execute = `authenticated` only (PUBLIC/anon/`service_role` = none). Helpers pinned likewise; `normalize_phone` is INVOKER+immutable.
+- **Structural tenancy:** every child link (`branch`/`customer`/`assignee`/`lead`) is a composite FK `(organization_id, child) → parent(organization_id, id)` — cross-tenant linkage impossible by construction. Empirically re-confirmed cross-tenant read = 0 and cross-tenant customer link on `create_lead` = `23503`.
+- **Capabilities:** no sales RPC grants capabilities (no self-escalation path); assignment requires `sales.assign`/`sales.manage`; branch-compatible assignment blocks cross-branch escalation; inactive membership → denied; org-wide (null-branch) create requires `sales.manage`.
+- **Phone normalization:** deterministic; Egyptian local/international/`00`/country-code forms all collapse to one `+20…` E.164 (correct dedup); empty/garbage → NULL (no false dedup).
+
+### Findings
+
+- **F1 (correctness, non-blocking — FIXED).** The RLS assignment-visibility subquery used `m.organization_id = organization_id`; the unqualified `organization_id` resolves to the subquery's `memberships` table, making the org predicate a **tautology** (dead code) in all four `*_select_scope` policies. Not exploitable — each policy is gated by `app.is_org_member(organization_id)` and membership ids are org-unique, so no cross-tenant/cross-branch leak occurs (re-proven empirically) — but the org-filter was a no-op relying on a second mechanism. **Fixed** by correlating to the row's org (`customers.organization_id`, `leads.organization_id`, `sales_activities.organization_id`, `follow_up_tasks.organization_id`). All 337 assertions still pass.
+- **F2 (test coverage — ADDED).** Optimistic-version pgTAP alone proves the version comparison but not that `transition_lead`'s `FOR UPDATE` **serializes** genuinely concurrent transitions. Added a real two-session script `lead_transition_concurrency_test.sh` (wired into `supabase-rls`): T1 holds the row lock via the RPC's internal `UPDATE` then sleeps; T2's concurrent transition **blocks ≥2 s**, re-reads the committed version, and is rejected with `40001` — final state is only T1's change (no lost update). Self-contained (sets up its own active actor) so it is order-independent of the other concurrency scripts. Observed second-session waits: 2.80 s / 2.73 s across the two clean cycles.
+- **F3 (data quality, non-blocking — documented).** `normalize_phone` on an extension-bearing / non-standard-length number (e.g. `0111-222-3333 x99`) yields a non-E.164 `+0111…` string. Deterministic, so intra-org dedup stays consistent and no isolation is affected; it is a documented pragmatic-MVP limitation, not a defect. A full libphonenumber normalizer remains deferred.
+
+### Test-quality note
+The sales pgTAP files use `reset role` (postgres) **only** for fixture setup (granting caps in-transaction, building temp-table id registries, reading `audit_log` counts) — never to make an unsafe production path look safe. Every security assertion (`throws_ok` on `42501`/`23503`/`23505`/`22023`/`40001`, cross-tenant counts, append-only denial) runs under the real `anon`/`authenticated`/`service_role` roles.
+
+### Validation
+Two clean cycles: `db reset` → `db lint public,app` (clean) → `supabase test db` (**337/337**) → all three concurrency scripts PASS (last-owner, approval, lead-transition). Frontend typecheck/lint/**12 tests**/build GREEN. Backend unchanged; `backend` check is **green on CI (Linux)** — the local Windows `cryptography` `_rust` DLL block is environmental. Repo: 822 doc links / 0 broken; `git diff --check` clean; YAML valid; no secrets/artifacts.
+
+### `.pen` integrity (accurate)
+No Pencil tool invoked; no `.pen` edited by this review; `.pen` files are gitignored, none tracked, none in the branch diff. Current on-disk `design.pen` SHA-256 = `965DB8D0434C0305E2C12C5E56DDB7F8629C0048B931E3C98648477C0B18D6EB`, **unchanged during this review** but **different from the Sprint 2.1 baseline `F1756CD3…`** — an external editor autosave that predates this task; not attributable to this review. Integrity is **not** claimed against the old baseline.
+
+### Commits created (this review)
+1. `fix: correlate sales RLS assignment-visibility to the row's organization`
+2. `test: prove lead-transition serialization with a real two-session race`
+3. `docs: record the independent Sprint 3.1 sales review`
+
+### Remaining
+PR #5 updates automatically; require `frontend`/`backend`/`docs`/`supabase-rls`; do not merge from this task.
+
+---
+
 ## Session — Phase 2: Sprint 3 (B2B Sales Domain Foundation)
 **Date/time:** 2026-08-03
 **Agent/tool:** Claude Code (Opus 4.8)
