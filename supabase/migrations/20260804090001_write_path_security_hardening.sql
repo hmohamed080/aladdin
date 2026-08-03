@@ -14,7 +14,14 @@
 -- ---------------------------------------------------------------------------
 
 -- Identity: bootstrap still runs as the postgres-owned auth trigger. Client and
--- service roles may read; only the caller may update the safe locale preference.
+-- service roles may read. The ONLY retained service-role write on any reviewed
+-- privileged table is the non-privileged `users.locale` UI-language preference:
+-- it lets trusted localization/support flows set a user's display language
+-- (en/ar) without a bespoke RPC and confers no escalation (it cannot touch
+-- identity, primary_account_type, verification, membership, visibility, or
+-- platform authority). This single deliberate exception is asserted by pgTAP
+-- test 14 as service_role's only column-update grant. Every other privileged
+-- write below is revoked from service_role.
 revoke insert, update, delete on public.users from service_role;
 grant update (locale) on public.users to service_role;
 
@@ -90,6 +97,9 @@ alter table public.verifications
   ),
   add constraint ck_verifications_expiry_after_submission check (
     expires_at is null or expires_at > submitted_at
+  ),
+  add constraint ck_verifications_reason_length check (
+    reason is null or length(reason) <= 2000
   );
 
 create or replace function app.guard_verification_update()
@@ -269,8 +279,9 @@ begin
   if not app.is_platform('support') then
     raise exception 'platform reviewer authority required' using errcode = '42501';
   end if;
-  if p_reason is null or length(btrim(p_reason)) = 0 then
-    raise exception 'a reason is required when requesting changes';
+  if p_reason is null or length(btrim(p_reason)) = 0 or length(btrim(p_reason)) > 2000 then
+    raise exception 'a reason of 1 to 2000 characters is required when requesting changes'
+      using errcode = '22023';
   end if;
   select * into v_v from public.verifications where id = p_verification_id for update;
   if not found then raise exception 'verification not found'; end if;
@@ -285,10 +296,10 @@ begin
     raise exception 'only the assigned reviewer may request changes' using errcode = '42501';
   end if;
   update public.verifications
-    set status = 'needs_more_info', reason = p_reason
+    set status = 'needs_more_info', reason = btrim(p_reason)
     where id = p_verification_id;
   perform app.record_audit_event('verification.changes_requested', 'verification', p_verification_id,
-    v_v.organization_id, '{}'::jsonb);
+    v_v.organization_id, jsonb_build_object('reason', btrim(p_reason)));
 end;
 $$;
 
@@ -305,8 +316,9 @@ begin
   if not app.is_platform('support') then
     raise exception 'platform reviewer authority required' using errcode = '42501';
   end if;
-  if p_reason is null or length(btrim(p_reason)) = 0 then
-    raise exception 'a reason is required when rejecting';
+  if p_reason is null or length(btrim(p_reason)) = 0 or length(btrim(p_reason)) > 2000 then
+    raise exception 'a reason of 1 to 2000 characters is required when rejecting'
+      using errcode = '22023';
   end if;
   select * into v_v from public.verifications where id = p_verification_id for update;
   if not found then raise exception 'verification not found'; end if;
@@ -327,10 +339,10 @@ begin
     raise exception 'only the assigned reviewer may reject' using errcode = '42501';
   end if;
   update public.verifications
-    set status = 'rejected', reason = p_reason, decided_at = now()
+    set status = 'rejected', reason = btrim(p_reason), decided_at = now()
     where id = p_verification_id;
   perform app.record_audit_event('verification.rejected', 'verification', p_verification_id,
-    v_v.organization_id, '{}'::jsonb);
+    v_v.organization_id, jsonb_build_object('reason', btrim(p_reason)));
 end;
 $$;
 
