@@ -67,6 +67,9 @@ jobs:
       - name: Prove concurrent approval is serialized and immutable
         run: bash supabase/tests/account_approval_concurrency_test.sh
 
+      - name: Prove lead transitions are optimistic-locked (no lost update)
+        run: bash supabase/tests/lead_transition_concurrency_test.sh
+
       - name: Prove repeatability (second clean reset + tests)
         run: |
           pnpm exec supabase db reset
