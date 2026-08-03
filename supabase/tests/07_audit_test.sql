@@ -52,13 +52,14 @@ set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","r
 select throws_ok('truncate public.audit_log', '42501', null,
   'a platform admin (authenticated) cannot TRUNCATE the audit log');
 
--- The trusted service_role IS the writer path (Sprint 1.1 CRITICAL-2): it can
--- INSERT, but cannot TRUNCATE (append-only preserved for the backend too).
+-- The service role must use constrained SECURITY DEFINER RPCs. Direct audit
+-- insertion would allow actor, tenant, subject, and metadata spoofing.
 set local role service_role;
-select lives_ok(
+select throws_ok(
   $$ insert into public.audit_log (action, subject_type, subject_id)
      values ('branch.created', 'branch', 'c1111111-cccc-4ccc-8ccc-cccccccccccc') $$,
-  'service_role (trusted writer) can insert an audit record');
+  '42501', null,
+  'service_role cannot directly insert a spoofed audit record');
 select throws_ok('truncate public.audit_log', '42501', null,
   'service_role cannot TRUNCATE the audit log');
 

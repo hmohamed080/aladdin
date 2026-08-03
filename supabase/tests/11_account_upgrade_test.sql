@@ -133,14 +133,12 @@ select is(
   (select primary_account_type::text from public.users where id='33333333-3333-4333-8333-333333333333'),
   'interior_designer', 'a rejected request does not change the account type');
 
--- 12. the trusted service_role path can transition account type directly (it
--- bypasses RLS and holds the users update grant) — the foundation's break-glass /
--- worker path, distinct from the reviewer RPC which needs a platform identity.
+-- 12. service_role cannot bypass the constrained reviewer/apply workflow.
 reset role;
 set local role service_role;
-select lives_ok(
+select throws_ok(
   $$ update public.users set primary_account_type='engineer' where id='44444444-4444-4444-8444-444444444444' $$,
-  'the trusted service_role path can transition an account type directly');
+  '42501', null, 'service_role cannot directly transition an account type');
 reset role;
 
 select * from finish();

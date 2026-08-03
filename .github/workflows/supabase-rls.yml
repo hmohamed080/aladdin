@@ -61,6 +61,12 @@ jobs:
       - name: Run pgTAP tenant-isolation / RLS tests
         run: pnpm exec supabase test db
 
+      - name: Prove last-owner safety with concurrent transactions
+        run: bash supabase/tests/last_owner_concurrency_test.sh
+
+      - name: Prove concurrent approval is serialized and immutable
+        run: bash supabase/tests/account_approval_concurrency_test.sh
+
       - name: Prove repeatability (second clean reset + tests)
         run: |
           pnpm exec supabase db reset

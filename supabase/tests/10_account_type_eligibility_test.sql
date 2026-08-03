@@ -2,7 +2,7 @@
 -- primary_account_type, identity verification, and public-profile visibility are
 -- ALL server-controlled: a user cannot self-promote to a professional type, cannot
 -- self-verify, and cannot self-list for public discovery. Safe preferences (locale)
--- stay self-editable, and the trusted service_role path can transition account type.
+-- stay self-editable. service_role cannot bypass the constrained upgrade RPC.
 create extension if not exists pgtap;
 
 begin;
@@ -72,17 +72,18 @@ select is(
   (select count(*)::int from public.profile_public_directory where display_name like 'Karim%'),
   1, 'once listed via the trusted path, the professional profile appears');
 
--- ---- 10. The trusted service_role path can transition account type -------
+-- ---- 10. service_role cannot bypass the account-upgrade workflow ----------
 reset role;
 set local role service_role;
-select lives_ok(
+select throws_ok(
   $$ update public.users set primary_account_type = 'engineer'
      where id = '44444444-4444-4444-8444-444444444444' $$,
-  'service_role (trusted upgrade path) can transition primary_account_type');
+  '42501', null,
+  'service_role cannot directly transition primary_account_type');
 reset role;
 select is(
   (select primary_account_type::text from public.users where id = '44444444-4444-4444-8444-444444444444'),
-  'engineer', 'the trusted account-type transition took effect');
+  'end_consumer', 'the denied service-role bypass leaves account type unchanged');
 
 select * from finish();
 rollback;
