@@ -86,6 +86,15 @@ Tables: `categories`, `brands`(global), `localities`, `plans`, account-type enum
 - Membership/capability mutations acquire a stable organization-row lock before authority/status recheck and mutation. Verification decisions/apply acquire the verification-row lock.
 - The postgres owner remains the migration/Auth-bootstrap/emergency root of trust. Emergency use is outside the normal production path and must follow ADR-0007's same-transaction mutation+audit procedure.
 
+### 3.9 Sales domain (implemented — Phase 2, Sprint 3, ADR-0008)
+
+Tables: `customers`, `leads`, `sales_activities`, `follow_up_tasks`.
+
+- **Ownership:** organization-owned, optional `branch_id` (NULL = org-wide). Cross-tenant linkage is structurally impossible (composite FKs to `(organization_id, id)` parents).
+- **SELECT (scope):** an active member sees a row when they have org-wide sales authority (`sales.manage`/`org.manage`) **or** `sales.read` **and** (the row's branch ∈ their assigned branches **or** the row is assigned to them). Activities/follow-ups carry a denormalized `branch_id` so the same predicate applies without cross-table recursion. **No platform cross-tenant read on customer PII** (data-minimization — no market-wide customer database).
+- **Writes:** no write policy and no write grant. Every mutation is a `security definer` RPC (SELECT-only base tables; `anon` none). `sales_activities` is append-only (no update/delete path).
+- **Concurrency:** `leads`/`follow_up_tasks` carry a `version`; `transition_lead` rejects a stale expected version (`40001`) under a row lock.
+
 ## 4. Admin & support access
 
 - **Administrator:** cross-tenant **read** for governance + write on platform/reference data + verification/ad decisions + moderation. All admin cross-tenant actions are **audited**.

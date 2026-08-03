@@ -145,11 +145,24 @@ Every business validation for the MVP. **Validation is Zod-first** (`frontend/sr
 
 ## 13. Sales, needs, matches
 
+> **Implemented (Sprint 3 — customers/leads/activities/follow-ups, ADR-0008).** All enforced in constrained `security definer` RPCs (never client DML):
+
+| Rule | Validation |
+|---|---|
+| customer | tenant-owned; branch (if set) belongs to the org (composite FK); one **active** customer per normalized phone **per org** (intra-org dedup); same phone allowed in another tenant; PII-minimized; archived not deleted |
+| customer scope | non-manager creates only within an assigned branch; org-wide (null-branch) customers require `sales.manage` |
+| lead | tenant-owned; `title` `[1,200]`; optional `customer`/`branch`/`assignee` must be same-org (composite FK); starts `active`/`new` |
+| lead transition | legal status/stage edges only ([11 §4a](11_state_machines.md)); **optimistic-locked** (expected `version`; stale → `40001`); `lost` requires a reason; `won`/`lost` set `closed_at`; audited |
+| assignment | assignee is an **active** membership in the same org with access to the lead's branch; assign/reassign needs `sales.assign` (or `sales.manage`); reassignment is audited + emits an activity |
+| activity | references a lead or customer; type ∈ `note`/`call`/`meeting`/`follow_up` (system emits `status_change`/`assignment_change`); actor = caller's membership (unspoofable); append-only; tenant-private |
+| follow-up | references a lead/customer; assignee active same-org + branch-compatible; `open`→`completed`→(reopen)`open`; `cancel` from open; assigning to another member needs `sales.assign` |
+| write boundary | direct sales DML denied to `authenticated`/`service_role`; every sensitive path emits audit in-transaction (rollback on audit failure) |
+
+### 13b. Sales (deferred — needs/matches/Smart Share)
 | Rule | Validation |
 |---|---|
 | need summary | required `[3,500]`; attributes typed |
 | opportunity | has owner membership + valid stage |
-| stage change | must be a legal transition ([11](11_state_machines.md)) |
 | match | score ∈ `[0,1]`; explanation non-empty; AI output flagged as AI, human-reviewed before share |
 | Smart Share | requires `sales.match.share`; human confirms before send |
 

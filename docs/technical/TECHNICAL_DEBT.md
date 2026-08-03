@@ -98,5 +98,18 @@ Track as `needs-product-decision` issues ([`../development/github-workflow.md`](
 - **Limits/retention:** OTP length/TTL/attempts; media size/dimensions/video caps; retention windows (documents, verification, soft-delete purge, exports TTL).
 - **Access:** exact verification/subscription gates on publish/RFQ-respond; org-visible audit scope.
 
+## Sales domain (Phase 2, Sprint 3 — ADR-0008)
+
+| Item | Trigger |
+|---|---|
+| **Sales UI (05C)** — schema/RPCs/read-models exist; no screens yet | the first approved sales frontend feature |
+| **Link `leads`/`customers` to RFQ/quotes/projects** | when those modules land (Opportunity/Need/Match chain deferred) |
+| **Notifications/reminders on `follow_up_tasks`** — schema is reminder-ready (`due_at`, assignee); no reminders/push/recurring | the notifications feature |
+| **Excel import/export** — schema supports it; no bulk path built. **Do not add an unaudited bulk bypass** — build a constrained, audited, caller-scoped importer with row-level validation + duplicate detection (reuse `app.normalize_phone`) and an audited export within caller scope | the import/export feature |
+| **Scheduled overdue materialization** — overdue is computed at read time; no job flips state | the jobs feature (use a constrained/audited worker RPC) |
+| **Org-customizable pipeline stages** — stages are a fixed enum | if product requires per-org stages |
+| **Platform governance over sales data** — no platform cross-tenant read on customer PII by design | a purpose-built, audited governance path |
+| **Multi-contact-point customer table** — MVP stores one primary phone/email directly | if customers need multiple structured contacts |
+
 ## Maintenance
 Add an item the moment a deferral/compromise is made (in the same PR). Removing an item requires the fix to land. This register is reviewed at each phase boundary and before any release.

@@ -43,7 +43,8 @@ Capabilities are granted on a `membership` (`membership_capabilities.capability_
 | verification | `verification.submit`, `verification.read` |
 | catalog | `catalog.read`, `catalog.write`, `catalog.publish` |
 | inventory | `inventory.write` |
-| sales | `sales.opportunity.read`, `sales.opportunity.write`, `sales.match.share`, `sales.task.write`, `sales.followup.send` |
+| sales (**Sprint 3, implemented**) | `sales.read`, `sales.write`, `sales.assign`, `sales.manage` |
+| sales (reserved for future Opportunity/Match) | `sales.opportunity.read`, `sales.opportunity.write`, `sales.match.share`, `sales.task.write`, `sales.followup.send` |
 | rfq | `rfq.create`, `rfq.respond` |
 | quotes | `quote.submit`, `quote.decide` |
 | projects | `project.read`, `project.write` |
@@ -113,6 +114,8 @@ Platform capabilities (from `platform_role_grants`, not memberships): `platform.
 | Org Owner | tenant | ✔ | ✔ | ✔ | ✔ |
 | End Consumer | own need/consult | own | own | — | — |
 | Administrator | xt (govern) | — | — | — | — |
+
+> **Implemented Sprint 3 boundary (customers/leads/activities/follow-ups — ADR-0008):** a branch-limited salesperson (`sales.read`+`sales.write`) sees and works only records in their assigned branch(es) **and** records assigned to them; `sales.assign` adds assign/reassign; `sales.manage` (or `org.manage`) grants org-wide sales authority. Reads are scoped by RLS, writes by constrained `security definer` RPCs — never by frontend filtering. **Platform admins have no cross-tenant read on customer PII** (data-minimization; no market-wide customer database). `authenticated`/`service_role` have no direct sales DML.
 
 ### RFQ & quotations
 | Audience | Create RFQ | Respond (quote) | Decide | Read scope |
