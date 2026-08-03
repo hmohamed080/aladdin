@@ -309,7 +309,7 @@ create policy customers_select_scope on public.customers
           or assigned_membership_id in (
             select m.id from public.memberships m
             where m.user_id = (select auth.uid())
-              and m.organization_id = organization_id
+              and m.organization_id = customers.organization_id  -- correlate to the row's org (not the subquery's)
               and m.status = 'active'
           )
         )
@@ -328,7 +328,7 @@ create policy leads_select_scope on public.leads
           or assigned_membership_id in (
             select m.id from public.memberships m
             where m.user_id = (select auth.uid())
-              and m.organization_id = organization_id
+              and m.organization_id = leads.organization_id  -- correlate to the row's org (not the subquery's)
               and m.status = 'active'
           )
         )

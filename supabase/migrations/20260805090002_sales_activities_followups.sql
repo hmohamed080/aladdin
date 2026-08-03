@@ -117,7 +117,7 @@ create policy sales_activities_select_scope on public.sales_activities
       or actor_membership_id in (
         select m.id from public.memberships m
         where m.user_id = (select auth.uid())
-          and m.organization_id = organization_id
+          and m.organization_id = sales_activities.organization_id  -- correlate to the row's org
           and m.status = 'active'
       )
       or (
@@ -138,7 +138,7 @@ create policy follow_up_tasks_select_scope on public.follow_up_tasks
       or assigned_membership_id in (
         select m.id from public.memberships m
         where m.user_id = (select auth.uid())
-          and m.organization_id = organization_id
+          and m.organization_id = follow_up_tasks.organization_id  -- correlate to the row's org
           and m.status = 'active'
       )
       or (
