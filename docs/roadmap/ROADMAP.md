@@ -64,7 +64,8 @@ The phase plan for Aladdin. **Source of truth for scope/order is [`mvp-scope.md`
 - **Estimate:** ~2–3 sprints. **Branch:** `feature/identity-multitenancy`.
 
 ### Phase 2 — Core Marketplace (Sales-first discovery + catalog)
-- **In progress (Sprint 3, 2026-08-03):** the **B2B Sales domain foundation** is implemented on `feature/b2b-sales-workflow` — tenant-owned `customers`/`leads`/`sales_activities`/`follow_up_tasks` with scope RLS, 13 constrained workflow RPCs, audit, and dashboard read-models ([ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md)); **337 pgTAP** green. Next: sales UI (05C). RFQ/quotes/products/projects stay later in the phase.
+- **In progress (Sprint 3, 2026-08-03):** the **B2B Sales domain foundation** — tenant-owned `customers`/`leads`/`sales_activities`/`follow_up_tasks` with scope RLS, 13 constrained workflow RPCs, audit, and dashboard read-models ([ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md)); **337 pgTAP** green (merged, PR #5).
+- **In progress (Sprint 4, 2026-08-04):** the **first product UI (05C vertical slice)** on `feature/b2b-sales-ui` — passwordless Email-OTP auth + guarded B2B workspace (home cockpit, customers, leads list/pipeline, follow-ups) wired to the real RLS/RPCs; Arabic-first RTL + English + light/dark, responsive ([`frontend/sprint-4-b2b-sales-ui.md`](../frontend/sprint-4-b2b-sales-ui.md)). Next: broaden 05C, then RFQ/quote/project journeys. RFQ/quotes/products/projects stay later in the phase.
 - **Objective:** the core value-chain surfaces — **05C B2B Sales workflow first (the wedge)**, then **05A B2C value journey** — on catalog + discovery.
 - **Deliverables:** catalog (products/brands/categories/media) + inventory/availability; smart search (FTS/`pg_trgm`); verification gating; Sales pipeline (Opportunity → Need → Match → Smart Share → Follow-up → Task) with Realtime; B2C discovery + AI consult entry.
 - **Dependencies:** Phase 1; matching needs identity + catalog liquidity.

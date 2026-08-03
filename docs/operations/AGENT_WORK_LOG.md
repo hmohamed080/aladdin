@@ -4,6 +4,54 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 2: Sprint 4 (Authenticated B2B Sales Vertical Slice — first product UI)
+**Date/time:** 2026-08-04
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `feature/b2b-sales-ui` (cut from `main` @ `f9596a3`, PR #5 merged; **not merged**)
+
+### Objective
+Ship the first usable end-to-end B2B Sales UI wired to the **real** Sprint-3 Supabase schema, RLS, RPCs, and server-only helpers (ADR-0008) — no mock data in core flows. Arabic-first (RTL), English switch, light/dark, responsive. Auth stays passwordless (Email OTP); authorization stays in the database.
+
+### What shipped
+- **Auth:** passwordless **Email-OTP** (`@supabase/ssr` cookie session) — `/auth/sign-in` (email → 6-digit code), `middleware.ts` refreshes the session and guards `/b2b/*` (redirect with `?next=`, open-redirect-guarded), sign-out. No passwords/SMS/WhatsApp.
+- **Shell + context:** top bar (brand, org/branch selectors, language/theme, account), sprint-only nav (Home/Customers/Leads/Follow-ups) with a mobile bottom bar; org/branch context **derived from real memberships/capabilities/branch-access** (no role switcher; cookie is a preference only, RLS re-checks).
+- **Routes (9):** `/b2b` cockpit (my open leads, leads-by-stage, overdue + due-today follow-ups, recent activity, quick actions); customers list/new/detail; leads list + **pipeline (kanban)**/new/detail (stage/won/lost/reopen/archive, assign/reassign, timeline note/call/meeting, inline follow-ups, **optimistic `version` concurrency** with a conflict-refresh); follow-ups (overdue/due-today/upcoming/completed + complete/reopen/cancel).
+- **Data access:** Server Components read via a caller-scoped client (RLS-scoped); Server Actions wrap the `server-only` sales helpers; RPC errors map to translation **keys** (never raw DB text); dashboard uses the `security_invoker` views. No service-role in browser code.
+- **i18n/theme:** custom cookie-based Arabic-first i18n (ar/en catalogs, key-parity-tested, `<html dir>` server-set) — locale not in the URL, preserving the flat routes; cookie light/dark via `.dark` on `<html>` (no flash), consuming design-system tokens.
+
+### Dependencies added (justified)
+`@supabase/ssr` (official cookie-session auth SDK — hard to get right; auth SDKs are on the AGENTS.md allow-list). Dev-only: `@testing-library/react`/`dom`/`jest-dom` + `happy-dom` for component tests.
+
+### Bugs found & fixed during live validation
+- **Org duplication / wrong capabilities:** `loadWorkspaceContext` queried `memberships` without a `user_id` filter; a manager sees other members' rows via RLS, so the org list duplicated and capability resolution could pick another member's row. Now scoped to `auth.getUser().id`.
+- **Ambiguous embed (PGRST201):** `listOrgMembers` embedded `users` while `memberships` has two FKs to `users` (`user_id`, `invited_by`). Disambiguated to `users!memberships_user_id_fkey`.
+- **Local auth "Database error finding user":** seeded `auth.users` rows had NULL GoTrue token columns (first sprint to use Auth). Normalized to `''` in `seed.sql` (auth-only; pgTAP stays 337/337).
+
+### Local test setup (product owner)
+Manual **demo seed** (`supabase/demo-seed.sql`, NOT part of `db reset` so the Phase-1 snapshot tests stay green): grants sales caps to the seeded members and adds 3 customers / 4 leads / 2 activities / 3 follow-ups. Sign in with `a-owner@example.test` (org manager) or `a-cairo@example.test` (Cairo branch-limited salesperson); read the 6-digit code from **Mailpit** (`:54324`). A local `magic_link.html` template shows `{{ .Token }}`. Full steps + identities in `docs/frontend/sprint-4-b2b-sales-ui.md`.
+
+### Validation
+Frontend typecheck · lint · **51 tests** (i18n parity, error-mapping, capability gates, auth + sales-forms actions, sign-in + customers-table component tests) · production build — all GREEN. Supabase `db reset`/lint/`test db` → **337/337** (unchanged; UI touches no schema). Backend unchanged. **Live browser validation:** real Email-OTP sign-in → Arabic RTL cockpit with RLS-scoped demo data (manager); English + dark leads pipeline; middleware redirect (307) for the unauthenticated `/b2b`; Arabic error state on a failed send. Repo: doc links, `git diff --check`, secret scan, `.pen` audit.
+
+### `.pen` integrity
+No Pencil tool invoked; no `.pen` edited; `.pen` files gitignored, none tracked, none in the branch diff.
+
+### Remaining / deferred
+WhatsApp OTP; notifications/reminders; products/inventory/RFQ/quotes/projects/ads/payments/OCR/AI/native mobile; bulk import/export UI; advanced team-permission UI. Session-refresh relies on middleware `getUser()` (adequate for the slice).
+
+### Commits created (this sprint)
+1. `feat: add passwordless auth and protected B2B shell`
+2. `feat: add customer list, create, and detail flows`
+3. `feat: add lead pipeline, create, and detail flows`
+4. `feat: add activities and follow-up flows`
+5. `test: cover the authenticated B2B sales vertical slice`
+6. `docs: record Sprint 4 frontend implementation`
+
+### Remaining (next)
+Open PR `feature/b2b-sales-ui → main`; require `frontend`/`backend`/`docs`/`supabase-rls`. Do not merge from this task.
+
+---
+
 ## Session — Phase 2: Sprint 3.1 (Independent B2B Sales Security & Correctness Review)
 **Date/time:** 2026-08-03
 **Agent/tool:** Claude Code (Opus 4.8)

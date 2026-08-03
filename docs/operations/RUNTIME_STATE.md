@@ -6,10 +6,10 @@ This is a **mutable snapshot** of the current live repository state — not an a
 
 | | |
 |---|---|
-| **Version** | Runtime snapshot · 2026-08-03 |
+| **Version** | Runtime snapshot · 2026-08-04 |
 | **Owner** | Foundation / Operations |
-| **Last updated** | 2026-08-03 |
-| **Updated by** | Claude Code (Opus 4.8) — Phase 2, Sprint 3 B2B Sales Domain Foundation |
+| **Last updated** | 2026-08-04 |
+| **Updated by** | Claude Code (Opus 4.8) — Phase 2, Sprint 4 Authenticated B2B Sales Vertical Slice (first product UI) |
 | **Current focus** | **Phase 2 — B2B Sales Operating Workflow · Sprint 3 (B2B Sales Domain Foundation).** Phase 1 is merged to `main` (@ `54792a4`, PR #4). Sprint 3 builds the tenant-owned sales foundation on the identity/tenancy spine: `customers`, `leads`, `sales_activities`, `follow_up_tasks` with organization + optional-branch ownership, composite-FK cross-tenant safety, scope-based RLS, 13 constrained `security definer` workflow RPCs (create/update/assign/transition/activity/follow-up), optimistic-locked lead transitions, in-transaction audit, and `security_invoker` dashboard read-models. Local suite: **337 pgTAP** assertions (254 preserved + 83 new). See [ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md). No orders/quotes/RFQ/products/payments/AI/WhatsApp. |
 
 ## Phase & repository
@@ -17,10 +17,10 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | Field | Value |
 |---|---|
 | **Current Phase** | **Phase 2 — B2B Sales Operating Workflow** (tenant-owned customers/leads/activities/follow-ups on the Phase 1 spine) |
-| **Current Sprint** | **Sprint 3 — B2B Sales Domain Foundation** |
-| **Current Feature** | Customers, leads, sales activities, follow-up tasks: schema + scope RLS + constrained workflow RPCs + audit + dashboard read-models |
+| **Current Sprint** | **Sprint 4 — Authenticated B2B Sales Vertical Slice** (first product UI) |
+| **Current Feature** | Passwordless Email-OTP auth + B2B app shell + customers/leads/follow-ups screens wired to the real Sprint-3 RLS/RPCs (Arabic-first, RTL, light/dark, responsive) |
 | **Next Phase** | **Phase 2 continued** — sales UI/screens (05C) then the RFQ/Quote/Project journey; dashboards last |
-| **Current Branch** | `feature/b2b-sales-workflow` (created from `main` @ `54792a4`) |
+| **Current Branch** | `feature/b2b-sales-ui` (created from `main` @ `f9596a3`) |
 | **Current Milestone** | Sprint 3 — secure sales operating foundation; open PR to `main`; no orders/quotes/products/payments |
 | **Current Remote Repository** | `origin` = `https://github.com/hmohamed080/aladdin.git` |
 | **Last Stable Commit** | `54792a4` — `main` after PR #4 merged (Phase 1 identity/tenancy + Sprint 2/2.1). Sprint 3 commits land on `feature/b2b-sales-workflow` and merge into `main` via PR |
@@ -28,7 +28,7 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | **Foundation Release** | Tagged `v0.1.0-foundation` on `main` @ `64e68d6` |
 | **Repository Status** | Published to GitHub (`origin`, full history, no squash/force); `main` protection recommended (ADR-0006), not yet applied |
 | **Documentation Status** | Updated for Phase 1 — see [`../DOCUMENTATION_STATUS.md`](../DOCUMENTATION_STATUS.md); 0 broken links; no orphan docs |
-| **Implementation Status** | **Sprint 3 sales domain implemented and validated locally (two clean cycles, 337 pgTAP); PR to `main` prepared.** Schema/RLS/RPC/read-model + server-only helpers only — no product UI/screens; no orders/quotes/RFQ/products/payments/AI. |
+| **Implementation Status** | **Sprint 4 vertical slice implemented and validated (frontend typecheck/lint/51 tests/build; 337 pgTAP unchanged; real Email-OTP sign-in exercised in-browser with Arabic RTL + English + dark).** PR to `main` prepared. No products/RFQ/quotes/projects/payments/WhatsApp/AI. |
 
 ## Live engineering state
 
@@ -39,7 +39,7 @@ Always reflects the current live engineering state of the project. Overwrite eac
 | **Current Sprint** | **Sprint 3 — B2B Sales Domain Foundation** (Phase 2) |
 | **Current Epic** | B2B Sales Operating Workflow (customers, leads, pipeline, activities, follow-ups) on the tenant spine |
 | **Current Feature** | Tenant-owned sales schema + scope RLS + constrained sales RPCs + audit + dashboard read-models + server-only helpers |
-| **Current UI Status** | Design system **v1.0.0** ("The Aperture") finalized + implemented as tokens; only the Next.js scaffold page exists — **no product screens** (Sprint 3 is schema/RLS/data-access + server helpers only) |
+| **Current UI Status** | **First product UI shipped (Sprint 4):** passwordless Email-OTP sign-in + guarded B2B workspace (home cockpit, customers, leads list/pipeline, follow-ups) on `@supabase/ssr`; Arabic-first RTL + English switch + light/dark, responsive; consumes the design-system tokens. Wired to the real Sprint-3 RLS/RPCs (no mock core data). |
 | **Current Backend Status** | FastAPI scaffold — `GET /health` only; **no product endpoints**. No backend change in Sprint 3 (sales write paths are Next.js server actions per ADR-0001). |
 | **Current Database Status** | **10 migrations**; Phase 1 identity/tenancy + Sprint 2/2.1 write paths + **Sprint 3 sales domain** (`customers`, `leads`, `sales_activities`, `follow_up_tasks`; 13 sales workflow RPCs; 5 read-model views; composite-FK tenant safety; scope RLS). All 27 public workflow RPCs are postgres-owned `security definer` (`search_path=""`), executable only by `authenticated`; base tables SELECT-only for client/service roles. **337 pgTAP** assertions across 16 files. |
 | **Current Design System Version** | **1.0.0** (`DESIGN.md` / `design/tokens/*`) |
@@ -48,8 +48,8 @@ Always reflects the current live engineering state of the project. Overwrite eac
 
 ## Git & branch
 
-- **Baseline:** `main` @ `54792a4` — Phase 1 identity/tenancy + Sprint 2/2.1 write paths merged (PR #4).
-- **Current work branch:** `feature/b2b-sales-workflow` (cut from `main` @ `54792a4`) — Sprint 3 B2B sales domain foundation.
+- **Baseline:** `main` @ `f9596a3` — Sprint 3 B2B sales domain foundation merged (PR #5).
+- **Current work branch:** `feature/b2b-sales-ui` (cut from `main` @ `f9596a3`) — Sprint 4 authenticated B2B sales vertical slice (first product UI).
 - **Remote:** `origin` → `https://github.com/hmohamed080/aladdin.git` (push preserves full history; no squash, no force). Sprint 3 merges into `main` via PR; direct pushes to `main` are prohibited.
 
 > HEAD moves with each commit; this file trails HEAD by its own commit. Re-derive live values with the [resume commands](#exact-resume-commands) below rather than trusting a pasted hash.
