@@ -159,6 +159,325 @@ export type Database = {
           },
         ]
       }
+      customers: {
+        Row: {
+          archived_at: string | null
+          assigned_membership_id: string | null
+          branch_id: string | null
+          created_at: string
+          created_by: string
+          customer_type: Database["public"]["Enums"]["customer_type"]
+          display_name: string
+          email: string | null
+          email_normalized: string | null
+          id: string
+          locality_id: string | null
+          location_summary: string | null
+          organization_id: string
+          preferred_language: string | null
+          primary_phone: string | null
+          primary_phone_e164: string | null
+          source: Database["public"]["Enums"]["sales_source"] | null
+          status: Database["public"]["Enums"]["customer_status"]
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          assigned_membership_id?: string | null
+          branch_id?: string | null
+          created_at?: string
+          created_by: string
+          customer_type?: Database["public"]["Enums"]["customer_type"]
+          display_name: string
+          email?: string | null
+          email_normalized?: string | null
+          id?: string
+          locality_id?: string | null
+          location_summary?: string | null
+          organization_id: string
+          preferred_language?: string | null
+          primary_phone?: string | null
+          primary_phone_e164?: string | null
+          source?: Database["public"]["Enums"]["sales_source"] | null
+          status?: Database["public"]["Enums"]["customer_status"]
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          assigned_membership_id?: string | null
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string
+          customer_type?: Database["public"]["Enums"]["customer_type"]
+          display_name?: string
+          email?: string | null
+          email_normalized?: string | null
+          id?: string
+          locality_id?: string | null
+          location_summary?: string | null
+          organization_id?: string
+          preferred_language?: string | null
+          primary_phone?: string | null
+          primary_phone_e164?: string | null
+          source?: Database["public"]["Enums"]["sales_source"] | null
+          status?: Database["public"]["Enums"]["customer_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_customers_assignee"
+            columns: ["organization_id", "assigned_membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_customers_branch"
+            columns: ["organization_id", "branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+        ]
+      }
+      follow_up_tasks: {
+        Row: {
+          assigned_membership_id: string
+          branch_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          customer_id: string | null
+          description: string | null
+          due_at: string | null
+          id: string
+          lead_id: string | null
+          organization_id: string
+          priority: Database["public"]["Enums"]["sales_priority"]
+          status: Database["public"]["Enums"]["follow_up_status"]
+          title: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          assigned_membership_id: string
+          branch_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          customer_id?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          lead_id?: string | null
+          organization_id: string
+          priority?: Database["public"]["Enums"]["sales_priority"]
+          status?: Database["public"]["Enums"]["follow_up_status"]
+          title: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          assigned_membership_id?: string
+          branch_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          customer_id?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          lead_id?: string | null
+          organization_id?: string
+          priority?: Database["public"]["Enums"]["sales_priority"]
+          status?: Database["public"]["Enums"]["follow_up_status"]
+          title?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_follow_up_assignee"
+            columns: ["organization_id", "assigned_membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_follow_up_branch"
+            columns: ["organization_id", "branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_follow_up_customer"
+            columns: ["organization_id", "customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_follow_up_lead"
+            columns: ["organization_id", "lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_follow_up_lead"
+            columns: ["organization_id", "lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_my_open_leads"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          assigned_membership_id: string | null
+          branch_id: string | null
+          closed_at: string | null
+          created_at: string
+          created_by: string
+          customer_id: string | null
+          id: string
+          lost_reason: string | null
+          next_follow_up_at: string | null
+          organization_id: string
+          priority: Database["public"]["Enums"]["sales_priority"]
+          source: Database["public"]["Enums"]["sales_source"] | null
+          stage: Database["public"]["Enums"]["lead_stage"]
+          status: Database["public"]["Enums"]["lead_status"]
+          title: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          assigned_membership_id?: string | null
+          branch_id?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by: string
+          customer_id?: string | null
+          id?: string
+          lost_reason?: string | null
+          next_follow_up_at?: string | null
+          organization_id: string
+          priority?: Database["public"]["Enums"]["sales_priority"]
+          source?: Database["public"]["Enums"]["sales_source"] | null
+          stage?: Database["public"]["Enums"]["lead_stage"]
+          status?: Database["public"]["Enums"]["lead_status"]
+          title: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          assigned_membership_id?: string | null
+          branch_id?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string
+          customer_id?: string | null
+          id?: string
+          lost_reason?: string | null
+          next_follow_up_at?: string | null
+          organization_id?: string
+          priority?: Database["public"]["Enums"]["sales_priority"]
+          source?: Database["public"]["Enums"]["sales_source"] | null
+          stage?: Database["public"]["Enums"]["lead_stage"]
+          status?: Database["public"]["Enums"]["lead_status"]
+          title?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_leads_assignee"
+            columns: ["organization_id", "assigned_membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_leads_branch"
+            columns: ["organization_id", "branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_leads_customer"
+            columns: ["organization_id", "customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "leads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membership_branch_access: {
         Row: {
           branch_id: string
@@ -444,6 +763,108 @@ export type Database = {
           },
         ]
       }
+      sales_activities: {
+        Row: {
+          activity_type: Database["public"]["Enums"]["sales_activity_type"]
+          actor_membership_id: string
+          branch_id: string | null
+          created_at: string
+          created_by: string
+          customer_id: string | null
+          id: string
+          lead_id: string | null
+          metadata: Json
+          occurred_at: string
+          organization_id: string
+          summary: string
+        }
+        Insert: {
+          activity_type: Database["public"]["Enums"]["sales_activity_type"]
+          actor_membership_id: string
+          branch_id?: string | null
+          created_at?: string
+          created_by: string
+          customer_id?: string | null
+          id?: string
+          lead_id?: string | null
+          metadata?: Json
+          occurred_at?: string
+          organization_id: string
+          summary: string
+        }
+        Update: {
+          activity_type?: Database["public"]["Enums"]["sales_activity_type"]
+          actor_membership_id?: string
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string
+          customer_id?: string | null
+          id?: string
+          lead_id?: string | null
+          metadata?: Json
+          occurred_at?: string
+          organization_id?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_sales_activity_actor"
+            columns: ["organization_id", "actor_membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_sales_activity_branch"
+            columns: ["organization_id", "branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_sales_activity_customer"
+            columns: ["organization_id", "customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_sales_activity_lead"
+            columns: ["organization_id", "lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_sales_activity_lead"
+            columns: ["organization_id", "lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_my_open_leads"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "sales_activities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_activities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_activities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string
@@ -648,11 +1069,493 @@ export type Database = {
         }
         Relationships: []
       }
+      sales_follow_ups_due_today: {
+        Row: {
+          assigned_membership_id: string | null
+          branch_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          description: string | null
+          due_at: string | null
+          id: string | null
+          lead_id: string | null
+          organization_id: string | null
+          priority: Database["public"]["Enums"]["sales_priority"] | null
+          status: Database["public"]["Enums"]["follow_up_status"] | null
+          title: string | null
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          assigned_membership_id?: string | null
+          branch_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string | null
+          lead_id?: string | null
+          organization_id?: string | null
+          priority?: Database["public"]["Enums"]["sales_priority"] | null
+          status?: Database["public"]["Enums"]["follow_up_status"] | null
+          title?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          assigned_membership_id?: string | null
+          branch_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string | null
+          lead_id?: string | null
+          organization_id?: string | null
+          priority?: Database["public"]["Enums"]["sales_priority"] | null
+          status?: Database["public"]["Enums"]["follow_up_status"] | null
+          title?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_follow_up_assignee"
+            columns: ["organization_id", "assigned_membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_follow_up_branch"
+            columns: ["organization_id", "branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_follow_up_customer"
+            columns: ["organization_id", "customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_follow_up_lead"
+            columns: ["organization_id", "lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_follow_up_lead"
+            columns: ["organization_id", "lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_my_open_leads"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_lead_stage_counts: {
+        Row: {
+          lead_count: number | null
+          organization_id: string | null
+          stage: Database["public"]["Enums"]["lead_stage"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_my_open_leads: {
+        Row: {
+          assigned_membership_id: string | null
+          branch_id: string | null
+          closed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          id: string | null
+          lost_reason: string | null
+          next_follow_up_at: string | null
+          organization_id: string | null
+          priority: Database["public"]["Enums"]["sales_priority"] | null
+          source: Database["public"]["Enums"]["sales_source"] | null
+          stage: Database["public"]["Enums"]["lead_stage"] | null
+          status: Database["public"]["Enums"]["lead_status"] | null
+          title: string | null
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          assigned_membership_id?: string | null
+          branch_id?: string | null
+          closed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string | null
+          lost_reason?: string | null
+          next_follow_up_at?: string | null
+          organization_id?: string | null
+          priority?: Database["public"]["Enums"]["sales_priority"] | null
+          source?: Database["public"]["Enums"]["sales_source"] | null
+          stage?: Database["public"]["Enums"]["lead_stage"] | null
+          status?: Database["public"]["Enums"]["lead_status"] | null
+          title?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          assigned_membership_id?: string | null
+          branch_id?: string | null
+          closed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string | null
+          lost_reason?: string | null
+          next_follow_up_at?: string | null
+          organization_id?: string | null
+          priority?: Database["public"]["Enums"]["sales_priority"] | null
+          source?: Database["public"]["Enums"]["sales_source"] | null
+          stage?: Database["public"]["Enums"]["lead_stage"] | null
+          status?: Database["public"]["Enums"]["lead_status"] | null
+          title?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_leads_assignee"
+            columns: ["organization_id", "assigned_membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_leads_branch"
+            columns: ["organization_id", "branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_leads_customer"
+            columns: ["organization_id", "customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "leads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_overdue_follow_ups: {
+        Row: {
+          assigned_membership_id: string | null
+          branch_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          description: string | null
+          due_at: string | null
+          id: string | null
+          lead_id: string | null
+          organization_id: string | null
+          priority: Database["public"]["Enums"]["sales_priority"] | null
+          status: Database["public"]["Enums"]["follow_up_status"] | null
+          title: string | null
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          assigned_membership_id?: string | null
+          branch_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string | null
+          lead_id?: string | null
+          organization_id?: string | null
+          priority?: Database["public"]["Enums"]["sales_priority"] | null
+          status?: Database["public"]["Enums"]["follow_up_status"] | null
+          title?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          assigned_membership_id?: string | null
+          branch_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string | null
+          lead_id?: string | null
+          organization_id?: string | null
+          priority?: Database["public"]["Enums"]["sales_priority"] | null
+          status?: Database["public"]["Enums"]["follow_up_status"] | null
+          title?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_follow_up_assignee"
+            columns: ["organization_id", "assigned_membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_follow_up_branch"
+            columns: ["organization_id", "branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_follow_up_customer"
+            columns: ["organization_id", "customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_follow_up_lead"
+            columns: ["organization_id", "lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_follow_up_lead"
+            columns: ["organization_id", "lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_my_open_leads"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_recent_activities: {
+        Row: {
+          activity_type:
+            | Database["public"]["Enums"]["sales_activity_type"]
+            | null
+          actor_membership_id: string | null
+          branch_id: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          id: string | null
+          lead_id: string | null
+          metadata: Json | null
+          occurred_at: string | null
+          organization_id: string | null
+          summary: string | null
+        }
+        Insert: {
+          activity_type?:
+            | Database["public"]["Enums"]["sales_activity_type"]
+            | null
+          actor_membership_id?: string | null
+          branch_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string | null
+          lead_id?: string | null
+          metadata?: Json | null
+          occurred_at?: string | null
+          organization_id?: string | null
+          summary?: string | null
+        }
+        Update: {
+          activity_type?:
+            | Database["public"]["Enums"]["sales_activity_type"]
+            | null
+          actor_membership_id?: string | null
+          branch_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string | null
+          lead_id?: string | null
+          metadata?: Json | null
+          occurred_at?: string | null
+          organization_id?: string | null
+          summary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_sales_activity_actor"
+            columns: ["organization_id", "actor_membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_sales_activity_branch"
+            columns: ["organization_id", "branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_sales_activity_customer"
+            columns: ["organization_id", "customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_sales_activity_lead"
+            columns: ["organization_id", "lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_sales_activity_lead"
+            columns: ["organization_id", "lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_my_open_leads"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "sales_activities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_activities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_public_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_activities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      add_sales_activity: {
+        Args: {
+          p_activity_type: Database["public"]["Enums"]["sales_activity_type"]
+          p_customer_id?: string
+          p_lead_id?: string
+          p_metadata?: Json
+          p_occurred_at?: string
+          p_org_id: string
+          p_summary: string
+        }
+        Returns: string
+      }
       apply_account_upgrade: {
         Args: { p_verification_id: string }
         Returns: undefined
+      }
+      assign_lead: {
+        Args: {
+          p_assignee_membership_id: string
+          p_expected_version: number
+          p_lead_id: string
+        }
+        Returns: number
       }
       branch_assign: {
         Args: { p_branch_id: string; p_membership_id: string }
@@ -661,6 +1564,52 @@ export type Database = {
       branch_unassign: {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: undefined
+      }
+      cancel_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
+      complete_follow_up: {
+        Args: { p_follow_up_id: string }
+        Returns: undefined
+      }
+      create_customer: {
+        Args: {
+          p_assigned_membership_id?: string
+          p_branch_id?: string
+          p_customer_type?: Database["public"]["Enums"]["customer_type"]
+          p_display_name: string
+          p_email?: string
+          p_location_summary?: string
+          p_org_id: string
+          p_preferred_language?: string
+          p_primary_phone?: string
+          p_source?: Database["public"]["Enums"]["sales_source"]
+        }
+        Returns: string
+      }
+      create_follow_up: {
+        Args: {
+          p_assignee_membership_id: string
+          p_customer_id?: string
+          p_description?: string
+          p_due_at?: string
+          p_lead_id?: string
+          p_org_id: string
+          p_priority?: Database["public"]["Enums"]["sales_priority"]
+          p_title: string
+        }
+        Returns: string
+      }
+      create_lead: {
+        Args: {
+          p_assigned_membership_id?: string
+          p_branch_id?: string
+          p_customer_id?: string
+          p_next_follow_up_at?: string
+          p_org_id: string
+          p_priority?: Database["public"]["Enums"]["sales_priority"]
+          p_source?: Database["public"]["Enums"]["sales_source"]
+          p_title: string
+        }
+        Returns: string
       }
       membership_activate: {
         Args: { p_membership_id: string }
@@ -686,6 +1635,11 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      reassign_follow_up: {
+        Args: { p_assignee_membership_id: string; p_follow_up_id: string }
+        Returns: undefined
+      }
+      reopen_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
       request_account_upgrade: {
         Args: {
           p_requested_account_type: Database["public"]["Enums"]["account_type"]
@@ -706,6 +1660,52 @@ export type Database = {
       }
       review_start: { Args: { p_verification_id: string }; Returns: undefined }
       set_profile_hidden: { Args: { p_user_id: string }; Returns: undefined }
+      transition_lead: {
+        Args: {
+          p_expected_version: number
+          p_lead_id: string
+          p_lost_reason?: string
+          p_new_stage?: Database["public"]["Enums"]["lead_stage"]
+          p_new_status?: Database["public"]["Enums"]["lead_status"]
+        }
+        Returns: number
+      }
+      update_customer: {
+        Args: {
+          p_archive?: boolean
+          p_customer_id: string
+          p_display_name?: string
+          p_email?: string
+          p_location_summary?: string
+          p_preferred_language?: string
+          p_primary_phone?: string
+          p_source?: Database["public"]["Enums"]["sales_source"]
+        }
+        Returns: undefined
+      }
+      update_follow_up: {
+        Args: {
+          p_clear_due?: boolean
+          p_description?: string
+          p_due_at?: string
+          p_follow_up_id: string
+          p_priority?: Database["public"]["Enums"]["sales_priority"]
+          p_title?: string
+        }
+        Returns: undefined
+      }
+      update_lead_details: {
+        Args: {
+          p_clear_next_follow_up?: boolean
+          p_customer_id?: string
+          p_expected_version: number
+          p_lead_id: string
+          p_next_follow_up_at?: string
+          p_priority?: Database["public"]["Enums"]["sales_priority"]
+          p_title?: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       account_type:
@@ -723,6 +1723,16 @@ export type Database = {
         | "trainer"
         | "trainee"
       contact_channel: "whatsapp" | "email"
+      customer_status: "active" | "archived"
+      customer_type: "individual" | "company"
+      follow_up_status: "open" | "completed" | "cancelled"
+      lead_stage:
+        | "new"
+        | "contacted"
+        | "qualified"
+        | "proposal_pending"
+        | "decision_pending"
+      lead_status: "active" | "won" | "lost" | "archived"
       membership_status: "invited" | "active" | "suspended" | "revoked"
       org_status:
         | "draft"
@@ -732,6 +1742,22 @@ export type Database = {
         | "archived"
       platform_role: "support" | "moderator" | "administrator"
       public_profile_status: "hidden" | "listed"
+      sales_activity_type:
+        | "note"
+        | "call"
+        | "meeting"
+        | "follow_up"
+        | "status_change"
+        | "assignment_change"
+      sales_priority: "low" | "normal" | "high" | "urgent"
+      sales_source:
+        | "referral"
+        | "walk_in"
+        | "phone"
+        | "whatsapp"
+        | "website"
+        | "campaign"
+        | "other"
       user_status:
         | "pending_verification"
         | "active"
@@ -890,6 +1916,17 @@ export const Constants = {
         "trainee",
       ],
       contact_channel: ["whatsapp", "email"],
+      customer_status: ["active", "archived"],
+      customer_type: ["individual", "company"],
+      follow_up_status: ["open", "completed", "cancelled"],
+      lead_stage: [
+        "new",
+        "contacted",
+        "qualified",
+        "proposal_pending",
+        "decision_pending",
+      ],
+      lead_status: ["active", "won", "lost", "archived"],
       membership_status: ["invited", "active", "suspended", "revoked"],
       org_status: [
         "draft",
@@ -900,6 +1937,24 @@ export const Constants = {
       ],
       platform_role: ["support", "moderator", "administrator"],
       public_profile_status: ["hidden", "listed"],
+      sales_activity_type: [
+        "note",
+        "call",
+        "meeting",
+        "follow_up",
+        "status_change",
+        "assignment_change",
+      ],
+      sales_priority: ["low", "normal", "high", "urgent"],
+      sales_source: [
+        "referral",
+        "walk_in",
+        "phone",
+        "whatsapp",
+        "website",
+        "campaign",
+        "other",
+      ],
       user_status: [
         "pending_verification",
         "active",
