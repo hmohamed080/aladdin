@@ -12,6 +12,8 @@
 The domain-event catalog for the MVP. Events are the seam between contexts: a context emits an event; notifications, analytics, workers, and Realtime react. **Specification only.**
 
 > **Implementation status (Sprint 2.1 review, 2026-08-03):** the **audit** consumer is implemented ahead of the full event bus. Sensitive production paths emit `audit_log` rows through the internal `app.record_audit_event()` writer, covering account-upgrade, verification-review, profile-visibility, membership/capability, and branch-assignment transitions. Direct client/`service_role` DML on those tables and direct audit INSERT are prohibited, so there is no unaudited application bypass. Audit is emitted **inside** the protected transaction; insertion failure rolls the business change back. The transactional outbox, Realtime channels, and notification fan-out remain specification (⚑ outbox recommended).
+>
+> **Sprint 3 (2026-08-03) — sales domain audit events (ADR-0008):** the same in-transaction writer now covers `customer.created`/`customer.updated`, `lead.created`/`lead.assigned`/`lead.reassigned`/`lead.stage_changed`/`lead.won`/`lead.lost`/`lead.reopened`/`lead.archived`, and `followup.created`/`followup.reassigned`/`followup.completed`/`followup.reopened`. Emitted only by the constrained sales RPCs; direct sales DML is denied. Realtime `pipeline:{orgId}` streaming and notification/reminder fan-out on follow-ups remain deferred.
 
 ## 1. Model
 

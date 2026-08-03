@@ -9,26 +9,26 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | **Version** | Runtime snapshot · 2026-08-03 |
 | **Owner** | Foundation / Operations |
 | **Last updated** | 2026-08-03 |
-| **Updated by** | Codex — Phase 1, Sprint 2.1 independent trusted write-path security review |
-| **Current focus** | **Phase 1 — Identity & Multi-Tenancy · Sprint 2.1.** Independent review closed direct `service_role` privileged-identity/verification/audit bypasses and direct membership/capability/branch-assignment bypasses. The fourteen public workflow RPCs are now the mandatory production boundary; verification decisions are sticky/immutable/expiry-checked, needs-more-info resubmission is real, decision reasons are bounded/preserved in audit, last-owner protection locks a stable organization row, and two real-session CI tests prove last-owner and approval concurrency. Final local suite: **254 pgTAP** assertions + both race tests. See [ADR-0007 Sprint 2.1](../decisions/ADR-0007-identity-and-tenancy-model.md) and [review §9](../database/phase1-identity-tenancy-review.md#9-sprint-21--independent-trusted-write-path-security-review-2026-08-03). |
+| **Updated by** | Claude Code (Opus 4.8) — Phase 2, Sprint 3 B2B Sales Domain Foundation |
+| **Current focus** | **Phase 2 — B2B Sales Operating Workflow · Sprint 3 (B2B Sales Domain Foundation).** Phase 1 is merged to `main` (@ `54792a4`, PR #4). Sprint 3 builds the tenant-owned sales foundation on the identity/tenancy spine: `customers`, `leads`, `sales_activities`, `follow_up_tasks` with organization + optional-branch ownership, composite-FK cross-tenant safety, scope-based RLS, 13 constrained `security definer` workflow RPCs (create/update/assign/transition/activity/follow-up), optimistic-locked lead transitions, in-transaction audit, and `security_invoker` dashboard read-models. Local suite: **337 pgTAP** assertions (254 preserved + 83 new). See [ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md). No orders/quotes/RFQ/products/payments/AI/WhatsApp. |
 
 ## Phase & repository
 
 | Field | Value |
 |---|---|
-| **Current Phase** | **Phase 1 — Identity & Multi-Tenancy** (canonical identity, orgs/branches/memberships/capabilities, RLS helpers + organization-isolation tests) |
-| **Current Sprint** | **Sprint 2.1 — Independent Trusted Write-Path Security Review** |
-| **Current Feature** | Security hardening of the existing account-upgrade, verification, membership, capability, branch-assignment, and audit boundaries |
-| **Next Phase** | **Phase 2** — first product workflow (per [`ROADMAP`](../roadmap/ROADMAP.md); design order starts at 05C B2B Sales) once identity/tenancy merges |
-| **Current Branch** | `feature/account-upgrade-verification` (created from `main` @ `a3d7526`) |
-| **Current Milestone** | Sprint 2.1 — close bypasses, prove exact ACLs and concurrency, update PR #4 only |
+| **Current Phase** | **Phase 2 — B2B Sales Operating Workflow** (tenant-owned customers/leads/activities/follow-ups on the Phase 1 spine) |
+| **Current Sprint** | **Sprint 3 — B2B Sales Domain Foundation** |
+| **Current Feature** | Customers, leads, sales activities, follow-up tasks: schema + scope RLS + constrained workflow RPCs + audit + dashboard read-models |
+| **Next Phase** | **Phase 2 continued** — sales UI/screens (05C) then the RFQ/Quote/Project journey; dashboards last |
+| **Current Branch** | `feature/b2b-sales-workflow` (created from `main` @ `54792a4`) |
+| **Current Milestone** | Sprint 3 — secure sales operating foundation; open PR to `main`; no orders/quotes/products/payments |
 | **Current Remote Repository** | `origin` = `https://github.com/hmohamed080/aladdin.git` |
-| **Last Stable Commit** | `861b54a` — remote Sprint 2 branch head at the start of the independent review; review commits remain on `feature/account-upgrade-verification` and merge only through PR #4 |
+| **Last Stable Commit** | `54792a4` — `main` after PR #4 merged (Phase 1 identity/tenancy + Sprint 2/2.1). Sprint 3 commits land on `feature/b2b-sales-workflow` and merge into `main` via PR |
 | **Last Stable Tag** | `v0.1.0-foundation` (repo `0.1.0`) — created on merged `main` after the closeout PR; Design System stays independently at `1.0.0` |
 | **Foundation Release** | Tagged `v0.1.0-foundation` on `main` @ `64e68d6` |
 | **Repository Status** | Published to GitHub (`origin`, full history, no squash/force); `main` protection recommended (ADR-0006), not yet applied |
 | **Documentation Status** | Updated for Phase 1 — see [`../DOCUMENTATION_STATUS.md`](../DOCUMENTATION_STATUS.md); 0 broken links; no orphan docs |
-| **Implementation Status** | **Sprint 2.1 review implementation complete locally; validation/documentation/commit-push closeout in progress.** No product UI/endpoints/screens or unrelated feature. |
+| **Implementation Status** | **Sprint 3 sales domain implemented and validated locally (two clean cycles, 337 pgTAP); PR to `main` prepared.** Schema/RLS/RPC/read-model + server-only helpers only — no product UI/screens; no orders/quotes/RFQ/products/payments/AI. |
 
 ## Live engineering state
 
@@ -36,21 +36,21 @@ Always reflects the current live engineering state of the project. Overwrite eac
 
 | Field | Value |
 |---|---|
-| **Current Sprint** | **Sprint 2.1 — Independent Trusted Write-Path Security Review** (Phase 1) |
-| **Current Epic** | Identity & Multi-Tenancy (canonical identity, organizations, memberships, branches, RLS spine, audit) |
-| **Current Feature** | Mandatory constrained write boundaries + adversarial/catalog/concurrency proof |
-| **Current UI Status** | Design system **v1.0.0** ("The Aperture") finalized + implemented as tokens; only the Next.js scaffold page exists — **no product screens** (Phase 1 is schema/RLS/data-access only) |
-| **Current Backend Status** | FastAPI scaffold — `GET /health` only; **no product endpoints**. `create_user_client` preserves caller JWT/RLS; `create_service_client` is restricted to approved worker/recovery contexts and cannot directly mutate the reviewed privileged tables. |
-| **Current Database Status** | **7 migrations**; Phase 1 identity/tenancy + Sprint 2 verification/account-upgrade/membership RPCs + Sprint 2.1 hardening. Fourteen public workflow RPCs are postgres-owned `security definer` with `search_path=""`, executable only by `authenticated`; four internal security helpers are postgres-only. `authenticated`/`service_role` direct privileged DML is revoked. **254 pgTAP** assertions + two real-session race tests. |
+| **Current Sprint** | **Sprint 3 — B2B Sales Domain Foundation** (Phase 2) |
+| **Current Epic** | B2B Sales Operating Workflow (customers, leads, pipeline, activities, follow-ups) on the tenant spine |
+| **Current Feature** | Tenant-owned sales schema + scope RLS + constrained sales RPCs + audit + dashboard read-models + server-only helpers |
+| **Current UI Status** | Design system **v1.0.0** ("The Aperture") finalized + implemented as tokens; only the Next.js scaffold page exists — **no product screens** (Sprint 3 is schema/RLS/data-access + server helpers only) |
+| **Current Backend Status** | FastAPI scaffold — `GET /health` only; **no product endpoints**. No backend change in Sprint 3 (sales write paths are Next.js server actions per ADR-0001). |
+| **Current Database Status** | **10 migrations**; Phase 1 identity/tenancy + Sprint 2/2.1 write paths + **Sprint 3 sales domain** (`customers`, `leads`, `sales_activities`, `follow_up_tasks`; 13 sales workflow RPCs; 5 read-model views; composite-FK tenant safety; scope RLS). All 27 public workflow RPCs are postgres-owned `security definer` (`search_path=""`), executable only by `authenticated`; base tables SELECT-only for client/service roles. **337 pgTAP** assertions across 16 files. |
 | **Current Design System Version** | **1.0.0** (`DESIGN.md` / `design/tokens/*`) |
 | **Current Documentation Version** | Technical spec **1.0.0** (Phase 0.7); engineering standards **1.0.0** (Phase 0.8); governance/planning **1.0.0** (Phase 0.9 — ADR-0006, ROADMAP, BACKLOG, TECHNICAL_DEBT, DOCUMENTATION_STATUS, DECISION_LOG); docs index **1.0.0** |
 | **Current Deployment Status** | **not deployed** — no Vercel/Railway/Supabase cloud project connected; **no CD**; a minimum **PR-validation CI** workflow (`.github/workflows/ci.yml`: `frontend`/`backend`/`docs`) is present (must run once, then be selected as required checks in branch protection); repository published to GitHub (`origin`) |
 
 ## Git & branch
 
-- **Baseline:** `main` @ `a3d7526` — Sprint 1 identity/tenancy merged (PR #3); foundation tag `v0.1.0-foundation`.
-- **Current work branch:** `feature/account-upgrade-verification` (cut from `main` @ `a3d7526`) — Sprint 2 trusted write paths.
-- **Remote:** `origin` → `https://github.com/hmohamed080/aladdin.git` (push preserves full history; no squash, no force). Phase 1 merges into `main` via PR; direct pushes to `main` are prohibited.
+- **Baseline:** `main` @ `54792a4` — Phase 1 identity/tenancy + Sprint 2/2.1 write paths merged (PR #4).
+- **Current work branch:** `feature/b2b-sales-workflow` (cut from `main` @ `54792a4`) — Sprint 3 B2B sales domain foundation.
+- **Remote:** `origin` → `https://github.com/hmohamed080/aladdin.git` (push preserves full history; no squash, no force). Sprint 3 merges into `main` via PR; direct pushes to `main` are prohibited.
 
 > HEAD moves with each commit; this file trails HEAD by its own commit. Re-derive live values with the [resume commands](#exact-resume-commands) below rather than trusting a pasted hash.
 

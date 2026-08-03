@@ -146,7 +146,27 @@ The product model (PRODUCT_DIRECTION_GUIDE) is **capability-based derived access
 
 ## F. Sales operating workflow (`sales`) — the wedge (05C)
 
-### Opportunity
+> **Implemented (Phase 2, Sprint 3 — 2026-08-03):** the MVP sales foundation ships four tenant-owned entities — **`Customer`**, **`Lead`** (the Sprint-3 pipeline unit), **`SalesActivity`** (append-only timeline), and **`FollowUpTask`** — via migrations `2026080509000x`. Each carries `organization_id` + optional `branch_id`; cross-tenant linkage is structurally impossible (composite FKs), reads are scope-limited by RLS, and every mutation is a constrained `security definer` RPC with in-transaction audit (ADR-0008). The **`Lead`** stage set is deliberately in-scope only (`new→contacted→qualified→proposal_pending→decision_pending`); the `Opportunity`/`Need`/`Match` chain below (with `matching`/`quoted` stages) stays **spec/deferred** until the Match/RFQ/Quote modules land, and will connect to `Lead` then.
+
+### Customer *(implemented — Sprint 3)*
+- **Purpose:** a tenant-owned CRM customer a sales team works (individual or company).
+- **Relationships:** *–1 `Organization` (owner tenant); 0–1 `Branch` (scope); 0–1 owning `Membership`; 1–* `Lead`, `SalesActivity`, `FollowUpTask`.
+- **Ownership:** `ORG` (+ optional `BRANCH`). **Constraints:** contact points stored directly (primary phone normalized to E.164 for **intra-org** dedup — one active customer per phone per org; no cross-tenant uniqueness); PII-minimized; archived not deleted; **never** public and never a market-wide directory.
+
+### Lead *(implemented — Sprint 3; the MVP pipeline unit)*
+- **Purpose:** a tenant-owned sales pipeline record. `status` (`active`/`won`/`lost`/`archived`) and `stage` (`new`…`decision_pending`) are **separate**.
+- **Relationships:** *–1 `Organization`; 0–1 `Branch`; 0–1 `Customer`; 0–1 assigned `Membership`; 1–* `SalesActivity`, `FollowUpTask`.
+- **Lifecycle:** [11 §4a](11_state_machines.md). Transitions are optimistic-locked (`version`) and validated server-side; `won`/`lost`/`reopened` are audited.
+
+### SalesActivity *(implemented — Sprint 3)*
+- **Purpose:** an append-only timeline event on a lead/customer (`note`/`call`/`meeting`/`follow_up`; `status_change`/`assignment_change` emitted by the system).
+- **Ownership:** `ORG`. **Constraints:** actor = the caller's own membership (unspoofable); tenant-private; no update/delete path.
+
+### FollowUpTask *(implemented — Sprint 3)*
+- **Purpose:** an actionable follow-up (`open`/`completed`/`cancelled`) with an assignee, `due_at`, and priority.
+- **Ownership:** `ORG` (+ optional `BRANCH`). **Constraints:** reminder-ready (notifications deferred); create/complete/reopen/reassign are audited RPCs.
+
+### Opportunity *(spec/deferred — see note above)*
 - **Purpose:** a sales prospect/deal a Sales user works (the pipeline's unit).
 - **Relationships:** *–1 `Organization` (owner tenant); *–1 owner `Membership` (Sales user); 0–1 originating `Need`/consultation; 1–* `Task`, `FollowUp`, `Match`; 0–* `RfqRequest`/`Quote`.
 - **Lifecycle:** pipeline stages (`new` → `qualified` → `matching` → `quoted` → `won` | `lost`). See [11](11_state_machines.md).

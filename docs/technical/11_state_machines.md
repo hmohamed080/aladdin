@@ -89,6 +89,29 @@ stateDiagram-v2
 ```
 - Stage changes stream on `pipeline:{orgId}`; `won`/`lost` are audited and feed analytics (win-rate). Backward moves allowed except out of terminal `won`/`lost` (reopen = new opportunity). ⚑ Whether stages are org-customizable: default fixed.
 
+### 4a. Lead (implemented — Phase 2, Sprint 3)
+
+The MVP pipeline record (`leads`) separates **status** and **stage**:
+
+```mermaid
+stateDiagram-v2
+  [*] --> new
+  new --> contacted
+  contacted --> qualified
+  qualified --> proposal_pending
+  proposal_pending --> decision_pending
+  decision_pending --> new: regress (any active->active move allowed)
+  new --> won
+  new --> lost
+  decision_pending --> won: mark won
+  decision_pending --> lost: mark lost (reason required)
+  new --> archived
+  won --> new: reopen
+  lost --> new: reopen
+```
+- **status:** `active`→`won`|`lost`|`archived`; `won`/`lost`/`archived`→`active` (reopen). **stage** (`new..decision_pending`) changes only while `active`; any active→active stage move (progress or regress) is allowed.
+- Enforced **only** by `public.transition_lead` (`security definer`), which is **optimistic-locked** (`version` + `FOR UPDATE`; a stale expected version raises `40001`), requires a reason on `lost`, sets/clears `closed_at`/`lost_reason`, emits a `status_change` timeline activity, and audits `lead.won`/`lead.lost`/`lead.reopened`/`lead.archived`/`lead.stage_changed`. Direct DML cannot move a lead. See [ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md).
+
 ## 5. RFQ
 
 ```mermaid

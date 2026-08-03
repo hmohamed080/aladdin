@@ -4,6 +4,53 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 2: Sprint 3 (B2B Sales Domain Foundation)
+**Date/time:** 2026-08-03
+**Agent/tool:** Claude Code (Opus 4.8)
+**Branch:** `feature/b2b-sales-workflow` (cut from `main` @ `54792a4`, PR #4 merged; **not merged**)
+
+### Objective
+Build the secure B2B sales operating foundation (the Sales beachhead) on the Phase 1 identity/tenancy spine: tenant-owned customers, leads, sales activities, and follow-up tasks with scope-based RLS, constrained auditable write paths, and dashboard read-models. No orders/quotes/RFQ/products/inventory/projects/payments/OCR/WhatsApp/AI; no UI screens.
+
+### Pre-implementation review (key decisions → ADR-0008)
+Reviewed the existing spec rather than implementing it blindly. The spec's pipeline unit is `Opportunity` (stages incl. `matching`/`quoted`); Sprint 3 implements **`leads`** with in-scope stages only (`new→contacted→qualified→proposal_pending→decision_pending`) — the Match/RFQ/Quote-dependent stages stay deferred. Reconciled `leads`/`customers` as the concrete MVP entities; the richer Opportunity/Need/Match chain remains spec. Deliberate decisions: minimal caps `sales.read/write/assign/manage`; **no** platform cross-tenant read on customer PII (Customer Data Never Leaves the Platform); composite-FK structural tenant safety; denormalized `branch_id` on activities/follow-ups for scope-consistent RLS; phone normalization for intra-org dedup.
+
+### Migrations added (schema source of truth)
+- `20260805090001_sales_customers_leads.sql` — enums (`customer_type`, `customer_status`, `sales_source`, `sales_priority`, `lead_status`, `lead_stage`); `customers` + `leads`; capability-catalog + audit-action-allow-list extensions; `unique (organization_id, id)` on `branches`/`memberships` for composite FKs; `app.normalize_phone`/`can_manage_sales`/`membership_can_access_branch`; scope RLS; SELECT-only grants.
+- `20260805090002_sales_activities_followups.sql` — enums (`sales_activity_type`, `follow_up_status`); append-only `sales_activities`; `follow_up_tasks`; scope RLS; SELECT-only grants.
+- `20260805090003_sales_write_paths.sql` — `app.active_membership_id`/`can_act_on_follow_up`; 13 `security definer` workflow RPCs (create/update customer; create/update-details/assign/transition lead; add activity; create/update/complete/reopen/cancel/reassign follow-up); execute granted to `authenticated` only; 5 `security_invoker` dashboard views.
+
+### Security model (reuses ADR-0007 pattern)
+Base tables SELECT-only for `authenticated`/`service_role`; `anon` none; no write policies/grants — every mutation is a `public` `security definer` RPC (`search_path=''`) deriving the caller from `auth.uid()`, resolving active membership, enforcing org + branch scope + capability, rejecting cross-tenant ids, and emitting audit in the same transaction. Cross-tenant linkage is structurally impossible (composite FKs). Lead transitions are optimistic-locked (`version` + `FOR UPDATE`; stale → `40001`). Direct DML cannot bypass lifecycle/assignment/tenant/audit invariants.
+
+### Tests / validation
+New pgTAP `15_sales_customers_leads` (49) + `16_sales_activities_followups` (34); all existing **254** preserved → suite **337/337 PASS** across **two clean `db reset` cycles** (reset → `db lint public,app` clean → `test db`). Sales caps are granted in-transaction inside the sales tests (the shared seed and Phase-1 snapshot assertions are unchanged). Proven: tenant ownership, cross-tenant read/link denial, branch isolation, revoked-member denial, duplicate detection (same phone across tenants allowed), assignment rules, optimistic-concurrency rejection, won/lost/reopen audit, append-only tenant-private activities with unspoofable actors, follow-up lifecycle, scoped overdue/due-today read-models, and the direct-DML write boundary. Frontend: types regenerated; `server-only` `sales.ts` helper + 5 unit tests; typecheck/lint/**12 tests**/build GREEN. Optimistic concurrency is deterministic (expected-version), so no shell race script was needed.
+
+### Backend note
+No backend change (sales write paths are Next.js server actions, ADR-0001). `uv sync --frozen` + `ruff` pass; local `pytest` was blocked by a Windows Application Control policy denying the `cryptography` `_rust` DLL — an environment issue, not a code regression (backend unchanged; CI `backend` runs on Linux).
+
+### `.pen` integrity
+No Pencil tool was invoked and no `.pen` file was edited by this task; `.pen` files are gitignored and absent from the branch/PR. (Observed: the on-disk `design.pen` SHA differs from the Sprint 2.1 baseline with an mtime around session start — an external editor autosave outside this task's scope; not attributable to any action here.)
+
+### Remaining technical debt
+Sales UI (05C); RFQ/quotes/projects link from `leads`; notifications/reminders on `follow_up_tasks` (schema is reminder-ready); Excel import/export execution (schema is import-ready); org-customizable pipeline stages; platform governance path over sales data; scheduled overdue materialization; multi-contact-point table if needed.
+
+### Rollback notes
+Additive and branch-confined. The three sales migrations and the capability/audit-allow-list extensions can be reverted together (the `unique (organization_id, id)` additions on `branches`/`memberships` are harmless if retained). `main` is untouched.
+
+### Commits created (this sprint)
+1. `db: add tenant-scoped customer and lead schema`
+2. `db: add sales activity and follow-up tables`
+3. `db: add trusted sales workflow RPCs and read models`
+4. `test: cover sales tenant isolation and lifecycle rules`
+5. `feat: add server-only B2B sales workflow helpers`
+6. `docs: record Sprint 3 B2B sales foundation`
+
+### Remaining (next)
+Open PR `feature/b2b-sales-workflow → main`; require `frontend`/`backend`/`docs`/`supabase-rls`; do not merge from this task. Recommend an independent security review of the sales tenancy/visibility model before merge.
+
+---
+
 ## Session — Phase 1: Sprint 2.1 (Independent Trusted Write-Path Security Review)
 **Date/time:** 2026-08-03
 **Agent/tool:** Claude Code (Opus 4.8)
