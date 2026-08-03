@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 
@@ -10,6 +12,15 @@ import type { Database } from "@/types/database.types";
  * forwards the CALLER's JWT via a caller-scoped server client; unauthorized
  * callers are rejected by the database. No service-role key is used here.
  */
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function requireUuid(value: unknown, rpcName: string): string {
+  if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
+    throw new Error(`${rpcName} returned an invalid identifier.`);
+  }
+  return value;
+}
 
 export async function membershipInvite(
   supabase: SupabaseClient<Database>,
@@ -24,7 +35,7 @@ export async function membershipInvite(
     ...(primaryBranchId ? { p_primary_branch_id: primaryBranchId } : {}),
   });
   if (error) throw error;
-  return data as string;
+  return requireUuid(data, "membership_invite");
 }
 
 export async function membershipActivate(
@@ -55,12 +66,33 @@ export async function membershipRevoke(
   if (error) throw error;
 }
 
+export async function membershipSuspend(
+  supabase: SupabaseClient<Database>,
+  membershipId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("membership_suspend", { p_membership_id: membershipId });
+  if (error) throw error;
+}
+
 export async function branchAssign(
   supabase: SupabaseClient<Database>,
   membershipId: string,
   branchId: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc("branch_assign", {
+  const { data, error } = await supabase.rpc("branch_assign", {
+    p_membership_id: membershipId,
+    p_branch_id: branchId,
+  });
+  if (error) throw error;
+  requireUuid(data, "branch_assign");
+}
+
+export async function branchUnassign(
+  supabase: SupabaseClient<Database>,
+  membershipId: string,
+  branchId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("branch_unassign", {
     p_membership_id: membershipId,
     p_branch_id: branchId,
   });

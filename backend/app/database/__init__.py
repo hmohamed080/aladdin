@@ -44,10 +44,12 @@ def create_user_client(access_token: str, settings: Settings | None = None) -> C
 def create_service_client(settings: Settings | None = None) -> Client:
     """A Supabase client using the service-role key, which BYPASSES RLS.
 
-    Trusted server/worker paths ONLY — e.g. append-only `audit_log` inserts and
-    worker outputs — and always with explicit intent. Never use it to satisfy an
-    ordinary user request (that would defeat tenant isolation), and never expose
-    the service-role key to client code (root AGENTS.md security baseline).
+    Trusted server/worker paths ONLY — for explicitly approved worker-output
+    tables and constrained RPCs. Identity, verification, audit, membership,
+    capability, branch-access, and platform-role tables deliberately withhold
+    direct service-role DML; business transitions preserve a human caller JWT and
+    use their auditable RPC. Never use this client to satisfy an ordinary user
+    request, and never expose the key to browser code.
     """
     s = settings or get_settings()
     if not s.supabase_url or not s.supabase_service_role_key:

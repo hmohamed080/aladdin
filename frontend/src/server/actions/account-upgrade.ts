@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 
@@ -15,6 +17,15 @@ import type { Database } from "@/types/database.types";
 
 type AccountType = Database["public"]["Enums"]["account_type"];
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function requireUuid(value: unknown, rpcName: string): string {
+  if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
+    throw new Error(`${rpcName} returned an invalid identifier.`);
+  }
+  return value;
+}
+
 /** Self-service: the signed-in user requests a professional account upgrade. */
 export async function requestAccountUpgrade(
   supabase: SupabaseClient<Database>,
@@ -24,7 +35,7 @@ export async function requestAccountUpgrade(
     p_requested_account_type: requestedAccountType,
   });
   if (error) throw error;
-  return data as string;
+  return requireUuid(data, "request_account_upgrade");
 }
 
 /**
@@ -51,6 +62,18 @@ export async function reviewApprove(
   if (error) throw error;
 }
 
+export async function reviewRequestChanges(
+  supabase: SupabaseClient<Database>,
+  verificationId: string,
+  reason: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("review_request_changes", {
+    p_verification_id: verificationId,
+    p_reason: reason,
+  });
+  if (error) throw error;
+}
+
 export async function applyAccountUpgrade(
   supabase: SupabaseClient<Database>,
   verificationId: string,
@@ -70,5 +93,13 @@ export async function reviewReject(
     p_verification_id: verificationId,
     p_reason: reason,
   });
+  if (error) throw error;
+}
+
+export async function setProfileHidden(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("set_profile_hidden", { p_user_id: userId });
   if (error) throw error;
 }
