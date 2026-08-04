@@ -14,10 +14,12 @@ import { formatDate } from "@/lib/ui/format";
 import { PageHeader, BackLink, FlashSuccess } from "@/features/sales/page-parts";
 import { Card, Field, StatePanel, SectionTitle } from "@/components/ui/primitives";
 import { StageBadge, StatusBadge, PriorityBadge, FollowUpStatusBadge } from "@/features/sales/badges";
+import Link from "next/link";
 import { ActivityTimeline } from "@/features/sales/activity-timeline";
 import { LeadActions } from "@/features/sales/lead-actions";
 import { LeadActivityForm } from "@/features/sales/lead-activity-form";
 import { InlineFollowUpForm } from "@/features/sales/follow-up-inline";
+import { FollowUpRowActions } from "@/features/sales/follow-up-row-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,14 +28,14 @@ export default async function LeadDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; updated?: string }>;
 }) {
   const ctx = await getPageContext();
   if (!ctx) return null;
   const { supabase, org, locale } = ctx;
   const m = getMessages(locale);
   const { id } = await params;
-  const { created } = await searchParams;
+  const { created, updated } = await searchParams;
 
   const lead = await getLead(supabase, id);
   if (!lead) {
@@ -66,6 +68,7 @@ export default async function LeadDetailPage({
       <div>
         <BackLink href="/b2b/leads">{m.leads.title}</BackLink>
         {created ? <FlashSuccess messageKey="leads.created" /> : null}
+        {updated ? <FlashSuccess messageKey="leads.updated" /> : null}
         <PageHeader title={lead.title} />
         <div className="flex flex-wrap items-center gap-1">
           <StageBadge stage={lead.stage} />
@@ -78,7 +81,14 @@ export default async function LeadDetailPage({
         {/* Left: summary + actions */}
         <div className="flex flex-col gap-lg desktop:col-span-1">
           <Card>
-            <SectionTitle className="mb-md">{m.leads.detailsTitle}</SectionTitle>
+            <div className="mb-md flex items-center justify-between gap-md">
+              <SectionTitle>{m.leads.detailsTitle}</SectionTitle>
+              {writable && lead.status !== "archived" ? (
+                <Link href={`/b2b/leads/${lead.id}/edit`} className="text-label text-accent hover:underline">
+                  {m.leads.editDetails}
+                </Link>
+              ) : null}
+            </div>
             <dl className="flex flex-col gap-md">
               <Field label={m.leads.customer}>
                 {lead.customer_id ? cn[lead.customer_id] ?? "—" : m.common.none}
@@ -149,12 +159,15 @@ export default async function LeadDetailPage({
               ) : (
                 <ul className="flex flex-col divide-y">
                   {openFollowUps.map((f) => (
-                    <li key={f.id} className="flex items-center justify-between gap-md py-2">
+                    <li key={f.id} className="flex flex-wrap items-center justify-between gap-md py-2">
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-body-lg text-fg">{f.title}</span>
                         <span className="text-label text-fg-muted">{formatDate(f.due_at, locale)}</span>
                       </span>
-                      <FollowUpStatusBadge status={f.status} />
+                      <span className="flex shrink-0 items-center gap-sm">
+                        <FollowUpStatusBadge status={f.status} />
+                        <FollowUpRowActions id={f.id} status={f.status} leadId={lead.id} canEdit={writable} />
+                      </span>
                     </li>
                   ))}
                 </ul>
