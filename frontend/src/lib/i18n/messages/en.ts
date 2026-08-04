@@ -42,6 +42,7 @@ export const en = {
     cancelFollowUpBody: "The follow-up is marked cancelled and leaves your open list. This can't be undone.",
     markLostTitle: "Mark this lead lost?",
     markLostBody: "Provide a reason below. The lead moves to the lost state and leaves the active pipeline.",
+    markWonBody: "The lead moves to the won state and leaves the active pipeline. You can reopen it later.",
   },
   nav: {
     home: "Home",
@@ -259,6 +260,7 @@ export const en = {
     assignDenied: "You don't have permission to assign records.",
     assigneeBranch: "That salesperson can't access this branch.",
     followUpNotOpen: "Only an open follow-up can be edited. Reopen it first.",
+    staleConflict: "This record changed since you opened it. We refreshed it — review the current values and try again.",
     genericRetry: "Something interrupted the request. Try again.",
   },
   validation: {

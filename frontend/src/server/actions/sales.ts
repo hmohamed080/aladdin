@@ -76,6 +76,8 @@ export async function updateCustomer(
   supabase: Client,
   customerId: string,
   patch: {
+    /** Optimistic precondition: the exact `updated_at` the caller last saw. */
+    expectedUpdatedAt?: string;
     displayName?: string;
     primaryPhone?: string;
     email?: string;
@@ -83,10 +85,15 @@ export async function updateCustomer(
     locationSummary?: string;
     source?: SalesSource;
     archive?: boolean;
+    /** Explicit clear-to-NULL flags (blank submission, not "leave unchanged"). */
+    clearPhone?: boolean;
+    clearEmail?: boolean;
+    clearLocation?: boolean;
   },
 ): Promise<void> {
   const { error } = await supabase.rpc("update_customer", {
     p_customer_id: customerId,
+    ...(patch.expectedUpdatedAt !== undefined ? { p_expected_updated_at: patch.expectedUpdatedAt } : {}),
     ...(patch.displayName !== undefined ? { p_display_name: patch.displayName } : {}),
     ...(patch.primaryPhone !== undefined ? { p_primary_phone: patch.primaryPhone } : {}),
     ...(patch.email !== undefined ? { p_email: patch.email } : {}),
@@ -94,6 +101,9 @@ export async function updateCustomer(
     ...(patch.locationSummary !== undefined ? { p_location_summary: patch.locationSummary } : {}),
     ...(patch.source !== undefined ? { p_source: patch.source } : {}),
     ...(patch.archive !== undefined ? { p_archive: patch.archive } : {}),
+    ...(patch.clearPhone ? { p_clear_phone: true } : {}),
+    ...(patch.clearEmail ? { p_clear_email: true } : {}),
+    ...(patch.clearLocation ? { p_clear_location: true } : {}),
   });
   if (error) throw error;
 }
@@ -242,20 +252,25 @@ export async function updateFollowUp(
   supabase: Client,
   followUpId: string,
   patch: {
+    /** Optimistic precondition: the version the caller last saw. */
+    expectedVersion?: number;
     title?: string;
     description?: string;
     dueAt?: string;
     priority?: SalesPriority;
     clearDue?: boolean;
+    clearDescription?: boolean;
   },
 ): Promise<void> {
   const { error } = await supabase.rpc("update_follow_up", {
     p_follow_up_id: followUpId,
+    ...(patch.expectedVersion !== undefined ? { p_expected_version: patch.expectedVersion } : {}),
     ...(patch.title !== undefined ? { p_title: patch.title } : {}),
     ...(patch.description !== undefined ? { p_description: patch.description } : {}),
     ...(patch.dueAt !== undefined ? { p_due_at: patch.dueAt } : {}),
     ...(patch.priority !== undefined ? { p_priority: patch.priority } : {}),
     ...(patch.clearDue ? { p_clear_due: true } : {}),
+    ...(patch.clearDescription ? { p_clear_description: true } : {}),
   });
   if (error) throw error;
 }
@@ -279,10 +294,12 @@ export async function reassignFollowUp(
   supabase: Client,
   followUpId: string,
   assigneeMembershipId: string,
+  expectedVersion?: number,
 ): Promise<void> {
   const { error } = await supabase.rpc("reassign_follow_up", {
     p_follow_up_id: followUpId,
     p_assignee_membership_id: assigneeMembershipId,
+    ...(expectedVersion !== undefined ? { p_expected_version: expectedVersion } : {}),
   });
   if (error) throw error;
 }

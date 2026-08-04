@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import * as sales from "@/server/actions/sales";
-import { mapSalesError } from "@/server/actions/error-mapping";
+import { mapSalesError, isStaleVersion } from "@/server/actions/error-mapping";
 import type { Database } from "@/types/database.types";
 
 /**
@@ -33,6 +33,19 @@ type ActivityType = Database["public"]["Enums"]["sales_activity_type"];
 function str(fd: FormData, key: string): string | undefined {
   const v = fd.get(key);
   return typeof v === "string" && v.trim() !== "" ? v.trim() : undefined;
+}
+
+/**
+ * Explicit PATCH semantics for a clearable optional field:
+ *  - field absent from the form  → `{}` (leave unchanged),
+ *  - present and blank           → `{ clear: true }` (set to NULL),
+ *  - present and non-blank       → `{ value }` (validate/update).
+ */
+function optionalPatch(fd: FormData, key: string): { value?: string; clear?: boolean } {
+  if (!fd.has(key)) return {};
+  const raw = fd.get(key);
+  const trimmed = typeof raw === "string" ? raw.trim() : "";
+  return trimmed === "" ? { clear: true } : { value: trimmed };
 }
 
 // ---- Customers -------------------------------------------------------------
@@ -77,19 +90,28 @@ export async function updateCustomerAction(_p: FormState, fd: FormData): Promise
   if (!id) return { ok: false, code: "states.genericRetry" };
   if (!displayName) return { ok: false, fieldErrors: { displayName: "validation.nameLength" } };
 
+  const phone = optionalPatch(fd, "primaryPhone");
+  const email = optionalPatch(fd, "email");
+  const location = optionalPatch(fd, "locationSummary");
+
   const supabase = await getServerSupabase();
   try {
     await sales.updateCustomer(supabase, id, {
+      // Optimistic precondition: the exact updated_at the form was rendered from.
+      expectedUpdatedAt: str(fd, "expectedUpdatedAt"),
       displayName,
-      // Blank leaves a field unchanged (the RPC coalesces null → keep). This
-      // matches create semantics and avoids empty-string phone normalization.
-      primaryPhone: str(fd, "primaryPhone"),
-      email: str(fd, "email"),
+      // Explicit PATCH: blank clears to NULL; non-blank updates; absent keeps.
+      primaryPhone: phone.value,
+      clearPhone: phone.clear,
+      email: email.value,
+      clearEmail: email.clear,
+      locationSummary: location.value,
+      clearLocation: location.clear,
       preferredLanguage: str(fd, "preferredLanguage"),
-      locationSummary: str(fd, "locationSummary"),
       source: str(fd, "source") as SalesSource | undefined,
     });
   } catch (e) {
+    if (isStaleVersion(e)) return { ok: false, code: "states.staleConflict" };
     return { ok: false, code: mapSalesError(e) };
   }
   revalidatePath(`/b2b/customers/${id}`);
@@ -291,16 +313,28 @@ export async function updateFollowUpAction(_p: FormState, fd: FormData): Promise
   const title = str(fd, "title");
   if (!id) return { ok: false, code: "states.genericRetry" };
   if (!title) return { ok: false, fieldErrors: { title: "validation.titleLength" } };
+  // Version must be explicitly present (an optimistic precondition) — a missing
+  // value is a bad request, not "version 0".
+  const versionRaw = fd.get("version");
+  const version = typeof versionRaw === "string" && versionRaw.trim() !== "" ? Number(versionRaw) : NaN;
+  if (!Number.isInteger(version)) return { ok: false, code: "states.genericRetry" };
+
+  const description = optionalPatch(fd, "description");
+  const due = optionalPatch(fd, "dueAt");
 
   const supabase = await getServerSupabase();
   try {
     await sales.updateFollowUp(supabase, id, {
+      expectedVersion: version,
       title,
-      description: str(fd, "description"),
-      dueAt: str(fd, "dueAt"),
+      description: description.value,
+      clearDescription: description.clear,
+      dueAt: due.value,
+      clearDue: due.clear,
       priority: (str(fd, "priority") as SalesPriority) ?? undefined,
     });
   } catch (e) {
+    if (isStaleVersion(e)) return { ok: false, code: "states.staleConflict" };
     return { ok: false, code: mapSalesError(e) };
   }
   revalidatePath("/b2b/follow-ups");
@@ -342,12 +376,24 @@ export async function reassignFollowUpAction(_p: FormState, fd: FormData): Promi
   const id = str(fd, "followUpId");
   const assignee = str(fd, "assigneeMembershipId");
   if (!id || !assignee) return { ok: false, code: "states.genericRetry" };
+  // Version is optional: passed from the edit form so a stale reassignment can't
+  // clobber a newer concurrent edit; omitted from quick reassign controls.
+  const versionRaw = fd.get("version");
+  const expectedVersion =
+    typeof versionRaw === "string" && versionRaw.trim() !== "" ? Number(versionRaw) : undefined;
+
   const supabase = await getServerSupabase();
   try {
-    await sales.reassignFollowUp(supabase, id, assignee);
+    await sales.reassignFollowUp(
+      supabase,
+      id,
+      assignee,
+      Number.isInteger(expectedVersion) ? expectedVersion : undefined,
+    );
   } catch (e) {
+    if (isStaleVersion(e)) return { ok: false, code: "states.staleConflict" };
     return { ok: false, code: mapSalesError(e) };
   }
   revalidatePath("/b2b/follow-ups");
-  return { ok: true, code: "followUps.created" };
+  return { ok: true, code: "followUps.reassigned" };
 }

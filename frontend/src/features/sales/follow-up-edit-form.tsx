@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import { updateFollowUpAction, type FormState } from "@/server/actions/sales-forms";
 import { Card } from "@/components/ui/primitives";
@@ -26,7 +27,12 @@ function toLocalInput(iso: string | null): string {
  */
 export function FollowUpEditForm({ followUp }: { followUp: FollowUpRow }) {
   const { t } = useI18n();
-  const [state, action] = useActionState(updateFollowUpAction, initial);
+  const router = useRouter();
+  const [state, action] = useActionState(async (prev: FormState, fd: FormData) => {
+    const res = await updateFollowUpAction(prev, fd);
+    if (res.code === "states.staleConflict") router.refresh();
+    return res;
+  }, initial);
   const fe = state.fieldErrors ?? {};
 
   return (
@@ -39,6 +45,7 @@ export function FollowUpEditForm({ followUp }: { followUp: FollowUpRow }) {
 
       <form action={action} className="grid gap-md tablet:grid-cols-2" noValidate>
         <input type="hidden" name="followUpId" value={followUp.id} />
+        <input type="hidden" name="version" value={followUp.version} />
         {followUp.lead_id ? <input type="hidden" name="leadId" value={followUp.lead_id} /> : null}
         {followUp.customer_id ? <input type="hidden" name="customerId" value={followUp.customer_id} /> : null}
 

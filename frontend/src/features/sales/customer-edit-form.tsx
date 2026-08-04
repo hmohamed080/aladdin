@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import { updateCustomerAction, type FormState } from "@/server/actions/sales-forms";
 import { Card } from "@/components/ui/primitives";
@@ -28,7 +29,14 @@ export function CustomerEditForm({
   assigneeName: string;
 }) {
   const { t } = useI18n();
-  const [state, action] = useActionState(updateCustomerAction, initial);
+  const router = useRouter();
+  const [state, action] = useActionState(async (prev: FormState, fd: FormData) => {
+    const res = await updateCustomerAction(prev, fd);
+    // On a stale-write conflict, reload the current server row so the form
+    // re-renders (and the hidden updated_at token) against the newer state.
+    if (res.code === "states.staleConflict") router.refresh();
+    return res;
+  }, initial);
   const fe = state.fieldErrors ?? {};
 
   return (
@@ -41,6 +49,7 @@ export function CustomerEditForm({
 
       <form action={action} className="grid gap-md tablet:grid-cols-2" noValidate>
         <input type="hidden" name="customerId" value={customer.id} />
+        <input type="hidden" name="expectedUpdatedAt" value={customer.updated_at} />
 
         <div className="tablet:col-span-2">
           <LabeledField label={t("customers.name")} htmlFor="displayName" error={fe.displayName ? t(fe.displayName) : undefined}>
