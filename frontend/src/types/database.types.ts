@@ -1636,7 +1636,11 @@ export type Database = {
         Returns: undefined
       }
       reassign_follow_up: {
-        Args: { p_assignee_membership_id: string; p_follow_up_id: string }
+        Args: {
+          p_assignee_membership_id: string
+          p_expected_version?: number
+          p_follow_up_id: string
+        }
         Returns: undefined
       }
       reopen_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
@@ -1673,9 +1677,13 @@ export type Database = {
       update_customer: {
         Args: {
           p_archive?: boolean
+          p_clear_email?: boolean
+          p_clear_location?: boolean
+          p_clear_phone?: boolean
           p_customer_id: string
           p_display_name?: string
           p_email?: string
+          p_expected_updated_at?: string
           p_location_summary?: string
           p_preferred_language?: string
           p_primary_phone?: string
@@ -1685,9 +1693,11 @@ export type Database = {
       }
       update_follow_up: {
         Args: {
+          p_clear_description?: boolean
           p_clear_due?: boolean
           p_description?: string
           p_due_at?: string
+          p_expected_version?: number
           p_follow_up_id: string
           p_priority?: Database["public"]["Enums"]["sales_priority"]
           p_title?: string

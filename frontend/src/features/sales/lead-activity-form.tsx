@@ -8,8 +8,20 @@ import { Input, Select, SubmitButton } from "@/components/ui/controls";
 
 const initial: FormState = { ok: false };
 
-/** Inline "add activity" (note/call/meeting) row on the lead timeline. */
-export function LeadActivityForm({ orgId, leadId }: { orgId: string; leadId: string }) {
+/**
+ * Inline "add activity" (note/call/meeting) row on a lead OR customer timeline.
+ * Exactly one of leadId/customerId is provided; the activity is attached to it
+ * through the trusted add_sales_activity RPC.
+ */
+export function LeadActivityForm({
+  orgId,
+  leadId,
+  customerId,
+}: {
+  orgId: string;
+  leadId?: string;
+  customerId?: string;
+}) {
   const { t } = useI18n();
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -26,7 +38,8 @@ export function LeadActivityForm({ orgId, leadId }: { orgId: string; leadId: str
   return (
     <form ref={formRef} action={action} className="flex flex-col gap-sm">
       <input type="hidden" name="orgId" value={orgId} />
-      <input type="hidden" name="leadId" value={leadId} />
+      {leadId ? <input type="hidden" name="leadId" value={leadId} /> : null}
+      {customerId ? <input type="hidden" name="customerId" value={customerId} /> : null}
       {state.code && !state.ok ? (
         <p role="alert" className="text-label text-danger">{t(state.code)}</p>
       ) : null}

@@ -124,7 +124,10 @@ Track as `needs-product-decision` issues ([`../development/github-workflow.md`](
 | **Session-refresh hardening** — refresh relies on middleware `getUser()`; no explicit refresh-token rotation UI/telemetry | before production auth hardening |
 | **Bulk import/export UI** — schema-ready (ADR-0008); no screens | the import/export feature |
 | **Broader 05C + B2C/Admin screens** — this sprint is a vertical slice (customers/leads/follow-ups) | subsequent design-roadmap modules |
-| **Component test depth** — logic + a couple of render tests exist; no full interaction/e2e harness | when a shared local-Supabase e2e fixture lands |
+| ~~**Component test depth / no e2e harness**~~ | **Resolved 2026-08-04 (Sprint 5/5.1)** — a local **Playwright** E2E suite (`frontend/e2e`, real Email-OTP via Mailpit, seeded identities) with 9 asserting scenarios; **executed and green** via `pnpm e2e` (set `PW_CHROMIUM` to the full Chromium if the headless-shell isn't downloaded). Live pixel-level visual QA across 4 viewports remains a maintainer follow-up. |
+| **Customer version column** — customers use an `updated_at` optimistic precondition (no `version` column, unlike leads/follow-ups) | add a `version` column + trigger if a uniform integer-version model is later preferred; the current `expected_updated_at` guard is proven by `customer_update_concurrency_test.sh` |
+| **Customer branch/type/assignee edit + lead source/branch edit** — Sprint 5 ships edits limited to the fields the trusted update RPCs support; `update_customer` has no type/branch/assignee params and `update_lead_details` has no source/branch. Customer assignment/type/branch and lead source/branch are not editable post-create | build a minimal, audited, caller-scoped RPC extension (composite-FK branch check, assignee same-org/branch, in-transaction audit) when product needs post-create reassignment/retagging |
+| **Live cross-breakpoint visual QA (Sprint 5)** — 4 viewports × light/dark × ar/en was not run in the authoring sandbox (no browser automation); structural server-render checks + build + 104 tests stand in | a maintainer runs `pnpm e2e` and the visual pass |
 | **`frontend/.env.local`** is required to run the app locally (public anon values) — documented, gitignored | — |
 
 ## Maintenance

@@ -2,7 +2,7 @@ import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listFollowUps, customerNameMap, memberNameMap } from "@/server/queries/sales";
 import { canAssign } from "@/server/queries/context";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader, FlashSuccess } from "@/features/sales/page-parts";
 import { StatePanel } from "@/components/ui/primitives";
 import { FollowUpsBoard } from "@/features/sales/follow-ups-board";
 
@@ -19,11 +19,16 @@ function bucketOf(due: string | null): "overdue" | "dueToday" | "upcoming" {
   return "upcoming";
 }
 
-export default async function FollowUpsPage() {
+export default async function FollowUpsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ updated?: string }>;
+}) {
   const ctx = await getPageContext();
   if (!ctx) return null;
   const { supabase, org, locale } = ctx;
   const m = getMessages(locale);
+  const { updated } = await searchParams;
 
   const branchId = org.activeBranchId ?? undefined;
   const [all, custNames, memberNames] = await Promise.all([
@@ -44,6 +49,7 @@ export default async function FollowUpsPage() {
 
   return (
     <div className="pb-16 tablet:pb-0">
+      {updated ? <FlashSuccess messageKey="followUps.updated" /> : null}
       <PageHeader title={m.followUps.title} />
       {all.length === 0 ? (
         <StatePanel title={m.followUps.empty} body={m.followUps.noDue} />

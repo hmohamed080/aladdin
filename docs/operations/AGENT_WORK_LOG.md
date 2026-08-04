@@ -4,6 +4,61 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 2: Sprint 5.1 (Independent Sales UI Merge-Gate Hardening)
+
+**Date:** 2026-08-04 · **Branch:** `feature/sales-ui-depth` (PR #8, unmerged) · **Base:** `main` @ `e949f2b`
+
+### Objective
+Independently harden the committed Sprint 5 UI for merge. Confirmed gaps addressed:
+
+1. **Customer stale-write** — `update_customer` gained `p_expected_updated_at` (compared under `FOR UPDATE`, 40001 before any write/audit); customers have no `version`, so the trigger-maintained `updated_at` is the precondition. New migration `20260805110000`.
+2. **Follow-up stale-write** — `update_follow_up` gained `p_expected_version`; `reassign_follow_up` gained an optional `p_expected_version`.
+3. **Optional-field clearing** — explicit PATCH: absent=unchanged, blank=clear-to-NULL, value=update. Added `p_clear_phone/email/location` (customer) and `p_clear_description` (follow-up).
+4. **Follow-up reassignment UI** — authorized reassign form on the edit route (capability-gated, version-guarded, RPC-enforced branch/active/same-org).
+5. **Lead terminal confirmations** — Mark Won / Mark Lost / Archive behind the extended `ConfirmDialog`; the lost reason is controlled and survives validation/concurrency errors.
+6. **Deterministic OTP** — the E2E helper snapshots existing Mailpit IDs and reads only a genuinely-new message (no bypass).
+7. **Honest E2E** — the suite now asserts persisted results for every step; unique values via `randomUUID`.
+
+### Migration + tests
+`20260805110000_sales_edit_concurrency.sql` (forward-only; drops+recreates `update_customer`/`update_follow_up`/`reassign_follow_up` with the new trailing params + re-grants). Regenerated the three RPC arg types surgically. New pgTAP `18_sales_edit_concurrency_test.sql` (+16) and two new two-session race scripts (`customer_update_concurrency_test.sh`, `follow_up_update_concurrency_test.sh`).
+
+### Validation
+Frontend typecheck/lint/**114 tests** (104→114)/build ✓ · backend ruff + 10 pytest ✓ · Supabase **two** clean cycles (reset+lint+**382 pgTAP**) ✓ · **5** race scripts ✓ · **Playwright E2E executed and green** (9 scenarios; `PW_CHROMIUM` full-build launch) ✓ · dev-runtime smoke ✓.
+
+### Commits
+`fix: add customer and follow-up optimistic concurrency` · `fix: support explicit optional-field clearing` · `feat: add follow-up reassignment and lead terminal confirmations` · `test: make local OTP and sales E2E deterministic` · `docs: record Sprint 5.1 merge-gate hardening`
+
+---
+
+## Session — Phase 2: Sprint 5 (Sales UI Depth & Product QA)
+
+**Date:** 2026-08-04 · **Branch:** `feature/sales-ui-depth` (from `main` @ `e949f2b`, PR #7 merged) · **Base:** `main`
+
+### Objective
+Deepen the Sprint-4 B2B sales UI so a salesperson can run the daily workflow end to end: real edit flows, richer detail, explicit confirmations, and a local E2E foundation. Real Supabase data + trusted RPCs only; RLS the boundary.
+
+### Pre-edit review (trusted RPC contracts)
+`update_customer` supports name/phone/email/preferred-language/location/source/archive (no type/branch/assignee, no version). `update_lead_details` supports title/priority/customer/next-follow-up with optimistic `expected_version` (source/branch not supported; assignment is the separate versioned `assign_lead`). `update_follow_up` supports title/description/due/priority under a `status='open'` guard (reassign/lifecycle are separate RPCs). → **No new migration required**; edit fields limited to what each RPC supports (no invented fields).
+
+### Implemented
+- **Routes:** `/b2b/customers/[id]/edit`, `/b2b/leads/[id]/edit`, `/b2b/follow-ups/[id]/edit` (each guards `canWrite`, localized not-found/permission).
+- **Server actions:** `updateCustomerAction`, `updateLeadDetailsAction` (optimistic version → `leads.conflict` refresh), `updateFollowUpAction` (open-guard → `states.followUpNotOpen`); robust idempotent archive with flash.
+- **Detail depth:** customer detail gains edit/add-activity/add-follow-up/follow-up lists + per-row actions + created/updated/archived flashes; lead detail gains an Edit-details link and per-follow-up row actions; follow-ups board gains Edit + a confirmed Cancel.
+- **Accessibility:** shared `ConfirmDialog` (role=dialog, aria-modal, focus-in/trap/Escape/restore) for terminal actions (archive, cancel).
+- **Query helpers:** `getFollowUp`, `listFollowUpsForCustomer`. Generalized the activity + inline-follow-up forms to accept a `customerId`.
+- **Local E2E:** Playwright foundation (`frontend/playwright.config.ts`, `frontend/e2e/`), real Email-OTP via Mailpit (no bypass), seeded identities (`a-owner` manager / `a-cairo` branch-limited), 12 smoke scenarios; `pnpm e2e` script; artifacts gitignored.
+
+### Validation
+Frontend typecheck/lint/**104 tests** (92→104)/build ✓ · backend ruff + 10 pytest ✓ · Supabase db reset + lint + **366 pgTAP** (unchanged; no SQL change) ✓ · doc links 0 broken · dev-runtime smoke (fresh `.next`, routes 200/307, no module error) ✓ · structural QA (AR rtl / EN ltr / dark class / guarded edit routes) ✓.
+
+### Not done in this sandbox (environmental)
+- **Live 4-viewport × light/dark × ar/en visual QA** and **Playwright suite execution** could not run: the sandbox blocks launching a browser process (`spawn UNKNOWN`), the Playwright headless-shell download 400s, and the Chrome automation extension was disconnected. The E2E suite is authored and type-checks; a maintainer runs `pnpm e2e` + the visual pass. No schema/`.pen`/`main` change.
+
+### Commits
+`feat: add customer edit and detail improvements` · `feat: add lead edit and pipeline interaction improvements` · `feat: add follow-up edit and lifecycle feedback` · `test: add local sales E2E foundation and product QA coverage` · `docs: record Sprint 5 sales UI depth and QA`
+
+---
+
 ## Session — Phase 2: Sprint 4.2 (Public Directory View Security Hardening)
 
 **Date:** 2026-08-04 · **Branch:** `bugfix/public-directory-view-hardening` (from `main` @ `2b19fa7`, PR #6 merged) · **Base:** `main`

@@ -23,7 +23,7 @@ Prioritized backlog for the Private Pilot MVP. **Source of truth for scope is [`
 | Product catalog (products/brands/categories/media) | P0 | 2 | orgs; storage | Not started | TBD (catalog) | publish gate = verified + media |
 | Inventory & availability | P1 | 2 | catalog | Not started | TBD (inventory) | availability signal, Realtime |
 | Smart search (FTS + trgm) | P0 | 2 | catalog | Not started | TBD (catalog) | server-side paginated |
-| B2B Sales workflow (05C — the wedge) | P0 | 2 | identity; catalog | Not started | TBD (sales) | Opportunity→Need→Match→Share→Follow-up→Task |
+| B2B Sales workflow (05C — the wedge) | P0 | 2 | identity; catalog | In progress (Sprints 3–5): domain + auth'd UI + customer/lead/follow-up **edit** flows + local E2E | TBD (sales) | Opportunity→Need→Match→Share→Follow-up→Task. Deferred: post-create reassignment/retag RPCs, Realtime, RFQ/quote linkage |
 | B2C value journey (05A) | P0 | 2 | catalog; AI consult | Not started | TBD (accounts/ai) | discovery → matching → RFQ |
 | RFQ | P0 | 3 | needs; catalog | Not started | TBD (rfq) | anti-auction; consultation-first |
 | Quotations (quote/compare/decision) | P0 | 3 | RFQ | Not started | TBD (quotations) | no cross-responder visibility |

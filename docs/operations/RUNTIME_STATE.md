@@ -9,7 +9,7 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | **Version** | Runtime snapshot · 2026-08-04 |
 | **Owner** | Foundation / Operations |
 | **Last updated** | 2026-08-04 |
-| **Updated by** | Claude Code (Opus 4.8) — Phase 2, Sprint 4.2 Public Directory View Security Hardening (Advisor "Security Definer View") |
+| **Updated by** | Claude Code (Opus 4.8) — Phase 2, Sprint 5.1 Independent Sales UI Merge-Gate Hardening (edit concurrency + reassignment + terminal confirmations + executed E2E) |
 | **Current focus** | **Phase 2 — B2B Sales Operating Workflow · Sprint 3 (B2B Sales Domain Foundation).** Phase 1 is merged to `main` (@ `54792a4`, PR #4). Sprint 3 builds the tenant-owned sales foundation on the identity/tenancy spine: `customers`, `leads`, `sales_activities`, `follow_up_tasks` with organization + optional-branch ownership, composite-FK cross-tenant safety, scope-based RLS, 13 constrained `security definer` workflow RPCs (create/update/assign/transition/activity/follow-up), optimistic-locked lead transitions, in-transaction audit, and `security_invoker` dashboard read-models. Local suite: **337 pgTAP** assertions (254 preserved + 83 new). See [ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md). No orders/quotes/RFQ/products/payments/AI/WhatsApp. |
 
 ## Phase & repository
@@ -17,7 +17,7 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | Field | Value |
 |---|---|
 | **Current Phase** | **Phase 2 — B2B Sales Operating Workflow** (tenant-owned customers/leads/activities/follow-ups on the Phase 1 spine) |
-| **Current Sprint** | **Sprint 4.2 — Public Directory View Security Hardening** (Advisor "Security Definer View"; branch `bugfix/public-directory-view-hardening`) |
+| **Current Sprint** | **Sprint 5.1 — Independent Sales UI Merge-Gate Hardening** (edit concurrency + optional-clearing + follow-up reassignment + lead terminal confirmations + executed E2E; branch `feature/sales-ui-depth`, PR #8) |
 | **Current Feature** | Passwordless Email-OTP auth + B2B app shell + customers/leads/follow-ups screens wired to the real Sprint-3 RLS/RPCs (Arabic-first, RTL, light/dark, responsive) |
 | **Next Phase** | **Phase 2 continued** — sales UI/screens (05C) then the RFQ/Quote/Project journey; dashboards last |
 | **Current Branch** | `feature/b2b-sales-ui` (created from `main` @ `f9596a3`) |
@@ -28,7 +28,7 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | **Foundation Release** | Tagged `v0.1.0-foundation` on `main` @ `64e68d6` |
 | **Repository Status** | Published to GitHub (`origin`, full history, no squash/force); `main` protection recommended (ADR-0006), not yet applied |
 | **Documentation Status** | Updated for Phase 1 — see [`../DOCUMENTATION_STATUS.md`](../DOCUMENTATION_STATUS.md); 0 broken links; no orphan docs |
-| **Implementation Status** | **Sprint 4.2 validated (Supabase db reset+lint+ pgTAP twice; 3 two-session races; frontend typecheck/lint/92 tests/build; backend ruff+10 pytest).** The two public-directory Advisor "Security Definer View" findings are resolved: `organization_public_directory`/`profile_public_directory` are now `security_invoker` views over constrained `security definer` `app._*` readers (migration `20260805100000`; ADR-0007 D21) — Advisor rule query returns 0 flagged, `anon` still holds no base-table grant, columns/eligibility unchanged. pgTAP **337 → 366** (+29). Sprint 4 slice + Sprint 4.1 hardening remain merged in `main` (PR #6, `2b19fa7`). Branch `bugfix/public-directory-view-hardening`, PR to `main`, unmerged. No products/RFQ/quotes/projects/payments/WhatsApp/AI. |
+| **Implementation Status** | **Sprint 5 + 5.1 validated (frontend typecheck/lint/114 tests/build; backend ruff+10 pytest; Supabase two clean cycles reset+lint+382 pgTAP; 5 two-session races; Playwright E2E executed & green; dev-runtime smoke).** Real **edit** flows for customers/leads/follow-ups via trusted RPCs. **Sprint 5.1** added edit-path optimistic concurrency (customer `expected_updated_at`, follow-up/reassign `expected_version` — migration `20260805110000`), explicit optional-field clearing, follow-up reassignment UI, and lead terminal confirmations (Won/Lost/Archive) with a reason that survives errors. Live cross-breakpoint **visual** QA remains a maintainer follow-up. Sprint 4.2 merged in `main` (PR #7, `e949f2b`). Branch `feature/sales-ui-depth`, PR #8 to `main`, unmerged. No products/RFQ/quotes/projects/B2C/payments/WhatsApp/Realtime/AI. |
 
 ## Live engineering state
 
@@ -39,9 +39,9 @@ Always reflects the current live engineering state of the project. Overwrite eac
 | **Current Sprint** | **Sprint 3 — B2B Sales Domain Foundation** (Phase 2) |
 | **Current Epic** | B2B Sales Operating Workflow (customers, leads, pipeline, activities, follow-ups) on the tenant spine |
 | **Current Feature** | Tenant-owned sales schema + scope RLS + constrained sales RPCs + audit + dashboard read-models + server-only helpers |
-| **Current UI Status** | **First product UI shipped (Sprint 4):** passwordless Email-OTP sign-in + guarded B2B workspace (home cockpit, customers, leads list/pipeline, follow-ups) on `@supabase/ssr`; Arabic-first RTL + English switch + light/dark, responsive; consumes the design-system tokens. Wired to the real Sprint-3 RLS/RPCs (no mock core data). |
+| **Current UI Status** | **B2B sales workspace with edit depth (Sprint 5):** Sprint-4 sign-in + workspace, plus real customer/lead/follow-up **edit** flows (trusted RPCs), richer customer detail (add-activity/add-follow-up/follow-up lists), an accessible confirmation dialog for terminal actions, and a local Playwright E2E foundation. Arabic-first RTL + EN + light/dark; optimistic lead concurrency; localized errors. Wired to real RLS/RPCs (no mock core data). |
 | **Current Backend Status** | FastAPI scaffold — `GET /health` only; **no product endpoints**. No backend change in Sprint 3 (sales write paths are Next.js server actions per ADR-0001). |
-| **Current Database Status** | **11 migrations** (Sprint 4.2 adds `20260805100000_public_directory_invoker_hardening`); Phase 1 identity/tenancy + Sprint 2/2.1 write paths + **Sprint 3 sales domain** (`customers`, `leads`, `sales_activities`, `follow_up_tasks`; 13 sales workflow RPCs; 5 read-model views; composite-FK tenant safety; scope RLS). All 27 public workflow RPCs are postgres-owned `security definer` (`search_path=""`), executable only by `authenticated`; base tables SELECT-only for client/service roles. **Sprint 4.2:** +2 internal `app._*_public_directory()` definer readers backing the hardened `security_invoker` directory views (migration `20260805100000`). **366 pgTAP** assertions across 17 files. |
+| **Current Database Status** | **11 migrations** (Sprint 4.2 adds `20260805100000_public_directory_invoker_hardening`); Phase 1 identity/tenancy + Sprint 2/2.1 write paths + **Sprint 3 sales domain** (`customers`, `leads`, `sales_activities`, `follow_up_tasks`; 13 sales workflow RPCs; 5 read-model views; composite-FK tenant safety; scope RLS). All 27 public workflow RPCs are postgres-owned `security definer` (`search_path=""`), executable only by `authenticated`; base tables SELECT-only for client/service roles. **Sprint 4.2:** +2 internal `app._*_public_directory()` definer readers backing the hardened `security_invoker` directory views (migration `20260805100000`). **Sprint 5.1:** **12 migrations** — `20260805110000_sales_edit_concurrency` adds edit-path optimistic concurrency (`update_customer` `expected_updated_at`; `update_follow_up`/`reassign_follow_up` `expected_version`) + explicit `p_clear_*` field-clearing. **382 pgTAP** assertions across 18 files. |
 | **Current Design System Version** | **1.0.0** (`DESIGN.md` / `design/tokens/*`) |
 | **Current Documentation Version** | Technical spec **1.0.0** (Phase 0.7); engineering standards **1.0.0** (Phase 0.8); governance/planning **1.0.0** (Phase 0.9 — ADR-0006, ROADMAP, BACKLOG, TECHNICAL_DEBT, DOCUMENTATION_STATUS, DECISION_LOG); docs index **1.0.0** |
 | **Current Deployment Status** | **not deployed** — no Vercel/Railway/Supabase cloud project connected; **no CD**; a minimum **PR-validation CI** workflow (`.github/workflows/ci.yml`: `frontend`/`backend`/`docs`) is present (must run once, then be selected as required checks in branch protection); repository published to GitHub (`origin`) |
@@ -49,7 +49,7 @@ Always reflects the current live engineering state of the project. Overwrite eac
 ## Git & branch
 
 - **Baseline:** `main` @ `f9596a3` — Sprint 3 B2B sales domain foundation merged (PR #5).
-- **Current work branch:** `bugfix/public-directory-view-hardening` (cut from `main` @ `2b19fa7`) — Sprint 4.2 public-directory Advisor hardening. (Sprint 4 `feature/b2b-sales-ui` is merged: PR #6.)
+- **Current work branch:** `feature/sales-ui-depth` (cut from `main` @ `e949f2b`) — Sprint 5 sales UI depth (edit flows + local E2E). (Sprint 4.2 `bugfix/public-directory-view-hardening` is merged: PR #7.)
 - **Remote:** `origin` → `https://github.com/hmohamed080/aladdin.git` (push preserves full history; no squash, no force). Sprint 3 merges into `main` via PR; direct pushes to `main` are prohibited.
 
 > HEAD moves with each commit; this file trails HEAD by its own commit. Re-derive live values with the [resume commands](#exact-resume-commands) below rather than trusting a pasted hash.

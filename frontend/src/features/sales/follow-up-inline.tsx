@@ -16,12 +16,14 @@ const initial: FormState = { ok: false };
 export function InlineFollowUpForm({
   orgId,
   leadId,
+  customerId,
   members,
   canAssign,
   selfMembershipId,
 }: {
   orgId: string;
-  leadId: string;
+  leadId?: string;
+  customerId?: string;
   members: { membershipId: string; displayName: string }[];
   canAssign: boolean;
   selfMembershipId: string;
@@ -29,6 +31,7 @@ export function InlineFollowUpForm({
   const { t } = useI18n();
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const anchor = leadId ?? customerId ?? "new";
   const [state, action] = useActionState(async (prev: FormState, fd: FormData) => {
     const res = await createFollowUpAction(prev, fd);
     if (res.ok) router.refresh();
@@ -44,19 +47,20 @@ export function InlineFollowUpForm({
       <summary className="cursor-pointer px-md py-2 text-label text-fg-secondary">+ {t("followUps.new")}</summary>
       <form ref={formRef} action={action} className="flex flex-col gap-sm border-t p-md">
         <input type="hidden" name="orgId" value={orgId} />
-        <input type="hidden" name="leadId" value={leadId} />
+        {leadId ? <input type="hidden" name="leadId" value={leadId} /> : null}
+        {customerId ? <input type="hidden" name="customerId" value={customerId} /> : null}
         {state.code && !state.ok ? (
           <p role="alert" className="text-label text-danger">{t(state.code)}</p>
         ) : null}
-        <LabeledField label={t("followUps.titleField")} htmlFor={`fu-title-${leadId}`} error={state.fieldErrors?.title ? t(state.fieldErrors.title) : undefined}>
-          <Input id={`fu-title-${leadId}`} name="title" required maxLength={200} />
+        <LabeledField label={t("followUps.titleField")} htmlFor={`fu-title-${anchor}`} error={state.fieldErrors?.title ? t(state.fieldErrors.title) : undefined}>
+          <Input id={`fu-title-${anchor}`} name="title" required maxLength={200} />
         </LabeledField>
         <div className="grid gap-sm tablet:grid-cols-2">
-          <LabeledField label={t("followUps.dueAt")} htmlFor={`fu-due-${leadId}`} optional={t("common.optional")}>
-            <Input id={`fu-due-${leadId}`} name="dueAt" type="datetime-local" />
+          <LabeledField label={t("followUps.dueAt")} htmlFor={`fu-due-${anchor}`} optional={t("common.optional")}>
+            <Input id={`fu-due-${anchor}`} name="dueAt" type="datetime-local" />
           </LabeledField>
-          <LabeledField label={t("followUps.priority")} htmlFor={`fu-prio-${leadId}`}>
-            <Select id={`fu-prio-${leadId}`} name="priority" defaultValue="normal">
+          <LabeledField label={t("followUps.priority")} htmlFor={`fu-prio-${anchor}`}>
+            <Select id={`fu-prio-${anchor}`} name="priority" defaultValue="normal">
               {PRIORITIES.map((p) => (
                 <option key={p} value={p}>{t(`priority.${p}`)}</option>
               ))}
@@ -64,8 +68,8 @@ export function InlineFollowUpForm({
           </LabeledField>
         </div>
         {canAssign && members.length > 0 ? (
-          <LabeledField label={t("followUps.assignee")} htmlFor={`fu-assignee-${leadId}`}>
-            <Select id={`fu-assignee-${leadId}`} name="assigneeMembershipId" defaultValue={selfMembershipId}>
+          <LabeledField label={t("followUps.assignee")} htmlFor={`fu-assignee-${anchor}`}>
+            <Select id={`fu-assignee-${anchor}`} name="assigneeMembershipId" defaultValue={selfMembershipId}>
               {members.map((mem) => (
                 <option key={mem.membershipId} value={mem.membershipId}>{mem.displayName}</option>
               ))}
