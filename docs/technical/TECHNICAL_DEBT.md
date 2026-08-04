@@ -116,6 +116,9 @@ Track as `needs-product-decision` issues ([`../development/github-workflow.md`](
 | Item | Trigger |
 |---|---|
 | **WhatsApp OTP** — Email-OTP only in the sign-in UI | the WhatsApp integration sprint |
+| **CAPTCHA / Turnstile on the OTP send endpoint** — Sprint 4.1 added a UI resend cooldown + disabled-while-pending + `shouldCreateUser:false` (Sign In can't register or enumerate), but the public send endpoint still relies on Supabase/GoTrue rate limits | **required before production** — wire Turnstile on Create Account / OTP send |
+| **Exact-at-scale stage counts** — `stageCounts` tallies the RLS-scoped base `leads` table (branch-aware) under a 2000-row scan cap; `sales_lead_stage_counts` aggregates by org only (no branch axis) | when a tenant's active-lead volume approaches the cap — add a branch-aware aggregate RPC |
+| **Transactional create-lead-with-note RPC** — Sprint 4.1 removed the swallowed best-effort intent write; Create Lead now creates only the lead and the intent is a real note from Lead details | if product wants the initial note captured atomically at creation |
 | **Notifications / reminders UI** — follow-ups are reminder-ready (`due_at`, assignee); no push/in-app reminders | the notifications feature |
 | **Session-refresh hardening** — refresh relies on middleware `getUser()`; no explicit refresh-token rotation UI/telemetry | before production auth hardening |
 | **Bulk import/export UI** — schema-ready (ADR-0008); no screens | the import/export feature |

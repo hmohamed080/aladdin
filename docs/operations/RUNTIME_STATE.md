@@ -9,7 +9,7 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | **Version** | Runtime snapshot · 2026-08-04 |
 | **Owner** | Foundation / Operations |
 | **Last updated** | 2026-08-04 |
-| **Updated by** | Claude Code (Opus 4.8) — Phase 2, Sprint 4 Authenticated B2B Sales Vertical Slice (first product UI) |
+| **Updated by** | Claude Code (Opus 4.8) — Phase 2, Sprint 4.1 Independent Frontend/Auth/UX Review (hardening on the Sprint 4 slice) |
 | **Current focus** | **Phase 2 — B2B Sales Operating Workflow · Sprint 3 (B2B Sales Domain Foundation).** Phase 1 is merged to `main` (@ `54792a4`, PR #4). Sprint 3 builds the tenant-owned sales foundation on the identity/tenancy spine: `customers`, `leads`, `sales_activities`, `follow_up_tasks` with organization + optional-branch ownership, composite-FK cross-tenant safety, scope-based RLS, 13 constrained `security definer` workflow RPCs (create/update/assign/transition/activity/follow-up), optimistic-locked lead transitions, in-transaction audit, and `security_invoker` dashboard read-models. Local suite: **337 pgTAP** assertions (254 preserved + 83 new). See [ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md). No orders/quotes/RFQ/products/payments/AI/WhatsApp. |
 
 ## Phase & repository
@@ -17,7 +17,7 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | Field | Value |
 |---|---|
 | **Current Phase** | **Phase 2 — B2B Sales Operating Workflow** (tenant-owned customers/leads/activities/follow-ups on the Phase 1 spine) |
-| **Current Sprint** | **Sprint 4 — Authenticated B2B Sales Vertical Slice** (first product UI) |
+| **Current Sprint** | **Sprint 4.1 — Independent Frontend/Auth/UX Review** (hardening the Sprint 4 slice; PR #6) |
 | **Current Feature** | Passwordless Email-OTP auth + B2B app shell + customers/leads/follow-ups screens wired to the real Sprint-3 RLS/RPCs (Arabic-first, RTL, light/dark, responsive) |
 | **Next Phase** | **Phase 2 continued** — sales UI/screens (05C) then the RFQ/Quote/Project journey; dashboards last |
 | **Current Branch** | `feature/b2b-sales-ui` (created from `main` @ `f9596a3`) |
@@ -28,7 +28,7 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | **Foundation Release** | Tagged `v0.1.0-foundation` on `main` @ `64e68d6` |
 | **Repository Status** | Published to GitHub (`origin`, full history, no squash/force); `main` protection recommended (ADR-0006), not yet applied |
 | **Documentation Status** | Updated for Phase 1 — see [`../DOCUMENTATION_STATUS.md`](../DOCUMENTATION_STATUS.md); 0 broken links; no orphan docs |
-| **Implementation Status** | **Sprint 4 vertical slice implemented and validated (frontend typecheck/lint/51 tests/build; 337 pgTAP unchanged; real Email-OTP sign-in exercised in-browser with Arabic RTL + English + dark).** PR to `main` prepared. No products/RFQ/quotes/projects/payments/WhatsApp/AI. |
+| **Implementation Status** | **Sprint 4 slice + Sprint 4.1 hardening validated (frontend typecheck/lint/92 tests/build; backend ruff+10 pytest; Supabase db reset+lint+337 pgTAP + 3 two-session races; 824 doc links/0 broken).** Sprint 4.1 fixed: OTP nested-form, Sign-In≠registration (`shouldCreateUser:false`, enumeration-safe), active org+branch narrowing across the cockpit, honest branch semantics, removed silent lead-intent loss, sanitized customer search, localized route error/not-found, accurate SSR cookie docs, Arabic copy. Live cross-breakpoint browser re-validation pending a maintainer (Chrome extension was disconnected). PR #6 to `main`, unmerged. No products/RFQ/quotes/projects/payments/WhatsApp/AI. |
 
 ## Live engineering state
 

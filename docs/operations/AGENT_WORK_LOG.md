@@ -4,6 +4,35 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 2: Sprint 4.1 (Independent Frontend, Auth & UX Review)
+
+**Date:** 2026-08-04 · **Branch:** `feature/b2b-sales-ui` (PR #6, unmerged) · **Base:** `main` @ `f9596a3`
+
+### Objective
+Independently review the committed Sprint 4 UI (not the prior completion report) and harden it: auth/registration boundary, nested forms, org/branch context consistency, branch-selection honesty, silent data loss, search injection, route-level error states, SSR cookie/cache accuracy, design-system/Arabic/accessibility, and responsive coverage.
+
+### Confirmed findings & fixes (no schema change; 337 pgTAP unchanged; frontend tests 51 → 92)
+1. **Nested `<form>`** at the OTP verify step → rewrote as sibling forms + `type="button"` change-email reset (refocuses email) + Resend-with-cooldown; DOM test asserts no `form form`.
+2. **Sign In implicitly registered** unknown emails (`shouldCreateUser: true`) → `false`; unknown-identity rejection returns the same "code sent" result (no enumeration, no implicit sign-up). Tests prove the boundary.
+3. **Cockpit widgets ignored active org/branch** → `myOpenLeads/overdueFollowUps/followUpsDueToday/recentActivities/stageCounts` now take `(orgId, branchId?)`; query tests cover org isolation + branch narrowing; `stageCounts` tallies the RLS-scoped base table so branch narrows honestly.
+4. **Dishonest branch selector** → `resolveActiveOrg`/`resolveActiveBranch` pure resolvers (single→auto-select, in-scope-cookie-only, "All / All my branches" labels); single branch renders read-only. Pure-function tests (one/many/forged/removed).
+5. **Silent lead-intent loss** (swallowed `try/catch`) → removed the field; intent is a real note from Lead details; test asserts no activity write on create.
+6. **Customer search** raw-interpolated into `.or()` → `sanitizeSearchTerm` whitelist + metacharacter matrix test (incl. Arabic/phone).
+7. **No route-level error/not-found** → `b2b/error.tsx` (self-contained bilingual, retry, no PII/raw-DB logging) + `b2b/not-found.tsx`.
+8. **Inaccurate SSR cookie docs** (claimed HttpOnly) → corrected (shared, non-HttpOnly, per-request client, force-dynamic, no token logging).
+9. **Awkward Arabic** (`تحديد كمكسوبة`) → `رابحة/كرابحة`.
+
+### Validation
+Frontend typecheck/lint/**92 tests**/build ✓ · backend ruff + 10 pytest ✓ · Supabase `db reset` + lint + **337 pgTAP** + all three two-session race scripts ✓ · 824 doc links/0 broken · workflow-YAML/secret/tracked-artifact/`.pen` audits clean.
+
+### Not done this session
+- **Live-browser responsive re-validation** — the Chrome automation extension was disconnected (after `/login`). Verified server-rendered structure via HTTP (Arabic `dir="rtl"`, single sign-in form, responsive classes, no inline hex) and the no-nested-form invariant via a real-DOM test; a maintainer should confirm the four breakpoints × light/dark × ar/en visually. No schema, `.pen`, or `main` changes.
+
+### Commits
+`fix: correct Email OTP form and pilot sign-in boundaries` · `fix: enforce organization and branch context across the sales UI` · `fix: remove silent lead-intent loss and harden customer search` · `feat: add localized route error and not-found states` · `test: expand frontend auth, context, and query coverage` · `docs: record the independent Sprint 4.1 review`
+
+---
+
 ## Session — Phase 2: Sprint 4 (Authenticated B2B Sales Vertical Slice — first product UI)
 **Date/time:** 2026-08-04
 **Agent/tool:** Claude Code (Opus 4.8)
