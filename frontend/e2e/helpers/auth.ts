@@ -8,40 +8,58 @@ export const IDENTITIES = {
 
 const MAILPIT = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
 
+type MailpitMessage = { ID: string; To: Array<{ Address: string }> };
+
+async function messagesFor(request: APIRequestContext, email: string): Promise<MailpitMessage[]> {
+  const res = await request.get(`${MAILPIT}/api/v1/messages?limit=50`);
+  if (!res.ok()) return [];
+  const body = await res.json();
+  const messages: MailpitMessage[] = body.messages ?? [];
+  return messages.filter((m) => m.To?.some((t) => t.Address.toLowerCase() === email.toLowerCase()));
+}
+
+/** The set of message IDs currently in Mailpit for `email` (snapshot BEFORE sending). */
+export async function messageIdsFor(request: APIRequestContext, email: string): Promise<Set<string>> {
+  return new Set((await messagesFor(request, email)).map((m) => m.ID));
+}
+
 /**
- * Read the latest Email-OTP code delivered to `email` from the local Mailpit
- * inbox. This exercises the REAL passwordless path (no test-only auth bypass):
- * the app sends the code, Mailpit captures it, and we extract the 6 digits.
+ * Deterministically read the OTP from the message that arrived AFTER `seen` was
+ * captured — never a stale code from a previous test. Exercises the REAL
+ * passwordless path (no auth bypass): the app sends the code, Mailpit captures
+ * it, and we extract the 6 digits from the newest genuinely-new message.
  */
-export async function readLatestOtp(request: APIRequestContext, email: string): Promise<string> {
-  // Poll briefly — delivery to Mailpit is near-instant but not synchronous.
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const list = await request.get(`${MAILPIT}/api/v1/messages?limit=20`);
-    if (list.ok()) {
-      const body = await list.json();
-      const messages: Array<{ ID: string; To: Array<{ Address: string }> }> = body.messages ?? [];
-      const match = messages.find((m) => m.To?.some((t) => t.Address.toLowerCase() === email.toLowerCase()));
-      if (match) {
-        const full = await request.get(`${MAILPIT}/api/v1/message/${match.ID}`);
-        const msg = await full.json();
-        const text: string = `${msg.Text ?? ""} ${msg.HTML ?? ""}`;
-        const code = text.match(/\b(\d{6})\b/);
-        if (code) return code[1]!;
-      }
+export async function readNewOtp(
+  request: APIRequestContext,
+  email: string,
+  seen: Set<string>,
+): Promise<string> {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const fresh = (await messagesFor(request, email)).filter((m) => !seen.has(m.ID));
+    for (const m of fresh) {
+      const full = await request.get(`${MAILPIT}/api/v1/message/${m.ID}`);
+      if (!full.ok()) continue;
+      const msg = await full.json();
+      const code = `${msg.Text ?? ""} ${msg.HTML ?? ""}`.match(/\b(\d{6})\b/);
+      if (code) return code[1]!;
     }
     await new Promise((r) => setTimeout(r, 500));
   }
-  throw new Error(`No OTP code found in Mailpit for ${email}`);
+  throw new Error(`No new OTP code arrived in Mailpit for ${email}`);
 }
 
 /** Sign in through the real Email-OTP flow and land on the B2B workspace. */
 export async function signIn(page: Page, request: APIRequestContext, email: string): Promise<void> {
+  // Snapshot existing messages BEFORE requesting a new code so we never reuse a
+  // stale OTP from an earlier test/run.
+  const seen = await messageIdsFor(request, email);
+
   await page.goto("/auth/sign-in");
   await page.getByLabel(/email|البريد/i).fill(email);
   await page.getByRole("button", { name: /send code|إرسال الرمز/i }).click();
   await expect(page.getByText(/we sent a code|أرسلنا رمزًا/i)).toBeVisible();
 
-  const code = await readLatestOtp(request, email);
+  const code = await readNewOtp(request, email, seen);
   await page.getByLabel(/one-time code|الرمز/i).fill(code);
   await page.getByRole("button", { name: /verify|تأكيد/i }).click();
 

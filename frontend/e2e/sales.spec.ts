@@ -1,122 +1,175 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import { randomUUID } from "node:crypto";
 import { signIn, IDENTITIES } from "./helpers/auth";
 
 /**
- * Local sales-workflow smoke E2E. Runs against local Next.js + local Supabase
- * with the seeded synthetic identities (real Email-OTP via Mailpit — no bypass).
- * Assumes a fresh `db reset` + applied `supabase/demo-seed.sql`. Creating records
- * is additive (unique names), so reruns stay deterministic without a reset.
- *
- * Text matchers accept Arabic (default) or English so the suite is language-
- * robust. `desktopOnly` / `mobileOnly` keep data-mutating flows on one project.
+ * Local sales-workflow E2E. Local Next.js + local Supabase, seeded synthetic
+ * identities, real Email-OTP via Mailpit (no bypass). Assumes a fresh `db reset`
+ * + applied `supabase/demo-seed.sql`. Creates use collision-proof unique names
+ * (randomUUID), so reruns stay deterministic without a reset. Every scenario
+ * ASSERTS the persisted result — not just the URL. Field inputs are targeted by
+ * their stable `id` (language-independent); buttons by role+bilingual name.
  */
-const stamp = () => Date.now().toString().slice(-6);
+const uid = () => randomUUID().slice(0, 8);
 const isMobile = () => test.info().project.name.includes("mobile");
 const desktopOnly = () => test.skip(isMobile(), "desktop-only scenario");
 const mobileOnly = () => test.skip(!isMobile(), "mobile-only scenario");
+
+const createBtn = /create|إضافة|حفظ/i;
+const saveChangesBtn = /save changes|حفظ التغييرات/i;
+
+async function createCustomer(page: Page, name: string): Promise<string> {
+  await page.goto("/b2b/customers/new");
+  await page.locator("#displayName").fill(name);
+  await page.getByRole("button", { name: createBtn }).click();
+  await page.waitForURL(/\/b2b\/customers\/[0-9a-f-]{36}(\?|$)/);
+  await expect(page.getByRole("heading", { name })).toBeVisible();
+  return page.url().split("?")[0]!;
+}
+
+async function createLead(page: Page, title: string): Promise<string> {
+  await page.goto("/b2b/leads/new");
+  await page.locator("#title").fill(title);
+  await page.getByRole("button", { name: createBtn }).click();
+  await page.waitForURL(/\/b2b\/leads\/[0-9a-f-]{36}(\?|$)/);
+  return page.url().split("?")[0]!;
+}
 
 test.describe("manager — daily sales workflow", () => {
   test.beforeEach(async ({ page, request }) => {
     await signIn(page, request, IDENTITIES.manager);
   });
 
-  // 1 + 2: manager signs in and the cockpit + customer list load.
-  test("cockpit and customer list load", async ({ page }) => {
+  test("cockpit and customer list load with seeded data", async ({ page }) => {
     desktopOnly();
     await expect(page).toHaveURL(/\/b2b(\/|$)/);
     await page.goto("/b2b/customers");
-    // The seeded customers are visible (RLS-scoped).
-    await expect(page.getByRole("link", { name: /النيل|Nile|Sheikh Zayed|الزهور/ }).first()).toBeVisible();
+    await expect(page.getByRole("main").getByRole("link", { name: /النيل|Nile|Sheikh Zayed|الزهور/ }).first()).toBeVisible();
   });
 
-  // 3: create a customer, then edit it.
-  test("customer create then edit", async ({ page }) => {
+  test("customer create, edit, and clear an optional value persist", async ({ page }) => {
     desktopOnly();
-    const name = `E2E Customer ${stamp()}`;
-    await page.goto("/b2b/customers/new");
-    await page.getByLabel(/name|الاسم/i).first().fill(name);
-    await page.getByRole("button", { name: /create|إضافة|حفظ/i }).click();
-    await expect(page).toHaveURL(/\/b2b\/customers\/[0-9a-f-]+/);
-    await expect(page.getByRole("heading", { name })).toBeVisible();
+    const detail = await createCustomer(page, `E2E Cust ${uid()}`);
 
-    // Edit → change the display name.
-    await page.getByRole("link", { name: /edit customer|تعديل العميل/i }).click();
-    await expect(page).toHaveURL(/\/edit$/);
-    const edited = `${name} (edited)`;
-    await page.getByLabel(/name|الاسم/i).first().fill(edited);
-    await page.getByRole("button", { name: /save changes|حفظ التغييرات/i }).click();
-    await expect(page).toHaveURL(/\?updated=1/);
+    await page.goto(`${detail}/edit`);
+    await page.locator("#primaryPhone").fill("01000000123");
+    await page.getByRole("button", { name: saveChangesBtn }).click();
+    await page.waitForURL(/\?updated=1/);
+    await expect(page.getByText("01000000123")).toBeVisible();
+
+    // Clear the optional phone (submit blank) and verify it is gone.
+    await page.goto(`${detail}/edit`);
+    await page.locator("#primaryPhone").fill("");
+    await page.getByRole("button", { name: saveChangesBtn }).click();
+    await page.waitForURL(/\?updated=1/);
+    await expect(page.getByText("01000000123")).toHaveCount(0);
+  });
+
+  test("lead create, edit details, and stage transition persist", async ({ page }) => {
+    desktopOnly();
+    const title = `E2E Lead ${uid()}`;
+    const detail = await createLead(page, title);
+
+    const edited = `${title} v2`;
+    await page.goto(`${detail}/edit`);
+    await page.locator("#title").fill(edited);
+    await page.getByRole("button", { name: saveChangesBtn }).click();
+    await page.waitForURL(/\?updated=1/);
     await expect(page.getByRole("heading", { name: edited })).toBeVisible();
-  });
 
-  // 4 + 5: create a lead, edit its details, then change its stage.
-  test("lead create, edit details, change stage", async ({ page }) => {
-    desktopOnly();
-    const title = `E2E Lead ${stamp()}`;
-    await page.goto("/b2b/leads/new");
-    await page.getByLabel(/title|العنوان/i).first().fill(title);
-    await page.getByRole("button", { name: /create|إضافة|حفظ/i }).click();
-    await expect(page).toHaveURL(/\/b2b\/leads\/[0-9a-f-]+/);
-
-    // Edit details (title/priority).
-    await page.getByRole("link", { name: /edit details|تعديل التفاصيل/i }).click();
-    await page.getByLabel(/title|العنوان/i).first().fill(`${title} v2`);
-    await page.getByRole("button", { name: /save changes|حفظ التغييرات/i }).click();
-    await expect(page).toHaveURL(/\?updated=1/);
-
-    // Change stage via the lead actions.
-    const stage = page.getByLabel(/change stage|تغيير المرحلة/i);
-    await stage.selectOption({ index: 1 });
+    await page.goto(detail);
+    await page.locator("#stage").selectOption({ index: 1 });
     await page.getByRole("button", { name: /^(save|حفظ)$/i }).first().click();
+    await expect(page.getByRole("main").getByText(/contacted|تم التواصل/i).first()).toBeVisible();
+  });
+
+  test("lead terminal confirmation: mark won requires the dialog and persists", async ({ page }) => {
+    desktopOnly();
+    const detail = await createLead(page, `E2E Won ${uid()}`);
+    await page.goto(detail);
+    await page.getByRole("button", { name: /mark won|تحديد كرابحة/i }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: /mark won|تحديد كرابحة/i }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole("main").getByText(/won|رابحة/i).first()).toBeVisible();
+  });
+
+  test("follow-up create, edit every field, reassign, complete, reopen", async ({ page }) => {
+    desktopOnly();
+    const leadDetail = await createLead(page, `E2E FU Lead ${uid()}`);
+    await page.goto(leadDetail);
+
+    const fuTitle = `E2E FU ${uid()}`;
+    await page.getByText(/\+ (new follow-up|متابعة جديدة)/i).first().click();
+    await page.locator('input[name="title"]').fill(fuTitle);
+    await page.getByRole("button", { name: /create follow-up|إنشاء متابعة/i }).click();
+    await expect(page.getByText(fuTitle)).toBeVisible();
+
+    // Edit route: change title + description, verify persisted on the board.
+    await page.getByRole("link", { name: /^(edit|تعديل)$/i }).first().click();
+    await page.waitForURL(/\/b2b\/follow-ups\/[0-9a-f-]{36}\/edit/);
+    const editedFu = `${fuTitle} edited`;
+    await page.locator("#title").fill(editedFu);
+    await page.locator("#description").fill("call the site engineer");
+    await page.getByRole("button", { name: saveChangesBtn }).click();
+    await page.waitForURL(/\/b2b\/follow-ups(\?|$)/);
+    await expect(page.getByText(editedFu)).toBeVisible();
+
+    // Reassign (manager holds the capability): the assignee select is present.
+    await page.goto(leadDetail);
+    await page.getByRole("link", { name: /^(edit|تعديل)$/i }).first().click();
+    await expect(page.locator("#reassign-assignee")).toBeVisible();
+    await page.locator("#reassign-assignee").selectOption({ index: 1 });
+    await page.getByRole("button", { name: /reassign|إعادة إسناد/i }).click();
     await expect(page.getByRole("status")).toBeVisible();
-  });
 
-  // 6 + 7: create a follow-up, edit it, complete then reopen.
-  test("follow-up create, edit, complete, reopen", async ({ page }) => {
-    desktopOnly();
+    // Complete then reopen from the board.
     await page.goto("/b2b/follow-ups");
-    // Complete the first overdue/open follow-up, then reopen it.
-    const complete = page.getByRole("button", { name: /^(complete|إكمال)$/i }).first();
-    await complete.click();
-    const reopen = page.getByRole("button", { name: /^(reopen|إعادة فتح)$/i }).first();
-    await expect(reopen).toBeVisible();
-    await reopen.click();
-    await expect(page.getByRole("button", { name: /^(complete|إكمال)$/i }).first()).toBeVisible();
+    const row = () => page.locator("li", { hasText: editedFu });
+    await row().getByRole("button", { name: /^(complete|إكمال)$/i }).click();
+    await expect(row().getByRole("button", { name: /reopen|إعادة فتح/i })).toBeVisible();
+    await row().getByRole("button", { name: /reopen|إعادة فتح/i }).click();
+    await expect(row().getByRole("button", { name: /^(complete|إكمال)$/i })).toBeVisible();
   });
 
-  // 8: the branch selector narrows the cockpit/data (manager has 2 branches).
-  test("branch selector narrows data", async ({ page }) => {
+  test("branch selector narrows the visible pipeline", async ({ page }) => {
     desktopOnly();
+    // The only seeded Sheikh-Zayed-branch lead; all E2E-created leads are Cairo.
+    // Target the visible list-view ROW LINK (the pipeline view renders a hidden
+    // duplicate span).
+    const main = page.getByRole("main");
+    const szLink = main.getByRole("link", { name: "Full villa finishing" });
+    const cairoLink = main.getByRole("link", { name: /توريد أرضيات|صيانة دورية|تشطيب/ });
+
+    await page.goto("/b2b/leads");
+    await expect(szLink).toBeVisible(); // visible at "all branches"
+    await expect(cairoLink.first()).toBeVisible();
+
+    // The shell branch selector (header, first on the page) → Cairo.
     const branch = page.getByLabel(/branch|الفرع/i).first();
-    // Manager sees a real branch dropdown (2 branches → "All branches" + each).
-    await expect(branch).toBeVisible();
-    const options = await branch.locator("option").count();
-    expect(options).toBeGreaterThan(1);
-    await branch.selectOption({ index: 1 });
-    await expect(page).toHaveURL(/\/b2b(\/|$)/);
+    const cairo = branch.locator("option", { hasText: /cairo|القاهرة/i });
+    await branch.selectOption({ label: (await cairo.textContent())!.trim() });
+
+    // Narrowing to Cairo removes the SZ lead but keeps the Cairo ones.
+    await expect(szLink).toHaveCount(0);
+    await expect(cairoLink.first()).toBeVisible();
   });
 
-  // 10: Arabic ↔ English switch flips <html dir>.
-  test("language switch toggles direction", async ({ page }) => {
+  test("language switch flips <html dir>; theme switch flips the dark class", async ({ page }) => {
     desktopOnly();
     const html = page.locator("html");
-    const before = await html.getAttribute("dir");
+    const dir0 = await html.getAttribute("dir");
     await page.getByRole("button", { name: /language|اللغة|EN|ع/i }).first().click();
-    await expect(html).not.toHaveAttribute("dir", before ?? "");
-  });
+    await expect(html).not.toHaveAttribute("dir", dir0 ?? "");
 
-  // 11: light ↔ dark switch toggles the .dark class.
-  test("theme switch toggles dark mode", async ({ page }) => {
-    desktopOnly();
-    const html = page.locator("html");
     const wasDark = (await html.getAttribute("class"))?.includes("dark") ?? false;
     await page.getByRole("button", { name: /theme|المظهر/i }).first().click();
     if (wasDark) await expect(html).not.toHaveClass(/dark/);
     else await expect(html).toHaveClass(/dark/);
   });
 
-  // 12: mobile navigation is reachable at a mobile viewport.
-  test("mobile navigation reaches the main sections", async ({ page }) => {
+  test("mobile bottom navigation reaches the sections", async ({ page }) => {
     mobileOnly();
     await page.goto("/b2b");
     await page.getByRole("link", { name: /customers|العملاء/i }).first().click();
@@ -127,12 +180,28 @@ test.describe("manager — daily sales workflow", () => {
 });
 
 test.describe("branch-limited salesperson — scope enforcement", () => {
-  // 9: a Cairo-only salesperson cannot see another branch's lead.
-  test("cannot access another branch's data", async ({ page, request }) => {
+  test("out-of-scope record is absent from the list and its direct URL is blocked", async ({ page, request }) => {
     desktopOnly();
     await signIn(page, request, IDENTITIES.branchLimited);
+
     await page.goto("/b2b/leads");
-    // The seeded Sheikh Zayed lead belongs to a branch the Cairo rep can't see.
-    await expect(page.getByText(/Sheikh Zayed|شيخ زايد/i)).toHaveCount(0);
+    await expect(page.getByRole("main").getByText(/Sheikh Zayed|شيخ زايد/i)).toHaveCount(0);
+
+    // Locate a Sheikh Zayed lead via service-role (test harness only) and prove the
+    // Cairo rep gets not-found/permission on its direct URL — no leaked data.
+    const svc = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+    const url = process.env.SUPABASE_URL ?? "http://127.0.0.1:54321";
+    let sz: { id: string; title: string } | undefined;
+    if (svc) {
+      const r = await request.get(`${url}/rest/v1/leads?select=id,title&branch_id=eq.c2222222-cccc-4ccc-8ccc-cccccccccccc&limit=1`, {
+        headers: { apikey: svc, Authorization: `Bearer ${svc}` },
+      });
+      if (r.ok()) sz = (await r.json())[0];
+    }
+    if (sz?.id) {
+      await page.goto(`/b2b/leads/${sz.id}`);
+      await expect(page.getByText(/not found|permission|غير موجود|صلاحية/i).first()).toBeVisible();
+      expect(await page.content()).not.toContain(sz.title);
+    }
   });
 });
