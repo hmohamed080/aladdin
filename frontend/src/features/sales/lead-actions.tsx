@@ -6,15 +6,18 @@ import { useI18n } from "@/lib/i18n/context";
 import { transitionLeadAction, assignLeadAction, type FormState } from "@/server/actions/sales-forms";
 import { Card } from "@/components/ui/primitives";
 import { Select, Textarea, SubmitButton, LabeledField } from "@/components/ui/controls";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LEAD_STAGES } from "@/lib/ui/format";
 
 const initial: FormState = { ok: false };
 
 /**
  * Lead lifecycle controls. Every mutation carries the current `version` for
- * optimistic concurrency. On a stale-version conflict (`leads.conflict`) we show
- * the message and refresh the server data so the caller sees the current state;
- * their in-progress selection stays in the local form until they retry.
+ * optimistic concurrency. Terminal actions (Mark Won / Mark Lost / Archive) go
+ * through an accessible ConfirmDialog; Mark Lost's required reason lives inside
+ * the confirmation and survives a validation or concurrency error (the dialog
+ * stays open and the field keeps its value). Stage change, reopen, and assign
+ * refresh on success/conflict.
  */
 export function LeadActions({
   leadId,
@@ -33,6 +36,9 @@ export function LeadActions({
 }) {
   const { t } = useI18n();
   const router = useRouter();
+  // Controlled so the required reason survives a validation/concurrency error
+  // (React resets the uncontrolled form after a Server-Action submit).
+  const [lostReason, setLostReason] = useState("");
 
   const [transState, transAction] = useActionState(
     async (prev: FormState, fd: FormData) => {
@@ -51,7 +57,6 @@ export function LeadActions({
     initial,
   );
 
-  const [showLost, setShowLost] = useState(false);
   const isActive = status === "active";
   const isClosed = status === "won" || status === "lost";
 
@@ -65,17 +70,22 @@ export function LeadActions({
       </p>
     ) : null;
 
+  const idAndVersion = (
+    <>
+      <input type="hidden" name="leadId" value={leadId} />
+      <input type="hidden" name="version" value={version} />
+    </>
+  );
+
   return (
     <Card className="flex flex-col gap-md">
-      {banner(transState)}
       {banner(assignState)}
 
       {isActive ? (
         <>
           {/* Stage change */}
           <form action={transAction} className="flex flex-col gap-sm">
-            <input type="hidden" name="leadId" value={leadId} />
-            <input type="hidden" name="version" value={version} />
+            {idAndVersion}
             <LabeledField label={t("leads.changeStage")} htmlFor="stage">
               <Select id="stage" name="stage" defaultValue={stage}>
                 {LEAD_STAGES.map((s) => (
@@ -85,66 +95,83 @@ export function LeadActions({
             </LabeledField>
             <SubmitButton variant="outline" pendingLabel={t("common.saving")}>{t("common.save")}</SubmitButton>
           </form>
+          {banner(transState)}
 
+          {/* Terminal actions — each behind an explicit confirmation. */}
           <div className="flex flex-wrap gap-sm">
-            {/* Mark won */}
-            <form action={transAction}>
-              <input type="hidden" name="leadId" value={leadId} />
-              <input type="hidden" name="version" value={version} />
-              <input type="hidden" name="status" value="won" />
-              <SubmitButton variant="accent" pendingLabel={t("common.saving")}>{t("leads.markWon")}</SubmitButton>
-            </form>
-            {/* Mark lost (reveals reason) */}
-            <button
-              type="button"
-              onClick={() => setShowLost((v) => !v)}
-              className="inline-flex min-h-9 items-center rounded-sm border border-danger/50 px-md py-1.5 text-label font-medium text-danger hover:bg-danger/10"
+            <ConfirmDialog
+              trigger={t("leads.markWon")}
+              triggerVariant="accent"
+              confirmVariant="accent"
+              title={t("leads.markWon")}
+              body={t("confirm.markWonBody")}
+              confirmLabel={t("leads.markWon")}
+              formAction={transitionLeadAction}
             >
-              {t("leads.markLost")}
-            </button>
-          </div>
+              {idAndVersion}
+              <input type="hidden" name="status" value="won" />
+            </ConfirmDialog>
 
-          {showLost ? (
-            <form action={transAction} className="flex flex-col gap-sm rounded-sm border border-danger/30 p-md">
-              <input type="hidden" name="leadId" value={leadId} />
-              <input type="hidden" name="version" value={version} />
-              <input type="hidden" name="status" value="lost" />
-              <LabeledField
-                label={t("leads.lostReason")}
-                htmlFor="lostReason"
-                error={transState.fieldErrors?.lostReason ? t(transState.fieldErrors.lostReason) : undefined}
-              >
-                <Textarea id="lostReason" name="lostReason" required maxLength={2000} />
-              </LabeledField>
-              <SubmitButton variant="danger" pendingLabel={t("common.saving")}>{t("leads.markLost")}</SubmitButton>
-            </form>
-          ) : null}
+            <ConfirmDialog
+              trigger={t("leads.markLost")}
+              triggerVariant="danger"
+              confirmVariant="danger"
+              title={t("confirm.markLostTitle")}
+              body={t("confirm.markLostBody")}
+              confirmLabel={t("leads.markLost")}
+              formAction={transitionLeadAction}
+            >
+              {(s: FormState) => (
+                <>
+                  {idAndVersion}
+                  <input type="hidden" name="status" value="lost" />
+                  <LabeledField
+                    label={t("leads.lostReason")}
+                    htmlFor="lostReason"
+                    error={s.fieldErrors?.lostReason ? t(s.fieldErrors.lostReason) : undefined}
+                  >
+                    <Textarea
+                      id="lostReason"
+                      name="lostReason"
+                      required
+                      maxLength={2000}
+                      value={lostReason}
+                      onChange={(e) => setLostReason(e.target.value)}
+                      aria-invalid={s.fieldErrors?.lostReason ? true : undefined}
+                    />
+                  </LabeledField>
+                </>
+              )}
+            </ConfirmDialog>
+
+            <ConfirmDialog
+              trigger={t("leads.archive")}
+              triggerVariant="ghost"
+              confirmVariant="danger"
+              title={t("confirm.archiveLeadTitle")}
+              body={t("confirm.archiveLeadBody")}
+              confirmLabel={t("leads.archive")}
+              formAction={transitionLeadAction}
+            >
+              {idAndVersion}
+              <input type="hidden" name="status" value="archived" />
+            </ConfirmDialog>
+          </div>
         </>
       ) : null}
 
       {isClosed || status === "archived" ? (
         <form action={transAction}>
-          <input type="hidden" name="leadId" value={leadId} />
-          <input type="hidden" name="version" value={version} />
+          {idAndVersion}
           <input type="hidden" name="status" value="active" />
           <SubmitButton variant="outline" pendingLabel={t("common.saving")}>{t("leads.reopen")}</SubmitButton>
-        </form>
-      ) : null}
-
-      {isActive ? (
-        <form action={transAction}>
-          <input type="hidden" name="leadId" value={leadId} />
-          <input type="hidden" name="version" value={version} />
-          <input type="hidden" name="status" value="archived" />
-          <SubmitButton variant="ghost" pendingLabel={t("common.saving")}>{t("leads.archive")}</SubmitButton>
         </form>
       ) : null}
 
       {/* Assign / reassign */}
       {canAssign && members.length > 0 ? (
         <form action={assignAction} className="flex flex-col gap-sm border-t pt-md">
-          <input type="hidden" name="leadId" value={leadId} />
-          <input type="hidden" name="version" value={version} />
+          {idAndVersion}
           <LabeledField label={t("leads.reassign")} htmlFor="assigneeMembershipId">
             <Select id="assigneeMembershipId" name="assigneeMembershipId" required defaultValue="">
               <option value="" disabled>{t("common.unassigned")}</option>

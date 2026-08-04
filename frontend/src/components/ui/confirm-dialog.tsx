@@ -1,18 +1,27 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useActionState } from "react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import { Button, SubmitButton } from "@/components/ui/controls";
 import { cn } from "@/lib/ui/cn";
+import type { FormState } from "@/server/actions/sales-forms";
 
 /**
- * Accessible confirmation dialog for a destructive/terminal action. The confirm
- * control submits an enclosed Server Action form (so the action still runs on
- * the server and enforces authorization); `children` supplies the hidden inputs
- * (and any extra field such as a required reason). Focus moves into the dialog on
- * open, is trapped, Escape closes, a backdrop click closes, and focus returns to
- * the trigger on close. The confirm button is disabled while pending, preventing
- * a double submit.
+ * Accessible confirmation dialog for a destructive/terminal action. Focus moves
+ * into the dialog on open, is trapped, Escape closes, a backdrop click closes,
+ * and focus returns to the trigger on close. The confirm button is disabled while
+ * pending (no double submit).
+ *
+ * Two action modes:
+ *  - `action` (void/string): a plain Server Action form (fire-and-forget; the
+ *    action redirects/revalidates). Used for simple archive/cancel.
+ *  - `formAction` (FormState): a STATEFUL action via `useActionState`. The dialog
+ *    stays OPEN on error and renders `state.code` (so a required reason and its
+ *    validation feedback survive — useActionState does not reset the form on a
+ *    non-redirect return); on success it refreshes and closes. `children` may be a
+ *    render function `(state) => ReactNode` to show per-field errors.
  */
 export function ConfirmDialog({
   trigger,
@@ -22,29 +31,47 @@ export function ConfirmDialog({
   confirmLabel,
   confirmVariant = "danger",
   action,
+  formAction,
   children,
 }: {
   trigger: string;
-  triggerVariant?: "danger" | "ghost" | "outline";
+  triggerVariant?: "danger" | "ghost" | "outline" | "accent";
   title: string;
   body?: string;
   confirmLabel: string;
   confirmVariant?: "danger" | "accent" | "primary";
-  action: ((fd: FormData) => void | Promise<void>) | string;
-  children?: ReactNode;
+  action?: ((fd: FormData) => void | Promise<void>) | string;
+  formAction?: (prev: FormState, fd: FormData) => Promise<FormState>;
+  children?: ReactNode | ((state: FormState) => ReactNode);
 }) {
   const { t } = useI18n();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const bodyId = useId();
 
+  const [state, dispatch] = useActionState(
+    async (prev: FormState, fd: FormData): Promise<FormState> => {
+      if (!formAction) return prev;
+      const res = await formAction(prev, fd);
+      // Success (or a conflict we refreshed): close and reload the server data.
+      if (res.ok) {
+        router.refresh();
+        setOpen(false);
+      } else if (res.code === "states.staleConflict" || res.code === "leads.conflict") {
+        router.refresh();
+      }
+      return res;
+    },
+    { ok: false } as FormState,
+  );
+
   useEffect(() => {
     if (!open) return;
-    const trigger = triggerRef.current;
+    const triggerEl = triggerRef.current;
     const previouslyFocused = document.activeElement as HTMLElement | null;
-    // Focus the first focusable control inside the dialog.
     const focusables = () =>
       Array.from(
         dialogRef.current?.querySelectorAll<HTMLElement>(
@@ -74,9 +101,12 @@ export function ConfirmDialog({
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      (previouslyFocused ?? trigger)?.focus();
+      (previouslyFocused ?? triggerEl)?.focus();
     };
   }, [open]);
+
+  const formProps = formAction ? { action: dispatch } : { action };
+  const renderedChildren = typeof children === "function" ? children(state) : children;
 
   return (
     <>
@@ -111,8 +141,14 @@ export function ConfirmDialog({
               </p>
             ) : null}
 
-            <form action={action} className="flex flex-col gap-md">
-              {children}
+            {formAction && state.code && !state.ok ? (
+              <p role="alert" className="rounded-sm border border-danger/40 bg-danger/10 px-md py-2 text-body text-danger">
+                {t(state.code)}
+              </p>
+            ) : null}
+
+            <form {...formProps} className="flex flex-col gap-md">
+              {renderedChildren}
               <div className="flex flex-wrap justify-end gap-sm">
                 <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
                   {t("common.cancel")}
