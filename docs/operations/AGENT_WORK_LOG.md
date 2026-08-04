@@ -4,6 +4,32 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 2: Sprint 5.1 (Independent Sales UI Merge-Gate Hardening)
+
+**Date:** 2026-08-04 · **Branch:** `feature/sales-ui-depth` (PR #8, unmerged) · **Base:** `main` @ `e949f2b`
+
+### Objective
+Independently harden the committed Sprint 5 UI for merge. Confirmed gaps addressed:
+
+1. **Customer stale-write** — `update_customer` gained `p_expected_updated_at` (compared under `FOR UPDATE`, 40001 before any write/audit); customers have no `version`, so the trigger-maintained `updated_at` is the precondition. New migration `20260805110000`.
+2. **Follow-up stale-write** — `update_follow_up` gained `p_expected_version`; `reassign_follow_up` gained an optional `p_expected_version`.
+3. **Optional-field clearing** — explicit PATCH: absent=unchanged, blank=clear-to-NULL, value=update. Added `p_clear_phone/email/location` (customer) and `p_clear_description` (follow-up).
+4. **Follow-up reassignment UI** — authorized reassign form on the edit route (capability-gated, version-guarded, RPC-enforced branch/active/same-org).
+5. **Lead terminal confirmations** — Mark Won / Mark Lost / Archive behind the extended `ConfirmDialog`; the lost reason is controlled and survives validation/concurrency errors.
+6. **Deterministic OTP** — the E2E helper snapshots existing Mailpit IDs and reads only a genuinely-new message (no bypass).
+7. **Honest E2E** — the suite now asserts persisted results for every step; unique values via `randomUUID`.
+
+### Migration + tests
+`20260805110000_sales_edit_concurrency.sql` (forward-only; drops+recreates `update_customer`/`update_follow_up`/`reassign_follow_up` with the new trailing params + re-grants). Regenerated the three RPC arg types surgically. New pgTAP `18_sales_edit_concurrency_test.sql` (+16) and two new two-session race scripts (`customer_update_concurrency_test.sh`, `follow_up_update_concurrency_test.sh`).
+
+### Validation
+Frontend typecheck/lint/**114 tests** (104→114)/build ✓ · backend ruff + 10 pytest ✓ · Supabase **two** clean cycles (reset+lint+**382 pgTAP**) ✓ · **5** race scripts ✓ · **Playwright E2E executed and green** (9 scenarios; `PW_CHROMIUM` full-build launch) ✓ · dev-runtime smoke ✓.
+
+### Commits
+`fix: add customer and follow-up optimistic concurrency` · `fix: support explicit optional-field clearing` · `feat: add follow-up reassignment and lead terminal confirmations` · `test: make local OTP and sales E2E deterministic` · `docs: record Sprint 5.1 merge-gate hardening`
+
+---
+
 ## Session — Phase 2: Sprint 5 (Sales UI Depth & Product QA)
 
 **Date:** 2026-08-04 · **Branch:** `feature/sales-ui-depth` (from `main` @ `e949f2b`, PR #7 merged) · **Base:** `main`

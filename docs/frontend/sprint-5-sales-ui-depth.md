@@ -142,3 +142,32 @@ before relying on the responsive/E2E claims.
 - **Turnstile/CAPTCHA** on the OTP endpoint — pre‑production requirement (deferred).
 - **Products, inventory, RFQ, quotations, orders, projects, B2C discovery,
   WhatsApp, OCR, payments, advertisements, AI** — out of scope.
+
+## Sprint 5.1 — merge-gate hardening (2026-08-04)
+
+Independent review of the committed Sprint 5 found and fixed:
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | **Stale customer edits** — `update_customer` had no concurrency check (a row lock serializes but doesn't detect stale data); customers have no `version` column | New migration `20260805110000`: `update_customer` takes `p_expected_updated_at`, compares it under `FOR UPDATE`, and raises **40001** before any write/audit. The edit form carries the exact `updated_at`; on conflict it shows `states.staleConflict` and refreshes. |
+| 2 | **Stale follow-up edits** — `update_follow_up` only checked `status='open'` | `update_follow_up` now takes `p_expected_version` (the table already has `version`) → **40001** on mismatch. The edit form carries the version; conflict → refresh. |
+| 3 | **Stale reassignment** | `reassign_follow_up` takes an optional `p_expected_version`; the edit-page reassign form passes it. |
+| 4 | **Optional fields couldn't be cleared** — `coalesce(p_x, x)` treated a blank submission as "leave unchanged" | Explicit PATCH: absent = unchanged, **blank = clear to NULL**, value = update. `p_clear_phone/email/location` (customer) and `p_clear_description` (follow-up; `p_clear_due` already existed). Clearing phone nulls the generated `primary_phone_e164` (a blank string was never a valid value). |
+| 5 | **No follow-up reassignment UI** | An authorized reassign form on `/b2b/follow-ups/[id]/edit` (only with `sales.assign`; members from the active org; branch/active/same-org enforced by the RPC; version-guarded). |
+| 6 | **Incomplete lead terminal confirmations** | Mark Won / Mark Lost / Archive all go through the (extended) `ConfirmDialog`; Mark Lost's required reason lives inside the confirmation and **survives a validation/concurrency error** (controlled field; the dialog stays open and shows the localized error). |
+| 7 | **Non-deterministic OTP** — the E2E helper matched the first message and could reuse a stale code | The helper snapshots existing Mailpit message IDs before sending, then reads only a **genuinely new** message. No auth bypass. |
+| 8 | **Dishonest E2E** — names claimed more than the assertions proved | Rewrote the suite to assert persisted results (not just URLs): customer create/edit/**clear**, lead create/edit/stage/**terminal confirm**, follow-up create/edit-every-field/**reassign**/complete/reopen, **branch narrowing by a specific SZ lead**, branch-limited absence + blocked direct URL + no leaked HTML, dir/theme/mobile-nav. Unique values via `randomUUID` (not a short `Date.now`). |
+
+### Concurrency model (final)
+
+- **Leads** — optimistic `version` end to end (edit, transition, assign).
+- **Follow-ups** — optimistic `version` (edit + reassign) plus the `status='open'` guard.
+- **Customers** — optimistic `updated_at` (trigger-maintained) precondition; the true two-session serialization is proven by `customer_update_concurrency_test.sh` (single-transaction pgTAP can't, since `now()` is constant per transaction — the pgTAP asserts the precondition logic with a mismatched token).
+
+### E2E execution — RUN in this environment
+
+The full Playwright suite was **executed and passes** (9 scenarios; the mobile-nav scenario on `chromium-mobile`, the rest on `chromium-desktop`; project-gated scenarios are skipped on the other project). It runs against local Next.js + local Supabase with the real Email-OTP path. If only the full Chromium build is present (no headless-shell), set `PW_CHROMIUM` to its `chrome.exe`; the branch-limited direct-URL check reads a Sheikh-Zayed lead id via `SUPABASE_SERVICE_ROLE_KEY` (test harness only — never shipped to the browser). Live pixel-level visual QA across all four viewports remains a maintainer follow-up.
+
+### Validation (Sprint 5.1)
+
+Frontend typecheck/lint/**114 tests**/build ✓ · backend ruff + 10 pytest ✓ · Supabase **two** clean cycles (reset + lint + **382 pgTAP**, +16 in `18_sales_edit_concurrency_test`) ✓ · **5** two-session race scripts (incl. new customer + follow-up) ✓ · Playwright E2E ✓ · dev-runtime smoke (auth + all edit routes, no module error) ✓.
