@@ -5,6 +5,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { formatDate } from "@/lib/ui/format";
 import { SectionTitle } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/controls";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FollowUpStatusBadge, PriorityBadge } from "@/features/sales/badges";
 import {
   completeFollowUpAction,
@@ -71,8 +72,21 @@ export function FollowUpsBoard({
                       <FollowUpStatusBadge status={f.status} />
                       {f.status === "open" ? (
                         <>
+                          <Link href={`/b2b/follow-ups/${f.id}/edit`} className="text-label text-accent hover:underline">
+                            {t("followUps.edit")}
+                          </Link>
                           <LifecycleButton action={completeFollowUpAction} id={f.id} leadId={f.lead_id} label={t("followUps.complete")} variant="accent" />
-                          <LifecycleButton action={cancelFollowUpAction} id={f.id} leadId={f.lead_id} label={t("followUps.cancel")} variant="ghost" />
+                          <ConfirmDialog
+                            trigger={t("followUps.cancel")}
+                            triggerVariant="ghost"
+                            title={t("confirm.cancelFollowUpTitle")}
+                            body={t("confirm.cancelFollowUpBody")}
+                            confirmLabel={t("followUps.cancel")}
+                            action={cancelFollowUpAction}
+                          >
+                            <input type="hidden" name="followUpId" value={f.id} />
+                            {f.lead_id ? <input type="hidden" name="leadId" value={f.lead_id} /> : null}
+                          </ConfirmDialog>
                         </>
                       ) : f.status === "completed" ? (
                         <LifecycleButton action={reopenFollowUpAction} id={f.id} leadId={f.lead_id} label={t("followUps.reopen")} variant="outline" />
