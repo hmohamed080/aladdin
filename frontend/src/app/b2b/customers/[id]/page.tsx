@@ -5,16 +5,20 @@ import {
   getCustomer,
   listLeads,
   listActivitiesForCustomer,
+  listFollowUpsForCustomer,
+  listOrgMembers,
   branchNameMap,
   memberNameMap,
 } from "@/server/queries/sales";
-import { canWrite } from "@/server/queries/context";
+import { canWrite, canAssign } from "@/server/queries/context";
 import { formatDate } from "@/lib/ui/format";
 import { PageHeader, BackLink, FlashSuccess } from "@/features/sales/page-parts";
 import { Card, Field, StatePanel, SectionTitle } from "@/components/ui/primitives";
-import { CustomerStatusBadge, StageBadge, StatusBadge } from "@/features/sales/badges";
+import { CustomerStatusBadge, StageBadge, StatusBadge, FollowUpStatusBadge } from "@/features/sales/badges";
 import { ActivityTimeline } from "@/features/sales/activity-timeline";
 import { ArchiveCustomerButton } from "@/features/sales/customer-actions";
+import { LeadActivityForm } from "@/features/sales/lead-activity-form";
+import { InlineFollowUpForm } from "@/features/sales/follow-up-inline";
 
 export const dynamic = "force-dynamic";
 
@@ -23,14 +27,14 @@ export default async function CustomerDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; updated?: string; archived?: string }>;
 }) {
   const ctx = await getPageContext();
   if (!ctx) return null;
   const { supabase, org, locale } = ctx;
   const m = getMessages(locale);
   const { id } = await params;
-  const { created } = await searchParams;
+  const { created, updated, archived } = await searchParams;
 
   const customer = await getCustomer(supabase, id);
   if (!customer) {
@@ -42,21 +46,29 @@ export default async function CustomerDetailPage({
     );
   }
 
-  const [leads, activities, branchNames, memberNames] = await Promise.all([
+  const assignable = canAssign(org);
+  const [leads, activities, followUps, branchNames, memberNames, members] = await Promise.all([
     listLeads(supabase, { orgId: org.organizationId, customerId: id }),
     listActivitiesForCustomer(supabase, id),
+    listFollowUpsForCustomer(supabase, id),
     branchNameMap(supabase, org.organizationId),
     memberNameMap(supabase, org.organizationId),
+    assignable ? listOrgMembers(supabase, org.organizationId) : Promise.resolve([]),
   ]);
   const bn = Object.fromEntries(branchNames);
   const mn = Object.fromEntries(memberNames);
   const writable = canWrite(org);
+  const isActive = customer.status === "active";
+  const openFollowUps = followUps.filter((f) => f.status === "open");
+  const doneFollowUps = followUps.filter((f) => f.status !== "open");
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <div>
         <BackLink href="/b2b/customers">{m.customers.title}</BackLink>
         {created ? <FlashSuccess messageKey="customers.created" /> : null}
+        {updated ? <FlashSuccess messageKey="customers.updated" /> : null}
+        {archived ? <FlashSuccess messageKey="customers.archived" /> : null}
         <PageHeader title={customer.display_name} />
       </div>
 
@@ -84,8 +96,14 @@ export default async function CustomerDetailPage({
             </Field>
             <Field label={m.customers.location}>{customer.location_summary ?? "—"}</Field>
           </dl>
-          {writable && customer.status === "active" ? (
+          {writable && isActive ? (
             <div className="mt-md flex flex-wrap gap-sm">
+              <Link
+                href={`/b2b/customers/${customer.id}/edit`}
+                className="inline-flex min-h-9 items-center rounded-sm border border-strong px-md py-1.5 text-label font-medium text-fg hover:bg-surface-2"
+              >
+                {m.customers.edit}
+              </Link>
               <Link
                 href={`/b2b/leads/new?customer=${customer.id}`}
                 className="inline-flex min-h-9 items-center rounded-sm border border-strong px-md py-1.5 text-label font-medium text-fg hover:bg-surface-2"
@@ -99,9 +117,7 @@ export default async function CustomerDetailPage({
 
         <div className="flex flex-col gap-lg desktop:col-span-2">
           <Card>
-            <div className="mb-md flex items-center justify-between">
-              <SectionTitle>{m.customers.relatedLeads}</SectionTitle>
-            </div>
+            <SectionTitle className="mb-md">{m.customers.relatedLeads}</SectionTitle>
             {leads.length === 0 ? (
               <p className="text-body text-fg-secondary">{m.customers.noLeads}</p>
             ) : (
@@ -122,17 +138,67 @@ export default async function CustomerDetailPage({
           </Card>
 
           <Card>
-            <SectionTitle className="mb-md">{m.home.recentActivity}</SectionTitle>
-            {activities.length === 0 ? (
-              <p className="text-body text-fg-secondary">{m.activities.empty}</p>
-            ) : (
-              <ActivityTimeline activities={activities} />
-            )}
-            {writable ? (
-              <div className="mt-md text-label text-fg-muted">
-                {formatDate(customer.created_at, locale)}
-              </div>
+            <SectionTitle className="mb-md">{m.customers.addActivity}</SectionTitle>
+            {writable ? <LeadActivityForm orgId={org.organizationId} customerId={customer.id} /> : null}
+            <div className="mt-md">
+              {activities.length === 0 ? (
+                <p className="text-body text-fg-secondary">{m.activities.empty}</p>
+              ) : (
+                <ActivityTimeline activities={activities} />
+              )}
+            </div>
+          </Card>
+
+          <Card>
+            <SectionTitle className="mb-md">{m.followUps.title}</SectionTitle>
+            {writable && isActive ? (
+              <InlineFollowUpForm
+                orgId={org.organizationId}
+                customerId={customer.id}
+                members={members}
+                canAssign={assignable}
+                selfMembershipId={org.membershipId}
+              />
             ) : null}
+            <div className="mt-md">
+              {openFollowUps.length === 0 ? (
+                <p className="text-body text-fg-secondary">{m.followUps.empty}</p>
+              ) : (
+                <ul className="flex flex-col divide-y">
+                  {openFollowUps.map((f) => (
+                    <li key={f.id} className="flex items-center justify-between gap-md py-2">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-body-lg text-fg">{f.title}</span>
+                        <span className="text-label text-fg-muted">{formatDate(f.due_at, locale)}</span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-sm">
+                        <FollowUpStatusBadge status={f.status} />
+                        {writable ? (
+                          <Link href={`/b2b/follow-ups/${f.id}/edit`} className="text-label text-accent hover:underline">
+                            {m.followUps.edit}
+                          </Link>
+                        ) : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {doneFollowUps.length > 0 ? (
+                <details className="mt-md">
+                  <summary className="cursor-pointer text-label text-fg-secondary">
+                    {m.followUps.completed} ({doneFollowUps.length})
+                  </summary>
+                  <ul className="mt-sm flex flex-col divide-y">
+                    {doneFollowUps.map((f) => (
+                      <li key={f.id} className="flex items-center justify-between gap-md py-2 text-fg-muted">
+                        <span className="min-w-0 flex-1 truncate">{f.title}</span>
+                        <FollowUpStatusBadge status={f.status} />
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+            </div>
           </Card>
         </div>
       </div>
