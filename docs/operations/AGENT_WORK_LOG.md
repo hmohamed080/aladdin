@@ -4,6 +4,38 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 2: Sprint 4.2 (Public Directory View Security Hardening)
+
+**Date:** 2026-08-04 · **Branch:** `bugfix/public-directory-view-hardening` (from `main` @ `2b19fa7`, PR #6 merged) · **Base:** `main`
+
+### Objective
+Resolve two Supabase Security Advisor "Security Definer View" findings on `public.organization_public_directory` and `public.profile_public_directory` without weakening the public-discovery boundary.
+
+### Pre-edit security report (live catalog)
+Both views: `reloptions = {security_invoker=false}` (owner-rights → Advisor rule 0010), owner `postgres`. `anon` holds **zero** grant on the base `organizations`/`profiles`/`users` tables (only `authenticated`/`service_role` have RLS-restricted SELECT); RLS enabled, `force_rls` off (owner-exempt, so the definer view applies its own WHERE). Directory objects also carried stale default `TRUNCATE`/`REFERENCES`/`TRIGGER` grants. → A blind `security_invoker=true` would break discovery (no anon base-table access) and "fixing" it via anon base-table grants would broaden the sensitive-table surface (the documented trap).
+
+### Design (evaluated A→B→C)
+- **A (projection tables)** rejected — duplicates identity data/authority, maintenance/staleness burden.
+- **B (invoker view over existing tables)** rejected — profiles needs the `users` join (would expose `users` to anon); organizations would require anon direct base-table SELECT + an anon RLS policy, broadening the anon surface.
+- **C selected** — the privileged read moved into constrained `security definer` readers `app._organization_public_directory()` / `app._profile_public_directory()` (`search_path=''`, schema-qualified, non-exposed `app` schema, `PUBLIC` execute revoked, EXECUTE to anon/authenticated/service_role); the `public.*` relations stay VIEWS, now `security_invoker=true`, whose body only calls the reader. Advisor cleared; `anon` still needs no base-table grant; exact columns, eligibility, and the Data-API relation path preserved. Directory grants tightened to SELECT-only.
+
+### Migration
+`supabase/migrations/20260805100000_public_directory_invoker_hardening.sql` (forward-only; deterministic under clean reset).
+
+### Public columns (unchanged)
+Org: `id, name, slug, org_type, is_verified, primary_locale, locality_id, logo_media_id` (active + verified + not-deleted). Profile: `id, display_name, headline, bio, avatar_media_id, locality_id, languages` (listed + professional + active + not-deleted).
+
+### Tests / validation
+New `supabase/tests/17_public_directory_hardening_test.sql` (+29): both views are `security_invoker` (not definer), backing readers are `security definer` with pinned search_path in `app`, `PUBLIC` cannot execute them, directory grants are SELECT-only (no TRUNCATE/REFERENCES/TRIGGER), anon still cannot read base tables, and anon discovery still returns the right rows. pgTAP **337 → 366**. Two clean reset→lint→test cycles (lint clean), all three two-session concurrency scripts pass, frontend (typecheck/lint/92 tests/build) + backend (ruff/10 pytest) green. Advisor rule-0010 catalog query returns **0 flagged**.
+
+### Advisor verification note
+`supabase db lint` runs `plpgsql_check`, not the Security Advisor rules; the Studio Advisor UI was not exercised headlessly. Verified instead via the exact rule-0010 catalog query (0 rows) and per-object `reloptions` (both `security_invoker=true`) after a clean reset. A maintainer can confirm visually in Studio.
+
+### Commits
+`security: harden public directory read boundaries` · `test: prove public directory visibility and privilege isolation` · `docs: record public directory Advisor hardening`
+
+---
+
 ## Session — Phase 2: Sprint 4.1 (Independent Frontend, Auth & UX Review)
 
 **Date:** 2026-08-04 · **Branch:** `feature/b2b-sales-ui` (PR #6, unmerged) · **Base:** `main` @ `f9596a3`

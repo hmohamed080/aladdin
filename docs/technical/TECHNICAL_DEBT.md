@@ -52,6 +52,7 @@ The RLS/isolation spine, passwordless model, and tenant filtering are **not** de
 
 | Item | Trigger |
 |---|---|
+| ~~**Supabase Advisor "Security Definer View"** on `organization_public_directory` / `profile_public_directory`~~ | **Resolved 2026-08-04 (Sprint 4.2)** — both re-expressed as `security_invoker` views over constrained `security definer` `app._*` readers (migration `20260805100000`; [ADR-0007 D21](../decisions/ADR-0007-identity-and-tenancy-model.md)). Advisor rule verified locally via the catalog rule query (0 flagged); the Studio Advisor UI was not exercised headlessly — a maintainer can confirm visually. |
 | Formal threat model + pen-test | pre-production |
 | Per-feature authorization matrices | as features land |
 | Secret rotation policy | with CI/CD |
