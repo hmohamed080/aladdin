@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { createLeadAction, type FormState } from "@/server/actions/sales-forms";
 import { Card } from "@/components/ui/primitives";
-import { Input, Select, Textarea, LabeledField, SubmitButton } from "@/components/ui/controls";
+import { Input, Select, LabeledField, SubmitButton } from "@/components/ui/controls";
 import { SALES_SOURCES, PRIORITIES } from "@/lib/ui/format";
 
 const initial: FormState = { ok: false };
@@ -93,14 +93,9 @@ export function LeadForm({
           </LabeledField>
         ) : null}
 
-        <div className="tablet:col-span-2">
-          <LabeledField label={t("leads.intent")} htmlFor="intent" optional={t("common.optional")}>
-            <Textarea id="intent" name="intent" maxLength={2000} />
-          </LabeledField>
-        </div>
-
-        <div className="tablet:col-span-2">
+        <div className="tablet:col-span-2 flex flex-col gap-1">
           <SubmitButton pendingLabel={t("common.saving")}>{t("common.create")}</SubmitButton>
+          <p className="text-label text-fg-muted">{t("leads.intentHint")}</p>
         </div>
       </form>
     </Card>

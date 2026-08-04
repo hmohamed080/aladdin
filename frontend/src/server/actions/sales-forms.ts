@@ -95,19 +95,11 @@ export async function createLeadAction(_p: FormState, fd: FormData): Promise<For
   } catch (e) {
     return { ok: false, code: mapSalesError(e) };
   }
-  const summary = str(fd, "intent");
-  if (summary) {
-    try {
-      await sales.addSalesActivity(supabase, {
-        orgId,
-        activityType: "note",
-        summary,
-        leadId: newId,
-      });
-    } catch {
-      // Non-fatal: the lead exists; the note is best-effort.
-    }
-  }
+  // NOTE: Create Lead intentionally creates ONLY the lead. The initial-intent
+  // note is added from the Lead Details timeline (a real, non-swallowed write),
+  // so no user-entered text can silently vanish and a retry can't duplicate the
+  // lead. A transactional create-lead-with-note RPC is the future upgrade path
+  // (TECHNICAL_DEBT / ADR-0008).
   revalidatePath("/b2b/leads");
   redirect(`/b2b/leads/${newId}?created=1`);
 }

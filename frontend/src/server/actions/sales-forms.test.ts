@@ -78,6 +78,16 @@ describe("createLeadAction", () => {
     const res = await createLeadAction({ ok: false }, fd({ orgId: ORG, title: "T", branchId: "cX" }));
     expect(res.code).toBe("states.branchDenied");
   });
+
+  it("creates ONLY the lead — never a swallowed best-effort intent activity", async () => {
+    vi.mocked(sales.createLead).mockResolvedValueOnce("1ead0002-0000-4000-8000-000000000002");
+    await expect(
+      // Even if the form carried an `intent`, it must not trigger a separate
+      // write whose failure could be silently discarded.
+      createLeadAction({ ok: false }, fd({ orgId: ORG, title: "T", intent: "wants tiles" })),
+    ).rejects.toThrow(/REDIRECT:\/b2b\/leads\//);
+    expect(sales.addSalesActivity).not.toHaveBeenCalled();
+  });
 });
 
 describe("transitionLeadAction", () => {
