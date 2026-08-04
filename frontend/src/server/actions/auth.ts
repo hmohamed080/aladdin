@@ -16,7 +16,32 @@ export type AuthState = { ok: boolean; code?: string; email?: string };
 const emailSchema = z.string().trim().email();
 const otpSchema = z.string().trim().regex(/^\d{6}$/);
 
-/** Step 1 — send a 6-digit code to the email. */
+/**
+ * True when GoTrue rejected the OTP send because the email is not an existing
+ * identity (Sign In runs with `shouldCreateUser: false`, so unknown emails are
+ * refused). We treat this like a successful send so the response is identical
+ * for known and unknown emails — Sign In must not become an account-enumeration
+ * oracle, and it must never silently register a new user.
+ */
+function isUnknownIdentityError(error: { code?: string; message?: string }): boolean {
+  const code = error.code ?? "";
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    code === "otp_disabled" ||
+    code === "signup_disabled" ||
+    /signups?\s+not\s+allowed/.test(message) ||
+    /user\s+not\s+found/.test(message)
+  );
+}
+
+/**
+ * Step 1 — send a 6-digit code to the email.
+ *
+ * This is SIGN IN, not registration: `shouldCreateUser: false` means an unknown
+ * email never creates an `auth.users` row. Registration / invitation is a
+ * separate, reviewed workflow (professional/business activation is not bypassed
+ * here). The caller-visible result is the same whether or not the email exists.
+ */
 export async function requestEmailOtp(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const parsed = emailSchema.safeParse(formData.get("email"));
   if (!parsed.success) return { ok: false, code: "auth.error.invalidEmail" };
@@ -24,9 +49,16 @@ export async function requestEmailOtp(_prev: AuthState, formData: FormData): Pro
   const supabase = await getServerSupabase();
   const { error } = await supabase.auth.signInWithOtp({
     email: parsed.data,
-    options: { shouldCreateUser: true },
+    options: { shouldCreateUser: false },
   });
-  if (error) return { ok: false, code: "auth.error.sendFailed", email: parsed.data };
+  if (error) {
+    // Unknown identity → indistinguishable "code sent" response (no enumeration,
+    // no implicit sign-up). Only genuine transient failures surface an error.
+    if (isUnknownIdentityError(error as { code?: string; message?: string })) {
+      return { ok: true, code: "auth.info.codeSent", email: parsed.data };
+    }
+    return { ok: false, code: "auth.error.sendFailed", email: parsed.data };
+  }
   return { ok: true, code: "auth.info.codeSent", email: parsed.data };
 }
 

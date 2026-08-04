@@ -31,20 +31,43 @@ describe("requestEmailOtp", () => {
     expect(signInWithOtp).not.toHaveBeenCalled();
   });
 
-  it("sends a code for a valid email (passwordless, shouldCreateUser)", async () => {
+  it("sends a code for a known pilot email as SIGN IN — never implicit sign-up", async () => {
     signInWithOtp.mockResolvedValueOnce({ error: null });
     const res = await requestEmailOtp({ ok: false }, fd({ email: "a-owner@example.test" }));
     expect(res.ok).toBe(true);
     expect(res.code).toBe("auth.info.codeSent");
+    // The boundary: shouldCreateUser is false, so an unknown email can't register.
     expect(signInWithOtp).toHaveBeenCalledWith({
       email: "a-owner@example.test",
-      options: { shouldCreateUser: true },
+      options: { shouldCreateUser: false },
     });
   });
 
-  it("surfaces a send failure", async () => {
-    signInWithOtp.mockResolvedValueOnce({ error: new Error("smtp") });
+  it("does NOT create a user for an unknown email and stays enumeration-safe", async () => {
+    // GoTrue refuses the send (signups disabled); we must show the SAME
+    // "code sent" response and never register the identity.
+    signInWithOtp.mockResolvedValueOnce({ error: { code: "otp_disabled", message: "Signups not allowed for otp" } });
+    const res = await requestEmailOtp({ ok: false }, fd({ email: "stranger@example.test" }));
+    expect(res.ok).toBe(true);
+    expect(res.code).toBe("auth.info.codeSent");
+    expect(signInWithOtp).toHaveBeenCalledWith({
+      email: "stranger@example.test",
+      options: { shouldCreateUser: false },
+    });
+  });
+
+  it("never passes shouldCreateUser:true (sign in cannot become sign up)", async () => {
+    signInWithOtp.mockResolvedValue({ error: null });
+    await requestEmailOtp({ ok: false }, fd({ email: "a-owner@example.test" }));
+    for (const call of signInWithOtp.mock.calls) {
+      expect(call[0]?.options?.shouldCreateUser).toBe(false);
+    }
+  });
+
+  it("surfaces a genuine transient send failure", async () => {
+    signInWithOtp.mockResolvedValueOnce({ error: { message: "smtp timeout" } });
     const res = await requestEmailOtp({ ok: false }, fd({ email: "a-owner@example.test" }));
+    expect(res.ok).toBe(false);
     expect(res.code).toBe("auth.error.sendFailed");
   });
 });

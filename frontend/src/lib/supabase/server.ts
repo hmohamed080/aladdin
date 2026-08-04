@@ -8,13 +8,18 @@ import type { Database } from "@/types/database.types";
 
 /**
  * Cookie-backed, CALLER-scoped server Supabase client (Server Components, Server
- * Actions, Route Handlers). The session lives in HTTP-only cookies managed by
- * `@supabase/ssr`, so every query runs under the caller's `authenticated`
- * identity and Postgres RLS enforces tenant/branch isolation — never application
- * filtering (ADR-0007/0008). The service-role key is NEVER used here.
+ * Actions, Route Handlers). The session lives in cookies managed by
+ * `@supabase/ssr` and SHARED with the browser client, so it is deliberately NOT
+ * HttpOnly — the browser client reads the same cookies to stay signed in. The
+ * value is a Supabase-issued JWT (not a raw credential); every query runs under
+ * the caller's `authenticated` identity and Postgres RLS enforces tenant/branch
+ * isolation — never application filtering (ADR-0007/0008). The service-role key
+ * is NEVER used here, and no access/refresh token is ever logged.
  *
- * `setAll` is a no-op when called during a Server Component render (cookies are
- * read-only there); the middleware refreshes the session cookie on navigation.
+ * A NEW client is created per request (never module-scoped), so one request can
+ * never reuse another request's session. `setAll` is a no-op when called during
+ * a Server Component render (cookies are read-only there); the middleware
+ * refreshes the session cookie on navigation and propagates it on the response.
  */
 export async function getServerSupabase(): Promise<SupabaseClient<Database>> {
   const cookieStore = await cookies();
