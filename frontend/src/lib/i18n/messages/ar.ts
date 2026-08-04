@@ -45,6 +45,7 @@ export const ar: Messages = {
     organization: "المؤسسة",
     branch: "الفرع",
     allBranches: "كل الفروع",
+    allAssignedBranches: "كل فروعي",
     menu: "القائمة",
   },
   auth: {
@@ -59,6 +60,8 @@ export const ar: Messages = {
     verify: "تأكيد ومتابعة",
     verifying: "جارٍ التأكيد…",
     changeEmail: "استخدام بريد آخر",
+    resend: "إعادة إرسال الرمز",
+    resendIn: "إعادة الإرسال خلال {seconds} ثانية",
     passwordless: "بدون كلمات مرور — سجّل الدخول برمز يُرسل إلى بريدك.",
     info: { codeSent: "أرسلنا رمزًا إلى {email}. قد يستغرق وصوله لحظات." },
     error: {
@@ -133,11 +136,11 @@ export const ar: Messages = {
     emptyHint: "أنشئ فرصة لتتبّعها عبر مسار المبيعات.",
     createTitle: "إضافة فرصة",
     created: "تم إنشاء الفرصة.",
-    intent: "ملخّص الاحتياج",
+    intentHint: "يمكنك إضافة احتياج العميل كملاحظة على الفرصة بعد إنشائها.",
     detailsTitle: "تفاصيل الفرصة",
     version: "الإصدار",
     changeStage: "تغيير المرحلة",
-    markWon: "تحديد كمكسوبة",
+    markWon: "تحديد كرابحة",
     markLost: "تحديد كخاسرة",
     reopen: "إعادة فتح",
     archive: "أرشفة",
@@ -153,7 +156,7 @@ export const ar: Messages = {
     logMeeting: "تسجيل اجتماع",
     conflict:
       "تغيّرت هذه الفرصة منذ فتحها. حدّثناها لك — راجع الحالة الحالية وحاول مجددًا.",
-    won: "تم تحديد الفرصة كمكسوبة.",
+    won: "تم تحديد الفرصة كرابحة.",
     lost: "تم تحديد الفرصة كخاسرة.",
     reopened: "تمت إعادة فتح الفرصة.",
     stageChanged: "تم تحديث المرحلة.",
@@ -165,7 +168,7 @@ export const ar: Messages = {
       proposal_pending: "بانتظار العرض",
       decision_pending: "بانتظار القرار",
     },
-    statuses: { active: "نشطة", won: "مكسوبة", lost: "خاسرة", archived: "مؤرشفة" },
+    statuses: { active: "نشطة", won: "رابحة", lost: "خاسرة", archived: "مؤرشفة" },
   },
   activities: {
     note: "ملاحظة",

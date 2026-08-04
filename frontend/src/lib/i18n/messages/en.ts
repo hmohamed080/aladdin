@@ -44,6 +44,7 @@ export const en = {
     organization: "Organization",
     branch: "Branch",
     allBranches: "All branches",
+    allAssignedBranches: "All my branches",
     menu: "Menu",
   },
   auth: {
@@ -58,6 +59,8 @@ export const en = {
     verify: "Verify and continue",
     verifying: "Verifying…",
     changeEmail: "Use a different email",
+    resend: "Resend code",
+    resendIn: "Resend in {seconds}s",
     passwordless: "No passwords — sign in with a one-time email code.",
     info: { codeSent: "We sent a code to {email}. It may take a moment to arrive." },
     error: {
@@ -132,7 +135,7 @@ export const en = {
     emptyHint: "Create a lead to track an opportunity through your pipeline.",
     createTitle: "Add lead",
     created: "Lead created.",
-    intent: "Intent summary",
+    intentHint: "You can add the customer's intent as a note on the lead once it's created.",
     detailsTitle: "Lead details",
     version: "Version",
     changeStage: "Change stage",
