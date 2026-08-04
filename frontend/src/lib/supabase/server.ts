@@ -1,20 +1,55 @@
+import "server-only";
+
+import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 import { readPublicEnv } from "@/lib/env";
 import type { Database } from "@/types/database.types";
 
 /**
- * Server-side Supabase client scoped to the CALLER, preserving their access
- * token so Postgres RLS applies (ADR-0007). Use this in Server Actions / Route
- * Handlers for any user-scoped read/write: every query runs under the caller's
- * `authenticated` identity, so tenant isolation is enforced by the database, not
- * by application filtering.
+ * Cookie-backed, CALLER-scoped server Supabase client (Server Components, Server
+ * Actions, Route Handlers). The session lives in cookies managed by
+ * `@supabase/ssr` and SHARED with the browser client, so it is deliberately NOT
+ * HttpOnly — the browser client reads the same cookies to stay signed in. The
+ * value is a Supabase-issued JWT (not a raw credential); every query runs under
+ * the caller's `authenticated` identity and Postgres RLS enforces tenant/branch
+ * isolation — never application filtering (ADR-0007/0008). The service-role key
+ * is NEVER used here, and no access/refresh token is ever logged.
  *
- * It authenticates with the public anon key and forwards the caller's token as
- * the Authorization header. The service-role key is NEVER used here — it bypasses
- * RLS and belongs only to trusted server/worker paths, never to request handlers
- * serving a user. Session/cookie plumbing (obtaining `accessToken`) is owned by
- * the `auth` feature; this factory only turns a verified token into a scoped
- * client.
+ * A NEW client is created per request (never module-scoped), so one request can
+ * never reuse another request's session. `setAll` is a no-op when called during
+ * a Server Component render (cookies are read-only there); the middleware
+ * refreshes the session cookie on navigation and propagates it on the response.
+ */
+export async function getServerSupabase(): Promise<SupabaseClient<Database>> {
+  const cookieStore = await cookies();
+  const env = readPublicEnv();
+  return createServerClient<Database>(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            for (const { name, value, options } of cookiesToSet) {
+              cookieStore.set(name, value, options);
+            }
+          } catch {
+            // Called from a Server Component render — the middleware owns refresh.
+          }
+        },
+      },
+    },
+  );
+}
+
+/**
+ * Explicit-token variant for trusted server/worker paths that already hold a
+ * verified caller access token (kept for the data-access boundary; ADR-0007).
+ * Still the caller's identity — never service-role.
  */
 export function createServerSupabaseClient(
   accessToken: string,
