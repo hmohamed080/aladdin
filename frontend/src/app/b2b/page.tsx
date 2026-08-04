@@ -19,13 +19,14 @@ export default async function B2BHomePage() {
   if (!ctx) return null; // layout shows the no-org notice
   const { supabase, org, locale } = ctx;
   const m = getMessages(locale);
+  const branchId = org.activeBranchId;
 
   const [open, overdue, dueToday, stages, activities, custNames] = await Promise.all([
-    myOpenLeads(supabase),
-    overdueFollowUps(supabase),
-    followUpsDueToday(supabase),
-    stageCounts(supabase, org.organizationId),
-    recentActivities(supabase),
+    myOpenLeads(supabase, org.organizationId, branchId),
+    overdueFollowUps(supabase, org.organizationId, branchId),
+    followUpsDueToday(supabase, org.organizationId, branchId),
+    stageCounts(supabase, org.organizationId, branchId),
+    recentActivities(supabase, org.organizationId, branchId),
     customerNameMap(supabase, org.organizationId),
   ]);
 

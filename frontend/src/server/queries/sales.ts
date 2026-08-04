@@ -18,6 +18,25 @@ export type FollowUpRow = Database["public"]["Tables"]["follow_up_tasks"]["Row"]
 
 const CUSTOMER_LIST_LIMIT = 100;
 const LEAD_LIST_LIMIT = 200;
+const STAGE_COUNT_SCAN_LIMIT = 2000;
+
+/**
+ * Neutralize a free-text search term before it is interpolated into a PostgREST
+ * `.or()` filter. PostgREST filter grammar treats `,` `(` `)` as structure and
+ * `%` `_` `*` `\` as LIKE/ilike wildcards; a bare `"` can also break value
+ * quoting. We whitelist letters (incl. Arabic), digits, whitespace and a few
+ * benign contact characters, so no metacharacter can reach the filter grammar.
+ * RLS remains the security boundary — this only prevents malformed/injected
+ * filters, never widens access.
+ */
+export function sanitizeSearchTerm(raw: string): string {
+  return raw
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}\s@.+#-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 100);
+}
 
 // ---- Customers -------------------------------------------------------------
 export type CustomerFilters = {
@@ -37,9 +56,10 @@ export async function listCustomers(supabase: DB, f: CustomerFilters): Promise<C
   if (f.branchId) q = q.eq("branch_id", f.branchId);
   if (f.status) q = q.eq("status", f.status);
   if (f.search && f.search.trim()) {
-    const term = f.search.trim();
-    // Name (trigram) OR phone fragment; both stay within RLS scope.
-    q = q.or(`display_name.ilike.%${term}%,primary_phone.ilike.%${term}%`);
+    const term = sanitizeSearchTerm(f.search);
+    // Name (trigram) OR phone fragment; both stay within RLS scope. The term is
+    // sanitized so it cannot inject PostgREST filter grammar or LIKE wildcards.
+    if (term) q = q.or(`display_name.ilike.%${term}%,primary_phone.ilike.%${term}%`);
   }
   const { data, error } = await q;
   if (error) throw error;
@@ -142,53 +162,103 @@ export async function listFollowUps(
 }
 
 // ---- Dashboard read-models -------------------------------------------------
+// Every cockpit widget takes the ACTIVE organization id (and optional branch id)
+// so the selected workspace narrows the whole dashboard. RLS still scopes what
+// is visible; these filters only ensure org A's cockpit never shows org B's rows
+// when a caller belongs to more than one organization, and that a chosen branch
+// narrows counts/leads/activities/follow-ups consistently. `null` branch = the
+// caller's full authorized scope in that org (org-wide, or all assigned branches).
+
+/** Active-lead counts by stage, narrowed to the active org (+ branch). */
 export async function stageCounts(
   supabase: DB,
   orgId: string,
+  branchId?: string | null,
 ): Promise<{ stage: string; lead_count: number }[]> {
-  const { data, error } = await supabase
-    .from("sales_lead_stage_counts")
-    .select("stage, lead_count")
-    .eq("organization_id", orgId);
+  // The `sales_lead_stage_counts` view aggregates by org only (no branch axis),
+  // so to keep branch narrowing honest we tally active leads from the base table
+  // (RLS-scoped). Pilot volumes sit well under the scan cap; an exact-at-scale
+  // aggregate RPC is the future upgrade (TECHNICAL_DEBT).
+  let q = supabase
+    .from("leads")
+    .select("stage")
+    .eq("organization_id", orgId)
+    .eq("status", "active")
+    .limit(STAGE_COUNT_SCAN_LIMIT);
+  if (branchId) q = q.eq("branch_id", branchId);
+  const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []).map((r) => ({ stage: r.stage ?? "new", lead_count: Number(r.lead_count ?? 0) }));
+  const tally = new Map<string, number>();
+  for (const row of data ?? []) {
+    const stage = (row.stage ?? "new") as string;
+    tally.set(stage, (tally.get(stage) ?? 0) + 1);
+  }
+  return [...tally.entries()].map(([stage, lead_count]) => ({ stage, lead_count }));
 }
 
-export async function myOpenLeads(supabase: DB): Promise<LeadRow[]> {
-  const { data, error } = await supabase
+export async function myOpenLeads(
+  supabase: DB,
+  orgId: string,
+  branchId?: string | null,
+): Promise<LeadRow[]> {
+  let q = supabase
     .from("sales_my_open_leads")
     .select("*")
+    .eq("organization_id", orgId)
     .order("updated_at", { ascending: false })
     .limit(25);
+  if (branchId) q = q.eq("branch_id", branchId);
+  const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as LeadRow[];
 }
 
-export async function overdueFollowUps(supabase: DB): Promise<FollowUpRow[]> {
-  const { data, error } = await supabase
+export async function overdueFollowUps(
+  supabase: DB,
+  orgId: string,
+  branchId?: string | null,
+): Promise<FollowUpRow[]> {
+  let q = supabase
     .from("sales_overdue_follow_ups")
     .select("*")
+    .eq("organization_id", orgId)
     .order("due_at", { ascending: true })
     .limit(25);
+  if (branchId) q = q.eq("branch_id", branchId);
+  const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as FollowUpRow[];
 }
 
-export async function followUpsDueToday(supabase: DB): Promise<FollowUpRow[]> {
-  const { data, error } = await supabase
+export async function followUpsDueToday(
+  supabase: DB,
+  orgId: string,
+  branchId?: string | null,
+): Promise<FollowUpRow[]> {
+  let q = supabase
     .from("sales_follow_ups_due_today")
     .select("*")
+    .eq("organization_id", orgId)
     .order("due_at", { ascending: true })
     .limit(25);
+  if (branchId) q = q.eq("branch_id", branchId);
+  const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as FollowUpRow[];
 }
 
-export async function recentActivities(supabase: DB): Promise<ActivityRow[]> {
-  const { data, error } = await supabase
+export async function recentActivities(
+  supabase: DB,
+  orgId: string,
+  branchId?: string | null,
+): Promise<ActivityRow[]> {
+  let q = supabase
     .from("sales_recent_activities")
     .select("*")
+    .eq("organization_id", orgId)
     .limit(15);
+  if (branchId) q = q.eq("branch_id", branchId);
+  const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as ActivityRow[];
 }

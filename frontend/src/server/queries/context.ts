@@ -50,6 +50,38 @@ export function canAssign(ctx: OrgContext): boolean {
   return ctx.canManageSales || ctx.capabilities.includes("sales.assign");
 }
 
+/**
+ * Pick the active organization from the caller's own orgs, honoring the cookie
+ * only if it names an org the caller actually belongs to (a forged/stale cookie
+ * grants nothing — it falls back to the first org).
+ */
+export function resolveActiveOrg<T extends { id: string }>(
+  orgs: T[],
+  cookieValue: string | undefined,
+): T | null {
+  if (orgs.length === 0) return null;
+  return orgs.find((o) => o.id === cookieValue) ?? orgs[0]!;
+}
+
+/**
+ * Resolve the active branch so the value shown in the UI ALWAYS matches the data
+ * scope:
+ *  - exactly one branch in scope → auto-select it (the cookie is irrelevant);
+ *  - multiple branches → honor the cookie only if it names an in-scope branch,
+ *    otherwise `null` = the caller's full scope ("all" / "all assigned");
+ *  - no branch list (org-wide with no branch rows) → `null` (whole org).
+ * A forged, stale, or since-removed branch cookie therefore narrows nothing it
+ * shouldn't and never selects a branch outside the allowed set.
+ */
+export function resolveActiveBranch(
+  branches: { id: string }[],
+  cookieValue: string | undefined,
+): string | null {
+  if (branches.length === 1) return branches[0]!.id;
+  if (branches.length === 0) return null;
+  return cookieValue && branches.some((b) => b.id === cookieValue) ? cookieValue : null;
+}
+
 export async function loadWorkspaceContext(
   supabase: SupabaseClient<Database>,
 ): Promise<WorkspaceContext> {
@@ -77,9 +109,7 @@ export async function loadWorkspaceContext(
   }
 
   const store = await cookies();
-  const requestedOrg = store.get(ORG_COOKIE)?.value;
-  const activeOrg =
-    orgs.find((o) => o.id === requestedOrg) ?? orgs[0]!;
+  const activeOrg = resolveActiveOrg(orgs, store.get(ORG_COOKIE)?.value)!;
 
   const membership = (memberships ?? []).find((m) => m.organization_id === activeOrg.id)!;
 
@@ -115,12 +145,9 @@ export async function loadWorkspaceContext(
       .filter((b): b is { id: string; name: string } => Boolean(b));
   }
 
-  // Active branch: honor the cookie only if it is genuinely in scope.
-  const requestedBranch = store.get(BRANCH_COOKIE)?.value;
-  const activeBranchId =
-    requestedBranch && branches.some((b) => b.id === requestedBranch)
-      ? requestedBranch
-      : null;
+  // Active branch: single branch auto-selects; otherwise honor an in-scope
+  // cookie, else null = full scope. The UI label matches (see AppShell).
+  const activeBranchId = resolveActiveBranch(branches, store.get(BRANCH_COOKIE)?.value);
 
   return {
     organizations: orgs,

@@ -43,7 +43,7 @@ export async function AppShell({
             <BranchSwitcher
               branches={active.branches}
               activeId={active.activeBranchId}
-              allowAll={active.canManageSales || active.capabilities.includes("branch.manage")}
+              orgWide={active.canManageSales || active.capabilities.includes("branch.manage")}
             />
           </div>
 
@@ -60,7 +60,7 @@ export async function AppShell({
           <BranchSwitcher
             branches={active.branches}
             activeId={active.activeBranchId}
-            allowAll={active.canManageSales || active.capabilities.includes("branch.manage")}
+            orgWide={active.canManageSales || active.capabilities.includes("branch.manage")}
           />
         </div>
 

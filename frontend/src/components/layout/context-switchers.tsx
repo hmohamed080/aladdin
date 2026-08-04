@@ -33,22 +33,34 @@ export function OrgSwitcher({ orgs, activeId }: { orgs: Named[]; activeId: strin
 }
 
 /**
- * Branch selector. A branch-limited user only ever sees their own assigned
- * branches (the list is server-derived); an org-wide user additionally gets the
- * "All branches" option. Selecting grants no authority — RLS/RPCs re-check.
+ * Branch selector. The value shown ALWAYS matches the data scope:
+ *  - a single in-scope branch renders as a read-only label (nothing to switch,
+ *    and the server has auto-selected it) — never a dropdown implying a choice;
+ *  - multiple branches render a dropdown whose "all" option is labelled
+ *    "All branches" for an org-wide caller and "All my branches" for a
+ *    branch-limited caller (whose "all" means the union of their assigned
+ *    branches). Selecting grants no authority — RLS/RPCs re-check.
  */
 export function BranchSwitcher({
   branches,
   activeId,
-  allowAll,
+  orgWide,
 }: {
   branches: Named[];
   activeId: string | null;
-  allowAll: boolean;
+  orgWide: boolean;
 }) {
   const { t } = useI18n();
   const [pending, start] = useTransition();
   if (branches.length === 0) return null;
+  if (branches.length === 1) {
+    return (
+      <span className="flex items-center gap-1 text-label text-fg-secondary">
+        <span className="text-fg-muted">{t("nav.branch")}:</span>
+        {branches[0]!.name}
+      </span>
+    );
+  }
   return (
     <label className="flex items-center gap-2">
       <span className="sr-only">{t("nav.branch")}</span>
@@ -59,7 +71,7 @@ export function BranchSwitcher({
         className="min-w-40"
         onChange={(e) => start(() => selectBranch(e.target.value))}
       >
-        {allowAll ? <option value="all">{t("nav.allBranches")}</option> : null}
+        <option value="all">{orgWide ? t("nav.allBranches") : t("nav.allAssignedBranches")}</option>
         {branches.map((b) => (
           <option key={b.id} value={b.id}>
             {b.name}

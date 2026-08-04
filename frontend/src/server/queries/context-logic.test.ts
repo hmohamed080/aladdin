@@ -3,7 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 
-import { canWrite, canAssign, hasCap, type OrgContext } from "./context";
+import {
+  canWrite,
+  canAssign,
+  hasCap,
+  resolveActiveOrg,
+  resolveActiveBranch,
+  type OrgContext,
+} from "./context";
 import { resolveTheme } from "@/lib/theme/config";
 
 function ctx(caps: string[], canManageSales = false): OrgContext {
@@ -40,6 +47,37 @@ describe("sales capability gates (mirror the DB authority; UI hides, RLS enforce
     expect(canWrite(reader)).toBe(false);
     expect(canAssign(reader)).toBe(false);
     expect(hasCap(reader, "sales.read")).toBe(true);
+  });
+});
+
+describe("resolveActiveOrg (a forged/stale org cookie grants nothing)", () => {
+  const orgs = [{ id: "a" }, { id: "b" }];
+  it("honors a cookie that names an org the caller belongs to", () => {
+    expect(resolveActiveOrg(orgs, "b")?.id).toBe("b");
+  });
+  it("falls back to the first org for a forged/unknown cookie", () => {
+    expect(resolveActiveOrg(orgs, "zzz")?.id).toBe("a");
+    expect(resolveActiveOrg(orgs, undefined)?.id).toBe("a");
+  });
+  it("returns null when the caller has no orgs", () => {
+    expect(resolveActiveOrg([], "a")).toBeNull();
+  });
+});
+
+describe("resolveActiveBranch (UI value must match data scope)", () => {
+  it("auto-selects the only assigned branch (cookie irrelevant)", () => {
+    expect(resolveActiveBranch([{ id: "b1" }], undefined)).toBe("b1");
+    expect(resolveActiveBranch([{ id: "b1" }], "forged")).toBe("b1");
+  });
+  it("honors an in-scope cookie when multiple branches exist", () => {
+    expect(resolveActiveBranch([{ id: "b1" }, { id: "b2" }], "b2")).toBe("b2");
+  });
+  it("treats a forged/removed branch cookie as full scope (null), never out-of-scope", () => {
+    expect(resolveActiveBranch([{ id: "b1" }, { id: "b2" }], "evil")).toBeNull();
+    expect(resolveActiveBranch([{ id: "b1" }, { id: "b2" }], undefined)).toBeNull();
+  });
+  it("returns null when there are no branches (whole org)", () => {
+    expect(resolveActiveBranch([], "anything")).toBeNull();
   });
 });
 
