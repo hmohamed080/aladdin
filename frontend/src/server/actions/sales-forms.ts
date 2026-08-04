@@ -64,13 +64,49 @@ export async function createCustomerAction(_p: FormState, fd: FormData): Promise
   redirect(`/b2b/customers/${newId}?created=1`);
 }
 
+/**
+ * Edit a customer through the trusted `update_customer` RPC. Only the RPC-
+ * supported fields are editable here (name/phone/email/preferred-language/
+ * location/source); type, branch, and assignee are set at creation and are not
+ * part of the update RPC. Entered values survive a validation error (the form is
+ * uncontrolled and re-renders with the submitted values via defaultValue).
+ */
+export async function updateCustomerAction(_p: FormState, fd: FormData): Promise<FormState> {
+  const id = str(fd, "customerId");
+  const displayName = str(fd, "displayName");
+  if (!id) return { ok: false, code: "states.genericRetry" };
+  if (!displayName) return { ok: false, fieldErrors: { displayName: "validation.nameLength" } };
+
+  const supabase = await getServerSupabase();
+  try {
+    await sales.updateCustomer(supabase, id, {
+      displayName,
+      // Blank leaves a field unchanged (the RPC coalesces null → keep). This
+      // matches create semantics and avoids empty-string phone normalization.
+      primaryPhone: str(fd, "primaryPhone"),
+      email: str(fd, "email"),
+      preferredLanguage: str(fd, "preferredLanguage"),
+      locationSummary: str(fd, "locationSummary"),
+      source: str(fd, "source") as SalesSource | undefined,
+    });
+  } catch (e) {
+    return { ok: false, code: mapSalesError(e) };
+  }
+  revalidatePath(`/b2b/customers/${id}`);
+  revalidatePath("/b2b/customers");
+  redirect(`/b2b/customers/${id}?updated=1`);
+}
+
 export async function archiveCustomerAction(fd: FormData): Promise<void> {
   const id = str(fd, "customerId");
   if (!id) return;
   const supabase = await getServerSupabase();
+  // update_customer with p_archive is idempotent (already-archived → no-op), so a
+  // double submit can't corrupt state; the RPC still enforces scope/capability.
   await sales.updateCustomer(supabase, id, { archive: true });
   revalidatePath(`/b2b/customers/${id}`);
   revalidatePath("/b2b/customers");
+  redirect(`/b2b/customers/${id}?archived=1`);
 }
 
 // ---- Leads -----------------------------------------------------------------
@@ -102,6 +138,37 @@ export async function createLeadAction(_p: FormState, fd: FormData): Promise<For
   // (TECHNICAL_DEBT / ADR-0008).
   revalidatePath("/b2b/leads");
   redirect(`/b2b/leads/${newId}?created=1`);
+}
+
+const editLeadSchema = z.object({
+  leadId: z.string().uuid(),
+  version: z.coerce.number().int(),
+});
+
+/**
+ * Edit NON-lifecycle lead details (title, priority) via `update_lead_details`.
+ * Stage/status/won-lost and assignment stay in their own versioned RPCs. Carries
+ * the expected version for optimistic concurrency: a stale submit raises
+ * "modified concurrently" → mapped to `leads.conflict`, and the caller refreshes.
+ */
+export async function updateLeadDetailsAction(_p: FormState, fd: FormData): Promise<FormState> {
+  const parsed = editLeadSchema.safeParse({ leadId: fd.get("leadId"), version: fd.get("version") });
+  if (!parsed.success) return { ok: false, code: "states.genericRetry" };
+  const title = str(fd, "title");
+  if (!title) return { ok: false, fieldErrors: { title: "validation.titleLength" } };
+
+  const supabase = await getServerSupabase();
+  try {
+    await sales.updateLeadDetails(supabase, parsed.data.leadId, parsed.data.version, {
+      title,
+      priority: (str(fd, "priority") as SalesPriority) ?? undefined,
+    });
+  } catch (e) {
+    return { ok: false, code: mapSalesError(e) };
+  }
+  revalidatePath(`/b2b/leads/${parsed.data.leadId}`);
+  revalidatePath("/b2b/leads");
+  redirect(`/b2b/leads/${parsed.data.leadId}?updated=1`);
 }
 
 const transitionSchema = z.object({
@@ -211,6 +278,38 @@ export async function createFollowUpAction(_p: FormState, fd: FormData): Promise
   revalidatePath("/b2b/follow-ups");
   revalidatePath("/b2b");
   return { ok: true, code: "followUps.created" };
+}
+
+/**
+ * Edit an OPEN follow-up (title/description/due/priority) via `update_follow_up`.
+ * The RPC rejects a non-open follow-up (mapped to `states.followUpNotOpen`), so a
+ * completed/cancelled task can't be silently mutated. Reassignment and lifecycle
+ * stay in their own RPCs.
+ */
+export async function updateFollowUpAction(_p: FormState, fd: FormData): Promise<FormState> {
+  const id = str(fd, "followUpId");
+  const title = str(fd, "title");
+  if (!id) return { ok: false, code: "states.genericRetry" };
+  if (!title) return { ok: false, fieldErrors: { title: "validation.titleLength" } };
+
+  const supabase = await getServerSupabase();
+  try {
+    await sales.updateFollowUp(supabase, id, {
+      title,
+      description: str(fd, "description"),
+      dueAt: str(fd, "dueAt"),
+      priority: (str(fd, "priority") as SalesPriority) ?? undefined,
+    });
+  } catch (e) {
+    return { ok: false, code: mapSalesError(e) };
+  }
+  revalidatePath("/b2b/follow-ups");
+  revalidatePath("/b2b");
+  const leadId = str(fd, "leadId");
+  const customerId = str(fd, "customerId");
+  if (leadId) revalidatePath(`/b2b/leads/${leadId}`);
+  if (customerId) revalidatePath(`/b2b/customers/${customerId}`);
+  redirect("/b2b/follow-ups?updated=1");
 }
 
 async function followUpLifecycle(

@@ -144,6 +144,30 @@ export async function listFollowUpsForLead(supabase: DB, leadId: string): Promis
   return data ?? [];
 }
 
+export async function getFollowUp(supabase: DB, id: string): Promise<FollowUpRow | null> {
+  const { data, error } = await supabase
+    .from("follow_up_tasks")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function listFollowUpsForCustomer(
+  supabase: DB,
+  customerId: string,
+): Promise<FollowUpRow[]> {
+  const { data, error } = await supabase
+    .from("follow_up_tasks")
+    .select("*")
+    .eq("customer_id", customerId)
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .limit(100);
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function listFollowUps(
   supabase: DB,
   orgId: string,

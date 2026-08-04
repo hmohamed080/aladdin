@@ -13,6 +13,7 @@ export function mapSalesError(error: unknown): string {
 
   if (code === "23505" || msg.includes("phone already exists")) return "states.duplicatePhone";
   if (code === "40001" || msg.includes("modified concurrently")) return "leads.conflict";
+  if (msg.includes("only an open follow-up")) return "states.followUpNotOpen";
   if (msg.includes("a reason is required when marking")) return "leads.lostReasonRequired";
   if (msg.includes("branch not in caller scope") || msg.includes("another tenant"))
     return "states.branchDenied";
