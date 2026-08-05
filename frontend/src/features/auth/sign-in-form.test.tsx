@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
 import { SignInForm } from "./sign-in-form";
 import { ar } from "@/lib/i18n/messages/ar";
@@ -19,14 +19,21 @@ async function advanceToVerifyStep() {
   renderWithI18n(<SignInForm next="/b2b" />);
   const emailInput = screen.getByLabelText(ar.auth.emailLabel);
   fireEvent.change(emailInput, { target: { value: EMAIL } });
-  // Submit through React's synthetic submit path rather than a native submit-
-  // button click. A React 19 form with a function `action` carries a
-  // `javascript:throw` native-submit guard; a native button click races React's
-  // preventDefault and, under full-suite timing, jsdom occasionally executes the
-  // guard ("A React form was unexpectedly submitted"). Dispatching `submit` on
-  // the form invokes the action deterministically without that native path.
-  fireEvent.submit(emailInput.closest("form")!);
+  // Submit via requestSubmit() inside act — the React-19-canonical path. A form
+  // with a function `action` carries a `javascript:throw` native-submit guard;
+  // a native submit-button click (and even fireEvent.submit) can race React's
+  // preventDefault under full-suite timing and let jsdom execute the guard
+  // ("A React form was unexpectedly submitted"). requestSubmit lets React
+  // intercept and preventDefault first, deterministically invoking the action.
+  await act(async () => {
+    (emailInput.closest("form") as HTMLFormElement).requestSubmit();
+  });
   await screen.findByLabelText(ar.auth.codeLabel);
+  // Let the post-send effect (which clears the editing override) fully settle so
+  // a later "change email" click can't race a trailing setEditingEmail(false).
+  await act(async () => {
+    await Promise.resolve();
+  });
 }
 
 describe("SignInForm (Arabic-first passwordless)", () => {

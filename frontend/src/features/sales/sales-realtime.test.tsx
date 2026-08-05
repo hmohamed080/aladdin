@@ -52,11 +52,15 @@ const wrap = (branchId: string | null) => (
 
 async function setup(branchId: string | null = null) {
   const result = render(wrap(branchId));
-  // Flush the async getSession → channel subscribe.
-  await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-  });
+  // Flush the async getSession → channel subscribe until the channel is wired
+  // (poll rather than a fixed number of microtask ticks — avoids a rare race).
+  for (let i = 0; i < 20 && (!subscribeCb || onChangeHandlers.length === 0); i++) {
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+  expect(subscribeCb, "mocked channel subscribed").toBeDefined();
+  expect(onChangeHandlers.length, "change handlers registered").toBeGreaterThan(0);
   await act(async () => subscribeCb?.("SUBSCRIBED"));
   const rerenderBranch = (b: string | null) => result.rerender(wrap(b));
   return { ...result, rerenderBranch };
