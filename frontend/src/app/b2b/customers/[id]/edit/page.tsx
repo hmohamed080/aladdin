@@ -1,6 +1,6 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
-import { getCustomer, branchNameMap, memberNameMap, listOrgMembers } from "@/server/queries/sales";
+import { getCustomer, branchNameMap, listOrgMembers } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
 import { PageHeader, BackLink } from "@/features/sales/page-parts";
 import { Card, StatePanel } from "@/components/ui/primitives";
@@ -35,11 +35,12 @@ export default async function CustomerEditPage({ params }: { params: Promise<{ i
   }
 
   const canReassign = canAssign(org);
-  const [branchNames, memberNames, members] = await Promise.all([
+  // One member fetch, reused for both the assignee label and the select (no dup).
+  const [branchNames, members] = await Promise.all([
     branchNameMap(supabase, org.organizationId),
-    memberNameMap(supabase, org.organizationId),
-    canReassign ? listOrgMembers(supabase, org.organizationId) : Promise.resolve([]),
+    listOrgMembers(supabase, org.organizationId),
   ]);
+  const memberNames = new Map(members.map((mm) => [mm.membershipId, mm.displayName]));
   const branchName = customer.branch_id
     ? branchNames.get(customer.branch_id) ?? "—"
     : m.common.none;

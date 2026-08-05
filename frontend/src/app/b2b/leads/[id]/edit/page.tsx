@@ -1,6 +1,6 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
-import { getLead, branchNameMap, memberNameMap, listOrgMembers } from "@/server/queries/sales";
+import { getLead, branchNameMap, listOrgMembers } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
 import { PageHeader, BackLink } from "@/features/sales/page-parts";
 import { Card, StatePanel } from "@/components/ui/primitives";
@@ -35,11 +35,12 @@ export default async function LeadEditPage({ params }: { params: Promise<{ id: s
   }
 
   const canReassign = canAssign(org);
-  const [branchNames, memberNames, members] = await Promise.all([
+  // One member fetch, reused for both the assignee label and the select (no dup).
+  const [branchNames, members] = await Promise.all([
     branchNameMap(supabase, org.organizationId),
-    memberNameMap(supabase, org.organizationId),
     listOrgMembers(supabase, org.organizationId),
   ]);
+  const memberNames = new Map(members.map((mm) => [mm.membershipId, mm.displayName]));
   const sourceLabel = lead.source ? m.source[lead.source] : m.common.none;
   const branchLabel = lead.branch_id ? branchNames.get(lead.branch_id) ?? "—" : m.common.none;
   const assigneeLabel = lead.assigned_membership_id
