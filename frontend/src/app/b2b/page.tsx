@@ -42,7 +42,7 @@ export default async function B2BHomePage() {
 
       {canWrite ? <HomeQuickActions /> : null}
 
-      <div className="grid gap-lg desktop:grid-cols-2">
+      <div className="grid gap-lg desktop:grid-cols-2 [&>*]:min-w-0">
         <Card>
           <SectionTitle className="mb-md">{m.home.overdue}</SectionTitle>
           {overdue.length === 0 ? (
