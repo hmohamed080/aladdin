@@ -119,6 +119,46 @@ export async function updateCustomerAction(_p: FormState, fd: FormData): Promise
   redirect(`/b2b/customers/${id}?updated=1`);
 }
 
+/** Normalize a select value: blank/absent → null, otherwise the trimmed value. */
+function orNull(fd: FormData, key: string): string | null {
+  const v = fd.get(key);
+  return typeof v === "string" && v.trim() !== "" ? v.trim() : null;
+}
+
+/**
+ * Change a customer's owning branch and/or salesperson via `set_customer_ownership`.
+ * The form carries the CURRENT branch/assignee (hidden) so we only send the axes
+ * that actually changed — the RPC still re-reads and re-authorizes. Type is never
+ * touched (immutable). Optimistic on the customer's `updated_at`.
+ */
+export async function setCustomerOwnershipAction(_p: FormState, fd: FormData): Promise<FormState> {
+  const id = str(fd, "customerId");
+  const expectedUpdatedAt = str(fd, "expectedUpdatedAt");
+  if (!id || !expectedUpdatedAt) return { ok: false, code: "states.genericRetry" };
+
+  const selBranch = orNull(fd, "branchId");
+  const curBranch = orNull(fd, "currentBranchId");
+  const selAssignee = orNull(fd, "assigneeMembershipId");
+  const curAssignee = orNull(fd, "currentAssigneeId");
+  const branchChanged = selBranch !== curBranch;
+  const assigneeChanged = selAssignee !== curAssignee;
+  if (!branchChanged && !assigneeChanged) return { ok: false, code: "states.noChange" };
+
+  const supabase = await getServerSupabase();
+  try {
+    await sales.setCustomerOwnership(supabase, id, expectedUpdatedAt, {
+      ...(branchChanged ? { branch: { to: selBranch } } : {}),
+      ...(assigneeChanged ? { assignee: { to: selAssignee } } : {}),
+    });
+  } catch (e) {
+    if (isStaleVersion(e)) return { ok: false, code: "states.staleConflict" };
+    return { ok: false, code: mapSalesError(e) };
+  }
+  revalidatePath(`/b2b/customers/${id}`);
+  revalidatePath("/b2b/customers");
+  redirect(`/b2b/customers/${id}?updated=1`);
+}
+
 export async function archiveCustomerAction(fd: FormData): Promise<void> {
   const id = str(fd, "customerId");
   if (!id) return;
@@ -224,6 +264,46 @@ export async function transitionLeadAction(_p: FormState, fd: FormData): Promise
   const msg =
     status === "won" ? "leads.won" : status === "lost" ? "leads.lost" : status === "active" && stage === undefined ? "leads.reopened" : "leads.stageChanged";
   return { ok: true, code: msg };
+}
+
+/**
+ * Change a lead's SOURCE and/or BRANCH (with an optional compatible reassignment)
+ * via `set_lead_source_branch`. Lifecycle (stage/status/won-lost) is never touched
+ * by this RPC. Version-guarded; the form carries the current source/branch/assignee
+ * (hidden) so we only send changed axes. A branch move that would strand the
+ * assignee is rejected by the RPC (mapped to `states.assigneeBranch`).
+ */
+export async function setLeadSourceBranchAction(_p: FormState, fd: FormData): Promise<FormState> {
+  const id = str(fd, "leadId");
+  const versionRaw = fd.get("version");
+  const version = typeof versionRaw === "string" && versionRaw.trim() !== "" ? Number(versionRaw) : NaN;
+  if (!id || !Number.isInteger(version)) return { ok: false, code: "states.genericRetry" };
+
+  const selSource = orNull(fd, "source");
+  const curSource = orNull(fd, "currentSource");
+  const selBranch = orNull(fd, "branchId");
+  const curBranch = orNull(fd, "currentBranchId");
+  const selAssignee = orNull(fd, "assigneeMembershipId");
+  const curAssignee = orNull(fd, "currentAssigneeId");
+  const sourceChanged = selSource !== curSource;
+  const branchChanged = selBranch !== curBranch;
+  const reassignChanged = selAssignee !== curAssignee;
+  if (!sourceChanged && !branchChanged && !reassignChanged) return { ok: false, code: "states.noChange" };
+
+  const supabase = await getServerSupabase();
+  try {
+    await sales.setLeadSourceBranch(supabase, id, version, {
+      ...(sourceChanged ? { source: { to: selSource as SalesSource | null } } : {}),
+      ...(branchChanged ? { branch: { to: selBranch } } : {}),
+      ...(reassignChanged ? { reassign: { to: selAssignee } } : {}),
+    });
+  } catch (e) {
+    if (isStaleVersion(e)) return { ok: false, code: "states.staleConflict" };
+    return { ok: false, code: mapSalesError(e) };
+  }
+  revalidatePath(`/b2b/leads/${id}`);
+  revalidatePath("/b2b/leads");
+  redirect(`/b2b/leads/${id}?updated=1`);
 }
 
 export async function assignLeadAction(_p: FormState, fd: FormData): Promise<FormState> {

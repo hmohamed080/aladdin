@@ -1,10 +1,11 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
-import { getLead } from "@/server/queries/sales";
-import { canWrite } from "@/server/queries/context";
+import { getLead, branchNameMap, memberNameMap, listOrgMembers } from "@/server/queries/sales";
+import { canWrite, canAssign } from "@/server/queries/context";
 import { PageHeader, BackLink } from "@/features/sales/page-parts";
-import { StatePanel } from "@/components/ui/primitives";
+import { Card, StatePanel } from "@/components/ui/primitives";
 import { LeadEditForm } from "@/features/sales/lead-edit-form";
+import { LeadSourceBranchForm } from "@/features/sales/lead-source-branch-form";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,18 @@ export default async function LeadEditPage({ params }: { params: Promise<{ id: s
     );
   }
 
+  const canReassign = canAssign(org);
+  const [branchNames, memberNames, members] = await Promise.all([
+    branchNameMap(supabase, org.organizationId),
+    memberNameMap(supabase, org.organizationId),
+    listOrgMembers(supabase, org.organizationId),
+  ]);
+  const sourceLabel = lead.source ? m.source[lead.source] : m.common.none;
+  const branchLabel = lead.branch_id ? branchNames.get(lead.branch_id) ?? "—" : m.common.none;
+  const assigneeLabel = lead.assigned_membership_id
+    ? memberNames.get(lead.assigned_membership_id) ?? "—"
+    : m.common.unassigned;
+
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <div>
@@ -40,6 +53,40 @@ export default async function LeadEditPage({ params }: { params: Promise<{ id: s
         <PageHeader title={m.leads.editTitle} />
       </div>
       <LeadEditForm lead={lead} />
+
+      <Card className="max-w-2xl">
+        <div className="flex flex-col gap-sm">
+          <div>
+            <h2 className="text-title text-fg">{m.leads.ownershipTitle}</h2>
+            <p className="text-label text-fg-muted">{m.leads.ownershipHint}</p>
+          </div>
+          <dl className="grid grid-cols-3 gap-md rounded-sm border border-dashed p-md text-label">
+            <div>
+              <dt className="text-fg-muted">{m.leads.source}</dt>
+              <dd className="text-fg">{sourceLabel}</dd>
+            </div>
+            <div>
+              <dt className="text-fg-muted">{m.leads.branch}</dt>
+              <dd className="text-fg">{branchLabel}</dd>
+            </div>
+            <div>
+              <dt className="text-fg-muted">{m.leads.assignee}</dt>
+              <dd className="text-fg">{assigneeLabel}</dd>
+            </div>
+          </dl>
+          <LeadSourceBranchForm
+            leadId={lead.id}
+            version={lead.version}
+            currentSource={lead.source}
+            currentBranchId={lead.branch_id}
+            currentAssigneeId={lead.assigned_membership_id}
+            branches={org.branches}
+            members={members}
+            canAssign={canReassign}
+            canOrgWide={org.canManageSales}
+          />
+        </div>
+      </Card>
     </div>
   );
 }
