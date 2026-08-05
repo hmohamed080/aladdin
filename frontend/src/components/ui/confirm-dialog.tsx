@@ -75,7 +75,9 @@ export function ConfirmDialog({
     const focusables = () =>
       Array.from(
         dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          // Exclude hidden inputs — focusing one is a no-op, which would leave the
+          // dialog without focus (and break the trap) when a form leads with them.
+          'button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])',
         ) ?? [],
       ).filter((el) => !el.hasAttribute("disabled"));
     focusables()[0]?.focus();
