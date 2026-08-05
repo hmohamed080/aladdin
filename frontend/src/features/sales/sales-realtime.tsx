@@ -5,27 +5,32 @@ import { useRouter } from "next/navigation";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
+import { rtAddChannel, rtRemoveChannel, rtRefresh, rtDeferred, rtStatus } from "@/features/sales/realtime-debug";
 
 /**
- * Scoped sales Realtime (Sprint 6). Mounted once in the B2B shell for the ACTIVE
- * organization. It subscribes — through the caller's normal anon browser client,
- * never service_role — to Postgres Changes on the two approved tables (`leads`,
- * `follow_up_tasks`), narrowed to this organization. RLS is the real boundary;
- * this component NEVER renders a Realtime payload. An event is only a hint: it
- * triggers `router.refresh()`, which re-fetches everything through RLS on the
- * server, so the client can never surface a row it isn't authorized to see, and a
- * duplicate or out-of-order event can never corrupt local state (there is no
- * local card state — the server is the single source of truth).
+ * Scoped sales Realtime (Sprint 6 / 6.1). Mounted once in the B2B shell for the
+ * ACTIVE organization + branch. It subscribes — through the caller's normal anon
+ * browser client, never service_role — to Postgres Changes on the two approved
+ * tables (`leads`, `follow_up_tasks`), narrowed to **exactly what the current
+ * pages display**:
+ *   - **All branches** (activeBranchId null) → `organization_id=eq.<orgId>`;
+ *   - **a selected branch** → `branch_id=eq.<branchId>` (which, like the list
+ *     queries, EXCLUDES org-wide NULL-branch rows — honest scope, no spurious
+ *     refreshes from other branches).
+ * The org/branch ids are SERVER-DERIVED (validated against real membership), not
+ * raw cookies, so a forged cookie can't widen the subscription.
  *
- * Safety details:
- *  - The org id is SERVER-DERIVED (validated against real membership), not a raw
- *    cookie, so a forged cookie can't widen the subscription.
- *  - The channel is removed on unmount and rebuilt when the active org/branch
- *    changes (deps), so switching context tears down the old scope and sign-out
- *    (navigation away / SIGNED_OUT) removes every channel — no leak, no duplicate.
- *  - While the user is typing in a form, the refresh is DEFERRED to a manual
- *    "refresh" affordance so incoming data never overwrites an open edit or moves
- *    focus. Reconnecting/paused states are shown; raw channel errors never are.
+ * RLS is the real boundary; this component NEVER renders a Realtime payload. An
+ * event is only a hint: it triggers a debounced `router.refresh()`, which
+ * re-fetches through RLS on the server — so the client can never surface a row it
+ * isn't authorized to see, and duplicate/out-of-order events can't corrupt local
+ * state (there is no client card state — the server is the single source of truth).
+ *
+ * Lifecycle: the channel is created per (org, branch); the effect deps rebuild it
+ * when either changes (old channel removed BEFORE the new one becomes effective),
+ * and it is removed on unmount and on `SIGNED_OUT` — no leak, no duplicate. While
+ * a form field is focused the refresh is DEFERRED to a manual affordance so
+ * incoming data never overwrites an open edit or moves focus.
  */
 type Status = "connecting" | "live" | "reconnecting" | "offline";
 
@@ -49,9 +54,11 @@ export function SalesRealtime({ orgId, branchId }: { orgId: string; branchId: st
   const [pending, setPending] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scopeRef = useRef<string>("");
 
   function doRefresh() {
     router.refresh();
+    rtRefresh(scopeRef.current);
     setPending(false);
     setFlash(true);
     if (flashTimer.current) clearTimeout(flashTimer.current);
@@ -63,16 +70,26 @@ export function SalesRealtime({ orgId, branchId }: { orgId: string; branchId: st
     let channel: RealtimeChannel | null = null;
     let cancelled = false;
 
+    // Scope matches the visible data: a selected branch filters by branch_id
+    // (excluding org-wide NULL-branch rows, like the list queries); "all" uses
+    // the validated organization scope.
+    const scope = branchId ? `branch:${branchId}` : `org:${orgId}`;
+    const filter = branchId ? `branch_id=eq.${branchId}` : `organization_id=eq.${orgId}`;
+    scopeRef.current = scope;
+
     function onChange() {
       // Coalesce bursts; never refresh mid-edit (defer to the manual affordance).
       if (debounce.current) clearTimeout(debounce.current);
       debounce.current = setTimeout(() => {
-        if (isEditing()) setPending(true);
-        else doRefresh();
+        if (isEditing()) {
+          rtDeferred();
+          setPending(true);
+        } else {
+          doRefresh();
+        }
       }, 400);
     }
 
-    const filter = `organization_id=eq.${orgId}`;
     (async () => {
       // Authenticate the Realtime socket as the CALLER so RLS authorizes each
       // Postgres Changes event against the user's own policies (an anon socket
@@ -81,19 +98,27 @@ export function SalesRealtime({ orgId, branchId }: { orgId: string; branchId: st
       if (cancelled) return;
       supabase.realtime.setAuth(data.session?.access_token ?? null);
       channel = supabase
-        .channel(`sales:${orgId}:${branchId ?? "all"}`)
+        .channel(`sales:${scope}`)
         .on("postgres_changes", { event: "*", schema: "public", table: "leads", filter }, onChange)
         .on("postgres_changes", { event: "*", schema: "public", table: "follow_up_tasks", filter }, onChange)
         .subscribe((s) => {
-          if (s === "SUBSCRIBED") setStatus("live");
-          else if (s === "CHANNEL_ERROR" || s === "TIMED_OUT") setStatus("reconnecting");
-          else if (s === "CLOSED") setStatus("offline");
+          rtStatus(s);
+          if (s === "SUBSCRIBED") {
+            rtAddChannel(scope);
+            setStatus("live");
+          } else if (s === "CHANNEL_ERROR" || s === "TIMED_OUT") {
+            setStatus("reconnecting");
+          } else if (s === "CLOSED") {
+            rtRemoveChannel(scope);
+            setStatus("offline");
+          }
         });
     })();
 
     const { data: authSub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") {
         if (channel) supabase.removeChannel(channel);
+        rtRemoveChannel(scope);
       } else if (session?.access_token) {
         supabase.realtime.setAuth(session.access_token);
       }
@@ -104,6 +129,7 @@ export function SalesRealtime({ orgId, branchId }: { orgId: string; branchId: st
       if (debounce.current) clearTimeout(debounce.current);
       authSub.subscription.unsubscribe();
       if (channel) supabase.removeChannel(channel);
+      rtRemoveChannel(scope);
     };
     // Rebuild the subscription when the active org or branch changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -121,6 +147,7 @@ export function SalesRealtime({ orgId, branchId }: { orgId: string; branchId: st
       {pending ? (
         <button
           type="button"
+          data-testid="realtime-refresh"
           onClick={doRefresh}
           className="rounded-sm border border-strong px-2 py-0.5 text-label text-fg hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
