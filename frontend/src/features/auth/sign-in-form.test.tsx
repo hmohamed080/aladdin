@@ -17,8 +17,15 @@ const EMAIL = "a-owner@example.test";
 async function advanceToVerifyStep() {
   vi.mocked(auth.requestEmailOtp).mockResolvedValue({ ok: true, code: "auth.info.codeSent", email: EMAIL });
   renderWithI18n(<SignInForm next="/b2b" />);
-  fireEvent.change(screen.getByLabelText(ar.auth.emailLabel), { target: { value: EMAIL } });
-  fireEvent.click(screen.getByRole("button", { name: ar.auth.sendCode }));
+  const emailInput = screen.getByLabelText(ar.auth.emailLabel);
+  fireEvent.change(emailInput, { target: { value: EMAIL } });
+  // Submit through React's synthetic submit path rather than a native submit-
+  // button click. A React 19 form with a function `action` carries a
+  // `javascript:throw` native-submit guard; a native button click races React's
+  // preventDefault and, under full-suite timing, jsdom occasionally executes the
+  // guard ("A React form was unexpectedly submitted"). Dispatching `submit` on
+  // the form invokes the action deterministically without that native path.
+  fireEvent.submit(emailInput.closest("form")!);
   await screen.findByLabelText(ar.auth.codeLabel);
 }
 
