@@ -134,7 +134,9 @@ Track as `needs-product-decision` issues ([`../development/github-workflow.md`](
 
 | Item | Trigger |
 |---|---|
-| **Lighthouse Performance score + TBT** — the Lighthouse runner was not installable in-sandbox; Sprint 6 measured production LCP/CLS/Navigation-Timing via Playwright (all LCP ≤ 2.5 s, CLS = 0) but not the Lighthouse composite score or TBT | run Lighthouse/LHCI on a runner with Chrome for the numeric score + TBT before a perf-sensitive release |
+| ~~**Lighthouse Performance score + TBT**~~ | **Resolved 2026-08-05 (Sprint 6.1)** — Lighthouse executed via `pnpm dlx lighthouse` with the local Chromium (authenticated routes via a captured session header from `_lh-cookies.spec`): sign-in Desktop **100** / Mobile **98**, /b2b **98**, /b2b/leads **96**; all LCP ≤ 2.5 s, CLS ≤ 0.1, TBT ≤ 200 ms. LHCI-in-CI on a Chrome runner is still a future add. |
+| **Favicon 404** — no `app/icon`/`favicon.ico`; the production console logs one benign `/favicon.ico` 404 (pre-existing, not an app error) | add an app icon/favicon (also improves the browser-tab UX) |
+| **CI Actions Node runtime** — workflows already use `actions/checkout@v4` + `setup-node@v4` (Node 20) + `setup-python@v5`; no deprecated (Node 16) action is in use | bump to the next major when GitHub deprecates the Node 20 runtime |
 | **Realtime via Broadcast** — Sprint 6 uses Postgres Changes (RLS-native, smallest for pilot volume); the client is refresh-only so per-row authorization cost is bounded | reconsider Broadcast-from-database (triggers + `realtime.messages` RLS) if change volume outgrows per-row Postgres-Changes authorization |
 | **Realtime surfaces limited to `leads` + `follow_up_tasks`** — customer-table changes are reflected only via related lead/follow-up events, not a direct `customers` subscription | publish `customers` (and widen the client) if a live customer list/detail needs its own change stream |
 | **customer_type immutability (decision, not a gap)** — kept immutable pending an explicit product rule for legal/operational type changes | revisit only if product documents an approved mutation path |

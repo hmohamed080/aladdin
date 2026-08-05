@@ -65,9 +65,12 @@ is published. Replica identity stays default (primary key).
 shell for the active org):
 
 - Subscribes through the caller’s **anon** browser client (never service_role),
-  filtered to the **server-derived** active `organization_id` (a forged cookie
-  can’t widen it). The socket is authenticated with the caller’s access token via
-  `realtime.setAuth`, so Postgres Changes are authorized as the user.
+  filtered to the **server-derived** active scope. **(Corrected in Sprint 6.1 — see
+  the closeout below):** the filter matches what the pages display — All Branches →
+  `organization_id=eq.<orgId>`; a selected branch → `branch_id=eq.<branchId>`
+  (which, like the list queries, excludes org-wide NULL-branch rows). A forged
+  cookie can’t widen it. The socket is authenticated with the caller’s access token
+  via `realtime.setAuth`, so Postgres Changes are authorized as the user.
 - **Never renders a Realtime payload.** An event is only a hint: a debounced
   `router.refresh()` re-fetches through RLS on the server. This is the keystone —
   an unauthorized row can never surface, and duplicate/out-of-order events can’t
@@ -128,10 +131,83 @@ shell for the active org):
 - **Frontend 114 → 125** (+11: wrapper contract shape + delta-computing form
   actions for both new RPCs).
 
+## Sprint 6.1 — merge-gate closeout (2026-08-05)
+
+Closes the confirmed Realtime-scope, E2E, visual-QA, and performance-gate gaps.
+**These correct/supersede the Sprint-6 claims above where noted.**
+
+**Active-branch Realtime scope (fix).** The subscription previously filtered only
+by `organization_id`, so an org-wide manager with one branch selected still
+refreshed on every branch. The filter now matches the visible data: All Branches →
+`organization_id=eq.<orgId>`; a selected branch → `branch_id=eq.<branchId>`
+(excludes org-wide NULL-branch rows, exactly like the list queries). The channel is
+keyed by that scope and rebuilt on branch change (old removed before the new
+becomes effective).
+
+**Realtime lifecycle instrumentation.** `realtime-debug.ts` mirrors channel
+scope/count, refresh count, and deferred-while-editing count to
+`window.__salesRealtime` **only** when `NEXT_PUBLIC_REALTIME_DEBUG=1` (a dev/E2E
+flag; a production build never sets it). It holds no secrets and is not application
+state.
+
+**Realtime E2E (`realtime-scope.spec.ts`, executed via two real browser
+contexts).** A+B manager scope narrows to `branch:<cairo>` on selecting Cairo
+(exactly one channel); a Cairo mutation refreshes while a Sheikh-Zayed mutation
+does **not**; switching to SZ tears down Cairo and one SZ channel remains; an SZ
+mutation then refreshes. C a follow-up created elsewhere is observed without
+reload. D sign-out removes every channel and a later mutation causes no refresh
+(the mutator is a different user — Supabase `signOut()` is global per user). E a
+revoked membership (revoked via the DB harness, restored after) can no longer
+surface data. F an in-scope event never overwrites an open edit (typed value +
+focus preserved, deferred not refreshed; the manual affordance then applies it). G
+repeated events render exactly one row.
+
+**Visual QA (complete matrix, corrected coverage).** Both roles now run the **full**
+4 viewports × {en,ar} × {light,dark} — earlier the rep ran only 2×2. Added a
+dialogs+states pass (customer-ownership dialog, lead source/branch dialog,
+follow-up edit/reassign, validation error, not-found, empty state) at 360 and 1440
+in en/light and ar/dark, asserting no overflow, dialog height ≤ viewport, and a
+reachable submit control, with 64 screenshots under `test-results/vqa/`. **Defect
+found & fixed:** the customer-**detail** Contact card overflowed ~42px at 360px in
+LTR (a long email couldn’t wrap) — fixed with `[&>*]:min-w-0` + `break-words`.
+
+**Lighthouse (now actually run** via `pnpm dlx lighthouse` with the local Chromium;
+authenticated routes measured with a captured session header — supersedes the
+“runner not installable” note):
+
+| Route | Form factor | Performance | LCP | CLS | TBT |
+|---|---|---|---|---|---|
+| /auth/sign-in | Desktop | **100** | 726 ms | 0 | 52 ms |
+| /auth/sign-in | Mobile | **98** | 1748 ms | 0.009 | 108 ms |
+| /b2b (auth) | Desktop | **98** | 795 ms | 0.032 | 19 ms |
+| /b2b/leads (auth) | Desktop | **96** | 1236 ms | 0.012 | 2 ms |
+
+All meet the targets (Desktop ≥ 90, Mobile ≥ 80, LCP ≤ 2.5 s, CLS ≤ 0.1, TBT ≤
+200 ms).
+
+**Extended Playwright production perf (`PERF=1`, median of 3 warm + cold).** Warm
+LCP: sign-in 52 · /b2b 552 · customers 648 · leads 908 · follow-ups 588 ms; CLS 0
+everywhere. Slowest **actual** request: the `/b2b` document (~0.9 s SSR), not TTFB.
+Failed requests **0** (navigation-cancelled `ERR_ABORTED` excluded); **page errors
+0**; **1 console error** = a `/favicon.ico` 404 (no favicon configured — benign,
+pre-existing). **Active Realtime channels = 1, duplicates = 0.**
+
+**CI flake (fixed).** The `sign-in-form` test failed ~2/8 full-suite runs (0/8
+isolated): `advanceToVerifyStep` clicked a submit button whose React 19
+`javascript:throw` native-submit guard occasionally beat `preventDefault`.
+Switching to `fireEvent.submit(form)` made it deterministic — **0/14** full-suite
+runs fail. Frontend **125 → 125** (no count change; the flake fix + realtime
+adapter are covered by the executed E2E).
+
 ## Known limitations / deferred
 
-- **Lighthouse score + TBT** — runner not installable in-sandbox (documented).
+- **Favicon 404** — no `app/icon`/`favicon.ico`; one benign console 404 (pre-existing).
 - **Realtime on Broadcast** — reconsider if per-row Postgres Changes volume grows.
+- **Realtime surfaces** limited to `leads` + `follow_up_tasks` (customer-table
+  changes reflected via related lead/follow-up events, not a direct subscription).
 - **customer_type mutation** — intentionally not implemented (no domain approval).
+- **CI Actions Node runtime** — workflows are current (checkout@v4/setup-node@v4 on
+  Node 20, setup-python@v5); Node 20 → 24 is a future maintenance bump when GitHub
+  deprecates it. No deprecated (Node 16) action is in use.
 - Products, inventory, RFQ, quotations, orders, projects, B2C, WhatsApp, OCR,
   payments, advertising, AI, community, academy — out of scope.

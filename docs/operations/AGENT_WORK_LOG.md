@@ -4,6 +4,30 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 2: Sprint 6.1 (Realtime Scope & Performance Merge-Gate Closeout)
+
+**Date:** 2026-08-05 · **Branch:** `feature/sales-ownership-realtime` (PR #9, continued) · **Base:** `main` @ `5a47011`
+
+### Objective
+Close confirmed Realtime-scope, E2E, visual-QA, performance-gate, and CI-flake gaps on PR #9. Ownership RPCs accepted in principle; no schema change this sub-sprint.
+
+### What changed
+1. **Active-branch Realtime scope (fix)** — the subscription filtered only by `organization_id`, so an org-wide manager with one branch selected still refreshed on every branch. Now it matches the visible data: All Branches → `organization_id=eq.<orgId>`; a selected branch → `branch_id=eq.<branchId>` (excludes org-wide NULL-branch rows). Channel keyed by scope, rebuilt on branch change.
+2. **Test-safe instrumentation** — `realtime-debug.ts` mirrors channel scope/count + refresh/deferred counts to `window.__salesRealtime` only when `NEXT_PUBLIC_REALTIME_DEBUG=1` (dev/E2E flag; production build never sets it; no secrets, not app state).
+3. **Realtime E2E** — `realtime-scope.spec.ts` (6 scenarios, two real contexts): branch-scope narrowing + teardown + out-of-scope-no-refresh + single channel; follow-up cross-context; sign-out channel removal; revoked-membership no-leak; open-form deferral/focus safety; duplicate → one row.
+4. **Visual QA** — both roles now run the **full** 4×{en,ar}×{light,dark} matrix + a dialogs/states pass (ownership dialogs, follow-up edit, validation/not-found/empty). **Fixed** a 42px customer-detail overflow at 360px (long email couldn't wrap → `[&>*]:min-w-0` + `break-words`). 64 screenshots.
+5. **Lighthouse (actually run** via `pnpm dlx`, no permanent dep) — sign-in Desktop **100** / Mobile **98**; authenticated /b2b **98**, /b2b/leads **96** (session captured via `_lh-cookies.spec`). All targets met (LCP ≤ 2.5 s, CLS ≤ 0.1, TBT ≤ 200 ms).
+6. **Extended perf.spec** — cold + median-of-3 warm, slowest **actual** request (not TTFB), failed/console/page-error counts, request count/size, **Realtime channels = 1, duplicates = 0**. One benign `/favicon.ico` 404 console error (pre-existing).
+7. **CI flake (fixed)** — `sign-in-form` test failed ~2/8 full-suite runs (React 19 form-action native-submit guard racing `preventDefault`); switched to `fireEvent.submit(form)` → **0/14** full-suite runs fail.
+
+### Validation
+Frontend typecheck/lint/**125 tests** (0/14 flaky)/build ✓ · backend ruff + 10 pytest ✓ · Supabase **one** clean cycle (no SQL change): reset + lint + **416 pgTAP** ✓ · **6** race scripts ✓ · Playwright: full suite 20 passed / 28 skipped (project/env-gated) / 0 failed, realtime-scope 6/6, visual-QA 4/4, perf + Lighthouse executed ✓. No new dependency; no migration; no `.pen`.
+
+### Commits
+`fix: narrow realtime subscriptions to active branch scope` · `fix: remove confirmed sign-in test flake` · `test: prove realtime teardown, branch switching and form safety` · `test: complete visual QA matrix; fix customer-detail 360px overflow` · `test: add Lighthouse gate and extended production perf metrics` · `docs: correct Sprint 6 merge-gate evidence`
+
+---
+
 ## Session — Phase 2: Sprint 6 (Sales Ownership, Realtime & Performance Hardening)
 
 **Date:** 2026-08-05 · **Branch:** `feature/sales-ownership-realtime` (from `main` @ `5a47011`, PR #8 merged) · **Base:** `main`
