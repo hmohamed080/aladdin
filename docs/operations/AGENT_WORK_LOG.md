@@ -4,6 +4,29 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 2: Sprint 6.2 (Final Realtime & QA Merge Gate)
+
+**Date:** 2026-08-05 · **Branch:** `feature/sales-ownership-realtime` (PR #9, continued) · **Base:** `main` @ `5a47011`
+
+### Objective
+Close the last confirmed Sprint 6.1 items on PR #9. No schema change.
+
+### What changed
+1. **Realtime timer teardown** — `SalesRealtime` clears the flash timer (not only the debounce) on unmount / org / branch change / sign-out, and guards all `setState` behind a mount ref (no post-unmount work). Component-tested.
+2. **Dirty-form protection** — replaced focus-only detection with a persistent dirty-form guard (document-capture listener marks a modified B2B edit form; stays dirty after focus leaves; navigation resets; search/filter forms opt out via `data-no-dirty`). Realtime defers while any form is dirty. No global state, no new lib, no PII in the adapter.
+3. **ConfirmDialog focus fix** — excluded hidden inputs from the focusables query (ownership dialogs lead with hidden inputs, so focus never entered the dialog / the trap broke).
+4. **State coverage** — rep visual matrix now asserts the theme exactly like the manager matrix + an out-of-scope direct-URL check per cell; reconnecting status (deterministic hook), permission-denied panel (DB harness), and dialog focus-trap/Escape/restore are browser-asserted; stale-conflict rendering is a component test (React controls the token in-page).
+5. **Exact perf console gate** — `perf.spec` asserts failed=0, page-errors=0, non-favicon 4xx/5xx=0, and only the documented `/favicon.ico` 404 is tolerated (no approved brand asset exists outside the encrypted `.pen`; kept as debt).
+6. **Flake fully fixed** — the sign-in change-email flake (resurfaced by the new test files) is deterministic via `requestSubmit()` in `act`; 0 failures across 50+ full-suite runs.
+
+### Validation
+Frontend typecheck/lint/**130 tests** (0 flaky over 50+ runs)/build ✓ · backend ruff + 10 pytest ✓ · Supabase **one** clean cycle (no SQL): reset + lint + **416 pgTAP** ✓ · **6** race scripts ✓ · Playwright: realtime-scope **9/9** (incl. reconnecting/permission/dirty-focus-off/terminal-dialog), visual-QA **4/4** (both roles full matrix + dialogs/states), perf + Lighthouse re-run ✓. No new dependency; no migration; no `.pen`.
+
+### Commits
+`fix: protect dirty forms and clean realtime teardown` · `test: complete visual and performance console gates` · `test: eliminate residual React-19 form-action flake in the suite` · `docs: finalize Sprint 6 merge evidence`
+
+---
+
 ## Session — Phase 2: Sprint 6.1 (Realtime Scope & Performance Merge-Gate Closeout)
 
 **Date:** 2026-08-05 · **Branch:** `feature/sales-ownership-realtime` (PR #9, continued) · **Base:** `main` @ `5a47011`

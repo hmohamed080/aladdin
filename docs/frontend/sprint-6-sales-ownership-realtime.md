@@ -199,6 +199,54 @@ Switching to `fireEvent.submit(form)` made it deterministic — **0/14** full-su
 runs fail. Frontend **125 → 125** (no count change; the flake fix + realtime
 adapter are covered by the executed E2E).
 
+## Sprint 6.2 — final merge gate (2026-08-05)
+
+Closes the last confirmed items; no schema change.
+
+**Realtime teardown.** `SalesRealtime` now clears the flash timer (not only the
+debounce) on unmount / org / branch change / sign-out, and guards every `setState`
+behind a mount ref (no post-unmount work). Covered by a component test
+(`sales-realtime.test.tsx`).
+
+**Dirty-form protection (not just focus).** Focus-only detection was replaced by a
+persistent **dirty-form guard**: a document-capture listener marks a B2B edit form
+modified on the first `input`/`change`, and it **stays** dirty after the edited
+control loses focus, until a navigation resets it. Search/filter forms opt out with
+`data-no-dirty`. Realtime defers while any form is dirty; the manual affordance
+still applies. No global state, no new library, no PII in the adapter (it holds
+counters/scope strings only). The two-context E2E now moves focus **off** the input
+before the incoming event (scenario F) and protects an entered lost-reason in a
+**terminal dialog** (scenario H).
+
+**ConfirmDialog focus fix.** The focusables query excluded hidden inputs — an
+ownership dialog leads with hidden inputs, so focus was landing on a no-op hidden
+input and never entering the dialog. Fixed; the visual QA now asserts focus starts
+inside, Tab stays trapped, Escape closes, and focus returns to the trigger.
+
+**Completed state coverage** (browser unless noted): rep matrix asserts the theme
+exactly like the manager matrix + an out-of-scope direct-URL check per cell;
+reconnecting status (deterministic debug hook, scenario J); permission-denied panel
+for a read-only member (DB harness, scenario K); **stale-conflict** rendering is a
+**component** test (`customer-edit-form.test.tsx`) because React controls the
+optimistic-token hidden input in-page (the RPC 40001 is pgTAP- + race-script-proven,
+the mapping is unit-tested).
+
+**Exact performance console gate.** `perf.spec` now asserts `failed=0`,
+`page-errors=0`, non-favicon `4xx/5xx=0`, and that the **only** tolerated console
+error is the documented `/favicon.ico` 404 (any other fails). No approved brand
+icon asset exists outside the encrypted `.pen`, so the favicon stays explicit debt.
+
+**Lighthouse (re-run)** — sign-in Desktop **100** / Mobile **99**; /b2b **99**;
+/b2b/leads **93**. All targets met. Warm LCP (median 3): sign-in 64 · /b2b 548 ·
+customers 528 · leads 984 · follow-ups 532 ms; CLS 0; slowest actual request `/b2b`
+doc ~0.9 s; channels = 1, duplicates = 0.
+
+**Flake (fully fixed).** Adding the new component tests resurfaced the sign-in
+change-email flake (~1/30 full-suite; 0 isolated). `requestSubmit()` inside `act`
+(React intercepts + preventDefaults before jsdom runs the guard) + settling the
+post-send effect made it deterministic — **0 failures across 50+ full-suite runs**.
+Frontend **125 → 130** (+5: SalesRealtime timer/dirty + edit-form stale-conflict).
+
 ## Known limitations / deferred
 
 - **Favicon 404** — no `app/icon`/`favicon.ico`; one benign console 404 (pre-existing).
