@@ -42,5 +42,9 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    // Enable the test-safe Realtime lifecycle adapter (window.__salesRealtime) so
+    // the scoped-realtime E2E can assert channel scope/teardown/refresh. This flag
+    // is a dev/E2E concern only — a production build never sets it.
+    env: { ...process.env, NEXT_PUBLIC_REALTIME_DEBUG: "1" },
   },
 });
