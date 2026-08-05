@@ -50,17 +50,25 @@ test("production performance — key sales routes (cold + median of 3 warm)", as
   test.skip(process.env.PERF !== "1", "set PERF=1 to run against a production server");
   test.setTimeout(240_000);
 
-  // Instrument the page: failed requests, console errors, page errors, and the
-  // slowest ACTUAL network request (by response duration — never TTFB).
+  // Instrument the page: failed requests, console errors, page errors, bad
+  // responses, and the slowest ACTUAL network request (by response duration).
+  // The ONLY tolerated error is the documented /favicon.ico 404 (no approved brand
+  // icon asset is available outside the encrypted .pen; kept as explicit debt).
+  const FAVICON = /favicon\.ico/;
+  const isFaviconConsole = (m: string) => /Failed to load resource.*404/i.test(m);
   const failed: string[] = [];
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
+  const badResponses: string[] = []; // 4xx/5xx that are NOT the favicon 404
   let slowest = { url: "", ms: 0 };
   page.on("requestfailed", (r) => {
     // ERR_ABORTED is a navigation-cancelled in-flight request (we re-goto the same
     // route 4× per profile) — a measurement artifact, not an app failure.
     const err = r.failure()?.errorText ?? "";
     if (!err.includes("ERR_ABORTED")) failed.push(`${r.method()} ${r.url()} ${err}`);
+  });
+  page.on("response", (r) => {
+    if (r.status() >= 400 && !FAVICON.test(r.url())) badResponses.push(`${r.status()} ${r.url()}`);
   });
   page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
   page.on("pageerror", (e) => pageErrors.push(e.message));
@@ -103,19 +111,26 @@ test("production performance — key sales routes (cold + median of 3 warm)", as
     ([r, m]) => `PERF ${r} | ${m.cold.lcp} | ${m.warm.lcp} | ${m.warm.cls} | ${m.warm.ttfb} | ${m.warm.load} | ${m.warm.reqs} | ${m.warm.kb}`,
   );
   console.log("PERF " + header + "\n" + lines.join("\n"));
+  const otherConsole = consoleErrors.filter((m) => !isFaviconConsole(m));
   console.log(`PERF slowest-request | ${slowest.ms}ms | ${slowest.url}`);
-  console.log(`PERF failed-requests=${failed.length} console-errors=${consoleErrors.length} page-errors=${pageErrors.length}`);
+  console.log(`PERF failed-requests=${failed.length} console-errors=${consoleErrors.length} (favicon-404=${consoleErrors.length - otherConsole.length}, other=${otherConsole.length}) page-errors=${pageErrors.length} bad-responses=${badResponses.length}`);
   if (failed.length) console.log("PERF failed:\n" + failed.join("\n"));
-  if (consoleErrors.length) console.log("PERF console-errors:\n" + consoleErrors.slice(0, 10).join("\n"));
+  if (otherConsole.length) console.log("PERF other-console-errors:\n" + otherConsole.slice(0, 10).join("\n"));
+  if (badResponses.length) console.log("PERF bad-responses:\n" + badResponses.slice(0, 10).join("\n"));
   if (pageErrors.length) console.log("PERF page-errors:\n" + pageErrors.slice(0, 10).join("\n"));
   console.log(`PERF realtime channels=${rtInfo.channelCount} duplicates=${rtInfo.duplicates} adapter=${rtInfo.present} [${rtInfo.channels.join(",")}]`);
 
-  // Guardrails (production, warm): LCP <= 2.5s, CLS <= 0.1, one channel, no dup, clean console.
+  // Guardrails (production, warm): LCP <= 2.5s, CLS <= 0.1, one channel, no dup,
+  // and an EXACT clean console — the only tolerated error is the documented
+  // /favicon.ico 404 (explicit tech debt); anything else fails.
   for (const [route, m] of Object.entries(rows)) {
     expect(m.warm.lcp, `${route} warm LCP`).toBeLessThanOrEqual(2500);
     expect(m.warm.cls, `${route} warm CLS`).toBeLessThanOrEqual(0.1);
   }
+  expect(failed, "no failed requests (excluding ERR_ABORTED)").toEqual([]);
   expect(pageErrors, "no page errors").toEqual([]);
+  expect(badResponses, "no non-favicon 4xx/5xx responses").toEqual([]);
+  expect(otherConsole, "no console error other than the known favicon 404").toEqual([]);
   if (rtInfo.present) {
     expect(rtInfo.channelCount, "exactly one active Realtime channel").toBe(1);
     expect(rtInfo.duplicates, "no duplicate Realtime channel").toBe(0);

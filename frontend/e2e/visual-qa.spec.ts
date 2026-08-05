@@ -21,6 +21,7 @@ const THEMES = ["light", "dark"] as const;
 
 const SEED_LEAD = "1ead0001-0000-4000-8000-000000000001";
 const SEED_CUST = "d0000001-0000-4000-8000-000000000001";
+const SEED_SZ_LEAD = "1ead0003-0000-4000-8000-000000000003"; // Sheikh-Zayed lead (out of Cairo-rep scope)
 const AUTHED_ROUTES = [
   "/b2b",
   "/b2b/customers",
@@ -97,8 +98,16 @@ test.describe("visual QA matrix", () => {
             await page.goto(route, { waitUntil: "networkidle" });
             const html = page.locator("html");
             await expect(html).toHaveAttribute("dir", locale === "ar" ? "rtl" : "ltr");
+            // Assert the theme exactly as the manager matrix does.
+            if (theme === "dark") await expect(html).toHaveClass(/dark/);
+            else await expect(html).not.toHaveClass(/dark/);
             await assertNoOverflow(page, `rep ${vp.name}/${locale}/${theme} ${route}`);
           }
+          // Out-of-scope direct URL: the Cairo rep opening a Sheikh-Zayed record
+          // must get the not-found/permission state (no leaked data).
+          await page.goto(`/b2b/leads/${SEED_SZ_LEAD}`, { waitUntil: "networkidle" });
+          await expect(page.getByText(/not found|permission|غير موجود|صلاحية/i).first()).toBeVisible();
+          await assertNoOverflow(page, `rep out-of-scope ${vp.name}/${locale}/${theme}`);
           await page.goto("/b2b", { waitUntil: "networkidle" });
           await page.screenshot({ path: `test-results/vqa/rep-cockpit-${vp.name}-${locale}-${theme}.png` });
         }
@@ -142,12 +151,21 @@ test.describe("visual QA matrix", () => {
         await setPrefs(page, locale, theme);
         const tag = `${vp.name}-${locale}-${theme}`;
 
-        // Customer ownership confirmation dialog.
+        // Customer ownership confirmation dialog + focus management.
         await page.goto(`/b2b/customers/${SEED_CUST}/edit`, { waitUntil: "networkidle" });
-        await page.getByRole("button", { name: /branch & salesperson|الفرع ومندوب/i }).click();
+        const ownTrigger = page.getByRole("button", { name: /branch & salesperson|الفرع ومندوب/i });
+        await ownTrigger.click();
         await dialogFits("customer-ownership");
         await page.screenshot({ path: `test-results/vqa/dialog-customer-ownership-${tag}.png` });
+        const inDialog = () => page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'));
+        await expect.poll(inDialog, { message: "focus starts inside the dialog" }).toBe(true);
+        await page.keyboard.press("Tab");
+        await page.keyboard.press("Tab");
+        await page.keyboard.press("Tab");
+        expect(await inDialog(), "Tab stays trapped inside the dialog").toBe(true);
         await page.keyboard.press("Escape");
+        await expect(page.getByRole("dialog")).toBeHidden(); // Escape closes
+        await expect(ownTrigger).toBeFocused(); // focus returns to the trigger
 
         // Lead source/branch confirmation dialog.
         await page.goto(`/b2b/leads/${SEED_LEAD}/edit`, { waitUntil: "networkidle" });

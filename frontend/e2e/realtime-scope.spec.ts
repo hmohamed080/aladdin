@@ -13,6 +13,7 @@ import { signIn, IDENTITIES } from "./helpers/auth";
 const CAIRO = "c1111111-cccc-4ccc-8ccc-cccccccccccc";
 const SZ = "c2222222-cccc-4ccc-8ccc-cccccccccccc";
 const CAIRO_MEM = "e2222222-eeee-4eee-8eee-eeeeeeeeeee2";
+const SEED_CUST = "d0000001-0000-4000-8000-000000000001";
 const DB = "supabase_db_aladdin";
 const uid = () => randomUUID().slice(0, 8);
 const isMobile = () => test.info().project.name.includes("mobile");
@@ -58,6 +59,7 @@ test.describe("scoped realtime lifecycle", () => {
   test.beforeEach(() => test.skip(isMobile(), "desktop-only (multi-context + instrumentation)"));
 
   test("A+B: manager scope narrows to the active branch and tears down on switch", async ({ browser }) => {
+    test.setTimeout(120_000); // longest scenario (5 creates + 2 branch switches + polls)
     const a = await signed(browser, IDENTITIES.manager);
     const b = await signed(browser, IDENTITIES.manager);
     try {
@@ -158,20 +160,22 @@ test.describe("scoped realtime lifecycle", () => {
     const b = await signed(browser, IDENTITIES.manager);
     try {
       await requireDebug(a);
-      // Open a customer edit form and type unsaved text (focus stays in the field).
+      // Open a customer edit form and type unsaved text, THEN move focus OFF the
+      // input (to the page heading) — the dirty-form guard must still protect it.
       await a.goto(`/b2b/customers/d0000001-0000-4000-8000-000000000001/edit`);
       await waitRt(a);
       const nameField = a.locator("#displayName");
       await nameField.click();
       await nameField.fill("Unsaved Edit In Progress");
+      await a.getByRole("heading").first().click(); // focus leaves the input
+      await expect(nameField).not.toBeFocused();
 
       const before = (await rt(a))!;
-      // Context B creates an in-scope lead → A should DEFER (not refresh) while editing.
+      // Context B creates an in-scope lead → A must DEFER (form is dirty), not refresh.
       await createLeadInBranch(b, `RT Edit ${uid()}`, CAIRO);
       await expect.poll(async () => (await rt(a))!.deferred, { timeout: 25_000 }).toBeGreaterThan(before.deferred);
-      // Typed value + focus preserved; no refresh happened.
+      // Typed value preserved, no silent overwrite, focus not stolen by Realtime.
       await expect(nameField).toHaveValue("Unsaved Edit In Progress");
-      await expect(nameField).toBeFocused();
       expect((await rt(a))!.refreshes).toBe(before.refreshes);
 
       // The manual "Updated ↻" affordance is offered; clicking it applies the refresh.
@@ -179,6 +183,37 @@ test.describe("scoped realtime lifecycle", () => {
       await expect(refreshBtn).toBeVisible();
       await refreshBtn.click();
       await expect.poll(async () => (await rt(a))!.refreshes).toBeGreaterThan(before.refreshes);
+    } finally {
+      await a.context().close();
+      await b.context().close();
+    }
+  });
+
+  test("H: a terminal dialog with an entered reason is protected from an incoming event", async ({ browser }) => {
+    const a = await signed(browser, IDENTITIES.manager);
+    const b = await signed(browser, IDENTITIES.manager);
+    try {
+      await requireDebug(a);
+      // Open the Mark-Lost confirmation dialog on a seeded lead and enter a reason.
+      await a.goto("/b2b/leads/1ead0001-0000-4000-8000-000000000001");
+      await waitRt(a);
+      await a.getByRole("button", { name: /mark lost|تحديد كخاسرة|خاسرة/i }).click();
+      const dialog = a.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      const reason = dialog.locator("textarea").first();
+      await reason.fill("Budget postponed to next quarter");
+      // Move focus off the textarea but stay inside the (focus-trapped) dialog, so
+      // deferral is proven by the dirty-form guard, not merely by input focus.
+      await a.keyboard.press("Tab");
+      await expect(reason).not.toBeFocused();
+
+      const before = (await rt(a))!;
+      await createLeadInBranch(b, `RT Lost ${uid()}`, CAIRO);
+      await expect.poll(async () => (await rt(a))!.deferred, { timeout: 25_000 }).toBeGreaterThan(before.deferred);
+      // Dialog stays open, the entered reason survives, and no refresh fired.
+      await expect(dialog).toBeVisible();
+      await expect(reason).toHaveValue("Budget postponed to next quarter");
+      expect((await rt(a))!.refreshes).toBe(before.refreshes);
     } finally {
       await a.context().close();
       await b.context().close();
@@ -229,6 +264,46 @@ test.describe("scoped realtime lifecycle", () => {
     } finally {
       // Restore the seed so reruns and other specs are unaffected.
       execSync(`docker exec ${DB} psql -U postgres -d postgres -c "update public.memberships set status='active' where id='${CAIRO_MEM}'"`, { stdio: "ignore" });
+      await rep.context().close();
+    }
+  });
+
+  // Stale-conflict UI rendering is covered deterministically by a COMPONENT test
+  // (customer-edit-form.test.tsx) — the browser path is unreliable because React
+  // controls the optimistic-token hidden input (DOM tampering is reverted, and the
+  // real token round-trips), so a genuine stale conflict can't be forced in-page
+  // without a second real writer racing the exact render. The RPC 40001 is proven
+  // by pgTAP 19 + customer_update_concurrency_test.sh, and the 40001 → conflict
+  // mapping by the sales-forms unit tests.
+
+  test("J: the reconnecting status is shown when the channel degrades (deterministic)", async ({ browser }) => {
+    const a = await signed(browser, IDENTITIES.manager);
+    try {
+      await requireDebug(a);
+      // Drive the status deterministically via the debug-only hook (no random network).
+      await a.evaluate(() => window.dispatchEvent(new CustomEvent("sales-realtime:set-status", { detail: "reconnecting" })));
+      const statusEl = a.getByTestId("realtime-status");
+      await expect(statusEl).toBeVisible();
+      await expect(statusEl).toHaveText(/reconnecting|إعادة الاتصال/i);
+      await a.screenshot({ path: "test-results/vqa/state-realtime-reconnecting.png" });
+      // Recover to live.
+      await a.evaluate(() => window.dispatchEvent(new CustomEvent("sales-realtime:set-status", { detail: "live" })));
+      await expect(statusEl).toHaveText("");
+    } finally {
+      await a.context().close();
+    }
+  });
+
+  test("K: a read-only member gets the permission-denied panel on an edit route", async ({ browser }) => {
+    const rep = await signed(browser, IDENTITIES.branchLimited); // Cairo rep (sales.read + sales.write)
+    try {
+      // Temporarily strip sales.write so the rep is read-only (harness; restored after).
+      execSync(`docker exec ${DB} psql -U postgres -d postgres -c "delete from public.membership_capabilities where membership_id='${CAIRO_MEM}' and capability_key='sales.write'"`, { stdio: "ignore" });
+      await rep.goto(`/b2b/customers/${SEED_CUST}/edit`);
+      await expect(rep.getByText(/don.t have access|permission|role or branch|الوصول|صلاحية|دورك/i).first()).toBeVisible();
+      await rep.screenshot({ path: "test-results/vqa/state-permission-denied.png" });
+    } finally {
+      execSync(`docker exec ${DB} psql -U postgres -d postgres -c "insert into public.membership_capabilities (membership_id, capability_key) values ('${CAIRO_MEM}','sales.write') on conflict do nothing"`, { stdio: "ignore" });
       await rep.context().close();
     }
   });
