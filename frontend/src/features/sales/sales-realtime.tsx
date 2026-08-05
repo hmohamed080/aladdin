@@ -60,6 +60,8 @@ export function SalesRealtime({ orgId, branchId }: { orgId: string; branchId: st
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
+    let channel: RealtimeChannel | null = null;
+    let cancelled = false;
 
     function onChange() {
       // Coalesce bursts; never refresh mid-edit (defer to the manual affordance).
@@ -71,24 +73,37 @@ export function SalesRealtime({ orgId, branchId }: { orgId: string; branchId: st
     }
 
     const filter = `organization_id=eq.${orgId}`;
-    const channel: RealtimeChannel = supabase
-      .channel(`sales:${orgId}:${branchId ?? "all"}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "leads", filter }, onChange)
-      .on("postgres_changes", { event: "*", schema: "public", table: "follow_up_tasks", filter }, onChange)
-      .subscribe((s) => {
-        if (s === "SUBSCRIBED") setStatus("live");
-        else if (s === "CHANNEL_ERROR" || s === "TIMED_OUT") setStatus("reconnecting");
-        else if (s === "CLOSED") setStatus("offline");
-      });
+    (async () => {
+      // Authenticate the Realtime socket as the CALLER so RLS authorizes each
+      // Postgres Changes event against the user's own policies (an anon socket
+      // would be authorized as anon and receive nothing).
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      supabase.realtime.setAuth(data.session?.access_token ?? null);
+      channel = supabase
+        .channel(`sales:${orgId}:${branchId ?? "all"}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "leads", filter }, onChange)
+        .on("postgres_changes", { event: "*", schema: "public", table: "follow_up_tasks", filter }, onChange)
+        .subscribe((s) => {
+          if (s === "SUBSCRIBED") setStatus("live");
+          else if (s === "CHANNEL_ERROR" || s === "TIMED_OUT") setStatus("reconnecting");
+          else if (s === "CLOSED") setStatus("offline");
+        });
+    })();
 
-    const { data: authSub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") supabase.removeChannel(channel);
+    const { data: authSub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        if (channel) supabase.removeChannel(channel);
+      } else if (session?.access_token) {
+        supabase.realtime.setAuth(session.access_token);
+      }
     });
 
     return () => {
+      cancelled = true;
       if (debounce.current) clearTimeout(debounce.current);
       authSub.subscription.unsubscribe();
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
     // Rebuild the subscription when the active org or branch changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
