@@ -5,7 +5,7 @@
 | **Status** | Specification · Phase 0.7 (pre-implementation) |
 | **Version** | 1.0.0 |
 | **Owner** | Architecture / Foundation |
-| **Last Updated** | 2026-08-01 |
+| **Last Updated** | 2026-08-05 |
 | **Depends On** | 03_database_design.md, ../security/rls-strategy.md, ../decisions/ADR-0002-database-migrations.md |
 | **Related** | 07_permissions_matrix.md, 05_storage_design.md |
 
@@ -95,6 +95,8 @@ Tables: `customers`, `leads`, `sales_activities`, `follow_up_tasks`.
 - **SELECT (scope):** an active member sees a row when they have org-wide sales authority (`sales.manage`/`org.manage`) **or** `sales.read` **and** (the row's branch ∈ their assigned branches **or** the row is assigned to them). Activities/follow-ups carry a denormalized `branch_id` so the same predicate applies without cross-table recursion. **No platform cross-tenant read on customer PII** (data-minimization — no market-wide customer database).
 - **Writes:** no write policy and no write grant. Every mutation is a `security definer` RPC (SELECT-only base tables; `anon` none). `sales_activities` is append-only (no update/delete path).
 - **Concurrency:** `leads`/`follow_up_tasks` carry a `version`; `transition_lead` rejects a stale expected version (`40001`) under a row lock.
+- **Ownership edits (Sprint 6):** `set_customer_ownership` / `set_lead_source_branch` change branch/assignee (and lead source) through the same RPC-only path — `sales.assign`-gated, scope-checked, assignee branch-compatibility enforced, optimistic-guarded (`40001`), audited transactionally. No RLS write policy is added; base tables stay SELECT-only.
+- **Realtime (Sprint 6):** only `leads` and `follow_up_tasks` are in the `supabase_realtime` publication. RLS is the Realtime boundary too — Postgres Changes are authorized against the subscriber's own `SELECT` policy, and the client is refresh-only (re-fetches through RLS; never trusts a payload). No customer/identity/verification/audit table is published.
 
 ## 4. Admin & support access
 

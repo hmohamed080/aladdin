@@ -5,7 +5,7 @@
 | **Status** | Specification · Phase 0.7 (pre-implementation) |
 | **Version** | 1.0.0 |
 | **Owner** | Architecture / Foundation |
-| **Last Updated** | 2026-08-01 |
+| **Last Updated** | 2026-08-05 |
 | **Depends On** | 02_domain_model.md, ../database/naming-conventions.md, ../decisions/ADR-0002-database-migrations.md |
 | **Related** | 04_relationships.md, 06_rls_strategy.md, 12_validation_rules.md |
 
@@ -14,6 +14,8 @@ Complete database **specification** for the MVP. **No migrations are created her
 > **Implementation status (Phase 1, independently hardened through Sprint 2.1, 2026-08-03):** §1 Identity, §2 Organizations & access, §3 Verification, and §12 `audit_log` are implemented by migrations `20260802090001–20260804090001`. Deltas are governed by **[ADR-0007](../decisions/ADR-0007-identity-and-tenancy-model.md)** and the [`Phase 1 review`](../database/phase1-identity-tenancy-review.md): `primary_branch_id` is descriptive only; public discovery uses curated views (Sprint 4.2: `security_invoker` views over constrained `security definer` `app._*` readers — [ADR-0007 D21](../decisions/ADR-0007-identity-and-tenancy-model.md)); platform authority exists only in `platform_role_grants`; `primary_account_type` and `public_profile_status` are privileged workflow fields. Account-upgrade, verification, membership, capability, and branch-assignment writes are mandatory postgres-owned `security definer` RPCs with a pinned empty `search_path`; direct `authenticated`/`service_role` DML is revoked. Remaining sections stay specification until their feature migration lands.
 >
 > **Phase 2, Sprint 3 (2026-08-03):** §F Sales is **partially implemented** — tenant-owned `customers`, `leads`, `sales_activities`, `follow_up_tasks` (migrations `2026080509000x`; [ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md)) with composite-FK tenant safety, scope RLS, 13 constrained `security definer` workflow RPCs, and `security_invoker` dashboard views. `Opportunity`/`Need`/`Match`, RFQ, quotes, and projects remain specification.
+>
+> **Phase 2, Sprint 6 (2026-08-05):** migration `20260806090001` adds two ownership-edit RPCs (`set_customer_ownership`, `set_lead_source_branch`) and two audit actions (`customer.reassigned`, `lead.details_changed`), and publishes **exactly** `leads` + `follow_up_tasks` to `supabase_realtime` (RLS-enforced Postgres Changes; no PII/identity table published). `customer_type` is kept immutable. **13 migrations**; **416 pgTAP** across 19 files.
 
 Follows [naming-conventions.md](../database/naming-conventions.md). Entities are defined in [02](02_domain_model.md); relationships in [04](04_relationships.md).
 

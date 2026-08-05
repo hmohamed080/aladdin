@@ -5,7 +5,7 @@
 | **Status** | Specification · Phase 0.7 (pre-implementation) |
 | **Version** | 1.0.0 |
 | **Owner** | Architecture / Foundation |
-| **Last Updated** | 2026-08-01 |
+| **Last Updated** | 2026-08-05 |
 | **Depends On** | 02_domain_model.md, 06_rls_strategy.md, ../product/PRODUCT_DIRECTION_GUIDE.md |
 | **Related** | 06_rls_strategy.md, 08_api_contracts.md |
 
@@ -116,6 +116,8 @@ Platform capabilities (from `platform_role_grants`, not memberships): `platform.
 | Administrator | xt (govern) | — | — | — | — |
 
 > **Implemented Sprint 3 boundary (customers/leads/activities/follow-ups — ADR-0008):** a branch-limited salesperson (`sales.read`+`sales.write`) sees and works only records in their assigned branch(es) **and** records assigned to them; `sales.assign` adds assign/reassign; `sales.manage` (or `org.manage`) grants org-wide sales authority. Reads are scoped by RLS, writes by constrained `security definer` RPCs — never by frontend filtering. **Platform admins have no cross-tenant read on customer PII** (data-minimization; no market-wide customer database). `authenticated`/`service_role` have no direct sales DML.
+>
+> **Sprint 6 ownership edits (ADR-0008 addendum):** changing a customer's **branch/assignee** (`set_customer_ownership`) or a lead's **branch** / reassigning it (`set_lead_source_branch`) requires **`sales.assign`** (org-wide moves need `sales.manage`); a lead's **source** alone needs only `sales.write`. Both RPCs keep the effective assignee branch-compatible (a stranding move is rejected), and `customer_type` is **immutable** (no capability grants type mutation).
 
 ### RFQ & quotations
 | Audience | Create RFQ | Respond (quote) | Decide | Read scope |

@@ -5,7 +5,7 @@
 | **Status** | Living document (tracked debt) |
 | **Version** | 1.0.0 |
 | **Owner** | Engineering |
-| **Last Updated** | 2026-08-01 |
+| **Last Updated** | 2026-08-05 |
 | **Depends On** | [`14_future_extensions.md`](14_future_extensions.md), [`../operations/RUNTIME_STATE.md`](../operations/RUNTIME_STATE.md) |
 | **Related** | [`../product/BACKLOG.md`](../product/BACKLOG.md), [`../roadmap/ROADMAP.md`](../roadmap/ROADMAP.md), [`../engineering/README.md`](../engineering/README.md) |
 
@@ -126,9 +126,18 @@ Track as `needs-product-decision` issues ([`../development/github-workflow.md`](
 | **Broader 05C + B2C/Admin screens** — this sprint is a vertical slice (customers/leads/follow-ups) | subsequent design-roadmap modules |
 | ~~**Component test depth / no e2e harness**~~ | **Resolved 2026-08-04 (Sprint 5/5.1)** — a local **Playwright** E2E suite (`frontend/e2e`, real Email-OTP via Mailpit, seeded identities) with 9 asserting scenarios; **executed and green** via `pnpm e2e` (set `PW_CHROMIUM` to the full Chromium if the headless-shell isn't downloaded). Live pixel-level visual QA across 4 viewports remains a maintainer follow-up. |
 | **Customer version column** — customers use an `updated_at` optimistic precondition (no `version` column, unlike leads/follow-ups) | add a `version` column + trigger if a uniform integer-version model is later preferred; the current `expected_updated_at` guard is proven by `customer_update_concurrency_test.sh` |
-| **Customer branch/type/assignee edit + lead source/branch edit** — Sprint 5 ships edits limited to the fields the trusted update RPCs support; `update_customer` has no type/branch/assignee params and `update_lead_details` has no source/branch. Customer assignment/type/branch and lead source/branch are not editable post-create | build a minimal, audited, caller-scoped RPC extension (composite-FK branch check, assignee same-org/branch, in-transaction audit) when product needs post-create reassignment/retagging |
-| **Live cross-breakpoint visual QA (Sprint 5)** — 4 viewports × light/dark × ar/en was not run in the authoring sandbox (no browser automation); structural server-render checks + build + 104 tests stand in | a maintainer runs `pnpm e2e` and the visual pass |
+| ~~**Customer branch/assignee edit + lead source/branch edit**~~ | **Resolved 2026-08-05 (Sprint 6)** — `set_customer_ownership` and `set_lead_source_branch` (migration `20260806090001`): caller-scoped, capability-gated, version/updated_at-guarded, strand-rejecting, transactionally audited. **`customer_type` is intentionally NOT editable** (kept immutable — no product/domain doc approves mutation; correct a mistype by archive + re-create). |
+| ~~**Live cross-breakpoint visual QA (Sprint 5)**~~ | **Resolved 2026-08-05 (Sprint 6)** — executed Playwright visual-QA matrix (`VQA=1`): 4 viewports × {en,ar} × {light,dark} × {manager, branch rep} + sign-in, asserting no horizontal overflow + correct dir/dark with screenshots; found and fixed a 360px cockpit overflow. |
 | **`frontend/.env.local`** is required to run the app locally (public anon values) — documented, gitignored | — |
+
+## Sales Ownership / Realtime / Perf (Phase 2, Sprint 6)
+
+| Item | Trigger |
+|---|---|
+| **Lighthouse Performance score + TBT** — the Lighthouse runner was not installable in-sandbox; Sprint 6 measured production LCP/CLS/Navigation-Timing via Playwright (all LCP ≤ 2.5 s, CLS = 0) but not the Lighthouse composite score or TBT | run Lighthouse/LHCI on a runner with Chrome for the numeric score + TBT before a perf-sensitive release |
+| **Realtime via Broadcast** — Sprint 6 uses Postgres Changes (RLS-native, smallest for pilot volume); the client is refresh-only so per-row authorization cost is bounded | reconsider Broadcast-from-database (triggers + `realtime.messages` RLS) if change volume outgrows per-row Postgres-Changes authorization |
+| **Realtime surfaces limited to `leads` + `follow_up_tasks`** — customer-table changes are reflected only via related lead/follow-up events, not a direct `customers` subscription | publish `customers` (and widen the client) if a live customer list/detail needs its own change stream |
+| **customer_type immutability (decision, not a gap)** — kept immutable pending an explicit product rule for legal/operational type changes | revisit only if product documents an approved mutation path |
 
 ## Maintenance
 Add an item the moment a deferral/compromise is made (in the same PR). Removing an item requires the fix to land. This register is reviewed at each phase boundary and before any release.
