@@ -12,8 +12,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/server/actions/sales", () => ({
   createCustomer: vi.fn(),
   updateCustomer: vi.fn(),
+  setCustomerOwnership: vi.fn(),
   createLead: vi.fn(),
   updateLeadDetails: vi.fn(),
+  setLeadSourceBranch: vi.fn(),
   transitionLead: vi.fn(),
   assignLead: vi.fn(),
   addSalesActivity: vi.fn(),
@@ -29,8 +31,10 @@ import * as sales from "@/server/actions/sales";
 import {
   createCustomerAction,
   updateCustomerAction,
+  setCustomerOwnershipAction,
   createLeadAction,
   updateLeadDetailsAction,
+  setLeadSourceBranchAction,
   updateFollowUpAction,
   reassignFollowUpAction,
   transitionLeadAction,
@@ -294,5 +298,94 @@ describe("reassignFollowUpAction — version-guarded reassignment", () => {
     vi.mocked(sales.reassignFollowUp).mockRejectedValueOnce({ code: "42501", message: "sales.assign required" });
     const res = await reassignFollowUpAction({ ok: false }, fd({ followUpId: "f1", assigneeMembershipId: "m1" }));
     expect(res.code).toBe("states.assignDenied");
+  });
+});
+
+describe("setCustomerOwnershipAction — only changed axes, optimistic on updated_at", () => {
+  const U0 = "2026-08-05T10:00:00.123456+00:00";
+
+  it("returns states.noChange when neither branch nor assignee differs (no RPC call)", async () => {
+    const res = await setCustomerOwnershipAction(
+      { ok: false },
+      fd({ customerId: CUST, expectedUpdatedAt: U0, branchId: "b1", currentBranchId: "b1", assigneeMembershipId: "m1", currentAssigneeId: "m1" }),
+    );
+    expect(res.code).toBe("states.noChange");
+    expect(sales.setCustomerOwnership).not.toHaveBeenCalled();
+  });
+
+  it("sends ONLY the changed branch (assignee unchanged) and forwards the token", async () => {
+    vi.mocked(sales.setCustomerOwnership).mockResolvedValueOnce(undefined);
+    await expect(
+      setCustomerOwnershipAction(
+        { ok: false },
+        fd({ customerId: CUST, expectedUpdatedAt: U0, branchId: "b2", currentBranchId: "b1", assigneeMembershipId: "m1", currentAssigneeId: "m1" }),
+      ),
+    ).rejects.toThrow(`REDIRECT:/b2b/customers/${CUST}?updated=1`);
+    expect(sales.setCustomerOwnership).toHaveBeenCalledWith({}, CUST, U0, { branch: { to: "b2" } });
+  });
+
+  it("clears the assignee (blank) as an explicit unassign delta", async () => {
+    vi.mocked(sales.setCustomerOwnership).mockResolvedValueOnce(undefined);
+    await expect(
+      setCustomerOwnershipAction(
+        { ok: false },
+        fd({ customerId: CUST, expectedUpdatedAt: U0, branchId: "b1", currentBranchId: "b1", assigneeMembershipId: "", currentAssigneeId: "m1" }),
+      ),
+    ).rejects.toThrow(/REDIRECT/);
+    expect(sales.setCustomerOwnership).toHaveBeenCalledWith({}, CUST, U0, { assignee: { to: null } });
+  });
+
+  it("maps a stale updated_at conflict to states.staleConflict", async () => {
+    vi.mocked(sales.setCustomerOwnership).mockRejectedValueOnce({ code: "40001", message: "customer was modified concurrently" });
+    const res = await setCustomerOwnershipAction(
+      { ok: false },
+      fd({ customerId: CUST, expectedUpdatedAt: U0, branchId: "b2", currentBranchId: "b1" }),
+    );
+    expect(res.code).toBe("states.staleConflict");
+  });
+});
+
+describe("setLeadSourceBranchAction — lifecycle-safe source/branch edit", () => {
+  it("returns states.noChange when nothing differs", async () => {
+    const res = await setLeadSourceBranchAction(
+      { ok: false },
+      fd({ leadId: LEAD, version: "2", source: "referral", currentSource: "referral", branchId: "b1", currentBranchId: "b1", assigneeMembershipId: "m1", currentAssigneeId: "m1" }),
+    );
+    expect(res.code).toBe("states.noChange");
+    expect(sales.setLeadSourceBranch).not.toHaveBeenCalled();
+  });
+
+  it("sends only the changed source and forwards the version", async () => {
+    vi.mocked(sales.setLeadSourceBranch).mockResolvedValueOnce(3);
+    await expect(
+      setLeadSourceBranchAction(
+        { ok: false },
+        fd({ leadId: LEAD, version: "2", source: "campaign", currentSource: "referral", branchId: "b1", currentBranchId: "b1" }),
+      ),
+    ).rejects.toThrow(`REDIRECT:/b2b/leads/${LEAD}?updated=1`);
+    expect(sales.setLeadSourceBranch).toHaveBeenCalledWith({}, LEAD, 2, { source: { to: "campaign" } });
+  });
+
+  it("sends branch + reassign deltas together", async () => {
+    vi.mocked(sales.setLeadSourceBranch).mockResolvedValueOnce(3);
+    await expect(
+      setLeadSourceBranchAction(
+        { ok: false },
+        fd({ leadId: LEAD, version: "2", source: "referral", currentSource: "referral", branchId: "b2", currentBranchId: "b1", assigneeMembershipId: "m2", currentAssigneeId: "m1" }),
+      ),
+    ).rejects.toThrow(/REDIRECT/);
+    expect(sales.setLeadSourceBranch).toHaveBeenCalledWith({}, LEAD, 2, { branch: { to: "b2" }, reassign: { to: "m2" } });
+  });
+
+  it("maps a strand rejection (assignee/branch) to states.assigneeBranch", async () => {
+    vi.mocked(sales.setLeadSourceBranch).mockRejectedValueOnce({
+      code: "22023",
+      message: "assignee is not compatible with the selected branch; reassign to a branch member",
+    });
+    const res = await setLeadSourceBranchAction(
+      { ok: false },
+      fd({ leadId: LEAD, version: "2", branchId: "b2", currentBranchId: "b1" }),
+    );
+    expect(res.code).toBe("states.assigneeBranch");
   });
 });
