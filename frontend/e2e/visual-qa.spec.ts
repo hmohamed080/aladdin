@@ -75,18 +75,33 @@ test.describe("visual QA matrix", () => {
     }
   });
 
-  test("branch-limited rep — mobile + desktop, ar dark and en light", async ({ page, request }) => {
-    test.setTimeout(180_000);
+  test("branch-limited rep — 4 viewports × en/ar × light/dark", async ({ page, request }) => {
+    test.setTimeout(600_000);
     await signIn(page, request, IDENTITIES.branchLimited);
-    for (const vp of [VIEWPORTS[0]!, VIEWPORTS[3]!]) {
+    // The rep can create/edit within Cairo but not reassign; the seeded Cairo
+    // customer/lead detail + edit are in scope.
+    const repRoutes = [
+      "/b2b",
+      "/b2b/customers",
+      `/b2b/customers/${SEED_CUST}`,
+      `/b2b/customers/${SEED_CUST}/edit`,
+      "/b2b/leads",
+      "/b2b/follow-ups",
+    ];
+    for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
-      for (const [locale, theme] of [["ar", "dark"], ["en", "light"]] as const) {
-        await setPrefs(page, locale, theme);
-        for (const route of ["/b2b", "/b2b/customers", "/b2b/leads", "/b2b/follow-ups"]) {
-          await page.goto(route, { waitUntil: "networkidle" });
-          await assertNoOverflow(page, `rep ${vp.name}/${locale}/${theme} ${route}`);
+      for (const locale of LOCALES) {
+        for (const theme of THEMES) {
+          await setPrefs(page, locale, theme);
+          for (const route of repRoutes) {
+            await page.goto(route, { waitUntil: "networkidle" });
+            const html = page.locator("html");
+            await expect(html).toHaveAttribute("dir", locale === "ar" ? "rtl" : "ltr");
+            await assertNoOverflow(page, `rep ${vp.name}/${locale}/${theme} ${route}`);
+          }
+          await page.goto("/b2b", { waitUntil: "networkidle" });
+          await page.screenshot({ path: `test-results/vqa/rep-cockpit-${vp.name}-${locale}-${theme}.png` });
         }
-        await page.screenshot({ path: `test-results/vqa/rep-${vp.name}-${locale}-${theme}.png` });
       }
     }
   });
@@ -99,6 +114,72 @@ test.describe("visual QA matrix", () => {
         await page.goto("/auth/sign-in", { waitUntil: "networkidle" });
         await assertNoOverflow(page, `sign-in ${vp.name}/${theme}`);
         await page.screenshot({ path: `test-results/vqa/signin-${vp.name}-${theme}.png` });
+      }
+    }
+  });
+
+  // Dialogs + edge states across mobile (360) and desktop (1440), en-light & ar-dark.
+  test("dialogs and state surfaces — mobile + desktop, en/light and ar/dark", async ({ page, request }) => {
+    test.setTimeout(300_000);
+    await signIn(page, request, IDENTITIES.manager);
+
+    async function dialogFits(name: string) {
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      const box = await dialog.boundingBox();
+      const vh = page.viewportSize()!.height;
+      expect(box, `${name} dialog box`).not.toBeNull();
+      // Dialog must not exceed the viewport height (it scrolls internally instead).
+      expect(box!.height, `${name} dialog height <= viewport`).toBeLessThanOrEqual(vh + 1);
+      // The confirm/submit control is reachable inside the dialog.
+      await expect(dialog.getByRole("button", { name: /save changes|حفظ التغييرات/i })).toBeVisible();
+      await assertNoOverflow(page, `${name} (dialog open)`);
+    }
+
+    for (const vp of [VIEWPORTS[0]!, VIEWPORTS[3]!]) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      for (const [locale, theme] of [["en", "light"], ["ar", "dark"]] as const) {
+        await setPrefs(page, locale, theme);
+        const tag = `${vp.name}-${locale}-${theme}`;
+
+        // Customer ownership confirmation dialog.
+        await page.goto(`/b2b/customers/${SEED_CUST}/edit`, { waitUntil: "networkidle" });
+        await page.getByRole("button", { name: /branch & salesperson|الفرع ومندوب/i }).click();
+        await dialogFits("customer-ownership");
+        await page.screenshot({ path: `test-results/vqa/dialog-customer-ownership-${tag}.png` });
+        await page.keyboard.press("Escape");
+
+        // Lead source/branch confirmation dialog.
+        await page.goto(`/b2b/leads/${SEED_LEAD}/edit`, { waitUntil: "networkidle" });
+        await page.getByRole("button", { name: /source & branch|المصدر والفرع/i }).click();
+        await dialogFits("lead-source-branch");
+        await page.screenshot({ path: `test-results/vqa/dialog-lead-source-branch-${tag}.png` });
+        await page.keyboard.press("Escape");
+
+        // Follow-up edit + reassign form (reach via the board's first Edit link).
+        await page.goto("/b2b/follow-ups", { waitUntil: "networkidle" });
+        await page.getByRole("link", { name: /^(edit|تعديل)$/i }).first().click();
+        await page.waitForURL(/\/b2b\/follow-ups\/[0-9a-f-]{36}\/edit/);
+        await assertNoOverflow(page, `follow-up-edit ${tag}`);
+        await page.screenshot({ path: `test-results/vqa/followup-edit-${tag}.png` });
+
+        // Validation error state (submit the new-customer form with no name).
+        await page.goto("/b2b/customers/new", { waitUntil: "networkidle" });
+        await page.getByRole("button", { name: /create|إضافة|حفظ/i }).click();
+        await expect(page.getByRole("alert").first()).toBeVisible();
+        await assertNoOverflow(page, `validation-error ${tag}`);
+        await page.screenshot({ path: `test-results/vqa/state-validation-${tag}.png` });
+
+        // Not-found state.
+        await page.goto("/b2b/customers/00000000-0000-4000-8000-000000000000", { waitUntil: "networkidle" });
+        await expect(page.getByText(/not found|غير موجود/i).first()).toBeVisible();
+        await assertNoOverflow(page, `not-found ${tag}`);
+        await page.screenshot({ path: `test-results/vqa/state-not-found-${tag}.png` });
+
+        // Empty state (search that matches nothing).
+        await page.goto("/b2b/customers?search=zzq-no-match-xyz", { waitUntil: "networkidle" });
+        await assertNoOverflow(page, `empty ${tag}`);
+        await page.screenshot({ path: `test-results/vqa/state-empty-${tag}.png` });
       }
     }
   });

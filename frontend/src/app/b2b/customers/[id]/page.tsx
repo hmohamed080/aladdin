@@ -72,10 +72,10 @@ export default async function CustomerDetailPage({
         <PageHeader title={customer.display_name} />
       </div>
 
-      <div className="grid gap-lg desktop:grid-cols-3">
+      <div className="grid gap-lg desktop:grid-cols-3 [&>*]:min-w-0">
         <Card className="desktop:col-span-1">
           <SectionTitle className="mb-md">{m.customers.contactInfo}</SectionTitle>
-          <dl className="flex flex-col gap-md">
+          <dl className="flex flex-col gap-md break-words">
             <Field label={m.customers.status}>
               <CustomerStatusBadge status={customer.status} />
             </Field>
