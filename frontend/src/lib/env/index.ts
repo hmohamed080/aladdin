@@ -16,6 +16,10 @@ const publicEnvSchema = z.object({
     .default("local"),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  // Approved support contact shown on /auth/support for account-recovery help
+  // (e.g. "support@aladdin.eg" or a help-desk URL). OPTIONAL: when unset, the
+  // support page shows a safe "unavailable" state instead of a fabricated contact.
+  NEXT_PUBLIC_SUPPORT_CONTACT: z.string().trim().min(1).optional(),
 });
 
 const serverEnvSchema = z.object({
@@ -59,5 +63,6 @@ export function readPublicEnv(): PublicEnv {
     NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_SUPPORT_CONTACT: process.env.NEXT_PUBLIC_SUPPORT_CONTACT,
   });
 }

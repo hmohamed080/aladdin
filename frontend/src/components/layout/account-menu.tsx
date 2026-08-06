@@ -11,18 +11,25 @@ import { LogOutIcon } from "@/components/ui/icons";
  * navigation is derived from memberships (PRODUCT_DIRECTION_GUIDE).
  */
 export function AccountMenu({ orgName }: { orgName: string }) {
-  const { t } = useI18n();
   return (
     <div className="flex items-center gap-sm">
       <span className="hidden max-w-40 truncate text-label font-medium text-fg-secondary desktop:inline">
         {orgName}
       </span>
-      <form action={signOut}>
-        <Button type="submit" variant="outline" size="sm" aria-label={t("common.signOut")}>
-          <LogOutIcon size={16} />
-          <span className="hidden tablet:inline">{t("common.signOut")}</span>
-        </Button>
-      </form>
+      <SignOutButton />
     </div>
+  );
+}
+
+/** Sign-out control (form + server action), reused across the shell chrome. */
+export function SignOutButton() {
+  const { t } = useI18n();
+  return (
+    <form action={signOut}>
+      <Button type="submit" variant="outline" size="sm" aria-label={t("common.signOut")}>
+        <LogOutIcon size={16} />
+        <span className="hidden tablet:inline">{t("common.signOut")}</span>
+      </Button>
+    </form>
   );
 }

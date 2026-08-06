@@ -21,6 +21,12 @@ import path from "node:path";
 const DB = process.env.E2E_DB_CONTAINER ?? "supabase_db_aladdin";
 const MANAGER = "e1111111-eeee-4eee-8eee-eeeeeeeeeee1";
 const REP = "e2222222-eeee-4eee-8eee-eeeeeeeeeee2";
+const ORG_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const CAIRO = "c1111111-cccc-4ccc-8ccc-cccccccccccc";
+const AMINA = "11111111-1111-4111-8111-111111111111";
+// Deterministic pending invitation to a-cairo@example.test (Karim) so the
+// invitation-entry E2E has a known token each run (reset to pending here).
+export const E2E_INVITE_TOKEN = "e2e0invite0token0cairo0000000000000000";
 
 const RESET_SQL = `
 begin;
@@ -29,6 +35,10 @@ update public.memberships set status = 'active' where id in ('${MANAGER}', '${RE
 delete from public.membership_capabilities
   where membership_id = '${REP}'
     and capability_key in ('sales.manage', 'sales.assign', 'org.manage', 'org.members.manage', 'branch.manage');
+delete from public.organization_invitations where email = 'a-cairo@example.test';
+insert into public.organization_invitations
+  (organization_id, email, primary_branch_id, token, status, invited_by, expires_at)
+values ('${ORG_A}', 'a-cairo@example.test', '${CAIRO}', '${E2E_INVITE_TOKEN}', 'pending', '${AMINA}', now() + interval '14 days');
 commit;
 `;
 

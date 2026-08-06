@@ -60,16 +60,26 @@ export function SubmitButton({
   variant = "primary",
   size = "md",
   className,
+  disabled = false,
 }: {
   children: ReactNode;
   pendingLabel?: string;
   variant?: keyof typeof variants;
   size?: keyof typeof sizes;
   className?: string;
+  /** Extra gate (e.g. required consent) ORed with the form's pending state. */
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant={variant} size={size} disabled={pending} aria-busy={pending} className={className}>
+    <Button
+      type="submit"
+      variant={variant}
+      size={size}
+      disabled={pending || disabled}
+      aria-busy={pending}
+      className={className}
+    >
       {pending ? (
         <>
           <Spinner />
@@ -79,6 +89,35 @@ export function SubmitButton({
         children
       )}
     </Button>
+  );
+}
+
+/** Accessible checkbox + label row used for consent and other opt-ins. */
+export function Checkbox({
+  id,
+  name,
+  checked,
+  onChange,
+  children,
+}: {
+  id: string;
+  name: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  children: ReactNode;
+}) {
+  return (
+    <label htmlFor={id} className="flex cursor-pointer items-start gap-2.5 text-body text-fg">
+      <input
+        id={id}
+        name={name}
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4.5 w-4.5 shrink-0 rounded-xs border border-strong text-accent-solid accent-[var(--accent-solid)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50"
+      />
+      <span>{children}</span>
+    </label>
   );
 }
 
