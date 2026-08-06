@@ -1,15 +1,50 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/ui/cn";
 
-/** A raised content surface. */
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
+/** A raised content surface. `pad="sm"` for tighter list cards. */
+export function Card({
+  className,
+  pad = "lg",
+  children,
+}: {
+  className?: string;
+  pad?: "sm" | "lg";
+  children: ReactNode;
+}) {
   return (
-    <div className={cn("rounded-md border bg-surface p-lg shadow-card", className)}>{children}</div>
+    <div
+      className={cn(
+        "rounded-md border bg-surface shadow-card",
+        pad === "sm" ? "p-md" : "p-lg",
+        className,
+      )}
+    >
+      {children}
+    </div>
   );
 }
 
-export function SectionTitle({ children, className }: { children: ReactNode; className?: string }) {
-  return <h2 className={cn("text-title text-fg", className)}>{children}</h2>;
+/** Section heading with an optional leading icon and trailing action slot. */
+export function SectionTitle({
+  children,
+  icon,
+  action,
+  className,
+}: {
+  children: ReactNode;
+  icon?: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center justify-between gap-md", className)}>
+      <h2 className="flex min-w-0 items-center gap-2 text-title text-fg">
+        {icon ? <span className="shrink-0 text-fg-secondary">{icon}</span> : null}
+        <span className="truncate">{children}</span>
+      </h2>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </div>
+  );
 }
 
 const badgeTones = {
@@ -31,7 +66,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-label",
+        "inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-label font-medium",
         badgeTones[tone],
       )}
     >
@@ -43,35 +78,47 @@ export function Badge({
 /** A labelled key/value row for detail panels. */
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex min-w-0 flex-col gap-0.5">
       <dt className="text-label text-fg-muted">{label}</dt>
-      <dd className="text-body-lg text-fg">{children ?? "—"}</dd>
+      <dd className="break-words text-body-lg text-fg">{children ?? "—"}</dd>
     </div>
   );
 }
 
-/** Empty / permission-denied / error placeholder with an optional action. */
+const stateTone = {
+  neutral: { ring: "border-border", chip: "bg-surface-2 text-fg-secondary" },
+  danger: { ring: "border-danger/40", chip: "bg-danger/15 text-danger" },
+  warning: { ring: "border-warning/40", chip: "bg-warning/15 text-warning" },
+} as const;
+
+/** Empty / no-results / permission / error placeholder with an optional action. */
 export function StatePanel({
   title,
   body,
   tone = "neutral",
+  icon,
   action,
 }: {
   title: string;
   body?: string;
-  tone?: "neutral" | "danger" | "warning";
+  tone?: keyof typeof stateTone;
+  icon?: ReactNode;
   action?: ReactNode;
 }) {
-  const ring =
-    tone === "danger" ? "border-danger/40" : tone === "warning" ? "border-warning/40" : "border";
+  const t = stateTone[tone];
   return (
     <div
       role={tone === "danger" ? "alert" : undefined}
       className={cn(
         "flex flex-col items-center justify-center gap-sm rounded-md border border-dashed bg-surface px-lg py-xl text-center",
-        ring,
+        t.ring,
       )}
     >
+      {icon ? (
+        <span className={cn("mb-1 grid h-11 w-11 place-items-center rounded-pill", t.chip)} aria-hidden="true">
+          {icon}
+        </span>
+      ) : null}
       <p className="text-body-lg font-medium text-fg">{title}</p>
       {body ? <p className="max-w-md text-body text-fg-secondary">{body}</p> : null}
       {action ? <div className="mt-sm">{action}</div> : null}
