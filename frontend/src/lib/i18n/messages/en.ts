@@ -80,6 +80,8 @@ export const en = {
     resend: "Resend code",
     resendIn: "Resend in {seconds}s",
     passwordless: "No passwords — sign in with a one-time email code.",
+    brandTagline: "The operating system for Egypt's finishing, construction, and interior-design sector.",
+    brandNote: "Consultation-first. Trusted matches. One calm workspace for your whole pipeline.",
     info: { codeSent: "We sent a code to {email}. It may take a moment to arrive." },
     error: {
       invalidEmail: "Enter a valid email address.",

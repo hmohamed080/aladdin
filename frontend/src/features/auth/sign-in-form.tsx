@@ -5,6 +5,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { requestEmailOtp, verifyEmailOtp, type AuthState } from "@/server/actions/auth";
 import { Card } from "@/components/ui/primitives";
 import { Input, LabeledField, SubmitButton, Button } from "@/components/ui/controls";
+import { ApertureMark } from "@/components/ui/icons";
 
 const initial: AuthState = { ok: false };
 const RESEND_COOLDOWN_SECONDS = 30;
@@ -64,10 +65,13 @@ export function SignInForm({ next }: { next: string }) {
   }
 
   return (
-    <Card className="flex flex-col gap-md">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display-ar text-title text-fg">{t("auth.title")}</h1>
-        <p className="text-body text-fg-secondary">{t("auth.subtitle")}</p>
+    <Card className="flex flex-col gap-lg p-lg tablet:p-xl">
+      <div className="flex flex-col gap-md">
+        <ApertureMark size={36} />
+        <div className="flex flex-col gap-1">
+          <h1 className="font-display-ar text-headline text-fg">{t("auth.title")}</h1>
+          <p className="text-body-lg text-fg-secondary">{t("auth.subtitle")}</p>
+        </div>
       </div>
 
       {!codeSent ? (
@@ -90,14 +94,17 @@ export function SignInForm({ next }: { next: string }) {
               aria-invalid={sendState.code && !sendState.ok ? true : undefined}
             />
           </LabeledField>
-          <SubmitButton pendingLabel={t("auth.sending")}>{t("auth.sendCode")}</SubmitButton>
-          <p className="text-label text-fg-muted">{t("auth.passwordless")}</p>
+          <SubmitButton className="w-full" pendingLabel={t("auth.sending")}>{t("auth.sendCode")}</SubmitButton>
+          <p className="text-center text-label text-fg-muted">{t("auth.passwordless")}</p>
         </form>
       ) : (
         // Sibling forms + a plain button — NOT nested. The verify form submits the
         // OTP only; the resend form re-sends; the change-email button resets.
         <div className="flex flex-col gap-md">
-          <p role="status" className="text-body text-success">
+          <p
+            role="status"
+            className="rounded-md border border-success/40 bg-success/10 px-md py-2.5 text-body text-success"
+          >
             {t("auth.info.codeSent", { email })}
           </p>
 
@@ -120,17 +127,18 @@ export function SignInForm({ next }: { next: string }) {
                 required
                 placeholder={t("auth.codePlaceholder")}
                 aria-invalid={verifyState.code && !verifyState.ok ? true : undefined}
+                className="text-center font-mono text-title tracking-[0.4em]"
               />
             </LabeledField>
-            <SubmitButton pendingLabel={t("auth.verifying")}>{t("auth.verify")}</SubmitButton>
+            <SubmitButton className="w-full" pendingLabel={t("auth.verifying")}>{t("auth.verify")}</SubmitButton>
           </form>
 
-          <div className="flex items-center justify-between gap-sm">
+          <div className="flex items-center justify-between gap-sm border-t pt-md">
             <form action={sendAction}>
               <input type="hidden" name="email" value={email} />
               <ResendButton cooldown={cooldown} />
             </form>
-            <Button type="button" variant="ghost" onClick={handleChangeEmail}>
+            <Button type="button" variant="ghost" size="sm" onClick={handleChangeEmail}>
               {t("auth.changeEmail")}
             </Button>
           </div>
@@ -145,7 +153,7 @@ function ResendButton({ cooldown }: { cooldown: number }) {
   const { t } = useI18n();
   const waiting = cooldown > 0;
   return (
-    <Button type="submit" variant="ghost" disabled={waiting}>
+    <Button type="submit" variant="ghost" size="sm" disabled={waiting}>
       {waiting ? t("auth.resendIn", { seconds: String(cooldown) }) : t("auth.resend")}
     </Button>
   );
