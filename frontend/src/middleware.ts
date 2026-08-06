@@ -41,16 +41,22 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  if (path.startsWith("/b2b") && !user) {
+  // Authenticated-only surfaces: the workspace and the post-registration handoff.
+  const authRequired = path.startsWith("/b2b") || path.startsWith("/onboarding");
+  if (authRequired && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/sign-in";
     url.searchParams.set("next", path + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 
-  if (path === "/auth/sign-in" && user) {
+  // A signed-in caller never needs Sign In / Sign Up — send them through the resume
+  // funnel (/onboarding forwards active users on to the workspace). Recovery,
+  // support, verify, and invitation entry stay reachable while signed in.
+  if ((path === "/auth/sign-in" || path === "/auth/sign-up") && user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/b2b";
+    url.pathname = "/onboarding";
+    url.search = "";
     return NextResponse.redirect(url);
   }
 
