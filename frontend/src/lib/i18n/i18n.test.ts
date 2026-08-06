@@ -12,6 +12,21 @@ function keys(obj: Record<string, unknown>, prefix = ""): string[] {
   });
 }
 
+/** Collect every leaf [keyPath, value] pair in a nested message object. */
+function entries(obj: Record<string, unknown>, prefix = ""): Array<[string, string]> {
+  return Object.entries(obj).flatMap(([k, v]) => {
+    const path = prefix ? `${prefix}.${k}` : k;
+    return v && typeof v === "object"
+      ? entries(v as Record<string, unknown>, path)
+      : ([[path, String(v)]] as Array<[string, string]>);
+  });
+}
+
+const ARABIC = /[؀-ۿ]/;
+// Values allowed to hold Latin letters in the Arabic catalog: technical samples
+// that are identical across locales (e.g. the neutral email placeholder).
+const LATIN_IN_ARABIC_WHITELIST = new Set<string>(["auth.emailPlaceholder"]);
+
 describe("i18n catalogs", () => {
   it("Arabic has exactly the same keys as English (no missing/extra)", () => {
     const enKeys = keys(en as unknown as Record<string, unknown>).sort();
@@ -27,6 +42,23 @@ describe("i18n catalogs", () => {
       expect(typeof value).toBe("string");
       expect((value as string).length).toBeGreaterThan(0);
     }
+  });
+
+  it("the English catalog contains no Arabic characters", () => {
+    const offenders = entries(en as unknown as Record<string, unknown>)
+      .filter(([, value]) => ARABIC.test(value))
+      .map(([key]) => key);
+    expect(offenders, `English values with Arabic text: ${offenders.join(", ")}`).toEqual([]);
+  });
+
+  it("the Arabic catalog contains no unintended English words", () => {
+    // Strip {placeholders} first, then flag any run of 3+ Latin letters — that is
+    // English UI copy leaking into Arabic (technical samples are whitelisted).
+    const offenders = entries(ar as unknown as Record<string, unknown>)
+      .filter(([key]) => !LATIN_IN_ARABIC_WHITELIST.has(key))
+      .filter(([, value]) => /[A-Za-z]{3,}/.test(value.replace(/\{[^}]*\}/g, "")))
+      .map(([key]) => key);
+    expect(offenders, `Arabic values with English words: ${offenders.join(", ")}`).toEqual([]);
   });
 });
 
