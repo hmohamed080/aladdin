@@ -5,7 +5,7 @@
 | **Status** | Living document (canonical delivery roadmap) |
 | **Version** | 1.0.0 |
 | **Owner** | Product / Engineering |
-| **Last Updated** | 2026-08-01 |
+| **Last Updated** | 2026-08-05 |
 | **Depends On** | [`../product/mvp-scope.md`](../product/mvp-scope.md), [`../product/PRODUCT_DIRECTION_GUIDE.md`](../product/PRODUCT_DIRECTION_GUIDE.md) |
 | **Related** | [`../product/BACKLOG.md`](../product/BACKLOG.md), [`../technical/TECHNICAL_DEBT.md`](../technical/TECHNICAL_DEBT.md), [`../development/github-workflow.md`](../development/github-workflow.md) (milestones) |
 
@@ -66,7 +66,8 @@ The phase plan for Aladdin. **Source of truth for scope/order is [`mvp-scope.md`
 ### Phase 2 — Core Marketplace (Sales-first discovery + catalog)
 - **In progress (Sprint 3, 2026-08-03):** the **B2B Sales domain foundation** — tenant-owned `customers`/`leads`/`sales_activities`/`follow_up_tasks` with scope RLS, 13 constrained workflow RPCs, audit, and dashboard read-models ([ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md)); **337 pgTAP** green (merged, PR #5).
 - **Merged (Sprint 4 + 4.1 + 4.2):** the **first product UI (05C vertical slice)** — passwordless Email-OTP auth + guarded B2B workspace (cockpit, customers, leads list/pipeline, follow-ups) on real RLS/RPCs; Arabic-first RTL + English + light/dark, responsive; public-directory Advisor hardening ([`frontend/sprint-4-b2b-sales-ui.md`](../frontend/sprint-4-b2b-sales-ui.md)).
-- **In progress (Sprint 5, 2026-08-04):** **05C depth** on `feature/sales-ui-depth` — real customer/lead/follow-up **edit** flows (trusted RPCs), richer customer detail, accessible confirmation dialogs, and a local **Playwright** E2E foundation ([`frontend/sprint-5-sales-ui-depth.md`](../frontend/sprint-5-sales-ui-depth.md)). Next: broaden 05C (post-create reassignment RPCs, Realtime), then RFQ/quote/project journeys. RFQ/quotes/products/projects stay later in the phase.
+- **Merged (Sprint 5 + 5.1, 2026-08-04):** **05C depth** — real customer/lead/follow-up **edit** flows (trusted RPCs), richer customer detail, accessible confirmation dialogs, edit-path optimistic concurrency, follow-up reassignment, lead terminal confirmations, and an executed local **Playwright** E2E foundation (PR #8, `5a47011`).
+- **In progress (Sprint 6, 2026-08-05):** **05C ownership + Realtime** on `feature/sales-ownership-realtime` — post-create ownership RPCs (customer branch/assignee, lead source/branch; strand-rejecting, audited), **scoped Realtime** (Postgres Changes on `leads`+`follow_up_tasks`, refresh-only/RLS-scoped), and **executed** E2E (two-context Realtime) / visual-QA / production-perf gates ([`frontend/sprint-6-sales-ownership-realtime.md`](../frontend/sprint-6-sales-ownership-realtime.md)). Next: RFQ/quote/project journeys. RFQ/quotes/products/projects stay later in the phase.
 - **Objective:** the core value-chain surfaces — **05C B2B Sales workflow first (the wedge)**, then **05A B2C value journey** — on catalog + discovery.
 - **Deliverables:** catalog (products/brands/categories/media) + inventory/availability; smart search (FTS/`pg_trgm`); verification gating; Sales pipeline (Opportunity → Need → Match → Smart Share → Follow-up → Task) with Realtime; B2C discovery + AI consult entry.
 - **Dependencies:** Phase 1; matching needs identity + catalog liquidity.

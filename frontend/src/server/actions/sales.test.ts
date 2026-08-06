@@ -7,6 +7,8 @@ import {
   createLead,
   completeFollowUp,
   transitionLead,
+  setCustomerOwnership,
+  setLeadSourceBranch,
 } from "./sales";
 
 vi.mock("server-only", () => ({}));
@@ -66,5 +68,41 @@ describe("sales workflow boundaries", () => {
   it("propagates RPC errors instead of swallowing them", async () => {
     const { client } = mockClient({ data: null, error: new Error("sales.write required") });
     await expect(completeFollowUp(client, "fu-1")).rejects.toThrow("sales.write required");
+  });
+
+  it("setCustomerOwnership sends only the requested change flags + the token", async () => {
+    const { client, rpc } = mockClient({ data: null, error: null });
+    await setCustomerOwnership(client, "cust-1", "2026-08-05T10:00:00+00:00", {
+      branch: { to: "b2" },
+      assignee: { to: null }, // explicit unassign — flag set, no id sent
+    });
+    expect(rpc).toHaveBeenCalledWith("set_customer_ownership", {
+      p_customer_id: "cust-1",
+      p_expected_updated_at: "2026-08-05T10:00:00+00:00",
+      p_change_branch: true,
+      p_new_branch_id: "b2",
+      p_change_assignee: true,
+    });
+  });
+
+  it("setLeadSourceBranch forwards the version and returns the bumped version", async () => {
+    const { client, rpc } = mockClient({ data: 4, error: null });
+    const v = await setLeadSourceBranch(client, "lead-1", 3, { source: { to: "campaign" }, branch: { to: "b2" } });
+    expect(rpc).toHaveBeenCalledWith("set_lead_source_branch", {
+      p_lead_id: "lead-1",
+      p_expected_version: 3,
+      p_change_source: true,
+      p_new_source: "campaign",
+      p_change_branch: true,
+      p_new_branch_id: "b2",
+    });
+    expect(v).toBe(4);
+  });
+
+  it("setLeadSourceBranch rejects a non-numeric version from the RPC", async () => {
+    const { client } = mockClient({ data: "nope", error: null });
+    await expect(setLeadSourceBranch(client, "lead-1", 3, { source: { to: "phone" } })).rejects.toThrow(
+      "set_lead_source_branch returned an invalid version",
+    );
   });
 });

@@ -4,6 +4,82 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 2: Sprint 6.2 (Final Realtime & QA Merge Gate)
+
+**Date:** 2026-08-05 · **Branch:** `feature/sales-ownership-realtime` (PR #9, continued) · **Base:** `main` @ `5a47011`
+
+### Objective
+Close the last confirmed Sprint 6.1 items on PR #9. No schema change.
+
+### What changed
+1. **Realtime timer teardown** — `SalesRealtime` clears the flash timer (not only the debounce) on unmount / org / branch change / sign-out, and guards all `setState` behind a mount ref (no post-unmount work). Component-tested.
+2. **Dirty-form protection** — replaced focus-only detection with a persistent dirty-form guard (document-capture listener marks a modified B2B edit form; stays dirty after focus leaves; navigation resets; search/filter forms opt out via `data-no-dirty`). Realtime defers while any form is dirty. No global state, no new lib, no PII in the adapter.
+3. **ConfirmDialog focus fix** — excluded hidden inputs from the focusables query (ownership dialogs lead with hidden inputs, so focus never entered the dialog / the trap broke).
+4. **State coverage** — rep visual matrix now asserts the theme exactly like the manager matrix + an out-of-scope direct-URL check per cell; reconnecting status (deterministic hook), permission-denied panel (DB harness), and dialog focus-trap/Escape/restore are browser-asserted; stale-conflict rendering is a component test (React controls the token in-page).
+5. **Exact perf console gate** — `perf.spec` asserts failed=0, page-errors=0, non-favicon 4xx/5xx=0, and only the documented `/favicon.ico` 404 is tolerated (no approved brand asset exists outside the encrypted `.pen`; kept as debt).
+6. **Flake fully fixed** — the sign-in change-email flake (resurfaced by the new test files) is deterministic via `requestSubmit()` in `act`; 0 failures across 50+ full-suite runs.
+
+### Validation
+Frontend typecheck/lint/**130 tests** (0 flaky over 50+ runs)/build ✓ · backend ruff + 10 pytest ✓ · Supabase **one** clean cycle (no SQL): reset + lint + **416 pgTAP** ✓ · **6** race scripts ✓ · Playwright: realtime-scope **9/9** (incl. reconnecting/permission/dirty-focus-off/terminal-dialog), visual-QA **4/4** (both roles full matrix + dialogs/states), perf + Lighthouse re-run ✓. No new dependency; no migration; no `.pen`.
+
+### Commits
+`fix: protect dirty forms and clean realtime teardown` · `test: complete visual and performance console gates` · `test: eliminate residual React-19 form-action flake in the suite` · `docs: finalize Sprint 6 merge evidence`
+
+---
+
+## Session — Phase 2: Sprint 6.1 (Realtime Scope & Performance Merge-Gate Closeout)
+
+**Date:** 2026-08-05 · **Branch:** `feature/sales-ownership-realtime` (PR #9, continued) · **Base:** `main` @ `5a47011`
+
+### Objective
+Close confirmed Realtime-scope, E2E, visual-QA, performance-gate, and CI-flake gaps on PR #9. Ownership RPCs accepted in principle; no schema change this sub-sprint.
+
+### What changed
+1. **Active-branch Realtime scope (fix)** — the subscription filtered only by `organization_id`, so an org-wide manager with one branch selected still refreshed on every branch. Now it matches the visible data: All Branches → `organization_id=eq.<orgId>`; a selected branch → `branch_id=eq.<branchId>` (excludes org-wide NULL-branch rows). Channel keyed by scope, rebuilt on branch change.
+2. **Test-safe instrumentation** — `realtime-debug.ts` mirrors channel scope/count + refresh/deferred counts to `window.__salesRealtime` only when `NEXT_PUBLIC_REALTIME_DEBUG=1` (dev/E2E flag; production build never sets it; no secrets, not app state).
+3. **Realtime E2E** — `realtime-scope.spec.ts` (6 scenarios, two real contexts): branch-scope narrowing + teardown + out-of-scope-no-refresh + single channel; follow-up cross-context; sign-out channel removal; revoked-membership no-leak; open-form deferral/focus safety; duplicate → one row.
+4. **Visual QA** — both roles now run the **full** 4×{en,ar}×{light,dark} matrix + a dialogs/states pass (ownership dialogs, follow-up edit, validation/not-found/empty). **Fixed** a 42px customer-detail overflow at 360px (long email couldn't wrap → `[&>*]:min-w-0` + `break-words`). 64 screenshots.
+5. **Lighthouse (actually run** via `pnpm dlx`, no permanent dep) — sign-in Desktop **100** / Mobile **98**; authenticated /b2b **98**, /b2b/leads **96** (session captured via `_lh-cookies.spec`). All targets met (LCP ≤ 2.5 s, CLS ≤ 0.1, TBT ≤ 200 ms).
+6. **Extended perf.spec** — cold + median-of-3 warm, slowest **actual** request (not TTFB), failed/console/page-error counts, request count/size, **Realtime channels = 1, duplicates = 0**. One benign `/favicon.ico` 404 console error (pre-existing).
+7. **CI flake (fixed)** — `sign-in-form` test failed ~2/8 full-suite runs (React 19 form-action native-submit guard racing `preventDefault`); switched to `fireEvent.submit(form)` → **0/14** full-suite runs fail.
+
+### Validation
+Frontend typecheck/lint/**125 tests** (0/14 flaky)/build ✓ · backend ruff + 10 pytest ✓ · Supabase **one** clean cycle (no SQL change): reset + lint + **416 pgTAP** ✓ · **6** race scripts ✓ · Playwright: full suite 20 passed / 28 skipped (project/env-gated) / 0 failed, realtime-scope 6/6, visual-QA 4/4, perf + Lighthouse executed ✓. No new dependency; no migration; no `.pen`.
+
+### Commits
+`fix: narrow realtime subscriptions to active branch scope` · `fix: remove confirmed sign-in test flake` · `test: prove realtime teardown, branch switching and form safety` · `test: complete visual QA matrix; fix customer-detail 360px overflow` · `test: add Lighthouse gate and extended production perf metrics` · `docs: correct Sprint 6 merge-gate evidence`
+
+---
+
+## Session — Phase 2: Sprint 6 (Sales Ownership, Realtime & Performance Hardening)
+
+**Date:** 2026-08-05 · **Branch:** `feature/sales-ownership-realtime` (from `main` @ `5a47011`, PR #8 merged) · **Base:** `main`
+
+### Objective
+Close the remaining post-create **ownership** gaps, add **scoped Realtime**, and establish **executed** E2E / visual-QA / production-performance merge gates. RLS stays the boundary; trusted RPCs only; no service-role browser path.
+
+### What shipped
+1. **Ownership RPCs** (migration `20260806090001_sales_ownership_and_realtime.sql`, forward-only): `set_customer_ownership` (branch + assignee; `sales.assign`; `p_expected_updated_at`→40001; audit `customer.reassigned`) and `set_lead_source_branch` (source + branch + optional compatible reassignment; `sales.write`/`sales.assign`; `p_expected_version`→40001; audit `lead.details_changed`). Both derive the caller from `auth.uid()`, enforce active-org/branch scope, keep the assignee branch-compatible (a stranding move is rejected — never a silent unassign), reject cross-tenant branches, and audit old/new transactionally. **Lead lifecycle is structurally out of bounds** for the lead RPC. **`customer_type` kept IMMUTABLE** — no domain doc approves mutation.
+2. **Scoped Realtime** — **Postgres Changes** chosen over Broadcast (RLS-native, zero extra schema for pilot volume). Publication = exactly `leads` + `follow_up_tasks`. Client boundary (`sales-realtime.tsx`, mounted once in the shell): anon browser client with `realtime.setAuth`, filtered to the server-derived active org, **refresh-only** (never renders a payload; RLS-scoped refetch is the source of truth → no leak, no duplicate/out-of-order corruption), rebuilds on org/branch change, tears down on unmount/SIGNED_OUT, and **defers refresh while a form is focused** (manual "Updated ↻" affordance).
+3. **Ownership UI** — capability-gated cards on the customer/lead edit pages; controls inside the accessible `ConfirmDialog` with the branch-move visibility warning; controlled selects so values survive an expected error; actions send only changed axes.
+4. **Perf** — de-duplicated the member lookup on the edit pages; bundle unchanged (~103 kB shared).
+
+### Executed gates
+- **E2E** (`playwright test`): 14 passed / 14 skipped (project-gated) / 0 failed. New `sales-ownership-realtime.spec.ts`: ownership edits, incompatible-assignment rejection, and **two real browser contexts** (a UI-created lead appears in another context — exactly one row; a Cairo rep never receives a Sheikh-Zayed lead).
+- **Visual QA** (`VQA=1`): 4 viewports × {en,ar} × {light,dark} × {manager, branch rep} + sign-in — no horizontal overflow, correct dir/dark, screenshots. **Found & fixed** a ~64px cockpit overflow at 360px (`[&>*]:min-w-0`).
+- **Production perf** (`PERF=1`, `next start`, median of 3): all routes LCP ≤ 2.5 s, CLS = 0; slowest `/b2b/leads` (LCP 1128 ms). Lighthouse score/TBT need the runner (not installable in-sandbox) — documented follow-up.
+
+### Validation
+Frontend typecheck/lint/**125 tests** (114→125)/build ✓ · backend ruff + pytest ✓ · Supabase **two** clean cycles (reset+lint+**416 pgTAP**, +34 in `19_sales_ownership_test`) ✓ · **6** race scripts (added `lead_ownership_concurrency_test.sh`) ✓ · dev + prod runtime smoke ✓. Note: `supabase db reset` was intermittently flaky on Windows (transient container bootstrap exit 1) and needed a retry twice — not a schema issue; the clean cycles complete on retry.
+
+### Commits
+`feat: add trusted customer and lead ownership update paths` · `test: prove ownership scope, concurrency and audit behavior` · `feat: add scoped sales realtime subscriptions` · `test: add realtime multi-context + ownership E2E; authenticate realtime socket` · `perf: de-duplicate member lookups on the sales edit pages` · `fix: eliminate 360px cockpit horizontal overflow` · `test: add executed visual-QA matrix and production perf gates` · `docs: record Sprint 6 ownership, realtime and performance`
+
+### `.pen` integrity
+No Pencil tool invoked; no `.pen` edited or tracked; none in the branch diff.
+
+---
+
 ## Session — Phase 2: Sprint 5.1 (Independent Sales UI Merge-Gate Hardening)
 
 **Date:** 2026-08-04 · **Branch:** `feature/sales-ui-depth` (PR #8, unmerged) · **Base:** `main` @ `e949f2b`

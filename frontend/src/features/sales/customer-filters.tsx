@@ -35,6 +35,9 @@ export function CustomerFilters({
         push({ q });
       }}
       role="search"
+      // A search/filter form is not an edit — never treat it as a dirty form for
+      // the Realtime open-edit guard (SalesRealtime reads this attribute).
+      data-no-dirty
     >
       <label className="flex-1">
         <span className="sr-only">{t("customers.searchName")}</span>

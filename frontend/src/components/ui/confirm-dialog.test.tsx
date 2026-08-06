@@ -59,7 +59,10 @@ describe("ConfirmDialog (accessible destructive confirmation)", () => {
       </ConfirmDialog>,
     );
     fireEvent.click(screen.getByRole("button", { name: "خسارة" }));
-    fireEvent.click(screen.getByRole("button", { name: "تأكيد" }));
+    // Submit through React's synthetic path (not a native submit-button click) —
+    // a React 19 form with a function action carries a javascript:throw
+    // native-submit guard that can race preventDefault under full-suite timing.
+    fireEvent.submit(screen.getByRole("button", { name: "تأكيد" }).closest("form")!);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(ar.leads.lostReasonRequired);
     expect(screen.getByRole("dialog")).toBeInTheDocument(); // did not close on error

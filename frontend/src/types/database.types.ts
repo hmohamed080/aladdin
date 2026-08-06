@@ -1663,6 +1663,30 @@ export type Database = {
         Returns: undefined
       }
       review_start: { Args: { p_verification_id: string }; Returns: undefined }
+      set_customer_ownership: {
+        Args: {
+          p_change_assignee?: boolean
+          p_change_branch?: boolean
+          p_customer_id: string
+          p_expected_updated_at: string
+          p_new_assignee_membership_id?: string
+          p_new_branch_id?: string
+        }
+        Returns: undefined
+      }
+      set_lead_source_branch: {
+        Args: {
+          p_change_branch?: boolean
+          p_change_source?: boolean
+          p_expected_version: number
+          p_lead_id: string
+          p_new_branch_id?: string
+          p_new_source?: Database["public"]["Enums"]["sales_source"]
+          p_reassign?: boolean
+          p_reassign_membership_id?: string
+        }
+        Returns: number
+      }
       set_profile_hidden: { Args: { p_user_id: string }; Returns: undefined }
       transition_lead: {
         Args: {

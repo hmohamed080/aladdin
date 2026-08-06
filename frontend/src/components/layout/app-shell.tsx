@@ -8,6 +8,7 @@ import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import { OrgSwitcher, BranchSwitcher } from "@/components/layout/context-switchers";
 import { AccountMenu } from "@/components/layout/account-menu";
 import { WorkspaceNav } from "@/components/layout/workspace-nav";
+import { SalesRealtime } from "@/features/sales/sales-realtime";
 
 /**
  * The B2B workspace chrome: a top bar (brand, org/branch context, language/
@@ -47,7 +48,10 @@ export async function AppShell({
             />
           </div>
 
-          <div className="ms-auto flex items-center gap-1">
+          <div className="ms-auto flex items-center gap-sm">
+            <div className="hidden tablet:block">
+              <SalesRealtime orgId={active.organizationId} branchId={active.activeBranchId} />
+            </div>
             <LanguageSwitch />
             <ThemeSwitch current={theme} />
             <AccountMenu orgName={active.organizationName} />

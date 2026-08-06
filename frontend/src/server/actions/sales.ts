@@ -108,6 +108,32 @@ export async function updateCustomer(
   if (error) throw error;
 }
 
+/**
+ * Change a customer's owning branch and/or salesperson through the trusted
+ * `set_customer_ownership` RPC (Sprint 6). The RPC enforces `sales.assign`,
+ * caller/branch scope, assignee branch-compatibility, optimistic concurrency on
+ * `updatedAt`, and transactional audit. Type stays immutable (not a parameter).
+ */
+export async function setCustomerOwnership(
+  supabase: Client,
+  customerId: string,
+  expectedUpdatedAt: string,
+  change: {
+    branch?: { to: string | null };
+    assignee?: { to: string | null };
+  },
+): Promise<void> {
+  const { error } = await supabase.rpc("set_customer_ownership", {
+    p_customer_id: customerId,
+    p_expected_updated_at: expectedUpdatedAt,
+    ...(change.branch ? { p_change_branch: true, ...(change.branch.to ? { p_new_branch_id: change.branch.to } : {}) } : {}),
+    ...(change.assignee
+      ? { p_change_assignee: true, ...(change.assignee.to ? { p_new_assignee_membership_id: change.assignee.to } : {}) }
+      : {}),
+  });
+  if (error) throw error;
+}
+
 // ---- Leads -----------------------------------------------------------------
 export async function createLead(
   supabase: Client,
@@ -160,6 +186,36 @@ export async function updateLeadDetails(
   });
   if (error) throw error;
   return requireVersion(data, "update_lead_details");
+}
+
+/**
+ * Change a lead's source and/or branch through the trusted
+ * `set_lead_source_branch` RPC (Sprint 6). LIFECYCLE (status/stage/won-lost) is
+ * never touched here. A branch move or reassignment needs `sales.assign`; the
+ * RPC keeps the assignee branch-compatible (reject or explicit reassignment),
+ * is version-guarded, and audits transactionally. Returns the new version.
+ */
+export async function setLeadSourceBranch(
+  supabase: Client,
+  leadId: string,
+  expectedVersion: number,
+  change: {
+    source?: { to: SalesSource | null };
+    branch?: { to: string | null };
+    reassign?: { to: string | null };
+  },
+): Promise<number> {
+  const { data, error } = await supabase.rpc("set_lead_source_branch", {
+    p_lead_id: leadId,
+    p_expected_version: expectedVersion,
+    ...(change.source ? { p_change_source: true, ...(change.source.to ? { p_new_source: change.source.to } : {}) } : {}),
+    ...(change.branch ? { p_change_branch: true, ...(change.branch.to ? { p_new_branch_id: change.branch.to } : {}) } : {}),
+    ...(change.reassign
+      ? { p_reassign: true, ...(change.reassign.to ? { p_reassign_membership_id: change.reassign.to } : {}) }
+      : {}),
+  });
+  if (error) throw error;
+  return requireVersion(data, "set_lead_source_branch");
 }
 
 export async function assignLead(
