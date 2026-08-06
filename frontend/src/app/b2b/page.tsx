@@ -10,7 +10,16 @@ import {
   customerNameMap,
 } from "@/server/queries/sales";
 import { Card, StatePanel, SectionTitle } from "@/components/ui/primitives";
-import { HomeQuickActions, HomeLeadList, HomeFollowUpList, HomeStageCounts, HomeActivityList } from "@/features/sales/home-widgets";
+import {
+  HomeQuickActions,
+  HomeStatTiles,
+  HomeLeadList,
+  HomeFollowUpList,
+  HomeStageCounts,
+  HomeActivityList,
+  EmptyLine,
+} from "@/features/sales/home-widgets";
+import { AlertIcon, ClockIcon, TargetIcon, ActivityIcon, CalendarCheckIcon } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -33,64 +42,71 @@ export default async function B2BHomePage() {
   const custMap = Object.fromEntries(custNames);
   const canWrite = org.canManageSales || org.capabilities.includes("sales.write");
 
+  const seeAll = (href: string, label: string) => (
+    <Link href={href} className="text-label font-medium text-accent hover:underline">
+      {label} →
+    </Link>
+  );
+
   return (
-    <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
-      <div>
-        <h1 className="text-headline text-fg">{m.home.title}</h1>
-        <p className="text-body text-fg-secondary">{org.organizationName}</p>
+    <div className="flex flex-col gap-lg">
+      {/* Welcome header */}
+      <div className="flex flex-wrap items-end justify-between gap-md">
+        <div className="min-w-0">
+          <p className="truncate text-label text-fg-muted">
+            {m.home.greeting} · {org.organizationName}
+          </p>
+          <h1 className="text-headline text-fg">{m.home.title}</h1>
+        </div>
+        {canWrite ? <HomeQuickActions /> : null}
       </div>
 
-      {canWrite ? <HomeQuickActions /> : null}
+      {/* KPI tiles */}
+      <HomeStatTiles overdue={overdue.length} dueToday={dueToday.length} openLeads={open.length} />
 
+      {/* Content grid */}
       <div className="grid gap-lg desktop:grid-cols-2 [&>*]:min-w-0">
         <Card>
-          <SectionTitle className="mb-md">{m.home.overdue}</SectionTitle>
-          {overdue.length === 0 ? (
-            <p className="text-body text-fg-secondary">{m.home.nothingDue}</p>
-          ) : (
-            <HomeFollowUpList items={overdue} tone="danger" />
-          )}
+          <SectionTitle icon={<AlertIcon size={18} />} action={seeAll("/b2b/follow-ups", m.followUps.title)}>
+            {m.home.overdue}
+          </SectionTitle>
           <div className="mt-md">
-            <Link href="/b2b/follow-ups" className="text-label text-accent hover:underline">
-              {m.followUps.title} →
-            </Link>
+            {overdue.length === 0 ? <EmptyLine>{m.home.nothingDue}</EmptyLine> : <HomeFollowUpList items={overdue} tone="danger" />}
           </div>
         </Card>
 
         <Card>
-          <SectionTitle className="mb-md">{m.home.dueToday}</SectionTitle>
-          {dueToday.length === 0 ? (
-            <p className="text-body text-fg-secondary">{m.home.nothingDue}</p>
-          ) : (
-            <HomeFollowUpList items={dueToday} tone="warning" />
-          )}
+          <SectionTitle icon={<ClockIcon size={18} />}>{m.home.dueToday}</SectionTitle>
+          <div className="mt-md">
+            {dueToday.length === 0 ? <EmptyLine>{m.home.nothingDue}</EmptyLine> : <HomeFollowUpList items={dueToday} tone="warning" />}
+          </div>
         </Card>
 
         <Card>
-          <SectionTitle className="mb-md">{m.home.myOpenLeads}</SectionTitle>
-          {open.length === 0 ? (
-            <p className="text-body text-fg-secondary">{m.home.noOpenLeads}</p>
-          ) : (
-            <HomeLeadList items={open} customerNames={custMap} />
-          )}
+          <SectionTitle icon={<TargetIcon size={18} />} action={seeAll("/b2b/leads", m.leads.title)}>
+            {m.home.myOpenLeads}
+          </SectionTitle>
+          <div className="mt-md">
+            {open.length === 0 ? <EmptyLine>{m.home.noOpenLeads}</EmptyLine> : <HomeLeadList items={open} customerNames={custMap} />}
+          </div>
         </Card>
 
         <Card>
-          <SectionTitle className="mb-md">{m.home.leadsByStage}</SectionTitle>
-          {stages.length === 0 ? (
-            <p className="text-body text-fg-secondary">{m.home.startHint}</p>
-          ) : (
-            <HomeStageCounts counts={stages} />
-          )}
+          <SectionTitle icon={<CalendarCheckIcon size={18} />}>{m.home.leadsByStage}</SectionTitle>
+          <div className="mt-md">
+            {stages.length === 0 ? <EmptyLine>{m.home.startHint}</EmptyLine> : <HomeStageCounts counts={stages} />}
+          </div>
         </Card>
 
         <Card className="desktop:col-span-2">
-          <SectionTitle className="mb-md">{m.home.recentActivity}</SectionTitle>
-          {activities.length === 0 ? (
-            <StatePanel title={m.home.noActivity} body={m.home.startHint} />
-          ) : (
-            <HomeActivityList items={activities} />
-          )}
+          <SectionTitle icon={<ActivityIcon size={18} />}>{m.home.recentActivity}</SectionTitle>
+          <div className="mt-md">
+            {activities.length === 0 ? (
+              <StatePanel icon={<ActivityIcon size={20} />} title={m.home.noActivity} body={m.home.startHint} />
+            ) : (
+              <HomeActivityList items={activities} />
+            )}
+          </div>
         </Card>
       </div>
     </div>
