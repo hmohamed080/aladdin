@@ -247,6 +247,18 @@ change-email flake (~1/30 full-suite; 0 isolated). `requestSubmit()` inside `act
 post-send effect made it deterministic — **0 failures across 50+ full-suite runs**.
 Frontend **125 → 130** (+5: SalesRealtime timer/dirty + edit-form stale-conflict).
 
+**Deterministic full E2E.** Data-mutating desktop/mobile specs shared local
+Supabase state, so a single combined `pnpm e2e` could fail on drift (e.g. a
+concurrency-script `sales.manage` grant leaking onto the Cairo rep) unless each
+project was run separately after a fresh seed. A Playwright **`globalSetup`**
+(`e2e/global-setup.ts`, run once — `workers=1`, never concurrent) now truncates the
+sales fixtures, restores the two seeded memberships to their exact scope (rep =
+read+write only, no leaked org-wide caps), and re-applies the demo seed before any
+project. Destructive scenarios still restore state in `finally`; records are
+created with unique names. After one `supabase db reset`, the standard command
+`corepack pnpm --filter frontend e2e` runs **twice consecutively with no manual
+reset**, each: **23 passed / 35 skipped / 0 failed**.
+
 ## Known limitations / deferred
 
 - **Favicon 404** — no `app/icon`/`favicon.ico`; one benign console 404 (pre-existing).

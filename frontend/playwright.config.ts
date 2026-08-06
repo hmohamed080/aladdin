@@ -20,6 +20,11 @@ const launchOptions = executablePath ? { executablePath } : undefined;
 
 export default defineConfig({
   testDir: "./e2e",
+  // Reset the sales fixtures + restore the seeded memberships ONCE before all
+  // projects, so a single `pnpm e2e` invocation is deterministic (no shared-state
+  // drift between the desktop and mobile projects, and no manual reset between
+  // consecutive runs). Requires a running local Supabase + demo seed on disk.
+  globalSetup: "./e2e/global-setup.ts",
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
