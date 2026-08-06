@@ -65,9 +65,12 @@ The Pilot has a single verification channel (email). Recovery only re-sends a co
 
 ## Testing
 
-- Frontend: `typecheck` ✓ · `lint` ✓ · **132 unit tests** ✓ (incl. 2 new bilingual guards) · `build` ✓ (shared JS ~103 kB; new routes 0.6–3.9 kB each).
-- Database: `supabase db reset` ✓ · `db lint` ✓ (no new warnings) · `supabase test db` ✓ — new pgTAP `20_account_registration_test.sql` (**25 assertions**: consent recording/forgery/idempotency, derived state, invitation create/lookup/accept, email-binding, single-use).
-- E2E (`account-registration.spec.ts`, real Email-OTP via Mailpit): sign-up consent gate → create → verify → resume at `/onboarding`; Arabic RTL with no mixed-language leakage; recovery send; support unavailable state; invalid invitation; existing sign-in; valid invitation accepted by the matching account. Browser QA at 390×844 / 768×1024 / 1440×900 across ar/en × light/dark with no horizontal overflow.
+All figures below are the **final executed evidence** on `feature/account-registration`.
+
+- Frontend: `typecheck` ✓ · `lint` ✓ · **135 unit tests passed** (incl. the bilingual guards: no Arabic in the English catalog, no unintended English in the Arabic catalog, and the Sprint 7.2 Arabic-copy presence/placeholder checks) · `build` ✓ (shared JS ~103 kB; new routes 0.6–3.9 kB each).
+- Database: `supabase db reset` ✓ · `db lint` ✓ (only the pre-existing `set_customer_ownership` unused-variable warning; no new warnings) · `supabase test db` ✓ — **full suite: 20 SQL test files / 441 pgTAP assertions / 0 failed**. Sprint 7.2's new `20_account_registration_test.sql` **contributes 25 of those 441 assertions** (consent recording/forgery/idempotency, derived registration state, invitation create/lookup/accept, email-binding, single-use); the other 416 are the pre-existing suite, all still passing.
+- E2E (Playwright, both projects, real Email-OTP via Mailpit): **full suite 36 passed / 40 skipped / 0 failed**. The new `account-registration.spec.ts` covers sign-up consent gate → create → verify → resume at `/onboarding`; Arabic RTL with no mixed-language leakage; recovery send; support unavailable state; invalid invitation; existing sign-in; valid invitation accepted by the matching account. Two previously full-suite-only Sales flakes (desktop follow-up, mobile bottom nav) were stabilized and each pass **10/10** in isolation.
+- Runtime bilingual + viewport QA: all seven auth routes (`/auth/sign-in`, `/auth/sign-up`, `/auth/verify`, `/auth/recovery`, `/auth/support`, `/auth/invite/[token]` valid + invalid) at **390×844 and 1440×900** across ar/en — correct `<html dir>` (ar=rtl, en=ltr), no horizontal overflow, and headings localize on switch. Registration-surface E2E additionally exercises 768×1024 and light/dark.
 
 ## Remaining work for Sprint 7.3 (shared onboarding engine)
 
