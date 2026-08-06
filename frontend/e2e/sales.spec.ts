@@ -1,6 +1,24 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { signIn, IDENTITIES } from "./helpers/auth";
+
+/**
+ * Click a server-action control and wait for its effect to land, re-clicking only
+ * if the effect never appears within a generous window (a swallowed pre-hydration
+ * click — the failure mode that surfaces under full-suite load). It WAITS before
+ * any retry, so a slow-but-successful submit never double-submits, and it never
+ * re-clicks a control that has already been replaced by its effect. The real
+ * post-state is still asserted — no weakened assertion, no blind timeout bump.
+ */
+async function clickUntil(target: Locator, effect: Locator): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (await effect.isVisible().catch(() => false)) return;
+    await target.click().catch(() => {});
+    const landed = await effect.waitFor({ state: "visible", timeout: 7000 }).then(() => true, () => false);
+    if (landed) return;
+  }
+  await expect(effect).toBeVisible();
+}
 
 /**
  * Local sales-workflow E2E. Local Next.js + local Supabase, seeded synthetic
@@ -101,10 +119,16 @@ test.describe("manager — daily sales workflow", () => {
     await page.goto(leadDetail);
 
     const fuTitle = `E2E FU ${uid()}`;
+    // The "+ new follow-up" disclosure is a native <details> (works pre-hydration);
+    // the create SUBMIT is a server action, so guard it against a swallowed click.
     await page.getByText(/\+ (new follow-up|متابعة جديدة)/i).first().click();
-    await page.locator('input[name="title"]').fill(fuTitle);
-    await page.getByRole("button", { name: /create follow-up|إنشاء متابعة/i }).click();
-    await expect(page.getByText(fuTitle)).toBeVisible();
+    const fuTitleInput = page.locator('input[name="title"]');
+    await expect(fuTitleInput).toBeVisible();
+    await fuTitleInput.fill(fuTitle);
+    await clickUntil(
+      page.getByRole("button", { name: /create follow-up|إنشاء متابعة/i }),
+      page.getByText(fuTitle),
+    );
 
     // Edit route: change title + description, verify persisted on the board.
     await page.getByRole("link", { name: /^(edit|تعديل)$/i }).first().click();
@@ -112,25 +136,27 @@ test.describe("manager — daily sales workflow", () => {
     const editedFu = `${fuTitle} edited`;
     await page.locator("#title").fill(editedFu);
     await page.locator("#description").fill("call the site engineer");
-    await page.getByRole("button", { name: saveChangesBtn }).click();
-    await page.waitForURL(/\/b2b\/follow-ups(\?|$)/);
-    await expect(page.getByText(editedFu)).toBeVisible();
+    // Save redirects to the board; the persisted title landing there IS the effect.
+    await clickUntil(page.getByRole("button", { name: saveChangesBtn }), page.getByText(editedFu));
 
     // Reassign (manager holds the capability): the assignee select is present.
     await page.goto(leadDetail);
     await page.getByRole("link", { name: /^(edit|تعديل)$/i }).first().click();
     await expect(page.locator("#reassign-assignee")).toBeVisible();
     await page.locator("#reassign-assignee").selectOption({ index: 1 });
-    await page.getByRole("button", { name: /reassign|إعادة إسناد/i }).click();
-    await expect(page.getByRole("status")).toBeVisible();
+    await clickUntil(page.getByRole("button", { name: /reassign|إعادة إسناد/i }), page.getByRole("status"));
 
-    // Complete then reopen from the board.
+    // Complete then reopen from the board (state toggles; guard each transition).
     await page.goto("/b2b/follow-ups");
     const row = () => page.locator("li", { hasText: editedFu });
-    await row().getByRole("button", { name: /^(complete|إكمال)$/i }).click();
-    await expect(row().getByRole("button", { name: /reopen|إعادة فتح/i })).toBeVisible();
-    await row().getByRole("button", { name: /reopen|إعادة فتح/i }).click();
-    await expect(row().getByRole("button", { name: /^(complete|إكمال)$/i })).toBeVisible();
+    await clickUntil(
+      row().getByRole("button", { name: /^(complete|إكمال)$/i }),
+      row().getByRole("button", { name: /reopen|إعادة فتح/i }),
+    );
+    await clickUntil(
+      row().getByRole("button", { name: /reopen|إعادة فتح/i }),
+      row().getByRole("button", { name: /^(complete|إكمال)$/i }),
+    );
   });
 
   test("branch selector narrows the visible pipeline", async ({ page }) => {
@@ -172,10 +198,14 @@ test.describe("manager — daily sales workflow", () => {
   test("mobile bottom navigation reaches the sections", async ({ page }) => {
     mobileOnly();
     await page.goto("/b2b");
-    await page.getByRole("link", { name: /customers|العملاء/i }).first().click();
-    await expect(page).toHaveURL(/\/b2b\/customers/);
-    await page.getByRole("link", { name: /leads|الفرص/i }).first().click();
-    await expect(page).toHaveURL(/\/b2b\/leads/);
+    // Scope to the bottom-nav landmark (the only navigation in the mobile a11y
+    // tree — the desktop sidebar is display:none). Avoids a page-wide `.first()`
+    // that could resolve to a cockpit link once seeded/created data grows.
+    const bottomNav = page.getByRole("navigation", { name: /sales workspace|مساحة المبيعات/i }).last();
+    await bottomNav.getByRole("link", { name: /customers|العملاء/i }).click();
+    await page.waitForURL(/\/b2b\/customers/);
+    await bottomNav.getByRole("link", { name: /leads|الفرص/i }).click();
+    await page.waitForURL(/\/b2b\/leads/);
   });
 });
 

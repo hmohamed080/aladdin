@@ -62,6 +62,44 @@ describe("i18n catalogs", () => {
   });
 });
 
+// The character guards above prove NO stray-script leakage but not that a
+// specific new surface was actually translated. These target the Sprint 7.2 keys
+// (registration / support / invitation / onboarding) and prove each Arabic value
+// is real Arabic prose, non-empty, and keeps every placeholder its English pair
+// declares — the concrete regression risk when adding a whole new surface.
+describe("Sprint 7.2 registration copy (Arabic)", () => {
+  const SPRINT_72_PREFIXES = ["support.", "invite.", "onboarding.", "auth.consent.", "auth.signUp", "auth.verify", "auth.recovery"];
+  const isNew = (key: string) =>
+    SPRINT_72_PREFIXES.some((p) => key.startsWith(p)) ||
+    ["auth.createAccount", "auth.haveAccount", "auth.noAccount", "auth.signInLink", "auth.signUpLink", "auth.troubleSigningIn", "auth.lostEmailAccess", "auth.getHelp", "auth.error.consentRequired"].includes(key);
+
+  const enPairs = entries(en as unknown as Record<string, unknown>).filter(([k]) => isNew(k));
+  const arMap = new Map(entries(ar as unknown as Record<string, unknown>));
+
+  it("covers a non-trivial set of new keys", () => {
+    expect(enPairs.length).toBeGreaterThan(30);
+  });
+
+  it("every new Arabic value is present, non-empty, and contains Arabic script", () => {
+    const bad = enPairs
+      .map(([key]) => [key, arMap.get(key)] as const)
+      .filter(([, v]) => !v || v.trim().length === 0 || !ARABIC.test(v))
+      .map(([key]) => key);
+    expect(bad, `new keys with missing/empty/non-Arabic values: ${bad.join(", ")}`).toEqual([]);
+  });
+
+  it("preserves every placeholder from the English pair (e.g. {email}, {org})", () => {
+    const drift: string[] = [];
+    for (const [key, enVal] of enPairs) {
+      const arVal = arMap.get(key) ?? "";
+      const enPlaceholders = (enVal.match(/\{[^}]+\}/g) ?? []).sort();
+      const arPlaceholders = (arVal.match(/\{[^}]+\}/g) ?? []).sort();
+      if (JSON.stringify(enPlaceholders) !== JSON.stringify(arPlaceholders)) drift.push(key);
+    }
+    expect(drift, `placeholder drift on: ${drift.join(", ")}`).toEqual([]);
+  });
+});
+
 describe("translate()", () => {
   it("resolves dotted keys and interpolates placeholders", () => {
     const t = createTranslator("ar");
