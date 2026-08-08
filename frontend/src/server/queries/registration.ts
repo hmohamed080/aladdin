@@ -16,7 +16,9 @@ export type RegistrationState =
   | "contact_pending"
   | "account_type_pending"
   | "consumer_onboarding_pending"
+  | "consumer_onboarding_complete"
   | "persona_onboarding_pending"
+  | "persona_review_pending"
   | "organization_setup_pending"
   | "invitation_pending"
   | "active_personal"
@@ -29,7 +31,9 @@ const KNOWN: readonly RegistrationState[] = [
   "contact_pending",
   "account_type_pending",
   "consumer_onboarding_pending",
+  "consumer_onboarding_complete",
   "persona_onboarding_pending",
+  "persona_review_pending",
   "organization_setup_pending",
   "invitation_pending",
   "active_personal",

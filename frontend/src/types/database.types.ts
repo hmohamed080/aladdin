@@ -382,6 +382,90 @@ export type Database = {
           },
         ]
       }
+      individual_onboarding: {
+        Row: {
+          consumer_budget: string | null
+          consumer_city: string | null
+          consumer_completed_at: string | null
+          consumer_governorate: string | null
+          consumer_intent: string | null
+          consumer_interests: string[] | null
+          created_at: string
+          prof_additional_services: string[] | null
+          prof_availability: string | null
+          prof_city: string | null
+          prof_concrete_type: Database["public"]["Enums"]["account_type"] | null
+          prof_governorate: string | null
+          prof_max_travel_km: number | null
+          prof_offers_remote: boolean
+          prof_service_areas: string[] | null
+          prof_services: string[] | null
+          prof_specialization: string | null
+          prof_years_experience: number | null
+          professional_completed_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          consumer_budget?: string | null
+          consumer_city?: string | null
+          consumer_completed_at?: string | null
+          consumer_governorate?: string | null
+          consumer_intent?: string | null
+          consumer_interests?: string[] | null
+          created_at?: string
+          prof_additional_services?: string[] | null
+          prof_availability?: string | null
+          prof_city?: string | null
+          prof_concrete_type?:
+            | Database["public"]["Enums"]["account_type"]
+            | null
+          prof_governorate?: string | null
+          prof_max_travel_km?: number | null
+          prof_offers_remote?: boolean
+          prof_service_areas?: string[] | null
+          prof_services?: string[] | null
+          prof_specialization?: string | null
+          prof_years_experience?: number | null
+          professional_completed_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          consumer_budget?: string | null
+          consumer_city?: string | null
+          consumer_completed_at?: string | null
+          consumer_governorate?: string | null
+          consumer_intent?: string | null
+          consumer_interests?: string[] | null
+          created_at?: string
+          prof_additional_services?: string[] | null
+          prof_availability?: string | null
+          prof_city?: string | null
+          prof_concrete_type?:
+            | Database["public"]["Enums"]["account_type"]
+            | null
+          prof_governorate?: string | null
+          prof_max_travel_km?: number | null
+          prof_offers_remote?: boolean
+          prof_service_areas?: string[] | null
+          prof_services?: string[] | null
+          prof_specialization?: string | null
+          prof_years_experience?: number | null
+          professional_completed_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "individual_onboarding_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           assigned_membership_id: string | null
@@ -1666,6 +1750,37 @@ export type Database = {
         }
         Returns: string
       }
+      individual_complete_consumer: { Args: never; Returns: undefined }
+      individual_save_consumer: {
+        Args: {
+          p_budget?: string
+          p_city?: string
+          p_governorate?: string
+          p_intent?: string
+          p_interests?: string[]
+        }
+        Returns: undefined
+      }
+      individual_save_professional: {
+        Args: {
+          p_additional_services?: string[]
+          p_availability?: string
+          p_bio?: string
+          p_city?: string
+          p_concrete_type: Database["public"]["Enums"]["account_type"]
+          p_governorate?: string
+          p_headline?: string
+          p_languages?: string[]
+          p_max_travel_km?: number
+          p_offers_remote?: boolean
+          p_service_areas?: string[]
+          p_services?: string[]
+          p_specialization?: string
+          p_years_experience?: number
+        }
+        Returns: undefined
+      }
+      individual_submit_professional: { Args: never; Returns: string }
       invitation_accept: { Args: { p_token: string }; Returns: string }
       invitation_create: {
         Args: {

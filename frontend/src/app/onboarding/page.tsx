@@ -25,7 +25,12 @@ export default async function OnboardingPage() {
     case "account_type_pending":
       redirect("/onboarding/account-type");
     case "consumer_onboarding_pending":
+    case "consumer_onboarding_complete":
+      redirect("/onboarding/consumer");
     case "persona_onboarding_pending":
+      redirect("/onboarding/professional");
+    case "persona_review_pending":
+      redirect("/onboarding/professional/review");
     case "organization_setup_pending":
       redirect("/onboarding/complete");
     default:
