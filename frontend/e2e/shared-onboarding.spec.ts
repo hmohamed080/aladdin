@@ -66,10 +66,11 @@ test.describe("shared onboarding", () => {
     await page.getByRole("button", { name: /engineer \/ designer/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
 
-    // Step 4 — persona handoff (professional). Not activation.
-    await page.waitForURL(/\/onboarding\/complete$/, { waitUntil: "commit" });
-    await expect(page.getByText(/ready for the next step/i)).toBeVisible();
-    await expect(page.getByText(/professional profile and verification/i)).toBeVisible();
+    // Step 4 — persona handoff: a professional now enters the Sprint 7.4 professional
+    // onboarding wizard (not the generic handoff panel). Still not activation.
+    await page.waitForURL(/\/onboarding\/professional$/, { waitUntil: "commit" });
+    await expect(page.getByText(/step 1 of 6/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /your professional identity/i })).toBeVisible();
   });
 
   test("refresh resumes saved profile; phone persists and stays unverified", async ({ page, request }) => {
