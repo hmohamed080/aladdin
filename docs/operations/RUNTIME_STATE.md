@@ -8,9 +8,9 @@ This is a **mutable snapshot** of the current live repository state — not an a
 |---|---|
 | **Version** | Runtime snapshot · 2026-08-04 |
 | **Owner** | Foundation / Operations |
-| **Last updated** | 2026-08-05 |
-| **Updated by** | Claude Code (Opus 4.8) — Phase 2, Sprint 6.2 Final Realtime & QA Merge Gate (dirty-form protection + realtime timer teardown + dialog focus fix + exact perf console gate + deterministic flake fix; on top of Sprint 6/6.1) |
-| **Current focus** | **Phase 2 — B2B Sales Operating Workflow · Sprint 3 (B2B Sales Domain Foundation).** Phase 1 is merged to `main` (@ `54792a4`, PR #4). Sprint 3 builds the tenant-owned sales foundation on the identity/tenancy spine: `customers`, `leads`, `sales_activities`, `follow_up_tasks` with organization + optional-branch ownership, composite-FK cross-tenant safety, scope-based RLS, 13 constrained `security definer` workflow RPCs (create/update/assign/transition/activity/follow-up), optimistic-locked lead transitions, in-transaction audit, and `security_invoker` dashboard read-models. Local suite: **337 pgTAP** assertions (254 preserved + 83 new). See [ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md). No orders/quotes/RFQ/products/payments/AI/WhatsApp. |
+| **Last updated** | 2026-08-08 |
+| **Updated by** | Pi design agent — canonical B2B canvas consolidation (`design.pen` organization only) |
+| **Current focus** | Engineering focus remains the Phase 2 B2B Sales workflow described below. Design-only update: all 86 existing Business/Professional B2B frames are consolidated under one canonical `05 — B2B` canvas area; no product UI or engineering artifact changed. |
 
 ## Phase & repository
 
@@ -125,19 +125,21 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 
 ## Active files (this session)
 
-- Private visual source: `UI-UX/design.pen` — 8 top-level groups, 207 product screens, 0 generic missing placeholders, 48 explicitly classified remaining gaps, and updated `00I` coverage.
+- Private visual source: `UI-UX/design.pen` — 7 top-level groups, 207 product frames, and one canonical `05 — B2B · Business and Professional Workspace` containing all 86 existing B2B frames.
 - Approved design record: root `DESIGN.md` — The Aperture concept, exact brand/token values, typography, component defaults, and usage rules.
 - Frontend token bridge: `frontend/src/styles/tokens.css`, `frontend/tailwind.config.ts`, `frontend/src/app/globals.css`, and `frontend/src/app/layout.tsx`.
 - Product/UI memory: root `PRODUCT.md` and `UI-UX/UI_UX_SYSTEM_GUIDE.md` now record the approved identity and artifact-authority chain.
 - Local tooling sidecar: `.impeccable/design.json` is synchronized but remains intentionally ignored; `DESIGN.md` is the versioned durable record.
 - Operations memory: `docs/operations/AGENT_WORK_LOG.md` and this file.
 
-## Design validation status (2026-08-01)
+## Design validation status (2026-08-08)
 
-- `design.pen`: 8 top-level groups; 0 top-level overlaps; 0 organizational sibling overlaps.
-- 120 original product screens preserved; 87 copied variants added, for 207 product screens total.
-- 0 generic `MISSING —` placeholders remain; 48 gaps are explicitly Partial, Blocked, Responsive Decision, Unresolved, or Not Required.
-- Known inherited source-screen warnings remain untouched; copied variants reproduce those source conditions where applicable.
+- `design.pen`: 7 top-level groups; 0 top-level overlaps; 0 B2B organizational sibling overlaps.
+- Product-frame count remains 207. All 86 Business/Professional B2B frames are consolidated under `05 — B2B`; IDs, names, widths, and heights reconcile exactly.
+- B2B organization: Home & Cockpit (1) · Subscription & Account Upgrade (39) · Professional / Business Onboarding (46).
+- Device counts: Desktop 19 · Tablet 1 responsive-spec frame · Mobile 58 · 8 device-neutral supporting/annotation boards. Theme counts: Light 39 · Dark 39 · 8 theme-neutral boards. Locale: AR 84 · EN 0 · 2 locale-neutral annotations.
+- Reusable component master IDs remain identical (127 before/after); no product content or screen layer was changed.
+- B2B root-screen clipping and organizational problems: 0. Twelve internal warnings confirmed in the pre-edit backup remain untouched inside locked product screens.
 - Root `PRODUCT.md` and `UI_UX_SYSTEM_GUIDE.md` encode the permanent governance rule and the approved Aperture identity.
 - Frontend primitives and light/dark semantic aliases mirror `DESIGN.md`; Impeccable detector returned 0 findings.
 - Semantic normal-size text clears WCAG AA in both themes (minimum measured ratios: light 4.76:1; dark 5.40:1).

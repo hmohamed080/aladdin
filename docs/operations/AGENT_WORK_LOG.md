@@ -4,6 +4,40 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Canonical B2B Canvas Consolidation
+
+**Date:** 2026-08-08 · **Branch:** `feature/individual-persona-onboarding` · **Scope:** `UI-UX/design.pen` organization only
+
+### Objective
+Collect every existing Business and Professional B2B product frame into one clearly separated B2B area without changing product UI, dimensions, component masters, content, styling, or flows.
+
+### Changes
+- Renamed the existing organizational root to `05 — B2B · Business and Professional Workspace`.
+- Consolidated the former Professional/Talent onboarding flow into the B2B root; no product screen was duplicated or deleted.
+- Added three populated organizational sections only: `B2B — 01 Home & Cockpit`, `B2B — 12 Subscription & Account Upgrade`, and `B2B — 13 Professional / Business Onboarding`.
+- Added one workspace-only Shared Canonical References note. Authentication, Professional/Business Account Type Selection, and Shared Verification remain canonical in their existing shared areas.
+- Preserved the existing Flow → Device → Theme → Sequence hierarchy and normalized natural screen order inside each B2B lane.
+- Fixed clipping only in workspace QA notes/gap labels; no product-screen layer was edited.
+
+### Reconciliation and validation
+- Product frames before/after: **207 / 207**. B2B frames before/after: **86 / 86**.
+- B2B family counts: Home & Cockpit **1**; Subscription & Account Upgrade **39**; Professional / Business Onboarding **46**.
+- Product-screen IDs, names, widths, and heights: **86/86 identical**. Screens renamed: **0**. Screens deleted/duplicated: **0**.
+- Reusable component masters: **127 before / 127 after**, identical ID set.
+- Top-level groups: **7**, overlaps **0**. B2B organizational sibling overlaps **0**. B2B screen-root clipping **0**. Workspace organizational problems **0**.
+- Twelve internal clipping/circular-layout warnings already existed in locked B2B source screens (Cockpit, Subscription status/drawer, Public Address); confirmed in the pre-edit backup and intentionally preserved.
+
+### Backup
+`UI-UX/design.BACKUP-BEFORE-B2B-AREA-ORGANIZATION-20260808-161550.pen` — verified byte-for-byte against the pre-edit canonical file (`SHA-256 fceb61fbd25f061234170b190178e9d93f09c4a715ab60f4cf319ba8bc44b429`).
+
+### Product gaps surfaced (not designed)
+- No English B2B product variants exist.
+- No canonical B2B Tablet product screen exists; the only Tablet frame is the upgrade responsive specification.
+- Business Cockpit exists only as Desktop Dark and remains Needs Review.
+- Account Type Selection and Verification remain shared canonical families and were not duplicated.
+
+---
+
 ## Session — Phase 2: Sprint 6.2 (Final Realtime & QA Merge Gate)
 
 **Date:** 2026-08-05 · **Branch:** `feature/sales-ownership-realtime` (PR #9, continued) · **Base:** `main` @ `5a47011`
