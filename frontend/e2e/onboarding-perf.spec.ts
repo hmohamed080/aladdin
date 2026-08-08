@@ -54,7 +54,7 @@ async function register(page: Page, request: APIRequestContext): Promise<void> {
   const code = await readNewOtp(request, email, seen);
   await page.getByLabel(/one-time code/i).fill(code);
   await page.getByRole("button", { name: /verify/i }).click();
-  await page.waitForURL(/\/onboarding\/profile$/);
+  await page.waitForURL(/\/onboarding\/profile$/, { waitUntil: "commit" });
 }
 
 test("production performance — onboarding routes (cold + median of 3 warm)", async ({ page, request }) => {
@@ -99,12 +99,12 @@ test("production performance — onboarding routes (cold + median of 3 warm)", a
 
   await page.locator("#displayName").fill("Perf User");
   await page.getByRole("button", { name: /^continue$/i }).click();
-  await page.waitForURL(/\/onboarding\/contact$/);
+  await page.waitForURL(/\/onboarding\/contact$/, { waitUntil: "commit" });
   await profile("/onboarding/contact");
 
   await page.locator("#phone").fill("01012345678");
   await page.getByRole("button", { name: /^continue$/i }).click();
-  await page.waitForURL(/\/onboarding\/account-type$/);
+  await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
   await profile("/onboarding/account-type");
 
   const header = "route | cold-lcp | warm-lcp | warm-ttfb | warm-load | warm-reqs | warm-kb";

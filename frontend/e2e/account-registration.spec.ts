@@ -53,12 +53,12 @@ test.describe("account registration", () => {
 
     // Verified + consented new account resumes at the first onboarding step
     // (Sprint 7.3: /onboarding forwards to the next incomplete step).
-    await page.waitForURL(/\/onboarding\/profile$/);
+    await page.waitForURL(/\/onboarding\/profile$/, { waitUntil: "commit" });
     await expect(page.getByText(/step 1 of 3/i)).toBeVisible();
 
     // Resume: a signed-in caller visiting Sign In is funnelled back into onboarding.
     await page.goto("/auth/sign-in");
-    await page.waitForURL(/\/onboarding\/profile$/);
+    await page.waitForURL(/\/onboarding\/profile$/, { waitUntil: "commit" });
   });
 
   test("sign up in Arabic renders RTL with no mixed-language leakage", async ({ page }) => {
@@ -89,7 +89,7 @@ test.describe("account registration", () => {
     // Lost-email path is one click away.
     await page.goto("/auth/recovery");
     await page.getByRole("link", { name: /lost access to your email/i }).click();
-    await page.waitForURL(/\/auth\/support$/);
+    await page.waitForURL(/\/auth\/support$/, { waitUntil: "commit" });
   });
 
   test("support shows a safe unavailable state (no fabricated contact)", async ({ page }) => {
@@ -127,6 +127,6 @@ test.describe("account registration", () => {
     await expect(page.getByText(/this invitation is for your account/i)).toBeVisible();
     await page.getByRole("button", { name: /accept invitation/i }).click();
     // Acceptance bridges to an active membership and lands in the workspace.
-    await page.waitForURL(/\/b2b(\/|$)/);
+    await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
   });
 });

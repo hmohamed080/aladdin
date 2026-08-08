@@ -36,7 +36,7 @@ async function registerFreshUser(page: Page, request: APIRequestContext): Promis
   const code = await readNewOtp(request, email, seen);
   await page.getByLabel(/one-time code|الرمز/i).fill(code);
   await page.getByRole("button", { name: /verify|تأكيد/i }).click();
-  await page.waitForURL(/\/onboarding\/profile$/);
+  await page.waitForURL(/\/onboarding\/profile$/, { waitUntil: "commit" });
   return email;
 }
 
@@ -52,7 +52,7 @@ test.describe("shared onboarding", () => {
     await page.getByRole("button", { name: /^continue$/i }).click();
 
     // Step 2 — contact. Email is verified + read-only; phone is collected unverified.
-    await page.waitForURL(/\/onboarding\/contact$/);
+    await page.waitForURL(/\/onboarding\/contact$/, { waitUntil: "commit" });
     await expect(page.getByText(/step 2 of 3/i)).toBeVisible();
     await expect(page.locator("#email")).toHaveAttribute("readonly", "");
     await expect(page.getByText(/not verified yet/i)).toBeVisible();
@@ -60,14 +60,14 @@ test.describe("shared onboarding", () => {
     await page.getByRole("button", { name: /^continue$/i }).click();
 
     // Step 3 — account type. Pick an individual professional type.
-    await page.waitForURL(/\/onboarding\/account-type$/);
+    await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
     await expect(page.getByText(/step 3 of 3/i)).toBeVisible();
     await noOverflow(page);
     await page.getByRole("button", { name: /engineer \/ designer/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
 
     // Step 4 — persona handoff (professional). Not activation.
-    await page.waitForURL(/\/onboarding\/complete$/);
+    await page.waitForURL(/\/onboarding\/complete$/, { waitUntil: "commit" });
     await expect(page.getByText(/ready for the next step/i)).toBeVisible();
     await expect(page.getByText(/professional profile and verification/i)).toBeVisible();
   });
@@ -78,7 +78,7 @@ test.describe("shared onboarding", () => {
 
     await page.locator("#displayName").fill("Persisted Name");
     await page.getByRole("button", { name: /^continue$/i }).click();
-    await page.waitForURL(/\/onboarding\/contact$/);
+    await page.waitForURL(/\/onboarding\/contact$/, { waitUntil: "commit" });
 
     // Refresh mid-flow → still on contact (profile step is saved, not lost).
     await page.reload();
@@ -92,7 +92,7 @@ test.describe("shared onboarding", () => {
     await page.goto("/onboarding/contact");
     await page.locator("#phone").fill("01234567890");
     await page.getByRole("button", { name: /^continue$/i }).click();
-    await page.waitForURL(/\/onboarding\/account-type$/);
+    await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
     await page.goto("/onboarding/contact");
     await expect(page.locator("#phone")).toHaveValue("01234567890");
     await expect(page.getByText(/not verified yet/i)).toBeVisible();
@@ -118,15 +118,15 @@ test.describe("shared onboarding", () => {
 
     await page.locator("#displayName").fill("منشأة تجريبية");
     await page.getByRole("button", { name: /متابعة/ }).click();
-    await page.waitForURL(/\/onboarding\/contact$/);
+    await page.waitForURL(/\/onboarding\/contact$/, { waitUntil: "commit" });
     await page.locator("#phone").fill("01512345678");
     await page.getByRole("button", { name: /متابعة/ }).click();
-    await page.waitForURL(/\/onboarding\/account-type$/);
+    await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
 
     // Choose Supplier (business) — Arabic label.
     await page.getByRole("button", { name: /مورّد/ }).click();
     await page.getByRole("button", { name: /متابعة/ }).click();
-    await page.waitForURL(/\/onboarding\/complete$/);
+    await page.waitForURL(/\/onboarding\/complete$/, { waitUntil: "commit" });
     // Business handoff copy mentions organization setup (Arabic).
     await expect(page.getByText(/إعداد مؤسستك/)).toBeVisible();
     await noOverflow(page);
@@ -137,11 +137,11 @@ test.describe("shared onboarding", () => {
     const email = await registerFreshUser(page, request);
     await page.locator("#displayName").fill("Resume User");
     await page.getByRole("button", { name: /^continue$/i }).click();
-    await page.waitForURL(/\/onboarding\/contact$/);
+    await page.waitForURL(/\/onboarding\/contact$/, { waitUntil: "commit" });
 
     // Sign out from the onboarding chrome, then sign back in via the real OTP path.
     await page.getByRole("button", { name: /sign out|تسجيل الخروج/i }).click();
-    await page.waitForURL(/\/auth\/sign-in$/);
+    await page.waitForURL(/\/auth\/sign-in$/, { waitUntil: "commit" });
 
     const seen = await messageIdsFor(request, email);
     await page.getByLabel(/email address|البريد/i).fill(email);
@@ -152,7 +152,7 @@ test.describe("shared onboarding", () => {
     await page.getByRole("button", { name: /verify|تأكيد/i }).click();
 
     // An incomplete account signing in is routed to onboarding, resuming at contact.
-    await page.waitForURL(/\/onboarding\/contact$/);
+    await page.waitForURL(/\/onboarding\/contact$/, { waitUntil: "commit" });
   });
 
   test("an active existing member skips onboarding and reaches /b2b", async ({ page, request }) => {

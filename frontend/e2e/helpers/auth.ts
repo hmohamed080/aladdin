@@ -63,5 +63,7 @@ export async function signIn(page: Page, request: APIRequestContext, email: stri
   await page.getByLabel(/one-time code|الرمز/i).fill(code);
   await page.getByRole("button", { name: /verify|تأكيد/i }).click();
 
-  await page.waitForURL(/\/b2b(\/|$)/);
+  // Wait on the URL committing, not the full "load" event — under sustained
+  // full-suite load the load event can lag far behind an interactive page.
+  await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
 }

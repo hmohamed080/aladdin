@@ -17,7 +17,18 @@ export function LanguageSwitch() {
       size="sm"
       aria-label={t("nav.language")}
       disabled={pending}
-      onClick={() => start(() => setLocale(next))}
+      onClick={() =>
+        start(async () => {
+          // React does not patch <html> attributes on a client-side re-render, so
+          // revalidatePath alone updates the translated text but leaves <html dir>
+          // stale in production (dev masks this with a fuller refresh). Flip the
+          // direction/lang client-side immediately — mirroring ThemeSwitch — then
+          // persist server-side so SSR stays correct on the next load.
+          document.documentElement.setAttribute("dir", next === "ar" ? "rtl" : "ltr");
+          document.documentElement.setAttribute("lang", next);
+          await setLocale(next);
+        })
+      }
     >
       <span className="min-w-5 text-center font-medium">{locale === "ar" ? "EN" : "ع"}</span>
     </Button>

@@ -177,7 +177,7 @@ test.describe("visual QA matrix", () => {
         // Follow-up edit + reassign form (reach via the board's first Edit link).
         await page.goto("/b2b/follow-ups", { waitUntil: "networkidle" });
         await page.getByRole("link", { name: /^(edit|تعديل)$/i }).first().click();
-        await page.waitForURL(/\/b2b\/follow-ups\/[0-9a-f-]{36}\/edit/);
+        await page.waitForURL(/\/b2b\/follow-ups\/[0-9a-f-]{36}\/edit/, { waitUntil: "commit" });
         await assertNoOverflow(page, `follow-up-edit ${tag}`);
         await page.screenshot({ path: `test-results/vqa/followup-edit-${tag}.png` });
 
