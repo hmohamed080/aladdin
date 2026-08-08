@@ -18,16 +18,18 @@ export default async function OnboardingCompletePage() {
   if (state === "profile_pending") redirect("/onboarding/profile");
   if (state === "contact_pending") redirect("/onboarding/contact");
   if (state === "account_type_pending") redirect("/onboarding/account-type");
+  // Consumer / professional now have their own persona flows; only the business
+  // track still ends at this generic handoff (org setup lands in Sprint 7.5).
+  if (state === "consumer_onboarding_pending" || state === "consumer_onboarding_complete") {
+    redirect("/onboarding/consumer");
+  }
+  if (state === "persona_onboarding_pending") redirect("/onboarding/professional");
+  if (state === "persona_review_pending") redirect("/onboarding/professional/review");
   if (state === "consent_pending" || state === "invitation_pending" || state === "manually_blocked") {
     redirect("/onboarding");
   }
 
-  const track =
-    state === "consumer_onboarding_pending"
-      ? "consumer"
-      : state === "persona_onboarding_pending"
-        ? "professional"
-        : "business";
+  const track = "business" as const;
 
   const data = await getOnboardingData();
   const accountTypeKey =
