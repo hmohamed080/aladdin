@@ -9,8 +9,9 @@ vi.mock("next/navigation", () => ({
 
 const signInWithOtp = vi.fn();
 const verifyOtp = vi.fn();
+const rpc = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({
-  getServerSupabase: vi.fn(async () => ({ auth: { signInWithOtp, verifyOtp } })),
+  getServerSupabase: vi.fn(async () => ({ auth: { signInWithOtp, verifyOtp }, rpc })),
 }));
 
 import { requestEmailOtp, verifyEmailOtp } from "./auth";
@@ -81,22 +82,36 @@ describe("verifyEmailOtp", () => {
 
   it("redirects to a safe /b2b destination on success", async () => {
     verifyOtp.mockResolvedValueOnce({ error: null });
+    // An explicit sub-path (not the bare workspace) is honoured as-is — the
+    // onboarding resume gate only applies when heading to the default "/b2b".
     await expect(
       verifyEmailOtp(
         { ok: false },
         fd({ email: "a-owner@example.test", token: "123456", next: "/b2b/leads" }),
       ),
     ).rejects.toThrow("REDIRECT:/b2b/leads");
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("ignores an unsafe next target (open-redirect guard)", async () => {
     verifyOtp.mockResolvedValueOnce({ error: null });
+    // Unsafe next → sanitized to "/b2b"; an ACTIVE member proceeds to the workspace.
+    rpc.mockResolvedValueOnce({ data: "active_personal" });
     await expect(
       verifyEmailOtp(
         { ok: false },
         fd({ email: "a-owner@example.test", token: "123456", next: "https://evil.example" }),
       ),
     ).rejects.toThrow("REDIRECT:/b2b");
+  });
+
+  it("routes an incomplete-onboarding caller to /onboarding instead of the workspace", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: null });
+    // Default "/b2b" destination + a non-active state → resume onboarding.
+    rpc.mockResolvedValueOnce({ data: "contact_pending" });
+    await expect(
+      verifyEmailOtp({ ok: false }, fd({ email: "a-owner@example.test", token: "123456", next: "/b2b" })),
+    ).rejects.toThrow("REDIRECT:/onboarding");
   });
 
   it("surfaces a verification failure", async () => {

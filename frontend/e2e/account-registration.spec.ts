@@ -51,13 +51,14 @@ test.describe("account registration", () => {
     await page.getByLabel(/one-time code/i).fill(code);
     await page.getByRole("button", { name: /verify/i }).click();
 
-    // Verified new account lands on the onboarding handoff (verified + next step).
-    await page.waitForURL(/\/onboarding$/);
-    await expect(page.getByText(/email verified/i)).toBeVisible();
+    // Verified + consented new account resumes at the first onboarding step
+    // (Sprint 7.3: /onboarding forwards to the next incomplete step).
+    await page.waitForURL(/\/onboarding\/profile$/);
+    await expect(page.getByText(/step 1 of 3/i)).toBeVisible();
 
-    // Resume: a signed-in caller visiting Sign In is funnelled back to /onboarding.
+    // Resume: a signed-in caller visiting Sign In is funnelled back into onboarding.
     await page.goto("/auth/sign-in");
-    await page.waitForURL(/\/onboarding$/);
+    await page.waitForURL(/\/onboarding\/profile$/);
   });
 
   test("sign up in Arabic renders RTL with no mixed-language leakage", async ({ page }) => {
