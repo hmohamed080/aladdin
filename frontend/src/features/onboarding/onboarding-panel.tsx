@@ -1,31 +1,27 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import type { RegistrationState } from "@/server/queries/registration";
 import { recordConsentAction, type ConsentState } from "@/server/actions/registration";
 import { Card, Badge } from "@/components/ui/primitives";
-import { Button, SubmitButton, Checkbox } from "@/components/ui/controls";
+import { SubmitButton, Checkbox } from "@/components/ui/controls";
 import { ApertureMark, CalendarCheckIcon } from "@/components/ui/icons";
 
 const initialConsent: ConsentState = { ok: false };
 
 /**
- * The post-registration resume surface. It only RESOLVES and DISPLAYS the current
- * setup state and the next required step — it does not collect persona-specific
- * onboarding data (that arrives in a later sprint). `active_personal` is redirected
- * to the workspace before this renders.
+ * The post-registration NOTICE surface for the non-step states: outstanding
+ * consent, a pending invitation, or a manually-blocked account. The collected
+ * onboarding steps and the handoff summary live on their own routes; the router
+ * forwards active users to the workspace before this renders.
  */
 export function OnboardingPanel({ state }: { state: RegistrationState }) {
   const { t } = useI18n();
 
   const copy: Record<string, { title: string; body: string }> = {
-    onboarding_pending: { title: t("onboarding.onboardingTitle"), body: t("onboarding.onboardingBody") },
     invitation_pending: { title: t("onboarding.invitationTitle"), body: t("onboarding.invitationBody") },
-    organization_setup_pending: { title: t("onboarding.organizationTitle"), body: t("onboarding.organizationBody") },
     manually_blocked: { title: t("onboarding.blockedTitle"), body: t("onboarding.blockedBody") },
-    active_personal: { title: t("onboarding.activeTitle"), body: t("onboarding.activeBody") },
   };
 
   return (
@@ -45,17 +41,10 @@ export function OnboardingPanel({ state }: { state: RegistrationState }) {
       {state === "consent_pending" ? (
         <ConsentStep />
       ) : (
-        <div className="flex flex-col gap-md">
-          <div className="flex flex-col gap-1">
-            <p className="text-label font-medium uppercase tracking-wide text-fg-muted">{t("onboarding.nextStep")}</p>
-            <h1 className="font-display-ar text-headline text-fg">{copy[state]?.title ?? t("onboarding.onboardingTitle")}</h1>
-            <p className="text-body-lg text-fg-secondary">{copy[state]?.body ?? t("onboarding.onboardingBody")}</p>
-          </div>
-          {state === "active_personal" ? (
-            <Link href="/b2b" className="w-full">
-              <Button variant="primary" className="w-full">{t("onboarding.goToWorkspace")}</Button>
-            </Link>
-          ) : null}
+        <div className="flex flex-col gap-1">
+          <p className="text-label font-medium uppercase tracking-wide text-fg-muted">{t("onboarding.nextStep")}</p>
+          <h1 className="font-display-ar text-headline text-fg">{copy[state]?.title ?? t("onboarding.invitationTitle")}</h1>
+          <p className="text-body-lg text-fg-secondary">{copy[state]?.body ?? t("onboarding.invitationBody")}</p>
         </div>
       )}
     </Card>

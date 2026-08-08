@@ -6,12 +6,30 @@ export const dynamic = "force-dynamic";
 
 /**
  * Post-registration handoff / resume entry. Resolves the derived registration
- * state and routes accordingly: no session -> sign in; an active user -> the
- * workspace; otherwise show the current setup state and the next required step.
+ * state and forwards to the next incomplete step (profile → contact →
+ * account-type), the handoff summary, or the workspace. Consent / invitation /
+ * blocked states render their notice here.
  */
 export default async function OnboardingPage() {
   const state = await getRegistrationState();
-  if (state === "unverified") redirect("/auth/sign-in");
-  if (state === "active_personal") redirect("/b2b");
-  return <OnboardingPanel state={state} />;
+
+  switch (state) {
+    case "unverified":
+      redirect("/auth/sign-in");
+    case "active_personal":
+      redirect("/b2b");
+    case "profile_pending":
+      redirect("/onboarding/profile");
+    case "contact_pending":
+      redirect("/onboarding/contact");
+    case "account_type_pending":
+      redirect("/onboarding/account-type");
+    case "consumer_onboarding_pending":
+    case "persona_onboarding_pending":
+    case "organization_setup_pending":
+      redirect("/onboarding/complete");
+    default:
+      // consent_pending, invitation_pending, manually_blocked
+      return <OnboardingPanel state={state} />;
+  }
 }
