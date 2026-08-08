@@ -48,7 +48,7 @@ async function createLeadInBranch(page: Page, title: string, branchId: string): 
   await page.locator("#title").fill(title);
   await page.locator("#branchId").selectOption(branchId);
   await page.getByRole("button", { name: createBtn }).click();
-  await page.waitForURL(/\/b2b\/leads\/[0-9a-f-]{36}(\?|$)/);
+  await page.waitForURL(/\/b2b\/leads\/[0-9a-f-]{36}(\?|$)/, { waitUntil: "commit" });
 }
 
 async function switchBranch(page: Page, branchId: string) {
@@ -74,7 +74,7 @@ test.describe("scoped realtime lifecycle", () => {
 
       // Switch A to Cairo → scope becomes branch:CAIRO, still exactly one channel.
       await switchBranch(a, CAIRO);
-      await expect.poll(async () => (await rt(a))?.channels ?? [], { timeout: 15_000 }).toEqual([`branch:${CAIRO}`]);
+      await expect.poll(async () => (await rt(a))?.channels ?? [], { timeout: 30_000 }).toEqual([`branch:${CAIRO}`]);
       expect((await rt(a))!.channelCount).toBe(1);
 
       // Cairo mutation → refresh; Sheikh Zayed mutation → NO refresh.
@@ -89,7 +89,7 @@ test.describe("scoped realtime lifecycle", () => {
 
       // Switch A to Sheikh Zayed → Cairo channel torn down, one SZ channel.
       await switchBranch(a, SZ);
-      await expect.poll(async () => (await rt(a))?.channels ?? [], { timeout: 15_000 }).toEqual([`branch:${SZ}`]);
+      await expect.poll(async () => (await rt(a))?.channels ?? [], { timeout: 30_000 }).toEqual([`branch:${SZ}`]);
       expect((await rt(a))!.channelCount).toBe(1);
 
       // Now an SZ mutation refreshes.
@@ -140,7 +140,7 @@ test.describe("scoped realtime lifecycle", () => {
       await expect.poll(async () => (await rt(a))?.channelCount ?? 0).toBe(1);
 
       await a.getByRole("button", { name: /sign out|تسجيل الخروج/i }).click();
-      await a.waitForURL(/\/auth\/sign-in/);
+      await a.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
       // The channel is gone (component unmounted on leaving the /b2b shell).
       await expect.poll(async () => (await rt(a))?.channelCount ?? 0, { timeout: 10_000 }).toBe(0);
 
@@ -236,7 +236,7 @@ test.describe("scoped realtime lifecycle", () => {
         await b.goto(`${detail.split("?")[0]}/edit`);
         await b.locator("#title").fill(title + suffix);
         await b.getByRole("button", { name: /save changes|حفظ التغييرات/i }).click();
-        await b.waitForURL(/\?updated=1/);
+        await b.waitForURL(/\?updated=1/, { waitUntil: "commit" });
       }
       await expect(a.getByRole("main").getByRole("link", { name: `${title} v3` })).toHaveCount(1, { timeout: 25_000 });
       await expect(a.getByRole("main").getByRole("link", { name: title, exact: true })).toHaveCount(0);

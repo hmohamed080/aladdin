@@ -87,7 +87,18 @@ export async function verifyEmailOtp(_prev: AuthState, formData: FormData): Prom
   });
   if (error) return { ok: false, code: "auth.error.verifyFailed", email: email.data };
 
-  redirect(sanitizeNext(formData.get("next")));
+  const next = sanitizeNext(formData.get("next"));
+  // Resume gate: when heading to the default workspace, a caller who hasn't
+  // finished onboarding (not an active member) is routed to /onboarding instead,
+  // which forwards to their next incomplete step. An explicit destination (an
+  // invitation link, /onboarding) is always honoured as-is.
+  if (next === "/b2b") {
+    const { data: state } = await supabase.rpc("my_registration_state");
+    if (typeof state === "string" && state !== "active_personal") {
+      redirect("/onboarding");
+    }
+  }
+  redirect(next);
 }
 
 /**

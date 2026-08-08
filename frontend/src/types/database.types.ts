@@ -608,6 +608,63 @@ export type Database = {
           },
         ]
       }
+      onboarding_progress: {
+        Row: {
+          account_type_completed_at: string | null
+          completed_at: string | null
+          contact_completed_at: string | null
+          created_at: string
+          phone: string | null
+          profile_completed_at: string | null
+          selected_account_type:
+            | Database["public"]["Enums"]["account_type"]
+            | null
+          selected_track: Database["public"]["Enums"]["onboarding_track"] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_type_completed_at?: string | null
+          completed_at?: string | null
+          contact_completed_at?: string | null
+          created_at?: string
+          phone?: string | null
+          profile_completed_at?: string | null
+          selected_account_type?:
+            | Database["public"]["Enums"]["account_type"]
+            | null
+          selected_track?:
+            | Database["public"]["Enums"]["onboarding_track"]
+            | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_type_completed_at?: string | null
+          completed_at?: string | null
+          contact_completed_at?: string | null
+          created_at?: string
+          phone?: string | null
+          profile_completed_at?: string | null
+          selected_account_type?:
+            | Database["public"]["Enums"]["account_type"]
+            | null
+          selected_track?:
+            | Database["public"]["Enums"]["onboarding_track"]
+            | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_invitations: {
         Row: {
           accepted_at: string | null
@@ -1652,6 +1709,18 @@ export type Database = {
         Returns: undefined
       }
       my_registration_state: { Args: never; Returns: string }
+      onboarding_save_contact: { Args: { p_phone: string }; Returns: undefined }
+      onboarding_save_profile: {
+        Args: { p_display_name: string; p_locale: string }
+        Returns: undefined
+      }
+      onboarding_select_account_type: {
+        Args: {
+          p_account_type?: Database["public"]["Enums"]["account_type"]
+          p_track: Database["public"]["Enums"]["onboarding_track"]
+        }
+        Returns: undefined
+      }
       reassign_follow_up: {
         Args: {
           p_assignee_membership_id: string
@@ -1794,6 +1863,7 @@ export type Database = {
         | "decision_pending"
       lead_status: "active" | "won" | "lost" | "archived"
       membership_status: "invited" | "active" | "suspended" | "revoked"
+      onboarding_track: "consumer" | "professional" | "business"
       org_status:
         | "draft"
         | "pending_verification"
@@ -1990,6 +2060,7 @@ export const Constants = {
       ],
       lead_status: ["active", "won", "lost", "archived"],
       membership_status: ["invited", "active", "suspended", "revoked"],
+      onboarding_track: ["consumer", "professional", "business"],
       org_status: [
         "draft",
         "pending_verification",

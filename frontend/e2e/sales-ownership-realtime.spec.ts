@@ -24,7 +24,7 @@ async function createCustomer(page: Page, name: string): Promise<string> {
   await page.goto("/b2b/customers/new");
   await page.locator("#displayName").fill(name);
   await page.getByRole("button", { name: createBtn }).click();
-  await page.waitForURL(/\/b2b\/customers\/[0-9a-f-]{36}(\?|$)/);
+  await page.waitForURL(/\/b2b\/customers\/[0-9a-f-]{36}(\?|$)/, { waitUntil: "commit" });
   return page.url().split("?")[0]!;
 }
 
@@ -36,7 +36,7 @@ async function createLead(page: Page, title: string, branchLabel?: RegExp): Prom
     await page.locator("#branchId").selectOption({ label: (await opt.textContent())!.trim() });
   }
   await page.getByRole("button", { name: createBtn }).click();
-  await page.waitForURL(/\/b2b\/leads\/[0-9a-f-]{36}(\?|$)/);
+  await page.waitForURL(/\/b2b\/leads\/[0-9a-f-]{36}(\?|$)/, { waitUntil: "commit" });
   return page.url().split("?")[0]!;
 }
 
@@ -58,7 +58,7 @@ test.describe("manager — ownership edits", () => {
     await dialog.locator("#own-branch").selectOption({ label: "Sheikh Zayed Branch" });
     await dialog.getByRole("button", { name: saveChangesBtn }).click();
 
-    await page.waitForURL(/\?updated=1/);
+    await page.waitForURL(/\?updated=1/, { waitUntil: "commit" });
     await expect(page.getByRole("main").getByText(SZ)).toBeVisible();
   });
 
@@ -74,7 +74,7 @@ test.describe("manager — ownership edits", () => {
     await dialog.locator("#lsb-branch").selectOption({ label: "Cairo Branch" });
     await dialog.getByRole("button", { name: saveChangesBtn }).click();
 
-    await page.waitForURL(/\?updated=1/);
+    await page.waitForURL(/\?updated=1/, { waitUntil: "commit" });
     await expect(page.getByRole("main").getByText(CAIRO)).toBeVisible();
   });
 
@@ -123,7 +123,7 @@ test.describe("scoped realtime between two browser contexts", () => {
       await b.goto("/b2b/leads/new");
       await b.locator("#title").fill(title);
       await b.getByRole("button", { name: createBtn }).click();
-      await b.waitForURL(/\/b2b\/leads\/[0-9a-f-]{36}(\?|$)/);
+      await b.waitForURL(/\/b2b\/leads\/[0-9a-f-]{36}(\?|$)/, { waitUntil: "commit" });
 
       // Context A refreshes itself from the Realtime hint (no manual reload).
       // Exactly one row — repeated/duplicate events never duplicate a card.
@@ -149,7 +149,7 @@ test.describe("scoped realtime between two browser contexts", () => {
       const opt = mgr.locator("#branchId option", { hasText: SZ });
       await mgr.locator("#branchId").selectOption({ label: (await opt.textContent())!.trim() });
       await mgr.getByRole("button", { name: createBtn }).click();
-      await mgr.waitForURL(/\/b2b\/leads\/[0-9a-f-]{36}(\?|$)/);
+      await mgr.waitForURL(/\/b2b\/leads\/[0-9a-f-]{36}(\?|$)/, { waitUntil: "commit" });
 
       // Give Realtime + any refresh time to settle, then prove ABSENCE: the
       // rep's RLS-scoped refetch never surfaces the SZ lead.

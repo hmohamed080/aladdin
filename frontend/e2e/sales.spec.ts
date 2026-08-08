@@ -40,7 +40,7 @@ async function createCustomer(page: Page, name: string): Promise<string> {
   await page.goto("/b2b/customers/new");
   await page.locator("#displayName").fill(name);
   await page.getByRole("button", { name: createBtn }).click();
-  await page.waitForURL(/\/b2b\/customers\/[0-9a-f-]{36}(\?|$)/);
+  await page.waitForURL(/\/b2b\/customers\/[0-9a-f-]{36}(\?|$)/, { waitUntil: "commit" });
   await expect(page.getByRole("heading", { name })).toBeVisible();
   return page.url().split("?")[0]!;
 }
@@ -49,7 +49,7 @@ async function createLead(page: Page, title: string): Promise<string> {
   await page.goto("/b2b/leads/new");
   await page.locator("#title").fill(title);
   await page.getByRole("button", { name: createBtn }).click();
-  await page.waitForURL(/\/b2b\/leads\/[0-9a-f-]{36}(\?|$)/);
+  await page.waitForURL(/\/b2b\/leads\/[0-9a-f-]{36}(\?|$)/, { waitUntil: "commit" });
   return page.url().split("?")[0]!;
 }
 
@@ -72,14 +72,14 @@ test.describe("manager — daily sales workflow", () => {
     await page.goto(`${detail}/edit`);
     await page.locator("#primaryPhone").fill("01000000123");
     await page.getByRole("button", { name: saveChangesBtn }).click();
-    await page.waitForURL(/\?updated=1/);
+    await page.waitForURL(/\?updated=1/, { waitUntil: "commit" });
     await expect(page.getByText("01000000123")).toBeVisible();
 
     // Clear the optional phone (submit blank) and verify it is gone.
     await page.goto(`${detail}/edit`);
     await page.locator("#primaryPhone").fill("");
     await page.getByRole("button", { name: saveChangesBtn }).click();
-    await page.waitForURL(/\?updated=1/);
+    await page.waitForURL(/\?updated=1/, { waitUntil: "commit" });
     await expect(page.getByText("01000000123")).toHaveCount(0);
   });
 
@@ -92,7 +92,7 @@ test.describe("manager — daily sales workflow", () => {
     await page.goto(`${detail}/edit`);
     await page.locator("#title").fill(edited);
     await page.getByRole("button", { name: saveChangesBtn }).click();
-    await page.waitForURL(/\?updated=1/);
+    await page.waitForURL(/\?updated=1/, { waitUntil: "commit" });
     await expect(page.getByRole("heading", { name: edited })).toBeVisible();
 
     await page.goto(detail);
@@ -132,7 +132,7 @@ test.describe("manager — daily sales workflow", () => {
 
     // Edit route: change title + description, verify persisted on the board.
     await page.getByRole("link", { name: /^(edit|تعديل)$/i }).first().click();
-    await page.waitForURL(/\/b2b\/follow-ups\/[0-9a-f-]{36}\/edit/);
+    await page.waitForURL(/\/b2b\/follow-ups\/[0-9a-f-]{36}\/edit/, { waitUntil: "commit" });
     const editedFu = `${fuTitle} edited`;
     await page.locator("#title").fill(editedFu);
     await page.locator("#description").fill("call the site engineer");
@@ -203,9 +203,9 @@ test.describe("manager — daily sales workflow", () => {
     // that could resolve to a cockpit link once seeded/created data grows.
     const bottomNav = page.getByRole("navigation", { name: /sales workspace|مساحة المبيعات/i }).last();
     await bottomNav.getByRole("link", { name: /customers|العملاء/i }).click();
-    await page.waitForURL(/\/b2b\/customers/);
+    await page.waitForURL(/\/b2b\/customers/, { waitUntil: "commit" });
     await bottomNav.getByRole("link", { name: /leads|الفرص/i }).click();
-    await page.waitForURL(/\/b2b\/leads/);
+    await page.waitForURL(/\/b2b\/leads/, { waitUntil: "commit" });
   });
 });
 

@@ -72,10 +72,11 @@ select throws_ok(
   '42501', null, 'direct client insert into consent_receipts is denied');
 
 -- ===== my_registration_state (derived) =====
--- Omar: verified + consent, no membership, no org -> onboarding_pending
+-- Omar: verified + consent, no onboarding progress -> profile_pending (Sprint 7.3
+-- refined the shared-onboarding state machine to resolve the next incomplete step).
 select is(
   (select public.my_registration_state()),
-  'onboarding_pending', 'a verified, consented, org-less user is onboarding_pending');
+  'profile_pending', 'a verified, consented user with no onboarding progress is profile_pending');
 
 -- Amina (Org A owner, active membership) -> active_personal
 set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';

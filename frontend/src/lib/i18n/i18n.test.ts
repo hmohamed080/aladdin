@@ -25,7 +25,12 @@ function entries(obj: Record<string, unknown>, prefix = ""): Array<[string, stri
 const ARABIC = /[؀-ۿ]/;
 // Values allowed to hold Latin letters in the Arabic catalog: technical samples
 // that are identical across locales (e.g. the neutral email placeholder).
-const LATIN_IN_ARABIC_WHITELIST = new Set<string>(["auth.emailPlaceholder"]);
+// Values that are intentionally identical technical samples in both locales
+// (neutral placeholders), so they carry Latin/digits and no Arabic script.
+const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
+  "auth.emailPlaceholder",
+  "onboarding.contact.phonePlaceholder",
+]);
 
 describe("i18n catalogs", () => {
   it("Arabic has exactly the same keys as English (no missing/extra)", () => {
@@ -82,6 +87,7 @@ describe("Sprint 7.2 registration copy (Arabic)", () => {
 
   it("every new Arabic value is present, non-empty, and contains Arabic script", () => {
     const bad = enPairs
+      .filter(([key]) => !LATIN_IN_ARABIC_WHITELIST.has(key)) // neutral technical samples
       .map(([key]) => [key, arMap.get(key)] as const)
       .filter(([, v]) => !v || v.trim().length === 0 || !ARABIC.test(v))
       .map(([key]) => key);
@@ -97,6 +103,39 @@ describe("Sprint 7.2 registration copy (Arabic)", () => {
       if (JSON.stringify(enPlaceholders) !== JSON.stringify(arPlaceholders)) drift.push(key);
     }
     expect(drift, `placeholder drift on: ${drift.join(", ")}`).toEqual([]);
+  });
+});
+
+// Sprint 7.3 shared onboarding: prove the new step/field/account-type/handoff keys
+// exist in both locales, are real Arabic, and keep every placeholder (e.g. the
+// {current}/{total} step counter). Parity/leakage are covered by the guards above.
+describe("Sprint 7.3 onboarding copy", () => {
+  const onboardingEn = entries(en.onboarding as unknown as Record<string, unknown>).map(
+    ([k, v]) => [`onboarding.${k}`, v] as [string, string],
+  );
+  const arMap = new Map(entries(ar as unknown as Record<string, unknown>));
+
+  it("adds the new onboarding step/account-type keys", () => {
+    // Baseline plus the new steps, fields, account-type choices, and handoff copy.
+    expect(onboardingEn.length).toBeGreaterThan(60);
+  });
+
+  it("every onboarding Arabic value is present, non-empty, and real Arabic (bar samples)", () => {
+    const bad = onboardingEn
+      .filter(([key]) => !LATIN_IN_ARABIC_WHITELIST.has(key))
+      .filter(([key]) => {
+        const v = arMap.get(key);
+        return !v || v.trim().length === 0 || !ARABIC.test(v);
+      })
+      .map(([key]) => key);
+    expect(bad, `onboarding keys missing/empty/non-Arabic: ${bad.join(", ")}`).toEqual([]);
+  });
+
+  it("preserves the {current}/{total} step-counter placeholders", () => {
+    expect(en.onboarding.stepLabel).toContain("{current}");
+    expect(en.onboarding.stepLabel).toContain("{total}");
+    expect(ar.onboarding.stepLabel).toContain("{current}");
+    expect(ar.onboarding.stepLabel).toContain("{total}");
   });
 });
 
