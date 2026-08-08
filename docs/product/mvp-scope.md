@@ -17,13 +17,15 @@ State what the Private Pilot MVP includes, in what order, and what is explicitly
 **Build order (roadmap):**
 1. **05C — B2B Sales operating workflow** (first; Sales is the key daily-active user): Opportunity → Need → Match → Smart Share → Follow-up → Quote → Pipeline → Task.
 2. **05A — Core B2C value journey**: AI consult → Intent → Discovery → Search → Matching → Profile → Product → RFQ.
-3. **05B — Quote & project journey**: RFQ → Responses → Quote comparison → Decision → Project → Follow-up.
+3. **05B — Quote & project journey**: RFQ → Quotation → Decision → Projects Lite → Follow-up. **Supplier quote comparison is not part of the Private Pilot MVP.**
 4. **05D — Supplier/Showroom/Product operations**: Catalog → Availability → Requests → Quotes → Orders → Campaigns.
 5. **05E — B2B Cockpit & Admin completion** (dashboards last, after inner workflows exist).
 
 **Roles (kept separate, one account can hold several):** End Consumer · Installer/Technician · Engineer · Interior Designer · Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · Sales · Contractor · Trainer · Trainee · Administrator.
 
-**Cross-cutting MVP requirements:** English (LTR) + Arabic (RTL); Light + Dark; responsive Desktop/Tablet/Mobile (PWA); Egyptian data conventions (localities, EGP).
+**Cross-cutting MVP requirements:** English (LTR) + Arabic (RTL); Light + Dark; responsive Desktop/Tablet/Mobile (PWA); Egyptian data conventions (localities, EGP). The approved B2B responsive contract is persistent Desktop workspace navigation, compact rail/drawer on Tablet, and intentional one-column Mobile reflow with structured data cards and stacked details.
+
+**Private Pilot subscription boundary:** eligible activated users use the service free during the Pilot; no online payment is collected; admin activation is manual; future packages may be described informationally; account upgrades extend the same canonical identity.
 
 ## Rationale
 

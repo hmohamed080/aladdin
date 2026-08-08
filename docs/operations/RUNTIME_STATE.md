@@ -8,9 +8,9 @@ This is a **mutable snapshot** of the current live repository state — not an a
 |---|---|
 | **Version** | Runtime snapshot · 2026-08-04 |
 | **Owner** | Foundation / Operations |
-| **Last updated** | 2026-08-05 |
-| **Updated by** | Claude Code (Opus 4.8) — Phase 2, Sprint 6.2 Final Realtime & QA Merge Gate (dirty-form protection + realtime timer teardown + dialog focus fix + exact perf console gate + deterministic flake fix; on top of Sprint 6/6.1) |
-| **Current focus** | **Phase 2 — B2B Sales Operating Workflow · Sprint 3 (B2B Sales Domain Foundation).** Phase 1 is merged to `main` (@ `54792a4`, PR #4). Sprint 3 builds the tenant-owned sales foundation on the identity/tenancy spine: `customers`, `leads`, `sales_activities`, `follow_up_tasks` with organization + optional-branch ownership, composite-FK cross-tenant safety, scope-based RLS, 13 constrained `security definer` workflow RPCs (create/update/assign/transition/activity/follow-up), optimistic-locked lead transitions, in-transaction audit, and `security_invoker` dashboard read-models. Local suite: **337 pgTAP** assertions (254 preserved + 83 new). See [ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md). No orders/quotes/RFQ/products/payments/AI/WhatsApp. |
+| **Last updated** | 2026-08-08 |
+| **Updated by** | Pi design agent — B2B product-decision closure and canonical screen completion |
+| **Current focus** | **Phase 2 implementation remains active; canonical Private-Pilot B2B Pencil design is complete.** Product decisions, responsive behavior, AR/EN, Light/Dark, operational component families, and Aperture token mappings are closed in the private design source. Existing engineering state and validated sales/onboarding work remain unchanged by this design-only session. |
 
 ## Phase & repository
 
@@ -20,8 +20,8 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | **Current Sprint** | **Sprint 6 — Sales Ownership, Realtime & Performance Hardening** (customer branch/assignee + lead source/branch ownership RPCs; scoped Postgres-Changes Realtime on `leads`+`follow_up_tasks`; executed E2E/visual-QA/production-perf gates; branch `feature/sales-ownership-realtime`, PR pending, base `main` @ `5a47011`). Sprint 5.1 merged (PR #8). |
 | **Current Feature** | Passwordless Email-OTP auth + B2B app shell + customers/leads/follow-ups screens wired to the real Sprint-3 RLS/RPCs (Arabic-first, RTL, light/dark, responsive) |
 | **Next Phase** | **Phase 2 continued** — sales UI/screens (05C) then the RFQ/Quote/Project journey; dashboards last |
-| **Current Branch** | `feature/b2b-sales-ui` (created from `main` @ `f9596a3`) |
-| **Current Milestone** | Sprint 3 — secure sales operating foundation; open PR to `main`; no orders/quotes/products/payments |
+| **Current Branch** | `docs/technical-finalization` (design/product records only in this session) |
+| **Current Milestone** | Phase 2 implementation continues; canonical Private-Pilot B2B design contract is complete |
 | **Current Remote Repository** | `origin` = `https://github.com/hmohamed080/aladdin.git` |
 | **Last Stable Commit** | `54792a4` — `main` after PR #4 merged (Phase 1 identity/tenancy + Sprint 2/2.1). Sprint 3 commits land on `feature/b2b-sales-workflow` and merge into `main` via PR |
 | **Last Stable Tag** | `v0.1.0-foundation` (repo `0.1.0`) — created on merged `main` after the closeout PR; Design System stays independently at `1.0.0` |
@@ -36,13 +36,13 @@ Always reflects the current live engineering state of the project. Overwrite eac
 
 | Field | Value |
 |---|---|
-| **Current Sprint** | **Sprint 3 — B2B Sales Domain Foundation** (Phase 2) |
-| **Current Epic** | B2B Sales Operating Workflow (customers, leads, pipeline, activities, follow-ups) on the tenant spine |
-| **Current Feature** | Tenant-owned sales schema + scope RLS + constrained sales RPCs + audit + dashboard read-models + server-only helpers |
-| **Current UI Status** | **B2B sales workspace with edit depth (Sprint 5):** Sprint-4 sign-in + workspace, plus real customer/lead/follow-up **edit** flows (trusted RPCs), richer customer detail (add-activity/add-follow-up/follow-up lists), an accessible confirmation dialog for terminal actions, and a local Playwright E2E foundation. Arabic-first RTL + EN + light/dark; optimistic lead concurrency; localized errors. Wired to real RLS/RPCs (no mock core data). |
-| **Current Backend Status** | FastAPI scaffold — `GET /health` only; **no product endpoints**. No backend change in Sprint 3 (sales write paths are Next.js server actions per ADR-0001). |
-| **Current Database Status** | **11 migrations** (Sprint 4.2 adds `20260805100000_public_directory_invoker_hardening`); Phase 1 identity/tenancy + Sprint 2/2.1 write paths + **Sprint 3 sales domain** (`customers`, `leads`, `sales_activities`, `follow_up_tasks`; 13 sales workflow RPCs; 5 read-model views; composite-FK tenant safety; scope RLS). All 27 public workflow RPCs are postgres-owned `security definer` (`search_path=""`), executable only by `authenticated`; base tables SELECT-only for client/service roles. **Sprint 4.2:** +2 internal `app._*_public_directory()` definer readers backing the hardened `security_invoker` directory views (migration `20260805100000`). **Sprint 5.1:** `20260805110000_sales_edit_concurrency` adds edit-path optimistic concurrency + explicit `p_clear_*` field-clearing. **Sprint 6:** **13 migrations** — `20260806090001_sales_ownership_and_realtime` adds two ownership RPCs (`set_customer_ownership`, `set_lead_source_branch`; `security definer`, `authenticated`-only, version/updated_at-guarded, strand-rejecting, audited via new actions `customer.reassigned`/`lead.details_changed`) and publishes **exactly** `leads`+`follow_up_tasks` to `supabase_realtime` (RLS-enforced Postgres Changes; no identity/PII table published). **416 pgTAP** assertions across 19 files (two clean cycles). |
-| **Current Design System Version** | **1.0.0** (`DESIGN.md` / `design/tokens/*`) |
+| **Current Sprint** | **Sprint 6 / subsequent onboarding work on the Phase 2 implementation line** |
+| **Current Epic** | B2B Sales Operating Workflow and shared/persona onboarding on the tenant spine |
+| **Current Feature** | Validated sales workspace, ownership/realtime hardening, and shared/persona onboarding; this session changed design/docs only |
+| **Current UI Status** | Implemented B2B sales workspace and onboarding work remain intact; private Pencil now contains the completed canonical MVP B2B screen set and Draft component contracts |
+| **Current Backend Status** | FastAPI scaffold — `GET /health` only; sales write paths remain Next.js server actions per ADR-0001 |
+| **Current Database Status** | Identity/tenancy, verification/upgrade, memberships/branches, sales domain, ownership/realtime migrations and validated RLS/RPC coverage remain unchanged by this design-only session |
+| **Current Design System Version** | **1.1.0** (`DESIGN.md` / `design/tokens/*`; B2B Draft component-contract release) |
 | **Current Documentation Version** | Technical spec **1.0.0** (Phase 0.7); engineering standards **1.0.0** (Phase 0.8); governance/planning **1.0.0** (Phase 0.9 — ADR-0006, ROADMAP, BACKLOG, TECHNICAL_DEBT, DOCUMENTATION_STATUS, DECISION_LOG); docs index **1.0.0** |
 | **Current Deployment Status** | **not deployed** — no Vercel/Railway/Supabase cloud project connected; **no CD**; a minimum **PR-validation CI** workflow (`.github/workflows/ci.yml`: `frontend`/`backend`/`docs`) is present (must run once, then be selected as required checks in branch protection); repository published to GitHub (`origin`) |
 
@@ -58,17 +58,17 @@ Always reflects the current live engineering state of the project. Overwrite eac
 
 - **Foundation:** scaffolded and validated. Modular monolith per ADR-0001 (Next.js + Supabase + specialized FastAPI + workers).
 - **Python data access:** `supabase-py` (ADR-0005); SQLAlchemy deferred/removed; Alembic excluded.
-- **No product features, product tables, or production connections exist.**
+- Product implementation exists on the Phase 2 line (identity/tenancy, verification/upgrade, memberships/branches, sales domain and UI/onboarding work); this session changed no application code, schema, runtime service, or deployment.
 - **MVP technical blueprint:** authored under [`../technical/`](../technical/) (Phase 0.7) — system overview, domain model, database design, ERD, storage, RLS, permissions, API contracts, jobs, events, state machines, validation, integrations, future scope. Specification only; open decisions marked `⚑ OPEN`.
 
 ## Design system state
 
-- **Version `1.0.0`** — approved, hardened, pre-feature. North star: **"The Aperture."**
+- **Version `1.1.0`** — approved, hardened, with canonical Private-Pilot B2B Draft component contracts. North star: **"The Aperture."**
 - **Authority chain:** `PRODUCT_DIRECTION_GUIDE.md` → `DESIGN.md` → `design/tokens/*.json` → `UI-UX/UI_UX_SYSTEM_GUIDE.md` → `design.pen` → frontend code.
 - **Canonical machine tokens:** `design/tokens/{colors,typography,spacing,radii,shadows,motion,breakpoints,z-index}.json` (+ README). Governance: `design/GOVERNANCE.md`; changelog: `design/CHANGELOG.md`; inventory: `design/COMPONENT_INVENTORY.md`; icons: `design/icons/README.md`.
 - **Frontend implementation:** `frontend/src/styles/tokens.css` (primitives + light/dark semantics + motion + z-index), `frontend/tailwind.config.ts` (semantic/brand colors, type roles, spacing, radii, shadows, motion, z-index, canonical `tablet`/`desktop`/`wide` screens), `frontend/src/app/globals.css` (base + `prefers-reduced-motion`), `frontend/src/app/layout.tsx` (four self-hosted fonts).
 - **Defect fixed this session:** dark-theme `--primary` referenced an undefined `--lime` → corrected to `--on-dark`.
-- **Components implemented:** none yet — inventory entries are `Proposed`/`Draft`. Icon library (Lucide) decided but not installed. PDF/Arabic font strategy is an open item.
+- **Pencil components:** 142 reusable masters — the preserved 127 plus 15 Draft B2B operational families (data grid/mobile row, opportunity, pipeline, task, need, match, Smart Share, RFQ, quotation, project, timeline, notification, navigation). Quote Comparison is deliberately absent. Production component status remains governed independently in the inventory.
 
 ## Implemented routes
 
@@ -115,7 +115,8 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 
 ## Current blockers
 
-- **None.** The previously environment-blocked network checks are now **executed and passing** (2026-08-01): the backend Docker image builds/runs (non-root, healthy `/health`), and the Supabase local stack starts, resets (×2), and lints cleanly with the extensions migration applied. See *Infrastructure validation status* below.
+- **B2B design blockers:** none for the approved Private-Pilot canonical main-screen scope. Full Supplier/Showroom suites, Quote Comparison, payment/checkout, enterprise permissions, advanced scheduling, forecasting, competitor intelligence, and advanced notification automation remain explicitly deferred — not blockers.
+- Previously environment-blocked network checks are executed and passing; see *Infrastructure validation status* below.
 - **Residual environment note (not a code defect):** `ghcr.io` still shows intermittent TLS-handshake timeouts that **slow** (no longer block) multi-image pulls; retries succeed. Docker Hub and `public.ecr.aws` are reachable.
 
 ## Known warnings (benign)
@@ -125,7 +126,7 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 
 ## Active files (this session)
 
-- Private visual source: `UI-UX/design.pen` — 8 top-level groups, 207 product screens, 0 generic missing placeholders, 48 explicitly classified remaining gaps, and updated `00I` coverage.
+- Private visual source: `UI-UX/design.pen` — 7 top-level groups, **423 product frames**, **302 B2B frames**, updated 21-row matrix/gap register, 15 new B2B masters, and QA trace board `00J`.
 - Approved design record: root `DESIGN.md` — The Aperture concept, exact brand/token values, typography, component defaults, and usage rules.
 - Frontend token bridge: `frontend/src/styles/tokens.css`, `frontend/tailwind.config.ts`, `frontend/src/app/globals.css`, and `frontend/src/app/layout.tsx`.
 - Product/UI memory: root `PRODUCT.md` and `UI-UX/UI_UX_SYSTEM_GUIDE.md` now record the approved identity and artifact-authority chain.
@@ -134,10 +135,12 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 
 ## Design validation status (2026-08-01)
 
-- `design.pen`: 8 top-level groups; 0 top-level overlaps; 0 organizational sibling overlaps.
-- 120 original product screens preserved; 87 copied variants added, for 207 product screens total.
-- 0 generic `MISSING —` placeholders remain; 48 gaps are explicitly Partial, Blocked, Responsive Decision, Unresolved, or Not Required.
-- Known inherited source-screen warnings remain untouched; copied variants reproduce those source conditions where applicable.
+- `design.pen`: 7 top-level groups; 0 top-level overlaps; 0 B2B organizational problems; 0 active canonical clipping/layout problems.
+- Product frames: **207 → 423**; B2B frames: **86 → 302**. All 207 pre-existing product screens remain present; 216 canonical B2B variants were added.
+- Canonical coverage: 18 MVP flow families × 12 variants each = Desktop 72 / Tablet 72 / Mobile 72; Light 108 / Dark 108; Arabic 108 / English 108.
+- Matrix/gap register classify all approved P0/P1/P2 rows Completed; full Supplier and Showroom suites remain Deferred — Not MVP.
+- Reusable masters: **127 → 142**; 15 new B2B Draft masters; 802 refs checked with 0 broken; new masters have 205 instances and 0 component-subtree layout problems.
+- Pencil semantic variables and onboarding aliases map to the Aperture palette/fonts. Active canonical B2B screens contain 0 detected legacy blue/Inter/IBM Plex mappings. Eight overflow/overlay flags remain only in preserved historical/deferred Cockpit/payment references.
 - Root `PRODUCT.md` and `UI_UX_SYSTEM_GUIDE.md` encode the permanent governance rule and the approved Aperture identity.
 - Frontend primitives and light/dark semantic aliases mirror `DESIGN.md`; Impeccable detector returned 0 findings.
 - Semantic normal-size text clears WCAG AA in both themes (minimum measured ratios: light 4.76:1; dark 5.40:1).
@@ -182,8 +185,9 @@ None. No Vercel / Railway / Supabase cloud project connected. No CI/CD pipeline.
 
 ## Next planned work
 
-1. Update PR #4 from `feature/account-upgrade-verification`; require `frontend`, `backend`, `docs`, and `supabase-rls`; do not merge until all four are green.
-2. After explicit merge authorization, close Phase 1 documentation/milestone state. Do not begin another sprint from this review task.
+1. Continue the approved implementation roadmap from the latest validated Phase 2 baseline; do not infer deployment or merge authorization from this design session.
+2. Implement remaining B2B journeys against the approved sequence: Opportunity → Need → Match → Smart Share → Follow-up → Quote → Pipeline → Task.
+3. Map the 15 Draft Pencil families to production components and validate keyboard, focus, screen-reader, responsive, RTL and theme behavior before promoting them to `Ready`.
 
 ## Exact resume commands
 

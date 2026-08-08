@@ -158,9 +158,9 @@ components:
 | | |
 |---|---|
 | **Design System** | Aladdin — "The Aperture" |
-| **Version** | `1.0.0` |
-| **Status** | Approved · foundation hardened (pre-feature). Ready to build product UI against. |
-| **Last updated** | 2026-08-01 |
+| **Version** | `1.1.0` |
+| **Status** | Approved · foundation hardened; canonical Private-Pilot B2B component contracts added in Pencil. |
+| **Last updated** | 2026-08-08 |
 | **Maintainer** | Design-system foundation (agent-maintained under founder approval) |
 | **Changelog** | [`design/CHANGELOG.md`](design/CHANGELOG.md) |
 | **Governance** | [`design/GOVERNANCE.md`](design/GOVERNANCE.md) — source-of-truth, versioning, component & AI-agent rules |
@@ -184,7 +184,7 @@ No lower source may contradict a higher one; on conflict, reconcile downward.
 ### Compatibility notes
 
 - **Semantic versioning:** MAJOR = breaking visual/component-contract change · MINOR = new tokens/components/states/theme behavior · PATCH = non-breaking corrections, docs, contrast fixes. Policy in [`design/GOVERNANCE.md`](design/GOVERNANCE.md#versioning).
-- `1.0.0` is the first approved, hardened foundation. **No product components are implemented yet** — the token contract and `.dark` override are ready for the first product feature to consume.
+- `1.0.0` is the first approved, hardened foundation. `1.1.0` adds the approved canonical Private-Pilot B2B component contracts as Draft Pencil masters. **No product components are implemented in frontend code yet** — production accessibility and interaction validation remains required.
 - Themes: Light + Dark are both first-class; `.dark` class on `<html>` (`darkMode: "class"`). Both AA-verified.
 
 ## Overview

@@ -169,7 +169,7 @@ The product model (PRODUCT_DIRECTION_GUIDE) is **capability-based derived access
 ### Opportunity *(spec/deferred — see note above)*
 - **Purpose:** a sales prospect/deal a Sales user works (the pipeline's unit).
 - **Relationships:** *–1 `Organization` (owner tenant); *–1 owner `Membership` (Sales user); 0–1 originating `Need`/consultation; 1–* `Task`, `FollowUp`, `Match`; 0–* `RfqRequest`/`Quote`.
-- **Lifecycle:** pipeline stages (`new` → `qualified` → `matching` → `quoted` → `won` | `lost`). See [11](11_state_machines.md).
+- **Lifecycle:** canonical Private-Pilot pipeline (`new` → `contacted` → `needs_captured` → `products_shared` → `quote_sent` → `won`; `lost` is the alternative terminal state). See [11](11_state_machines.md).
 - **Ownership:** `ORG+BRANCH`. **Constraints:** always has an owner and a current stage; stage changes stream live.
 
 ### Need

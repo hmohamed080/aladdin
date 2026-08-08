@@ -9,6 +9,24 @@ Each entry uses: Added · Changed · Fixed · Deprecated · Removed · Migration
 
 ---
 
+## 1.1.0 — 2026-08-08 — Canonical Private-Pilot B2B contracts
+
+### Added
+- Fifteen Draft reusable B2B Pencil component families: Data Grid, Mobile Data Row, Opportunity Card, Pipeline Stage, Task Row, Task Editor, Customer Need Summary, Product Match Card, Smart Share Item, RFQ Line Item, Quotation Line Item, Project Workspace Shell, Activity Timeline Item, Notification Item, and Responsive Workspace Navigation.
+- Canonical responsive usage contracts across Desktop, Tablet and Mobile with Light/Dark and AR/EN parity.
+
+### Changed
+- Reconciled the private Pencil semantic variable mappings and legacy onboarding aliases to The Aperture palette and typography authority. Canonical machine token values did not change.
+- Component inventory now distinguishes Draft Pencil masters from frontend-implemented `Ready` components.
+
+### Removed
+- Quote Comparison from the Private-Pilot MVP component requirement; no component was created.
+
+### Migration notes
+- Frontend remains unimplemented. When product implementation starts, map these Draft contracts to domain components and complete keyboard, focus, screen-reader, interaction-state and responsive validation before promoting them to `Ready`.
+
+---
+
 ## 1.0.0 — 2026-08-01 — Foundation finalized & hardened
 
 First approved, hardened Design System foundation. No product components implemented yet; the token contract is ready to build against.

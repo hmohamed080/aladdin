@@ -77,17 +77,21 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
   [*] --> new
-  new --> qualified: qualify
-  qualified --> matching: request matches
-  matching --> quoted: RFQ/quote created
-  quoted --> won: quote accepted
-  quoted --> lost: lost/declined
-  new --> lost: disqualify
-  qualified --> lost
+  new --> contacted: first contact recorded
+  contacted --> needs_captured: customer need captured
+  needs_captured --> products_shared: reviewed products shared
+  products_shared --> quote_sent: quotation sent
+  quote_sent --> won: customer decision accepted
+  new --> lost
+  contacted --> lost
+  needs_captured --> lost
+  products_shared --> lost
+  quote_sent --> lost
   won --> [*]
   lost --> [*]
 ```
-- Stage changes stream on `pipeline:{orgId}`; `won`/`lost` are audited and feed analytics (win-rate). Backward moves allowed except out of terminal `won`/`lost` (reopen = new opportunity). ⚑ Whether stages are org-customizable: default fixed.
+- The Private-Pilot pipeline is fixed: `new` → `contacted` → `needs_captured` → `products_shared` → `quote_sent` → `won`, with `lost` as the alternative terminal state. `Lead` may remain source terminology but is not a second workflow.
+- Stage changes stream on `pipeline:{orgId}`; `won`/`lost` are audited and feed analytics (win-rate). Backward moves are allowed except out of terminal `won`/`lost` (reopen = new opportunity). Organization-custom stages are deferred.
 
 ### 4a. Lead (implemented — Phase 2, Sprint 3)
 
@@ -124,7 +128,7 @@ stateDiagram-v2
   responses_in --> cancelled
   closed --> [*]
 ```
-- Anti-auction: responders never see each other. Closing on an accepted decision transitions linked opportunity→`quoted`/`won`.
+- Anti-auction: responders never see each other. Sending a linked quotation transitions the opportunity to `quote_sent`; an accepted decision transitions it to `won`. Supplier Quote Comparison is not part of the Private Pilot MVP.
 
 ## 6. Quote
 

@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Status** | Living document (canonical project memory) |
-| **Version** | Living (canonical) · rev 2026-08-01 |
+| **Version** | Living (canonical) · rev 2026-08-08 |
 | **Owner** | Design System / UX |
 | **Last updated** | 2026-08-01 |
 | **Scope** | The design system and UX rules that govern **both** design work in `design.pen` **and** its frontend implementation. |
@@ -164,7 +164,7 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 
 ## Canvas Screen Organization
 - `design.pen` permanently follows **Product Surface → Flow → Device → Theme → Sequence**.
-- Product-surface areas remain separate: Authentication, B2C/Consumer, Professional/Talent, B2B/Business, Admin, Shared/System, Foundation/Components/Documentation, and Archive.
+- Product-surface areas remain separate: Authentication, B2C/Consumer, the consolidated B2B Business and Professional Workspace, Admin, Shared/System, Foundation/Components/Documentation, and Archive.
 - Device order is always **Desktop → Tablet → Mobile**. Theme order inside every device is always **Light → Dark**.
 - Main-path screens follow screen-ID and user-flow order. Supporting states, errors/exceptions, responsive tests, and specifications use separate labelled lanes and never interrupt the happy path.
 - Canonical viewport lanes are Desktop `1440 × 1024`, Tablet `768 × 1024`, and Mobile `390 × 844`. The `360px` and `430px` frames are responsive tests in a separate lane, never substitutes for Mobile 390px.
@@ -196,6 +196,11 @@ Newest first.
 ### 2026-08-01 — Finalized & hardened the Design System (v1.0.0)
 - **What:** Established the design system as a **versioned** system (`1.0.0`). Added canonical machine-readable tokens (`design/tokens/*.json`), `design/GOVERNANCE.md` (source-of-truth, versioning, component & AI-agent rules, measured AA contrast), `design/COMPONENT_INVENTORY.md`, `design/icons/README.md`, and `design/CHANGELOG.md`. Added the Design System Authority section and the measured-contrast + Muted-On-Sand accessibility notes here. Fixed a broken dark-theme primary token in the frontend and added motion/z-index/breakpoint tokens + `prefers-reduced-motion`.
 - **Why:** Make the approved brand a governed, enforceable, versioned system before any product-feature work — one authority chain, no invented values.
+
+### 2026-08-08 — Closed the canonical Private-Pilot B2B design
+- **What:** Reconciled active Pencil semantic variables with Aperture typography/color authority; added 15 reusable operational B2B component masters; completed 18 canonical B2B flow families across Desktop/Tablet/Mobile, Light/Dark, and AR/EN; replaced active Pilot payment with informational/manual activation; retained historical Cockpit and payment concepts as deferred references.
+- **Why:** Apply approved Product Owner decisions and close the P0/P1/P2 screen, responsive, locale, component, and token blockers without inventing deferred product behavior.
+- **Authority:** `DESIGN.md` remains normative for tokens; `design.pen` board `00J` is the screen/component QA trace; `design/COMPONENT_INVENTORY.md` records design-only Draft component status.
 
 ### 2026-08-01 — Approved The Aperture identity and extracted frontend tokens
 - **What:** Recorded the founder-approved Aperture mark, Basalt/Limestone/Lumen/Bronze/Lapis palette, Archivo/Reem Kufi/Readex Pro/JetBrains Mono type system, and the authority chain between `DESIGN.md`, `design.pen`, and frontend semantic tokens. Added accessible semantic tones for normal-size text without changing the approved brand primitives.

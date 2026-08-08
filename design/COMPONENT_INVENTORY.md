@@ -2,12 +2,12 @@
 
 The register of reusable UI components. **Search this file before creating any component** (see [new-component governance](./GOVERNANCE.md#new-component-governance)).
 
-- **Version:** `1.0.0` · **Updated:** 2026-08-01
+- **Version:** `1.1.0` · **Updated:** 2026-08-08
 - **Status legend:** `Proposed` (named, not designed) · `Draft` (in `design.pen`, not implemented) · `Ready` (implemented + validated: themes, RTL, a11y, states, responsive) · `Deprecated` · `Superseded`.
 
 ## Current reality
 
-**No product components are implemented yet.** `frontend/` has the scaffold home page only; there is no `frontend/src/components/ui/`. Every entry below is therefore `Proposed` — this inventory defines the *contract* each component must meet when built, not existing code. Do not read a row as "exists".
+**No product components are implemented in frontend code yet.** `frontend/` has the scaffold home page only; there is no `frontend/src/components/ui/`. The reusable B2B families listed below now exist as **Draft Pencil masters** in the private canonical `design.pen`; this does not make them production-implemented or accessibility-validated.
 
 ## Shared defaults (apply to every component unless a row overrides)
 
@@ -51,6 +51,30 @@ The register of reusable UI components. **Search this file before creating any c
 | **File upload** | Attach documents | Proposed | idle, dragover, uploading, success, error | Keyboard trigger; progress `aria` | Off-request-path upload + progress via Realtime |
 | **Charts** | Data visualization | Proposed | loading, empty, error, populated | Text/table alternative; RTL axes; theme-aware | Follow the dataviz skill; palette per theme |
 | **AI surfaces** | Consult / Smart Share / suggestion + explanation | Proposed | idle, streaming, awaiting-review, sent | Human-review before send; streaming `aria-live`; Lumen "thinking" | Never auto-send; attribution + explanation required |
+
+## Canonical B2B Pencil families (design-only)
+
+The following responsive, theme-aware, direction-aware masters were added to `UI-UX/design.pen` during the approved 2026-08-08 B2B closure. Their status is **Draft** until implemented and validated in frontend code.
+
+| Component family | Pencil master | Status | MVP use |
+|---|---|---|---|
+| Data Grid / Table | `Comp/B2B Data Grid` | Draft | Desktop/Tablet operational records |
+| Mobile Data Row | `Comp/B2B Mobile Data Row` | Draft | Mobile table replacement |
+| Opportunity Card | `Comp/B2B Opportunity Card` | Draft | Cockpit, opportunities, pipeline |
+| Pipeline Stage | `Comp/B2B Pipeline Stage` | Draft | Canonical Opportunity pipeline |
+| Task / Follow-up Row | `Comp/B2B Task Follow-up Row` | Draft | Priorities and due work |
+| Task Editor | `Comp/B2B Task Editor` | Draft | Progressive task creation/editing |
+| Customer Need Summary | `Comp/B2B Customer Need Summary` | Draft | Need capture/review |
+| Product Match Card | `Comp/B2B Product Match Card` | Draft | Structured match + human-reviewable AI explanation |
+| Smart Share Product Item | `Comp/B2B Smart Share Product Item` | Draft | Selected-product presentation review |
+| RFQ Line Item | `Comp/B2B RFQ Line Item` | Draft | Operational RFQ composition |
+| Quotation Line Item | `Comp/B2B Quotation Line Item` | Draft | Quotation composition; no Quote Comparison |
+| Project Workspace Shell | `Comp/B2B Project Workspace Shell` | Draft | Projects Lite |
+| Activity Timeline Item | `Comp/B2B Activity Timeline Item` | Draft | Opportunity/project/share history |
+| Notification Item | `Comp/B2B Notification Item` | Draft | Actionable Notification Center |
+| Responsive Workspace Navigation | `Comp/B2B Responsive Workspace Navigation` | Draft | Desktop sidebar / Tablet drawer / Mobile navigation contract |
+
+**Explicit exclusion:** no Quote Comparison component exists for the Private Pilot MVP.
 
 ## Signature brand components (custom, not library)
 

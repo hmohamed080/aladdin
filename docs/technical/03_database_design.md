@@ -44,7 +44,7 @@ Follows [naming-conventions.md](../database/naming-conventions.md). Entities are
 | `verification_subject` | `user, organization` |
 | `product_status` | `draft, active, archived` |
 | `availability_state` | `in_stock, low, made_to_order, unavailable` |
-| `opportunity_stage` | `new, qualified, matching, quoted, won, lost` |
+| `opportunity_stage` | `new, contacted, needs_captured, products_shared, quote_sent, won, lost` |
 | `task_status` | `open, in_progress, done, cancelled` |
 | `followup_status` | `drafted, scheduled, sent, dismissed` |
 | `rfq_status` | `draft, sent, responses_in, closed, cancelled` |

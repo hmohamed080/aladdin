@@ -142,6 +142,24 @@ The design roadmap orders *what the user sees*; the implementation roadmap order
 ### Long-term (Full Aladdin Platform)
 Installation & service marketplace, industrial/RFQ at scale, deeper supplier/technician matching, project-execution workflow, learning & training, business opportunities, supply-chain workflow, and **payments/milestones/disputes**. The information architecture and design system are designed for the whole platform up front; screens are built in phases.
 
+## Approved Private-Pilot B2B Product Contract (2026-08-08)
+
+The Product Owner approved the following MVP design contract. It supersedes narrower or conflicting pre-implementation examples for the B2B design surface:
+
+- Canonical opportunity pipeline: **New → Contacted → Needs Captured → Products Shared → Quote Sent → Won**, with **Lost** as the alternative terminal state. Do not expose a second Lead-stage workflow.
+- Customer Need uses progressive disclosure across customer/opportunity, category, use case, location, optional quantity/budget/style/finish/color, required date/urgency, notes, and relevant attachments.
+- Product Match uses structured catalog/variant/availability/location data and human-reviewable AI explanation; price is not the primary rank and AI never invents availability.
+- Smart Share reviews selected products and prepares a shareable link/presentation, optional PDF, WhatsApp draft, or Email draft; the human sends and the share is recorded on the opportunity timeline.
+- RFQ is operational and simple: opportunity/customer context, product or free-text need, optional quantity, attachments, recipient, notes, required date, and status.
+- Quotation supports business/customer/RFQ context, line items, optional pricing/totals, validity, PDF, WhatsApp/Email sharing, and status. **Quote Comparison is not MVP.**
+- Projects Lite supports title, status, customer, related opportunity/quotation, participants, files, tasks, activity, and notes. Statuses: Draft, Active, On Hold, Completed, Cancelled. No escrow, milestone payments, logistics, accounting, or advanced scheduling.
+- Product/Inventory supports product, brand, category, variant/SKU, branch, quantity, and availability: Available, Limited, Out of Stock, Coming Soon, Hidden. Price and Request Quote visibility are admin-controlled.
+- Organizations/Branches, basic membership roles (Owner, Sales Manager, Sales Representative, Basic Member), operational analytics, Notification Center, and Business Profile/Settings are MVP. Advanced permission engines, automation, forecasting, competitor intelligence, and enterprise administration are deferred.
+- Full Supplier/Showroom operating suites remain deferred; only shared catalog, inventory, RFQ, quotation, branch, sales, and profile subsets are MVP.
+- Private Pilot subscription is informational: eligible activated users use the service free; no payment is collected; admin activates accounts manually; upgrades extend the same canonical identity. Existing payment/checkout designs are future references, not active Pilot flow.
+- B2B workspace responsive behavior is approved: persistent desktop sidebar; compact rail/drawer on Tablet; intentional one-column Mobile with structured cards, stage-filtered/horizontally navigable pipeline, stacked details, and reachable primary actions.
+- Arabic is default and English is supported with exact information/action parity, RTL/LTR correctness, and no mixed-language UI beyond approved brand/technical terms.
+
 ## Product-Decision Process
 1. A product-direction change is **proposed explicitly** and approved by the user — never changed silently by an agent.
 2. It is recorded here (and in a new/updated ADR when it is also architectural).
@@ -171,6 +189,11 @@ Installation & service marketplace, industrial/RFQ at scale, deeper supplier/tec
 
 ## Change History
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
+
+### 2026-08-08 — Private-Pilot B2B product-decision closure
+- **What:** Approved the canonical Opportunity pipeline, Need/Match/Smart Share/RFQ/Quotation/Projects Lite/Catalog/Org/Team/Analytics/Notification/Settings contracts; removed Quote Comparison from MVP; confirmed free/manual Pilot activation; approved B2B responsive and AR/EN parity rules.
+- **Why:** Close the design blockers recorded in the canonical B2B Pencil matrix without inventing business logic.
+- **Approved by:** Product Owner (B2B Product-Decision Closure task, 2026-08-08).
 
 ### 2026-07-30 — Canonical memory promotion + account-model correction
 - **What:** Promoted this guide to a canonical project-memory file (`product-direction.md` → `PRODUCT_DIRECTION_GUIDE.md`, history preserved via `git mv`). Added the metadata block, an explicit dual roadmap (design + implementation), the product-decision process, and this change history. **Corrected the account model** from "active-profile switching" to the canonical **one-current-primary-account-type / no-profile-switcher / derived-navigation** model across all product statements.
