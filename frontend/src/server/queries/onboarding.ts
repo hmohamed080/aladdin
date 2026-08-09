@@ -89,6 +89,67 @@ export type IndividualOnboardingData = {
   professional: ProfessionalAnswers;
 };
 
+/**
+ * The signed-in caller's saved BUSINESS onboarding draft (Sprint 8), used to
+ * hydrate the shared business flow so state lives in the DB and resumes across
+ * refresh / sign-out. `selectedAccountType` is the intent recorded at the shared
+ * account-type step (showroom_dealer / supplier / manufacturer, or null for the
+ * generic organization owner/manager choice) — it pre-selects the business type.
+ * Returns null when signed out.
+ */
+export type BusinessAnswers = {
+  legalName: string | null;
+  displayName: string | null;
+  orgType: AccountTypeValue | null;
+  description: string | null;
+  governorate: string | null;
+  city: string | null;
+  primaryBranchName: string | null;
+  ownerConfirmed: boolean;
+  organizationId: string | null;
+  completedAt: string | null;
+};
+
+export type BusinessOnboardingData = {
+  selectedTrack: OnboardingTrack | null;
+  selectedAccountType: AccountTypeValue | null;
+  business: BusinessAnswers;
+};
+
+export async function getBusinessOnboardingData(): Promise<BusinessOnboardingData | null> {
+  const supabase = await getServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const [{ data: progress }, { data: bo }] = await Promise.all([
+    supabase
+      .from("onboarding_progress")
+      .select("selected_track, selected_account_type")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase.from("business_onboarding").select("*").eq("user_id", user.id).maybeSingle(),
+  ]);
+
+  return {
+    selectedTrack: progress?.selected_track ?? null,
+    selectedAccountType: progress?.selected_account_type ?? null,
+    business: {
+      legalName: bo?.legal_name ?? null,
+      displayName: bo?.display_name ?? null,
+      orgType: bo?.org_type ?? null,
+      description: bo?.description ?? null,
+      governorate: bo?.governorate ?? null,
+      city: bo?.city ?? null,
+      primaryBranchName: bo?.primary_branch_name ?? null,
+      ownerConfirmed: bo?.owner_confirmed ?? false,
+      organizationId: bo?.organization_id ?? null,
+      completedAt: bo?.completed_at ?? null,
+    },
+  };
+}
+
 export async function getIndividualOnboardingData(): Promise<IndividualOnboardingData | null> {
   const supabase = await getServerSupabase();
   const {

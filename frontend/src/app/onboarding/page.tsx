@@ -32,7 +32,7 @@ export default async function OnboardingPage() {
     case "persona_review_pending":
       redirect("/onboarding/professional/review");
     case "organization_setup_pending":
-      redirect("/onboarding/complete");
+      redirect("/onboarding/business");
     default:
       // consent_pending, invitation_pending, manually_blocked
       return <OnboardingPanel state={state} />;
