@@ -382,6 +382,62 @@ export type Database = {
           },
         ]
       }
+      business_onboarding: {
+        Row: {
+          city: string | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          display_name: string | null
+          governorate: string | null
+          legal_name: string | null
+          org_type: Database["public"]["Enums"]["account_type"] | null
+          organization_id: string | null
+          owner_confirmed: boolean
+          primary_branch_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          city?: string | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          display_name?: string | null
+          governorate?: string | null
+          legal_name?: string | null
+          org_type?: Database["public"]["Enums"]["account_type"] | null
+          organization_id?: string | null
+          owner_confirmed?: boolean
+          primary_branch_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          city?: string | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          display_name?: string | null
+          governorate?: string | null
+          legal_name?: string | null
+          org_type?: Database["public"]["Enums"]["account_type"] | null
+          organization_id?: string | null
+          owner_confirmed?: boolean
+          primary_branch_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_onboarding_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       individual_onboarding: {
         Row: {
           consumer_budget: string | null
@@ -1761,6 +1817,20 @@ export type Database = {
         }
         Returns: undefined
       }
+      business_save: {
+        Args: {
+          p_city?: string
+          p_description?: string
+          p_display_name?: string
+          p_governorate?: string
+          p_legal_name?: string
+          p_org_type?: Database["public"]["Enums"]["account_type"]
+          p_owner_confirmed?: boolean
+          p_primary_branch_name?: string
+        }
+        Returns: undefined
+      }
+      business_submit: { Args: never; Returns: string }
       individual_save_professional: {
         Args: {
           p_additional_services?: string[]
