@@ -107,6 +107,46 @@ export const MoonIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const PackageIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M21 8.5 12 3.5 3 8.5v7L12 20.5l9-5v-7Z" />
+    <path d="M3 8.5 12 13.5l9-5M12 13.5V20.5" />
+  </Svg>
+);
+
+export const FileTextIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z" />
+    <path d="M14 3.5V8.5h5M8.5 13h7M8.5 16.5h7M8.5 9.5h2" />
+  </Svg>
+);
+
+export const ReceiptIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 3.5h14v17l-2.5-1.5L14 20.5l-2-1.5-2 1.5-2.5-1.5L5 20.5Z" />
+    <path d="M9 8.5h6M9 12h6" />
+  </Svg>
+);
+
+export const SearchIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m21 21-4.3-4.3" />
+  </Svg>
+);
+
+export const CheckIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20 6 9 17l-5-5" />
+  </Svg>
+);
+
+export const XIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M18 6 6 18M6 6l12 12" />
+  </Svg>
+);
+
 /** The Aperture mark — a chamfered opening with a warm Lumen core. */
 export function ApertureMark({ size = 24, className }: { size?: number; className?: string }) {
   return (

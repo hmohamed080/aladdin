@@ -5,13 +5,23 @@ import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
-import { HomeIcon, UsersIcon, TargetIcon, CalendarCheckIcon } from "@/components/ui/icons";
+import {
+  HomeIcon,
+  UsersIcon,
+  TargetIcon,
+  CalendarCheckIcon,
+  SearchIcon,
+  PackageIcon,
+  FileTextIcon,
+  ReceiptIcon,
+} from "@/components/ui/icons";
 
 /**
- * Primary workspace navigation — the four implemented modules (no dead links).
- * A persistent icon+label rail on desktop/tablet (`Sidebar`) and a fixed bottom
- * bar on mobile (`MobileNav`). Both derive the active item from the pathname and
- * mirror correctly in RTL (leading/trailing via logical properties).
+ * Primary workspace navigation — the implemented modules (no dead links). A
+ * persistent icon+label rail on desktop/tablet (`Sidebar`) and a fixed bottom bar
+ * on mobile (`MobileNav`). Both derive the active item from the pathname and
+ * mirror correctly in RTL (leading/trailing via logical properties). Access is
+ * still enforced server-side on every page.
  */
 type Item = { href: string; key: string; exact: boolean; Icon: ComponentType<{ size?: number }> };
 
@@ -20,6 +30,10 @@ const items: Item[] = [
   { href: "/b2b/customers", key: "nav.customers", exact: false, Icon: UsersIcon },
   { href: "/b2b/leads", key: "nav.leads", exact: false, Icon: TargetIcon },
   { href: "/b2b/follow-ups", key: "nav.followUps", exact: false, Icon: CalendarCheckIcon },
+  { href: "/b2b/catalog", key: "nav.catalog", exact: false, Icon: SearchIcon },
+  { href: "/b2b/products", key: "nav.products", exact: false, Icon: PackageIcon },
+  { href: "/b2b/rfqs", key: "nav.rfqs", exact: false, Icon: FileTextIcon },
+  { href: "/b2b/quotations", key: "nav.quotations", exact: false, Icon: ReceiptIcon },
 ];
 
 function useActive() {
