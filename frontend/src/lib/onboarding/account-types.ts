@@ -32,6 +32,35 @@ export type AccountTypeChoice = {
 /** The invitation-only path is not selectable through public registration. */
 export const INVITED_EMPLOYEE_KEY = "invited_employee";
 
+/**
+ * The concrete business `org_type` values a new organization may be created as
+ * (Sprint 8). These are the BUSINESS account types only — never a consumer or an
+ * individual-professional type. Shared by the business onboarding UI (type cards)
+ * and the server action (shape validation) so the two can never drift, and mirror
+ * the `ck_business_org_type` constraint in the database.
+ */
+export const BUSINESS_ORG_TYPES = [
+  "showroom_dealer",
+  "supplier",
+  "manufacturer",
+  "importer",
+  "wholesaler",
+] as const;
+export type BusinessOrgType = (typeof BUSINESS_ORG_TYPES)[number];
+
+/**
+ * Pre-select the business type from the account-type step intent. The generic
+ * "organization owner/manager" choice records no concrete type (null) — the owner
+ * picks it during business onboarding.
+ */
+export function businessOrgTypeFromAccountType(
+  accountType: string | null | undefined,
+): BusinessOrgType | null {
+  return accountType && (BUSINESS_ORG_TYPES as readonly string[]).includes(accountType)
+    ? (accountType as BusinessOrgType)
+    : null;
+}
+
 export const ACCOUNT_TYPE_CHOICES: AccountTypeChoice[] = [
   // Individual
   { key: "end_consumer", track: "consumer", accountType: "end_consumer" },

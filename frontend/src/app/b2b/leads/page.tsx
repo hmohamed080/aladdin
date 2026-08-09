@@ -4,6 +4,7 @@ import { listLeads, customerNameMap, memberNameMap } from "@/server/queries/sale
 import { canWrite } from "@/server/queries/context";
 import { PageHeader } from "@/features/sales/page-parts";
 import { StatePanel } from "@/components/ui/primitives";
+import { TargetIcon } from "@/components/ui/icons";
 import { LeadsView } from "@/features/sales/leads-view";
 
 export const dynamic = "force-dynamic";
@@ -45,11 +46,13 @@ export default async function LeadsPage({
     <div className="pb-16 tablet:pb-0">
       <PageHeader
         title={m.leads.title}
+        subtitle={m.leads.subtitle}
+        count={leads.length}
         action={canWrite(org) ? { href: "/b2b/leads/new", label: m.leads.new } : undefined}
       />
 
       {leads.length === 0 && !sp.stage && !sp.status ? (
-        <StatePanel title={m.leads.empty} body={m.leads.emptyHint} />
+        <StatePanel icon={<TargetIcon size={20} />} title={m.leads.empty} body={m.leads.emptyHint} />
       ) : (
         <LeadsView
           leads={leads}

@@ -110,7 +110,7 @@ test.describe("shared onboarding", () => {
     await expect(page).toHaveURL(/\/onboarding\/profile$/);
   });
 
-  test("business selection ends at the organization-setup handoff", async ({ page, request }) => {
+  test("business selection enters the organization onboarding flow", async ({ page, request }) => {
     await prefs(page, "ar", "dark");
     await registerFreshUser(page, request);
     // Arabic + dark: dir is rtl, no overflow.
@@ -124,12 +124,13 @@ test.describe("shared onboarding", () => {
     await page.getByRole("button", { name: /متابعة/ }).click();
     await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
 
-    // Choose Supplier (business) — Arabic label.
+    // Choose Supplier (business) — Arabic label. Sprint 8: the business track now
+    // enters the shared organization onboarding wizard (not the generic handoff).
     await page.getByRole("button", { name: /مورّد/ }).click();
     await page.getByRole("button", { name: /متابعة/ }).click();
-    await page.waitForURL(/\/onboarding\/complete$/, { waitUntil: "commit" });
-    // Business handoff copy mentions organization setup (Arabic).
-    await expect(page.getByText(/إعداد مؤسستك/)).toBeVisible();
+    await page.waitForURL(/\/onboarding\/business$/, { waitUntil: "commit" });
+    // The business identity step is shown (Arabic).
+    await expect(page.getByRole("heading", { name: /أنشئ مؤسستك/ })).toBeVisible();
     await noOverflow(page);
   });
 

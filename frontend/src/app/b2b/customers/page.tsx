@@ -3,6 +3,7 @@ import { getMessages } from "@/lib/i18n/translate";
 import { listCustomers, branchNameMap, memberNameMap } from "@/server/queries/sales";
 import { PageHeader } from "@/features/sales/page-parts";
 import { StatePanel } from "@/components/ui/primitives";
+import { UsersIcon } from "@/components/ui/icons";
 import { CustomersTable } from "@/features/sales/customers-table";
 import { CustomerFilters } from "@/features/sales/customer-filters";
 
@@ -39,6 +40,8 @@ export default async function CustomersPage({
     <div className="pb-16 tablet:pb-0">
       <PageHeader
         title={m.customers.title}
+        subtitle={m.customers.subtitle}
+        count={customers.length}
         action={canWrite ? { href: "/b2b/customers/new", label: m.customers.new } : undefined}
       />
 
@@ -48,7 +51,7 @@ export default async function CustomersPage({
       />
 
       {customers.length === 0 ? (
-        <StatePanel title={m.customers.empty} body={m.customers.emptyHint} />
+        <StatePanel icon={<UsersIcon size={20} />} title={m.customers.empty} body={m.customers.emptyHint} />
       ) : (
         <CustomersTable
           customers={customers}

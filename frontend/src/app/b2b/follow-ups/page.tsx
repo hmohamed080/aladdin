@@ -4,6 +4,7 @@ import { listFollowUps, customerNameMap, memberNameMap } from "@/server/queries/
 import { canAssign } from "@/server/queries/context";
 import { PageHeader, FlashSuccess } from "@/features/sales/page-parts";
 import { StatePanel } from "@/components/ui/primitives";
+import { CalendarCheckIcon } from "@/components/ui/icons";
 import { FollowUpsBoard } from "@/features/sales/follow-ups-board";
 
 export const dynamic = "force-dynamic";
@@ -50,9 +51,9 @@ export default async function FollowUpsPage({
   return (
     <div className="pb-16 tablet:pb-0">
       {updated ? <FlashSuccess messageKey="followUps.updated" /> : null}
-      <PageHeader title={m.followUps.title} />
+      <PageHeader title={m.followUps.title} subtitle={m.followUps.subtitle} count={open.length} />
       {all.length === 0 ? (
-        <StatePanel title={m.followUps.empty} body={m.followUps.noDue} />
+        <StatePanel icon={<CalendarCheckIcon size={20} />} title={m.followUps.empty} body={m.followUps.noDue} />
       ) : (
         <FollowUpsBoard
           groups={groups}
