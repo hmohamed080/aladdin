@@ -81,6 +81,21 @@ export const ActivityIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const ClipboardIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1Z" />
+    <path d="M8 6H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-2" />
+    <path d="M9 12h6M9 16h4" />
+  </Svg>
+);
+
+export const LayersIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3 3 8l9 5 9-5-9-5Z" />
+    <path d="M3 13l9 5 9-5M3 16.5l9 5 9-5" />
+  </Svg>
+);
+
 export const PlusIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M12 5v14M5 12h14" />

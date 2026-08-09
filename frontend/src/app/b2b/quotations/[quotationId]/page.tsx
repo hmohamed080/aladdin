@@ -6,6 +6,7 @@ import {
   getQuotationDisplay,
   listQuotationItems,
 } from "@/server/queries/commerce";
+import { getOrderForQuotation } from "@/server/queries/execution";
 import { BackLink, FlashSuccess } from "@/features/sales/page-parts";
 import { QuotationDetail } from "@/features/commerce/quotation-detail";
 
@@ -32,6 +33,9 @@ export default async function QuotationDetailPage({
   ]);
   if (!quotation || !display) notFound();
 
+  // If this quotation was accepted, an order may already exist (drives the CTA).
+  const order = quotation.status === "accepted" ? await getOrderForQuotation(supabase, quotationId) : null;
+
   const isSupplier = org.organizationId === quotation.supplier_org_id;
   const isRequester = org.organizationId === quotation.requester_org_id;
   const canRespond =
@@ -39,6 +43,7 @@ export default async function QuotationDetailPage({
     org.capabilities.includes("quote.submit") ||
     org.capabilities.includes("org.manage");
   const canDecide = org.capabilities.includes("quote.decide") || org.capabilities.includes("org.manage");
+  const canCreateOrder = org.capabilities.includes("order.create") || org.capabilities.includes("org.manage");
 
   return (
     <div className="pb-16 tablet:pb-0">
@@ -51,7 +56,8 @@ export default async function QuotationDetailPage({
         requesterName={display.requester_name ?? "—"}
         rfqTitle={display.rfq_title ?? "—"}
         rfqId={quotation.rfq_id}
-        role={{ isSupplier, canRespond, isRequester, canDecide }}
+        role={{ isSupplier, canRespond, isRequester, canDecide, canCreateOrder }}
+        orderId={order?.id ?? null}
         locale={locale}
       />
     </div>

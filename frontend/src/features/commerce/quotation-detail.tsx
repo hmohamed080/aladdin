@@ -10,8 +10,9 @@ import {
   decideQuotationAction,
   type FormState,
 } from "@/server/actions/commerce-forms";
+import { createOrderAction } from "@/server/actions/execution-forms";
 import { Card, SectionTitle, Field, InlineError, InlineSuccess } from "@/components/ui/primitives";
-import { Input, Textarea, LabeledField, SubmitButton } from "@/components/ui/controls";
+import { Input, Textarea, LabeledField, SubmitButton, Button } from "@/components/ui/controls";
 import { ReceiptIcon, CheckIcon, XIcon } from "@/components/ui/icons";
 import { QuotationStatusBadge, ReadyForOrderBadge } from "@/features/commerce/badges";
 import { formatDate, formatDateTime } from "@/lib/ui/format";
@@ -20,7 +21,13 @@ import type { QuotationRow, QuotationItemRow } from "@/server/queries/commerce";
 
 const initial: FormState = { ok: false };
 
-type Role = { isSupplier: boolean; canRespond: boolean; isRequester: boolean; canDecide: boolean };
+type Role = {
+  isSupplier: boolean;
+  canRespond: boolean;
+  isRequester: boolean;
+  canDecide: boolean;
+  canCreateOrder: boolean;
+};
 
 export function QuotationDetail({
   quotation,
@@ -30,6 +37,7 @@ export function QuotationDetail({
   rfqTitle,
   rfqId,
   role,
+  orderId,
   locale,
 }: {
   quotation: QuotationRow;
@@ -39,6 +47,7 @@ export function QuotationDetail({
   rfqTitle: string;
   rfqId: string;
   role: Role;
+  orderId: string | null;
   locale: Locale;
 }) {
   const { t } = useI18n();
@@ -71,14 +80,23 @@ export function QuotationDetail({
         </dl>
       </Card>
 
-      {/* READY FOR ORDER handoff */}
+      {/* READY FOR ORDER handoff → create (or open) the order */}
       {quotation.status === "accepted" ? (
         <div
           role="status"
-          className="rounded-md border border-success/40 bg-success/10 px-lg py-md text-center"
+          className="flex flex-col items-center gap-md rounded-md border border-success/40 bg-success/10 px-lg py-md text-center"
         >
-          <p className="text-title font-semibold text-success">{t("commerce.readyForOrder")}</p>
-          <p className="mt-1 text-body text-fg-secondary">{t("commerce.readyForOrderBody")}</p>
+          <div>
+            <p className="text-title font-semibold text-success">{t("commerce.readyForOrder")}</p>
+            <p className="mt-1 text-body text-fg-secondary">{t("commerce.readyForOrderBody")}</p>
+          </div>
+          {orderId ? (
+            <Link href={`/b2b/orders/${orderId}`}>
+              <Button variant="accent">{t("commerce.viewOrder")}</Button>
+            </Link>
+          ) : role.isRequester && role.canCreateOrder ? (
+            <CreateOrderForm quotationId={quotation.id} />
+          ) : null}
         </div>
       ) : null}
 
@@ -278,6 +296,20 @@ function SubmitQuotationForm({ quotationId, version }: { quotationId: string; ve
       <input type="hidden" name="expectedVersion" value={version} />
       <SubmitButton variant="accent" pendingLabel={t("common.saving")}>
         {t("commerce.quotation.submit")}
+      </SubmitButton>
+      {state.code && !state.ok ? <InlineError>{t(state.code)}</InlineError> : null}
+    </form>
+  );
+}
+
+function CreateOrderForm({ quotationId }: { quotationId: string }) {
+  const { t } = useI18n();
+  const [state, action] = useActionState(createOrderAction, initial);
+  return (
+    <form action={action} className="flex flex-col items-center gap-1">
+      <input type="hidden" name="quotationId" value={quotationId} />
+      <SubmitButton variant="accent" pendingLabel={t("common.saving")}>
+        {t("commerce.createOrder")}
       </SubmitButton>
       {state.code && !state.ok ? <InlineError>{t(state.code)}</InlineError> : null}
     </form>

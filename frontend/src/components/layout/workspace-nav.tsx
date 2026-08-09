@@ -14,6 +14,8 @@ import {
   PackageIcon,
   FileTextIcon,
   ReceiptIcon,
+  ClipboardIcon,
+  LayersIcon,
 } from "@/components/ui/icons";
 
 /**
@@ -34,6 +36,8 @@ const items: Item[] = [
   { href: "/b2b/products", key: "nav.products", exact: false, Icon: PackageIcon },
   { href: "/b2b/rfqs", key: "nav.rfqs", exact: false, Icon: FileTextIcon },
   { href: "/b2b/quotations", key: "nav.quotations", exact: false, Icon: ReceiptIcon },
+  { href: "/b2b/orders", key: "nav.orders", exact: false, Icon: ClipboardIcon },
+  { href: "/b2b/projects", key: "nav.projects", exact: false, Icon: LayersIcon },
 ];
 
 function useActive() {
