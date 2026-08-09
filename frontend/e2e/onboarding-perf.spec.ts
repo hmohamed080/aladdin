@@ -39,8 +39,8 @@ async function measure(page: Page, path: string): Promise<Nav> {
   });
 }
 
-async function register(page: Page, request: APIRequestContext): Promise<void> {
-  const email = `perf+${Date.now()}@example.test`;
+async function register(page: Page, request: APIRequestContext, tag = "x"): Promise<void> {
+  const email = `perf-${tag}+${Date.now()}${Math.floor(Math.random() * 1000)}@example.test`;
   const seen = await messageIdsFor(request, email);
   // The app is Arabic-first by default; pin English so the label selectors match.
   await page.context().addCookies([{ name: "NEXT_LOCALE", value: "en", url: "http://127.0.0.1" }]);
@@ -91,21 +91,42 @@ test("production performance — onboarding routes (cold + median of 3 warm)", a
     };
   }
 
-  // Fresh user at the profile step. Measure /onboarding (redirects to the current
-  // step) and each step route, advancing the state between measurements.
-  await register(page, request);
+  // Advance a fresh user through the shared steps to the account-type page.
+  async function toAccountType(tag: string) {
+    await register(page, request, tag);
+    await page.locator("#displayName").fill("Perf User");
+    await page.getByRole("button", { name: /^continue$/i }).click();
+    await page.waitForURL(/\/onboarding\/contact$/, { waitUntil: "commit" });
+    await page.locator("#phone").fill("01012345678");
+    await page.getByRole("button", { name: /^continue$/i }).click();
+    await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
+  }
+
+  // User 1 — the shared routes, then the representative Consumer persona route.
+  await register(page, request, "shared");
   await profile("/onboarding");
   await profile("/onboarding/profile");
-
   await page.locator("#displayName").fill("Perf User");
   await page.getByRole("button", { name: /^continue$/i }).click();
   await page.waitForURL(/\/onboarding\/contact$/, { waitUntil: "commit" });
   await profile("/onboarding/contact");
-
   await page.locator("#phone").fill("01012345678");
   await page.getByRole("button", { name: /^continue$/i }).click();
   await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
   await profile("/onboarding/account-type");
+  await page.getByRole("button", { name: /personal use/i }).click();
+  await page.getByRole("button", { name: /^continue$/i }).click();
+  await page.waitForURL(/\/onboarding\/consumer$/, { waitUntil: "commit" });
+  await profile("/onboarding/consumer");
+  await page.getByRole("button", { name: /sign out/i }).click();
+  await page.waitForURL(/\/auth\/sign-in$/, { waitUntil: "commit" });
+
+  // User 2 — the representative Professional persona route (engineer/designer).
+  await toAccountType("pro");
+  await page.getByRole("button", { name: /engineer \/ designer/i }).click();
+  await page.getByRole("button", { name: /^continue$/i }).click();
+  await page.waitForURL(/\/onboarding\/professional$/, { waitUntil: "commit" });
+  await profile("/onboarding/professional");
 
   const header = "route | cold-lcp | warm-lcp | warm-ttfb | warm-load | warm-reqs | warm-kb";
   const lines = Object.entries(rows).map(

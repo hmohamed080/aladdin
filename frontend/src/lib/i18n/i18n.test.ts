@@ -139,6 +139,46 @@ describe("Sprint 7.3 onboarding copy", () => {
   });
 });
 
+// Sprint 7.4 individual persona onboarding: prove the whole consumer +
+// professional persona surface is translated in both locales, is real Arabic
+// prose, and preserves placeholders (e.g. the {n} years counter). Parity /
+// stray-script leakage are covered by the top-level guards.
+describe("Sprint 7.4 individual onboarding copy", () => {
+  const consumerEn = entries(en.onboarding.consumer as unknown as Record<string, unknown>).map(
+    ([k, v]) => [`onboarding.consumer.${k}`, v] as [string, string],
+  );
+  const professionalEn = entries(en.onboarding.professional as unknown as Record<string, unknown>).map(
+    ([k, v]) => [`onboarding.professional.${k}`, v] as [string, string],
+  );
+  const all = [...consumerEn, ...professionalEn];
+  const arMap = new Map(entries(ar as unknown as Record<string, unknown>));
+
+  it("covers the full consumer + professional persona surface", () => {
+    // Five consumer steps + the common professional flow + five personas' options.
+    expect(all.length).toBeGreaterThan(120);
+  });
+
+  it("every persona Arabic value is present, non-empty, and real Arabic", () => {
+    const bad = all
+      .map(([key]) => [key, arMap.get(key)] as const)
+      .filter(([, v]) => !v || v.trim().length === 0 || !ARABIC.test(v))
+      .map(([key]) => key);
+    expect(bad, `persona keys missing/empty/non-Arabic: ${bad.join(", ")}`).toEqual([]);
+  });
+
+  it("preserves placeholders (e.g. the {n} experience counter)", () => {
+    const drift: string[] = [];
+    for (const [key, enVal] of all) {
+      const arVal = arMap.get(key) ?? "";
+      const enPh = (enVal.match(/\{[^}]+\}/g) ?? []).sort();
+      const arPh = (arVal.match(/\{[^}]+\}/g) ?? []).sort();
+      if (JSON.stringify(enPh) !== JSON.stringify(arPh)) drift.push(key);
+    }
+    expect(drift, `placeholder drift on: ${drift.join(", ")}`).toEqual([]);
+    expect(en.onboarding.professional.review.years).toContain("{n}");
+  });
+});
+
 describe("translate()", () => {
   it("resolves dotted keys and interpolates placeholders", () => {
     const t = createTranslator("ar");
