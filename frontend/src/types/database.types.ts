@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       audit_log: {
@@ -812,6 +837,177 @@ export type Database = {
           },
         ]
       }
+      order_items: {
+        Row: {
+          created_at: string
+          id: string
+          line_total: number | null
+          order_id: string
+          product_name: string
+          quantity: number
+          unit: Database["public"]["Enums"]["product_unit"]
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_total?: number | null
+          order_id: string
+          product_name: string
+          quantity: number
+          unit: Database["public"]["Enums"]["product_unit"]
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_total?: number | null
+          order_id?: string
+          product_name?: string
+          quantity?: number
+          unit?: Database["public"]["Enums"]["product_unit"]
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "order_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          cancelled_at: string | null
+          completed_at: string | null
+          confirmed_at: string
+          created_at: string
+          created_by: string
+          id: string
+          note: string | null
+          quotation_id: string
+          requester_branch_id: string | null
+          requester_org_id: string
+          rfq_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal: number
+          supplier_org_id: string
+          title: string
+          total: number
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          confirmed_at?: string
+          created_at?: string
+          created_by: string
+          id?: string
+          note?: string | null
+          quotation_id: string
+          requester_branch_id?: string | null
+          requester_org_id: string
+          rfq_id: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          subtotal?: number
+          supplier_org_id: string
+          title: string
+          total?: number
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          confirmed_at?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          note?: string | null
+          quotation_id?: string
+          requester_branch_id?: string | null
+          requester_org_id?: string
+          rfq_id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          subtotal?: number
+          supplier_org_id?: string
+          title?: string
+          total?: number
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_orders_requester_branch"
+            columns: ["requester_org_id", "requester_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: true
+            referencedRelation: "quotation_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: true
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_requester_org_id_fkey"
+            columns: ["requester_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfqs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_supplier_org_id_fkey"
+            columns: ["supplier_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_invitations: {
         Row: {
           accepted_at: string | null
@@ -1102,6 +1298,109 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          activated_at: string | null
+          branch_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          executing_org_id: string
+          id: string
+          location: string | null
+          order_id: string
+          requester_org_id: string
+          start_date: string | null
+          status: Database["public"]["Enums"]["project_status"]
+          target_date: string | null
+          title: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          activated_at?: string | null
+          branch_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          executing_org_id: string
+          id?: string
+          location?: string | null
+          order_id: string
+          requester_org_id: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["project_status"]
+          target_date?: string | null
+          title: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          activated_at?: string | null
+          branch_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          executing_org_id?: string
+          id?: string
+          location?: string | null
+          order_id?: string
+          requester_org_id?: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["project_status"]
+          target_date?: string | null
+          title?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_projects_branch"
+            columns: ["requester_org_id", "branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "projects_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_executing_org_id_fkey"
+            columns: ["executing_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "order_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_requester_org_id_fkey"
+            columns: ["requester_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1693,6 +1992,112 @@ export type Database = {
           },
         ]
       }
+      order_list: {
+        Row: {
+          completed_at: string | null
+          confirmed_at: string | null
+          created_at: string | null
+          has_project: boolean | null
+          id: string | null
+          item_count: number | null
+          quotation_id: string | null
+          requester_name: string | null
+          requester_org_id: string | null
+          rfq_id: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          supplier_name: string | null
+          supplier_org_id: string | null
+          title: string | null
+          total: number | null
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          confirmed_at?: string | null
+          created_at?: string | null
+          has_project?: never
+          id?: string | null
+          item_count?: never
+          quotation_id?: string | null
+          requester_name?: never
+          requester_org_id?: string | null
+          rfq_id?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["order_status"] | null
+          supplier_name?: never
+          supplier_org_id?: string | null
+          title?: string | null
+          total?: number | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          confirmed_at?: string | null
+          created_at?: string | null
+          has_project?: never
+          id?: string | null
+          item_count?: never
+          quotation_id?: string | null
+          requester_name?: never
+          requester_org_id?: string | null
+          rfq_id?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["order_status"] | null
+          supplier_name?: never
+          supplier_org_id?: string | null
+          title?: string | null
+          total?: number | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: true
+            referencedRelation: "quotation_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: true
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_requester_org_id_fkey"
+            columns: ["requester_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfqs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_supplier_org_id_fkey"
+            columns: ["supplier_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_public_directory: {
         Row: {
           id: string | null
@@ -1717,6 +2122,92 @@ export type Database = {
           locality_id: string | null
         }
         Relationships: []
+      }
+      project_list: {
+        Row: {
+          activated_at: string | null
+          completed_at: string | null
+          created_at: string | null
+          executing_name: string | null
+          executing_org_id: string | null
+          id: string | null
+          location: string | null
+          order_id: string | null
+          requester_name: string | null
+          requester_org_id: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["project_status"] | null
+          target_date: string | null
+          title: string | null
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          activated_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          executing_name?: never
+          executing_org_id?: string | null
+          id?: string | null
+          location?: string | null
+          order_id?: string | null
+          requester_name?: never
+          requester_org_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["project_status"] | null
+          target_date?: string | null
+          title?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          activated_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          executing_name?: never
+          executing_org_id?: string | null
+          id?: string | null
+          location?: string | null
+          order_id?: string | null
+          requester_name?: never
+          requester_org_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["project_status"] | null
+          target_date?: string | null
+          title?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_executing_org_id_fkey"
+            columns: ["executing_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "order_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_requester_org_id_fkey"
+            columns: ["requester_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quotation_list: {
         Row: {
@@ -2271,6 +2762,10 @@ export type Database = {
       }
     }
     Functions: {
+      activate_project: {
+        Args: { p_expected_version: number; p_project_id: string }
+        Returns: number
+      }
       add_rfq_item: {
         Args: {
           p_note?: string
@@ -2327,10 +2822,15 @@ export type Database = {
       }
       business_submit: { Args: never; Returns: string }
       cancel_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
+      cancel_order: { Args: { p_order_id: string }; Returns: undefined }
       cancel_rfq: { Args: { p_rfq_id: string }; Returns: undefined }
       complete_follow_up: {
         Args: { p_follow_up_id: string }
         Returns: undefined
+      }
+      complete_project: {
+        Args: { p_expected_version: number; p_project_id: string }
+        Returns: number
       }
       create_customer: {
         Args: {
@@ -2373,6 +2873,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_order_from_quotation: {
+        Args: { p_quotation_id: string }
+        Returns: string
+      }
       create_product: {
         Args: {
           p_brand?: string
@@ -2383,6 +2887,17 @@ export type Database = {
           p_short_description?: string
           p_sku?: string
           p_unit: Database["public"]["Enums"]["product_unit"]
+        }
+        Returns: string
+      }
+      create_project_from_order: {
+        Args: {
+          p_description?: string
+          p_location?: string
+          p_order_id: string
+          p_start_date?: string
+          p_target_date?: string
+          p_title: string
         }
         Returns: string
       }
@@ -2568,6 +3083,10 @@ export type Database = {
         Args: { p_item_id: string; p_unit_price: number }
         Returns: undefined
       }
+      start_order: {
+        Args: { p_expected_version: number; p_order_id: string }
+        Returns: number
+      }
       submit_quotation: {
         Args: { p_expected_version: number; p_quotation_id: string }
         Returns: number
@@ -2699,6 +3218,7 @@ export type Database = {
       lead_status: "active" | "won" | "lost" | "archived"
       membership_status: "invited" | "active" | "suspended" | "revoked"
       onboarding_track: "consumer" | "professional" | "business"
+      order_status: "confirmed" | "in_progress" | "completed" | "cancelled"
       org_status:
         | "draft"
         | "pending_verification"
@@ -2728,6 +3248,7 @@ export type Database = {
         | "roll"
         | "bag"
         | "pack"
+      project_status: "planned" | "active" | "completed"
       public_profile_status: "hidden" | "listed"
       quotation_status: "draft" | "submitted" | "accepted" | "rejected"
       rfq_status: "draft" | "submitted" | "quoted" | "closed" | "cancelled"
@@ -2887,6 +3408,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       account_type: [
@@ -2920,6 +3444,7 @@ export const Constants = {
       lead_status: ["active", "won", "lost", "archived"],
       membership_status: ["invited", "active", "suspended", "revoked"],
       onboarding_track: ["consumer", "professional", "business"],
+      order_status: ["confirmed", "in_progress", "completed", "cancelled"],
       org_status: [
         "draft",
         "pending_verification",
@@ -2952,6 +3477,7 @@ export const Constants = {
         "bag",
         "pack",
       ],
+      project_status: ["planned", "active", "completed"],
       public_profile_status: ["hidden", "listed"],
       quotation_status: ["draft", "submitted", "accepted", "rejected"],
       rfq_status: ["draft", "submitted", "quoted", "closed", "cancelled"],

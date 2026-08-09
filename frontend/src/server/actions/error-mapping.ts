@@ -50,6 +50,31 @@ export function mapCommerceError(error: unknown): string {
   return "states.genericRetry";
 }
 
+/**
+ * Maps a B2B execution (order / project) RPC error to a stable translation KEY.
+ * Same principle as mapCommerceError: SQLSTATE + short stable message fragments,
+ * never locale text. Authorization/lifecycle rules live in the RPCs.
+ */
+export function mapExecutionError(error: unknown): string {
+  const e = (error ?? {}) as PgLikeError;
+  const code = e.code ?? "";
+  const msg = (e.message ?? "").toLowerCase();
+
+  if (code === "40001" || msg.includes("modified concurrently")) return "execution.errors.conflict";
+  if (msg.includes("order already exists for this quotation")) return "execution.errors.orderExists";
+  if (msg.includes("project already exists for this order")) return "execution.errors.projectExists";
+  if (msg.includes("only be created from an accepted quotation"))
+    return "execution.errors.notAccepted";
+  if (msg.includes("in-progress order can start a project")) return "execution.errors.orderNotStarted";
+  if (msg.includes("only a confirmed order can be started")) return "execution.errors.orderNotConfirmed";
+  if (msg.includes("only a confirmed order can be cancelled")) return "execution.errors.orderNotCancellable";
+  if (msg.includes("only a planned project can be activated")) return "execution.errors.projectNotPlanned";
+  if (msg.includes("only an active project can be completed")) return "execution.errors.projectNotActive";
+  if (code === "42501" || msg.includes("required") || msg.includes("not a member"))
+    return "execution.errors.denied";
+  return "states.genericRetry";
+}
+
 /** True when the error means "the record moved under me" (caller should refresh). */
 export function isStaleVersion(error: unknown): boolean {
   const e = (error ?? {}) as PgLikeError;

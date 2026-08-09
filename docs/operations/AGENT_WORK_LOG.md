@@ -1047,3 +1047,13 @@ Establish the repository architecture foundation only — audit the repo, consol
 - Deleting the whole scaffold is safe (nothing external was connected; no migrations were applied to any live DB).
 
 ---
+
+## 2026-08-09 — Sprint 10: Orders → Projects → Completion (branch `feature/mvp-orders-projects`)
+
+Completed the B2B execution workflow: **accepted quotation → order → start → project → activate → complete → PROJECT COMPLETED** (no invoice/payment — out of scope). Built on the Sprint 9 commerce spine reusing the ADR-0008 trusted-write-path architecture unchanged.
+
+- **DB** (`20260811090001_orders_projects.sql`): `orders` (immutable commercial snapshot of an accepted quotation, one per quotation), `order_items` (frozen lines, no write path), `projects` (one per order). Enums `order_status` (confirmed→in_progress→completed/cancelled), `project_status` (planned→active→completed). New caps `order.create`/`order.manage` (project.* pre-existed). 6 security-definer RPCs (actor from `auth.uid()`, capability + scope + version + in-txn audit). `order_list`/`project_list` invoker views. Actor model: requester creates order; supplier starts + runs the project; completing the project completes its order.
+- **Proof**: pgTAP `24_orders_projects_test.sql` (30 assertions) — full journey, RPC-only boundary, duplicate-order/duplicate-project denied, cross-tenant denial, invalid-quotation→no-order, lifecycle gates, audit. Test 23 updated (accept still creates no order). Full suite **25 files / 579 tests pass**. `supabase db lint`: no Sprint 10 findings.
+- **Frontend**: routes `/b2b/orders`, `/b2b/orders/[orderId]`, `/b2b/projects`, `/b2b/projects/[projectId]`; Orders+Projects in nav; `server/{queries,actions}/execution*.ts`, `mapExecutionError`; `features/execution/*` (badges, lists, order detail w/ snapshot table + timeline + inline create-project, project detail w/ activity trail + PROJECT COMPLETED). Accepted-quotation view now has a live **Create order / View order** handoff. Full EN/AR, responsive, no overflow.
+- **Validation**: typecheck ✅ · lint ✅ (0 errors) · vitest ✅ (157, +`execution.test.ts`) · build ✅ · pgTAP ✅ · targeted E2E `orders-projects.spec.ts` (pages/nav/bilingual/overflow/not-found).
+- Docs: `docs/frontend/sprint-10-orders-projects.md`. PR to `main`, not merged.

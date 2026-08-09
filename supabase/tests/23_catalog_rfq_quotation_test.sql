@@ -224,10 +224,12 @@ select is(
    where action in ('product.published','rfq.submitted','quotation.submitted','quotation.accepted','rfq.closed')),
   5, 'the commercial lifecycle emitted its audit events');
 
--- ===== No order was created (Sprint 10 boundary) ===========================
+-- ===== Accepting a quotation does NOT itself create an order ================
+-- (Sprint 10 adds the orders/projects tables; accepting still creates NO order —
+-- the order is a separate, explicit requester action. Proven fully in test 24.)
 select is(
-  (select count(*)::int from pg_tables where schemaname='public' and tablename in ('orders','projects')),
-  0, 'no orders/projects table exists yet (out of Sprint 9 scope)');
+  (select count(*)::int from public.orders where quotation_id = (select q from _qids)),
+  0, 'accepting a quotation does not auto-create an order (explicit action — Sprint 10)');
 
 select * from finish();
 rollback;
