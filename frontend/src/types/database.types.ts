@@ -101,6 +101,69 @@ export type Database = {
           },
         ]
       }
+      business_onboarding: {
+        Row: {
+          city: string | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          display_name: string | null
+          governorate: string | null
+          legal_name: string | null
+          org_type: Database["public"]["Enums"]["account_type"] | null
+          organization_id: string | null
+          owner_confirmed: boolean
+          primary_branch_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          city?: string | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          display_name?: string | null
+          governorate?: string | null
+          legal_name?: string | null
+          org_type?: Database["public"]["Enums"]["account_type"] | null
+          organization_id?: string | null
+          owner_confirmed?: boolean
+          primary_branch_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          city?: string | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          display_name?: string | null
+          governorate?: string | null
+          legal_name?: string | null
+          org_type?: Database["public"]["Enums"]["account_type"] | null
+          organization_id?: string | null
+          owner_confirmed?: boolean
+          primary_branch_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_onboarding_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_onboarding_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consent_receipts: {
         Row: {
           accepted_at: string
@@ -378,62 +441,6 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      business_onboarding: {
-        Row: {
-          city: string | null
-          completed_at: string | null
-          created_at: string
-          description: string | null
-          display_name: string | null
-          governorate: string | null
-          legal_name: string | null
-          org_type: Database["public"]["Enums"]["account_type"] | null
-          organization_id: string | null
-          owner_confirmed: boolean
-          primary_branch_name: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          city?: string | null
-          completed_at?: string | null
-          created_at?: string
-          description?: string | null
-          display_name?: string | null
-          governorate?: string | null
-          legal_name?: string | null
-          org_type?: Database["public"]["Enums"]["account_type"] | null
-          organization_id?: string | null
-          owner_confirmed?: boolean
-          primary_branch_name?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          city?: string | null
-          completed_at?: string | null
-          created_at?: string
-          description?: string | null
-          display_name?: string | null
-          governorate?: string | null
-          legal_name?: string | null
-          org_type?: Database["public"]["Enums"]["account_type"] | null
-          organization_id?: string | null
-          owner_confirmed?: boolean
-          primary_branch_name?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "business_onboarding_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -974,6 +981,78 @@ export type Database = {
           },
         ]
       }
+      products: {
+        Row: {
+          brand: string | null
+          category: Database["public"]["Enums"]["product_category"]
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          id: string
+          image_ref: string | null
+          name: string
+          organization_id: string
+          published_at: string | null
+          short_description: string | null
+          sku: string | null
+          status: Database["public"]["Enums"]["product_status"]
+          unit: Database["public"]["Enums"]["product_unit"]
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          brand?: string | null
+          category: Database["public"]["Enums"]["product_category"]
+          created_at?: string
+          created_by: string
+          deleted_at?: string | null
+          id?: string
+          image_ref?: string | null
+          name: string
+          organization_id: string
+          published_at?: string | null
+          short_description?: string | null
+          sku?: string | null
+          status?: Database["public"]["Enums"]["product_status"]
+          unit: Database["public"]["Enums"]["product_unit"]
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          brand?: string | null
+          category?: Database["public"]["Enums"]["product_category"]
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          id?: string
+          image_ref?: string | null
+          name?: string
+          organization_id?: string
+          published_at?: string | null
+          short_description?: string | null
+          sku?: string | null
+          status?: Database["public"]["Enums"]["product_status"]
+          unit?: Database["public"]["Enums"]["product_unit"]
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_media_id: string | null
@@ -1023,6 +1102,320 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotation_items: {
+        Row: {
+          created_at: string
+          id: string
+          line_total: number | null
+          product_name: string
+          quantity: number
+          quotation_id: string
+          rfq_item_id: string
+          unit: Database["public"]["Enums"]["product_unit"]
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_total?: number | null
+          product_name: string
+          quantity: number
+          quotation_id: string
+          rfq_item_id: string
+          unit: Database["public"]["Enums"]["product_unit"]
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_total?: number | null
+          product_name?: string
+          quantity?: number
+          quotation_id?: string
+          rfq_item_id?: string
+          unit?: Database["public"]["Enums"]["product_unit"]
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_quotation_items_quotation"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_quotation_items_quotation"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_quotation_items_rfq_item"
+            columns: ["rfq_item_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_items_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_items_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotations: {
+        Row: {
+          created_at: string
+          created_by: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          note: string | null
+          requester_org_id: string
+          rfq_id: string
+          status: Database["public"]["Enums"]["quotation_status"]
+          submitted_at: string | null
+          subtotal: number
+          supplier_org_id: string
+          total: number
+          updated_at: string
+          validity_date: string | null
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          note?: string | null
+          requester_org_id: string
+          rfq_id: string
+          status?: Database["public"]["Enums"]["quotation_status"]
+          submitted_at?: string | null
+          subtotal?: number
+          supplier_org_id: string
+          total?: number
+          updated_at?: string
+          validity_date?: string | null
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          note?: string | null
+          requester_org_id?: string
+          rfq_id?: string
+          status?: Database["public"]["Enums"]["quotation_status"]
+          submitted_at?: string | null
+          subtotal?: number
+          supplier_org_id?: string
+          total?: number
+          updated_at?: string
+          validity_date?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotations_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotations_requester_org_id_fkey"
+            columns: ["requester_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotations_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotations_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfqs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotations_supplier_org_id_fkey"
+            columns: ["supplier_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfq_items: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          product_id: string | null
+          product_name: string
+          quantity: number
+          rfq_id: string
+          unit: Database["public"]["Enums"]["product_unit"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          product_id?: string | null
+          product_name: string
+          quantity: number
+          rfq_id: string
+          unit: Database["public"]["Enums"]["product_unit"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          rfq_id?: string
+          unit?: Database["public"]["Enums"]["product_unit"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_rfq_items_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_published_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_rfq_items_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_items_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_items_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfqs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfqs: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          created_by: string
+          id: string
+          note: string | null
+          requester_branch_id: string | null
+          requester_org_id: string
+          required_date: string | null
+          status: Database["public"]["Enums"]["rfq_status"]
+          submitted_at: string | null
+          supplier_org_id: string
+          title: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          note?: string | null
+          requester_branch_id?: string | null
+          requester_org_id: string
+          required_date?: string | null
+          status?: Database["public"]["Enums"]["rfq_status"]
+          submitted_at?: string | null
+          supplier_org_id: string
+          title: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          note?: string | null
+          requester_branch_id?: string | null
+          requester_org_id?: string
+          required_date?: string | null
+          status?: Database["public"]["Enums"]["rfq_status"]
+          submitted_at?: string | null
+          supplier_org_id?: string
+          title?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_rfqs_requester_branch"
+            columns: ["requester_org_id", "requester_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "rfqs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfqs_requester_org_id_fkey"
+            columns: ["requester_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfqs_supplier_org_id_fkey"
+            columns: ["supplier_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1274,6 +1667,32 @@ export type Database = {
       }
     }
     Views: {
+      catalog_published_products: {
+        Row: {
+          brand: string | null
+          category: Database["public"]["Enums"]["product_category"] | null
+          id: string | null
+          image_ref: string | null
+          name: string | null
+          organization_id: string | null
+          published_at: string | null
+          short_description: string | null
+          sku: string | null
+          supplier_name: string | null
+          supplier_slug: string | null
+          supplier_verified: boolean | null
+          unit: Database["public"]["Enums"]["product_unit"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_public_directory: {
         Row: {
           id: string | null
@@ -1298,6 +1717,130 @@ export type Database = {
           locality_id: string | null
         }
         Relationships: []
+      }
+      quotation_list: {
+        Row: {
+          created_at: string | null
+          decided_at: string | null
+          id: string | null
+          item_count: number | null
+          requester_name: string | null
+          requester_org_id: string | null
+          rfq_id: string | null
+          rfq_title: string | null
+          status: Database["public"]["Enums"]["quotation_status"] | null
+          submitted_at: string | null
+          subtotal: number | null
+          supplier_name: string | null
+          supplier_org_id: string | null
+          total: number | null
+          updated_at: string | null
+          validity_date: string | null
+          version: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotations_requester_org_id_fkey"
+            columns: ["requester_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotations_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotations_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfqs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotations_supplier_org_id_fkey"
+            columns: ["supplier_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfq_list: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          item_count: number | null
+          requester_branch_id: string | null
+          requester_name: string | null
+          requester_org_id: string | null
+          required_date: string | null
+          status: Database["public"]["Enums"]["rfq_status"] | null
+          submitted_at: string | null
+          supplier_name: string | null
+          supplier_org_id: string | null
+          title: string | null
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          item_count?: never
+          requester_branch_id?: string | null
+          requester_name?: never
+          requester_org_id?: string | null
+          required_date?: string | null
+          status?: Database["public"]["Enums"]["rfq_status"] | null
+          submitted_at?: string | null
+          supplier_name?: never
+          supplier_org_id?: string | null
+          title?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          item_count?: never
+          requester_branch_id?: string | null
+          requester_name?: never
+          requester_org_id?: string | null
+          required_date?: string | null
+          status?: Database["public"]["Enums"]["rfq_status"] | null
+          submitted_at?: string | null
+          supplier_name?: never
+          supplier_org_id?: string | null
+          title?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_rfqs_requester_branch"
+            columns: ["requester_org_id", "requester_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "rfqs_requester_org_id_fkey"
+            columns: ["requester_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfqs_supplier_org_id_fkey"
+            columns: ["supplier_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_follow_ups_due_today: {
         Row: {
@@ -1728,6 +2271,15 @@ export type Database = {
       }
     }
     Functions: {
+      add_rfq_item: {
+        Args: {
+          p_note?: string
+          p_product_id: string
+          p_quantity: number
+          p_rfq_id: string
+        }
+        Returns: string
+      }
       add_sales_activity: {
         Args: {
           p_activity_type: Database["public"]["Enums"]["sales_activity_type"]
@@ -1760,7 +2312,22 @@ export type Database = {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: undefined
       }
+      business_save: {
+        Args: {
+          p_city?: string
+          p_description?: string
+          p_display_name?: string
+          p_governorate?: string
+          p_legal_name?: string
+          p_org_type?: Database["public"]["Enums"]["account_type"]
+          p_owner_confirmed?: boolean
+          p_primary_branch_name?: string
+        }
+        Returns: undefined
+      }
+      business_submit: { Args: never; Returns: string }
       cancel_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
+      cancel_rfq: { Args: { p_rfq_id: string }; Returns: undefined }
       complete_follow_up: {
         Args: { p_follow_up_id: string }
         Returns: undefined
@@ -1806,6 +2373,42 @@ export type Database = {
         }
         Returns: string
       }
+      create_product: {
+        Args: {
+          p_brand?: string
+          p_category: Database["public"]["Enums"]["product_category"]
+          p_image_ref?: string
+          p_name: string
+          p_org_id: string
+          p_short_description?: string
+          p_sku?: string
+          p_unit: Database["public"]["Enums"]["product_unit"]
+        }
+        Returns: string
+      }
+      create_quotation: {
+        Args: { p_note?: string; p_rfq_id: string; p_validity_date?: string }
+        Returns: string
+      }
+      create_rfq: {
+        Args: {
+          p_branch_id?: string
+          p_note?: string
+          p_requester_org_id: string
+          p_required_date?: string
+          p_supplier_org_id: string
+          p_title: string
+        }
+        Returns: string
+      }
+      decide_quotation: {
+        Args: {
+          p_accept: boolean
+          p_expected_version: number
+          p_quotation_id: string
+        }
+        Returns: number
+      }
       individual_complete_consumer: { Args: never; Returns: undefined }
       individual_save_consumer: {
         Args: {
@@ -1817,20 +2420,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      business_save: {
-        Args: {
-          p_city?: string
-          p_description?: string
-          p_display_name?: string
-          p_governorate?: string
-          p_legal_name?: string
-          p_org_type?: Database["public"]["Enums"]["account_type"]
-          p_owner_confirmed?: boolean
-          p_primary_branch_name?: string
-        }
-        Returns: undefined
-      }
-      business_submit: { Args: never; Returns: string }
       individual_save_professional: {
         Args: {
           p_additional_services?: string[]
@@ -1921,6 +2510,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      remove_rfq_item: { Args: { p_item_id: string }; Returns: undefined }
       reopen_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
       request_account_upgrade: {
         Args: {
@@ -1965,7 +2555,27 @@ export type Database = {
         }
         Returns: number
       }
+      set_product_published: {
+        Args: {
+          p_expected_version: number
+          p_product_id: string
+          p_published: boolean
+        }
+        Returns: number
+      }
       set_profile_hidden: { Args: { p_user_id: string }; Returns: undefined }
+      set_quotation_item_price: {
+        Args: { p_item_id: string; p_unit_price: number }
+        Returns: undefined
+      }
+      submit_quotation: {
+        Args: { p_expected_version: number; p_quotation_id: string }
+        Returns: number
+      }
+      submit_rfq: {
+        Args: { p_expected_version: number; p_rfq_id: string }
+        Returns: number
+      }
       transition_lead: {
         Args: {
           p_expected_version: number
@@ -2018,6 +2628,46 @@ export type Database = {
         }
         Returns: number
       }
+      update_product: {
+        Args: {
+          p_brand?: string
+          p_category?: Database["public"]["Enums"]["product_category"]
+          p_clear_brand?: boolean
+          p_clear_description?: boolean
+          p_clear_sku?: boolean
+          p_expected_version: number
+          p_image_ref?: string
+          p_name?: string
+          p_product_id: string
+          p_short_description?: string
+          p_sku?: string
+          p_unit?: Database["public"]["Enums"]["product_unit"]
+        }
+        Returns: number
+      }
+      update_quotation: {
+        Args: {
+          p_clear_note?: boolean
+          p_clear_validity?: boolean
+          p_expected_version: number
+          p_note?: string
+          p_quotation_id: string
+          p_validity_date?: string
+        }
+        Returns: number
+      }
+      update_rfq: {
+        Args: {
+          p_clear_note?: boolean
+          p_clear_required_date?: boolean
+          p_expected_version: number
+          p_note?: string
+          p_required_date?: string
+          p_rfq_id: string
+          p_title?: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       account_type:
@@ -2056,7 +2706,31 @@ export type Database = {
         | "suspended"
         | "archived"
       platform_role: "support" | "moderator" | "administrator"
+      product_category:
+        | "finishing"
+        | "construction"
+        | "interior_design"
+        | "furnishing"
+        | "supply"
+        | "tools"
+        | "other"
+      product_status: "draft" | "published"
+      product_unit:
+        | "piece"
+        | "box"
+        | "set"
+        | "meter"
+        | "square_meter"
+        | "linear_meter"
+        | "kilogram"
+        | "ton"
+        | "liter"
+        | "roll"
+        | "bag"
+        | "pack"
       public_profile_status: "hidden" | "listed"
+      quotation_status: "draft" | "submitted" | "accepted" | "rejected"
+      rfq_status: "draft" | "submitted" | "quoted" | "closed" | "cancelled"
       sales_activity_type:
         | "note"
         | "call"
@@ -2254,7 +2928,33 @@ export const Constants = {
         "archived",
       ],
       platform_role: ["support", "moderator", "administrator"],
+      product_category: [
+        "finishing",
+        "construction",
+        "interior_design",
+        "furnishing",
+        "supply",
+        "tools",
+        "other",
+      ],
+      product_status: ["draft", "published"],
+      product_unit: [
+        "piece",
+        "box",
+        "set",
+        "meter",
+        "square_meter",
+        "linear_meter",
+        "kilogram",
+        "ton",
+        "liter",
+        "roll",
+        "bag",
+        "pack",
+      ],
       public_profile_status: ["hidden", "listed"],
+      quotation_status: ["draft", "submitted", "accepted", "rejected"],
+      rfq_status: ["draft", "submitted", "quoted", "closed", "cancelled"],
       sales_activity_type: [
         "note",
         "call",
