@@ -9,6 +9,7 @@ import { AccountMenu } from "@/components/layout/account-menu";
 import { Sidebar, MobileNav } from "@/components/layout/workspace-nav";
 import { Brand } from "@/components/layout/brand";
 import { SalesRealtime } from "@/features/sales/sales-realtime";
+import { allowedNavKeys } from "@/lib/nav/modules";
 
 /**
  * The B2B workspace chrome: a persistent left sidebar (brand + primary nav) on
@@ -31,6 +32,7 @@ export async function AppShell({
   const m = getMessages(locale);
   const active = workspace.active!;
   const orgWide = active.canManageSales || active.capabilities.includes("branch.manage");
+  const navKeys = allowedNavKeys(active.capabilities);
 
   return (
     <div className="flex min-h-dvh bg-canvas">
@@ -39,7 +41,7 @@ export async function AppShell({
         <div className="px-2 pb-lg">
           <Brand name={m.common.appName} size="md" />
         </div>
-        <Sidebar />
+        <Sidebar allowed={navKeys} />
         <p className="mt-auto px-3 pt-lg text-label text-fg-muted">{m.nav.workspace}</p>
       </aside>
 
@@ -80,7 +82,7 @@ export async function AppShell({
           {children}
         </main>
 
-        <MobileNav />
+        <MobileNav allowed={navKeys} />
       </div>
     </div>
   );

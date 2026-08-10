@@ -179,3 +179,41 @@ export function ApertureMark({ size = 24, className }: { size?: number; classNam
     </svg>
   );
 }
+
+export const BuildingIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16" />
+    <path d="M15 9h4a1 1 0 0 1 1 1v11" />
+    <path d="M3 21h18" />
+    <path d="M8 8h3M8 12h3M8 16h3" />
+  </Svg>
+);
+
+export const ShieldIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3 5 6v5c0 4.4 3 7.6 7 9 4-1.4 7-4.6 7-9V6l-7-3Z" />
+    <path d="m9.5 12 1.8 1.8L15 10" />
+  </Svg>
+);
+
+export const GaugeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 13 15 9.5" />
+    <path d="M4 17a8 8 0 1 1 16 0" />
+    <circle cx="12" cy="17" r="1" />
+  </Svg>
+);
+
+export const BadgeCheckIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m9 12 2 2 4-4" />
+    <path d="M12 3.5 14 5l2.5-.4 1 2.4 2.2 1.3-.6 2.5.6 2.5-2.2 1.3-1 2.4L14 19l-2 1.5L10 19l-2.5.4-1-2.4-2.2-1.3.6-2.5-.6-2.5 2.2-1.3 1-2.4L10 5l2-1.5Z" />
+  </Svg>
+);
+
+export const ScrollIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v12a2 2 0 0 0 2 2H8a2 2 0 0 1-2-2V5" />
+    <path d="M9 7h6M9 11h6M9 15h3" />
+  </Svg>
+);

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getRegistrationState } from "@/server/queries/registration";
+import { activeLandingPath } from "@/server/queries/landing";
 import { OnboardingPanel } from "@/features/onboarding/onboarding-panel";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function OnboardingPage() {
     case "unverified":
       redirect("/auth/sign-in");
     case "active_personal":
-      redirect("/b2b");
+      redirect(await activeLandingPath());
     case "profile_pending":
       redirect("/onboarding/profile");
     case "contact_pending":

@@ -4,6 +4,35 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Sprint 11 (Pilot Personas, Admin Operations & Connected Demo World)
+
+**Date:** 2026-08-10 · **Branch:** `feature/mvp-pilot-readiness` (PR to `main`, unmerged) · **Base:** `main` @ `2ef6205`
+
+### Objective
+Make the B2B Pilot usable as a CONNECTED multi-role product: every persona → account → correct landing → correct UI → correct capabilities → realistic data → interaction with other personas. Replace the developer-only Admin with a real in-product Admin console. Feature sprint; the repo-wide integration audit is deferred.
+
+### What shipped
+1. **Persona-aware landing** — `resolveActiveLanding()` (server): platform staff → `/admin`, active org member → `/b2b`, consumer/org-less individual → new non-B2B `/home`. Replaced every hardcoded `active_personal → /b2b` in the onboarding funnel + root page. Fixes a consumer landing in the B2B shell.
+2. **Capability-aware nav** — `allowedNavKeys()` filters the workspace rail by membership capabilities (`org.manage` = blanket in-org unlock, matching the RPCs); people-ops gated on `org.members.manage`. Pinned by `src/lib/nav/modules.test.ts`.
+3. **Organization people ops** — `/b2b/organization`: manager-gated roster via new trusted `org_members_list` read-model (masked identity — profiles/users aren't co-member readable), invite-by-email through the existing token `invitation_create`, capability-preset roles, branch assignment, suspend/reactivate/revoke.
+4. **Admin console** — platform-staff-gated `/admin` (dashboard, users + detail, organizations + detail, verifications queue wired to `review_*`, audit log). Guard reads `platform_role_grants`; every query stays RLS-scoped by `is_platform()` (defense in depth). Dense Aladdin-branded shell.
+5. **Connected Pilot world** — `supabase/seed-pilot.sql` (loaded by `db reset` after the pgTAP base seed): 10 identities across every persona, 5 business orgs + branches, capability-scoped memberships, a PENDING token invitation, one end-to-end commercial story (Cairo Ceramics products → Horizon Contracting RFQ → accepted quotation → in-progress order → active project), and two orgs queued for Admin verification.
+6. **DB** — migration `20260812090001_pilot_people_ops.sql`: `org_members_list` + refreshed `membership_set_capabilities` allow-list (adds live `sales.*`/`order.*` keys that had drifted behind Sprints 3/10).
+
+### Seed vs. pgTAP
+Pilot data lives in a SEPARATE seed file so the pgTAP-pinned base (`seed.sql`) is untouched. Design keeps the suite green: nothing added to Org A/B, all new orgs `is_verified=false`, new profiles `hidden` — so only the two admin-context global counts move (reconciled in `06_admin_boundary`), and `14`'s org-verification lookup was made deterministic (it assumed exactly one org verification).
+
+### Validation
+Frontend typecheck ✓ · lint ✓ (0) · unit **163** ✓ · production build ✓ (all `/admin/*`, `/home`, `/b2b/organization` compile). Supabase: `db reset` (base + pilot) ✓ · `db lint` ✓ (only pre-existing `set_customer_ownership` warning) · pgTAP **579/579** ✓. Per sprint rules: targeted unit + DB validation only; no repeated full Playwright loops; no unrelated flakes touched. Browser persona-landing E2E left for the pre-audit gate.
+
+### Docs
+`docs/frontend/sprint-11-pilot-readiness.md` — full Pilot Account Matrix + connected story + validation.
+
+### `.pen` integrity
+No Pencil tool invoked; no `.pen` edited or in the branch diff.
+
+---
+
 ## Session — Phase 2: Sprint 6.2 (Final Realtime & QA Merge Gate)
 
 **Date:** 2026-08-05 · **Branch:** `feature/sales-ownership-realtime` (PR #9, continued) · **Base:** `main` @ `5a47011`

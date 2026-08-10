@@ -41,8 +41,14 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  // Authenticated-only surfaces: the workspace and the post-registration handoff.
-  const authRequired = path.startsWith("/b2b") || path.startsWith("/onboarding");
+  // Authenticated-only surfaces: the workspace, the admin console, the consumer
+  // home, and the post-registration handoff. Authorization within each (platform
+  // staff, org membership, capabilities) is still enforced by RLS + route guards.
+  const authRequired =
+    path.startsWith("/b2b") ||
+    path.startsWith("/admin") ||
+    path.startsWith("/home") ||
+    path.startsWith("/onboarding");
   if (authRequired && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/sign-in";

@@ -369,9 +369,14 @@ values (
   '55555555-5555-4555-8555-555555555555',now());
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
+-- Target the approved Org A verification inserted just above. (The Sprint-11
+-- Pilot seed adds further organization verifications, so this must not rely on
+-- there being exactly one.)
 select throws_ok(
   $$ select public.apply_account_upgrade((select id from public.verifications
-       where subject_type='organization')) $$,
+       where subject_type='organization'
+         and organization_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+         and status='approved')) $$,
   '22023', null, 'organization verification cannot enter the user-account upgrade path');
 
 -- Audit failure must roll back all protected business writes.

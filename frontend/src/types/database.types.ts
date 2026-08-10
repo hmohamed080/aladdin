@@ -3010,6 +3010,22 @@ export type Database = {
         }
         Returns: undefined
       }
+      org_members_list: {
+        Args: { p_org_id: string }
+        Returns: {
+          accepted_at: string
+          branch_ids: string[]
+          capabilities: string[]
+          display_name: string
+          email_masked: string
+          invited_at: string
+          membership_id: string
+          primary_account_type: Database["public"]["Enums"]["account_type"]
+          primary_branch_id: string
+          status: Database["public"]["Enums"]["membership_status"]
+          user_id: string
+        }[]
+      }
       reassign_follow_up: {
         Args: {
           p_assignee_membership_id: string
