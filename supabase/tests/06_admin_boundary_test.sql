@@ -30,10 +30,16 @@ select is(app.is_platform('administrator'), true,
   'the provisioned platform admin is recognized');
 select is(app.is_platform('support'), true,
   'administrator implies support-level read authority');
-select is((select count(*)::int from public.memberships), 3,
-  'platform admin has cross-tenant read of all memberships');
-select is((select count(*)::int from public.branches), 3,
-  'platform admin has cross-tenant read of all branches (both tenants)');
+-- Base tenants (Org A + Org B) contribute 3 memberships; the Sprint-11 Pilot
+-- world (supabase/seed-pilot.sql) adds 9 more active memberships across the five
+-- new organizations, for 12. The invited employee (Nour) is a PENDING token
+-- invitation, not a membership row, so she is not counted here.
+select is((select count(*)::int from public.memberships), 12,
+  'platform admin has cross-tenant read of all memberships (base + Pilot)');
+-- Base tenants contribute 3 branches; the Pilot world adds one branch per new
+-- organization (5), for 8.
+select is((select count(*)::int from public.branches), 8,
+  'platform admin has cross-tenant read of all branches (base + Pilot)');
 
 reset role;
 select * from finish();
