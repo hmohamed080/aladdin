@@ -60,7 +60,7 @@ export const en = {
     quotations: "Quotations",
     orders: "Orders",
     projects: "Projects",
-    workspace: "Sales workspace",
+    workspace: "Workspace",
     account: "Account",
     language: "Language",
     theme: "Theme",
@@ -71,6 +71,30 @@ export const en = {
     allBranches: "All branches",
     allAssignedBranches: "All my branches",
     menu: "Menu",
+  },
+  consumerHome: {
+    eyebrow: "Your Aladdin",
+    friend: "there",
+    greeting: "Welcome, {name}",
+    subtitle:
+      "This is your personal space. Follow your finishing and construction projects, discover trusted professionals, and get advice — all in one place.",
+    comingSoon: "Coming soon",
+    projects: {
+      title: "Your projects",
+      body: "Track requests and projects you start with Aladdin professionals.",
+    },
+    discover: {
+      title: "Discover professionals",
+      body: "Find verified engineers, designers, and suppliers near you.",
+    },
+    advice: {
+      title: "Get advice",
+      body: "Ask for guidance before you commit — consultation first, never a price war.",
+    },
+    pilot: {
+      title: "You're in the Aladdin Pilot",
+      body: "Your consumer experience is being connected to the wider Aladdin network during the pilot.",
+    },
   },
   auth: {
     title: "Sign in to Aladdin",

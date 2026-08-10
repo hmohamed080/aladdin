@@ -16,7 +16,9 @@ import {
   ReceiptIcon,
   ClipboardIcon,
   LayersIcon,
+  BuildingIcon,
 } from "@/components/ui/icons";
+import type { NavKey } from "@/lib/nav/modules";
 
 /**
  * Primary workspace navigation — the implemented modules (no dead links). A
@@ -25,20 +27,38 @@ import {
  * mirror correctly in RTL (leading/trailing via logical properties). Access is
  * still enforced server-side on every page.
  */
-type Item = { href: string; key: string; exact: boolean; Icon: ComponentType<{ size?: number }> };
+type Item = {
+  navKey: NavKey;
+  href: string;
+  key: string;
+  exact: boolean;
+  Icon: ComponentType<{ size?: number }>;
+};
 
-const items: Item[] = [
-  { href: "/b2b", key: "nav.home", exact: true, Icon: HomeIcon },
-  { href: "/b2b/customers", key: "nav.customers", exact: false, Icon: UsersIcon },
-  { href: "/b2b/leads", key: "nav.leads", exact: false, Icon: TargetIcon },
-  { href: "/b2b/follow-ups", key: "nav.followUps", exact: false, Icon: CalendarCheckIcon },
-  { href: "/b2b/catalog", key: "nav.catalog", exact: false, Icon: SearchIcon },
-  { href: "/b2b/products", key: "nav.products", exact: false, Icon: PackageIcon },
-  { href: "/b2b/rfqs", key: "nav.rfqs", exact: false, Icon: FileTextIcon },
-  { href: "/b2b/quotations", key: "nav.quotations", exact: false, Icon: ReceiptIcon },
-  { href: "/b2b/orders", key: "nav.orders", exact: false, Icon: ClipboardIcon },
-  { href: "/b2b/projects", key: "nav.projects", exact: false, Icon: LayersIcon },
+const ALL_ITEMS: Item[] = [
+  { navKey: "home", href: "/b2b", key: "nav.home", exact: true, Icon: HomeIcon },
+  { navKey: "customers", href: "/b2b/customers", key: "nav.customers", exact: false, Icon: UsersIcon },
+  { navKey: "leads", href: "/b2b/leads", key: "nav.leads", exact: false, Icon: TargetIcon },
+  { navKey: "followUps", href: "/b2b/follow-ups", key: "nav.followUps", exact: false, Icon: CalendarCheckIcon },
+  { navKey: "catalog", href: "/b2b/catalog", key: "nav.catalog", exact: false, Icon: SearchIcon },
+  { navKey: "products", href: "/b2b/products", key: "nav.products", exact: false, Icon: PackageIcon },
+  { navKey: "rfqs", href: "/b2b/rfqs", key: "nav.rfqs", exact: false, Icon: FileTextIcon },
+  { navKey: "quotations", href: "/b2b/quotations", key: "nav.quotations", exact: false, Icon: ReceiptIcon },
+  { navKey: "orders", href: "/b2b/orders", key: "nav.orders", exact: false, Icon: ClipboardIcon },
+  { navKey: "projects", href: "/b2b/projects", key: "nav.projects", exact: false, Icon: LayersIcon },
+  { navKey: "organization", href: "/b2b/organization", key: "nav.organization", exact: false, Icon: BuildingIcon },
 ];
+
+/** Keep only the modules the caller may reach (order preserved). */
+function visibleItems(allowed: NavKey[]): Item[] {
+  const set = new Set(allowed);
+  return ALL_ITEMS.filter((i) => set.has(i.navKey));
+}
+
+/** Mobile bottom bar shows at most 5 items; prioritize by canonical order. */
+function mobileItems(allowed: NavKey[]): Item[] {
+  return visibleItems(allowed).slice(0, 5);
+}
 
 function useActive() {
   const pathname = usePathname();
@@ -47,12 +67,12 @@ function useActive() {
 }
 
 /** Desktop/tablet vertical rail (rendered inside the persistent sidebar). */
-export function Sidebar() {
+export function Sidebar({ allowed }: { allowed: NavKey[] }) {
   const { t } = useI18n();
   const isActive = useActive();
   return (
     <nav aria-label={t("nav.workspace")} className="flex flex-col gap-1">
-      {items.map(({ href, key, exact, Icon }) => {
+      {visibleItems(allowed).map(({ href, key, exact, Icon }) => {
         const active = isActive(href, exact);
         return (
           <Link
@@ -83,18 +103,22 @@ export function Sidebar() {
   );
 }
 
-/** Mobile fixed bottom bar. */
-export function MobileNav() {
+/** Mobile fixed bottom bar (at most five primary modules). */
+export function MobileNav({ allowed }: { allowed: NavKey[] }) {
   const { t } = useI18n();
   const isActive = useActive();
+  const shown = mobileItems(allowed);
   return (
     <nav
       aria-label={t("nav.workspace")}
       className="fixed inset-x-0 bottom-0 z-sticky border-t bg-surface/95 backdrop-blur tablet:hidden"
       style={{ zIndex: 100 }}
     >
-      <ul className="mx-auto grid max-w-lg grid-cols-4">
-        {items.map(({ href, key, exact, Icon }) => {
+      <ul
+        className="mx-auto grid max-w-lg"
+        style={{ gridTemplateColumns: `repeat(${Math.max(shown.length, 1)}, minmax(0, 1fr))` }}
+      >
+        {shown.map(({ href, key, exact, Icon }) => {
           const active = isActive(href, exact);
           return (
             <li key={href}>

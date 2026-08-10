@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getRegistrationState } from "@/server/queries/registration";
+import { activeLandingPath } from "@/server/queries/landing";
 import { getOnboardingData } from "@/server/queries/onboarding";
 import { AccountTypeStep } from "@/features/onboarding/account-type-step";
 import { ACCOUNT_TYPE_CHOICES } from "@/lib/onboarding/account-types";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function OnboardingAccountTypePage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state === "active_personal") redirect("/b2b");
+  if (state === "active_personal") redirect(await activeLandingPath());
   if (state === "consent_pending" || state === "invitation_pending" || state === "manually_blocked") {
     redirect("/onboarding");
   }

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getRegistrationState } from "@/server/queries/registration";
+import { activeLandingPath } from "@/server/queries/landing";
 import { getOnboardingData } from "@/server/queries/onboarding";
 import { ACCOUNT_TYPE_CHOICES } from "@/lib/onboarding/account-types";
 import { HandoffPanel } from "@/features/onboarding/handoff-panel";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function OnboardingCompletePage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state === "active_personal") redirect("/b2b");
+  if (state === "active_personal") redirect(await activeLandingPath());
   if (state === "profile_pending") redirect("/onboarding/profile");
   if (state === "contact_pending") redirect("/onboarding/contact");
   if (state === "account_type_pending") redirect("/onboarding/account-type");

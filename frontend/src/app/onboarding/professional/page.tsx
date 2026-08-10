@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getRegistrationState } from "@/server/queries/registration";
+import { activeLandingPath } from "@/server/queries/landing";
 import { getIndividualOnboardingData } from "@/server/queries/onboarding";
 import { ProfessionalFlow } from "@/features/onboarding/professional-flow";
 import { PERSONA_BY_ACCOUNT_TYPE } from "@/lib/onboarding/persona-fields";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function ProfessionalOnboardingPage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state === "active_personal") redirect("/b2b");
+  if (state === "active_personal") redirect(await activeLandingPath());
   if (state === "persona_review_pending") redirect("/onboarding/professional/review");
   if (state !== "persona_onboarding_pending") redirect("/onboarding");
 

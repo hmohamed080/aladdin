@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getRegistrationState } from "@/server/queries/registration";
+import { activeLandingPath } from "@/server/queries/landing";
 import { getIndividualOnboardingData } from "@/server/queries/onboarding";
 import { ConsumerFlow, ConsumerComplete } from "@/features/onboarding/consumer-flow";
 
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function ConsumerOnboardingPage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state === "active_personal") redirect("/b2b");
+  if (state === "active_personal") redirect(await activeLandingPath());
   // Anyone not on the consumer branch resolves elsewhere.
   if (state !== "consumer_onboarding_pending" && state !== "consumer_onboarding_complete") {
     redirect("/onboarding");

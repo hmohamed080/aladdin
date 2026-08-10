@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getRegistrationState } from "@/server/queries/registration";
+import { activeLandingPath } from "@/server/queries/landing";
 import { getBusinessOnboardingData } from "@/server/queries/onboarding";
 import { BusinessFlow } from "@/features/onboarding/business-flow";
 import { businessOrgTypeFromAccountType } from "@/lib/onboarding/account-types";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function BusinessOnboardingPage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state === "active_personal") redirect("/b2b");
+  if (state === "active_personal") redirect(await activeLandingPath());
   if (state !== "organization_setup_pending") redirect("/onboarding");
 
   const data = await getBusinessOnboardingData();
