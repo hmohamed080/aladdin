@@ -23,7 +23,7 @@ export function AuditFeed({ entries, locale }: { entries: AuditEntry[]; locale: 
           {e.actorRole ? (
             <span className="rounded-pill bg-surface-2 px-1.5 py-0.5 text-label text-fg-muted">{e.actorRole}</span>
           ) : null}
-          <span className="text-fg-secondary">{actions[e.action] ?? e.action}</span>
+          <span className="text-fg-secondary">{actions[e.action.replaceAll(".", "_")] ?? e.action}</span>
           <span className="text-label text-fg-muted">· {e.subjectType}</span>
           <span className="ms-auto text-label text-fg-muted">{formatDateTime(e.createdAt, locale)}</span>
         </li>

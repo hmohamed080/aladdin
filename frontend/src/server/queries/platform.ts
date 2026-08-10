@@ -1,7 +1,6 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getServerSupabase } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.types";
 
 export type PlatformRole = "support" | "moderator" | "administrator";
