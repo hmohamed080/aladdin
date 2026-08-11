@@ -26,10 +26,13 @@ select throws_ok(
   '42501', null,
   'ordinary user cannot insert an audit record');
 
--- Platform admin CAN read the audit log.
+-- Platform admin CAN read the audit log. Scoped to THIS test's row: the pilot
+-- world seeds its own audit history so /admin/audit is reviewable, and this
+-- assertion is about read access, not about the size of the seeded trail.
 set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
-select is((select count(*)::int from public.audit_log), 1,
-  'platform administrator can read the audit log');
+select is(
+  (select count(*)::int from public.audit_log where metadata->>'note' = 'synthetic test row'),
+  1, 'platform administrator can read the audit log');
 
 -- Admin cannot UPDATE or DELETE audit rows (no grant → permission denied).
 select throws_ok(

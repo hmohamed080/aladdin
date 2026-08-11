@@ -37,9 +37,13 @@ export default async function AdminOrgDetailPage({ params }: { params: Promise<{
       </div>
 
       <Card>
-        <dl className="grid gap-md tablet:grid-cols-3">
+        <dl className="grid gap-md tablet:grid-cols-4">
           <Field label={m.admin.orgs.type}>{typeLabels[org.orgType] ?? org.orgType}</Field>
           <Field label={m.admin.orgs.status}>{statusLabels[org.status] ?? org.status}</Field>
+          {/* Stated explicitly: an absent badge must not be read as "unknown". */}
+          <Field label={m.admin.orgs.verification}>
+            {org.isVerified ? m.admin.orgs.verified : m.admin.orgs.notVerified}
+          </Field>
           <Field label={m.admin.orgs.created}>{formatDate(org.createdAt, locale)}</Field>
         </dl>
       </Card>

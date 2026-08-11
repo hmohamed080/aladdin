@@ -50,13 +50,24 @@ export async function startReviewAction(_p: ReviewFormState, fd: FormData): Prom
   return { ok: true, code: "admin.review.started" };
 }
 
+/**
+ * Approve, then APPLY. `review_approve` only records the decision; the effect on
+ * the subject is a separate, idempotent apply step — `apply_account_upgrade` for a
+ * professional user, `apply_organization_verification` for an organization. Without
+ * it an approval changed nothing about the account or the organization.
+ *
+ * Public listing is only meaningful for a professional upgrade (the database
+ * constraint `ck_verifications_listing_only_professional` rejects it on any other
+ * subject), so it is requested only there.
+ */
 export async function approveVerificationAction(
   _p: ReviewFormState,
   fd: FormData,
 ): Promise<ReviewFormState> {
   const id = str(fd, "id");
   if (!id) return { ok: false, code: "states.genericRetry" };
-  const grantListing = fd.get("grantListing") === "on" || fd.get("grantListing") === "true";
+  const verificationType = str(fd, "verificationType");
+  const isProfessional = verificationType === "professional";
   const supabase = await getServerSupabase();
 
   const startErr = await ensureStarted(supabase, id, str(fd, "status"));
@@ -64,10 +75,21 @@ export async function approveVerificationAction(
 
   const { error } = await supabase.rpc("review_approve", {
     p_verification_id: id,
-    p_grant_public_listing: grantListing,
+    p_grant_public_listing: isProfessional,
   });
   if (error) return { ok: false, code: mapReviewError(error.message) };
+
+  // An `identity` verification has no subject effect to apply yet.
+  if (isProfessional || verificationType === "organization") {
+    const { error: applyError } = isProfessional
+      ? await supabase.rpc("apply_account_upgrade", { p_verification_id: id })
+      : await supabase.rpc("apply_organization_verification", { p_verification_id: id });
+    if (applyError) return { ok: false, code: mapReviewError(applyError.message) };
+  }
+
   revalidatePath("/admin/verifications");
+  revalidatePath("/admin/organizations");
+  revalidatePath("/admin/users");
   return { ok: true, code: "admin.review.approved" };
 }
 
