@@ -6,24 +6,24 @@ This is a **mutable snapshot** of the current live repository state — not an a
 
 | | |
 |---|---|
-| **Version** | Runtime snapshot · 2026-08-04 |
+| **Version** | Runtime snapshot · 2026-08-11 |
 | **Owner** | Foundation / Operations |
-| **Last updated** | 2026-08-05 |
-| **Updated by** | Claude Code (Opus 4.8) — Phase 2, Sprint 6.2 Final Realtime & QA Merge Gate (dirty-form protection + realtime timer teardown + dialog focus fix + exact perf console gate + deterministic flake fix; on top of Sprint 6/6.1) |
-| **Current focus** | **Phase 2 — B2B Sales Operating Workflow · Sprint 3 (B2B Sales Domain Foundation).** Phase 1 is merged to `main` (@ `54792a4`, PR #4). Sprint 3 builds the tenant-owned sales foundation on the identity/tenancy spine: `customers`, `leads`, `sales_activities`, `follow_up_tasks` with organization + optional-branch ownership, composite-FK cross-tenant safety, scope-based RLS, 13 constrained `security definer` workflow RPCs (create/update/assign/transition/activity/follow-up), optimistic-locked lead transitions, in-transaction audit, and `security_invoker` dashboard read-models. Local suite: **337 pgTAP** assertions (254 preserved + 83 new). See [ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md). No orders/quotes/RFQ/products/payments/AI/WhatsApp. |
+| **Last updated** | 2026-08-11 |
+| **Updated by** | Codex — Sprint 11 Pilot post-login landing hotfix |
+| **Current focus** | **Pilot UAT hotfix:** the real Email-OTP completion action now preserves pending onboarding/invitation destinations and routes active platform staff → `/admin`, active organization members → `/b2b`, and organization-less personal accounts → `/home` through `resolveActiveLanding()`. Branch `hotfix/pilot-landing-routing`; no schema, RLS, product-direction, or `.pen` change. |
 
 ## Phase & repository
 
 | Field | Value |
 |---|---|
-| **Current Phase** | **Phase 2 — B2B Sales Operating Workflow** (tenant-owned customers/leads/activities/follow-ups on the Phase 1 spine) |
-| **Current Sprint** | **Sprint 6 — Sales Ownership, Realtime & Performance Hardening** (customer branch/assignee + lead source/branch ownership RPCs; scoped Postgres-Changes Realtime on `leads`+`follow_up_tasks`; executed E2E/visual-QA/production-perf gates; branch `feature/sales-ownership-realtime`, PR pending, base `main` @ `5a47011`). Sprint 5.1 merged (PR #8). |
-| **Current Feature** | Passwordless Email-OTP auth + B2B app shell + customers/leads/follow-ups screens wired to the real Sprint-3 RLS/RPCs (Arabic-first, RTL, light/dark, responsive) |
-| **Next Phase** | **Phase 2 continued** — sales UI/screens (05C) then the RFQ/Quote/Project journey; dashboards last |
-| **Current Branch** | `feature/b2b-sales-ui` (created from `main` @ `f9596a3`) |
-| **Current Milestone** | Sprint 3 — secure sales operating foundation; open PR to `main`; no orders/quotes/products/payments |
+| **Current Phase** | **Private Pilot UAT — Sprint 11 hotfix** |
+| **Current Sprint** | **Sprint 11 — Pilot readiness; post-login landing regression fix** |
+| **Current Feature** | Canonical Email-OTP post-auth landing with onboarding preservation and surface isolation |
+| **Next Phase** | Review PR to `main`; do not merge from this task |
+| **Current Branch** | `hotfix/pilot-landing-routing` (created from `main` @ `1b07cf5`) |
+| **Current Milestone** | Pilot landing hotfix; targeted acceptance complete |
 | **Current Remote Repository** | `origin` = `https://github.com/hmohamed080/aladdin.git` |
-| **Last Stable Commit** | `54792a4` — `main` after PR #4 merged (Phase 1 identity/tenancy + Sprint 2/2.1). Sprint 3 commits land on `feature/b2b-sales-workflow` and merge into `main` via PR |
+| **Last Stable Commit** | `1b07cf5` — `main` at hotfix branch point |
 | **Last Stable Tag** | `v0.1.0-foundation` (repo `0.1.0`) — created on merged `main` after the closeout PR; Design System stays independently at `1.0.0` |
 | **Foundation Release** | Tagged `v0.1.0-foundation` on `main` @ `64e68d6` |
 | **Repository Status** | Published to GitHub (`origin`, full history, no squash/force); `main` protection recommended (ADR-0006), not yet applied |
@@ -31,6 +31,8 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | **Implementation Status** | **Sprint 6 validated (frontend typecheck/lint/130 tests/build; backend ruff+pytest; Supabase two clean cycles reset+lint+416 pgTAP; 6 two-session races; Playwright E2E executed & green incl. two-context Realtime; executed visual-QA matrix; production perf measured; dev+prod runtime smoke).** Adds post-create **ownership** edits — `set_customer_ownership` (branch/assignee) and `set_lead_source_branch` (source/branch/compatible-reassign), both version/updated_at-guarded, scope+capability enforced, strand-rejecting, transactionally audited; **`customer_type` immutable** (no domain approval); lead lifecycle out of bounds for the lead RPC. Adds **scoped Realtime** (Postgres Changes on `leads`+`follow_up_tasks`; refresh-only client, RLS-scoped, defers on edit, rebuilds on org/branch change). **Sprint 6.1 closeout:** the Realtime filter now narrows to the **active branch** (`branch_id=eq.<branchId>`, matching the list queries) not just the org; a two-context `realtime-scope` E2E proves scope narrowing/teardown/single-channel, sign-out removal, revoked-membership no-leak, open-form deferral, and duplicate→one-row; the visual-QA matrix runs **both roles** full 4×{en,ar}×{light,dark} + dialogs/states (fixed a 42px customer-detail overflow); **Lighthouse was executed** (sign-in Desktop 100/Mobile 98, /b2b 98, /b2b/leads 96 — all targets met); a pre-existing sign-in test flake was made deterministic. Sprint 5.1 merged (PR #8, `5a47011`). Branch `feature/sales-ownership-realtime`, PR #9 to `main` pending. No products/RFQ/quotes/projects/B2C/payments/WhatsApp/OCR/AI. |
 
 ## Live engineering state
+
+> **Current hotfix override (2026-08-11):** Sprint 11 is on `main` at `1b07cf5`; this branch changes frontend post-auth routing and targeted tests only. Typecheck and lint pass; targeted auth/landing Vitest is 17/17; targeted production Chromium Playwright is 8/8 across EN/LTR and AR/RTL. The database/schema remains the Sprint 11 state and was not reset, linted, or pgTAP-tested again for this no-schema hotfix. No `.pen` file changed.
 
 Always reflects the current live engineering state of the project. Overwrite each session with verified values.
 

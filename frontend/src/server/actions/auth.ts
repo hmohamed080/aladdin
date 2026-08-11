@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { sanitizeNext } from "@/server/auth/next";
+import { resolveActiveLanding } from "@/server/queries/landing";
 
 /**
  * Passwordless Email-OTP account access (Supabase Auth). Two steps: request a
@@ -88,17 +89,24 @@ export async function verifyEmailOtp(_prev: AuthState, formData: FormData): Prom
   if (error) return { ok: false, code: "auth.error.verifyFailed", email: email.data };
 
   const next = sanitizeNext(formData.get("next"));
-  // Resume gate: when heading to the default workspace, a caller who hasn't
-  // finished onboarding (not an active member) is routed to /onboarding instead,
-  // which forwards to their next incomplete step. An explicit destination (an
-  // invitation link, /onboarding) is always honoured as-is.
-  if (next === "/b2b") {
-    const { data: state } = await supabase.rpc("my_registration_state");
-    if (typeof state === "string" && state !== "active_personal") {
-      redirect("/onboarding");
-    }
+
+  // Registration and invitation continuations keep their existing handoff. They
+  // must remain reachable before the account becomes active.
+  if (next.startsWith("/onboarding") || next.startsWith("/auth/invite/")) {
+    redirect(next);
   }
-  redirect(next);
+
+  // Every other successful sign-in passes through the registration gate first.
+  // An indeterminate state is safest at /onboarding, whose route re-derives the
+  // exact pending step; it must never fall through into an active surface.
+  const { data: state } = await supabase.rpc("my_registration_state");
+  if (state !== "active_personal") redirect("/onboarding");
+
+  // This is the real post-OTP landing path. Resolve the caller's canonical
+  // surface, then retain a safe deep link only when it belongs to that surface.
+  const landing = await resolveActiveLanding(supabase);
+  const destination = next === landing || next.startsWith(`${landing}/`) ? next : landing;
+  redirect(destination);
 }
 
 /**

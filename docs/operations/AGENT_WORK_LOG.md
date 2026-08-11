@@ -4,6 +4,21 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Sprint 11 Pilot post-login landing hotfix
+
+**Date:** 2026-08-11 · **Branch:** `hotfix/pilot-landing-routing` · **Base:** `main` @ `1b07cf5`
+
+### Objective
+Fix the manual-Pilot-UAT regression where successful Email-OTP sign-in sent every active account to `/b2b`, bypassing Sprint 11's canonical derived landing resolver.
+
+### Root cause and fix
+`verifyEmailOtp()` sanitized an absent/unsafe `next` to `/b2b`, checked only `my_registration_state`, and redirected that value directly. The Sprint 11 resolver was wired into root/onboarding routes but not the real post-OTP action. The action now preserves explicit onboarding/invitation continuations, sends every other non-active state to `/onboarding`, resolves active accounts through `resolveActiveLanding()`, and retains a deep link only inside the resolved `/admin`, `/b2b`, or `/home` surface. Platform authority remains exclusively `platform_role_grants`; organization membership remains the B2B boundary.
+
+### Validation
+Frontend typecheck ✓ · lint ✓ · targeted auth/landing Vitest **17/17** ✓ · targeted production Playwright Chromium **8/8** ✓ (`admin`, `consumer`, `a-owner`, `youssef` across EN/LTR + AR/RTL; consumer and ordinary B2B direct `/admin` denial included). No DB/schema change, so no reset/lint/pgTAP rerun. No `.pen` modified.
+
+---
+
 ## Session — Sprint 11 (Pilot Personas, Admin Operations & Connected Demo World)
 
 **Date:** 2026-08-10 · **Branch:** `feature/mvp-pilot-readiness` (PR to `main`, unmerged) · **Base:** `main` @ `2ef6205`
