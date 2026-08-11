@@ -55,7 +55,12 @@ export async function saveConsumer(input: ConsumerInput): Promise<IndividualActi
   return OK;
 }
 
-/** Persist final consumer answers, reach the consumer handoff, and show it. */
+/**
+ * Persist the final consumer answers and finish onboarding. The RPC activates the
+ * personal account, so the consumer goes straight into their usable home — the
+ * completed consumer state is a terminal the product actually serves, not a
+ * waiting room.
+ */
 export async function completeConsumer(input: ConsumerInput): Promise<IndividualActionState> {
   const saved = await saveConsumer(input);
   if (!saved.ok) return saved;
@@ -63,7 +68,7 @@ export async function completeConsumer(input: ConsumerInput): Promise<Individual
   const supabase = await getServerSupabase();
   const { error } = await supabase.rpc("individual_complete_consumer");
   if (error) return { ok: false, code: "onboarding.error.saveFailed" };
-  redirect("/onboarding/consumer");
+  redirect("/home");
 }
 
 /* -------------------------------- Professional -------------------------------- */
@@ -122,10 +127,13 @@ export async function saveProfessionalAndReview(input: ProfessionalInput): Promi
 }
 
 /**
- * Submit the professional profile for review. The RPC validates the required
- * fields, stamps completion, and hands off to the trusted upgrade/review workflow
- * (a 'submitted' verification) — the account type is never applied here. On a
- * required-field failure the caller is bounced back to complete the wizard.
+ * Submit the professional profile. The RPC validates the required fields, files
+ * the verification request with the trusted upgrade/review workflow (a
+ * 'submitted' verification — the account type is still never applied here), and
+ * ACTIVATES the personal account. The professional therefore lands in their own
+ * usable home with the review shown as an independent trust state, instead of
+ * waiting on an Admin decision. On a required-field failure the caller is bounced
+ * back to complete the wizard.
  */
 export async function submitProfessional(): Promise<IndividualActionState> {
   const supabase = await getServerSupabase();
@@ -134,5 +142,5 @@ export async function submitProfessional(): Promise<IndividualActionState> {
     // A required-field violation means the wizard is not actually complete.
     redirect("/onboarding/professional");
   }
-  redirect("/onboarding/professional/review");
+  redirect("/home");
 }
