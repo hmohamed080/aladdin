@@ -4,6 +4,9 @@ import { expect, type Page, type APIRequestContext } from "@playwright/test";
 export const IDENTITIES = {
   manager: "a-owner@example.test",
   branchLimited: "a-cairo@example.test",
+  admin: "admin@example.test",
+  consumer: "consumer@example.test",
+  salesperson: "youssef@example.test",
 } as const;
 
 const MAILPIT = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
@@ -48,8 +51,13 @@ export async function readNewOtp(
   throw new Error(`No new OTP code arrived in Mailpit for ${email}`);
 }
 
-/** Sign in through the real Email-OTP flow and land on the B2B workspace. */
-export async function signIn(page: Page, request: APIRequestContext, email: string): Promise<void> {
+/** Sign in through the real Email-OTP flow and wait for the expected landing. */
+export async function signIn(
+  page: Page,
+  request: APIRequestContext,
+  email: string,
+  expectedLanding: RegExp = /\/b2b(\/|$)/,
+): Promise<void> {
   // Snapshot existing messages BEFORE requesting a new code so we never reuse a
   // stale OTP from an earlier test/run.
   const seen = await messageIdsFor(request, email);
@@ -65,5 +73,5 @@ export async function signIn(page: Page, request: APIRequestContext, email: stri
 
   // Wait on the URL committing, not the full "load" event — under sustained
   // full-suite load the load event can lag far behind an interactive page.
-  await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
+  await page.waitForURL(expectedLanding, { waitUntil: "commit" });
 }

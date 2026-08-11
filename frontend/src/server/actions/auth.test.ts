@@ -10,8 +10,13 @@ vi.mock("next/navigation", () => ({
 const signInWithOtp = vi.fn();
 const verifyOtp = vi.fn();
 const rpc = vi.fn();
+const { resolveActiveLanding } = vi.hoisted(() => ({ resolveActiveLanding: vi.fn() }));
+const supabase = { auth: { signInWithOtp, verifyOtp }, rpc };
 vi.mock("@/lib/supabase/server", () => ({
-  getServerSupabase: vi.fn(async () => ({ auth: { signInWithOtp, verifyOtp }, rpc })),
+  getServerSupabase: vi.fn(async () => supabase),
+}));
+vi.mock("@/server/queries/landing", () => ({
+  resolveActiveLanding,
 }));
 
 import { requestEmailOtp, verifyEmailOtp } from "./auth";
@@ -22,7 +27,10 @@ function fd(entries: Record<string, string>): FormData {
   return f;
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  resolveActiveLanding.mockResolvedValue("/b2b");
+});
 
 describe("requestEmailOtp", () => {
   it("rejects an invalid email without contacting Supabase", async () => {
@@ -80,17 +88,54 @@ describe("verifyEmailOtp", () => {
     expect(verifyOtp).not.toHaveBeenCalled();
   });
 
-  it("redirects to a safe /b2b destination on success", async () => {
+  it("preserves a safe deep link within an active member's derived B2B surface", async () => {
     verifyOtp.mockResolvedValueOnce({ error: null });
-    // An explicit sub-path (not the bare workspace) is honoured as-is — the
-    // onboarding resume gate only applies when heading to the default "/b2b".
+    rpc.mockResolvedValueOnce({ data: "active_personal" });
+    // A deep link is retained only after the caller's canonical surface resolves
+    // to B2B.
     await expect(
       verifyEmailOtp(
         { ok: false },
         fd({ email: "a-owner@example.test", token: "123456", next: "/b2b/leads" }),
       ),
     ).rejects.toThrow("REDIRECT:/b2b/leads");
-    expect(rpc).not.toHaveBeenCalled();
+    expect(resolveActiveLanding).toHaveBeenCalledWith(supabase);
+  });
+
+  it("routes an active platform user through the canonical resolver to /admin", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: null });
+    rpc.mockResolvedValueOnce({ data: "active_personal" });
+    resolveActiveLanding.mockResolvedValueOnce("/admin");
+    await expect(
+      verifyEmailOtp(
+        { ok: false },
+        fd({ email: "admin@example.test", token: "123456", next: "/b2b" }),
+      ),
+    ).rejects.toThrow("REDIRECT:/admin");
+  });
+
+  it("routes an active organization-less consumer through the canonical resolver to /home", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: null });
+    rpc.mockResolvedValueOnce({ data: "active_personal" });
+    resolveActiveLanding.mockResolvedValueOnce("/home");
+    await expect(
+      verifyEmailOtp(
+        { ok: false },
+        fd({ email: "consumer@example.test", token: "123456", next: "/b2b" }),
+      ),
+    ).rejects.toThrow("REDIRECT:/home");
+  });
+
+  it("does not let a consumer retain a B2B deep link", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: null });
+    rpc.mockResolvedValueOnce({ data: "active_personal" });
+    resolveActiveLanding.mockResolvedValueOnce("/home");
+    await expect(
+      verifyEmailOtp(
+        { ok: false },
+        fd({ email: "consumer@example.test", token: "123456", next: "/b2b/leads" }),
+      ),
+    ).rejects.toThrow("REDIRECT:/home");
   });
 
   it("ignores an unsafe next target (open-redirect guard)", async () => {
@@ -112,6 +157,23 @@ describe("verifyEmailOtp", () => {
     await expect(
       verifyEmailOtp({ ok: false }, fd({ email: "a-owner@example.test", token: "123456", next: "/b2b" })),
     ).rejects.toThrow("REDIRECT:/onboarding");
+    expect(resolveActiveLanding).not.toHaveBeenCalled();
+  });
+
+  it("preserves an explicit invitation continuation without bypassing it", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: null });
+    await expect(
+      verifyEmailOtp(
+        { ok: false },
+        fd({
+          email: "a-owner@example.test",
+          token: "123456",
+          next: "/auth/invite/pilotinvite000000000000000000nour01",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/auth/invite/pilotinvite000000000000000000nour01");
+    expect(rpc).not.toHaveBeenCalled();
+    expect(resolveActiveLanding).not.toHaveBeenCalled();
   });
 
   it("surfaces a verification failure", async () => {
