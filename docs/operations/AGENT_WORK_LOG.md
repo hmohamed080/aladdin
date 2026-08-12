@@ -4,6 +4,33 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Pilot UAT fix round 1
+
+**Date:** 2026-08-11 · **Branch:** `fix/pilot-uat-round-1` (PR to `main`, unmerged) · **Base:** `main` @ `d595a6d`
+
+### Objective
+Fix the product defects found during manual Pilot testing before the full persona UAT continues. Not the final integration gate: only the affected flows were audited, then fixed.
+
+### Product decisions taken (these change behaviour — see the notes added to `PRODUCT_DIRECTION_GUIDE.md`)
+1. **Completing onboarding activates a personal account. Verification is an independent trust state.** Previously nothing ever set `public.users.status = 'active'` for an organization-less account, so `active_personal` was reachable only through an ACTIVE ORG MEMBERSHIP. A consumer who finished consumer onboarding, and a professional who submitted their profile, were stuck on a terminal screen forever — an Admin approval was the de-facto activation mechanism. `individual_complete_consumer` and `individual_submit_professional` now activate the account (new internal `app.activate_personal_account`, promotes `pending_verification` only, so a suspended identity is never revived). The professional submission still files the SAME `verifications` request; `users.primary_account_type` and `profiles.public_profile_status` are still written only by the approved+applied upgrade workflow, so an unapproved professional is usable but not publicly discoverable.
+2. **"Organization owner / manager" is a relationship, not a business type.** `onboarding_select_account_type` demanded a concrete `account_type` for every non-consumer track, so the generic owner/manager entry — which deliberately carries none — always raised and surfaced as "We couldn't save that. Try again." The business track now accepts a null concrete type (exactly as the `onboarding_progress` table comment already documented) and still refuses a consumer or non-business type; the real organization type is chosen and validated during business onboarding.
+
+### What shipped
+- **DB** — `20260813090001_pilot_personal_account_activation.sql` (the two decisions above + a one-time backfill releasing accounts already trapped) and `20260813090002_organization_verification_apply.sql` (`apply_organization_verification`, the organization-subject counterpart of `apply_account_upgrade`, plus the `organization.verified` audit action).
+- **Persona-aware `/home`** — ONE personal surface with a consumer variant (setup recap, interests, honest coming-soon discovery placeholders) and a professional variant (persona, professional profile, services, service location, next actions, no consumer copy). Guarded on the derived registration state and the derived landing, so a consumer never reaches `/b2b` and an unfinished account resumes at `/onboarding`. Both persona flows stay re-openable, so an active personal account can keep its profile current.
+- **Derived profile completeness** — `lib/profile/completeness.ts`: computed on every read from the APPLICABLE fields for that persona (the travel radius drops out of the denominator for a remote-only professional). Never stored, and verification is deliberately not an item; the two are shown side by side and neither blocks usage.
+- **Admin fixes found by real-browser QA** — approving an organization always requested a public professional listing, which `ck_verifications_listing_only_professional` rejects, so approving ANY organization failed; `review_approve` records the decision only and the apply step was never called (and did not exist for an organization); 19 audit actions had no translation so `/admin/audit` printed raw enum keys; audit entries showed only the subject discriminator, not the target; the pilot world seeded no audit rows so the surface opened empty; organization detail only showed a badge when verified; and the organization detail page overflowed horizontally on a narrow viewport (grid items default to `min-width:auto`).
+
+### Validation
+Frontend typecheck ✓ · lint ✓ (0) · unit **186/186** ✓. Supabase: `db reset` ✓ · `db lint` ✓ (only the pre-existing `set_customer_ownership` warning) · pgTAP **614/614** ✓ (two new files: `25_pilot_account_activation`, `26_organization_verification_apply`; `11_individual_persona_onboarding` updated where it pinned the superseded "completion never activates" behaviour; `07_audit` scoped its admin-read count to its own row now that the pilot world seeds an audit trail). Targeted production Playwright **57 passed / 1 skipped** across desktop + mobile (`pilot-uat-round-1`, `individual-onboarding`, `business-onboarding`, `pilot-landing`, `shared-onboarding`) — the skip is the destructive Admin-approval acceptance, pinned to one project because the seeded review queue is a one-shot resource. Repository-wide E2E deliberately not run. No `.pen` modified.
+
+### Notes / unfinished
+- `e2e/global-setup.ts` now restores the two pending pilot organization reviews, because an APPLIED verification is immutable by design and cannot be reset in place.
+- `e2e/business-onboarding.spec.ts` carried a latent strict-mode selector failure (the workspace shell renders the organization name in more than one slot); fixed in passing, unrelated to this round.
+- The `consumer_onboarding_complete` / `persona_review_pending` terminals remain in `my_registration_state` and still have their screens, but are now only reachable by a legacy row written before this migration.
+
+---
+
 ## Session — Sprint 11 Pilot post-login landing hotfix
 
 **Date:** 2026-08-11 · **Branch:** `hotfix/pilot-landing-routing` · **Base:** `main` @ `1b07cf5`

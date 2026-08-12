@@ -83,6 +83,17 @@ What the user can see and do is **derived**, not toggled — from:
 
 Keep roles separate in the taxonomy, but never imply simultaneous profile switching in product, navigation, or copy.
 
+## Activation vs. Verification (Pilot UAT round 1, 2026-08-11)
+**Completing onboarding activates the account. Verification is an independent trust state and is never the activation mechanism.**
+
+- Finishing consumer onboarding, and submitting a professional profile, make the personal account **usable immediately** — the user reaches their own `/home`. An Engineer, Interior Designer, Installer/Technician, Contractor, or organization-less Salesperson is never held in a review-waiting screen.
+- Verification is reported alongside the account, never folded into it: *not verified · pending review · more info needed · verified · rejected*. It gates **trust and public discoverability**, not access.
+- An Admin decision may add trust — the approved-and-applied review is still the only thing that writes `users.primary_account_type` and sets `profiles.public_profile_status = 'listed'` — but it must never be what lets someone in.
+- **Profile completeness** is a separate, always-DERIVED signal computed from the applicable profile fields for that persona. It is never a stored percentage, never includes verification, and never blocks usage.
+
+## "Organization owner / manager" is not a business type
+It describes the user's **relationship to an organization**, so it carries no `account_type`. The flow is: business/organization account → *I am the owner/manager* → business onboarding → choose the **real** organization type (Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler) → organization details → branch → review/create. Never create an `owner_manager` organization type.
+
 ## Consultation-First Principle
 We **guide decisions; we are not a checkout.** The product optimizes for the *right, verified* match — trust over cheapest — never a race-to-the-bottom price war. Advice, verification, and provenance lead; pricing pressure never does.
 
@@ -171,6 +182,11 @@ Installation & service marketplace, industrial/RFQ at scale, deeper supplier/tec
 
 ## Change History
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
+
+### 2026-08-11 — Activation vs. verification; owner/manager is not a business type
+- **What:** Added the *Activation vs. Verification* rule and the *"Organization owner / manager" is not a business type* rule. Completing onboarding now activates a personal account and the user reaches `/home`; verification became an independent trust state that gates discoverability, not access. Profile completeness was defined as an always-derived signal that excludes verification. The generic owner/manager registration entry carries no `account_type`; the real organization type is chosen during business onboarding.
+- **Why:** Manual Pilot testing found consumers and individual professionals trapped after finishing onboarding — an Admin approval was the de-facto activation mechanism — and the generic owner/manager path failed outright with a generic save error.
+- **Approved by:** User (Pilot UAT fix round 1 task, 2026-08-11).
 
 ### 2026-07-30 — Canonical memory promotion + account-model correction
 - **What:** Promoted this guide to a canonical project-memory file (`product-direction.md` → `PRODUCT_DIRECTION_GUIDE.md`, history preserved via `git mv`). Added the metadata block, an explicit dual roadmap (design + implementation), the product-decision process, and this change history. **Corrected the account model** from "active-profile switching" to the canonical **one-current-primary-account-type / no-profile-switcher / derived-navigation** model across all product statements.

@@ -5,9 +5,14 @@ import { messageIdsFor, readNewOtp } from "./helpers/auth";
  * Sprint 7.4 — individual persona onboarding. Drives the REAL flow (no bypass):
  * a fresh Email-OTP sign-up + consent, the Sprint 7.3 shared steps, then the
  * persona-specific journey for each of the five individual personas. Resume,
- * Back, the review/handoff terminals, cross-persona URL isolation, and the
- * account-type safety model (no activation; submit only requests review) are all
- * asserted against the real UI + persisted state.
+ * Back, cross-persona URL isolation, and the completion terminal are asserted
+ * against the real UI + persisted state.
+ *
+ * Pilot UAT round 1 changed what "completed" means: finishing consumer setup and
+ * submitting a professional profile ACTIVATE the personal account, so each flow
+ * ends on the usable /home rather than a waiting screen. Submitting still only
+ * REQUESTS a review — the account type is not applied — and /home reports that
+ * review as an independent trust state.
  */
 
 async function prefs(page: Page, locale: "en" | "ar", theme: "light" | "dark") {
@@ -89,11 +94,15 @@ test.describe("individual persona onboarding", () => {
     await page.getByRole("button", { name: /EGP 100–250k/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
 
-    // Step 5 — review, then finish → completion terminal (NOT activation).
+    // Step 5 — review, then finish → the account is ACTIVE and lands on /home.
     await expect(page.getByRole("heading", { name: /review your setup/i })).toBeVisible();
     await page.getByRole("button", { name: /finish setup/i }).click();
-    await expect(page.getByRole("heading", { name: /you're all set for now/i })).toBeVisible();
-    await expect(page.getByText(/setup complete/i)).toBeVisible();
+    await page.waitForURL(/\/home$/, { waitUntil: "commit" });
+    await expect(page.getByRole("heading", { name: /welcome, persona tester/i })).toBeVisible();
+    // Consumer variant: their own answers are read back, and it is never /b2b.
+    await expect(page.getByText(/planning a project/i)).toBeVisible();
+    await expect(page.getByText(/profile completeness/i)).toBeVisible();
+    await noOverflow(page);
   });
 
   test("Engineer / Designer: resolves the concrete type and submits for review", async ({ page, request }) => {
@@ -133,9 +142,14 @@ test.describe("individual persona onboarding", () => {
     await expect(page.getByText(/engineer · 8 years/i)).toBeVisible();
     await page.getByRole("button", { name: /submit for review/i }).click();
 
-    // Submitted terminal — with review, not activated.
-    await expect(page.getByText(/your profile is with our team/i)).toBeVisible();
-    await expect(page.getByText(/with review/i)).toBeVisible();
+    // Submitting ACTIVATES the personal account: the engineer lands on their own
+    // professional home immediately, with the review shown as a separate state.
+    await page.waitForURL(/\/home$/, { waitUntil: "commit" });
+    await expect(page.getByRole("heading", { name: /welcome, persona tester/i })).toBeVisible();
+    await expect(page.getByText("Structural engineer, Cairo")).toBeVisible();
+    await expect(page.getByText(/pending review/i)).toBeVisible();
+    await expect(page.getByText(/verification is separate from your account/i)).toBeVisible();
+    await noOverflow(page);
   });
 
   test("Installer / Technician (Arabic + dark): fixed type, RTL, submits for review", async ({ page, request }) => {
@@ -165,7 +179,12 @@ test.describe("individual persona onboarding", () => {
     await page.waitForURL(/\/onboarding\/professional\/review$/, { waitUntil: "commit" });
     await noOverflow(page);
     await page.getByRole("button", { name: /إرسال للمراجعة/ }).click();
-    await expect(page.getByText(/ملفك لدى فريقنا/)).toBeVisible();
+    // Arabic professional home, RTL, usable immediately.
+    await page.waitForURL(/\/home$/, { waitUntil: "commit" });
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+    await expect(page.getByText(/اكتمال الملف الشخصي/)).toBeVisible();
+    await expect(page.getByText(/قيد المراجعة/)).toBeVisible();
+    await noOverflow(page);
   });
 
   test("Contractor: completes the common flow and submits", async ({ page, request }) => {
@@ -185,7 +204,8 @@ test.describe("individual persona onboarding", () => {
     await page.getByRole("button", { name: /continue to review/i }).click();
     await page.waitForURL(/\/onboarding\/professional\/review$/, { waitUntil: "commit" });
     await page.getByRole("button", { name: /submit for review/i }).click();
-    await expect(page.getByText(/your profile is with our team/i)).toBeVisible();
+    await page.waitForURL(/\/home$/, { waitUntil: "commit" });
+    await expect(page.getByText("Finishing contractor")).toBeVisible();
   });
 
   test("Salesperson: individual identity — submits for review, never enters /b2b", async ({ page, request }) => {
@@ -205,8 +225,10 @@ test.describe("individual persona onboarding", () => {
     await page.getByRole("button", { name: /continue to review/i }).click();
     await page.waitForURL(/\/onboarding\/professional\/review$/, { waitUntil: "commit" });
     await page.getByRole("button", { name: /submit for review/i }).click();
-    await expect(page.getByText(/your profile is with our team/i)).toBeVisible();
-    // A salesperson is never silently activated into the sales workspace.
+    // An organization-less salesperson gets the personal professional home —
+    // never the Sales cockpit, which belongs to an organization membership.
+    await page.waitForURL(/\/home$/, { waitUntil: "commit" });
+    await expect(page.getByText("Showroom sales specialist")).toBeVisible();
     await expect(page).not.toHaveURL(/\/b2b(\/|$)/);
   });
 
