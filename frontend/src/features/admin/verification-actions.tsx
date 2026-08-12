@@ -51,7 +51,7 @@ export function VerificationActions({ v }: { v: VerificationRow }) {
         <form action={approve}>
           <input type="hidden" name="id" value={v.id} />
           <input type="hidden" name="status" value={v.status} />
-          <input type="hidden" name="grantListing" value="true" />
+          <input type="hidden" name="verificationType" value={v.verificationType} />
           <SubmitButton size="sm">{t("admin.review.approve")}</SubmitButton>
         </form>
 

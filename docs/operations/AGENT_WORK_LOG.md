@@ -4,6 +4,98 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Business classification belongs to the Organization (account-model clarification)
+
+**Date:** 2026-08-12 · **Branch:** `fix/pilot-uat-round-1` (same PR #20, unmerged) · **Base:** `main` @ `d595a6d`
+
+### Objective
+Resolve the last account-model ambiguity before PR #20 merges: whether a concrete business type is the *person's* identity or the *organization's* classification. **Documentation only — no code, schema, enum, migration, or test change.**
+
+### Canonical rule now recorded
+**Concrete business classifications** — Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · contractor company · design/engineering office · future classifications — are canonically **`organizations.org_type`**, never a person's long-term personal identity. **`users.primary_account_type` is personal identity / persona state**, not the type of every business the user owns or joins. This is structural: *Ahmed Hassan* (persona **Engineer**) owns *AH Showroom* (`showroom_dealer`) and *AH Import* (`importer`) on **one user ID**, and a single `primary_account_type` cannot be both. **Registration UX is unchanged** — *"I am a Showroom"* stays, and architecturally means *"I am creating a business whose `org_type` is X"*, with the backend creating Organization + Owner Membership + Primary Branch in one transactional, idempotent operation for the existing user.
+
+### Contradictions corrected
+1. **`AccountType` (`02_domain_model`)** — described business classifications as canonical *primary account types*; now states the target semantics (persona state) and flags the business-valued members as transitional.
+2. **`07_permissions_matrix` audience map** — "Exhibition → business **account type**", "Company → business **account types**" → corrected to **organization types** (`org_type`), with a note that business-audience access derives from *membership in an org of that type* + capabilities, never a business-valued `primary_account_type`.
+3. **`mvp-scope`** — *"Roles (kept separate, **one account can hold several**)"* directly contradicted one-primary-account-type; rewritten, with business classifications attributed to `org_type`.
+4. **`PRODUCT_DIRECTION_GUIDE` taxonomy + "Businesses" actor bullet** — listed business classifications among a *person's* capacities; now split into personal personas vs organization classifications.
+5. **`03_database_design`** — the `account_type` enum row and the `organizations.org_type` column (`org_type account_type`) read as "a business type is an account type"; annotated as a **shared physical enum**, not a claim about identity, with the target semantics and the unchanged-here scope stated.
+6. **`system-context` actor list** and **PRODUCT.md** businesses bullet — same person/organization conflation, corrected.
+7. **`12_validation_rules`** — `org_type` clarified as a property of the organization, never of the creating user.
+8. **ADR-0007 (highest authority on `primary_account_type`)** — added **D22** recording the target semantics + explicit transitional status, since D10/D11's "six concepts kept distinct" list was the top-authority definition and did not cover this.
+
+### Transitional debt (explicitly recorded, not fixed here)
+`TECHNICAL_DEBT.md` §2 now carries **business-valued `account_type` / `primary_account_type`**: the enum still contains `showroom_dealer`/`supplier`/`manufacturer`/`importer`/`wholesaler` and onboarding paths may still set them. They stay as **implementation compatibility only**; the upcoming **Account & Workspace Model** feature must audit every read/write and migrate behind a reviewed migration rather than create a second source of truth. Until then no path may mirror `org_type` into `users`. **The enum and migration behaviour are deliberately unchanged in PR #20.**
+
+### Files touched
+`PRODUCT_DIRECTION_GUIDE.md` (new *Business Classification Belongs to the Organization* section + taxonomy/actor fixes + NEVER rule + change history), `ADR-0007` (D22), `02_domain_model.md`, `03_database_design.md`, `07_permissions_matrix.md`, `12_validation_rules.md`, `TECHNICAL_DEBT.md`, `mvp-scope.md`, `ARCHITECTURE_GUIDE.md`, `system-context.md`, `PRODUCT.md`, `CLAUDE.md`, `RUNTIME_STATE.md`, this log.
+
+### Validation
+Documentation-consistency search across the canonical docs; `git diff` inspected. **No** schema, enum, migration, frontend, backend, or test change; no `.pen` file touched; no tests re-run (nothing executable changed).
+
+---
+
+## Session — Pilot UAT product-direction alignment (account / organization / workspace model)
+
+**Date:** 2026-08-12 · **Branch:** `fix/pilot-uat-round-1` (same PR #20, unmerged) · **Base:** `main` @ `d595a6d`
+
+### Objective
+Align the canonical product documentation with the account/workspace model approved during the Pilot UAT discussion. **Documentation-only patch** — the workspace switcher and the account lifecycle are recorded as direction and are deliberately **not implemented**.
+
+### What is now canonical (PRODUCT_DIRECTION_GUIDE)
+**One person = one user ID** (another business never creates another user) · **personal identity is not a business**, and a personal professional may hold **zero** organizations · **a business is an Organization**, created **once** in the UX (backend transactionally creates organization + owner membership + primary branch) · **Membership** is the only user↔organization link and owns relationship, capabilities, branch scope, lifecycle · **zero/one/many organizations on one login** · **workspace is a derived UX concept** (Personal = User+Profile · Business = Organization+active Membership), **no `workspaces` table** · an **existing user can add a business later** with no second sign-up · **single-source-of-truth ownership table** (auth user · users/profiles · organizations · memberships · branches · org-owned business records) forbidding identity duplication in either direction · **duplicate-business protection** (transactional + idempotent; name alone is never the permanent identity) · **membership history survives leaving** (revoked stops access, retains attribution) · **approved future account lifecycle** (deactivate reversible; delete request → grace period → identity released, business/audit history retained; a reused email/phone gets a NEW user id inheriting nothing; muted non-clickable historical attribution; leaving an org ≠ deleting an account).
+
+### Contradictions corrected
+1. **"No profile switcher" read as banning all context switching** (PRODUCT_DIRECTION_GUIDE, ARCHITECTURE_GUIDE, `02_domain_model`, `07_permissions_matrix`, `14_future_extensions`, `mvp-scope`, BACKLOG, PRODUCT.md, DESIGN.md, UI_UX_SYSTEM_GUIDE, CLAUDE.md, `12_ai_agent_rules`) — split into **persona/account-identity switching (forbidden)** vs **active work-context switching across the user's own active memberships (allowed, not built)**.
+2. **Owner/manager framed only as "not a business type"** — restated as **not an account type either**, a pure user↔organization relationship; the target *personal persona OR concrete business type* registration UX was recorded, and the generic entry demoted to **transitional backward-compatibility** (also noted in `sprint-8-business-readiness.md`).
+3. **"Create an account, then create an organization" framing** — replaced with *create the business once* (transactional organization + owner membership + primary branch); added as a UI anti-pattern.
+4. **`User` 0–\* `Membership` was ambiguous about zero** — `02_domain_model` now states an organization-less personal account is valid and fully usable.
+5. **No stated rule against a second identity per business** — added to the identity model, the NEVER list, `12_ai_agent_rules`, `14_future_extensions`, and BACKLOG.
+6. **No stated single-source-of-truth ownership rule** — added the ownership table plus the draft-until-commit exception; `Organization` is now explicitly the canonical business identity.
+7. **Nothing forbade a generic `workspaces` table** — now explicitly forbidden; workspaces are derived.
+8. **Membership lifecycle was not distinguished from account lifecycle** — separated, with history retained on revoke.
+9. **No duplicate-business protection recorded** — transactional + idempotent creation documented for the upcoming implementation.
+10. **No account-deletion rule existed anywhere** — recorded as approved future direction in PRODUCT_DIRECTION_GUIDE + `14_future_extensions`, explicitly not implemented.
+
+### Files touched
+`PRODUCT_DIRECTION_GUIDE.md` (anchor + change history), `ARCHITECTURE_GUIDE.md`, `02_domain_model.md`, `07_permissions_matrix.md`, `14_future_extensions.md`, `mvp-scope.md`, `BACKLOG.md`, `PRODUCT.md`, `DESIGN.md`, `UI_UX_SYSTEM_GUIDE.md`, `CLAUDE.md`, `12_ai_agent_rules.md`, `sprint-8-business-readiness.md`, `RUNTIME_STATE.md`, this log.
+
+### Validation
+Documentation-consistency search across the canonical docs; `git diff` inspected. **No** schema, frontend, backend, or test change — the PR-20 migration comments (`20260813090001`) were checked and are compatible with the new rules, so no code assertion needed correcting. No `.pen` file touched. No tests re-run (nothing executable changed).
+
+### Notes / unfinished
+- `frontend/src/lib/onboarding/account-types.ts` calls `BUSINESS_ORG_TYPES` "the BUSINESS account types" in a comment; the values are `org_type`s, not account types. Left unchanged — outside PR #20's diff and not factually load-bearing — but it should be reworded when that file is next edited.
+- The target registration UX (*personal persona OR concrete business type* → business info → creator becomes Owner), the work-context switcher, "add a business" for an existing user, and the account lifecycle all remain **unimplemented, approved direction**.
+
+---
+
+## Session — Pilot UAT fix round 1
+
+**Date:** 2026-08-11 · **Branch:** `fix/pilot-uat-round-1` (PR to `main`, unmerged) · **Base:** `main` @ `d595a6d`
+
+### Objective
+Fix the product defects found during manual Pilot testing before the full persona UAT continues. Not the final integration gate: only the affected flows were audited, then fixed.
+
+### Product decisions taken (these change behaviour — see the notes added to `PRODUCT_DIRECTION_GUIDE.md`)
+1. **Completing onboarding activates a personal account. Verification is an independent trust state.** Previously nothing ever set `public.users.status = 'active'` for an organization-less account, so `active_personal` was reachable only through an ACTIVE ORG MEMBERSHIP. A consumer who finished consumer onboarding, and a professional who submitted their profile, were stuck on a terminal screen forever — an Admin approval was the de-facto activation mechanism. `individual_complete_consumer` and `individual_submit_professional` now activate the account (new internal `app.activate_personal_account`, promotes `pending_verification` only, so a suspended identity is never revived). The professional submission still files the SAME `verifications` request; `users.primary_account_type` and `profiles.public_profile_status` are still written only by the approved+applied upgrade workflow, so an unapproved professional is usable but not publicly discoverable.
+2. **"Organization owner / manager" is a relationship, not a business type.** `onboarding_select_account_type` demanded a concrete `account_type` for every non-consumer track, so the generic owner/manager entry — which deliberately carries none — always raised and surfaced as "We couldn't save that. Try again." The business track now accepts a null concrete type (exactly as the `onboarding_progress` table comment already documented) and still refuses a consumer or non-business type; the real organization type is chosen and validated during business onboarding.
+
+### What shipped
+- **DB** — `20260813090001_pilot_personal_account_activation.sql` (the two decisions above + a one-time backfill releasing accounts already trapped) and `20260813090002_organization_verification_apply.sql` (`apply_organization_verification`, the organization-subject counterpart of `apply_account_upgrade`, plus the `organization.verified` audit action).
+- **Persona-aware `/home`** — ONE personal surface with a consumer variant (setup recap, interests, honest coming-soon discovery placeholders) and a professional variant (persona, professional profile, services, service location, next actions, no consumer copy). Guarded on the derived registration state and the derived landing, so a consumer never reaches `/b2b` and an unfinished account resumes at `/onboarding`. Both persona flows stay re-openable, so an active personal account can keep its profile current.
+- **Derived profile completeness** — `lib/profile/completeness.ts`: computed on every read from the APPLICABLE fields for that persona (the travel radius drops out of the denominator for a remote-only professional). Never stored, and verification is deliberately not an item; the two are shown side by side and neither blocks usage.
+- **Admin fixes found by real-browser QA** — approving an organization always requested a public professional listing, which `ck_verifications_listing_only_professional` rejects, so approving ANY organization failed; `review_approve` records the decision only and the apply step was never called (and did not exist for an organization); 19 audit actions had no translation so `/admin/audit` printed raw enum keys; audit entries showed only the subject discriminator, not the target; the pilot world seeded no audit rows so the surface opened empty; organization detail only showed a badge when verified; and the organization detail page overflowed horizontally on a narrow viewport (grid items default to `min-width:auto`).
+
+### Validation
+Frontend typecheck ✓ · lint ✓ (0) · unit **186/186** ✓. Supabase: `db reset` ✓ · `db lint` ✓ (only the pre-existing `set_customer_ownership` warning) · pgTAP **614/614** ✓ (two new files: `25_pilot_account_activation`, `26_organization_verification_apply`; `11_individual_persona_onboarding` updated where it pinned the superseded "completion never activates" behaviour; `07_audit` scoped its admin-read count to its own row now that the pilot world seeds an audit trail). Targeted production Playwright **57 passed / 1 skipped** across desktop + mobile (`pilot-uat-round-1`, `individual-onboarding`, `business-onboarding`, `pilot-landing`, `shared-onboarding`) — the skip is the destructive Admin-approval acceptance, pinned to one project because the seeded review queue is a one-shot resource. Repository-wide E2E deliberately not run. No `.pen` modified.
+
+### Notes / unfinished
+- `e2e/global-setup.ts` now restores the two pending pilot organization reviews, because an APPLIED verification is immutable by design and cannot be reset in place.
+- `e2e/business-onboarding.spec.ts` carried a latent strict-mode selector failure (the workspace shell renders the organization name in more than one slot); fixed in passing, unrelated to this round.
+- The `consumer_onboarding_complete` / `persona_review_pending` terminals remain in `my_registration_state` and still have their screens, but are now only reachable by a legacy row written before this migration.
+
+---
+
 ## Session — Sprint 11 Pilot post-login landing hotfix
 
 **Date:** 2026-08-11 · **Branch:** `hotfix/pilot-landing-routing` · **Base:** `main` @ `1b07cf5`

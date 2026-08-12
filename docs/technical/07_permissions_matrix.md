@@ -9,7 +9,7 @@
 | **Depends On** | 02_domain_model.md, 06_rls_strategy.md, ../product/PRODUCT_DIRECTION_GUIDE.md |
 | **Related** | 06_rls_strategy.md, 08_api_contracts.md |
 
-The complete permission model for the MVP. Access is **capability-based and derived** (PRODUCT_DIRECTION_GUIDE): what a user can do = f(primary account type, org membership, branch, granted capabilities, verification state, subscription state, platform role). There is **no role toggle / profile switcher**.
+The complete permission model for the MVP. Access is **capability-based and derived** (PRODUCT_DIRECTION_GUIDE): what a user can do = f(primary account type, org membership, branch, granted capabilities, verification state, subscription state, platform role). There is **no role toggle / persona (profile) switcher**. Selecting the **active work context** — the user's personal surface, or an organization where that same user holds an **active membership** — is a separate, allowed concept: it changes the scope a request is evaluated in, never the identity or the account type, and every capability is still re-derived and re-enforced server-side for the selected organization (PRODUCT_DIRECTION_GUIDE *Switching*).
 
 ## 1. Audiences (reconciled)
 
@@ -20,14 +20,16 @@ The task's generic role names map to Aladdin's canonical model:
 | Guest | **Guest** (unauthenticated) | anon |
 | End User | **End Consumer** | account type (B2C) |
 | Engineer | **Engineer** (+ Interior Designer, Installer/Technician) | professional account types |
-| Exhibition | **Showroom/Dealer** | business account type |
-| Company | **Supplier / Manufacturer / Importer / Wholesaler / Contractor** | business account types |
+| Exhibition | **Showroom/Dealer** | **organization type** (`organizations.org_type`); the audience is a *person* acting through a membership in such an org |
+| Company | **Supplier / Manufacturer / Importer / Wholesaler / Contractor company** | **organization types** (`organizations.org_type`), same as above |
 | — | **Sales** | account type (key daily user) |
 | — | **Org Owner/Admin** | membership capability tier (org-level) |
 | Support | **Support** | platform role |
 | Moderator | **Moderator** | platform role |
 | Admin | **Administrator** | platform role |
 | Future Super Admin | **Super Admin** | ⚑ future platform role |
+
+> **Business classification is an organization property, not a person's identity.** Access for a business audience is derived from *membership in an organization of that type* plus capabilities — never from a business-valued `primary_account_type`. Business-valued account types that exist today are **transitional** (PRODUCT_DIRECTION_GUIDE *Business Classification Belongs to the Organization*).
 
 Two independent dimensions:
 - **Account type** (one per user) + **org membership capabilities** → what you do inside the product.

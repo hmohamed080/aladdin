@@ -5,9 +5,9 @@
 | | |
 |---|---|
 | **Status** | Living document (canonical project memory) |
-| **Version** | Living (canonical) · rev 2026-08-01 |
+| **Version** | Living (canonical) · rev 2026-08-12 |
 | **Owner** | Product |
-| **Last updated** | 2026-07-30 |
+| **Last updated** | 2026-08-12 |
 | **Scope** | The durable *why and where* of Aladdin — vision, positioning, priority rules, and the guardrails agents use to decide what to build and what to refuse. |
 | **Authority** | Authoritative for **product direction**. Sits above [`mvp-scope.md`](./mvp-scope.md) (the *what and in what order*) and the [ADRs](../decisions/) (the *how*). Where this guide and `mvp-scope.md` disagree on sequencing, `mvp-scope.md` wins for the current cycle. |
 | **Update triggers** | Any change to vision, positioning, target users, MVP boundaries, roadmap order, the account/identity model, or the "never do" guardrails. Every such change requires **explicit user approval** and a new [Change History](#change-history) entry. |
@@ -48,7 +48,7 @@ Every feature must locate itself somewhere on this chain and move the user to th
 - **Sales** — the highest-frequency daily user; optimize relentlessly for their speed and low friction.
 - **End Consumer** — seeking advice, discovery, and trusted execution.
 - **Service providers** — Installer/Technician, Engineer, Interior Designer.
-- **Businesses** — Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, Contractor.
+- **Businesses** (organizations, classified by `org_type`) — Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, Contractor company. The daily user is always a *person* acting through a membership in one of these.
 - **Learning** — Trainer, Trainee.
 - **Administrator** — governance and platform operations.
 
@@ -64,16 +64,68 @@ The CRM is not the whole product — it is the beachhead that makes the rest wor
 ## User & Account Taxonomy
 One person can legitimately relate to the platform in several capacities (End Consumer, Installer/Technician, Engineer, Interior Designer, Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, Sales, Contractor, Trainer, Trainee, Administrator). **Roles stay separate** in the taxonomy even when their behavior overlaps — this keeps analysis, search, and permissions clean. Roles are merged later only by an explicit, recorded decision.
 
+**Where each capacity lives is not uniform.** Personal personas (End Consumer, Installer/Technician, Engineer, Interior Designer, Sales, Contractor, Trainer, Trainee) describe **the person**. The business classifications in that list (Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, contractor company, design/engineering office) describe **a business the person owns or works in** — canonically `organizations.org_type`, never the person's long-term identity. See [Business Classification Belongs to the Organization](#business-classification-belongs-to-the-organization).
+
 ## Canonical Identity Model
-- **One canonical identity per person**, regardless of verification method (WhatsApp OTP or Email OTP/verification link). No duplicate accounts per role or per contact channel.
+- **One person = one user ID.** A human has exactly **one** authentication/user identity. Creating or joining another business **never** creates a second user for the same person.
+- **One canonical identity per person**, regardless of verification method (WhatsApp OTP or Email OTP/verification link). No duplicate accounts per role, per contact channel, or per business.
 - **Passwordless.** No passwords, and no password/forgot/reset flows anywhere — those are legacy/superseded.
 - A user verifies exactly **one** primary contact at account creation; a secondary is added later from profile settings.
 - **Organization membership, branch assignment, and permission capabilities are separate from identity** — they attach to the canonical account, they do not fork it.
 
-## No-Profile-Switcher Rule
-There is **no Profile Switcher and no "Use As" mode.** A user has **one current primary account type** at a time; they do not hold multiple simultaneously-active profiles, and there is no role-switching UI.
+## Personal Identity Is Not a Business
+**Personal identity/profile data belongs to the user/profile domain** — End Consumer, Engineer, Interior Designer, Installer/Technician, Contractor, Salesperson. **A personal professional can exist with no organization at all;** an organization is never required for a usable account.
 
-What the user can see and do is **derived**, not toggled — from:
+**A business is an Organization.** A Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, contractor company, or design/engineering office is represented internally as an **Organization** — never as a second user account.
+
+The user must **not** experience this as *"create an account, then create an organization."* In the UX **they create their business once**; the backend may transactionally create the **organization + owner membership + primary branch** as one operation.
+
+## Business Classification Belongs to the Organization
+**Concrete business classifications are properties of the business, not of the person.** Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · Contractor company · Design/Engineering office — and every future business classification — are **canonically `organizations.org_type`**. They must **never** be treated as a person's long-term personal identity.
+
+Why this is structural, not stylistic: **a user may own several businesses of different types at once.**
+
+> *Ahmed Hassan* — personal persona: **Engineer** · *AH Showroom*: Owner, `org_type = showroom_dealer` · *AH Import*: Owner, `org_type = importer`. **Same user ID.**
+
+A single `users.primary_account_type` cannot simultaneously be `showroom_dealer` **and** `importer`, so business type cannot be the canonical user identity in the target multi-organization model.
+
+**`users.primary_account_type` represents personal identity / persona state** — it is not the type of every business the user owns or joins.
+
+### Registration UX stays direct
+The user may still pick *"I am a Showroom" · "I am a Supplier" · "I am an Importer"* directly — that is good UX and stays. Architecturally that selection means **"I am creating a business whose `org_type` is X"**, *not* "my personal identity becomes X". The backend creates, in one transactional and idempotent business-creation operation:
+
+```
+User (unchanged)
+ └─ Organization(org_type = X)
+     ├─ Owner Membership
+     └─ Primary Branch
+```
+
+### Transitional compatibility (technical debt, not the target)
+Business-valued `primary_account_type` values and the existing account-type paths **remain as-is for now** — the database enum and migration behaviour are **not** changed by this clarification. They are **transitional implementation compatibility**, explicitly **not** the target source of truth. The upcoming Account & Workspace Model feature must **audit and migrate them safely** to the organization-owned classification rather than creating a second source of truth. Tracked in [`../technical/TECHNICAL_DEBT.md`](../technical/TECHNICAL_DEBT.md).
+
+## Membership Connects a User to an Organization
+```
+User  ↕  Membership  ↕  Organization
+```
+`Membership` is the link, and it owns the **organization relationship**, **role/capabilities**, **branch scope**, and **lifecycle/status**. **Employees join an existing business through an invitation** — they never create another organization in order to join one.
+
+## Multiple Business Contexts Are Allowed
+One user may have **zero, one, or many** organizations. Example — *Ahmed Hassan*: Personal → Engineer · *AH Design Studio* → Owner · *ABC Design* → Engineer/member. **Same login, same user ID**, three contexts.
+
+## Workspace Is a UX Concept
+- **Personal Workspace** = derived from **User + Profile**.
+- **Business Workspace** = derived from **Organization + the user's active Membership**.
+
+Both are **derived**. Do **not** introduce a generic `workspaces` table at this stage.
+
+## Switching: What Is Forbidden, What Is Allowed
+Workspace switching is **not** persona/profile switching.
+
+- **NO** arbitrary switching between personal personas / account identities. There is no Profile Switcher and no "Use As" mode. A user has **one current primary account type** at a time, and it changes only through the approved, reviewed upgrade workflow.
+- **YES** switching the **active work context** between the user's personal surface and the organizations where that same user holds an **active membership**. This changes *which context you are working in*, never *who you are*.
+
+What the user can see and do inside any context stays **derived**, not toggled — from:
 - primary account type,
 - organization membership,
 - branch assignment,
@@ -81,7 +133,54 @@ What the user can see and do is **derived**, not toggled — from:
 - verification state,
 - subscription state.
 
-Keep roles separate in the taxonomy, but never imply simultaneous profile switching in product, navigation, or copy.
+Keep roles separate in the taxonomy, and never imply simultaneous *profile* switching in product, navigation, or copy.
+
+> **Implementation status:** the work-context switcher and the account lifecycle below are **approved direction, not built.** This section is the target model, not a claim that the UI exists.
+
+## An Existing User Can Create a Business Later
+Ahmed registers today as an Engineer. A year later the **same login** uses *Add / Create Business* → *AH Design Studio*, and the backend creates the Organization + Owner Membership **for the existing user**. **No new sign-up. No second auth identity. No duplicate personal profile.**
+
+## Single Source of Truth — No Duplicated Identity
+| Data | Canonical owner |
+|---|---|
+| Auth identity (email/phone credential) | the **auth user** |
+| Personal identity / profile | **`users`/`profiles`** + the professional-profile domain |
+| Business identity | **`organizations`** |
+| Relationship, role, capabilities | **`memberships`** |
+| Branches | **`branches`** |
+| Business products, customers, RFQs, quotations, orders, projects | **organization-owned records** |
+
+**Never** copy business identity onto the user as a second source of truth, and **never** copy personal identity into organization records as a second source of truth. Draft/onboarding rows may hold entered values **temporarily, as a draft only**; after commit every canonical read comes from the owning entity.
+
+## Duplicate-Business Protection (for the upcoming implementation)
+Business creation must be **transactional and idempotent**: retrying the same completed business-onboarding operation must return the **same organization** rather than create duplicates. **Business name alone is never the permanent unique identity;** future verified identifiers may include normalized legal/business identifiers where appropriate.
+
+## Membership History
+Leaving a company does **not** delete history. **Membership lifecycle is separate from user/account lifecycle** — a former/revoked membership must stop access while retaining historical attribution.
+
+## Account Lifecycle — Approved Future Rule (do NOT implement now)
+Recorded as approved direction only; **no deletion feature is in current scope.**
+- **Deactivate** is reversible.
+- A **delete request** starts a grace period.
+- **Final deletion** removes/releases the login identity per the privacy policy; **business and audit history remains.**
+- A later account using the same released email/phone gets a **NEW user ID** and **never** automatically inherits the old memberships, permissions, or history.
+- Historical business actions may keep showing the person's historical name as **muted, non-clickable attribution** once the old account no longer exists.
+- **Leaving an organization and deleting an Aladdin account are different events.**
+
+## Activation vs. Verification (Pilot UAT round 1, 2026-08-11)
+**Completing onboarding activates the account. Verification is an independent trust state and is never the activation mechanism.**
+
+- Finishing consumer onboarding, and submitting a professional profile, make the personal account **usable immediately** — the user reaches their own `/home`. An Engineer, Interior Designer, Installer/Technician, Contractor, or organization-less Salesperson is never held in a review-waiting screen.
+- Verification is reported alongside the account, never folded into it: *not verified · pending review · more info needed · verified · rejected*. It gates **trust and public discoverability**, not access.
+- An Admin decision may add trust — the approved-and-applied review is still the only thing that writes `users.primary_account_type` and sets `profiles.public_profile_status = 'listed'` — but it must never be what lets someone in.
+- **Profile completeness** is a separate, always-DERIVED signal computed from the applicable profile fields for that persona. It is never a stored percentage, never includes verification, and never blocks usage.
+
+## "Owner / manager" is not an account type or a business type
+It describes the **relationship between a user and a business**, so it carries no `account_type` and is never an `org_type`. Never create an `owner_manager` account type or organization type.
+
+**Target registration UX:** *Choose what you are* → a **personal persona** **or** a **concrete business type** (e.g. Showroom/Dealer) → enter the business information → **the creator becomes Owner automatically.** If a manager-created-business path is supported, "Manager" is **relationship metadata inside business setup**, never a business/account type.
+
+**Transitional (backward compatibility only):** the generic *"organization owner/manager"* registration entry — it carries a null concrete type, and the real organization type (Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler) is chosen during business onboarding. It exists so already-saved and in-flight onboarding rows resume safely. It is **not** the target registration UX and must not be extended or treated as canonical.
 
 ## Consultation-First Principle
 We **guide decisions; we are not a checkout.** The product optimizes for the *right, verified* match — trust over cheapest — never a race-to-the-bottom price war. Advice, verification, and provenance lead; pricing pressure never does.
@@ -159,7 +258,11 @@ Installation & service marketplace, industrial/RFQ at scale, deeper supplier/tec
 ## What Agents Must NEVER Do
 - **Never** build commerce/marketplace framing (add-to-cart, checkout, price-war bidding) — this is consultation-first.
 - **Never** add password/forgot/reset UI or flows — the product is **passwordless** (WhatsApp/Email OTP).
-- **Never** merge roles, and **never** add a Profile Switcher / "Use As" mode or any role-switching UI — roles stay separate in the taxonomy; navigation is **derived**, not toggled. One current primary account type at a time.
+- **Never** merge roles, and **never** add a Profile Switcher / "Use As" mode or any persona/account-identity-switching UI — roles stay separate in the taxonomy; navigation is **derived**, not toggled. One current primary account type at a time. *(Switching the active **work context** between the personal surface and organizations where the user has an active membership is a different, allowed concept — see [Switching](#switching-what-is-forbidden-what-is-allowed).)*
+- **Never** create a second user/auth identity for the same person — not for another role, another contact channel, or another business. A business is an **Organization**, never a second account.
+- **Never** copy business identity onto the user, or personal identity into organization records, as a second source of truth; after a draft is committed, read from the owning entity.
+- **Never** treat a business classification (Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, …) as the person's canonical identity, and never mirror `organizations.org_type` permanently into `users.primary_account_type` — one user may own several businesses of different types at once.
+- **Never** introduce a generic `workspaces` table — a workspace is derived (User+Profile, or Organization+active Membership).
 - **Never** leak data across organizations in UI, API, workers, or AI retrieval; **never** bypass RLS or trust client-supplied `user_id`/`organization_id`.
 - **Never** put technical/implementation copy in the UI ("WhatsApp Business API", "reCAPTCHA verified", "canonical account", stack/schema jargon).
 - **Never** let AI auto-send or take irreversible action without human review.
@@ -171,6 +274,22 @@ Installation & service marketplace, industrial/RFQ at scale, deeper supplier/tec
 
 ## Change History
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
+
+### 2026-08-12 — Business classification belongs to the Organization
+- **What:** Resolved the remaining ambiguity around business types. **Concrete business classifications** (Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · contractor company · design/engineering office · future classifications) are canonically **`organizations.org_type`** and must never be treated as a person's long-term personal identity. **`users.primary_account_type` represents personal identity/persona state**, not the type of every business the user owns or joins — a single value cannot be `showroom_dealer` *and* `importer` at once, which the multi-organization model requires (*Ahmed Hassan*: persona Engineer · *AH Showroom* `showroom_dealer` · *AH Import* `importer`, same user ID). **Registration UX is unchanged** — picking *"I am a Showroom"* stays, but it architecturally means *"I am creating a business whose `org_type` is X"*, and the backend creates Organization + Owner Membership + Primary Branch in one transactional, idempotent operation. Existing business-valued `primary_account_type`/account-type paths are recorded as **transitional technical debt** to be audited and migrated by the upcoming Account & Workspace Model feature, never duplicated into a second source of truth.
+- **Why:** The docs still listed business classifications among the capacities of a *person*, which contradicts the approved multi-organization model and would push implementers to mirror `org_type` into the user.
+- **Scope:** Documentation only. **No database enum, migration, schema, code, or test change** in this PR.
+- **Approved by:** User (Pilot UAT account-model clarification, 2026-08-12).
+
+### 2026-08-12 — Account / organization / workspace model made canonical
+- **What:** Recorded the approved account-and-workspace model as canonical: **one person = one user ID** (another business never creates another user); **personal identity is not a business** and a personal professional may hold **zero** organizations; **a business is an Organization** created once in the UX (backend transactionally creates organization + owner membership + primary branch); **Membership** is the only user↔organization link and owns relationship, capabilities, branch scope, and lifecycle; **one user may hold zero/one/many organizations on the same login**; **Workspace is a derived UX concept** (Personal = User+Profile, Business = Organization+active Membership) with **no `workspaces` table**; an **existing user can create a business later** with no second sign-up; a **single-source-of-truth ownership table** forbidding identity duplication in either direction; **duplicate-business protection** (transactional + idempotent creation, name alone is never the permanent identity); **membership history survives leaving**; and the **approved future account-lifecycle rule** (deactivate reversible · delete request → grace period → identity released, history retained · a reused email/phone gets a NEW user ID inheriting nothing · muted historical attribution) which is **explicitly not implemented**. **Clarified the no-profile-switcher rule:** switching *personas/account identities* stays forbidden; switching the *active work context* between the personal surface and organizations where the same user has an **active membership** is allowed and is not persona switching. **Owner/Manager** was restated as a **relationship**, never an account or business type, with the target *personal persona OR concrete business type* registration UX recorded and the generic owner/manager entry demoted to **transitional backward-compatibility** behaviour.
+- **Why:** The Pilot UAT discussion surfaced that the docs implied a business was a second account and that any context switching was forbidden — which blocks the approved multi-organization model and would have driven duplicate users, duplicated identity data, and duplicate organizations. Documentation alignment only: **no workspace switcher and no account lifecycle is implemented in this patch.**
+- **Approved by:** User (Pilot UAT product-direction alignment task, 2026-08-12).
+
+### 2026-08-11 — Activation vs. verification; owner/manager is not a business type
+- **What:** Added the *Activation vs. Verification* rule and the *"Organization owner / manager" is not a business type* rule. Completing onboarding now activates a personal account and the user reaches `/home`; verification became an independent trust state that gates discoverability, not access. Profile completeness was defined as an always-derived signal that excludes verification. The generic owner/manager registration entry carries no `account_type`; the real organization type is chosen during business onboarding.
+- **Why:** Manual Pilot testing found consumers and individual professionals trapped after finishing onboarding — an Admin approval was the de-facto activation mechanism — and the generic owner/manager path failed outright with a generic save error.
+- **Approved by:** User (Pilot UAT fix round 1 task, 2026-08-11).
 
 ### 2026-07-30 — Canonical memory promotion + account-model correction
 - **What:** Promoted this guide to a canonical project-memory file (`product-direction.md` → `PRODUCT_DIRECTION_GUIDE.md`, history preserved via `git mv`). Added the metadata block, an explicit dual roadmap (design + implementation), the product-decision process, and this change history. **Corrected the account model** from "active-profile switching" to the canonical **one-current-primary-account-type / no-profile-switcher / derived-navigation** model across all product statements.

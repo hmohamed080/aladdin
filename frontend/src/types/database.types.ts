@@ -2791,6 +2791,10 @@ export type Database = {
         Args: { p_verification_id: string }
         Returns: undefined
       }
+      apply_organization_verification: {
+        Args: { p_verification_id: string }
+        Returns: undefined
+      }
       assign_lead: {
         Args: {
           p_assignee_membership_id: string

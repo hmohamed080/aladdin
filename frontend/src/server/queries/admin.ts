@@ -61,6 +61,8 @@ export type AuditEntry = {
   action: string;
   subjectType: string;
   subjectId: string | null;
+  /** Resolved target name when the subject is a user or an organization. */
+  subjectName: string | null;
   createdAt: string;
 };
 
@@ -338,10 +340,17 @@ export async function listAudit(supabase: Client, limit = 40): Promise<AuditEntr
     .limit(limit);
   if (error) throw error;
   const rows = data ?? [];
-  const { users } = await resolveSubjectNames(
+  // Resolve both the actor and — where the subject is an identity or a tenant —
+  // the TARGET, so an entry reads "who did what to whom", not just a discriminator.
+  const { users, orgs } = await resolveSubjectNames(
     supabase,
-    rows.filter((r) => r.actor_user_id).map((r) => r.actor_user_id as string),
-    [],
+    [
+      ...rows.filter((r) => r.actor_user_id).map((r) => r.actor_user_id as string),
+      ...rows.filter((r) => r.subject_type === "user" && r.subject_id).map((r) => r.subject_id as string),
+    ],
+    rows
+      .filter((r) => r.subject_type === "organization" && r.subject_id)
+      .map((r) => r.subject_id as string),
   );
   return rows.map((a) => ({
     id: a.id,
@@ -350,6 +359,13 @@ export async function listAudit(supabase: Client, limit = 40): Promise<AuditEntr
     action: a.action,
     subjectType: a.subject_type,
     subjectId: a.subject_id,
+    subjectName: a.subject_id
+      ? (a.subject_type === "user"
+          ? users.get(a.subject_id)
+          : a.subject_type === "organization"
+            ? orgs.get(a.subject_id)
+            : undefined) ?? null
+      : null,
     createdAt: a.created_at,
   }));
 }

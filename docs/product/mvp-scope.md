@@ -12,7 +12,7 @@ State what the Private Pilot MVP includes, in what order, and what is explicitly
 
 **Design approach (from founder brief):** design the full Information Architecture and Design System for the whole platform, but build screens in phases — MVP journeys in detail first.
 
-**MVP capability areas:** Authentication (passwordless) · Onboarding & Profiles · Roles & derived navigation (one current primary account type; no profile switcher) · Portfolio · Product Catalog · Smart Search · AI Assistant · Notifications · Subscription · Advertisement · Admin Dashboard. Plus the core value journey (AI consult → intent → discovery → search → matching → profile → product → RFQ → quote → project).
+**MVP capability areas:** Authentication (passwordless) · Onboarding & Profiles · Roles & derived navigation (one current primary account type; no persona/profile switcher — work-context switching across the user's own organizations is a separate, deferred concept) · Portfolio · Product Catalog · Smart Search · AI Assistant · Notifications · Subscription · Advertisement · Admin Dashboard. Plus the core value journey (AI consult → intent → discovery → search → matching → profile → product → RFQ → quote → project).
 
 **Build order (roadmap):**
 1. **05C — B2B Sales operating workflow** (first; Sales is the key daily-active user): Opportunity → Need → Match → Smart Share → Follow-up → Quote → Pipeline → Task.
@@ -21,7 +21,7 @@ State what the Private Pilot MVP includes, in what order, and what is explicitly
 4. **05D — Supplier/Showroom/Product operations**: Catalog → Availability → Requests → Quotes → Orders → Campaigns.
 5. **05E — B2B Cockpit & Admin completion** (dashboards last, after inner workflows exist).
 
-**Roles (kept separate, one account can hold several):** End Consumer · Installer/Technician · Engineer · Interior Designer · Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · Sales · Contractor · Trainer · Trainee · Administrator.
+**Roles (kept separate):** End Consumer · Installer/Technician · Engineer · Interior Designer · Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · Sales · Contractor · Trainer · Trainee · Administrator. A user holds **one current primary account type** (personal persona); the **business classifications** in this list are canonically `organizations.org_type`, reached through organization membership — one user may own organizations of several different types at once.
 
 **Cross-cutting MVP requirements:** English (LTR) + Arabic (RTL); Light + Dark; responsive Desktop/Tablet/Mobile (PWA); Egyptian data conventions (localities, EGP).
 

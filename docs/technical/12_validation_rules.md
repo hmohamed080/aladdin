@@ -45,7 +45,7 @@ Every business validation for the MVP. **Validation is Zod-first** (`frontend/sr
 | Rule | Validation |
 |---|---|
 | name | required, `[2,120]`, unique-ish (trgm dupe warning, not hard block) |
-| org_type | ∈ enum subset that can own an org (not `end_consumer`) |
+| org_type | ∈ enum subset that can own an org (not `end_consumer`) — the **canonical business classification**; it is a property of the organization, never of the creating user |
 | locality | valid `locality_id` |
 | logo | image rules; `logos/` bucket |
 | submit-for-verification | required fields complete + ≥1 verification doc + creator has `org.manage` |

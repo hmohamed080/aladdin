@@ -294,3 +294,37 @@ insert into public.verifications (id, subject_type, organization_id, verificatio
 values
   ('d6000001-0000-4000-8000-000000000001', 'organization', '9d000000-dddd-4ddd-8ddd-000000000002', 'organization', 'submitted', now() - interval '2 days'),
   ('d6000002-0000-4000-8000-000000000002', 'organization', '9e000000-eeee-4eee-8eee-000000000003', 'organization', 'submitted', now() - interval '1 day');
+
+-- ---------------------------------------------------------------------------
+-- 9. Audit history for the Admin audit surface
+-- ---------------------------------------------------------------------------
+-- Everything above is inserted directly (not through the RPCs), so the trail the
+-- RPCs would normally emit does not exist and /admin/audit opens empty — a Pilot
+-- tester cannot review a screen with no rows. These entries retell exactly the
+-- story seeded above (org + people setup, then the Cairo Ceramics → Horizon
+-- commerce chain), with a real actor, target, and timestamp on each.
+--
+-- Deliberately avoids the four verification/profile actions pinned by
+-- tests/13_audit_emission_test.sql, so the pgTAP fixtures stay exact.
+insert into public.audit_log (actor_user_id, action, subject_type, subject_id, organization_id, metadata, created_at)
+values
+  -- Organization + people setup.
+  ('70000001-0000-4000-8000-000000000001', 'organization.created', 'organization', '9c000000-cccc-4ccc-8ccc-000000000001', '9c000000-cccc-4ccc-8ccc-000000000001', '{"org_type":"showroom_dealer"}'::jsonb, now() - interval '30 days'),
+  ('70000001-0000-4000-8000-000000000001', 'branch.created', 'branch', 'b0000001-0000-4000-8000-000000000001', '9c000000-cccc-4ccc-8ccc-000000000001', '{"primary":true}'::jsonb, now() - interval '30 days'),
+  ('70000006-0000-4000-8000-000000000006', 'organization.created', 'organization', '9a000000-aaaa-4aaa-8aaa-000000000005', '9a000000-aaaa-4aaa-8aaa-000000000005', '{"org_type":"contractor"}'::jsonb, now() - interval '28 days'),
+  ('70000006-0000-4000-8000-000000000006', 'branch.created', 'branch', 'b0000005-0000-4000-8000-000000000005', '9a000000-aaaa-4aaa-8aaa-000000000005', '{"primary":true}'::jsonb, now() - interval '28 days'),
+  ('70000006-0000-4000-8000-000000000006', 'membership.granted', 'user', '70000007-0000-4000-8000-000000000007', '9a000000-aaaa-4aaa-8aaa-000000000005', '{"via":"invitation"}'::jsonb, now() - interval '21 days'),
+  ('70000006-0000-4000-8000-000000000006', 'membership.activated', 'user', '70000007-0000-4000-8000-000000000007', '9a000000-aaaa-4aaa-8aaa-000000000005', '{}'::jsonb, now() - interval '21 days'),
+  ('70000007-0000-4000-8000-000000000007', 'membership.granted', 'user', '70000008-0000-4000-8000-000000000008', '9a000000-aaaa-4aaa-8aaa-000000000005', '{"via":"invitation"}'::jsonb, now() - interval '14 days'),
+  ('70000007-0000-4000-8000-000000000007', 'membership.activated', 'user', '70000008-0000-4000-8000-000000000008', '9a000000-aaaa-4aaa-8aaa-000000000005', '{}'::jsonb, now() - interval '14 days'),
+  -- Catalog.
+  ('70000001-0000-4000-8000-000000000001', 'product.created', 'product', 'd1000001-0000-4000-8000-000000000001', '9c000000-cccc-4ccc-8ccc-000000000001', '{}'::jsonb, now() - interval '12 days'),
+  ('70000001-0000-4000-8000-000000000001', 'product.published', 'product', 'd1000001-0000-4000-8000-000000000001', '9c000000-cccc-4ccc-8ccc-000000000001', '{}'::jsonb, now() - interval '12 days'),
+  ('70000001-0000-4000-8000-000000000001', 'product.published', 'product', 'd1000002-0000-4000-8000-000000000002', '9c000000-cccc-4ccc-8ccc-000000000001', '{}'::jsonb, now() - interval '11 days'),
+  -- The RFQ → quote → order → project chain.
+  ('70000006-0000-4000-8000-000000000006', 'rfq.submitted', 'rfq', 'd2000001-0000-4000-8000-000000000001', '9a000000-aaaa-4aaa-8aaa-000000000005', '{}'::jsonb, now() - interval '5 days'),
+  ('70000002-0000-4000-8000-000000000002', 'quotation.submitted', 'quotation', 'd3000001-0000-4000-8000-000000000001', '9c000000-cccc-4ccc-8ccc-000000000001', '{"total":143000}'::jsonb, now() - interval '3 days'),
+  ('70000006-0000-4000-8000-000000000006', 'quotation.accepted', 'quotation', 'd3000001-0000-4000-8000-000000000001', '9a000000-aaaa-4aaa-8aaa-000000000005', '{}'::jsonb, now() - interval '1 day'),
+  ('70000006-0000-4000-8000-000000000006', 'order.created', 'order', 'd4000001-0000-4000-8000-000000000001', '9a000000-aaaa-4aaa-8aaa-000000000005', '{}'::jsonb, now() - interval '1 day'),
+  ('70000001-0000-4000-8000-000000000001', 'order.started', 'order', 'd4000001-0000-4000-8000-000000000001', '9c000000-cccc-4ccc-8ccc-000000000001', '{}'::jsonb, now() - interval '12 hours'),
+  ('70000001-0000-4000-8000-000000000001', 'project.activated', 'project', 'd5000001-0000-4000-8000-000000000001', '9c000000-cccc-4ccc-8ccc-000000000001', '{}'::jsonb, now() - interval '10 hours');

@@ -85,7 +85,8 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 
 ## Navigation System
 - **Surface-appropriate navigation:** B2C = discovery-style top navigation + prominent search; B2B/Admin = **workspace shell with a sidebar**.
-- **Navigation is derived, not toggled.** There is no Profile Switcher and no "Use As" mode. What a user sees is derived from their **primary account type, organization membership, branch assignment, permission capabilities, verification state, and subscription state** — a user has one current primary account type at a time. Roles stay separate in the taxonomy; never build a role-switching control.
+- **Navigation is derived, not toggled.** There is no Profile Switcher and no "Use As" mode. What a user sees is derived from their **primary account type, organization membership, branch assignment, permission capabilities, verification state, and subscription state** — a user has one current primary account type at a time. Roles stay separate in the taxonomy; never build a persona/account-identity switching control.
+- **Work context is not persona.** Selecting the active **workspace** — the user's personal surface, or an organization where the same user has an **active membership** — is an allowed, different concept from persona switching, and is how a user with several organizations moves between them on one login. Workspaces are derived (Personal = User+Profile · Business = Organization+active Membership). Copy must read as *changing where you are working*, never as *changing who you are*; never label it a profile/role switch. **Not yet built** — see PRODUCT_DIRECTION_GUIDE *Switching*.
 - Primary nav exposes the core journeys, not an exhaustive site map. Keep depth shallow; provide breadcrumbs in deep workspace flows.
 - Navigation is fully **RTL-mirrored** (leading/trailing, chevron direction, back gestures) in Arabic.
 
@@ -181,7 +182,8 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 ## Anti-Patterns To Avoid
 - **Commerce framing:** add-to-cart, checkout, buy-now — this is consultation-first.
 - **Password UI:** sign-in-with-password, forgot/reset-password — the product is passwordless (WhatsApp/Email OTP).
-- **Profile-switching UI:** a Profile Switcher, a "Use As" mode, or any role-switching control — navigation is **derived**, not toggled; one current primary account type at a time.
+- **Profile-switching UI:** a Profile Switcher, a "Use As" mode, or any control that swaps a user's persona/account identity — navigation is **derived**, not toggled; one current primary account type at a time. *(A **work-context / workspace** selector across the user's own personal surface and their active organization memberships is **not** this anti-pattern.)*
+- **"Create an account, then create an organization" framing:** a business is created **once**; never make the user feel they are opening a second account, and never present owner/manager as a business type.
 - **Technical copy in UI:** "WhatsApp Business API", "reCAPTCHA verified on server", "canonical account", schema/stack jargon.
 - **Design-scaffolding in production:** QA labels, "SAMPLE/DEMO" ribbons, session/agent tags, placeholder lorem.
 - **Merging roles** because they look similar — roles stay separate (End Consumer, Installer, Engineer, Interior Designer, Showroom, Supplier, Manufacturer, Importer, Wholesaler, Sales, Contractor, Trainer, Trainee, Admin).

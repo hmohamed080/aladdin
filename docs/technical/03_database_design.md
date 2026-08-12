@@ -34,7 +34,7 @@ Follows [naming-conventions.md](../database/naming-conventions.md). Entities are
 
 | Enum | Values |
 |---|---|
-| `account_type` | `end_consumer, installer_technician, engineer, interior_designer, showroom_dealer, supplier, manufacturer, importer, wholesaler, sales, contractor, trainer, trainee, administrator` |
+| `account_type` | `end_consumer, installer_technician, engineer, interior_designer, showroom_dealer, supplier, manufacturer, importer, wholesaler, sales, contractor, trainer, trainee, administrator` — ⚑ the **business-valued** members (`showroom_dealer`, `supplier`, `manufacturer`, `importer`, `wholesaler`) are **transitional**: in the target model business classification is canonically `organizations.org_type`, and `users.primary_account_type` carries personal persona state only. The enum is **unchanged**; migration is owned by the upcoming Account & Workspace Model feature ([02 AccountType](02_domain_model.md#accounttype-reference), [TECHNICAL_DEBT](TECHNICAL_DEBT.md)). |
 | `platform_role` | `support, moderator, administrator` (⚑ future `super_admin`) |
 | `contact_channel` | `whatsapp, email` |
 | `user_status` | `pending_verification, active, suspended, deactivated` |
@@ -104,7 +104,7 @@ Follows [naming-conventions.md](../database/naming-conventions.md). Entities are
 |---|---|---|---|
 | id | uuid | no | |
 | name | text | no | |
-| org_type | account_type | no | subset that can own an org |
+| org_type | account_type | no | **the canonical business classification** (Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · contractor company · design/engineering office …). It reuses the `account_type` enum as its *physical* domain — a shared enum, **not** a claim that a business type is a person's identity. `users.primary_account_type` stays personal persona state and is never a mirror of this column. A dedicated `org_type` enum is a candidate for the upcoming Account & Workspace Model feature ([TECHNICAL_DEBT](TECHNICAL_DEBT.md)); **unchanged here.** |
 | status | org_status | no | default `draft` |
 | is_verified | boolean | no | default false |
 | locality_id | uuid | yes | FK→localities |

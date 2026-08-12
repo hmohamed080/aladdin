@@ -37,15 +37,22 @@ export default async function AdminOrgDetailPage({ params }: { params: Promise<{
       </div>
 
       <Card>
-        <dl className="grid gap-md tablet:grid-cols-3">
+        <dl className="grid gap-md tablet:grid-cols-4">
           <Field label={m.admin.orgs.type}>{typeLabels[org.orgType] ?? org.orgType}</Field>
           <Field label={m.admin.orgs.status}>{statusLabels[org.status] ?? org.status}</Field>
+          {/* Stated explicitly: an absent badge must not be read as "unknown". */}
+          <Field label={m.admin.orgs.verification}>
+            {org.isVerified ? m.admin.orgs.verified : m.admin.orgs.notVerified}
+          </Field>
           <Field label={m.admin.orgs.created}>{formatDate(org.createdAt, locale)}</Field>
         </dl>
       </Card>
 
       <section className="grid gap-lg tablet:grid-cols-2">
-        <div className="flex flex-col gap-md">
+        {/* min-w-0: a grid item defaults to min-width:auto and would otherwise
+            refuse to shrink below its content, pushing the page sideways on a
+            narrow viewport instead of letting the names truncate. */}
+        <div className="flex min-w-0 flex-col gap-md">
           <SectionTitle>{m.admin.orgs.branches}</SectionTitle>
           {org.branches.length === 0 ? (
             <StatePanel title={m.admin.orgs.noBranches} />
@@ -53,17 +60,20 @@ export default async function AdminOrgDetailPage({ params }: { params: Promise<{
             <div className="flex flex-col gap-sm">
               {org.branches.map((b) => (
                 <Card key={b.id} pad="sm" className="flex items-center justify-between gap-md">
-                  <span className="font-medium text-fg">{b.name}</span>
-                  <Badge tone={b.isActive ? "success" : "neutral"}>
-                    {b.isActive ? m.admin.orgs.branchActive : m.admin.orgs.branchInactive}
-                  </Badge>
+                  {/* A long name truncates; the status must never be pushed off-screen. */}
+                  <span className="min-w-0 truncate font-medium text-fg">{b.name}</span>
+                  <span className="shrink-0">
+                    <Badge tone={b.isActive ? "success" : "neutral"}>
+                      {b.isActive ? m.admin.orgs.branchActive : m.admin.orgs.branchInactive}
+                    </Badge>
+                  </span>
                 </Card>
               ))}
             </div>
           )}
         </div>
 
-        <div className="flex flex-col gap-md">
+        <div className="flex min-w-0 flex-col gap-md">
           <SectionTitle>{m.admin.orgs.membersHeading}</SectionTitle>
           {org.members.length === 0 ? (
             <StatePanel title={m.admin.orgs.noMembers} />
@@ -71,10 +81,15 @@ export default async function AdminOrgDetailPage({ params }: { params: Promise<{
             <div className="flex flex-col gap-sm">
               {org.members.map((mem) => (
                 <Card key={mem.membershipId} pad="sm" className="flex items-center justify-between gap-md">
-                  <Link href={`/admin/users/${mem.userId}`} className="truncate font-medium text-accent hover:underline">
+                  <Link
+                    href={`/admin/users/${mem.userId}`}
+                    className="min-w-0 truncate font-medium text-accent hover:underline"
+                  >
                     {mem.displayName || m.admin.users.unnamed}
                   </Link>
-                  <StatusBadge status={mem.status} label={statusLabels[mem.status] ?? mem.status} />
+                  <span className="shrink-0">
+                    <StatusBadge status={mem.status} label={statusLabels[mem.status] ?? mem.status} />
+                  </span>
                 </Card>
               ))}
             </div>

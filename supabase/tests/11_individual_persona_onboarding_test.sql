@@ -1,13 +1,15 @@
--- pgTAP: individual persona onboarding (Phase 2 — Sprint 7.4).
+-- pgTAP: individual persona onboarding (Phase 2 — Sprint 7.4, revised by the
+-- Pilot UAT round 1 activation migration).
 -- Proves the persona RPCs derive the actor from auth.uid(), gate consumer vs
--- professional by the shared track, persist the answers, and — crucially — that
--- completing a persona flow is a HANDOFF, never an activation: the professional
--- submit hands off to the trusted upgrade/review workflow (a 'submitted'
--- verification) and NEVER mutates users.primary_account_type.
+-- professional by the shared track, and persist the answers. Completing a persona
+-- flow now ACTIVATES the personal account (it is a usable terminal state), while
+-- the professional submit still hands off to the trusted upgrade/review workflow
+-- (a 'submitted' verification) and NEVER mutates users.primary_account_type —
+-- verification is an independent trust state, not the activation mechanism.
 create extension if not exists pgtap;
 
 begin;
-select plan(17);
+select plan(18);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures: two fresh, verified, non-active users (bootstrap trigger provisions
@@ -60,12 +62,14 @@ select is(
   2, 'consumer interests are persisted');
 
 select lives_ok($$ select public.individual_complete_consumer() $$, 'consumer can reach the handoff');
-select is(public.my_registration_state(), 'consumer_onboarding_complete',
-  'after completion the derived state is consumer_onboarding_complete');
--- Completion is a handoff, not activation.
+-- Pilot UAT round 1: the consumer terminal is a USABLE state — completion
+-- activates the personal account, so the derived state short-circuits to
+-- active_personal (and the caller lands on /home).
+select is(public.my_registration_state(), 'active_personal',
+  'after completion the consumer account is active (usable terminal state)');
 select is(
   (select status::text from public.users where id = 'c0000000-0000-4000-8000-0000000000c1'),
-  'pending_verification', 'consumer completion NEVER activates the account');
+  'active', 'consumer completion activates the personal account');
 
 -- A consumer cannot enter the professional branch (track gate at the DB).
 select throws_ok(
@@ -118,8 +122,14 @@ select is(
 select is(
   (select primary_account_type::text from public.users where id = 'd0000000-0000-4000-8000-0000000000d1'),
   'end_consumer', 'submit NEVER mutates users.primary_account_type (review still required)');
-select is(public.my_registration_state(), 'persona_review_pending',
-  'after submission the derived state is persona_review_pending');
+-- Pilot UAT round 1: submission ACTIVATES the personal account. The review stays
+-- open above (verification is an independent trust state), but the professional
+-- is never trapped in a review-waiting screen.
+select is(public.my_registration_state(), 'active_personal',
+  'after submission the professional account is active while the review is still open');
+select is(
+  (select status::text from public.users where id = 'd0000000-0000-4000-8000-0000000000d1'),
+  'active', 'professional submission activates the personal account');
 
 reset role;
 

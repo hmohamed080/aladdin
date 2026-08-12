@@ -1,71 +1,48 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { getServerSupabase } from "@/lib/supabase/server";
+import { getRegistrationState } from "@/server/queries/registration";
 import { resolveActiveLanding } from "@/server/queries/landing";
-import { getMessages } from "@/lib/i18n/translate";
+import { loadPersonalHome } from "@/server/queries/personal-home";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
-import { Card, StatePanel } from "@/components/ui/primitives";
-import { HomeIcon, SearchIcon, ActivityIcon, UsersIcon } from "@/components/ui/icons";
+import { ConsumerHome } from "@/features/home/consumer-home";
+import { ProfessionalHome } from "@/features/home/professional-home";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Consumer / individual home. A signed-in caller with no organization (typically
- * an End Consumer) lands here. If the caller in fact belongs to a workspace or is
- * platform staff, they are corrected to their real destination — landing is always
- * derived, never assumed.
+ * The ONE personal-account surface. A signed-in caller with no organization —
+ * an End Consumer, or an individual professional (Engineer, Interior Designer,
+ * Installer/Technician, Contractor, org-less Salesperson) — lands here, and the
+ * page is persona-aware rather than consumer-specific.
+ *
+ * Two guards, both derived, never assumed:
+ *   * an account that has not finished onboarding resumes at /onboarding;
+ *   * a caller who in fact belongs to a workspace, or is platform staff, is
+ *     corrected to their real destination (a consumer is never sent to /b2b).
+ *
+ * Reaching this page never depends on a verification decision — completing
+ * onboarding activates the account, and trust state is shown, not enforced.
  */
-export default async function ConsumerHomePage() {
-  const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/auth/sign-in");
+export default async function PersonalHomePage() {
+  const state = await getRegistrationState();
+  if (state === "unverified") redirect("/auth/sign-in");
+  if (state !== "active_personal") redirect("/onboarding");
 
+  const supabase = await getServerSupabase();
   const landing = await resolveActiveLanding(supabase);
   if (landing !== "/home") redirect(landing);
 
+  const data = await loadPersonalHome();
+  if (!data) redirect("/auth/sign-in");
+
   const store = await cookies();
-  const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
-  const m = getMessages(locale);
+  const t = createTranslator(resolveLocale(store.get(LOCALE_COOKIE)?.value));
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  const name = profile?.display_name?.trim() || m.consumerHome.friend;
-
-  const cards: { Icon: typeof HomeIcon; title: string; body: string }[] = [
-    { Icon: ActivityIcon, title: m.consumerHome.projects.title, body: m.consumerHome.projects.body },
-    { Icon: SearchIcon, title: m.consumerHome.discover.title, body: m.consumerHome.discover.body },
-    { Icon: UsersIcon, title: m.consumerHome.advice.title, body: m.consumerHome.advice.body },
-  ];
-
-  return (
-    <div className="flex flex-col gap-xl">
-      <header className="flex flex-col gap-1">
-        <p className="text-label text-fg-muted">{m.consumerHome.eyebrow}</p>
-        <h1 className="text-title text-fg">{m.consumerHome.greeting.replace("{name}", name)}</h1>
-        <p className="max-w-prose text-body text-fg-secondary">{m.consumerHome.subtitle}</p>
-      </header>
-
-      <section className="grid gap-md tablet:grid-cols-3">
-        {cards.map(({ Icon, title, body }) => (
-          <Card key={title} className="flex flex-col gap-sm">
-            <span className="flex size-9 items-center justify-center rounded-md bg-surface-2 text-accent">
-              <Icon size={20} />
-            </span>
-            <h2 className="text-body font-semibold text-fg">{title}</h2>
-            <p className="text-label text-fg-secondary">{body}</p>
-            <span className="mt-auto pt-sm text-label font-medium text-fg-muted">
-              {m.consumerHome.comingSoon}
-            </span>
-          </Card>
-        ))}
-      </section>
-
-      <StatePanel title={m.consumerHome.pilot.title} body={m.consumerHome.pilot.body} />
-    </div>
+  return data.variant === "professional" ? (
+    <ProfessionalHome data={data} t={t} />
+  ) : (
+    <ConsumerHome data={data} t={t} />
   );
 }

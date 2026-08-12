@@ -22,7 +22,8 @@ Covers **AI Agent Development Rules (25)** — the rules **every AI agent** must
 ## 2. Must NOT (hard rules)
 
 **Product & architecture**
-- Do **not** build "never" features: add-to-cart/checkout/storefront, price-war/blind bidding, generic horizontal CRM, profile switcher / "Use As" / role-switching, password/forgot/reset flows.
+- Do **not** build "never" features: add-to-cart/checkout/storefront, price-war/blind bidding, generic horizontal CRM, profile (persona) switcher / "Use As" / account-identity switching, password/forgot/reset flows.
+- Do **not** create a second user/auth identity for the same person (per role, per contact channel, or per business), model a business as anything but an `Organization` reached through a `Membership`, add a generic `workspaces` table, or copy business identity onto the user (or personal identity into organization records) as a second source of truth. *(Switching the active **work context** between the personal surface and organizations with an active membership is allowed — it is not persona switching.)*
 - Do **not** change product direction, architecture, or the design system outside the documented change process (+ the required memory/ADR updates).
 - Do **not** introduce excluded tech (Vite/SPA/React Router, Alembic, `create_all()` in staging/prod, Kubernetes/Kafka/Redis/Elasticsearch/second DB) without a new ADR.
 - Do **not** recreate product CRUD in FastAPI; do **not** add unapproved integrations (Cloudinary/Firebase/Google-Maps/payments) — use the approved stack ([`13_integrations`](../technical/13_integrations.md)).

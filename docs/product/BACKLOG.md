@@ -68,7 +68,9 @@ Explicitly out of the pilot — see [`14_future_extensions.md`](../technical/14_
 | Add-to-cart / checkout / storefront | **never** (consultation-first) | Never |
 | Price-war reverse-auction / blind bidding | **never** | Never |
 | Generic horizontal CRM | **never** | Never |
-| Profile switcher / "Use As" / role toggle | **never** (derived nav) | Never |
+| Profile (persona) switcher / "Use As" / role toggle | **never** (derived nav) — note: switching the active **work context** between the personal surface and organizations with an active membership is a *different*, allowed concept | Never |
+| A second user/auth identity per business, or a generic `workspaces` table | **never** (one person = one user ID; workspaces are derived) | Never |
+| Work-context (workspace) switcher · "add a business" for an existing user · account deactivate/delete lifecycle | approved direction, **not** in current scope | Deferred |
 | Passwords / forgot / reset | **never** (passwordless) | Never |
 
 ## Maintenance

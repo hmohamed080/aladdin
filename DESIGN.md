@@ -325,7 +325,7 @@ The form language is **precise and chamfered**, echoing the Aperture: corners ar
 ### Navigation
 - **B2B/Admin:** Workspace sidebar reflecting *derived* capabilities (items the account type/membership/permissions don't grant are hidden, not disabled); active item uses a token-based state; collapses to icons; mirrors to the trailing edge in RTL.
 - **B2C:** Top navigation exposing core journeys with prominent search.
-- Navigation is **derived, never toggled** — there is no profile switcher or role-switching control.
+- Navigation is **derived, never toggled** — there is no profile (persona) switcher or role-switching control. Selecting the active **work context** (personal surface ↔ an organization where the user has an active membership) is a separate, allowed concept and is not a persona switch.
 
 ### The Aperture Mark (signature)
 Nested chamfered octagonal facets (bronze → bronze-deep → lumen strokes) converging on a Lumen-gradient core with a soft bloom. Primary form on Basalt; a single-color `currentColor` monochrome variant for favicon (down to 16px), bronze verification seal, and on-light use. It is the app icon, the auth brand-panel motif, and the trust seal.
@@ -348,7 +348,7 @@ Bronze concentric ring (one solid + one dashed) around the monochrome Aperture; 
 - **Don't** render the name literally — no lamp, genie, arabesque ornament, or gold-kitsch. The Aperture is the disciplined abstraction.
 - **Don't** use Lumen as a button fill or a status color, and don't scatter it as a general accent.
 - **Don't** introduce commerce/marketplace visual framing (add-to-cart, checkout, price-war) — this is consultation-first.
-- **Don't** build a profile switcher, "Use As" mode, or role-switching UI; navigation is derived.
+- **Don't** build a profile (persona) switcher, "Use As" mode, or account-identity-switching UI; navigation is derived. A **work-context/workspace** selector across the user's own memberships is a different, allowed concept.
 - **Don't** surface technical/implementation copy ("WhatsApp Business API", "reCAPTCHA verified", "canonical account", stack jargon) in the UI.
 - **Don't** hardcode raw hex in components — add or adjust a token. Don't treat Dark as an inverted Light filter.
 - **Don't** use cream/warm-white grounds with a serif-italic display — that default is explicitly not this brand; the ground is low-chroma Limestone stone.

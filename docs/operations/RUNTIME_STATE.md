@@ -6,24 +6,24 @@ This is a **mutable snapshot** of the current live repository state — not an a
 
 | | |
 |---|---|
-| **Version** | Runtime snapshot · 2026-08-11 |
+| **Version** | Runtime snapshot · 2026-08-12 |
 | **Owner** | Foundation / Operations |
-| **Last updated** | 2026-08-11 |
-| **Updated by** | Codex — Sprint 11 Pilot post-login landing hotfix |
-| **Current focus** | **Pilot UAT hotfix:** the real Email-OTP completion action now preserves pending onboarding/invitation destinations and routes active platform staff → `/admin`, active organization members → `/b2b`, and organization-less personal accounts → `/home` through `resolveActiveLanding()`. Branch `hotfix/pilot-landing-routing`; no schema, RLS, product-direction, or `.pen` change. |
+| **Last updated** | 2026-08-12 |
+| **Updated by** | Claude — account-model clarification (business classification belongs to the Organization) |
+| **Current focus** | **Pilot UAT fix round 1 + product-direction alignment (same branch/PR):** completing onboarding now ACTIVATES a personal account (verification became an independent trust state), `/home` is one persona-aware personal surface with derived profile completeness, the generic "organization owner / manager" registration path saves and resumes, and the Admin verification queue actually reaches the account/organization it decides on. On top of that, the **account / organization / workspace model is now canonical documentation**: one person = one user ID · personal identity ≠ business · a business is an Organization created once (org + owner membership + primary branch, transactional) · Membership is the only user↔organization link · zero/one/many organizations per login · workspace is **derived** (no `workspaces` table) and work-context switching ≠ persona switching · single-source-of-truth ownership · duplicate-business protection · membership history retained · account deletion recorded as **future** rule. Finally, **business classification is canonically `organizations.org_type`**, never a person's identity: `users.primary_account_type` is personal persona state only (one user may own organizations of several different types at once), *"I am a Showroom"* at registration means *"create a business whose `org_type` is X"*, and the business-valued `account_type` enum members are recorded as **transitional debt** for the upcoming Account & Workspace Model feature to audit and migrate (ADR-0007 D22). Branch `fix/pilot-uat-round-1`; two new migrations (both from the fix round — **unchanged** by the alignment work); **the alignment and clarification patches are documentation-only** (no schema/enum/migration/frontend/test change); no `.pen` change. |
 
 ## Phase & repository
 
 | Field | Value |
 |---|---|
-| **Current Phase** | **Private Pilot UAT — Sprint 11 hotfix** |
-| **Current Sprint** | **Sprint 11 — Pilot readiness; post-login landing regression fix** |
-| **Current Feature** | Canonical Email-OTP post-auth landing with onboarding preservation and surface isolation |
+| **Current Phase** | **Private Pilot UAT — fix round 1** |
+| **Current Sprint** | **Pilot UAT fix round 1 — personal-account activation, persona-aware home, Admin review defects** |
+| **Current Feature** | Activation-vs-verification model, persona-aware `/home` with derived completeness, generic owner/manager entry, Admin approval apply-step |
 | **Next Phase** | Review PR to `main`; do not merge from this task |
-| **Current Branch** | `hotfix/pilot-landing-routing` (created from `main` @ `1b07cf5`) |
-| **Current Milestone** | Pilot landing hotfix; targeted acceptance complete |
+| **Current Branch** | `fix/pilot-uat-round-1` (created from `main` @ `d595a6d`) |
+| **Current Milestone** | Pilot UAT fix round 1; targeted acceptance complete, PR open, not merged |
 | **Current Remote Repository** | `origin` = `https://github.com/hmohamed080/aladdin.git` |
-| **Last Stable Commit** | `1b07cf5` — `main` at hotfix branch point |
+| **Last Stable Commit** | `d595a6d` — `main` at this branch point |
 | **Last Stable Tag** | `v0.1.0-foundation` (repo `0.1.0`) — created on merged `main` after the closeout PR; Design System stays independently at `1.0.0` |
 | **Foundation Release** | Tagged `v0.1.0-foundation` on `main` @ `64e68d6` |
 | **Repository Status** | Published to GitHub (`origin`, full history, no squash/force); `main` protection recommended (ADR-0006), not yet applied |
@@ -32,7 +32,7 @@ This is a **mutable snapshot** of the current live repository state — not an a
 
 ## Live engineering state
 
-> **Current hotfix override (2026-08-11):** Sprint 11 is on `main` at `1b07cf5`; this branch changes frontend post-auth routing and targeted tests only. Typecheck and lint pass; targeted auth/landing Vitest is 17/17; targeted production Chromium Playwright is 8/8 across EN/LTR and AR/RTL. The database/schema remains the Sprint 11 state and was not reset, linted, or pgTAP-tested again for this no-schema hotfix. No `.pen` file changed.
+> **Current override (2026-08-11, Pilot UAT fix round 1):** `main` is at `d595a6d`. The database now has **22 migrations** — `20260813090001_pilot_personal_account_activation` (personal accounts activate on onboarding completion; the business track accepts the typeless owner/manager entry; one-time backfill) and `20260813090002_organization_verification_apply` (`apply_organization_verification` + the `organization.verified` audit action). Validated this session: frontend typecheck ✓, lint ✓ (0), unit **186/186** ✓; `supabase db reset` ✓, `db lint` ✓ (only the pre-existing `set_customer_ownership` warning), pgTAP **614/614** ✓ across 27 files; targeted production Playwright **57 passed / 1 skipped** on desktop + mobile (the skip is the destructive Admin-approval acceptance, pinned to one project). Repository-wide E2E deliberately not run — this is not the final integration gate. No `.pen` file changed.
 
 Always reflects the current live engineering state of the project. Overwrite each session with verified values.
 
