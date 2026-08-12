@@ -26,7 +26,7 @@ Next.js App Router web app, delivered as a responsive PWA (Desktop / Tablet / Mo
 Other confirmed audiences, kept as **separate roles** even where behavior overlaps:
 - **End Consumer** (B2C) — seeking advice, discovery, and a path to trusted execution.
 - **Service providers** — Installer/Technician, Engineer, Interior Designer.
-- **Businesses** — Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, Contractor.
+- **Businesses** (organizations, classified by `org_type` — not personal identities) — Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, Contractor company.
 - **Learning** — Trainer, Trainee.
 - **Administrator** — governance and platform operations (a deliberately darker/utilitarian surface).
 
@@ -64,6 +64,8 @@ It is deliberately **not**:
 **Authentication (canonical, hard constraint):** Passwordless. Register / sign in via **WhatsApp OTP** or **Email OTP / verification link**. WhatsApp OTP only for phone (no SMS). The user verifies exactly **one** primary contact at account creation; a secondary is added later from profile settings. **No passwords, and no password / forgot / reset flows anywhere.** reCAPTCHA only on Create Account. One canonical identity regardless of verification method.
 
 **Identity model (hard constraint):** **One person = one user ID** — one canonical identity per person, never a second user for another role, contact channel, or business. Roles stay separate in the taxonomy; they are merged only by an explicit, recorded decision. **One current primary account type at a time — no Profile Switcher, no "Use As" mode, no persona/account-identity-switching UI.** Organization membership, branch assignment, and permission capabilities attach to the canonical account; they do not fork it.
+
+**Business classification (hard constraint):** Concrete business classifications (Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · contractor company · design/engineering office) are canonically **`organizations.org_type`** — never the person's long-term identity. **`users.primary_account_type` is personal persona state only;** one user may own organizations of several different types simultaneously, which a single value cannot represent. Choosing *"I am a Showroom"* at registration stays good UX and means *"I am creating a business whose `org_type` is X"*. Business-valued account types that exist today are **transitional compatibility**, not the target source of truth.
 
 **Personal vs. business (hard constraint):** Personal identity is **not** a business — a personal professional (Engineer, Interior Designer, Installer/Technician, Contractor, Salesperson, Consumer) is fully usable with **zero** organizations. A business is an **Organization**, created **once** in the UX (the backend transactionally creates organization + owner membership + primary branch), linked to the user by a **Membership** that owns the relationship, capabilities, branch scope, and lifecycle. The same login may hold **zero, one, or many** organizations, and an existing user can add a business later without a second sign-up. **"Owner/manager" is a relationship, never an account or business type.** A **workspace** is a derived UX concept (Personal = User+Profile · Business = Organization+active Membership) — switching the active **work context** is allowed and is *not* persona switching. Full rules: [`docs/product/PRODUCT_DIRECTION_GUIDE.md`](docs/product/PRODUCT_DIRECTION_GUIDE.md).
 

@@ -20,14 +20,16 @@ The task's generic role names map to Aladdin's canonical model:
 | Guest | **Guest** (unauthenticated) | anon |
 | End User | **End Consumer** | account type (B2C) |
 | Engineer | **Engineer** (+ Interior Designer, Installer/Technician) | professional account types |
-| Exhibition | **Showroom/Dealer** | business account type |
-| Company | **Supplier / Manufacturer / Importer / Wholesaler / Contractor** | business account types |
+| Exhibition | **Showroom/Dealer** | **organization type** (`organizations.org_type`); the audience is a *person* acting through a membership in such an org |
+| Company | **Supplier / Manufacturer / Importer / Wholesaler / Contractor company** | **organization types** (`organizations.org_type`), same as above |
 | — | **Sales** | account type (key daily user) |
 | — | **Org Owner/Admin** | membership capability tier (org-level) |
 | Support | **Support** | platform role |
 | Moderator | **Moderator** | platform role |
 | Admin | **Administrator** | platform role |
 | Future Super Admin | **Super Admin** | ⚑ future platform role |
+
+> **Business classification is an organization property, not a person's identity.** Access for a business audience is derived from *membership in an organization of that type* plus capabilities — never from a business-valued `primary_account_type`. Business-valued account types that exist today are **transitional** (PRODUCT_DIRECTION_GUIDE *Business Classification Belongs to the Organization*).
 
 Two independent dimensions:
 - **Account type** (one per user) + **org membership capabilities** → what you do inside the product.

@@ -21,7 +21,7 @@ State what the Private Pilot MVP includes, in what order, and what is explicitly
 4. **05D — Supplier/Showroom/Product operations**: Catalog → Availability → Requests → Quotes → Orders → Campaigns.
 5. **05E — B2B Cockpit & Admin completion** (dashboards last, after inner workflows exist).
 
-**Roles (kept separate, one account can hold several):** End Consumer · Installer/Technician · Engineer · Interior Designer · Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · Sales · Contractor · Trainer · Trainee · Administrator.
+**Roles (kept separate):** End Consumer · Installer/Technician · Engineer · Interior Designer · Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · Sales · Contractor · Trainer · Trainee · Administrator. A user holds **one current primary account type** (personal persona); the **business classifications** in this list are canonically `organizations.org_type`, reached through organization membership — one user may own organizations of several different types at once.
 
 **Cross-cutting MVP requirements:** English (LTR) + Arabic (RTL); Light + Dark; responsive Desktop/Tablet/Mobile (PWA); Egyptian data conventions (localities, EGP).
 

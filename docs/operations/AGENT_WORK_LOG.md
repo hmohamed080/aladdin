@@ -4,6 +4,37 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Business classification belongs to the Organization (account-model clarification)
+
+**Date:** 2026-08-12 · **Branch:** `fix/pilot-uat-round-1` (same PR #20, unmerged) · **Base:** `main` @ `d595a6d`
+
+### Objective
+Resolve the last account-model ambiguity before PR #20 merges: whether a concrete business type is the *person's* identity or the *organization's* classification. **Documentation only — no code, schema, enum, migration, or test change.**
+
+### Canonical rule now recorded
+**Concrete business classifications** — Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · contractor company · design/engineering office · future classifications — are canonically **`organizations.org_type`**, never a person's long-term personal identity. **`users.primary_account_type` is personal identity / persona state**, not the type of every business the user owns or joins. This is structural: *Ahmed Hassan* (persona **Engineer**) owns *AH Showroom* (`showroom_dealer`) and *AH Import* (`importer`) on **one user ID**, and a single `primary_account_type` cannot be both. **Registration UX is unchanged** — *"I am a Showroom"* stays, and architecturally means *"I am creating a business whose `org_type` is X"*, with the backend creating Organization + Owner Membership + Primary Branch in one transactional, idempotent operation for the existing user.
+
+### Contradictions corrected
+1. **`AccountType` (`02_domain_model`)** — described business classifications as canonical *primary account types*; now states the target semantics (persona state) and flags the business-valued members as transitional.
+2. **`07_permissions_matrix` audience map** — "Exhibition → business **account type**", "Company → business **account types**" → corrected to **organization types** (`org_type`), with a note that business-audience access derives from *membership in an org of that type* + capabilities, never a business-valued `primary_account_type`.
+3. **`mvp-scope`** — *"Roles (kept separate, **one account can hold several**)"* directly contradicted one-primary-account-type; rewritten, with business classifications attributed to `org_type`.
+4. **`PRODUCT_DIRECTION_GUIDE` taxonomy + "Businesses" actor bullet** — listed business classifications among a *person's* capacities; now split into personal personas vs organization classifications.
+5. **`03_database_design`** — the `account_type` enum row and the `organizations.org_type` column (`org_type account_type`) read as "a business type is an account type"; annotated as a **shared physical enum**, not a claim about identity, with the target semantics and the unchanged-here scope stated.
+6. **`system-context` actor list** and **PRODUCT.md** businesses bullet — same person/organization conflation, corrected.
+7. **`12_validation_rules`** — `org_type` clarified as a property of the organization, never of the creating user.
+8. **ADR-0007 (highest authority on `primary_account_type`)** — added **D22** recording the target semantics + explicit transitional status, since D10/D11's "six concepts kept distinct" list was the top-authority definition and did not cover this.
+
+### Transitional debt (explicitly recorded, not fixed here)
+`TECHNICAL_DEBT.md` §2 now carries **business-valued `account_type` / `primary_account_type`**: the enum still contains `showroom_dealer`/`supplier`/`manufacturer`/`importer`/`wholesaler` and onboarding paths may still set them. They stay as **implementation compatibility only**; the upcoming **Account & Workspace Model** feature must audit every read/write and migrate behind a reviewed migration rather than create a second source of truth. Until then no path may mirror `org_type` into `users`. **The enum and migration behaviour are deliberately unchanged in PR #20.**
+
+### Files touched
+`PRODUCT_DIRECTION_GUIDE.md` (new *Business Classification Belongs to the Organization* section + taxonomy/actor fixes + NEVER rule + change history), `ADR-0007` (D22), `02_domain_model.md`, `03_database_design.md`, `07_permissions_matrix.md`, `12_validation_rules.md`, `TECHNICAL_DEBT.md`, `mvp-scope.md`, `ARCHITECTURE_GUIDE.md`, `system-context.md`, `PRODUCT.md`, `CLAUDE.md`, `RUNTIME_STATE.md`, this log.
+
+### Validation
+Documentation-consistency search across the canonical docs; `git diff` inspected. **No** schema, enum, migration, frontend, backend, or test change; no `.pen` file touched; no tests re-run (nothing executable changed).
+
+---
+
 ## Session — Pilot UAT product-direction alignment (account / organization / workspace model)
 
 **Date:** 2026-08-12 · **Branch:** `fix/pilot-uat-round-1` (same PR #20, unmerged) · **Base:** `main` @ `d595a6d`

@@ -50,8 +50,10 @@ The product model (PRODUCT_DIRECTION_GUIDE) is **capability-based derived access
 - **Ownership:** `USER`. **Constraints:** `channel ∈ {whatsapp, email}`; unique verified contact value per channel across users; phone OTP only via WhatsApp (no SMS).
 
 ### AccountType (reference)
-- **Purpose:** enumerates the canonical primary account types (End Consumer, Installer/Technician, Engineer, Interior Designer, Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, Sales, Contractor, Trainer, Trainee, Administrator).
+- **Purpose:** enumerates the values `users.primary_account_type` may take (End Consumer, Installer/Technician, Engineer, Interior Designer, Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, Sales, Contractor, Trainer, Trainee, Administrator).
+- **Target semantics:** `primary_account_type` is **personal identity / persona state** — *not* the classification of any business the user owns or joins. **Business classification is canonically `organizations.org_type`** (Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · contractor company · design/engineering office · future types) and is **never** mirrored permanently into `User`. One user may own several organizations of **different** types simultaneously, which one `primary_account_type` value structurally cannot represent.
 - **Ownership:** `PLATFORM` (reference/enum). **Constraints:** roles stay **separate**; never merged without a recorded decision.
+- ⚑ **Transitional debt (not the target):** the enum currently also carries business-valued members (`showroom_dealer`, `supplier`, `manufacturer`, `importer`, `wholesaler`, …), and existing registration/onboarding paths may still set them. **The enum and migration behaviour are unchanged** — these values are implementation compatibility only. The upcoming Account & Workspace Model feature must **audit and migrate** them to organization-owned classification rather than establish a second source of truth. See PRODUCT_DIRECTION_GUIDE *Business Classification Belongs to the Organization* and [`TECHNICAL_DEBT.md`](TECHNICAL_DEBT.md).
 
 ### OtpChallenge (transient)
 - **Purpose:** a short-lived OTP/verification challenge; not durable business data.

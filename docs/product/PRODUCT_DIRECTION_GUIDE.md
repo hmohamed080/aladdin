@@ -48,7 +48,7 @@ Every feature must locate itself somewhere on this chain and move the user to th
 - **Sales** — the highest-frequency daily user; optimize relentlessly for their speed and low friction.
 - **End Consumer** — seeking advice, discovery, and trusted execution.
 - **Service providers** — Installer/Technician, Engineer, Interior Designer.
-- **Businesses** — Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, Contractor.
+- **Businesses** (organizations, classified by `org_type`) — Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, Contractor company. The daily user is always a *person* acting through a membership in one of these.
 - **Learning** — Trainer, Trainee.
 - **Administrator** — governance and platform operations.
 
@@ -64,6 +64,8 @@ The CRM is not the whole product — it is the beachhead that makes the rest wor
 ## User & Account Taxonomy
 One person can legitimately relate to the platform in several capacities (End Consumer, Installer/Technician, Engineer, Interior Designer, Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, Sales, Contractor, Trainer, Trainee, Administrator). **Roles stay separate** in the taxonomy even when their behavior overlaps — this keeps analysis, search, and permissions clean. Roles are merged later only by an explicit, recorded decision.
 
+**Where each capacity lives is not uniform.** Personal personas (End Consumer, Installer/Technician, Engineer, Interior Designer, Sales, Contractor, Trainer, Trainee) describe **the person**. The business classifications in that list (Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, contractor company, design/engineering office) describe **a business the person owns or works in** — canonically `organizations.org_type`, never the person's long-term identity. See [Business Classification Belongs to the Organization](#business-classification-belongs-to-the-organization).
+
 ## Canonical Identity Model
 - **One person = one user ID.** A human has exactly **one** authentication/user identity. Creating or joining another business **never** creates a second user for the same person.
 - **One canonical identity per person**, regardless of verification method (WhatsApp OTP or Email OTP/verification link). No duplicate accounts per role, per contact channel, or per business.
@@ -77,6 +79,30 @@ One person can legitimately relate to the platform in several capacities (End Co
 **A business is an Organization.** A Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, contractor company, or design/engineering office is represented internally as an **Organization** — never as a second user account.
 
 The user must **not** experience this as *"create an account, then create an organization."* In the UX **they create their business once**; the backend may transactionally create the **organization + owner membership + primary branch** as one operation.
+
+## Business Classification Belongs to the Organization
+**Concrete business classifications are properties of the business, not of the person.** Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · Contractor company · Design/Engineering office — and every future business classification — are **canonically `organizations.org_type`**. They must **never** be treated as a person's long-term personal identity.
+
+Why this is structural, not stylistic: **a user may own several businesses of different types at once.**
+
+> *Ahmed Hassan* — personal persona: **Engineer** · *AH Showroom*: Owner, `org_type = showroom_dealer` · *AH Import*: Owner, `org_type = importer`. **Same user ID.**
+
+A single `users.primary_account_type` cannot simultaneously be `showroom_dealer` **and** `importer`, so business type cannot be the canonical user identity in the target multi-organization model.
+
+**`users.primary_account_type` represents personal identity / persona state** — it is not the type of every business the user owns or joins.
+
+### Registration UX stays direct
+The user may still pick *"I am a Showroom" · "I am a Supplier" · "I am an Importer"* directly — that is good UX and stays. Architecturally that selection means **"I am creating a business whose `org_type` is X"**, *not* "my personal identity becomes X". The backend creates, in one transactional and idempotent business-creation operation:
+
+```
+User (unchanged)
+ └─ Organization(org_type = X)
+     ├─ Owner Membership
+     └─ Primary Branch
+```
+
+### Transitional compatibility (technical debt, not the target)
+Business-valued `primary_account_type` values and the existing account-type paths **remain as-is for now** — the database enum and migration behaviour are **not** changed by this clarification. They are **transitional implementation compatibility**, explicitly **not** the target source of truth. The upcoming Account & Workspace Model feature must **audit and migrate them safely** to the organization-owned classification rather than creating a second source of truth. Tracked in [`../technical/TECHNICAL_DEBT.md`](../technical/TECHNICAL_DEBT.md).
 
 ## Membership Connects a User to an Organization
 ```
@@ -235,6 +261,7 @@ Installation & service marketplace, industrial/RFQ at scale, deeper supplier/tec
 - **Never** merge roles, and **never** add a Profile Switcher / "Use As" mode or any persona/account-identity-switching UI — roles stay separate in the taxonomy; navigation is **derived**, not toggled. One current primary account type at a time. *(Switching the active **work context** between the personal surface and organizations where the user has an active membership is a different, allowed concept — see [Switching](#switching-what-is-forbidden-what-is-allowed).)*
 - **Never** create a second user/auth identity for the same person — not for another role, another contact channel, or another business. A business is an **Organization**, never a second account.
 - **Never** copy business identity onto the user, or personal identity into organization records, as a second source of truth; after a draft is committed, read from the owning entity.
+- **Never** treat a business classification (Showroom/Dealer, Supplier, Manufacturer, Importer, Wholesaler, …) as the person's canonical identity, and never mirror `organizations.org_type` permanently into `users.primary_account_type` — one user may own several businesses of different types at once.
 - **Never** introduce a generic `workspaces` table — a workspace is derived (User+Profile, or Organization+active Membership).
 - **Never** leak data across organizations in UI, API, workers, or AI retrieval; **never** bypass RLS or trust client-supplied `user_id`/`organization_id`.
 - **Never** put technical/implementation copy in the UI ("WhatsApp Business API", "reCAPTCHA verified", "canonical account", stack/schema jargon).
@@ -247,6 +274,12 @@ Installation & service marketplace, industrial/RFQ at scale, deeper supplier/tec
 
 ## Change History
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
+
+### 2026-08-12 — Business classification belongs to the Organization
+- **What:** Resolved the remaining ambiguity around business types. **Concrete business classifications** (Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · contractor company · design/engineering office · future classifications) are canonically **`organizations.org_type`** and must never be treated as a person's long-term personal identity. **`users.primary_account_type` represents personal identity/persona state**, not the type of every business the user owns or joins — a single value cannot be `showroom_dealer` *and* `importer` at once, which the multi-organization model requires (*Ahmed Hassan*: persona Engineer · *AH Showroom* `showroom_dealer` · *AH Import* `importer`, same user ID). **Registration UX is unchanged** — picking *"I am a Showroom"* stays, but it architecturally means *"I am creating a business whose `org_type` is X"*, and the backend creates Organization + Owner Membership + Primary Branch in one transactional, idempotent operation. Existing business-valued `primary_account_type`/account-type paths are recorded as **transitional technical debt** to be audited and migrated by the upcoming Account & Workspace Model feature, never duplicated into a second source of truth.
+- **Why:** The docs still listed business classifications among the capacities of a *person*, which contradicts the approved multi-organization model and would push implementers to mirror `org_type` into the user.
+- **Scope:** Documentation only. **No database enum, migration, schema, code, or test change** in this PR.
+- **Approved by:** User (Pilot UAT account-model clarification, 2026-08-12).
 
 ### 2026-08-12 — Account / organization / workspace model made canonical
 - **What:** Recorded the approved account-and-workspace model as canonical: **one person = one user ID** (another business never creates another user); **personal identity is not a business** and a personal professional may hold **zero** organizations; **a business is an Organization** created once in the UX (backend transactionally creates organization + owner membership + primary branch); **Membership** is the only user↔organization link and owns relationship, capabilities, branch scope, and lifecycle; **one user may hold zero/one/many organizations on the same login**; **Workspace is a derived UX concept** (Personal = User+Profile, Business = Organization+active Membership) with **no `workspaces` table**; an **existing user can create a business later** with no second sign-up; a **single-source-of-truth ownership table** forbidding identity duplication in either direction; **duplicate-business protection** (transactional + idempotent creation, name alone is never the permanent identity); **membership history survives leaving**; and the **approved future account-lifecycle rule** (deactivate reversible · delete request → grace period → identity released, history retained · a reused email/phone gets a NEW user ID inheriting nothing · muted historical attribution) which is **explicitly not implemented**. **Clarified the no-profile-switcher rule:** switching *personas/account identities* stays forbidden; switching the *active work context* between the personal surface and organizations where the same user has an **active membership** is allowed and is not persona switching. **Owner/Manager** was restated as a **relationship**, never an account or business type, with the target *personal persona OR concrete business type* registration UX recorded and the generic owner/manager entry demoted to **transitional backward-compatibility** behaviour.
