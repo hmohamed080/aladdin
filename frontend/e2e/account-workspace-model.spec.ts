@@ -189,7 +189,7 @@ test.describe("2 + 3 + 5 — an existing professional adds businesses", () => {
       { name: "aladdin-org", value: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", url: "http://127.0.0.1" },
     ]);
     await page.goto("/b2b");
-    await expect(page.getByText("Organization A", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Nile Finishing Supplies", { exact: true })).toHaveCount(0);
     await noOverflow(page);
 
     // Sign back in later: the same identity still holds both businesses.
@@ -240,14 +240,20 @@ test.describe("7 — invitation regression", () => {
     const accept = page.getByRole("button", { name: /accept|join/i }).first();
     if (await accept.isVisible().catch(() => false)) {
       await accept.click();
-      await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
+      // Where acceptance lands depends on the caller's work context, and Karim
+      // already holds a personal persona — so this asserts that it RESOLVED, not
+      // that it went to one particular surface.
+      await page.waitForURL(/\/(b2b|home)(\/|$)/, { waitUntil: "commit" });
     }
 
-    // He joined the EXISTING organization — no second organization was created
-    // for him, and no second identity exists.
+    // The invariant that matters: he joined the EXISTING organization. Exactly one
+    // Organization A entry, no second organization, and no second identity — the
+    // switcher is read from his own memberships, so a duplicate would show here.
+    await page.goto("/home");
     await openSwitcher(page);
     const menu = page.getByTestId("workspace-menu").first();
-    await expect(menu.getByRole("menuitem", { name: /Organization A/ })).toHaveCount(1);
+    await expect(menu.getByRole("menuitem", { name: /Nile Finishing Supplies/ })).toHaveCount(1);
+    await expect(menu.getByRole("menuitem", { name: /Karim|^Personal$/ })).toHaveCount(1);
   });
 });
 
@@ -261,7 +267,7 @@ test.describe("6 — revoked membership", () => {
     await signIn(page, request, IDENTITIES.branchLimited, /\/(home|b2b)(\/|$)/);
     await openSwitcher(page);
     await expect(
-      page.getByTestId("workspace-menu").first().getByRole("menuitem", { name: /Organization A/ }),
+      page.getByTestId("workspace-menu").first().getByRole("menuitem", { name: /Nile Finishing Supplies/ }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: /sign out/i }).click();
@@ -284,7 +290,7 @@ test.describe("6 — revoked membership", () => {
     // selector, and direct navigation cannot reach it.
     await signIn(page, request, IDENTITIES.branchLimited, /\/(home|b2b)(\/|$)/);
     await page.goto("/b2b");
-    await expect(page.getByText("Organization A", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Nile Finishing Supplies", { exact: true })).toHaveCount(0);
   });
 });
 
