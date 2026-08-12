@@ -106,36 +106,59 @@ update public.users u
        ('showroom_dealer', 'supplier', 'manufacturer', 'importer', 'wholesaler');
 
 -- ---------------------------------------------------------------------------
--- 4. profile_public_directory — explicit about the personaless identity
+-- 4. Public professional discovery — explicit about the personaless identity
 -- ---------------------------------------------------------------------------
--- A business-only identity has no personal professional profile to discover, so it
--- must never surface here. `null <> 'end_consumer'` already evaluates to NULL (and
--- therefore filters the row out), but the intent is load-bearing enough to state.
+-- A business-only identity has no PERSONAL professional profile to discover, so it
+-- must never surface here (businesses are found through
+-- organization_public_directory instead). `null <> 'end_consumer'` already
+-- evaluates to NULL and therefore filters the row out, but a public-visibility
+-- rule that depends on three-valued-logic trivia deserves to be stated outright.
+--
+-- The eligibility filter lives in the internal SECURITY DEFINER reader behind the
+-- `security_invoker = true` view (20260805100000 hardening) — so we replace the
+-- FUNCTION here, never the view. Recreating the view would silently revert that
+-- hardening and reintroduce the Advisor "Security Definer View" finding.
 -- Column set and every other eligibility rule are unchanged.
-create or replace view public.profile_public_directory
-  with (security_invoker = false) as
+create or replace function app._profile_public_directory()
+returns table (
+  id              uuid,
+  display_name    text,
+  headline        text,
+  bio             text,
+  avatar_media_id uuid,
+  locality_id     uuid,
+  languages       text[]
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
   select p.id, p.display_name, p.headline, p.bio,
          p.avatar_media_id, p.locality_id, p.languages
   from public.profiles p
   join public.users u on u.id = p.user_id
   where p.deleted_at is null
-    and p.public_profile_status = 'listed'
-    and u.status = 'active'
+    and p.public_profile_status = 'listed'::public.public_profile_status
+    and u.status = 'active'::public.user_status
     and u.primary_account_type is not null
-    and u.primary_account_type <> 'end_consumer';
-comment on view public.profile_public_directory is 'Approved PUBLIC projection of PERSONAL professional profiles for B2C discovery. Requires public_profile_status = listed (server-controlled) AND an explicit personal professional persona AND active AND not deleted. A business-only identity (null persona) is never listed here — businesses are discovered through organization_public_directory. Only display columns; never user_id/timestamps/deleted_at.';
+    and u.primary_account_type <> 'end_consumer'::public.account_type;
+$$;
+comment on function app._profile_public_directory() is
+  'Internal SECURITY DEFINER reader backing public.profile_public_directory. Returns ONLY approved display columns of listed, active, non-deleted PERSONAL professional profiles. A business-only identity (null persona) is never listed — businesses are discovered through organization_public_directory. Not in an exposed schema; PUBLIC execute revoked.';
 
 -- ---------------------------------------------------------------------------
 -- 5. request_account_upgrade — null-safe, and personal-personas only
 -- ---------------------------------------------------------------------------
--- Two corrections, both consequences of section 1:
+-- Two corrections, both consequences of section 1. Everything else (one open
+-- request per user, idempotent re-request, the needs-more-info resubmission path,
+-- conflict on a different open target, audit emission) is the current Sprint 4
+-- logic, carried over unchanged:
 --   * the "no identity row" guard tested the VALUE, so a business-only identity
 --     (null persona) would have been told it has no identity row at all;
 --   * a BUSINESS classification must never be applied to a person. The upgrade
 --     workflow writes users.primary_account_type on approval, so business values
 --     are rejected at the door — a business is created as an Organization instead.
--- Everything else (one open request per user, idempotent re-request, conflict on a
--- different open target, audit emission) is the Sprint 2 logic unchanged.
 create or replace function public.request_account_upgrade(
   p_requested_account_type public.account_type
 )
@@ -147,7 +170,7 @@ as $$
 declare
   v_uid     uuid := (select auth.uid());
   v_current public.account_type;
-  v_id      uuid;
+  v_v       public.verifications;
 begin
   if v_uid is null then
     raise exception 'authentication required' using errcode = '42501';
@@ -160,6 +183,7 @@ begin
     raise exception 'a business classification belongs to an organization, not a person'
       using errcode = '22023';
   end if;
+  -- Presence of the ROW, not of a persona: a business-only identity has none.
   if not exists (select 1 from public.users u where u.id = v_uid) then
     raise exception 'no identity row for caller' using errcode = '42501';
   end if;
@@ -172,23 +196,34 @@ begin
     (subject_type, user_id, verification_type, requested_account_type, status, submitted_at)
   values ('user', v_uid, 'professional', p_requested_account_type, 'submitted', now())
   on conflict do nothing
-  returning id into v_id;
+  returning * into v_v;
 
-  if v_id is null then
-    select v.id into v_id from public.verifications v
-    where v.subject_type = 'user' and v.user_id = v_uid
-      and v.status in ('draft','submitted','under_review','needs_more_info');
-    if (select v.requested_account_type from public.verifications v where v.id = v_id)
-         is distinct from p_requested_account_type then
+  if v_v.id is null then
+    select * into v_v from public.verifications
+    where subject_type = 'user' and user_id = v_uid
+      and status in ('draft','submitted','under_review','needs_more_info')
+    for update;
+    if v_v.requested_account_type is distinct from p_requested_account_type then
       raise exception 'an open upgrade request already exists for a different account type'
         using errcode = '23505';
     end if;
-    return v_id;
+    if v_v.status = 'needs_more_info' then
+      update public.verifications
+        set status = 'submitted', reviewer_id = null, reason = null
+        where id = v_v.id;
+      perform app.record_audit_event(
+        'account.upgrade_requested', 'verification', v_v.id, null,
+        jsonb_build_object('requested_account_type', p_requested_account_type, 'resubmission', true)
+      );
+    end if;
+    return v_v.id;
   end if;
 
-  perform app.record_audit_event('account.upgrade_requested', 'user', v_uid, null,
-    jsonb_build_object('requested_account_type', p_requested_account_type));
-  return v_id;
+  perform app.record_audit_event(
+    'account.upgrade_requested', 'verification', v_v.id, null,
+    jsonb_build_object('requested_account_type', p_requested_account_type)
+  );
+  return v_v.id;
 end;
 $$;
 revoke execute on function public.request_account_upgrade(public.account_type) from public;

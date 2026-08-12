@@ -118,10 +118,12 @@ select is(
    where user_id = 'd0000000-0000-4000-8000-0000000000d1'
      and requested_account_type = 'interior_designer' and status = 'submitted'),
   1, 'submit hands off to the trusted upgrade workflow (a submitted verification)');
--- …and the account type is NEVER applied here (still the default consumer type).
+-- …and the account type is NEVER applied here. The identity carries no persona
+-- yet (Sprint 12: no default), which is precisely the "claimed but not yet
+-- granted" state — the declared type lives on the onboarding row until review.
 select is(
   (select primary_account_type::text from public.users where id = 'd0000000-0000-4000-8000-0000000000d1'),
-  'end_consumer', 'submit NEVER mutates users.primary_account_type (review still required)');
+  null, 'submit NEVER mutates users.primary_account_type (review still required)');
 -- Pilot UAT round 1: submission ACTIVATES the personal account. The review stays
 -- open above (verification is an independent trust state), but the professional
 -- is never trapped in a review-waiting screen.

@@ -219,6 +219,17 @@ begin
     select * into v_d from public.business_creation_drafts d
     where d.user_id = v_uid and d.completed_at is null
     for update;
+    -- No OPEN draft: the caller has already completed this creation and is
+    -- retrying without a handle (the no-arg registration wrapper). Return their
+    -- most recent result rather than erroring — and, crucially, rather than
+    -- treating "nothing open" as licence to create another business. A caller who
+    -- genuinely wants a second business opens a new draft first.
+    if v_d.id is null then
+      select * into v_d from public.business_creation_drafts d
+      where d.user_id = v_uid and d.organization_id is not null
+      order by d.completed_at desc
+      limit 1;
+    end if;
   else
     select * into v_d from public.business_creation_drafts d
     where d.id = p_draft_id and d.user_id = v_uid

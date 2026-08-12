@@ -111,8 +111,10 @@ select is(
   (select status::text from public.verifications
    where subject_type = 'user' and user_id = 'e2000000-0000-4000-8000-0000000000e2'),
   'submitted', 'the professional verification request is preserved for Admin review');
+-- Sprint 12: with no column default, an unapplied persona reads as null rather
+-- than a fake consumer one — the same assertion, stated honestly.
 select is((select primary_account_type::text from public.users where id = 'e2000000-0000-4000-8000-0000000000e2'),
-  'end_consumer', 'activation NEVER applies the requested account type (review still required)');
+  null, 'activation NEVER applies the requested account type (review still required)');
 -- Usable, but not yet trusted: an unapproved professional stays undiscoverable.
 select is(
   (select public_profile_status::text from public.profiles where user_id = 'e2000000-0000-4000-8000-0000000000e2'),
