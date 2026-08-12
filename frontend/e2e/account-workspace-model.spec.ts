@@ -131,7 +131,7 @@ test.describe("2 + 3 + 5 — an existing professional adds businesses", () => {
     await page.getByRole("button", { name: /^continue$/i }).click();
     await page.waitForURL(/\/onboarding\/professional$/, { waitUntil: "commit" });
 
-    await page.getByRole("button", { name: /^engineer$/i }).click();
+    // The concrete type came from registration; the flow does not re-ask it.
     await page.locator("#headline").fill("Structural engineering, Cairo");
     await page.locator("#years").fill("9");
     await page.getByRole("button", { name: /^structural$/i }).click();

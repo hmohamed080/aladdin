@@ -31,18 +31,25 @@ export type ConsumerBudget = (typeof CONSUMER_BUDGETS)[number];
 
 /**
  * The professional persona is derived from the account type chosen at the shared
- * account-type step (Sprint 7.3). The "engineer / designer" choice is stored as the
- * `engineer` account type and is disambiguated into engineer vs interior_designer
- * inside the professional flow (the design + DB keep these two distinct).
+ * account-type step.
+ *
+ * Sprint 12: Engineer and Interior Designer became DISTINCT registration choices,
+ * so each now maps to its own persona with a FIXED concrete type — the type is
+ * asked once, at registration, and never again. The combined `engineer_designer`
+ * persona is retained for saved drafts from before the split: it carries no fixed
+ * type and still resolves through the in-flow sub-choice.
  */
 export type ProfessionalPersona =
+  | "engineer"
+  | "interior_designer"
   | "engineer_designer"
   | "installer_technician"
   | "contractor"
   | "salesperson";
 
 export const PERSONA_BY_ACCOUNT_TYPE: Partial<Record<AccountTypeValue, ProfessionalPersona>> = {
-  engineer: "engineer_designer",
+  engineer: "engineer",
+  interior_designer: "interior_designer",
   installer_technician: "installer_technician",
   contractor: "contractor",
   sales: "salesperson",
@@ -53,11 +60,14 @@ export const INDIVIDUAL_PROFESSIONAL_TYPES: AccountTypeValue[] = [
   "engineer", "interior_designer", "installer_technician", "contractor", "sales",
 ];
 
-/** Only engineer/designer needs a concrete-type sub-choice; the rest are fixed. */
+/** Only the legacy combined persona needs a sub-choice; every current one is fixed. */
 export const ENGINEER_DESIGNER_TYPES = ["engineer", "interior_designer"] as const;
 
 /** The fixed concrete account type for a persona (null → resolved by sub-choice). */
 export const FIXED_CONCRETE_TYPE: Record<ProfessionalPersona, AccountTypeValue | null> = {
+  engineer: "engineer",
+  interior_designer: "interior_designer",
+  // Transitional: a draft saved before the Engineer/Interior Designer split.
   engineer_designer: null,
   installer_technician: "installer_technician",
   contractor: "contractor",

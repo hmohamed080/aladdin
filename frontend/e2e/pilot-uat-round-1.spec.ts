@@ -75,7 +75,8 @@ test.describe("Pilot UAT round 1 — personal accounts", () => {
     await page.getByRole("button", { name: /^continue$/i }).click();
     await page.waitForURL(/\/onboarding\/professional$/, { waitUntil: "commit" });
 
-    await page.getByRole("button", { name: /^interior designer$/i }).click();
+    // The concrete type came from registration, so the flow never re-asks it.
+    await expect(page.getByText(/which best describes you/i)).toHaveCount(0);
     await page.locator("#headline").fill("Residential interiors, New Cairo");
     await page.locator("#years").fill("7");
     await page.getByRole("button", { name: /^residential$/i }).click();
