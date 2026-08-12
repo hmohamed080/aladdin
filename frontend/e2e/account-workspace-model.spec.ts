@@ -76,16 +76,19 @@ async function createBusiness(page: Page, name: string, branch: string, orgType?
   await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
 }
 
-const switcher = (page: Page) => page.getByTestId("workspace-switcher").first();
+// The B2B shell renders the switcher twice — a desktop slot and a mobile row —
+// with CSS choosing which is shown. Match the VISIBLE one so the same journeys
+// run on both viewports.
+const switcher = (page: Page) => page.locator('[data-testid="workspace-switcher"]:visible').first();
 
 async function openSwitcher(page: Page) {
   await switcher(page).click();
-  await expect(page.getByTestId("workspace-menu").first()).toBeVisible();
+  await expect(page.locator('[data-testid="workspace-menu"]:visible').first()).toBeVisible();
 }
 
 async function switchTo(page: Page, name: RegExp, landing: RegExp) {
   await openSwitcher(page);
-  await page.getByTestId("workspace-menu").first().getByRole("menuitem", { name }).click();
+  await page.locator('[data-testid="workspace-menu"]:visible').first().getByRole("menuitem", { name }).click();
   await page.waitForURL(landing, { waitUntil: "commit" });
 }
 
@@ -110,7 +113,7 @@ test.describe("1 — new business registration", () => {
     await expect(page.getByText("Hala Ceramics", { exact: true }).first()).toBeAttached();
     // The creator is the OWNER, stated by the switcher.
     await openSwitcher(page);
-    const menu = page.getByTestId("workspace-menu").first();
+    const menu = page.locator('[data-testid="workspace-menu"]:visible').first();
     await expect(menu.getByRole("menuitem", { name: /Hala Ceramics/ })).toContainText(/owner/i);
     // No fake Personal workspace: they never claimed a personal persona.
     await expect(menu.getByRole("menuitem", { name: /^Personal$/ })).toHaveCount(0);
@@ -170,7 +173,7 @@ test.describe("2 + 3 + 5 — an existing professional adds businesses", () => {
     // Both businesses AND the personal context are offered — one login, three
     // places to work, one identity.
     await openSwitcher(page);
-    const menu = page.getByTestId("workspace-menu").first();
+    const menu = page.locator('[data-testid="workspace-menu"]:visible').first();
     await expect(menu.getByRole("menuitem", { name: /AH Design Studio/ })).toBeVisible();
     await expect(menu.getByRole("menuitem", { name: /AH Import/ })).toBeVisible();
     await expect(menu.getByRole("menuitem", { name: /Ahmed Engineer|^Personal$/ })).toBeVisible();
@@ -251,7 +254,7 @@ test.describe("7 — invitation regression", () => {
     // switcher is read from his own memberships, so a duplicate would show here.
     await page.goto("/home");
     await openSwitcher(page);
-    const menu = page.getByTestId("workspace-menu").first();
+    const menu = page.locator('[data-testid="workspace-menu"]:visible').first();
     await expect(menu.getByRole("menuitem", { name: /Nile Finishing Supplies/ })).toHaveCount(1);
     await expect(menu.getByRole("menuitem", { name: /Karim|^Personal$/ })).toHaveCount(1);
   });
@@ -267,7 +270,7 @@ test.describe("6 — revoked membership", () => {
     await signIn(page, request, IDENTITIES.branchLimited, /\/(home|b2b)(\/|$)/);
     await openSwitcher(page);
     await expect(
-      page.getByTestId("workspace-menu").first().getByRole("menuitem", { name: /Nile Finishing Supplies/ }),
+      page.locator('[data-testid="workspace-menu"]:visible').first().getByRole("menuitem", { name: /Nile Finishing Supplies/ }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: /sign out/i }).click();
@@ -312,7 +315,7 @@ test.describe("8 — migrated pilot owners", () => {
       // Business-only: no Personal entry is offered (it would be empty and fake).
       await openSwitcher(page);
       await expect(
-        page.getByTestId("workspace-menu").first().getByRole("menuitem", { name: /^Personal$/ }),
+        page.locator('[data-testid="workspace-menu"]:visible').first().getByRole("menuitem", { name: /^Personal$/ }),
       ).toHaveCount(0);
     });
   }
@@ -328,7 +331,7 @@ test.describe("bilingual + responsive — changed surfaces", () => {
 
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await openSwitcher(page);
-    const menu = page.getByTestId("workspace-menu").first();
+    const menu = page.locator('[data-testid="workspace-menu"]:visible').first();
     // Arabic copy, not English leaking through.
     await expect(menu.getByText("مساحة العمل").first()).toBeVisible();
     await expect(menu.getByText("إضافة نشاط تجاري")).toBeVisible();
