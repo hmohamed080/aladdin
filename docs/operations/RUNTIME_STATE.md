@@ -6,11 +6,11 @@ This is a **mutable snapshot** of the current live repository state — not an a
 
 | | |
 |---|---|
-| **Version** | Runtime snapshot · 2026-08-11 |
+| **Version** | Runtime snapshot · 2026-08-12 |
 | **Owner** | Foundation / Operations |
-| **Last updated** | 2026-08-11 |
-| **Updated by** | Claude — Pilot UAT fix round 1 |
-| **Current focus** | **Pilot UAT fix round 1:** completing onboarding now ACTIVATES a personal account (verification became an independent trust state), `/home` is one persona-aware personal surface with derived profile completeness, the generic "organization owner / manager" registration path saves and resumes, and the Admin verification queue actually reaches the account/organization it decides on. Branch `fix/pilot-uat-round-1`; two new migrations; product direction updated; no `.pen` change. |
+| **Last updated** | 2026-08-12 |
+| **Updated by** | Claude — Pilot UAT product-direction alignment (account / organization / workspace model) |
+| **Current focus** | **Pilot UAT fix round 1 + product-direction alignment (same branch/PR):** completing onboarding now ACTIVATES a personal account (verification became an independent trust state), `/home` is one persona-aware personal surface with derived profile completeness, the generic "organization owner / manager" registration path saves and resumes, and the Admin verification queue actually reaches the account/organization it decides on. On top of that, the **account / organization / workspace model is now canonical documentation**: one person = one user ID · personal identity ≠ business · a business is an Organization created once (org + owner membership + primary branch, transactional) · Membership is the only user↔organization link · zero/one/many organizations per login · workspace is **derived** (no `workspaces` table) and work-context switching ≠ persona switching · single-source-of-truth ownership · duplicate-business protection · membership history retained · account deletion recorded as **future** rule. Branch `fix/pilot-uat-round-1`; two new migrations; **the alignment patch is documentation-only** (no schema/frontend/test change); no `.pen` change. |
 
 ## Phase & repository
 

@@ -8,7 +8,7 @@ Show Aladdin's external actors and systems — who and what it talks to.
 
 ## Current decision
 
-**Actors (separate roles under one canonical identity; one current primary account type at a time — no profile switcher):** End Consumer · Installer/Technician · Engineer · Interior Designer · Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · **Sales** (key daily-active B2B user) · Contractor · Trainer · Trainee · Administrator. Navigation/access is derived from primary account type, organization membership, branch assignment, permission capabilities, verification state, and subscription state.
+**Actors (separate roles under one canonical identity — one person = one user ID; one current primary account type at a time — no persona/profile switcher, though the same user may work across the personal surface and any organization where they hold an active membership):** End Consumer · Installer/Technician · Engineer · Interior Designer · Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · **Sales** (key daily-active B2B user) · Contractor · Trainer · Trainee · Administrator. Navigation/access is derived from primary account type, organization membership, branch assignment, permission capabilities, verification state, and subscription state.
 
 **Surfaces:** B2C (marketplace-style discovery/consultation), B2B (Sales/organization workspace), Admin (control center).
 

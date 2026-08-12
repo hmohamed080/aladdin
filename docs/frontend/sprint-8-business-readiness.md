@@ -15,7 +15,10 @@ persona-specific difference is only the pre-selected business type:
 - **Showroom / Dealer**, **Supplier**, **Manufacturer / Importer / Wholesaler** — the
   concrete `org_type` chosen at the shared account-type step pre-selects the type.
 - **Organization owner / manager** — the generic business choice; the owner picks the
-  type in the wizard.
+  type in the wizard. **Transitional (2026-08-12):** kept for backward compatibility and
+  resume safety only. Owner/manager is a *relationship*, never an account or business
+  type; the target registration UX is *personal persona OR concrete business type*, with
+  the creator becoming Owner automatically (PRODUCT_DIRECTION_GUIDE).
 - **Invited organization employee** — joins through the **existing** invitation path
   (`/auth/invite/[token]` → `invitation_accept`), unchanged. An invited employee never
   creates an org: acceptance only bridges into a membership.

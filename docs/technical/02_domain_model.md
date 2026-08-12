@@ -19,7 +19,10 @@ The product model (PRODUCT_DIRECTION_GUIDE) is **capability-based derived access
 
 - **Account Type** (a person's *one current primary* type) and **Platform Role** (admin-team tier) replace the generic notion of "Role".
 - **Capability** (a granted permission on a membership) replaces a free-standing "Permission" entity.
-- A user has **one canonical identity** and **one primary account type at a time**; there is **no profile switcher**. What they can see/do is derived from: account type + org membership + branch assignment + capabilities + verification state + subscription state.
+- A user has **one canonical identity** and **one primary account type at a time**; there is **no persona/profile switcher**. What they can see/do is derived from: account type + org membership + branch assignment + capabilities + verification state + subscription state.
+- **One person = one user ID.** A business is an `Organization`, never a second `User`; joining or creating a business adds a `Membership`, never an auth identity. A user may hold **zero, one, or many** memberships.
+- **Workspace is a derived UX concept, not an entity** — Personal = `User`+`Profile`, Business = `Organization`+ active `Membership`. There is **no `workspaces` table**, and switching work context is *not* persona switching (PRODUCT_DIRECTION_GUIDE *Switching*).
+- **No duplicated identity across domains:** personal identity is owned by `users`/`profiles`, business identity by `organizations`, the relationship by `memberships`. Onboarding drafts may hold entered values temporarily; after commit the canonical read is always from the owning entity.
 
 ---
 
@@ -28,8 +31,8 @@ The product model (PRODUCT_DIRECTION_GUIDE) is **capability-based derived access
 ### User
 - **Purpose:** the single canonical identity for a person, regardless of verification channel.
 - **Responsibilities:** anchor authentication (Supabase Auth), hold the current `primary_account_type`, own personal data.
-- **Relationships:** 1–1 `Profile`; 1–* `Contact`; 0–* `Membership`; 0–* personal records (needs, conversations, notifications).
-- **Lifecycle:** `pending_verification` → `active` → (`suspended`) → (`deactivated`). Created at first successful OTP; never duplicated per channel.
+- **Relationships:** 1–1 `Profile`; 1–* `Contact`; **0–\*** `Membership` (zero is valid and fully usable — a personal professional needs no organization); 0–* personal records (needs, conversations, notifications).
+- **Lifecycle:** `pending_verification` → `active` → (`suspended`) → (`deactivated`). Created at first successful OTP; **never duplicated** — not per channel, not per role, and **not per business**. ⚑ **Future (approved, not implemented):** deactivate is reversible; a delete request runs a grace period, then final deletion releases the login identity while business/audit history remains; a later account reusing the released email/phone gets a **new** `User` id and inherits no membership, permission, or history. See PRODUCT_DIRECTION_GUIDE *Account Lifecycle*.
 - **Ownership:** `USER`. Mirrors `auth.users` (Supabase); app-level `users` row keyed by `auth.uid()`.
 - **Constraints:** exactly **one** verified primary contact at creation; passwordless (no password fields ever); one primary account type at a time. **`primary_account_type` is server-controlled** — it is not directly user-editable; it changes only through the approved account-upgrade / admin workflow (transactional + auditable), which *extends* the one identity (no second user/profile, no profile switcher). See [ADR-0007 D10](../decisions/ADR-0007-identity-and-tenancy-model.md).
 
@@ -63,7 +66,8 @@ The product model (PRODUCT_DIRECTION_GUIDE) is **capability-based derived access
 - **Responsibilities:** own all tenant data; hold verification and subscription state; be the RLS boundary.
 - **Relationships:** 1–* `Branch`; 1–* `Membership`; 1–* `Product`; 1–1 (current) `Subscription`; 1–* `Verification`; 1–* `Opportunity`/`Project`/`Quote`.
 - **Lifecycle:** `draft` → `pending_verification` → `active` → (`suspended`) → (`archived`). See [11](11_state_machines.md).
-- **Ownership:** `ORG` (self). **Constraints:** `org_type` aligns with account types that can own an org; a personal End-Consumer identity is not an org.
+- **Ownership:** `ORG` (self) — the **canonical source of business identity**; business identity is never mirrored onto the creating `User` as a second source of truth. **Constraints:** `org_type` is a **concrete business type** (Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler …) — **never `owner_manager`**, which is a user↔organization *relationship*, not a type; a personal identity is never an org, and a personal professional may hold none.
+- **Creation (⚑ for the upcoming implementation):** the user creates their business **once** in the UX; the backend creates `Organization` + owner `Membership` + primary `Branch` **in one transaction**. Creation must be **idempotent** — retrying the same completed business-onboarding operation returns the **same** organization instead of a duplicate. **Business name alone is never the permanent unique identity**; future verified identifiers may include normalized legal/business identifiers.
 
 ### Branch
 - **Purpose:** a physical/operational sub-unit of an organization (e.g. Cairo branch) for scoping catalog, inventory, pipeline, and staff.
@@ -71,10 +75,10 @@ The product model (PRODUCT_DIRECTION_GUIDE) is **capability-based derived access
 - **Lifecycle:** `active` → (`inactive`). **Ownership:** `ORG+BRANCH`. **Constraints:** every branch belongs to exactly one org; branch-scoped rows carry `branch_id`.
 
 ### Membership
-- **Purpose:** links a `User` to an `Organization` (and optionally a `Branch`) with a set of **capabilities**.
-- **Responsibilities:** the unit that derives what an org-user can do; carries invite/acceptance state.
-- **Relationships:** *–1 `User`, *–1 `Organization`, 0–1 `Branch`, 1–* `Capability`.
-- **Lifecycle:** `invited` → `active` → (`suspended`) → `revoked`. **Ownership:** `ORG`. **Constraints:** unique (`user_id`, `organization_id`); does **not** fork the canonical identity.
+- **Purpose:** the **only** link between a `User` and an `Organization` (and optionally a `Branch`), owning the organization relationship, role/**capabilities**, branch scope, and lifecycle/status.
+- **Responsibilities:** the unit that derives what an org-user can do; carries invite/acceptance state. **Employees join an existing organization by invitation** — joining never creates another organization, and never another `User`.
+- **Relationships:** *–1 `User`, *–1 `Organization`, 0–1 `Branch`, 1–* `Capability`. The same `User` may hold memberships in **many** organizations concurrently (same identity, different work contexts).
+- **Lifecycle:** `invited` → `active` → (`suspended`) → `revoked` — **separate from the user/account lifecycle**. **Ownership:** `ORG`. **Constraints:** unique (`user_id`, `organization_id`); does **not** fork the canonical identity. **Leaving does not delete history:** a `revoked`/former membership stops access but is retained for historical attribution of the work it produced.
 
 ### Capability (permission grant)
 - **Purpose:** a granular permission attached to a membership (e.g. `catalog.write`, `quote.approve`, `verification.submit`).

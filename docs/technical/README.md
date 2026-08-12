@@ -48,5 +48,5 @@ Where this blueprint had to reconcile a request against the approved architectur
 
 - **DB naming** follows [`database/naming-conventions.md`](../database/naming-conventions.md) (snake_case, plural tables, `uuid` PKs, `organization_id`/`branch_id` tenancy columns, `ix_`/`uq_`/`fk_` prefixes).
 - **Tenancy:** the **organization** is the tenant; branch scoping where applicable. RLS is the isolation spine ([`security/rls-strategy.md`](../security/rls-strategy.md)).
-- **Identity:** one canonical passwordless identity; access is **derived** from primary account type + org membership + branch + permission capabilities + verification + subscription — never a role toggle.
+- **Identity:** **one person = one user ID** — one canonical passwordless identity, never a second user per role, channel, or business (a business is an `Organization` reached through a `Membership`). Access is **derived** from primary account type + org membership + branch + permission capabilities + verification + subscription — never a role toggle.
 - **Open items** are marked `⚑ OPEN` inline and collected in the final report.

@@ -29,6 +29,9 @@ Cross-cutting: bilingual AR-RTL/EN-LTR, Light+Dark, responsive PWA, Egyptian loc
 | **Learning & training (Trainer/Trainee)** | Account types exist; feature surface deferred | account-type enum includes trainer/trainee |
 | **Business opportunities / supply-chain workflow** | Full-platform | pipeline/opportunity model generalizes |
 | **Advanced analytics / BI** | Dashboards built last (05E); deep BI later | `analytics_snapshots` derived model |
+| **Work-context (workspace) switcher** | Approved direction, not built; the model already permits many memberships per identity | workspaces are **derived** (User+Profile / Organization+active Membership) — no `workspaces` table is to be added |
+| **"Add / create a business" for an existing user** | Approved direction, not built | creates `Organization` + owner `Membership` for the **existing** user — no second sign-up, no duplicate profile |
+| **Account lifecycle: deactivate / delete** | Approved future rule only — **do not implement now** | deactivate reversible; delete request → grace period → final deletion releases the login identity per privacy policy while **business/audit history remains**; a later account on the same released email/phone gets a **new** user id and inherits nothing; historical actions show a **muted, non-clickable** historical name. Leaving an organization ≠ deleting an account (PRODUCT_DIRECTION_GUIDE *Account Lifecycle*) |
 
 ## 3. Deferred — technical / platform
 
@@ -50,7 +53,8 @@ Cross-cutting: bilingual AR-RTL/EN-LTR, Light+Dark, responsive PWA, Egyptian loc
 - Add-to-cart / checkout / storefront commerce.
 - Price-war reverse-auction / blind price bidding.
 - A generic, configurable horizontal CRM.
-- Merging roles / a Profile Switcher / "Use As" mode / role-switching UI.
+- Merging roles / a Profile Switcher / "Use As" mode / persona (account-identity) switching UI. *(Selecting the active **work context** between the personal surface and organizations where the user has an active membership is **not** this, and is allowed — see §2.)*
+- A second user/auth identity for the same person (per role, per contact channel, or per business), or a generic `workspaces` table.
 - Passwords / forgot / reset flows (product is passwordless).
 - Excluded infrastructure: Kubernetes, Kafka, RabbitMQ, Redis, Elasticsearch/OpenSearch, event sourcing, CQRS frameworks, service mesh, API gateway, second database, Vite/React SPA/React Router, Alembic (ADR-0001/0002).
 

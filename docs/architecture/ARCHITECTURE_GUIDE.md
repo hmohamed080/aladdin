@@ -71,11 +71,13 @@ Token/brand changes follow the design-system edit-order (token JSON first) and u
 ## Multi-Tenancy Model
 - The **tenant unit is the organization**, with **branch** scoping where applicable.
 - **RLS is the isolation spine** — cross-tenant data must never leak in UI, API, worker, or AI retrieval.
-- Tenancy attaches to the canonical identity via organization membership + branch assignment; it does not fork the account.
+- Tenancy attaches to the canonical identity via organization membership + branch assignment; it does not fork the account. One user may hold **zero, one, or many** memberships on the same identity, and a personal (organization-less) account is fully valid.
 
 ## Identity & Authorization Model
-- **One canonical identity per person** (passwordless; WhatsApp/Email OTP). See the [Product Direction Guide](../product/PRODUCT_DIRECTION_GUIDE.md) *Canonical Identity Model* and *No-Profile-Switcher Rule*.
-- **One current primary account type** at a time — no profile switcher. What a user can see/do is **derived** from primary account type, organization membership, branch assignment, permission capabilities, verification state, and subscription state.
+- **One person = one user ID.** One canonical identity per person (passwordless; WhatsApp/Email OTP); creating or joining another business never creates a second auth user. A business is an **Organization**, never a second account. See the [Product Direction Guide](../product/PRODUCT_DIRECTION_GUIDE.md) *Canonical Identity Model*, *Personal Identity Is Not a Business*, and *Switching*.
+- **One current primary account type** at a time — **no persona/profile switcher**. What a user can see/do is **derived** from primary account type, organization membership, branch assignment, permission capabilities, verification state, and subscription state.
+- **Work context ≠ identity.** Switching the active work context between the personal surface (User+Profile) and an organization where the same user holds an **active membership** (Organization+Membership) is allowed and is *not* persona switching. Both workspaces are **derived** — there is no `workspaces` table.
+- **No duplicated identity.** Personal identity lives in `users`/`profiles`, business identity in `organizations`, and the relationship in `memberships`; neither side is copied into the other as a second source of truth (onboarding drafts excepted, until commit).
 - **Authorization is enforced server-side** (RLS + explicit permission checks). The UI never implies access it cannot grant. Identity is always derived from the verified JWT, never from a request body.
 
 ## RLS Strategy

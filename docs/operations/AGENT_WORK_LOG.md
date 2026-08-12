@@ -4,6 +4,40 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Pilot UAT product-direction alignment (account / organization / workspace model)
+
+**Date:** 2026-08-12 · **Branch:** `fix/pilot-uat-round-1` (same PR #20, unmerged) · **Base:** `main` @ `d595a6d`
+
+### Objective
+Align the canonical product documentation with the account/workspace model approved during the Pilot UAT discussion. **Documentation-only patch** — the workspace switcher and the account lifecycle are recorded as direction and are deliberately **not implemented**.
+
+### What is now canonical (PRODUCT_DIRECTION_GUIDE)
+**One person = one user ID** (another business never creates another user) · **personal identity is not a business**, and a personal professional may hold **zero** organizations · **a business is an Organization**, created **once** in the UX (backend transactionally creates organization + owner membership + primary branch) · **Membership** is the only user↔organization link and owns relationship, capabilities, branch scope, lifecycle · **zero/one/many organizations on one login** · **workspace is a derived UX concept** (Personal = User+Profile · Business = Organization+active Membership), **no `workspaces` table** · an **existing user can add a business later** with no second sign-up · **single-source-of-truth ownership table** (auth user · users/profiles · organizations · memberships · branches · org-owned business records) forbidding identity duplication in either direction · **duplicate-business protection** (transactional + idempotent; name alone is never the permanent identity) · **membership history survives leaving** (revoked stops access, retains attribution) · **approved future account lifecycle** (deactivate reversible; delete request → grace period → identity released, business/audit history retained; a reused email/phone gets a NEW user id inheriting nothing; muted non-clickable historical attribution; leaving an org ≠ deleting an account).
+
+### Contradictions corrected
+1. **"No profile switcher" read as banning all context switching** (PRODUCT_DIRECTION_GUIDE, ARCHITECTURE_GUIDE, `02_domain_model`, `07_permissions_matrix`, `14_future_extensions`, `mvp-scope`, BACKLOG, PRODUCT.md, DESIGN.md, UI_UX_SYSTEM_GUIDE, CLAUDE.md, `12_ai_agent_rules`) — split into **persona/account-identity switching (forbidden)** vs **active work-context switching across the user's own active memberships (allowed, not built)**.
+2. **Owner/manager framed only as "not a business type"** — restated as **not an account type either**, a pure user↔organization relationship; the target *personal persona OR concrete business type* registration UX was recorded, and the generic entry demoted to **transitional backward-compatibility** (also noted in `sprint-8-business-readiness.md`).
+3. **"Create an account, then create an organization" framing** — replaced with *create the business once* (transactional organization + owner membership + primary branch); added as a UI anti-pattern.
+4. **`User` 0–\* `Membership` was ambiguous about zero** — `02_domain_model` now states an organization-less personal account is valid and fully usable.
+5. **No stated rule against a second identity per business** — added to the identity model, the NEVER list, `12_ai_agent_rules`, `14_future_extensions`, and BACKLOG.
+6. **No stated single-source-of-truth ownership rule** — added the ownership table plus the draft-until-commit exception; `Organization` is now explicitly the canonical business identity.
+7. **Nothing forbade a generic `workspaces` table** — now explicitly forbidden; workspaces are derived.
+8. **Membership lifecycle was not distinguished from account lifecycle** — separated, with history retained on revoke.
+9. **No duplicate-business protection recorded** — transactional + idempotent creation documented for the upcoming implementation.
+10. **No account-deletion rule existed anywhere** — recorded as approved future direction in PRODUCT_DIRECTION_GUIDE + `14_future_extensions`, explicitly not implemented.
+
+### Files touched
+`PRODUCT_DIRECTION_GUIDE.md` (anchor + change history), `ARCHITECTURE_GUIDE.md`, `02_domain_model.md`, `07_permissions_matrix.md`, `14_future_extensions.md`, `mvp-scope.md`, `BACKLOG.md`, `PRODUCT.md`, `DESIGN.md`, `UI_UX_SYSTEM_GUIDE.md`, `CLAUDE.md`, `12_ai_agent_rules.md`, `sprint-8-business-readiness.md`, `RUNTIME_STATE.md`, this log.
+
+### Validation
+Documentation-consistency search across the canonical docs; `git diff` inspected. **No** schema, frontend, backend, or test change — the PR-20 migration comments (`20260813090001`) were checked and are compatible with the new rules, so no code assertion needed correcting. No `.pen` file touched. No tests re-run (nothing executable changed).
+
+### Notes / unfinished
+- `frontend/src/lib/onboarding/account-types.ts` calls `BUSINESS_ORG_TYPES` "the BUSINESS account types" in a comment; the values are `org_type`s, not account types. Left unchanged — outside PR #20's diff and not factually load-bearing — but it should be reworded when that file is next edited.
+- The target registration UX (*personal persona OR concrete business type* → business info → creator becomes Owner), the work-context switcher, "add a business" for an existing user, and the account lifecycle all remain **unimplemented, approved direction**.
+
+---
+
 ## Session — Pilot UAT fix round 1
 
 **Date:** 2026-08-11 · **Branch:** `fix/pilot-uat-round-1` (PR to `main`, unmerged) · **Base:** `main` @ `d595a6d`
