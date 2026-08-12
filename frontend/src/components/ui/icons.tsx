@@ -217,3 +217,16 @@ export const ScrollIcon = (p: IconProps) => (
     <path d="M9 7h6M9 11h6M9 15h3" />
   </Svg>
 );
+
+export const ChevronDownIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m6 9 6 6 6-6" />
+  </Svg>
+);
+
+export const UserIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+    <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
+  </Svg>
+);

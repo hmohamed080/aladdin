@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getRegistrationState } from "@/server/queries/registration";
-import { resolveActiveLanding } from "@/server/queries/landing";
+import { loadPlatformRole } from "@/server/queries/platform";
+import { loadWorkspaces } from "@/server/queries/workspace";
+import { personalEntry, businessEntries } from "@/lib/workspace/model";
 import { loadPersonalHome } from "@/server/queries/personal-home";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { NoPersonalWorkspace } from "@/features/home/no-personal-workspace";
 import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { ConsumerHome } from "@/features/home/consumer-home";
@@ -17,10 +20,17 @@ export const dynamic = "force-dynamic";
  * Installer/Technician, Contractor, org-less Salesperson) — lands here, and the
  * page is persona-aware rather than consumer-specific.
  *
- * Two guards, both derived, never assumed:
+ * Three guards, all derived, never assumed:
  *   * an account that has not finished onboarding resumes at /onboarding;
- *   * a caller who in fact belongs to a workspace, or is platform staff, is
- *     corrected to their real destination (a consumer is never sent to /b2b).
+ *   * platform staff belong in /admin;
+ *   * a caller with NO personal persona has no personal home to show. A
+ *     business-only identity is sent to its business workspace rather than a
+ *     fabricated, empty Personal one; a caller with neither gets an account-safe
+ *     terminal here (never a redirect, which would loop).
+ *
+ * Crucially, merely BELONGING to an organization no longer evicts the caller: an
+ * Engineer who also owns a business keeps a real personal home, and the workspace
+ * switcher — not a forced redirect — decides where they work.
  *
  * Reaching this page never depends on a verification decision — completing
  * onboarding activates the account, and trust state is shown, not enforced.
@@ -31,8 +41,13 @@ export default async function PersonalHomePage() {
   if (state !== "active_personal") redirect("/onboarding");
 
   const supabase = await getServerSupabase();
-  const landing = await resolveActiveLanding(supabase);
-  if (landing !== "/home") redirect(landing);
+  if (await loadPlatformRole(supabase)) redirect("/admin");
+
+  const { entries } = await loadWorkspaces(supabase);
+  if (!personalEntry(entries)) {
+    if (businessEntries(entries).length > 0) redirect("/b2b");
+    return <NoPersonalWorkspace />;
+  }
 
   const data = await loadPersonalHome();
   if (!data) redirect("/auth/sign-in");
