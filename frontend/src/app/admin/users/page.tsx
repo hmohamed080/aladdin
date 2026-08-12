@@ -61,7 +61,11 @@ export default async function AdminUsersPage({
                     {u.displayName || m.admin.users.unnamed}
                   </Link>
                 </td>
-                <td className="px-md py-2.5 text-fg-secondary">{typeLabels[u.accountType] ?? u.accountType}</td>
+                <td className="px-md py-2.5 text-fg-secondary">
+                  {u.accountType
+                    ? (typeLabels[u.accountType] ?? u.accountType)
+                    : m.admin.users.businessOnly}
+                </td>
                 <td className="px-md py-2.5">
                   <StatusBadge status={u.status} label={statusLabels[u.status] ?? u.status} />
                 </td>

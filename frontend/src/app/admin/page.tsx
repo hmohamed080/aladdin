@@ -20,8 +20,12 @@ export default async function AdminDashboardPage() {
   const label = (map: Record<string, string>, key: string) => map[key] ?? key;
   const totalUsers = Object.values(s.usersByStatus).reduce((a, b) => a + b, 0);
 
+  // `unknown` is how the tally buckets a null persona: a business-only identity.
   const typeEntries = Object.entries(s.usersByType)
-    .map(([k, v]) => ({ label: label(m.accountType as Record<string, string>, k), value: v }))
+    .map(([k, v]) => ({
+      label: k === "unknown" ? m.admin.users.businessOnly : label(m.accountType as Record<string, string>, k),
+      value: v,
+    }))
     .sort((a, b) => b.value - a.value);
   const statusEntries = Object.entries(s.usersByStatus).map(([k, v]) => ({
     label: label(m.admin.status as Record<string, string>, k),

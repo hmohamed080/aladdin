@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { Input, Textarea, Select, LabeledField, Checkbox } from "@/components/ui/controls";
+import { Input, Textarea, Select, LabeledField } from "@/components/ui/controls";
 import { WizardShell, WizardProgress, ChoiceCard, FlowActions, SavedHint } from "@/features/onboarding/wizard";
 import { saveBusiness, submitBusiness, type BusinessInput } from "@/server/actions/business-onboarding";
 import type { BusinessAnswers } from "@/server/queries/onboarding";
@@ -10,18 +10,25 @@ import { BUSINESS_ORG_TYPES, businessOrgTypeFromAccountType, type BusinessOrgTyp
 import { GOVERNORATES, CITIES_BY_GOVERNORATE, isGovernorate } from "@/lib/onboarding/persona-fields";
 
 /**
- * Business / organization onboarding (Sprint 8) — ONE shared flow for every
- * business persona (Showroom/Dealer, Supplier, Manufacturer/Importer/Wholesaler,
- * and the generic Organization owner/manager). The persona-specific difference is
- * intentionally minimal: the chosen account type at the shared step pre-selects the
- * business type; the owner may still adjust it here. State is hydrated from the DB
- * and persisted per step. Nothing is activated mid-flow — submit creates the org
- * (pending_verification) + the owner's active membership + primary branch through
- * the trusted backend path, then lands the owner in the workspace.
+ * Business creation — "create my showroom", not "create an organization".
+ *
+ * One flow serves both entry points (a new registration that chose a business
+ * type, and an existing account adding another business) because both write the
+ * same draft. Three properties matter:
+ *
+ *   * THE TYPE IS NEVER ASKED TWICE. When the person already picked "Showroom" at
+ *     registration, that type is carried into the draft and its step is dropped
+ *     from the wizard entirely.
+ *   * THE CREATOR IS THE OWNER. There is no owner/manager confirmation to tick —
+ *     owning is the relationship that creating a business produces, and it is
+ *     established transactionally alongside the organization and its first branch.
+ *   * RETRYING IS SAFE. Every save round-trips a draft id, and submit is keyed on
+ *     it, so a slow network or an impatient second click yields ONE business.
+ *
+ * State lives in the database (hydrated on load), so the wizard resumes across
+ * refresh and sign-out.
  */
-const STEPS = ["identity", "type", "location", "branch", "review"] as const;
-const TOTAL = STEPS.length;
-type Step = (typeof STEPS)[number];
+type Step = "identity" | "type" | "location" | "branch" | "review";
 
 type BState = {
   legalName: string;
@@ -31,40 +38,21 @@ type BState = {
   governorate: string | null;
   city: string | null;
   primaryBranchName: string;
-  ownerConfirmed: boolean;
 };
-
-function toInput(s: BState): BusinessInput {
-  return {
-    legalName: s.legalName.trim() || null,
-    displayName: s.displayName.trim() || null,
-    orgType: s.orgType,
-    description: s.description.trim() || null,
-    governorate: s.governorate,
-    city: s.city,
-    primaryBranchName: s.primaryBranchName.trim() || null,
-    ownerConfirmed: s.ownerConfirmed,
-  };
-}
-
-const identityDone = (s: BState) => s.displayName.trim().length > 0;
-const typeDone = (s: BState) => !!s.orgType;
-
-function firstIncomplete(s: BState): number {
-  if (!identityDone(s)) return 0;
-  if (!typeDone(s)) return 1;
-  return 4; // location + branch are optional; land on review
-}
 
 export function BusinessFlow({
   answers,
   presetOrgType,
+  draftId: initialDraftId,
 }: {
   answers: BusinessAnswers;
   presetOrgType: BusinessOrgType | null;
+  draftId: string | null;
 }) {
   const { t } = useI18n();
   const [pending, start] = useTransition();
+  const [draftId, setDraftId] = useState<string | null>(initialDraftId);
+  const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<BState>({
     legalName: answers.legalName ?? "",
     displayName: answers.displayName ?? "",
@@ -73,31 +61,70 @@ export function BusinessFlow({
     governorate: answers.governorate,
     city: answers.city,
     primaryBranchName: answers.primaryBranchName ?? "",
-    ownerConfirmed: answers.ownerConfirmed,
   });
-  const [step, setStep] = useState<number>(() => firstIncomplete(state));
 
-  const current: Step = STEPS[step] ?? "review";
+  // The type step exists only when the type is still unknown. A person who chose
+  // "Showroom" to sign up is never asked what kind of business they are building.
+  const typePreselected = Boolean(businessOrgTypeFromAccountType(answers.orgType) ?? presetOrgType);
+  const steps: Step[] = typePreselected
+    ? ["identity", "location", "branch", "review"]
+    : ["identity", "type", "location", "branch", "review"];
+
+  const identityDone = (s: BState) => s.displayName.trim().length > 0;
+  const typeDone = (s: BState) => !!s.orgType;
+
+  const [step, setStep] = useState<number>(() => {
+    if (!identityDone(state)) return 0;
+    if (!typePreselected && !typeDone(state)) return steps.indexOf("type");
+    return steps.length - 1; // location + branch are optional; land on review
+  });
+
+  const current: Step = steps[step] ?? "review";
   const areaCities =
     state.governorate && isGovernorate(state.governorate) ? CITIES_BY_GOVERNORATE[state.governorate] : [];
 
   const set = (patch: Partial<BState>) => setState((s) => ({ ...s, ...patch }));
+  const goto = (s: Step) => setStep(Math.max(steps.indexOf(s), 0));
+
+  const toInput = (s: BState): BusinessInput => ({
+    draftId,
+    legalName: s.legalName.trim() || null,
+    displayName: s.displayName.trim() || null,
+    orgType: s.orgType,
+    description: s.description.trim() || null,
+    governorate: s.governorate,
+    city: s.city,
+    primaryBranchName: s.primaryBranchName.trim() || null,
+  });
 
   const persistAdvance = () =>
     start(async () => {
-      await saveBusiness(toInput(state));
-      setStep((x) => Math.min(x + 1, STEPS.length - 1));
+      setError(null);
+      const res = await saveBusiness(toInput(state));
+      if (!res.ok) {
+        setError(res.code ?? "onboarding.error.saveFailed");
+        return;
+      }
+      if (res.draftId) setDraftId(res.draftId);
+      setStep((x) => Math.min(x + 1, steps.length - 1));
     });
+
   const back = () => setStep((x) => Math.max(x - 1, 0));
+
   const submit = () =>
     start(async () => {
-      await submitBusiness(toInput(state));
+      setError(null);
+      const res = await submitBusiness(toInput(state));
+      // A successful submit redirects; reaching here means it was rejected.
+      if (res && !res.ok) setError(res.code ?? "onboarding.error.saveFailed");
     });
 
   const canContinue =
     current === "identity" ? identityDone(state) : current === "type" ? typeDone(state) : true;
 
-  const progress = <WizardProgress current={step} total={TOTAL} label={t(`onboarding.business.step.${current}`)} />;
+  const progress = (
+    <WizardProgress current={step} total={steps.length} label={t(`onboarding.business.step.${current}`)} />
+  );
 
   return (
     <WizardShell
@@ -200,21 +227,21 @@ export function BusinessFlow({
         <div className="flex flex-col gap-lg">
           <dl className="flex flex-col divide-y divide-strong/60">
             {[
-              { label: t("onboarding.business.review.name"), value: state.displayName || t("onboarding.consumer.notSet"), to: 0 },
+              { label: t("onboarding.business.review.name"), value: state.displayName || t("onboarding.consumer.notSet"), to: "identity" as Step },
               {
                 label: t("onboarding.business.review.type"),
                 value: state.orgType ? t(`onboarding.business.orgTypes.${state.orgType}`) : t("onboarding.consumer.notSet"),
-                to: 1,
+                to: (typePreselected ? "identity" : "type") as Step,
               },
               {
                 label: t("onboarding.business.review.location"),
                 value: state.governorate ? t(`onboarding.consumer.governorates.${state.governorate}`) : t("onboarding.consumer.notSet"),
-                to: 2,
+                to: "location" as Step,
               },
               {
                 label: t("onboarding.business.review.branch"),
                 value: state.primaryBranchName.trim() || state.displayName || t("onboarding.consumer.notSet"),
-                to: 3,
+                to: "branch" as Step,
               },
             ].map((r) => (
               <div key={r.label} className="flex items-start justify-between gap-3 py-3">
@@ -224,7 +251,7 @@ export function BusinessFlow({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setStep(r.to)}
+                  onClick={() => goto(r.to)}
                   className="shrink-0 text-label font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   {t("onboarding.edit")}
@@ -233,24 +260,25 @@ export function BusinessFlow({
             ))}
           </dl>
 
-          <div className="rounded-md border border-strong/70 bg-surface-2/40 p-md">
-            <Checkbox id="owner" name="owner" checked={state.ownerConfirmed} onChange={(v) => set({ ownerConfirmed: v })}>
-              <span className="flex flex-col">
-                <span className="font-medium text-fg">{t("onboarding.business.review.ownerConfirmLabel")}</span>
-                <span className="text-label text-fg-muted">{t("onboarding.business.review.ownerConfirmHint")}</span>
-              </span>
-            </Checkbox>
-          </div>
-
+          {/* The creator IS the owner — stated, never asked. */}
+          <p className="rounded-md border border-strong/70 bg-surface-2/40 p-md text-body text-fg-secondary">
+            {t("onboarding.business.review.ownerNote")}
+          </p>
           <p className="text-label text-fg-secondary">{t("onboarding.business.review.reviewNote")}</p>
         </div>
+      ) : null}
+
+      {error ? (
+        <p role="alert" className="text-label text-danger">
+          {t(error)}
+        </p>
       ) : null}
 
       <FlowActions
         onBack={step > 0 ? back : undefined}
         onPrimary={current === "review" ? submit : persistAdvance}
         primaryLabel={current === "review" ? t("onboarding.business.review.submit") : t("onboarding.continue")}
-        primaryDisabled={current === "review" ? !state.ownerConfirmed || !typeDone(state) || !identityDone(state) : !canContinue}
+        primaryDisabled={current === "review" ? !typeDone(state) || !identityDone(state) : !canContinue}
         pending={pending}
       />
       <SavedHint />

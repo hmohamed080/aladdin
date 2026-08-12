@@ -38,7 +38,13 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
 
       <Card>
         <dl className="grid gap-md tablet:grid-cols-3">
-          <Field label={m.admin.users.type}>{typeLabels[user.accountType] ?? user.accountType}</Field>
+          {/* A null persona is a real, valid state — a business-only identity whose
+              classification lives on its organizations. Say so, don't blank it. */}
+          <Field label={m.admin.users.type}>
+            {user.accountType
+              ? (typeLabels[user.accountType] ?? user.accountType)
+              : m.admin.users.businessOnly}
+          </Field>
           <Field label={m.admin.users.status}>{statusLabels[user.status] ?? user.status}</Field>
           <Field label={m.admin.users.joined}>{formatDate(user.createdAt, locale)}</Field>
         </dl>
