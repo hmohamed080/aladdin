@@ -3,6 +3,13 @@ import "server-only";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
+import {
+  resolveActiveBusinessId,
+  ORG_COOKIE,
+  BRANCH_COOKIE,
+  type WorkspaceEntry,
+} from "@/lib/workspace/model";
+import { loadWorkspaces, businessEntries } from "@/server/queries/workspace";
 
 /**
  * Derives the caller's ACTIVE organization/branch context from real membership +
@@ -11,8 +18,9 @@ import type { Database } from "@/types/database.types";
  * this only picks which of the caller's own orgs/branches is "active" for the UI.
  */
 
-export const ORG_COOKIE = "aladdin-org";
-export const BRANCH_COOKIE = "aladdin-branch";
+// Re-exported so existing importers keep their import path; the constants now live
+// in the pure work-context model alongside the resolution rules that use them.
+export { ORG_COOKIE, BRANCH_COOKIE };
 
 export type SalesCapability = "sales.read" | "sales.write" | "sales.assign" | "sales.manage";
 
@@ -34,6 +42,8 @@ export type OrgContext = {
 export type WorkspaceContext = {
   organizations: { id: string; name: string }[];
   active: OrgContext | null;
+  /** Every work context the caller may switch to (Personal + active memberships). */
+  entries: WorkspaceEntry[];
 };
 
 export function hasCap(ctx: OrgContext, cap: SalesCapability | "org.manage"): boolean {
@@ -91,27 +101,37 @@ export async function loadWorkspaceContext(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { organizations: [], active: null };
+  if (!user) return { organizations: [], active: null, entries: [] };
+
+  // The switcher's entries and this shell's active org come from the SAME derived
+  // source, so what the caller sees and what the page renders can never disagree.
+  const { entries } = await loadWorkspaces(supabase);
+  const orgs = businessEntries(entries).map((b) => ({ id: b.organizationId, name: b.name }));
+
+  const store = await cookies();
+  // B2B surfaces are business by definition: a Personal selection falls through to
+  // a valid organization here rather than bouncing a caller off a link they
+  // followed. Landing (not this) is what honors a Personal selection.
+  const activeOrgId = resolveActiveBusinessId(entries, store.get(ORG_COOKIE)?.value);
+  if (!activeOrgId) {
+    return { organizations: orgs, active: null, entries };
+  }
+  const activeOrg = orgs.find((o) => o.id === activeOrgId)!;
 
   const { data: memberships, error: mErr } = await supabase
     .from("memberships")
-    .select("id, organization_id, status, organizations(id, name)")
+    .select("id, organization_id, status")
     .eq("status", "active")
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .eq("organization_id", activeOrgId);
   if (mErr) throw mErr;
 
-  const orgs = (memberships ?? [])
-    .map((m) => m.organizations)
-    .filter((o): o is { id: string; name: string } => Boolean(o));
-
-  if (orgs.length === 0) {
-    return { organizations: [], active: null };
+  const membership = (memberships ?? [])[0];
+  if (!membership) {
+    // The membership vanished between the two reads (revoked mid-request). Deny
+    // rather than render a stale workspace.
+    return { organizations: orgs, active: null, entries };
   }
-
-  const store = await cookies();
-  const activeOrg = resolveActiveOrg(orgs, store.get(ORG_COOKIE)?.value)!;
-
-  const membership = (memberships ?? []).find((m) => m.organization_id === activeOrg.id)!;
 
   // Capabilities for this membership.
   const { data: caps, error: cErr } = await supabase
@@ -151,6 +171,7 @@ export async function loadWorkspaceContext(
 
   return {
     organizations: orgs,
+    entries,
     active: {
       organizationId: activeOrg.id,
       organizationName: activeOrg.name,

@@ -126,6 +126,69 @@ export type Database = {
           },
         ]
       }
+      business_creation_drafts: {
+        Row: {
+          city: string | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          display_name: string | null
+          governorate: string | null
+          id: string
+          legal_name: string | null
+          org_type: Database["public"]["Enums"]["account_type"] | null
+          organization_id: string | null
+          primary_branch_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          city?: string | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          display_name?: string | null
+          governorate?: string | null
+          id?: string
+          legal_name?: string | null
+          org_type?: Database["public"]["Enums"]["account_type"] | null
+          organization_id?: string | null
+          primary_branch_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          city?: string | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          display_name?: string | null
+          governorate?: string | null
+          id?: string
+          legal_name?: string | null
+          org_type?: Database["public"]["Enums"]["account_type"] | null
+          organization_id?: string | null
+          primary_branch_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_creation_drafts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_creation_drafts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_onboarding: {
         Row: {
           city: string | null
@@ -1820,7 +1883,9 @@ export type Database = {
           id: string
           is_verified: boolean
           locale: string
-          primary_account_type: Database["public"]["Enums"]["account_type"]
+          primary_account_type:
+            | Database["public"]["Enums"]["account_type"]
+            | null
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
         }
@@ -1829,7 +1894,9 @@ export type Database = {
           id: string
           is_verified?: boolean
           locale?: string
-          primary_account_type?: Database["public"]["Enums"]["account_type"]
+          primary_account_type?:
+            | Database["public"]["Enums"]["account_type"]
+            | null
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
         }
@@ -1838,7 +1905,9 @@ export type Database = {
           id?: string
           is_verified?: boolean
           locale?: string
-          primary_account_type?: Database["public"]["Enums"]["account_type"]
+          primary_account_type?:
+            | Database["public"]["Enums"]["account_type"]
+            | null
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
         }
@@ -2811,6 +2880,20 @@ export type Database = {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: undefined
       }
+      business_draft_save: {
+        Args: {
+          p_city?: string
+          p_description?: string
+          p_display_name?: string
+          p_draft_id?: string
+          p_governorate?: string
+          p_legal_name?: string
+          p_org_type?: Database["public"]["Enums"]["account_type"]
+          p_primary_branch_name?: string
+        }
+        Returns: string
+      }
+      business_draft_submit: { Args: { p_draft_id?: string }; Returns: string }
       business_save: {
         Args: {
           p_city?: string
@@ -3002,6 +3085,16 @@ export type Database = {
         Returns: undefined
       }
       my_registration_state: { Args: never; Returns: string }
+      my_workspaces: {
+        Args: never
+        Returns: {
+          kind: string
+          name: string
+          org_type: Database["public"]["Enums"]["account_type"]
+          organization_id: string
+          relationship: string
+        }[]
+      }
       onboarding_save_contact: { Args: { p_phone: string }; Returns: undefined }
       onboarding_save_profile: {
         Args: { p_display_name: string; p_locale: string }
