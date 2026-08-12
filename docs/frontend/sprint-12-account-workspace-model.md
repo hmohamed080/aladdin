@@ -160,7 +160,8 @@ still reads business type from the Organization.
 | `supabase db reset` | ✅ 24 migrations from clean |
 | pgTAP | ✅ **650 across 28 files** (adds `27_account_workspace_model_test.sql`) |
 | EN/AR key parity | ✅ 1310 / 1310, no mismatches |
-| Targeted Playwright | `account-workspace-model.spec.ts` (8 journeys + EN/AR RTL) + updated `pilot-uat-round-1.spec.ts` — see the PR for the run |
+| Targeted Playwright — desktop | ✅ 17 (`account-workspace-model.spec.ts` 8 journeys + EN/AR RTL, and `pilot-uat-round-1.spec.ts`) |
+| Targeted Playwright — mobile EN/AR | ✅ 3 (registration choice, workspace selector, Add business) |
 
 Repo-wide E2E, Lighthouse, and the full persona matrix were deliberately **not**
 run — those belong to the later Integration Gate.
