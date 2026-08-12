@@ -18,7 +18,8 @@ export type OrgMember = {
   userId: string;
   displayName: string;
   emailMasked: string;
-  accountType: string;
+  /** Personal persona, or null for a business-only identity (Sprint 12). */
+  accountType: string | null;
   status: "invited" | "active" | "suspended" | "revoked";
   primaryBranchId: string | null;
   branchIds: string[];
