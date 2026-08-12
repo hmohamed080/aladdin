@@ -1425,8 +1425,10 @@ export const en = {
     notFoundTitle: "Not found",
     notFoundBody: "This record doesn't exist or is outside your access.",
     emptyTitle: "Nothing here yet",
-    noOrg: "You're not a member of any organization yet.",
-    noOrgBody: "Ask an organization manager to add you, then sign in again.",
+    noOrg: "You don't belong to a business yet.",
+    // The panel now carries an "Add business" action, so the copy offers both
+    // routes in: create your own, or wait to be invited.
+    noOrgBody: "Create your business to start working, or ask a business to invite you.",
     duplicatePhone: "A customer with this phone already exists in this organization.",
     branchDenied: "That branch isn't in your scope.",
     salesWriteDenied: "You don't have permission to make this change.",
