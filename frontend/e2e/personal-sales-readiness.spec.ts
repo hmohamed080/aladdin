@@ -1,5 +1,7 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
 import { messageIdsFor, readNewOtp, signIn } from "./helpers/auth";
+import { en } from "../src/lib/i18n/messages/en";
+import { ar } from "../src/lib/i18n/messages/ar";
 
 /**
  * Sprint 13 — Personal Experience + Sales Affiliation. Targeted acceptance, all
@@ -30,6 +32,19 @@ async function prefs(page: Page, locale: "en" | "ar", theme: "light" | "dark" = 
   ]);
 }
 
+/**
+ * An exact matcher for one label, in either locale. Built from the shipped
+ * catalogues: hand-transcribed Arabic drifts invisibly (a missing shadda reads
+ * identically and fails as a timeout), and a renamed label should fail at
+ * typecheck rather than pass against copy nobody ships.
+ */
+const esc = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const label = (pick: (m: typeof en) => string) =>
+  new RegExp(`^(?:${esc(pick(en))}|${esc(pick(ar as unknown as typeof en))})$`, "i");
+/** Same, but matching anywhere in the accessible name (label + description cards). */
+const labelIn = (pick: (m: typeof en) => string) =>
+  new RegExp(`(?:${esc(pick(en))}|${esc(pick(ar as unknown as typeof en))})`, "i");
+
 /** The page body must never scroll horizontally — at either viewport. */
 async function noOverflow(page: Page) {
   const o = await page.evaluate(
@@ -47,45 +62,45 @@ async function toAccountType(
   const email = `s13+${Date.now()}${Math.floor(Math.random() * 10000)}@example.test`;
   const seen = await messageIdsFor(request, email);
   await page.goto("/auth/sign-up");
-  await page.getByLabel(/email address|البريد/i).fill(email);
-  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-  await page.getByLabel(/pilot release|نسخة تجريبية/i).check();
-  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-  await expect(page.getByText(/we sent a code|أرسلنا رمزًا/i)).toBeVisible();
+  await page.getByLabel(labelIn((m) => m.auth.emailLabel)).fill(email);
+  await page.getByLabel(labelIn((m) => m.auth.consent.terms)).check();
+  await page.getByLabel(labelIn((m) => m.auth.consent.privacy)).check();
+  await page.getByLabel(labelIn((m) => m.auth.consent.pilot)).check();
+  await page.getByRole("button", { name: label((m) => m.auth.createAccount) }).click();
+  await expect(page.getByText(labelIn((m) => m.auth.info.codeSent.split("{")[0]!.trim()))).toBeVisible();
   const code = await readNewOtp(request, email, seen);
-  await page.getByLabel(/one-time code|الرمز/i).fill(code);
-  await page.getByRole("button", { name: /verify|تأكيد/i }).click();
+  await page.getByLabel(labelIn((m) => m.auth.codeLabel)).fill(code);
+  await page.getByRole("button", { name: label((m) => m.auth.verify) }).click();
   await page.waitForURL(/\/onboarding\/profile$/, { waitUntil: "commit" });
 
   await page.locator("#displayName").fill(displayName);
-  await page.getByRole("button", { name: /^continue$|متابعة/i }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.continue) }).click();
   await page.waitForURL(/\/onboarding\/contact$/, { waitUntil: "commit" });
   await page.locator("#phone").fill("01012345678");
-  await page.getByRole("button", { name: /^continue$|متابعة/i }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.continue) }).click();
   await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
   return email;
 }
 
-async function pickType(page: Page, label: RegExp, landing: RegExp) {
-  await page.getByRole("button", { name: label }).click();
-  await page.getByRole("button", { name: /^continue$|متابعة/i }).click();
+async function pickType(page: Page, card: RegExp, landing: RegExp) {
+  await page.getByRole("button", { name: card }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.continue) }).click();
   await page.waitForURL(landing, { waitUntil: "commit" });
 }
 
 /** Fresh Consumer, all the way to a usable /home. */
 async function registerConsumer(page: Page, request: APIRequestContext, name: string) {
   const email = await toAccountType(page, request, name);
-  await pickType(page, /personal use|استخدام شخصي/i, /\/onboarding\/consumer$/);
-  await page.getByRole("button", { name: /planning a project|أخطط لمشروع/i }).click();
-  await page.getByRole("button", { name: /^continue$|متابعة/i }).click();
-  await page.getByRole("button", { name: /^flooring$|^الأرضيات$/i }).click();
-  await page.getByRole("button", { name: /^continue$|متابعة/i }).click();
+  await pickType(page, labelIn((m) => m.onboarding.accountType.types.end_consumer), /\/onboarding\/consumer$/);
+  await page.getByRole("button", { name: label((m) => m.onboarding.consumer.intents.planning) }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.continue) }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.consumer.interests.flooring) }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.continue) }).click();
   await page.locator("#gov").selectOption("cairo");
   await page.locator("#city").selectOption("new_cairo");
-  await page.getByRole("button", { name: /^continue$|متابعة/i }).click();
-  await page.getByRole("button", { name: /^continue$|متابعة/i }).click(); // budget (optional)
-  await page.getByRole("button", { name: /finish setup|إنهاء الإعداد/i }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.continue) }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.continue) }).click(); // budget (optional)
+  await page.getByRole("button", { name: label((m) => m.onboarding.consumer.review.finish) }).click();
   await page.waitForURL(/\/home$/, { waitUntil: "commit" });
   return email;
 }
@@ -108,24 +123,24 @@ async function registerProfessional(
   await page.locator("#headline").fill(headline);
   await page.locator("#years").fill("6");
   await page.getByRole("button", { name: opts.specialization }).click();
-  await page.getByRole("button", { name: /^continue$|متابعة/i }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.continue) }).click();
   await page.getByRole("button", { name: opts.service }).click();
-  await page.getByRole("button", { name: /^continue$|متابعة/i }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.continue) }).click();
   // Remote-only keeps the flow short and is a valid professional shape.
-  await page.getByRole("checkbox", { name: /i offer remote consultations|استشارات عن بُعد/i }).check();
-  await page.getByRole("button", { name: /^continue$|متابعة/i }).click();
-  await page.getByRole("button", { name: /^continue$|متابعة/i }).click();
-  await page.getByRole("button", { name: /continue to review|متابعة إلى المراجعة/i }).click();
+  await page.getByRole("checkbox", { name: labelIn((m) => m.onboarding.professional.location.remoteLabel) }).check();
+  await page.getByRole("button", { name: label((m) => m.onboarding.continue) }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.continue) }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.professional.toReview) }).click();
   await page.waitForURL(/\/onboarding\/professional\/review$/, { waitUntil: "commit" });
-  await page.getByRole("button", { name: /submit for review|إرسال للمراجعة/i }).click();
+  await page.getByRole("button", { name: label((m) => m.onboarding.professional.review.submit) }).click();
   await page.waitForURL(/\/home$/, { waitUntil: "commit" });
   return email;
 }
 
 const registerSalesperson = (page: Page, request: APIRequestContext, name: string, headline: string) =>
-  registerProfessional(page, request, name, /^salesperson|^مندوب مبيعات/i, headline, {
-    specialization: /^showroom sales$|^مبيعات معارض$/i,
-    service: /^showroom advice$|^استشارة معرض$/i,
+  registerProfessional(page, request, name, labelIn((m) => m.onboarding.accountType.types.salesperson), headline, {
+    specialization: label((m) => m.onboarding.professional.specializations.showroom_sales),
+    service: label((m) => m.onboarding.professional.serviceItems.showroom_advice),
   });
 
 /** The switcher is rendered twice (desktop slot + mobile row); use the visible one. */
@@ -183,9 +198,9 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
       page,
       request,
       "Engineer Home Tester",
-      /^engineer|^مهندس /i,
+      labelIn((m) => m.onboarding.accountType.types.engineer),
       "Structural engineer, Cairo",
-      { specialization: /^structural$|^إنشائي$/i, service: /^structural design$|^تصميم إنشائي$/i },
+      { specialization: label((m) => m.onboarding.professional.specializations.structural), service: label((m) => m.onboarding.professional.serviceItems.structural_design) },
     );
 
     // The professional identity leads.
@@ -413,9 +428,11 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     // Select Personal → sign out → back in → Personal is restored.
     await page.goto("/home");
     await switcher(page).click();
-    await page.getByRole("menuitem", { name: /^personal/i }).click();
+    // The Personal entry's accessible name LEADS with the display name and carries
+    // "Personal" as its subtitle, so an anchored match would never hit it.
+    await page.getByRole("menuitem").filter({ hasText: /personal/i }).click();
     await page.waitForURL(/\/home$/, { waitUntil: "commit" });
-    await page.getByRole("button", { name: /sign out|تسجيل الخروج/i }).click();
+    await page.getByRole("button", { name: label((m) => m.common.signOut) }).click();
     await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
     await signIn(page, request, "mostafa@example.test", /\/home$/);
     await expect(page).toHaveURL(/\/home$/);
@@ -424,7 +441,7 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     await switcher(page).click();
     await page.getByRole("menuitem", { name: /horizon contracting/i }).click();
     await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
-    await page.getByRole("button", { name: /sign out|تسجيل الخروج/i }).click();
+    await page.getByRole("button", { name: label((m) => m.common.signOut) }).click();
     await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
     await signIn(page, request, "mostafa@example.test", /\/b2b(\/|$)/);
     await expect(page).toHaveURL(/\/b2b(\/|$)/);
@@ -512,7 +529,8 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     await registerSalesperson(page, request, "Locale Switch Tester", "Showroom sales");
     await expect(page.getByRole("heading", { name: /your sales setup/i })).toBeVisible();
 
-    await page.getByRole("button", { name: /العربية|arabic/i }).click();
+    // The switch is labelled "Language" (it toggles to the other locale).
+    await page.getByRole("button", { name: /^language$/i }).click();
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.getByRole("heading", { name: /إعداد المبيعات/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: /your sales setup/i })).toHaveCount(0);

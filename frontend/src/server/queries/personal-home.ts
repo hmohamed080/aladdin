@@ -167,8 +167,23 @@ export async function loadPersonalHome(): Promise<PersonalHomeData | null> {
     },
   };
 
-  const variant = track === "professional" ? "professional" : "consumer";
   const accountType: PersonaType = declaredType ?? canonicalType ?? "end_consumer";
+
+  /**
+   * Which home to render. The onboarding TRACK decides when the person declared
+   * one — it is their own statement about which flow they are in.
+   *
+   * When there is no track, fall back to the PERSONA. An identity whose canonical
+   * persona is `engineer` is an engineer whether or not an onboarding row exists;
+   * showing them the consumer home (and, for a Salesperson, hiding their showroom
+   * affiliation entirely) is wrong. This matters for any identity created outside
+   * the onboarding flow — a seeded Pilot account, an Admin-applied upgrade, or a
+   * future import — none of which write `onboarding_progress`.
+   */
+  const variant: "consumer" | "professional" =
+    track === "professional" || (track === null && accountType !== "end_consumer")
+      ? "professional"
+      : "consumer";
   const isSalesperson = variant === "professional" && accountType === "sales";
 
   return {
