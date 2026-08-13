@@ -42,9 +42,14 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
     <I18nProvider locale={locale} dir={dir}>
       <div className="flex min-h-dvh flex-col bg-canvas">
         <header className="sticky top-0 z-header border-b bg-surface/85 backdrop-blur" style={{ zIndex: 200 }}>
-          <div className="mx-auto flex w-full max-w-[1120px] items-center gap-md px-md py-2.5">
+          {/* `min-w-0` on both the row and the control group is what lets the
+              switcher's label truncate instead of forcing the row wider than the
+              viewport — a flex item's default `min-width:auto` refuses to shrink
+              below its content, which is how a 393px screen ends up scrolling
+              sideways by a couple of pixels. */}
+          <div className="mx-auto flex w-full min-w-0 max-w-[1120px] items-center gap-sm px-md py-2.5 tablet:gap-md">
             <Brand name={m.common.appName} size="sm" />
-            <div className="ms-auto flex items-center gap-sm">
+            <div className="ms-auto flex min-w-0 items-center gap-1.5 tablet:gap-sm">
               <WorkspaceSwitcher
                 entries={entries}
                 activeKey={PERSONAL_CONTEXT}

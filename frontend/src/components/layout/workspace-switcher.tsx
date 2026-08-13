@@ -84,7 +84,10 @@ export function WorkspaceSwitcher({
         aria-label={t("workspace.switch")}
         data-testid="workspace-switcher"
         className={cn(
-          "flex max-w-56 items-center gap-2 rounded-md border border-strong px-2.5 py-1.5 text-label font-medium text-fg",
+          // The cap is responsive: at 393px the trigger shares one header row with
+          // the language, theme and sign-out controls, and a fixed 14rem cap pushes
+          // that row past the viewport. It still truncates its label either way.
+          "flex min-w-0 max-w-32 items-center gap-2 rounded-md border border-strong px-2.5 py-1.5 text-label font-medium text-fg tablet:max-w-56",
           "transition-colors hover:bg-surface-2/60 disabled:opacity-60",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
         )}
