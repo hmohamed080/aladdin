@@ -9,22 +9,29 @@ import {
 } from "@/lib/profile/completeness";
 import type { Database } from "@/types/database.types";
 
-type AccountType = Database["public"]["Enums"]["account_type"];
+type PersonaType = Database["public"]["Enums"]["persona_type"];
 type OnboardingTrack = Database["public"]["Enums"]["onboarding_track"];
+type AffiliationStatus = Database["public"]["Enums"]["affiliation_request_status"];
+type ReferralStatus = Database["public"]["Enums"]["referral_status"];
 
 /**
  * Everything the ONE personal surface (`/home`) needs, for either persona.
  *
  * The variant is chosen by the caller's onboarding TRACK, and the persona label
  * by the professional's declared concrete type falling back to the canonical
- * `users.primary_account_type`. That fallback matters: the canonical type is only
- * written by the approved+applied upgrade workflow, so between submission and
- * approval a professional's canonical type is still the default consumer one —
- * the declared type is what the account actually is, and the separate
- * verification state says how far the platform has gone in trusting the claim.
+ * `users.primary_account_type`. That fallback matters: the canonical persona is
+ * only written by the approved+applied upgrade workflow, so between submission and
+ * approval it is still null — the declared type is what the account actually is,
+ * and the separate verification state says how far the platform has gone in
+ * trusting the claim.
  *
- * Verification is reported alongside completeness, never folded into it, and
- * neither gates anything on this page.
+ * FOUR INDEPENDENT STATES, never merged into one number or one badge:
+ *   * account status       — is the account usable? (it is, from onboarding onward)
+ *   * profile completeness — how much of the profile is filled in
+ *   * personal verification— how far the platform trusts the professional claim
+ *   * showroom affiliation — whether a salesperson may use a showroom's B2B tools
+ *
+ * None of them gates this page.
  */
 
 /** The trust state of the caller's professional claim — independent of access. */
@@ -35,16 +42,57 @@ export type VerificationState =
   | "rejected"
   | "needs_more_info";
 
+/** One request to be affiliated with an existing showroom. */
+export type Affiliation = {
+  requestId: string;
+  organizationId: string;
+  organizationName: string;
+  branchName: string | null;
+  status: AffiliationStatus;
+  reason: string | null;
+  /** True when this affiliation came out of a referral the caller submitted. */
+  viaReferral: boolean;
+};
+
+/** One referred showroom candidate awaiting (or past) platform review. */
+export type Referral = {
+  id: string;
+  displayName: string | null;
+  governorate: string | null;
+  city: string | null;
+  status: ReferralStatus;
+  reason: string | null;
+  organizationId: string | null;
+};
+
+/**
+ * A salesperson's affiliation picture. Deliberately a separate object from
+ * `completeness` and `verification`: the Pilot's first testers read a pending
+ * showroom connection as a locked account, which it never is.
+ */
+export type SalesAffiliation = {
+  /** Showrooms the caller can already work in (ACTIVE membership). */
+  active: { organizationId: string; name: string }[];
+  /** Open and decided requests to join an existing showroom. */
+  requests: Affiliation[];
+  /** Referred candidates the caller submitted (or has a draft of). */
+  referrals: Referral[];
+};
+
 export type PersonalHomeData = {
   variant: "consumer" | "professional";
   displayName: string;
   /** The persona to label the account with (professional variant only). */
-  accountType: AccountType;
+  accountType: PersonaType;
+  /** True when the persona is Salesperson — the one persona with an affiliation. */
+  isSalesperson: boolean;
   phone: string | null;
   completeness: Completeness;
   verification: { state: VerificationState; reason: string | null; decidedAt: string | null };
   consumer: CompletenessInput["consumer"];
   professional: CompletenessInput["professional"] & { additionalServices: string[] };
+  /** Only loaded for a salesperson; null for every other persona. */
+  sales: SalesAffiliation | null;
 };
 
 /** Map the verification row's status to the trust state the UI shows. */
@@ -89,7 +137,7 @@ export async function loadPersonalHome(): Promise<PersonalHomeData | null> {
     ]);
 
   const track: OnboardingTrack | null = progress?.selected_track ?? null;
-  const canonicalType: AccountType = userRow?.primary_account_type ?? "end_consumer";
+  const canonicalType: PersonaType | null = userRow?.primary_account_type ?? null;
   const declaredType = io?.prof_concrete_type ?? null;
 
   const input: CompletenessInput = {
@@ -120,11 +168,14 @@ export async function loadPersonalHome(): Promise<PersonalHomeData | null> {
   };
 
   const variant = track === "professional" ? "professional" : "consumer";
+  const accountType: PersonaType = declaredType ?? canonicalType ?? "end_consumer";
+  const isSalesperson = variant === "professional" && accountType === "sales";
 
   return {
     variant,
     displayName: profile?.display_name?.trim() ?? "",
-    accountType: declaredType ?? canonicalType,
+    accountType,
+    isSalesperson,
     phone: input.phone,
     completeness: variant === "professional" ? professionalCompleteness(input) : consumerCompleteness(input),
     verification: {
@@ -134,5 +185,51 @@ export async function loadPersonalHome(): Promise<PersonalHomeData | null> {
     },
     consumer: input.consumer,
     professional: { ...input.professional, additionalServices: io?.prof_additional_services ?? [] },
+    // Only a salesperson has an affiliation, so only a salesperson pays for the
+    // extra round trips.
+    sales: isSalesperson ? await loadSalesAffiliation() : null,
+  };
+}
+
+/**
+ * The salesperson's affiliation state, read through the trusted RPCs.
+ *
+ * `active` is the only one of the three that means ACCESS: an approved request or
+ * referral is *evidence*, but the ACTIVE membership is the fact. A membership since
+ * suspended stops appearing here even though the historical request still reads
+ * "approved" — which is exactly why the home renders `active` for "open workspace"
+ * and the requests only as status.
+ */
+export async function loadSalesAffiliation(): Promise<SalesAffiliation> {
+  const supabase = await getServerSupabase();
+
+  const [{ data: workspaces }, { data: requests }, { data: referrals }] = await Promise.all([
+    supabase.rpc("my_workspaces"),
+    supabase.rpc("my_showroom_affiliations"),
+    supabase.rpc("my_showroom_referrals"),
+  ]);
+
+  return {
+    active: (workspaces ?? [])
+      .filter((w) => w.kind === "business" && w.org_type === "showroom_dealer" && w.organization_id)
+      .map((w) => ({ organizationId: w.organization_id!, name: w.name ?? "" })),
+    requests: (requests ?? []).map((r) => ({
+      requestId: r.request_id,
+      organizationId: r.organization_id,
+      organizationName: r.organization_name ?? "",
+      branchName: r.branch_name ?? null,
+      status: r.status,
+      reason: r.decision_reason ?? null,
+      viaReferral: r.via_referral ?? false,
+    })),
+    referrals: (referrals ?? []).map((f) => ({
+      id: f.id,
+      displayName: f.display_name ?? null,
+      governorate: f.governorate ?? null,
+      city: f.city ?? null,
+      status: f.status,
+      reason: f.decision_reason ?? null,
+      organizationId: f.organization_id ?? null,
+    })),
   };
 }

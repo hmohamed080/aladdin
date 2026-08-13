@@ -26,11 +26,18 @@ import { cn } from "@/lib/ui/cn";
 export function WorkspaceSwitcher({
   entries,
   activeKey,
+  showConnectShowroom = false,
 }: {
   /** Personal + every organization with an active membership. */
   entries: WorkspaceEntry[];
   /** `personal`, or the active organization id. */
   activeKey: string;
+  /**
+   * Offer "connect a showroom" — the affiliation path, distinct from creating a
+   * business. Shown for a Salesperson, whose Sales tools live in someone else's
+   * business (Sprint 13).
+   */
+  showConnectShowroom?: boolean;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -142,7 +149,12 @@ export function WorkspaceSwitcher({
             })}
           </ul>
 
-          <div className="border-t">
+          {/* Two DIFFERENT things, kept visibly apart. "Add business" creates a
+              business the person will OWN. "Connect a showroom" asks to join a
+              business someone else owns — the salesperson becomes a member, never
+              its owner. Collapsing them into one entry is how a salesperson ends up
+              accidentally creating a duplicate of their own employer. */}
+          <div className="flex flex-col border-t">
             <a
               href="/business/new"
               role="menuitem"
@@ -151,6 +163,16 @@ export function WorkspaceSwitcher({
               <PlusIcon size={16} className="shrink-0" />
               {t("workspace.addBusiness")}
             </a>
+            {showConnectShowroom ? (
+              <a
+                href="/home/showroom"
+                role="menuitem"
+                className="flex w-full items-center gap-2.5 px-3 pb-2.5 text-start text-body font-medium text-accent transition-colors hover:bg-surface-2/70 focus-visible:outline-none focus-visible:bg-surface-2/70"
+              >
+                <BuildingIcon size={16} className="shrink-0" />
+                {t("workspace.connectShowroom")}
+              </a>
+            ) : null}
           </div>
         </div>
       ) : null}

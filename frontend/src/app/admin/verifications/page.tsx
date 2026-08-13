@@ -2,12 +2,14 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { listVerifications } from "@/server/queries/admin";
+import { listAdminReferrals } from "@/server/queries/affiliation";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatDate } from "@/lib/ui/format";
 import { AdminHeader, StatusBadge } from "@/features/admin/parts";
 import { Card, StatePanel } from "@/components/ui/primitives";
 import { VerificationActions } from "@/features/admin/verification-actions";
+import { ReferralReview } from "@/features/admin/referral-review";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,11 @@ export default async function AdminVerificationsPage({
   const m = getMessages(locale);
   const { all } = await searchParams;
   const pendingOnly = all !== "1";
-  const rows = await listVerifications(supabase, pendingOnly);
+  const [rows, referrals] = await Promise.all([
+    listVerifications(supabase, pendingOnly),
+    // Referred showrooms are reviewed HERE rather than on a second Admin surface.
+    listAdminReferrals(supabase, pendingOnly),
+  ]);
 
   const typeLabels = m.accountType as Record<string, string>;
   const statusLabels = m.admin.status as Record<string, string>;
@@ -73,6 +79,8 @@ export default async function AdminVerificationsPage({
           ))}
         </div>
       )}
+
+      <ReferralReview rows={referrals} m={m} />
     </div>
   );
 }

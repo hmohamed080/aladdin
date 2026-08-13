@@ -20,7 +20,8 @@ export default async function AdminOrgDetailPage({ params }: { params: Promise<{
   const org = await getOrganizationDetail(supabase, id);
   if (!org) notFound();
 
-  const typeLabels = m.accountType as Record<string, string>;
+  // An organization's classification, not a person's persona: separate label set.
+  const typeLabels = m.orgType as Record<string, string>;
   const statusLabels = m.admin.status as Record<string, string>;
 
   return (

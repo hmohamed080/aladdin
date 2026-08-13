@@ -15,7 +15,7 @@ import type { Database } from "@/types/database.types";
  * `public_profile_status` are never written directly from the client.
  */
 
-type AccountType = Database["public"]["Enums"]["account_type"];
+type PersonaType = Database["public"]["Enums"]["persona_type"];
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -29,7 +29,7 @@ function requireUuid(value: unknown, rpcName: string): string {
 /** Self-service: the signed-in user requests a professional account upgrade. */
 export async function requestAccountUpgrade(
   supabase: SupabaseClient<Database>,
-  requestedAccountType: AccountType,
+  requestedAccountType: PersonaType,
 ): Promise<string> {
   const { data, error } = await supabase.rpc("request_account_upgrade", {
     p_requested_account_type: requestedAccountType,

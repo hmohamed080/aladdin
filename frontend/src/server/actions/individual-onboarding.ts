@@ -90,7 +90,7 @@ const professionalSchema = z.object({
   maxTravelKm: z.number().int().min(0).max(2000).nullish(),
 });
 export type ProfessionalInput = z.input<typeof professionalSchema>;
-type AccountType = Database["public"]["Enums"]["account_type"];
+type PersonaType = Database["public"]["Enums"]["persona_type"];
 
 /** Persist the accumulated professional profile (also writes profiles.*). No redirect. */
 export async function saveProfessional(input: ProfessionalInput): Promise<IndividualActionState> {
@@ -100,7 +100,7 @@ export async function saveProfessional(input: ProfessionalInput): Promise<Indivi
 
   const supabase = await getServerSupabase();
   const { error } = await supabase.rpc("individual_save_professional", {
-    p_concrete_type: v.concreteType as AccountType,
+    p_concrete_type: v.concreteType as PersonaType,
     p_headline: v.headline ?? undefined,
     p_years_experience: v.yearsExperience ?? undefined,
     p_specialization: v.specialization ?? undefined,

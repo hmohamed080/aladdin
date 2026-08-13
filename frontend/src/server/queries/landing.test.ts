@@ -14,10 +14,13 @@ vi.mock("next/headers", () => ({
 
 import { resolveActiveLanding } from "./landing";
 
+// The my_workspaces() row shape: a Personal row carries a `persona` and a Business
+// row an `org_type`, in separate columns of separate types (Sprint 13).
 type Row = {
   kind: string;
   organization_id: string | null;
   name: string;
+  persona: string | null;
   org_type: string | null;
   relationship: string | null;
 };
@@ -26,13 +29,15 @@ const personal: Row = {
   kind: "personal",
   organization_id: null,
   name: "Ahmed Hassan",
-  org_type: "engineer",
+  persona: "engineer",
+  org_type: null,
   relationship: null,
 };
 const business = (id: string, name: string): Row => ({
   kind: "business",
   organization_id: id,
   name,
+  persona: null,
   org_type: "showroom_dealer",
   relationship: "owner",
 });

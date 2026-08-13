@@ -10,7 +10,8 @@
  */
 import type { Database } from "@/types/database.types";
 
-export type AccountTypeValue = Database["public"]["Enums"]["account_type"];
+/** A person's persona. A business classification is a different type entirely. */
+export type AccountTypeValue = Database["public"]["Enums"]["persona_type"];
 
 /* ---------------------------------- Consumer ---------------------------------- */
 

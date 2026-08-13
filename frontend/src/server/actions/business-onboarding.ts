@@ -27,7 +27,7 @@ import type { Database } from "@/types/database.types";
  */
 export type BusinessActionState = { ok: boolean; code?: string; draftId?: string };
 
-type AccountType = Database["public"]["Enums"]["account_type"];
+type OrgType = Database["public"]["Enums"]["organization_type"];
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
 const businessSchema = z.object({
@@ -57,7 +57,7 @@ export async function saveBusiness(input: BusinessInput): Promise<BusinessAction
     p_draft_id: v.draftId ?? undefined,
     p_legal_name: v.legalName ?? undefined,
     p_display_name: v.displayName ?? undefined,
-    p_org_type: (v.orgType as AccountType) ?? undefined,
+    p_org_type: (v.orgType as OrgType) ?? undefined,
     p_description: v.description ?? undefined,
     p_governorate: v.governorate ?? undefined,
     p_city: v.city ?? undefined,

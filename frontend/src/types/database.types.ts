@@ -136,7 +136,7 @@ export type Database = {
           governorate: string | null
           id: string
           legal_name: string | null
-          org_type: Database["public"]["Enums"]["account_type"] | null
+          org_type: Database["public"]["Enums"]["organization_type"] | null
           organization_id: string | null
           primary_branch_name: string | null
           updated_at: string
@@ -151,7 +151,7 @@ export type Database = {
           governorate?: string | null
           id?: string
           legal_name?: string | null
-          org_type?: Database["public"]["Enums"]["account_type"] | null
+          org_type?: Database["public"]["Enums"]["organization_type"] | null
           organization_id?: string | null
           primary_branch_name?: string | null
           updated_at?: string
@@ -166,7 +166,7 @@ export type Database = {
           governorate?: string | null
           id?: string
           legal_name?: string | null
-          org_type?: Database["public"]["Enums"]["account_type"] | null
+          org_type?: Database["public"]["Enums"]["organization_type"] | null
           organization_id?: string | null
           primary_branch_name?: string | null
           updated_at?: string
@@ -198,7 +198,7 @@ export type Database = {
           display_name: string | null
           governorate: string | null
           legal_name: string | null
-          org_type: Database["public"]["Enums"]["account_type"] | null
+          org_type: Database["public"]["Enums"]["organization_type"] | null
           organization_id: string | null
           owner_confirmed: boolean
           primary_branch_name: string | null
@@ -213,7 +213,7 @@ export type Database = {
           display_name?: string | null
           governorate?: string | null
           legal_name?: string | null
-          org_type?: Database["public"]["Enums"]["account_type"] | null
+          org_type?: Database["public"]["Enums"]["organization_type"] | null
           organization_id?: string | null
           owner_confirmed?: boolean
           primary_branch_name?: string | null
@@ -228,7 +228,7 @@ export type Database = {
           display_name?: string | null
           governorate?: string | null
           legal_name?: string | null
-          org_type?: Database["public"]["Enums"]["account_type"] | null
+          org_type?: Database["public"]["Enums"]["organization_type"] | null
           organization_id?: string | null
           owner_confirmed?: boolean
           primary_branch_name?: string | null
@@ -545,7 +545,7 @@ export type Database = {
           prof_additional_services: string[] | null
           prof_availability: string | null
           prof_city: string | null
-          prof_concrete_type: Database["public"]["Enums"]["account_type"] | null
+          prof_concrete_type: Database["public"]["Enums"]["persona_type"] | null
           prof_governorate: string | null
           prof_max_travel_km: number | null
           prof_offers_remote: boolean
@@ -569,7 +569,7 @@ export type Database = {
           prof_availability?: string | null
           prof_city?: string | null
           prof_concrete_type?:
-            | Database["public"]["Enums"]["account_type"]
+            | Database["public"]["Enums"]["persona_type"]
             | null
           prof_governorate?: string | null
           prof_max_travel_km?: number | null
@@ -594,7 +594,7 @@ export type Database = {
           prof_availability?: string | null
           prof_city?: string | null
           prof_concrete_type?:
-            | Database["public"]["Enums"]["account_type"]
+            | Database["public"]["Enums"]["persona_type"]
             | null
           prof_governorate?: string | null
           prof_max_travel_km?: number | null
@@ -851,9 +851,10 @@ export type Database = {
           created_at: string
           phone: string | null
           profile_completed_at: string | null
-          selected_account_type:
-            | Database["public"]["Enums"]["account_type"]
+          selected_org_type:
+            | Database["public"]["Enums"]["organization_type"]
             | null
+          selected_persona: Database["public"]["Enums"]["persona_type"] | null
           selected_track: Database["public"]["Enums"]["onboarding_track"] | null
           updated_at: string
           user_id: string
@@ -865,9 +866,10 @@ export type Database = {
           created_at?: string
           phone?: string | null
           profile_completed_at?: string | null
-          selected_account_type?:
-            | Database["public"]["Enums"]["account_type"]
+          selected_org_type?:
+            | Database["public"]["Enums"]["organization_type"]
             | null
+          selected_persona?: Database["public"]["Enums"]["persona_type"] | null
           selected_track?:
             | Database["public"]["Enums"]["onboarding_track"]
             | null
@@ -881,9 +883,10 @@ export type Database = {
           created_at?: string
           phone?: string | null
           profile_completed_at?: string | null
-          selected_account_type?:
-            | Database["public"]["Enums"]["account_type"]
+          selected_org_type?:
+            | Database["public"]["Enums"]["organization_type"]
             | null
+          selected_persona?: Database["public"]["Enums"]["persona_type"] | null
           selected_track?:
             | Database["public"]["Enums"]["onboarding_track"]
             | null
@@ -1145,6 +1148,176 @@ export type Database = {
           },
         ]
       }
+      organization_join_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          id: string
+          membership_id: string | null
+          note: string | null
+          organization_id: string
+          requested_branch_id: string | null
+          status: Database["public"]["Enums"]["affiliation_request_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          id?: string
+          membership_id?: string | null
+          note?: string | null
+          organization_id: string
+          requested_branch_id?: string | null
+          status?: Database["public"]["Enums"]["affiliation_request_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          id?: string
+          membership_id?: string | null
+          note?: string | null
+          organization_id?: string
+          requested_branch_id?: string | null
+          status?: Database["public"]["Enums"]["affiliation_request_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_join_requests_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_join_requests_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_join_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_join_requests_requested_branch_id_fkey"
+            columns: ["requested_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_join_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_referrals: {
+        Row: {
+          city: string | null
+          created_at: string
+          decision_reason: string | null
+          description: string | null
+          display_name: string | null
+          governorate: string | null
+          id: string
+          join_request_id: string | null
+          legal_name: string | null
+          org_type: Database["public"]["Enums"]["organization_type"]
+          organization_id: string | null
+          primary_branch_name: string | null
+          referred_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["referral_status"]
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          decision_reason?: string | null
+          description?: string | null
+          display_name?: string | null
+          governorate?: string | null
+          id?: string
+          join_request_id?: string | null
+          legal_name?: string | null
+          org_type?: Database["public"]["Enums"]["organization_type"]
+          organization_id?: string | null
+          primary_branch_name?: string | null
+          referred_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          decision_reason?: string | null
+          description?: string | null
+          display_name?: string | null
+          governorate?: string | null
+          id?: string
+          join_request_id?: string | null
+          legal_name?: string | null
+          org_type?: Database["public"]["Enums"]["organization_type"]
+          organization_id?: string | null
+          primary_branch_name?: string | null
+          referred_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_referrals_join_request_id_fkey"
+            columns: ["join_request_id"]
+            isOneToOne: false
+            referencedRelation: "organization_join_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_referrals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_referrals_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_referrals_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           created_at: string
@@ -1155,9 +1328,11 @@ export type Database = {
           locality_id: string | null
           logo_media_id: string | null
           name: string
-          org_type: Database["public"]["Enums"]["account_type"]
+          org_type: Database["public"]["Enums"]["organization_type"]
           primary_locale: string
+          referred_by_user_id: string | null
           slug: string | null
+          source: string
           status: Database["public"]["Enums"]["org_status"]
           updated_at: string
         }
@@ -1170,9 +1345,11 @@ export type Database = {
           locality_id?: string | null
           logo_media_id?: string | null
           name: string
-          org_type: Database["public"]["Enums"]["account_type"]
+          org_type: Database["public"]["Enums"]["organization_type"]
           primary_locale?: string
+          referred_by_user_id?: string | null
           slug?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["org_status"]
           updated_at?: string
         }
@@ -1185,9 +1362,11 @@ export type Database = {
           locality_id?: string | null
           logo_media_id?: string | null
           name?: string
-          org_type?: Database["public"]["Enums"]["account_type"]
+          org_type?: Database["public"]["Enums"]["organization_type"]
           primary_locale?: string
+          referred_by_user_id?: string | null
           slug?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["org_status"]
           updated_at?: string
         }
@@ -1195,6 +1374,13 @@ export type Database = {
           {
             foreignKeyName: "organizations_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizations_referred_by_user_id_fkey"
+            columns: ["referred_by_user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -1884,7 +2070,7 @@ export type Database = {
           is_verified: boolean
           locale: string
           primary_account_type:
-            | Database["public"]["Enums"]["account_type"]
+            | Database["public"]["Enums"]["persona_type"]
             | null
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
@@ -1895,7 +2081,7 @@ export type Database = {
           is_verified?: boolean
           locale?: string
           primary_account_type?:
-            | Database["public"]["Enums"]["account_type"]
+            | Database["public"]["Enums"]["persona_type"]
             | null
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
@@ -1906,7 +2092,7 @@ export type Database = {
           is_verified?: boolean
           locale?: string
           primary_account_type?:
-            | Database["public"]["Enums"]["account_type"]
+            | Database["public"]["Enums"]["persona_type"]
             | null
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
@@ -1957,7 +2143,7 @@ export type Database = {
           organization_id: string | null
           reason: string | null
           requested_account_type:
-            | Database["public"]["Enums"]["account_type"]
+            | Database["public"]["Enums"]["persona_type"]
             | null
           reviewer_id: string | null
           status: Database["public"]["Enums"]["verification_status"]
@@ -1978,7 +2164,7 @@ export type Database = {
           organization_id?: string | null
           reason?: string | null
           requested_account_type?:
-            | Database["public"]["Enums"]["account_type"]
+            | Database["public"]["Enums"]["persona_type"]
             | null
           reviewer_id?: string | null
           status?: Database["public"]["Enums"]["verification_status"]
@@ -1999,7 +2185,7 @@ export type Database = {
           organization_id?: string | null
           reason?: string | null
           requested_account_type?:
-            | Database["public"]["Enums"]["account_type"]
+            | Database["public"]["Enums"]["persona_type"]
             | null
           reviewer_id?: string | null
           status?: Database["public"]["Enums"]["verification_status"]
@@ -2174,7 +2360,7 @@ export type Database = {
           locality_id: string | null
           logo_media_id: string | null
           name: string | null
-          org_type: Database["public"]["Enums"]["account_type"] | null
+          org_type: Database["public"]["Enums"]["organization_type"] | null
           primary_locale: string | null
           slug: string | null
         }
@@ -2856,6 +3042,32 @@ export type Database = {
         }
         Returns: string
       }
+      admin_showroom_referrals_list: {
+        Args: { p_pending_only?: boolean }
+        Returns: {
+          city: string
+          created_at: string
+          decision_reason: string
+          description: string
+          display_name: string
+          governorate: string
+          id: string
+          legal_name: string
+          match_count: number
+          match_id: string
+          match_name: string
+          org_type: Database["public"]["Enums"]["organization_type"]
+          organization_id: string
+          organization_name: string
+          primary_branch_name: string
+          referred_by: string
+          referrer_email: string
+          referrer_name: string
+          referrer_persona: Database["public"]["Enums"]["persona_type"]
+          reviewed_at: string
+          status: Database["public"]["Enums"]["referral_status"]
+        }[]
+      }
       apply_account_upgrade: {
         Args: { p_verification_id: string }
         Returns: undefined
@@ -2888,7 +3100,7 @@ export type Database = {
           p_draft_id?: string
           p_governorate?: string
           p_legal_name?: string
-          p_org_type?: Database["public"]["Enums"]["account_type"]
+          p_org_type?: Database["public"]["Enums"]["organization_type"]
           p_primary_branch_name?: string
         }
         Returns: string
@@ -2901,7 +3113,7 @@ export type Database = {
           p_display_name?: string
           p_governorate?: string
           p_legal_name?: string
-          p_org_type?: Database["public"]["Enums"]["account_type"]
+          p_org_type?: Database["public"]["Enums"]["organization_type"]
           p_owner_confirmed?: boolean
           p_primary_branch_name?: string
         }
@@ -3028,7 +3240,7 @@ export type Database = {
           p_availability?: string
           p_bio?: string
           p_city?: string
-          p_concrete_type: Database["public"]["Enums"]["account_type"]
+          p_concrete_type: Database["public"]["Enums"]["persona_type"]
           p_governorate?: string
           p_headline?: string
           p_languages?: string[]
@@ -3085,13 +3297,48 @@ export type Database = {
         Returns: undefined
       }
       my_registration_state: { Args: never; Returns: string }
+      my_showroom_affiliations: {
+        Args: never
+        Returns: {
+          branch_name: string
+          created_at: string
+          decided_at: string
+          decision_reason: string
+          is_verified: boolean
+          org_type: Database["public"]["Enums"]["organization_type"]
+          organization_id: string
+          organization_name: string
+          request_id: string
+          status: Database["public"]["Enums"]["affiliation_request_status"]
+          via_referral: boolean
+        }[]
+      }
+      my_showroom_referrals: {
+        Args: never
+        Returns: {
+          city: string
+          created_at: string
+          decision_reason: string
+          description: string
+          display_name: string
+          governorate: string
+          id: string
+          legal_name: string
+          org_type: Database["public"]["Enums"]["organization_type"]
+          organization_id: string
+          primary_branch_name: string
+          reviewed_at: string
+          status: Database["public"]["Enums"]["referral_status"]
+        }[]
+      }
       my_workspaces: {
         Args: never
         Returns: {
           kind: string
           name: string
-          org_type: Database["public"]["Enums"]["account_type"]
+          org_type: Database["public"]["Enums"]["organization_type"]
           organization_id: string
+          persona: Database["public"]["Enums"]["persona_type"]
           relationship: string
         }[]
       }
@@ -3102,10 +3349,35 @@ export type Database = {
       }
       onboarding_select_account_type: {
         Args: {
-          p_account_type?: Database["public"]["Enums"]["account_type"]
+          p_account_type?: string
           p_track: Database["public"]["Enums"]["onboarding_track"]
         }
         Returns: undefined
+      }
+      org_join_request_approve: {
+        Args: { p_branch_id?: string; p_request_id: string }
+        Returns: string
+      }
+      org_join_request_reject: {
+        Args: { p_reason: string; p_request_id: string }
+        Returns: undefined
+      }
+      org_join_requests_list: {
+        Args: { p_org_id: string }
+        Returns: {
+          branch_id: string
+          branch_name: string
+          created_at: string
+          decided_at: string
+          decision_reason: string
+          display_name: string
+          email_masked: string
+          note: string
+          persona: Database["public"]["Enums"]["persona_type"]
+          request_id: string
+          status: Database["public"]["Enums"]["affiliation_request_status"]
+          user_id: string
+        }[]
       }
       org_members_list: {
         Args: { p_org_id: string }
@@ -3117,7 +3389,7 @@ export type Database = {
           email_masked: string
           invited_at: string
           membership_id: string
-          primary_account_type: Database["public"]["Enums"]["account_type"]
+          primary_account_type: Database["public"]["Enums"]["persona_type"]
           primary_branch_id: string
           status: Database["public"]["Enums"]["membership_status"]
           user_id: string
@@ -3142,7 +3414,7 @@ export type Database = {
       reopen_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
       request_account_upgrade: {
         Args: {
-          p_requested_account_type: Database["public"]["Enums"]["account_type"]
+          p_requested_account_type: Database["public"]["Enums"]["persona_type"]
         }
         Returns: string
       }
@@ -3195,6 +3467,62 @@ export type Database = {
       set_quotation_item_price: {
         Args: { p_item_id: string; p_unit_price: number }
         Returns: undefined
+      }
+      showroom_branches: {
+        Args: { p_org_id: string }
+        Returns: {
+          id: string
+          name: string
+        }[]
+      }
+      showroom_directory_search: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          id: string
+          is_verified: boolean
+          locality_id: string
+          logo_media_id: string
+          name: string
+          org_type: Database["public"]["Enums"]["organization_type"]
+          primary_locale: string
+          slug: string
+        }[]
+      }
+      showroom_join_request_cancel: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
+      showroom_join_request_create: {
+        Args: {
+          p_branch_id?: string
+          p_note?: string
+          p_organization_id: string
+        }
+        Returns: string
+      }
+      showroom_referral_approve: {
+        Args: { p_link_organization_id?: string; p_referral_id: string }
+        Returns: string
+      }
+      showroom_referral_reject: {
+        Args: { p_reason: string; p_referral_id: string }
+        Returns: undefined
+      }
+      showroom_referral_save: {
+        Args: {
+          p_city?: string
+          p_description?: string
+          p_display_name?: string
+          p_governorate?: string
+          p_legal_name?: string
+          p_primary_branch_name?: string
+          p_referral_id?: string
+        }
+        Returns: string
+      }
+      showroom_referral_submit: {
+        Args: { p_referral_id?: string }
+        Returns: string
       }
       start_order: {
         Args: { p_expected_version: number; p_order_id: string }
@@ -3302,20 +3630,11 @@ export type Database = {
       }
     }
     Enums: {
-      account_type:
-        | "end_consumer"
-        | "installer_technician"
-        | "engineer"
-        | "interior_designer"
-        | "showroom_dealer"
-        | "supplier"
-        | "manufacturer"
-        | "importer"
-        | "wholesaler"
-        | "sales"
-        | "contractor"
-        | "trainer"
-        | "trainee"
+      affiliation_request_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "cancelled"
       consent_type: "terms" | "privacy" | "pilot"
       contact_channel: "whatsapp" | "email"
       customer_status: "active" | "archived"
@@ -3338,6 +3657,23 @@ export type Database = {
         | "active"
         | "suspended"
         | "archived"
+      organization_type:
+        | "showroom_dealer"
+        | "supplier"
+        | "manufacturer"
+        | "importer"
+        | "wholesaler"
+        | "contractor_company"
+        | "design_office"
+      persona_type:
+        | "end_consumer"
+        | "engineer"
+        | "interior_designer"
+        | "installer_technician"
+        | "contractor"
+        | "sales"
+        | "trainer"
+        | "trainee"
       platform_role: "support" | "moderator" | "administrator"
       product_category:
         | "finishing"
@@ -3364,6 +3700,7 @@ export type Database = {
       project_status: "planned" | "active" | "completed"
       public_profile_status: "hidden" | "listed"
       quotation_status: "draft" | "submitted" | "accepted" | "rejected"
+      referral_status: "draft" | "submitted" | "approved" | "rejected"
       rfq_status: "draft" | "submitted" | "quoted" | "closed" | "cancelled"
       sales_activity_type:
         | "note"
@@ -3526,20 +3863,11 @@ export const Constants = {
   },
   public: {
     Enums: {
-      account_type: [
-        "end_consumer",
-        "installer_technician",
-        "engineer",
-        "interior_designer",
-        "showroom_dealer",
-        "supplier",
-        "manufacturer",
-        "importer",
-        "wholesaler",
-        "sales",
-        "contractor",
-        "trainer",
-        "trainee",
+      affiliation_request_status: [
+        "pending",
+        "approved",
+        "rejected",
+        "cancelled",
       ],
       consent_type: ["terms", "privacy", "pilot"],
       contact_channel: ["whatsapp", "email"],
@@ -3564,6 +3892,25 @@ export const Constants = {
         "active",
         "suspended",
         "archived",
+      ],
+      organization_type: [
+        "showroom_dealer",
+        "supplier",
+        "manufacturer",
+        "importer",
+        "wholesaler",
+        "contractor_company",
+        "design_office",
+      ],
+      persona_type: [
+        "end_consumer",
+        "engineer",
+        "interior_designer",
+        "installer_technician",
+        "contractor",
+        "sales",
+        "trainer",
+        "trainee",
       ],
       platform_role: ["support", "moderator", "administrator"],
       product_category: [
@@ -3593,6 +3940,7 @@ export const Constants = {
       project_status: ["planned", "active", "completed"],
       public_profile_status: ["hidden", "listed"],
       quotation_status: ["draft", "submitted", "accepted", "rejected"],
+      referral_status: ["draft", "submitted", "approved", "rejected"],
       rfq_status: ["draft", "submitted", "quoted", "closed", "cancelled"],
       sales_activity_type: [
         "note",

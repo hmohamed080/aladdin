@@ -1,13 +1,31 @@
-import { Card, StatePanel } from "@/components/ui/primitives";
-import { SearchIcon, ActivityIcon, UsersIcon } from "@/components/ui/icons";
+import { Card } from "@/components/ui/primitives";
+import { ClipboardIcon, UserIcon, BuildingIcon } from "@/components/ui/icons";
 import type { PersonalHomeData } from "@/server/queries/personal-home";
 import type { TranslateFn } from "@/lib/i18n/translate";
-import { CompletenessCard, DetailCard, ChipList, HomeHeader, NextActions } from "./parts";
+import {
+  AccountStrip,
+  ActionCard,
+  ActionGrid,
+  ChipList,
+  DetailCard,
+  Footnote,
+  HomeHeader,
+  HomeSection,
+  VerificationBadge,
+} from "./parts";
 
 /**
- * The CONSUMER variant of the personal surface. Consumer-focused copy, the
- * caller's own setup read back, and the discovery/project areas the Pilot does
- * not serve yet marked honestly as coming soon (never as a broken feature).
+ * The CONSUMER variant of the personal surface.
+ *
+ * Product-first, and honest about it: every card here is a route that exists and
+ * an action this account can take right now. The Pilot does not yet serve
+ * discovery or project execution for consumers, so those are ONE quiet footnote —
+ * not three prominent cards that look like features and behave like signs.
+ *
+ * What leads the page is the consumer's own brief: what they are working on, where,
+ * and at what budget. That is real product context, owned by this account, and it
+ * is the thing a consultation-first platform actually needs from them. Profile
+ * completeness and verification sit below it as secondary account widgets.
  */
 export function ConsumerHome({ data, t }: { data: PersonalHomeData; t: TranslateFn }) {
   const { consumer, completeness } = data;
@@ -21,7 +39,7 @@ export function ConsumerHome({ data, t }: { data: PersonalHomeData; t: Translate
     .filter(Boolean)
     .join(" · ");
 
-  const rows = [
+  const briefRows = [
     {
       label: t("onboarding.consumer.step.intent"),
       value: consumer.intent ? t(`onboarding.consumer.intents.${consumer.intent}`) : null,
@@ -33,61 +51,66 @@ export function ConsumerHome({ data, t }: { data: PersonalHomeData; t: Translate
     },
   ];
 
-  const upcoming: { Icon: typeof ActivityIcon; key: "projects" | "discover" | "advice" }[] = [
-    { Icon: ActivityIcon, key: "projects" },
-    { Icon: SearchIcon, key: "discover" },
-    { Icon: UsersIcon, key: "advice" },
-  ];
+  // The brief is where a consumer's next missing field almost always lives, so it
+  // is the emphasised action while anything is outstanding.
+  const briefIncomplete = completeness.missing.some((k) =>
+    (["intent", "interests", "location", "budget"] as string[]).includes(k),
+  );
 
   return (
     <div className="flex flex-col gap-xl">
       <HomeHeader
         eyebrow={t("personalHome.consumer.eyebrow")}
         title={t("personalHome.greeting", { name })}
+        name={data.displayName}
         lead={t("personalHome.consumer.subtitle")}
+        meta={<VerificationBadge state={data.verification.state} t={t} />}
       />
 
-      <section className="grid gap-md tablet:grid-cols-2">
-        <CompletenessCard completeness={completeness} t={t} />
-        <Card className="flex flex-col gap-sm">
-          <h2 className="text-body font-semibold text-fg">{t("personalHome.consumer.interests")}</h2>
-          <ChipList items={interests} empty={t("personalHome.consumer.noInterests")} />
-        </Card>
-      </section>
+      <HomeSection title={t("personalHome.consumer.doNext")} description={t("personalHome.consumer.doNextBody")}>
+        <ActionGrid>
+          <ActionCard
+            href="/onboarding/consumer"
+            icon={<ClipboardIcon size={20} />}
+            label={t("personalHome.consumer.action.brief")}
+            body={t("personalHome.consumer.action.briefBody")}
+            emphasis={briefIncomplete}
+          />
+          <ActionCard
+            href="/onboarding/profile"
+            icon={<UserIcon size={20} />}
+            label={t("personalHome.action.profile")}
+            body={t("personalHome.action.profileBody")}
+          />
+          {/* A consumer may own a business without becoming a second user. */}
+          <ActionCard
+            href="/business/new"
+            icon={<BuildingIcon size={20} />}
+            label={t("personalHome.action.addBusiness")}
+            body={t("personalHome.action.addBusinessBody")}
+          />
+        </ActionGrid>
+      </HomeSection>
 
-      <section className="grid gap-md tablet:grid-cols-2">
-        <DetailCard title={t("personalHome.consumer.setup")} rows={rows} t={t} />
-        <NextActions
-          title={t("personalHome.nextActions")}
-          actions={[
-            {
-              href: "/onboarding/consumer",
-              label: t("personalHome.consumer.action.editSetup"),
-              body: t("personalHome.consumer.action.editSetupBody"),
-            },
-          ]}
-        />
-      </section>
-
-      <section className="flex flex-col gap-md">
-        <h2 className="text-body font-semibold text-fg">{t("personalHome.consumer.comingUp")}</h2>
-        <div className="grid gap-md tablet:grid-cols-3">
-          {upcoming.map(({ Icon, key }) => (
-            <Card key={key} className="flex flex-col gap-sm">
-              <span className="flex size-9 items-center justify-center rounded-md bg-surface-2 text-accent">
-                <Icon size={20} />
-              </span>
-              <h3 className="text-body font-semibold text-fg">{t(`personalHome.consumer.${key}.title`)}</h3>
-              <p className="text-label text-fg-secondary">{t(`personalHome.consumer.${key}.body`)}</p>
-              <span className="mt-auto pt-sm text-label font-medium text-fg-muted">
-                {t("personalHome.comingSoon")}
-              </span>
-            </Card>
-          ))}
+      <HomeSection title={t("personalHome.consumer.brief")} description={t("personalHome.consumer.briefDesc")}>
+        <div className="grid gap-md desktop:grid-cols-[3fr_2fr]">
+          <DetailCard title={t("personalHome.consumer.setup")} rows={briefRows} t={t} />
+          <Card className="flex flex-col gap-md">
+            <h3 className="text-title text-fg">{t("personalHome.consumer.interests")}</h3>
+            <ChipList items={interests} empty={t("personalHome.consumer.noInterests")} />
+          </Card>
         </div>
-      </section>
+      </HomeSection>
 
-      <StatePanel title={t("personalHome.pilot.title")} body={t("personalHome.consumer.pilotBody")} />
+      <HomeSection title={t("personalHome.accountSection")} description={t("personalHome.accountSectionBody")}>
+        <AccountStrip
+          completeness={completeness}
+          verification={data.verification}
+          continueHref="/onboarding/consumer"
+          t={t}
+        />
+        <Footnote>{t("personalHome.consumer.pilotNote")}</Footnote>
+      </HomeSection>
     </div>
   );
 }

@@ -16,7 +16,8 @@ export default async function AdminOrganizationsPage() {
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const m = getMessages(locale);
   const orgs = await listOrganizations(supabase);
-  const typeLabels = m.accountType as Record<string, string>;
+  // An organization's classification, not a person's persona: separate label set.
+  const typeLabels = m.orgType as Record<string, string>;
   const statusLabels = m.admin.status as Record<string, string>;
 
   return (
