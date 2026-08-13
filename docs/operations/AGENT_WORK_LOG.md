@@ -1223,3 +1223,45 @@ Completed the B2B execution workflow: **accepted quotation → order → start �
 - **Frontend**: routes `/b2b/orders`, `/b2b/orders/[orderId]`, `/b2b/projects`, `/b2b/projects/[projectId]`; Orders+Projects in nav; `server/{queries,actions}/execution*.ts`, `mapExecutionError`; `features/execution/*` (badges, lists, order detail w/ snapshot table + timeline + inline create-project, project detail w/ activity trail + PROJECT COMPLETED). Accepted-quotation view now has a live **Create order / View order** handoff. Full EN/AR, responsive, no overflow.
 - **Validation**: typecheck ✅ · lint ✅ (0 errors) · vitest ✅ (157, +`execution.test.ts`) · build ✅ · pgTAP ✅ · targeted E2E `orders-projects.spec.ts` (pages/nav/bilingual/overflow/not-found).
 - Docs: `docs/frontend/sprint-10-orders-projects.md`. PR to `main`, not merged.
+
+---
+
+## 2026-08-15 — Sprint 13: Personal Experience + Sales Affiliation + Type Separation (branch `feature/pilot-personal-sales-readiness`)
+
+Three things: the person/business type separation became structural, a Salesperson gained a way to reach the Sales tools of a business they do not own, and personal `/home` stopped looking like a form under review.
+
+### A — The shared enum is gone, not documented
+`public.account_type` typed BOTH `users.primary_account_type` and `organizations.org_type`. Sprint 12 fixed the meaning in comments and RPC guards; a rule that lives only there is a rule a future `update` can violate. Migration `20260815090001` replaces it with two **disjoint** types — `public.persona_type` (a person: consumer, engineer, interior designer, installer/technician, contractor, salesperson, **trainer, trainee** — the legacy training personas are legitimate and preserved) and `public.organization_type` (a business: showroom/dealer, supplier, manufacturer, importer, wholesaler, contractor_company, design_office) — then **drops** `account_type`, which is also the completeness check: `DROP TYPE ... RESTRICT` fails and names anything still referencing it.
+
+`users.primary_account_type = 'supplier'` and `organizations.org_type = 'engineer'` are now **22P02** in every path, including a direct statement by a superuser.
+
+Two things the audit forced:
+- **Two organizations legitimately carried a persona spelling as their classification** (a design studio typed `interior_designer`, a contracting company typed `contractor`). They are preserved under business-shaped names — `design_office`, `contractor_company` — inside the `USING` cast, since the new label is not a value of the old enum. An organization holding any *other* persona value stops the migration with an instruction rather than being assigned a guessed type.
+- **`onboarding_progress.selected_account_type` held either taxonomy depending on the track** — the debt's last hiding place. Split into `selected_persona` + `selected_org_type`, mutually exclusive and track-consistent by CHECK. The union survives only as a TypeScript read-boundary type, because the registration *choice* genuinely spans both.
+
+**Bug found and fixed en route:** `apply_account_upgrade` tested the persona VALUE for presence and raised *"verification subject has no identity row"*. Since Sprint 12 made the column nullable, a professional's persona is legitimately null until that function applies it — so Admin approval of every individual professional created after Sprint 12 was failing. It now locks and tests the ROW, as `request_account_upgrade` already did.
+
+### B–G — Salesperson affiliation
+Migration `20260815090002`. Canonical rule: **a Salesperson's personal account is usable immediately; a showroom's Sales tools need an ACTIVE affiliation with that showroom.** Account status, profile completeness, personal verification, showroom affiliation and showroom verification are five states that move independently and are never merged into one number or badge. Verification is not an activation gate anywhere.
+
+- **Showroom on Aladdin** → `organization_join_requests`. Search returns only the approved public directory columns (min 2 chars, capped, includes `pending_verification` showrooms — hiding unverified ones would push their staff into referring duplicates of businesses already present). An Owner/Manager of *that* organization decides, on the existing People surface, under the existing `org.members.manage` capability. No second permission architecture.
+- **Showroom not on Aladdin** → `organization_referrals`. Submitting creates nothing; an Admin reviews it on the existing verifications surface and prefers **linking** to an existing organization (exact case/whitespace-insensitive match auto-links; a trigram shortlist is shown for the human's judgement) over creating a duplicate. Company name stays non-unique — two real showrooms may share one.
+- Both approvals converge on `app.membership_grant_sales`, so "approved" means one thing and a returning salesperson reactivates their existing membership row instead of accumulating duplicates.
+- **The owner question, answered explicitly:** the model has no invariant requiring an organization to have an owner (`assert_not_last_owner` protects one that exists; nothing demands one exist). So a referred showroom is created with its primary branch and the referrer's **Sales** membership and **no owner membership at all** — a platform-managed business, claimable later. No ownership is faked, and `created_by` is the reviewing Admin rather than the referrer, because that column feeds the creator RLS policy and would read as ownership.
+- **Attribution only** (part G): `organizations.source` + `organizations.referred_by_user_id`, write-once by trigger. No wallet, balance, leaderboard or reward calculation — a reward paid on a mutable field is paid to whoever wrote last.
+
+### H–M — Personal home product pass
+The UAT findings traced to two concrete facts: the shell capped content at 900px, and the `h1` used `text-title` (1.25rem, 1.4× body). Both were reaches for the wrong end of an existing scale rather than missing tokens.
+
+- Content column 900px → **1120px**; page title `text-title` → **`text-headline`** (2rem); identity + real actions lead; completeness and verification become a compact secondary strip at the end, still separate from each other and never averaged into an "account health" figure.
+- **Consumer** leads with the project brief — real data this account owns — and the three prominent "coming soon" cards collapse to one footnote. `Add a business` stays available: a consumer may own a business without becoming a second user.
+- **One professional structure** serves all five personas with persona-aware content. The Salesperson variant adds the affiliation panel, which reports a *connection*, never an account state.
+
+### Validation
+- frontend typecheck ✅ · lint ✅ (0 errors, 0 warnings) · unit **204/204** ✅ · bilingual parity gate ✅
+- `supabase db reset` ✅ from clean with both seeds · pgTAP **729/729** ✅ across 29 files (79 new in `28_persona_sales_affiliation_test.sql`, covering all fourteen required DB acceptances)
+- Targeted production Playwright — see the Runtime State snapshot for the measured counts. Repo-wide E2E, Lighthouse and the full persona matrix deliberately **not** run; this is not the final Integration Gate.
+- No `.pen` file touched.
+
+### Rollback
+Two migrations and three commits on `feature/pilot-personal-sales-readiness`; `main` @ `e7fc5e0` is untouched. Reverting the type-separation migration is **not** a simple `git revert` — it changed column types and dropped an enum, so a down-migration would have to recreate `account_type` and re-cast four columns. The safe rollback is `supabase db reset` to the previous migration set on a local/staging database; nothing has been applied to production.

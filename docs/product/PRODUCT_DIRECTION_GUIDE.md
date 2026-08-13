@@ -101,8 +101,19 @@ User (unchanged)
      └─ Primary Branch
 ```
 
-### Transitional compatibility (technical debt, not the target)
-Business-valued `primary_account_type` values and the existing account-type paths **remain as-is for now** — the database enum and migration behaviour are **not** changed by this clarification. They are **transitional implementation compatibility**, explicitly **not** the target source of truth. The upcoming Account & Workspace Model feature must **audit and migrate them safely** to the organization-owned classification rather than creating a second source of truth. Tracked in [`../technical/TECHNICAL_DEBT.md`](../technical/TECHNICAL_DEBT.md).
+### The separation is enforced by the type system (Sprint 13)
+The two taxonomies now live in **two disjoint database types**, so the rule above is no longer a convention that code must remember:
+
+| | Type | Contains |
+|---|---|---|
+| A person | `public.persona_type` | `end_consumer` · `engineer` · `interior_designer` · `installer_technician` · `contractor` · `sales` · `trainer` · `trainee` |
+| A business | `public.organization_type` | `showroom_dealer` · `supplier` · `manufacturer` · `importer` · `wholesaler` · `contractor_company` · `design_office` |
+
+`users.primary_account_type` is a `persona_type` and `organizations.org_type` is an `organization_type`, so **`user.primary_account_type = 'supplier'` and `organizations.org_type = 'engineer'` are type errors** — in every code path, including a direct SQL statement by a superuser. The shared `account_type` enum is **dropped**; the transitional debt it represented is closed, not documented.
+
+Two nuances worth knowing:
+- **A business whose classification shared a persona spelling kept its identity, under a business-shaped name.** A design studio typed `interior_designer` is now `design_office`; a contracting company typed `contractor` is now `contractor_company`. The owner of either may separately hold the matching *personal* persona — the two values now coexist honestly instead of colliding.
+- **The registration CHOICE is the one place the taxonomies meet**, because the card the person taps either claims a persona or names a business to create. `onboarding_progress` therefore records it in two separate typed columns (`selected_persona`, `selected_org_type`), mutually exclusive and consistent with the track — never one union column.
 
 ## Membership Connects a User to an Organization
 ```
@@ -174,6 +185,27 @@ Recorded as approved direction only; **no deletion feature is in current scope.*
 - Verification is reported alongside the account, never folded into it: *not verified · pending review · more info needed · verified · rejected*. It gates **trust and public discoverability**, not access.
 - An Admin decision may add trust — the approved-and-applied review is still the only thing that writes `users.primary_account_type` and sets `profiles.public_profile_status = 'listed'` — but it must never be what lets someone in.
 - **Profile completeness** is a separate, always-DERIVED signal computed from the applicable profile fields for that persona. It is never a stored percentage, never includes verification, and never blocks usage.
+
+## The Salesperson Pilot Rule (Sprint 13, 2026-08-15)
+**A Salesperson has a usable personal Aladdin account immediately. A showroom's Sales / B2B tools require an ACTIVE affiliation with that showroom.**
+
+Five states, each moving on its own — never combined into one percentage or one badge:
+
+| State | Example | What it controls |
+|---|---|---|
+| Account status | `ACTIVE` | Whether the person can use Aladdin at all — yes, from onboarding onward |
+| Profile completeness | `80%` | Nothing. A derived quality signal |
+| Personal verification | `PENDING` | Trust and public discoverability, never access |
+| Showroom affiliation | `PENDING` | Whether *that showroom's* Sales tools open |
+| Showroom verification | `PENDING` | The showroom's own trust state, not the salesperson's |
+
+A salesperson in exactly that combination uses their personal account normally and simply cannot yet open that showroom's B2B workspace. **Verification must never become the general account-activation gate again**, and landing is never derived from persona — "Salesperson → always `/b2b`" is wrong, because an independent salesperson may have no showroom at all.
+
+Two paths reach an affiliation, and neither creates a second user:
+- **The showroom is on Aladdin** → the salesperson finds it, requests to join, and an Owner/Manager of *that* organization decides, using the existing `org.members.manage` capability on the existing People surface. Approval activates a **Sales membership** through the same trusted path an invitation uses. A rejection never disables the personal account.
+- **The showroom is not on Aladdin** → the salesperson **refers** it. This is emphatically not the owner "Add Business" flow: submitting creates no organization, and an Admin reviews the candidate through the existing verification architecture, preferring to **link** it to an organization that already exists over creating a duplicate. Company name stays non-unique — de-duplication is a reviewed decision, not a constraint.
+
+**The referrer is never the Owner.** A referred showroom that nobody has claimed is created with a primary branch and the referring salesperson's Sales membership, and with **no owner membership at all** — the data model requires none, so a platform-managed, claimable business is available and fabricating an owner is unnecessary. Referral **attribution** is retained write-once (`organizations.source` + `organizations.referred_by_user_id`) so a future rewards feature can credit the salesperson; **no points, wallet, leaderboard or reward calculation exists.**
 
 ## "Owner / manager" is not an account type or a business type
 It describes the **relationship between a user and a business**, so it carries no `account_type` and is never an `org_type`. Never create an `owner_manager` account type or organization type.

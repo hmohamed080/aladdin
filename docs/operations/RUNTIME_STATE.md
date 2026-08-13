@@ -6,24 +6,24 @@ This is a **mutable snapshot** of the current live repository state — not an a
 
 | | |
 |---|---|
-| **Version** | Runtime snapshot · 2026-08-12 |
+| **Version** | Runtime snapshot · 2026-08-15 |
 | **Owner** | Foundation / Operations |
-| **Last updated** | 2026-08-12 |
-| **Updated by** | Claude — Pilot Account & Workspace Model (feature sprint) |
-| **Current focus** | **Pilot Account & Workspace Model (feature sprint):** the approved account model is now **implemented**, not just documented. `users.primary_account_type` is **nullable, defaultless, and means personal persona only** — a business-only identity legitimately has **no** personal persona, which the old `not null default 'end_consumer'` column could not represent; `organizations.org_type` stays the sole business classification and is never mirrored onto a user. Business creation moved to a **per-attempt draft** whose id is both resume handle and **idempotency key**, replacing the one-draft-per-user shape that structurally prevented a second business. Registration is a **direct Personal-or-Business choice** (the generic "Organization owner / manager" entry and the owner-confirmation checkbox are gone — the creator *is* the owner); an existing user can **add a business** with no second sign-up; a **workspace switcher** changes the active work context without touching persona or membership; landing is deterministic and belonging to an organization no longer evicts a person from `/home`. Branch `feature/pilot-account-workspace-model`; two new migrations (`20260814090001`, `20260814090002`); no `.pen` change.
+| **Last updated** | 2026-08-15 |
+| **Updated by** | Claude — Personal Experience + Sales Affiliation + Type Separation (Sprint 13) |
+| **Current focus** | **Personal Experience + Sales Affiliation + Type Separation (Sprint 13):** the person/business separation moved from convention into the **type system**. `public.account_type` is dropped and replaced by two disjoint types — `public.persona_type` (a person) and `public.organization_type` (a business) — so `users.primary_account_type = 'supplier'` and `organizations.org_type = 'engineer'` are now **22P02 type errors in every path**, including direct SQL; the transitional shared-enum debt is closed rather than documented. Two organizations whose classification shared a persona spelling were preserved under business-shaped names (`design_office`, `contractor_company`), and `onboarding_progress.selected_account_type` was split into `selected_persona` + `selected_org_type`. A **Salesperson** now has a usable personal account immediately, with a showroom's Sales tools gated on an **ACTIVE affiliation** with that showroom: they either request to join a showroom already on Aladdin (decided by its Owner/Manager on the existing People surface under `org.members.manage`) or **refer** their employer for platform review (which prefers linking to an existing organization over creating a duplicate, and never makes the referrer Owner). Referral **attribution** is retained write-once for a future rewards feature; no points/wallet/leaderboard exists. Personal `/home` had a product pass: a 1120px content column, `text-headline` page title, real actions leading, and completeness/verification demoted to a compact secondary strip. Branch `feature/pilot-personal-sales-readiness`; two new migrations (`20260815090001`, `20260815090002`); no `.pen` change. |
 
 ## Phase & repository
 
 | Field | Value |
 |---|---|
 | **Current Phase** | **Private Pilot — account & workspace model** |
-| **Current Sprint** | **Pilot Account & Workspace Model — persona/business decoupling, idempotent business creation, workspace switching** |
-| **Current Feature** | Nullable personal persona (business-only identities), `business_creation_drafts`, direct Personal-or-Business registration, Add business, workspace switcher, deterministic landing |
+| **Current Sprint** | **Sprint 13 — persona/organization type separation, salesperson showroom affiliation, personal-home product pass** |
+| **Current Feature** | Disjoint `persona_type`/`organization_type`, `organization_join_requests`, `organization_referrals`, write-once referral attribution, client-ready personal home |
 | **Next Phase** | Review PR to `main`; do not merge from this task |
-| **Current Branch** | `feature/pilot-account-workspace-model` (created from `main` @ `a0ff5f6`) |
-| **Current Milestone** | Account & Workspace Model; targeted acceptance complete, PR open, not merged |
+| **Current Branch** | `feature/pilot-personal-sales-readiness` (created from `main` @ `e7fc5e0`) |
+| **Current Milestone** | Sprint 13; targeted acceptance complete, PR open, not merged |
 | **Current Remote Repository** | `origin` = `https://github.com/hmohamed080/aladdin.git` |
-| **Last Stable Commit** | `a0ff5f6` — `main` at this branch point (PR #20 merged) |
+| **Last Stable Commit** | `e7fc5e0` — `main` at this branch point (PR #21 merged) |
 | **Last Stable Tag** | `v0.1.0-foundation` (repo `0.1.0`) — created on merged `main` after the closeout PR; Design System stays independently at `1.0.0` |
 | **Foundation Release** | Tagged `v0.1.0-foundation` on `main` @ `64e68d6` |
 | **Repository Status** | Published to GitHub (`origin`, full history, no squash/force); `main` protection recommended (ADR-0006), not yet applied |
