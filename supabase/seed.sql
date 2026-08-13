@@ -56,8 +56,14 @@ update auth.users set
   phone_change_token = coalesce(phone_change_token, '')
 where instance_id = '00000000-0000-0000-0000-000000000000';
 
--- Set primary account types (bootstrap defaults everyone to end_consumer).
-update public.users set primary_account_type = 'supplier',          status = 'active' where id = '11111111-1111-4111-8111-111111111111';
+-- Set PERSONAL personas. `primary_account_type` is personal persona state only —
+-- a business classification (Supplier / Showroom / Manufacturer / ...) belongs to
+-- `organizations.org_type` and is never mirrored onto a person (Sprint 12).
+-- A-owner OWNS the seeded supplier organization and has never claimed a personal
+-- persona, so she is a BUSINESS-ONLY identity: null here, `supplier` on the
+-- organization. This is exactly what the migration produces for a legacy owner
+-- whose persona was the business classification.
+update public.users set primary_account_type = null,                status = 'active' where id = '11111111-1111-4111-8111-111111111111';
 update public.users set primary_account_type = 'sales',             status = 'active' where id = '22222222-2222-4222-8222-222222222222';
 update public.users set primary_account_type = 'interior_designer', status = 'active' where id = '33333333-3333-4333-8333-333333333333';
 update public.users set primary_account_type = 'end_consumer',      status = 'active' where id = '44444444-4444-4444-8444-444444444444';

@@ -7,53 +7,97 @@ vi.mock("server-only", () => ({}));
 const { loadPlatformRole } = vi.hoisted(() => ({ loadPlatformRole: vi.fn() }));
 vi.mock("@/server/queries/platform", () => ({ loadPlatformRole }));
 
+const { cookieValue } = vi.hoisted(() => ({ cookieValue: { current: undefined as string | undefined } }));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => (cookieValue.current ? { value: cookieValue.current } : undefined) }),
+}));
+
 import { resolveActiveLanding } from "./landing";
 
-function clientWithMembership(membership: { id: string } | null) {
-  const maybeSingle = vi.fn(async () => ({ data: membership, error: null }));
-  const chain = {
-    select: vi.fn(),
-    eq: vi.fn(),
-    limit: vi.fn(),
-    maybeSingle,
+type Row = {
+  kind: string;
+  organization_id: string | null;
+  name: string;
+  org_type: string | null;
+  relationship: string | null;
+};
+
+const personal: Row = {
+  kind: "personal",
+  organization_id: null,
+  name: "Ahmed Hassan",
+  org_type: "engineer",
+  relationship: null,
+};
+const business = (id: string, name: string): Row => ({
+  kind: "business",
+  organization_id: id,
+  name,
+  org_type: "showroom_dealer",
+  relationship: "owner",
+});
+
+function clientWithWorkspaces(rows: Row[]) {
+  const rpc = vi.fn(async () => ({ data: rows, error: null }));
+  return {
+    client: { rpc } as unknown as SupabaseClient<Database>,
+    rpc,
   };
-  chain.select.mockReturnValue(chain);
-  chain.eq.mockReturnValue(chain);
-  chain.limit.mockReturnValue(chain);
-
-  const client = {
-    auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
-    from: vi.fn(() => chain),
-  } as unknown as SupabaseClient<Database>;
-
-  return { client, chain };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   loadPlatformRole.mockResolvedValue(null);
+  cookieValue.current = undefined;
 });
 
 describe("resolveActiveLanding", () => {
-  it("routes platform staff to /admin without inferring authority from membership", async () => {
-    const { client } = clientWithMembership({ id: "membership-1" });
+  it("routes platform staff to /admin without consulting workspaces", async () => {
+    const { client, rpc } = clientWithWorkspaces([business("org-1", "Cairo Ceramics")]);
     loadPlatformRole.mockResolvedValueOnce("administrator");
 
     await expect(resolveActiveLanding(client)).resolves.toBe("/admin");
-    expect(client.from).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("routes an active organization member to /b2b", async () => {
-    const { client, chain } = clientWithMembership({ id: "membership-1" });
+  it("routes a BUSINESS-ONLY identity to /b2b — never a fake personal home", async () => {
+    // No personal entry at all: the person has no personal persona.
+    const { client } = clientWithWorkspaces([business("org-1", "Cairo Ceramics")]);
 
     await expect(resolveActiveLanding(client)).resolves.toBe("/b2b");
-    expect(client.from).toHaveBeenCalledWith("memberships");
-    expect(chain.eq).toHaveBeenCalledWith("user_id", "user-1");
-    expect(chain.eq).toHaveBeenCalledWith("status", "active");
   });
 
-  it("routes an active organization-less account to /home", async () => {
-    const { client } = clientWithMembership(null);
+  it("routes a personal-only identity to /home", async () => {
+    const { client } = clientWithWorkspaces([personal]);
+
+    await expect(resolveActiveLanding(client)).resolves.toBe("/home");
+  });
+
+  it("prefers Personal for a mixed identity with no valid selection", async () => {
+    // Owning a business no longer evicts a person from their personal home.
+    const { client } = clientWithWorkspaces([personal, business("org-1", "AH Design Studio")]);
+
+    await expect(resolveActiveLanding(client)).resolves.toBe("/home");
+  });
+
+  it("honors an explicit business selection for a mixed identity", async () => {
+    cookieValue.current = "org-1";
+    const { client } = clientWithWorkspaces([personal, business("org-1", "AH Design Studio")]);
+
+    await expect(resolveActiveLanding(client)).resolves.toBe("/b2b");
+  });
+
+  it("falls back safely when the selected workspace is no longer available", async () => {
+    // The cookie names an org whose membership was revoked: it is simply not in
+    // the caller's entries any more, so landing resolves to what they do have.
+    cookieValue.current = "org-revoked";
+    const { client } = clientWithWorkspaces([business("org-2", "Delta Wholesale")]);
+
+    await expect(resolveActiveLanding(client)).resolves.toBe("/b2b");
+  });
+
+  it("sends a caller with no usable workspace to the account-safe /home", async () => {
+    const { client } = clientWithWorkspaces([]);
 
     await expect(resolveActiveLanding(client)).resolves.toBe("/home");
   });

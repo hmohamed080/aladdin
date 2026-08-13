@@ -80,12 +80,19 @@ update auth.users set
   phone_change_token = coalesce(phone_change_token, '')
 where id::text like '70000%';
 
--- Primary account types (bootstrap defaults everyone to end_consumer + pending).
-update public.users set primary_account_type = 'showroom_dealer',      status = 'active' where id = '70000001-0000-4000-8000-000000000001';
+-- PERSONAL personas only. The four business owners below (Showroom, Manufacturer,
+-- Importer, Wholesaler) are BUSINESS-ONLY identities: their business classification
+-- lives in `organizations.org_type`, and they hold NO personal persona at all
+-- (`primary_account_type` stays null — Sprint 12). They still land and operate
+-- normally, through their owner memberships. `status = 'active'` is what makes an
+-- account usable; a persona is not required for that.
+update public.users set primary_account_type = null,                   status = 'active' where id = '70000001-0000-4000-8000-000000000001';
 update public.users set primary_account_type = 'sales',                status = 'active' where id = '70000002-0000-4000-8000-000000000002';
-update public.users set primary_account_type = 'manufacturer',         status = 'active' where id = '70000003-0000-4000-8000-000000000003';
-update public.users set primary_account_type = 'importer',             status = 'active' where id = '70000004-0000-4000-8000-000000000004';
-update public.users set primary_account_type = 'wholesaler',           status = 'active' where id = '70000005-0000-4000-8000-000000000005';
+update public.users set primary_account_type = null,                   status = 'active' where id = '70000003-0000-4000-8000-000000000003';
+update public.users set primary_account_type = null,                   status = 'active' where id = '70000004-0000-4000-8000-000000000004';
+update public.users set primary_account_type = null,                   status = 'active' where id = '70000005-0000-4000-8000-000000000005';
+-- Contractor is a PERSONAL persona (an individual professional), not a business
+-- classification — Horizon Contracting's type lives on the organization.
 update public.users set primary_account_type = 'contractor',           status = 'active' where id = '70000006-0000-4000-8000-000000000006';
 update public.users set primary_account_type = 'sales',                status = 'active' where id = '70000007-0000-4000-8000-000000000007';
 update public.users set primary_account_type = 'engineer',             status = 'active' where id = '70000008-0000-4000-8000-000000000008';

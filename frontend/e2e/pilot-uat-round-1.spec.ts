@@ -68,12 +68,15 @@ test.describe("Pilot UAT round 1 — personal accounts", () => {
     await prefs(page, "en", "light");
     await registerToAccountType(page, request, "Dalia Designer");
 
-    await page.getByRole("button", { name: /engineer \/ designer/i }).click();
+    // Sprint 12: Engineer and Interior Designer are now DISTINCT personal choices
+    // (the combined "Engineer / Designer" entry is gone), so the persona is picked
+    // once at registration rather than disambiguated later.
+    await page.getByRole("button", { name: /^Interior Designer Offer/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
     await page.waitForURL(/\/onboarding\/professional$/, { waitUntil: "commit" });
 
-    // The engineer/designer choice resolves to the DISTINCT interior_designer type.
-    await page.getByRole("button", { name: /^interior designer$/i }).click();
+    // The concrete type came from registration, so the flow never re-asks it.
+    await expect(page.getByText(/which best describes you/i)).toHaveCount(0);
     await page.locator("#headline").fill("Residential interiors, New Cairo");
     await page.locator("#years").fill("7");
     await page.getByRole("button", { name: /^residential$/i }).click();
@@ -128,96 +131,55 @@ test.describe("Pilot UAT round 1 — personal accounts", () => {
   });
 });
 
-test.describe("Pilot UAT round 1 — organization owner / manager", () => {
-  test("D. generic Owner/Manager: saves, picks the real organization type, resumes, creates", async ({
-    page,
-    request,
-  }) => {
-    await prefs(page, "en", "light");
-    await registerToAccountType(page, request, "Owner Manager");
+test.describe("Pilot UAT round 1 — business owners", () => {
+  // Round 1's test D covered the GENERIC "Organization owner / manager" entry.
+  // Sprint 12 removes that entry from registration by design — owner is the
+  // relationship creating a business produces, never a type to choose — so the
+  // journey it protected is now covered by the direct business-type path below
+  // and by e2e/account-workspace-model.spec.ts.
 
-    // The generic entry carries NO business type — this used to fail with
-    // "We couldn't save that. Try again."
-    await page.getByRole("button", { name: /organization owner \/ manager/i }).click();
-    await page.getByRole("button", { name: /^continue$/i }).click();
-    await page.waitForURL(/\/onboarding\/business$/, { waitUntil: "commit" });
-    await expect(page.getByText(/couldn't save that/i)).toHaveCount(0);
-    await noOverflow(page);
-
-    await page.locator("#bname").fill("Zayed Marble Trading");
-    await page.getByRole("button", { name: /^continue$/i }).click();
-
-    // The REAL organization type is chosen here, not at the account-type step.
-    await expect(page.getByRole("heading", { name: /what kind of business/i })).toBeVisible();
-    await page.getByRole("button", { name: /^wholesaler/i }).click();
-    await page.getByRole("button", { name: /^continue$/i }).click();
-
-    // Resume check: the autosaved draft (name + chosen type) survives a full
-    // reload, and the wizard resumes past the steps that are already answered.
-    await page.reload();
-    await expect(page.getByRole("heading", { name: /review and create/i })).toBeVisible();
-    await expect(page.getByText("Wholesaler").first()).toBeVisible();
-    await expect(page.getByText("Zayed Marble Trading").first()).toBeVisible();
-
-    // Step back into the type step: the selection is still the saved one.
-    await page.getByRole("button", { name: /^back$/i }).click();
-    await page.getByRole("button", { name: /^back$/i }).click();
-    await page.getByRole("button", { name: /^back$/i }).click();
-    await expect(page.getByRole("button", { name: /^wholesaler/i })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await page.getByRole("button", { name: /^continue$/i }).click();
-    await page.getByRole("button", { name: /^continue$/i }).click(); // location (optional)
-    await page.locator("#bbranch").fill("Sheikh Zayed HQ");
-    await page.getByRole("button", { name: /^continue$/i }).click();
-
-    await expect(page.getByRole("heading", { name: /review and create/i })).toBeVisible();
-    await page.locator("#owner").check();
-    await page.getByRole("button", { name: /create organization/i }).click();
-
-    // Owner reaches the workspace of the organization they just created.
-    await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
-    // The shell shows the organization in viewport-dependent slots, so assert
-    // presence rather than the visibility of one particular slot.
-    await expect(page.getByText("Zayed Marble Trading", { exact: true }).first()).toBeAttached();
-
-    // Surface isolation: an organization owner cannot open the Admin console.
-    await page.goto("/admin");
-    await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
-    await expect(page.getByText("Pilot overview")).toHaveCount(0);
-  });
-
-  test("a concrete business type chosen at the account-type step still works", async ({ page, request }) => {
+  test("a concrete business type chosen at registration creates the business", async ({ page, request }) => {
     await prefs(page, "en", "light");
     await registerToAccountType(page, request, "Concrete Owner");
 
     await page.getByRole("button", { name: /showroom \/ dealer/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
     await page.waitForURL(/\/onboarding\/business$/, { waitUntil: "commit" });
+    await expect(page.getByText(/couldn't save that/i)).toHaveCount(0);
+    await noOverflow(page);
 
     await page.locator("#bname").fill("Giza Showroom");
     await page.getByRole("button", { name: /^continue$/i }).click();
-    // Pre-selected from the account-type intent.
-    await expect(page.getByRole("button", { name: /^showroom \/ dealer/i })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+
+    // The type was already chosen at registration, so it is NEVER asked again —
+    // the wizard goes straight past it.
+    await expect(page.getByRole("heading", { name: /what kind of business/i })).toHaveCount(0);
+
+    await page.getByRole("button", { name: /^continue$/i }).click(); // location (optional)
+    await page.locator("#bbranch").fill("Sheikh Zayed HQ");
     await page.getByRole("button", { name: /^continue$/i }).click();
-    await page.getByRole("button", { name: /^continue$/i }).click();
-    await page.getByRole("button", { name: /^continue$/i }).click();
-    await page.locator("#owner").check();
-    await page.getByRole("button", { name: /create organization/i }).click();
+
+    await expect(page.getByRole("heading", { name: /review and create/i })).toBeVisible();
+    // No owner/manager confirmation exists to tick.
+    await expect(page.locator("#owner")).toHaveCount(0);
+    await expect(page.getByText(/you'll be the owner of this business/i)).toBeVisible();
+    await page.getByRole("button", { name: /create business/i }).click();
+
     await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
     await expect(page.getByText("Giza Showroom", { exact: true }).first()).toBeAttached();
+
+    // Surface isolation: a business owner cannot open the Admin console.
+    await page.goto("/admin");
+    await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
+    await expect(page.getByText("Pilot overview")).toHaveCount(0);
   });
 
   test("an organization MANAGER cannot open the Admin console", async ({ page, request }) => {
     await prefs(page, "en", "light");
     // Laila is Horizon Contracting's org manager in the pilot world.
-    await signIn(page, request, "laila@example.test", /\/b2b(\/|$)/);
+    await signIn(page, request, "laila@example.test", /\/(home|b2b)(\/|$)/);
     await page.goto("/admin");
-    await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
+    await page.waitForURL(/\/(home|b2b)(\/|$)/, { waitUntil: "commit" });
     await expect(page.getByText("Pilot overview")).toHaveCount(0);
   });
 });
@@ -245,7 +207,10 @@ test.describe("Pilot UAT round 1 — Admin console", () => {
     await page.waitForURL(/q=hana/, { waitUntil: "commit" });
     await page.getByRole("link", { name: /Hana \(Cairo Ceramics Owner\)/ }).click();
     await expect(page.getByText(/organization memberships/i)).toBeVisible();
-    await expect(page.getByText(/Showroom \/ Dealer/).first()).toBeVisible();
+    // Sprint 12: Hana is a BUSINESS-ONLY identity. Her showroom classification
+    // lives on the organization, not on her, and Admin says so explicitly rather
+    // than rendering a blank account type.
+    await expect(page.getByText(/business only \(no personal account type\)/i)).toBeVisible();
     await expect(page.getByRole("link", { name: /Cairo Ceramics Showroom/ })).toBeVisible();
 
     // Organizations — list and detail (members, branches, verification state).

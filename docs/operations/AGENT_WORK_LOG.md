@@ -4,6 +4,36 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Pilot Account & Workspace Model (feature sprint)
+
+**Date:** 2026-08-12 · **Branch:** `feature/pilot-account-workspace-model` · **Base:** `main` @ `a0ff5f6` (PR #20 merged)
+
+### Objective
+Make the approved account model real in schema and product: **one person = one user ID**, holding a personal identity, zero businesses, one, or many — all on the same login. A business is an **Organization**, a **Membership** links the two, and a **workspace is derived** (no `workspaces` table, no persona switcher).
+
+### The coupling that was removed
+`users.primary_account_type` was doing two incompatible jobs — *what kind of person are you* and *what kind of business do you run*. Being `not null default 'end_consumer'`, it could not even **represent** a business-only identity, so a showroom owner had to carry either a fake consumer persona or their organization's type copied onto their person. It is now **nullable with no default and means personal persona only**; `organizations.org_type` stays the sole business classification, is never mirrored onto a user, and `request_account_upgrade` rejects business values outright.
+
+The backfill (`20260814090001`) only ever *clears* a mis-typed persona: where an **explicit** personal professional type was independently declared in the personal track it is restored, and everyone else becomes a valid **business-only identity**. No persona is guessed from `org_type`. User ids, auth identities, organizations, memberships, branches, capabilities and commercial history are untouched; re-running is a no-op. `app.has_personal_persona()` answers "is there a Personal workspace?" from explicit evidence only.
+
+### Business creation made repeatable
+`business_onboarding` was keyed `user_id primary key` — one draft per person, forever — which made the completion idempotency key the **user**, so a second business could only exist by destroying the record of the first. `business_creation_drafts` (`20260814090002`) holds one row per creation **attempt**: the draft id is both resume handle and idempotency key, `organization_id` is the canonical result behind a partial unique index, one open draft per user, unlimited completed ones. Submitting takes a row lock and short-circuits on the recorded organization, so retries return O1 while a different draft legitimately creates O2. Creation stays transactional (organization + owner membership + full owner capabilities + primary branch). The legacy table is copied forward and left intact.
+
+### Product
+Registration is now a **direct Personal-or-Business question** with concrete business types; *"Showroom"* means "create a business whose `org_type` is `showroom_dealer`". **"Organization owner / manager" is no longer offered** and the owner confirmation checkbox is gone — owner is the relationship creating a business produces, so the review step states it rather than asking. The type chosen at registration carries into the draft, so the type step is dropped from the wizard entirely. `/business/new` lets an existing account add a business with no second sign-up, repeatedly. A **workspace switcher** in both shells changes the active work context without touching persona or membership; selection is a preference, never authority, and a stale cookie resolves safely. Landing is deterministic, and merely belonging to an organization no longer evicts a person from `/home`. Admin distinguishes a business-only user instead of rendering a blank account type.
+
+### Validation
+Frontend typecheck ✓ · lint ✓ (0/0) · unit **204** ✓ · `supabase db reset` ✓ (24 migrations) · pgTAP **650 across 28 files** ✓ · targeted Playwright **17 passed** desktop (8 journeys + bilingual/RTL + the updated Pilot UAT round-1 spec) and **3 passed** mobile EN/AR. Repo-wide E2E, Lighthouse and the full persona matrix deliberately not run — Integration Gate work.
+
+`27_account_workspace_model_test.sql` pins acceptance A–H. Three defects the tests caught, all fixed: recreating `profile_public_directory` would have silently reverted the `security_invoker` hardening from `20260805100000` (the eligibility filter belongs in the reader function behind the view); `request_account_upgrade` had been rebased on a superseded version, dropping the needs-more-info resubmission path; and splitting Engineer from Interior Designer left `interior_designer` absent from `PERSONA_BY_ACCOUNT_TYPE`, so choosing it bounced the user back to `/onboarding` — each now maps to its own persona with a fixed concrete type, which also removes the in-flow sub-question.
+
+### Debt
+**Removed:** business classification on the person; one-draft-per-user business onboarding; the generic owner/manager registration entry. **Remaining:** the `account_type` enum still contains the business members because `organizations.org_type` is typed with it — correct for the organization, unreachable for a person; splitting it is a separate mechanical migration. `business_onboarding` is retained read-only; `business_save`/`business_submit` remain transitional wrappers.
+
+Build notes: [`docs/frontend/sprint-12-account-workspace-model.md`](../frontend/sprint-12-account-workspace-model.md). No `.pen` file changed.
+
+---
+
 ## Session — Business classification belongs to the Organization (account-model clarification)
 
 **Date:** 2026-08-12 · **Branch:** `fix/pilot-uat-round-1` (same PR #20, unmerged) · **Base:** `main` @ `d595a6d`

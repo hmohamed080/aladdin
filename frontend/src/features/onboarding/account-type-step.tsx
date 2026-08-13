@@ -12,10 +12,18 @@ import { cn } from "@/lib/ui/cn";
 const initial: OnboardingActionState = { ok: false };
 
 /**
- * Step 3 — Account-Type Selection. Visually grouped Individual / Business, plus a
- * non-selectable "joining a team?" note directing invited employees to their
- * invitation link (the invited-employee path is never a public choice). The chosen
- * key is controlled so a validation error keeps the selection. Records intent only.
+ * Step 3 — the direct Personal-or-Business question.
+ *
+ * The two groups are not cosmetic. A PERSONAL choice claims a persona for the
+ * person; a BUSINESS choice declares the kind of business they are about to
+ * create, and flows straight into business setup. Nobody is asked to pick
+ * "Organization owner / manager" — owning is what creating a business makes you,
+ * so it is a relationship, never a type to choose.
+ *
+ * Also here: a non-selectable "joining a team?" note directing invited employees
+ * to their invitation link (that path is never a public choice). The chosen key is
+ * controlled so a validation error keeps the selection. Records intent only — no
+ * persona and no organization is written at this step.
  */
 export function AccountTypeStep({ selectedKey }: { selectedKey: string | null }) {
   const { t } = useI18n();
@@ -28,10 +36,15 @@ export function AccountTypeStep({ selectedKey }: { selectedKey: string | null })
         <input type="hidden" name="choice" value={choice ?? ""} />
 
         {CHOICE_GROUPS.map(({ group, keys }) => (
-          <fieldset key={group} className="flex flex-col gap-2.5">
+          <fieldset key={group} className="flex flex-col gap-2.5" data-group={group}>
             <legend className="mb-1 text-label font-semibold uppercase tracking-wide text-fg-muted">
-              {group === "individual" ? t("onboarding.accountType.groupIndividual") : t("onboarding.accountType.groupBusiness")}
+              {group === "personal" ? t("onboarding.accountType.groupPersonal") : t("onboarding.accountType.groupBusiness")}
             </legend>
+            <p className="-mt-0.5 mb-0.5 text-label text-fg-secondary">
+              {group === "personal"
+                ? t("onboarding.accountType.personalHint")
+                : t("onboarding.accountType.businessHint")}
+            </p>
             <div className="grid gap-2.5 tablet:grid-cols-2">
               {keys.map((key) => {
                 const active = choice === key;

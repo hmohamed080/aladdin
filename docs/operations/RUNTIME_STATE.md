@@ -9,21 +9,21 @@ This is a **mutable snapshot** of the current live repository state — not an a
 | **Version** | Runtime snapshot · 2026-08-12 |
 | **Owner** | Foundation / Operations |
 | **Last updated** | 2026-08-12 |
-| **Updated by** | Claude — account-model clarification (business classification belongs to the Organization) |
-| **Current focus** | **Pilot UAT fix round 1 + product-direction alignment (same branch/PR):** completing onboarding now ACTIVATES a personal account (verification became an independent trust state), `/home` is one persona-aware personal surface with derived profile completeness, the generic "organization owner / manager" registration path saves and resumes, and the Admin verification queue actually reaches the account/organization it decides on. On top of that, the **account / organization / workspace model is now canonical documentation**: one person = one user ID · personal identity ≠ business · a business is an Organization created once (org + owner membership + primary branch, transactional) · Membership is the only user↔organization link · zero/one/many organizations per login · workspace is **derived** (no `workspaces` table) and work-context switching ≠ persona switching · single-source-of-truth ownership · duplicate-business protection · membership history retained · account deletion recorded as **future** rule. Finally, **business classification is canonically `organizations.org_type`**, never a person's identity: `users.primary_account_type` is personal persona state only (one user may own organizations of several different types at once), *"I am a Showroom"* at registration means *"create a business whose `org_type` is X"*, and the business-valued `account_type` enum members are recorded as **transitional debt** for the upcoming Account & Workspace Model feature to audit and migrate (ADR-0007 D22). Branch `fix/pilot-uat-round-1`; two new migrations (both from the fix round — **unchanged** by the alignment work); **the alignment and clarification patches are documentation-only** (no schema/enum/migration/frontend/test change); no `.pen` change. |
+| **Updated by** | Claude — Pilot Account & Workspace Model (feature sprint) |
+| **Current focus** | **Pilot Account & Workspace Model (feature sprint):** the approved account model is now **implemented**, not just documented. `users.primary_account_type` is **nullable, defaultless, and means personal persona only** — a business-only identity legitimately has **no** personal persona, which the old `not null default 'end_consumer'` column could not represent; `organizations.org_type` stays the sole business classification and is never mirrored onto a user. Business creation moved to a **per-attempt draft** whose id is both resume handle and **idempotency key**, replacing the one-draft-per-user shape that structurally prevented a second business. Registration is a **direct Personal-or-Business choice** (the generic "Organization owner / manager" entry and the owner-confirmation checkbox are gone — the creator *is* the owner); an existing user can **add a business** with no second sign-up; a **workspace switcher** changes the active work context without touching persona or membership; landing is deterministic and belonging to an organization no longer evicts a person from `/home`. Branch `feature/pilot-account-workspace-model`; two new migrations (`20260814090001`, `20260814090002`); no `.pen` change.
 
 ## Phase & repository
 
 | Field | Value |
 |---|---|
-| **Current Phase** | **Private Pilot UAT — fix round 1** |
-| **Current Sprint** | **Pilot UAT fix round 1 — personal-account activation, persona-aware home, Admin review defects** |
-| **Current Feature** | Activation-vs-verification model, persona-aware `/home` with derived completeness, generic owner/manager entry, Admin approval apply-step |
+| **Current Phase** | **Private Pilot — account & workspace model** |
+| **Current Sprint** | **Pilot Account & Workspace Model — persona/business decoupling, idempotent business creation, workspace switching** |
+| **Current Feature** | Nullable personal persona (business-only identities), `business_creation_drafts`, direct Personal-or-Business registration, Add business, workspace switcher, deterministic landing |
 | **Next Phase** | Review PR to `main`; do not merge from this task |
-| **Current Branch** | `fix/pilot-uat-round-1` (created from `main` @ `d595a6d`) |
-| **Current Milestone** | Pilot UAT fix round 1; targeted acceptance complete, PR open, not merged |
+| **Current Branch** | `feature/pilot-account-workspace-model` (created from `main` @ `a0ff5f6`) |
+| **Current Milestone** | Account & Workspace Model; targeted acceptance complete, PR open, not merged |
 | **Current Remote Repository** | `origin` = `https://github.com/hmohamed080/aladdin.git` |
-| **Last Stable Commit** | `d595a6d` — `main` at this branch point |
+| **Last Stable Commit** | `a0ff5f6` — `main` at this branch point (PR #20 merged) |
 | **Last Stable Tag** | `v0.1.0-foundation` (repo `0.1.0`) — created on merged `main` after the closeout PR; Design System stays independently at `1.0.0` |
 | **Foundation Release** | Tagged `v0.1.0-foundation` on `main` @ `64e68d6` |
 | **Repository Status** | Published to GitHub (`origin`, full history, no squash/force); `main` protection recommended (ADR-0006), not yet applied |
@@ -32,7 +32,7 @@ This is a **mutable snapshot** of the current live repository state — not an a
 
 ## Live engineering state
 
-> **Current override (2026-08-11, Pilot UAT fix round 1):** `main` is at `d595a6d`. The database now has **22 migrations** — `20260813090001_pilot_personal_account_activation` (personal accounts activate on onboarding completion; the business track accepts the typeless owner/manager entry; one-time backfill) and `20260813090002_organization_verification_apply` (`apply_organization_verification` + the `organization.verified` audit action). Validated this session: frontend typecheck ✓, lint ✓ (0), unit **186/186** ✓; `supabase db reset` ✓, `db lint` ✓ (only the pre-existing `set_customer_ownership` warning), pgTAP **614/614** ✓ across 27 files; targeted production Playwright **57 passed / 1 skipped** on desktop + mobile (the skip is the destructive Admin-approval acceptance, pinned to one project). Repository-wide E2E deliberately not run — this is not the final integration gate. No `.pen` file changed.
+> **Current override (2026-08-12, Pilot Account & Workspace Model):** `main` is at `a0ff5f6` (PR #20 merged). The database now has **24 migrations** — `20260814090001_account_persona_decoupling` (personal persona nullable/defaultless; `app.has_personal_persona`; `public.my_workspaces`; idempotent backfill clearing business-valued personas; `request_account_upgrade` refuses business classifications) and `20260814090002_business_creation_drafts` (`business_creation_drafts` + `business_draft_save`/`business_draft_submit`; per-draft idempotent, transactional creation; legacy drafts copied forward, legacy table retained). Validated this session: frontend typecheck ✓, lint ✓ (0 errors, 0 warnings), unit **204/204** ✓; `supabase db reset` ✓ from clean, pgTAP **650/650** ✓ across 28 files; targeted production Playwright **17 passed** on desktop (the eight account/workspace journeys + EN/AR RTL, plus the updated Pilot UAT round-1 spec) and **3 passed** on mobile EN/AR for the changed surfaces. Repository-wide E2E, Lighthouse and the full persona matrix deliberately **not** run — this is not the final Integration Gate. No `.pen` file changed.
 
 Always reflects the current live engineering state of the project. Overwrite each session with verified values.
 

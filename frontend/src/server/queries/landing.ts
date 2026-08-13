@@ -4,18 +4,26 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadPlatformRole } from "@/server/queries/platform";
+import { loadWorkspaces } from "@/server/queries/workspace";
+import { landingFor } from "@/lib/workspace/model";
 
 /**
- * Where an ACTIVE ("active_personal") caller belongs. Landing is DERIVED — never
- * a role switcher (PRODUCT_DIRECTION_GUIDE):
+ * Where an ACTIVE ("active_personal") caller belongs. Landing is DERIVED from the
+ * caller's real work contexts and their current selection — never from a role
+ * switcher, and never from an account type (PRODUCT_DIRECTION_GUIDE):
  *
- *   1. Platform staff        → /admin   (platform operations)
- *   2. Has an active org      → /b2b     (capability-scoped workspace)
- *   3. Otherwise (consumer /  → /home    (non-B2B destination; NEVER the Sales
- *      org-less professional)             cockpit)
+ *   1. Platform staff                              → /admin
+ *   2. Selected (or only) business workspace       → /b2b
+ *   3. Personal workspace                          → /home
  *
- * A consumer must never land in the B2B workspace, so the fall-through target is
- * the consumer/individual home, not /b2b.
+ * The two rules that matter for the account model:
+ *   * a BUSINESS-ONLY identity — no personal persona, one or more active
+ *     memberships — lands in /b2b and is never shown an empty Personal home;
+ *   * an identity that has BOTH keeps whichever context it selected, so an
+ *     Engineer who also owns a business is no longer trapped in /b2b.
+ *
+ * Verification state is not consulted anywhere here: it is a trust state, not an
+ * access gate.
  */
 export async function resolveActiveLanding(
   supabase: SupabaseClient<Database>,
@@ -23,20 +31,8 @@ export async function resolveActiveLanding(
   const platformRole = await loadPlatformRole(supabase);
   if (platformRole) return "/admin";
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return "/home";
-
-  const { data: membership } = await supabase
-    .from("memberships")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
-
-  return membership ? "/b2b" : "/home";
+  const { context } = await loadWorkspaces(supabase);
+  return landingFor(context, false);
 }
 
 /** Convenience for route handlers: resolve the active caller's landing path. */

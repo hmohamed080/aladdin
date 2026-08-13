@@ -26,7 +26,12 @@ export type AdminSummary = {
 export type AdminUserRow = {
   id: string;
   displayName: string;
-  accountType: string;
+  /**
+   * The user's PERSONAL persona, or null for a valid business-only identity
+   * (their business classification lives on the organization, never here).
+   * Admin must be able to tell those two apart, so null is data, not an error.
+   */
+  accountType: string | null;
   status: string;
   isVerified: boolean;
   createdAt: string;
@@ -134,7 +139,7 @@ export async function listUsers(supabase: Client, search?: string): Promise<Admi
   if (!search) return rows;
   const q = search.toLowerCase();
   return rows.filter(
-    (r) => r.displayName.toLowerCase().includes(q) || r.accountType.toLowerCase().includes(q),
+    (r) => r.displayName.toLowerCase().includes(q) || (r.accountType ?? "").toLowerCase().includes(q),
   );
 }
 
@@ -142,7 +147,8 @@ export type AdminUserDetail = {
   id: string;
   displayName: string;
   headline: string | null;
-  accountType: string;
+  /** Personal persona, or null for a business-only identity (see AdminUserRow). */
+  accountType: string | null;
   status: string;
   isVerified: boolean;
   createdAt: string;

@@ -193,7 +193,12 @@ export function PeopleManager({
                         {member.displayName || t("org.members.unnamed")}
                       </p>
                       <Badge tone={statusTone(member.status)}>{t(`org.statusLabel.${member.status}`)}</Badge>
-                      <Badge tone="neutral">{t(`accountType.${member.accountType}`)}</Badge>
+                      {/* A colleague may be a business-only identity with no
+                          personal persona — show nothing rather than an empty
+                          badge, since what matters here is their membership. */}
+                      {member.accountType ? (
+                        <Badge tone="neutral">{t(`accountType.${member.accountType}`)}</Badge>
+                      ) : null}
                     </div>
                     <p className="truncate text-label text-fg-muted">{member.emailMasked}</p>
                   </div>

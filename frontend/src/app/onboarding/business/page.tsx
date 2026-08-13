@@ -8,12 +8,15 @@ import { businessOrgTypeFromAccountType } from "@/lib/onboarding/account-types";
 export const dynamic = "force-dynamic";
 
 /**
- * Business / organization onboarding (Sprint 8) — the shared flow for every
- * business persona (owner/manager who creates the organization). Only a
- * business-track caller who has not yet created their org reaches the wizard; once
- * the org + active owner membership exist, `my_registration_state` resolves to
- * active_personal and the caller is forwarded to the workspace. An invited employee
- * never lands here (they join via the invitation link → active membership).
+ * Business setup during REGISTRATION. Someone who chose a concrete business type
+ * ("Showroom") arrives here to create it; the type they already picked is carried
+ * in, so the wizard never asks a second time. Once the organization and the
+ * creator's owner membership exist, `my_registration_state` resolves to
+ * active_personal and they are forwarded to their new workspace.
+ *
+ * The same flow is reachable later at /business/new — the only difference is where
+ * the person came from, never what gets created. An invited employee never lands
+ * here (they join an existing organization via their invitation link).
  */
 export default async function BusinessOnboardingPage() {
   const state = await getRegistrationState();
@@ -24,9 +27,9 @@ export default async function BusinessOnboardingPage() {
   const data = await getBusinessOnboardingData();
   if (!data || data.selectedTrack !== "business") redirect("/onboarding");
 
-  // The org intent chosen at the shared account-type step pre-selects the type
-  // (null for the generic "organization owner/manager" choice).
   const presetOrgType = businessOrgTypeFromAccountType(data.selectedAccountType);
 
-  return <BusinessFlow answers={data.business} presetOrgType={presetOrgType} />;
+  return (
+    <BusinessFlow answers={data.business} presetOrgType={presetOrgType} draftId={data.draftId} />
+  );
 }

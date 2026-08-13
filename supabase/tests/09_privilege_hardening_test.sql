@@ -103,8 +103,11 @@ values ('7a000000-0000-4000-8000-00000000000a', '00000000-0000-0000-0000-0000000
           'is_verified', true,
           'role', 'administrator'
         ), now(), now(), now());
+-- The bootstrap never records a persona at all (Sprint 12: the column has no
+-- default), so an injected one is not merely overridden — there is nothing to
+-- override. A persona exists only when the person explicitly claims one.
 select is((select primary_account_type::text from public.users where id = '7a000000-0000-4000-8000-00000000000a'),
-  'end_consumer', 'bootstrap ignores injected primary_account_type');
+  null, 'bootstrap ignores injected primary_account_type (and records none)');
 select is((select is_verified from public.users where id = '7a000000-0000-4000-8000-00000000000a'),
   false, 'bootstrap ignores injected is_verified');
 select is((select locale from public.users where id = '7a000000-0000-4000-8000-00000000000a'),

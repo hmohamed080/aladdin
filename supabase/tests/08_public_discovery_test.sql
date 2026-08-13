@@ -26,8 +26,12 @@ select is((select count(*)::int from public.organization_public_directory), 2,
 -- Only the two LISTED professionals appear; the seeded sales professional (Karim)
 -- is a professional account type left `hidden`, so eligibility — not account type
 -- — gates discovery (Sprint 1.2).
-select is((select count(*)::int from public.profile_public_directory), 2,
-  'anon sees only the two LISTED professional profiles');
+-- Sprint 12: only PERSONAL professionals are discoverable here. The seeded
+-- supplier OWNER is a business-only identity (no personal persona) — her business
+-- is discovered through organization_public_directory instead — so the seeded
+-- interior designer is the single listed personal professional.
+select is((select count(*)::int from public.profile_public_directory), 1,
+  'anon sees only the LISTED personal professional profile');
 select is(
   (select count(*)::int from public.profile_public_directory where display_name like 'Karim%'),
   0, 'a professional account type left hidden does NOT appear in public discovery');
@@ -63,15 +67,6 @@ select is(
    where display_name like 'Omar%'),
   0, 'end-consumer profiles are not in the public professional directory');
 
--- Soft-deleted professional profile drops out of discovery.
-reset role;
-update public.profiles set deleted_at = now()
-  where user_id = '11111111-1111-4111-8111-111111111111';
-set local role anon;
-set local request.jwt.claims = '';
-select is((select count(*)::int from public.profile_public_directory), 1,
-  'soft-deleting a listed professional profile removes it from public discovery');
-
 -- A suspended user's listed profile is not publicly discoverable.
 reset role;
 update public.users set status = 'suspended'
@@ -80,6 +75,18 @@ set local role anon;
 set local request.jwt.claims = '';
 select is((select count(*)::int from public.profile_public_directory), 0,
   'a suspended user never appears publicly even when listed');
+
+-- Soft-deleted professional profile drops out of discovery (restore the status
+-- first, so this proves the DELETE gate rather than re-proving the status gate).
+reset role;
+update public.users set status = 'active'
+  where id = '33333333-3333-4333-8333-333333333333';
+update public.profiles set deleted_at = now()
+  where user_id = '33333333-3333-4333-8333-333333333333';
+set local role anon;
+set local request.jwt.claims = '';
+select is((select count(*)::int from public.profile_public_directory), 0,
+  'soft-deleting a listed professional profile removes it from public discovery');
 
 -- A logged-in non-member also only gets the projection, never base columns.
 set local role authenticated;

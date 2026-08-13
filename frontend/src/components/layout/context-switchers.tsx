@@ -3,34 +3,13 @@
 import { useTransition } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { Select } from "@/components/ui/controls";
-import { selectOrganization, selectBranch } from "@/server/actions/context";
+import { selectBranch } from "@/server/actions/context";
 
 type Named = { id: string; name: string };
 
-/** Organization selector — only shown when the caller belongs to 2+ orgs. */
-export function OrgSwitcher({ orgs, activeId }: { orgs: Named[]; activeId: string }) {
-  const { t } = useI18n();
-  const [pending, start] = useTransition();
-  if (orgs.length < 2) return null;
-  return (
-    <label className="flex items-center gap-2">
-      <span className="sr-only">{t("nav.organization")}</span>
-      <Select
-        aria-label={t("nav.organization")}
-        defaultValue={activeId}
-        disabled={pending}
-        className="min-w-40"
-        onChange={(e) => start(() => selectOrganization(e.target.value))}
-      >
-        {orgs.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.name}
-          </option>
-        ))}
-      </Select>
-    </label>
-  );
-}
+// The organization dropdown that used to live here is superseded by
+// WorkspaceSwitcher: organizations are no longer a separate axis from the
+// Personal context, they are two kinds of the same thing — a work context.
 
 /**
  * Branch selector. The value shown ALWAYS matches the data scope:

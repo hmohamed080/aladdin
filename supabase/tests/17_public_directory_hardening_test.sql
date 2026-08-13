@@ -127,8 +127,10 @@ set local role anon;
 set local request.jwt.claims = '';
 select is((select count(*)::int from public.organization_public_directory), 2,
   'anon still discovers the two active+verified orgs through the hardened view');
-select is((select count(*)::int from public.profile_public_directory), 2,
-  'anon still discovers the two listed professional profiles through the hardened view');
+-- Sprint 12: the seeded supplier owner is a business-only identity, so the
+-- interior designer is the single listed PERSONAL professional.
+select is((select count(*)::int from public.profile_public_directory), 1,
+  'anon still discovers the listed personal professional profile through the hardened view');
 select is((select count(*)::int from public.profile_public_directory where display_name like 'Karim%'),
   0, 'a hidden professional is still absent after hardening');
 select throws_ok('select count(*) from public.organizations', '42501', null,
