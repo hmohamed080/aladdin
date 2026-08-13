@@ -238,7 +238,12 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     request,
   }) => {
     await prefs(page, "en");
-    const email = await registerSalesperson(page, request, "Sales Joins Ceramics", "Ceramics sales");
+    // A unique display name keeps this journey self-isolating: a retry (or a
+    // previous run) leaves a real request in the showroom's queue, and scoping the
+    // owner's decision to THIS person's card is what makes the assertions mean what
+    // they say instead of matching whichever card happens to be first.
+    const name = `Sales Joins ${Date.now()}`;
+    const email = await registerSalesperson(page, request, name, "Ceramics sales");
 
     // --- request ---
     await page.getByRole("link", { name: /connect your showroom/i }).first().click();
@@ -248,7 +253,7 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     await page.getByRole("link", { name: /cairo ceramics showroom/i }).first().click();
     await expect(page.getByRole("heading", { name: /cairo ceramics showroom/i })).toBeVisible();
     await page.getByRole("button", { name: /request to join/i }).click();
-    await page.waitForURL(/\/home/, { waitUntil: "commit" });
+    await page.waitForURL(/connected=pending/, { waitUntil: "commit" });
 
     // Still usable, and the connection reads as pending — not as a locked account.
     await expect(page.getByText(/connection pending/i)).toBeVisible();
@@ -263,16 +268,17 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     await signIn(page, request, OWNER, /\/b2b(\/|$)/);
     await page.goto("/b2b/organization");
     await expect(page.getByRole("heading", { name: /requests to join/i })).toBeVisible();
-    await expect(page.getByText(/sales joins ceramics/i)).toBeVisible();
-    await page.getByLabel(/reason for declining/i).fill("Please ask your branch manager first");
-    await page.getByRole("button", { name: /^decline$/i }).click();
-    await page.waitForURL(/\/b2b\/organization/, { waitUntil: "commit" });
+    const declineCard = page.getByRole("listitem").filter({ hasText: name });
+    await expect(declineCard).toBeVisible();
+    await declineCard.getByLabel(/reason for declining/i).fill("Please ask your branch manager first");
+    await declineCard.getByRole("button", { name: /^decline$/i }).click();
+    await page.waitForURL(/decided=1/, { waitUntil: "commit" });
 
     // The salesperson's personal account is untouched, and the reason is visible.
     await page.context().clearCookies();
     await prefs(page, "en");
     await signIn(page, request, email, /\/home$/);
-    await expect(page.getByRole("heading", { level: 1, name: /welcome, sales joins ceramics/i })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: new RegExp(`welcome, ${name}`, "i") })).toBeVisible();
     await expect(page.getByText(/connection declined/i)).toBeVisible();
     await expect(page.getByText(/ask your branch manager/i)).toBeVisible();
     // Still no B2B membership.
@@ -285,17 +291,22 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     await page.getByRole("button", { name: /^search$/i }).click();
     await page.getByRole("link", { name: /cairo ceramics showroom/i }).first().click();
     await page.getByRole("button", { name: /request to join/i }).click();
-    await page.waitForURL(/\/home/, { waitUntil: "commit" });
+    await page.waitForURL(/connected=pending/, { waitUntil: "commit" });
     await expect(page.getByText(/connection pending/i)).toBeVisible();
 
     await page.context().clearCookies();
     await prefs(page, "en");
     await signIn(page, request, OWNER, /\/b2b(\/|$)/);
     await page.goto("/b2b/organization");
-    await page.getByRole("button", { name: /approve and add to team/i }).click();
-    await page.waitForURL(/\/b2b\/organization/, { waitUntil: "commit" });
-    // They joined as a salesperson — the roster shows them as a member.
-    await expect(page.getByText(/sales joins ceramics/i).first()).toBeVisible();
+    const approveCard = page.getByRole("listitem").filter({ hasText: name });
+    await approveCard.getByRole("button", { name: /approve and add to team/i }).click();
+    await page.waitForURL(/joined=1/, { waitUntil: "commit" });
+    // They are on the MEMBERS roster now, as an active member. Scoped to that
+    // section: their name also appears in the collapsed decided-requests history
+    // above it, which is in the DOM but deliberately not visible.
+    const roster = page.locator("section").filter({ has: page.getByRole("heading", { name: /^Members/ }) });
+    await expect(roster.getByText(name)).toBeVisible();
+    await expect(roster.getByText(/^active$/i).first()).toBeVisible();
 
     // The showroom is now a real workspace for the salesperson.
     await page.context().clearCookies();
@@ -322,7 +333,8 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     request,
   }) => {
     await prefs(page, "en");
-    const email = await registerSalesperson(page, request, "Sales Refers Zayed", "Tiles sales");
+    const referrer = `Sales Refers ${Date.now()}`;
+    const email = await registerSalesperson(page, request, referrer, "Tiles sales");
     const showroom = `Zayed Tiles ${Date.now()}`;
 
     // --- 5. the referral ---
@@ -342,7 +354,7 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     await page.locator("#city").selectOption("sheikh_zayed");
     await page.locator("#primaryBranchName").fill("Zayed Main");
     await page.getByRole("button", { name: /submit for review/i }).click();
-    await page.waitForURL(/\/home/, { waitUntil: "commit" });
+    await page.waitForURL(/connected=submitted/, { waitUntil: "commit" });
 
     // The account stays usable and the referral reads as pending.
     await expect(page.getByText(/submitted for verification/i)).toBeVisible();
@@ -360,17 +372,16 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     await expect(page.getByRole("heading", { name: /referred showrooms/i })).toBeVisible();
     // The referring salesperson is identified — the attribution a future rewards
     // feature will read.
-    await expect(page.getByText(/referred by/i).first()).toBeVisible();
-    await expect(page.getByText(/sales refers zayed/i)).toBeVisible();
-    // The supplied business/location data is inspectable.
-    await expect(page.getByText(showroom)).toBeVisible();
-    await expect(page.getByText(/sheikh zayed/i).first()).toBeVisible();
+    const card = page.getByRole("listitem").filter({ hasText: showroom });
+    await expect(card).toBeVisible();
+    // The referring salesperson is named on the card — the attribution a future
+    // rewards feature reads — alongside the supplied business/location data.
+    await expect(card.getByText(/referred by/i)).toBeVisible();
+    await expect(card.getByText(referrer)).toBeVisible();
+    await expect(card.getByText(/sheikh zayed/i)).toBeVisible();
 
-    await page
-      .getByRole("button", { name: /approve as a new business/i })
-      .first()
-      .click();
-    await page.waitForURL(/\/admin\/verifications/, { waitUntil: "commit" });
+    await card.getByRole("button", { name: /approve as a new business/i }).click();
+    await page.waitForURL(/referral=approved/, { waitUntil: "commit" });
 
     // Exactly ONE organization of that name exists — approval cannot duplicate.
     await page.goto("/admin/organizations");
