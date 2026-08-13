@@ -170,7 +170,8 @@ The first message after onboarding now reads *your account is ready, use Aladdin
 | bilingual parity gate | ✅ exact EN/AR key parity |
 | `supabase db reset` | ✅ clean, both seeds |
 | pgTAP | ✅ **729/729** across 29 files (79 new — all fourteen required DB acceptances) |
-| targeted Playwright | see [`RUNTIME_STATE.md`](../operations/RUNTIME_STATE.md) for the measured counts |
+| targeted Playwright (desktop 1440×900) | ✅ **9 passed / 0 failed, no retries** — all ten required journeys |
+| targeted Playwright (mobile Pixel 5) | ✅ **8 passed / 1 flaky** — journey 4 timed out once at the decline step under the slower emulation and passed on retry #1 |
 | production build | ✅ (Playwright runs against `next build` + `next start`) |
 
 Repository-wide E2E, Lighthouse and the full persona matrix were deliberately **not** run — this is a feature sprint, not the final Integration Gate. No `.pen` file was touched.
