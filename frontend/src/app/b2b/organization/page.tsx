@@ -1,9 +1,11 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listOrgMembers, listOrgInvitations } from "@/server/queries/organization";
+import { listJoinRequests } from "@/server/queries/affiliation";
 import { PageHeader } from "@/features/sales/page-parts";
 import { StatePanel } from "@/components/ui/primitives";
 import { PeopleManager } from "@/features/organization/people-manager";
+import { JoinRequests } from "@/features/organization/join-requests";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +31,10 @@ export default async function OrganizationPeoplePage() {
     );
   }
 
-  const [members, invitations, branchesRes] = await Promise.all([
+  const [members, invitations, joinRequests, branchesRes] = await Promise.all([
     listOrgMembers(supabase, org.organizationId),
     listOrgInvitations(supabase, org.organizationId),
+    listJoinRequests(supabase, org.organizationId),
     supabase
       .from("branches")
       .select("id, name")
@@ -44,6 +47,9 @@ export default async function OrganizationPeoplePage() {
   return (
     <div className="flex flex-col gap-xl pb-16 tablet:pb-0">
       <PageHeader title={m.org.title} subtitle={m.org.subtitle} />
+      {/* People who asked to join THIS business (Sprint 13). Same surface, same
+          org.members.manage capability — joining a business happens in one place. */}
+      <JoinRequests requests={joinRequests} branches={branches} m={m} />
       <PeopleManager
         orgId={org.organizationId}
         members={members}

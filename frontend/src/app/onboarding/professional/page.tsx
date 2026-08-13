@@ -29,7 +29,7 @@ export default async function ProfessionalOnboardingPage() {
   const data = await getIndividualOnboardingData();
   if (!data || data.selectedTrack !== "professional") redirect("/onboarding");
 
-  const persona = data.selectedAccountType ? PERSONA_BY_ACCOUNT_TYPE[data.selectedAccountType] : undefined;
+  const persona = data.selectedPersona ? PERSONA_BY_ACCOUNT_TYPE[data.selectedPersona] : undefined;
   if (!persona) redirect("/onboarding");
 
   return <ProfessionalFlow persona={persona} answers={data.professional} />;

@@ -4,7 +4,20 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.types";
 
 export type OnboardingTrack = Database["public"]["Enums"]["onboarding_track"];
-export type AccountTypeValue = Database["public"]["Enums"]["account_type"];
+
+/** A person's persona, and a business's classification — two disjoint enums. */
+export type PersonaValue = Database["public"]["Enums"]["persona_type"];
+export type OrgTypeValue = Database["public"]["Enums"]["organization_type"];
+
+/**
+ * The registration CHOICE, which is the one place the two taxonomies meet: the
+ * card the person tapped either claims a persona ("I am an Engineer") or names a
+ * business to create ("I am creating a Showroom"). The database keeps them in
+ * separate typed columns — `selected_persona` and `selected_org_type` — and this
+ * union re-joins them for the resume logic, which only needs to know which card
+ * was chosen. It is deliberately a UNION at the read boundary and never a column.
+ */
+export type AccountTypeValue = PersonaValue | OrgTypeValue;
 
 /**
  * The signed-in caller's saved onboarding data, for pre-filling the step forms and
@@ -33,7 +46,7 @@ export async function getOnboardingData(): Promise<OnboardingData | null> {
     supabase.from("users").select("locale").eq("id", user.id).maybeSingle(),
     supabase
       .from("onboarding_progress")
-      .select("phone, selected_track, selected_account_type")
+      .select("phone, selected_track, selected_persona, selected_org_type")
       .eq("user_id", user.id)
       .maybeSingle(),
   ]);
@@ -44,7 +57,7 @@ export async function getOnboardingData(): Promise<OnboardingData | null> {
     locale: userRow?.locale === "ar" ? "ar" : "en",
     phone: progress?.phone ?? null,
     selectedTrack: progress?.selected_track ?? null,
-    selectedAccountType: progress?.selected_account_type ?? null,
+    selectedAccountType: progress?.selected_persona ?? progress?.selected_org_type ?? null,
   };
 }
 
@@ -65,7 +78,7 @@ export type ConsumerAnswers = {
 };
 
 export type ProfessionalAnswers = {
-  concreteType: AccountTypeValue | null;
+  concreteType: PersonaValue | null;
   headline: string | null;
   yearsExperience: number | null;
   specialization: string | null;
@@ -85,6 +98,12 @@ export type ProfessionalAnswers = {
 export type IndividualOnboardingData = {
   selectedTrack: OnboardingTrack | null;
   selectedAccountType: AccountTypeValue | null;
+  /**
+   * The persona alone. On the personal tracks a business classification is not
+   * merely unlikely, it is unrepresentable — so the flows that pick a persona form
+   * read this rather than narrowing the registration union at every use site.
+   */
+  selectedPersona: PersonaValue | null;
   consumer: ConsumerAnswers;
   professional: ProfessionalAnswers;
 };
@@ -101,7 +120,7 @@ export type IndividualOnboardingData = {
 export type BusinessAnswers = {
   legalName: string | null;
   displayName: string | null;
-  orgType: AccountTypeValue | null;
+  orgType: OrgTypeValue | null;
   description: string | null;
   governorate: string | null;
   city: string | null;
@@ -134,7 +153,7 @@ export async function getBusinessOnboardingData(): Promise<BusinessOnboardingDat
   const [{ data: progress }, { data: draft }] = await Promise.all([
     supabase
       .from("onboarding_progress")
-      .select("selected_track, selected_account_type")
+      .select("selected_track, selected_persona, selected_org_type")
       .eq("user_id", user.id)
       .maybeSingle(),
     supabase
@@ -147,7 +166,7 @@ export async function getBusinessOnboardingData(): Promise<BusinessOnboardingDat
 
   return {
     selectedTrack: progress?.selected_track ?? null,
-    selectedAccountType: progress?.selected_account_type ?? null,
+    selectedAccountType: progress?.selected_persona ?? progress?.selected_org_type ?? null,
     draftId: draft?.id ?? null,
     business: {
       legalName: draft?.legal_name ?? null,
@@ -173,7 +192,7 @@ export async function getIndividualOnboardingData(): Promise<IndividualOnboardin
   const [{ data: progress }, { data: profile }, { data: io }] = await Promise.all([
     supabase
       .from("onboarding_progress")
-      .select("selected_track, selected_account_type")
+      .select("selected_track, selected_persona, selected_org_type")
       .eq("user_id", user.id)
       .maybeSingle(),
     supabase.from("profiles").select("headline, bio, languages").eq("user_id", user.id).maybeSingle(),
@@ -182,7 +201,8 @@ export async function getIndividualOnboardingData(): Promise<IndividualOnboardin
 
   return {
     selectedTrack: progress?.selected_track ?? null,
-    selectedAccountType: progress?.selected_account_type ?? null,
+    selectedAccountType: progress?.selected_persona ?? progress?.selected_org_type ?? null,
+    selectedPersona: progress?.selected_persona ?? null,
     consumer: {
       intent: io?.consumer_intent ?? null,
       interests: io?.consumer_interests ?? [],

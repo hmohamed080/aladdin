@@ -41,9 +41,12 @@ export async function loadWorkspaces(supabase: SupabaseClient<Database>): Promis
   const { data, error } = await supabase.rpc("my_workspaces");
   if (error) throw error;
 
+  // A Personal row reports a `persona` and a Business row an `org_type`; since
+  // Sprint 13 those are two different columns of two different types, and each row
+  // populates only its own. Reading one for the other is no longer possible.
   const entries: WorkspaceEntry[] = (data ?? []).map((row) =>
     row.kind === "personal"
-      ? { kind: "personal" as const, name: row.name ?? "", persona: row.org_type ?? null }
+      ? { kind: "personal" as const, name: row.name ?? "", persona: row.persona ?? null }
       : {
           kind: "business" as const,
           organizationId: row.organization_id!,

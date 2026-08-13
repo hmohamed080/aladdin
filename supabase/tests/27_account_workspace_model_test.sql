@@ -51,12 +51,17 @@ select is(
                        '70000004-0000-4000-8000-000000000004','70000005-0000-4000-8000-000000000005')
      and m.status = 'active'),
   4, 'H: each still holds their ACTIVE owner membership');
-select isnt(
-  (select count(*)::int from public.users where primary_account_type in
-     ('showroom_dealer','supplier','manufacturer','importer','wholesaler')),
-  null, 'H: the business-persona query is answerable');
+-- Since Sprint 13 this is no longer a question the data can even be asked: the
+-- comparison is between two disjoint enums, so it is a TYPE error rather than a
+-- row count of zero. Proving that is stronger than proving the count — the
+-- dedicated type-separation suite (28) does it exhaustively.
+select throws_ok(
+  $$ select count(*) from public.users where primary_account_type::text = 'supplier'
+       and primary_account_type = 'supplier'::public.organization_type $$,
+  '42883', null,
+  'H: a business classification cannot even be COMPARED to a personal persona any more');
 select is(
-  (select count(*)::int from public.users where primary_account_type in
+  (select count(*)::int from public.users where primary_account_type::text in
      ('showroom_dealer','supplier','manufacturer','importer','wholesaler')),
   0, 'H: NO identity anywhere carries a business classification as a personal persona');
 -- Their organizations still carry the business classification — it moved nowhere.
@@ -151,9 +156,12 @@ select is(
   'end_consumer',
   'B: the org type was NOT written onto the creator (his persona is untouched)');
 -- And a business classification can never be requested as a personal upgrade.
+-- Sprint 13 moved this from a hand-written guard inside the RPC (22023) to the
+-- PARAMETER TYPE (22P02 invalid enum input): the value is now rejected before the
+-- function body runs, in every caller, and no future edit can forget the check.
 select throws_ok(
   $$ select public.request_account_upgrade('showroom_dealer') $$,
-  '22023', null,
+  '22P02', null,
   'B: a business classification cannot be requested as a personal account type');
 
 -- ===========================================================================

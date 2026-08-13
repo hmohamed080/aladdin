@@ -35,7 +35,7 @@ from (values ('c0000000-0000-4000-8000-0000000000c1'::uuid),
 cross join unnest(array['terms','privacy','pilot']::public.consent_type[]) t(t);
 
 insert into public.onboarding_progress
-  (user_id, phone, selected_track, selected_account_type,
+  (user_id, phone, selected_track, selected_persona,
    profile_completed_at, contact_completed_at, account_type_completed_at, completed_at)
 values
   ('c0000000-0000-4000-8000-0000000000c1', '01012345678', 'consumer', null, now(), now(), now(), now()),
@@ -73,7 +73,7 @@ select is(
 
 -- A consumer cannot enter the professional branch (track gate at the DB).
 select throws_ok(
-  $$ select public.individual_save_professional('engineer'::public.account_type) $$,
+  $$ select public.individual_save_professional('engineer'::public.persona_type) $$,
   '42501', null, 'a consumer-track caller is rejected by the professional RPC');
 
 reset role;
@@ -95,7 +95,7 @@ select throws_ok(
 -- Save WITHOUT a headline first → submit must fail on the required-field check.
 select lives_ok(
   $$ select public.individual_save_professional(
-       'interior_designer'::public.account_type, null, 8::smallint, 'residential', null,
+       'interior_designer'::public.persona_type, null, 8::smallint, 'residential', null,
        array['space_planning','styling'], null, array['arabic'], 'within_week',
        array['nasr_city'], false, 'cairo', 'nasr_city', 30::smallint) $$,
   'professional can save the common profile (concrete type resolved to interior_designer)');
@@ -106,7 +106,7 @@ select throws_ok(
 -- Provide the headline, then submit succeeds and hands off to review.
 select lives_ok(
   $$ select public.individual_save_professional(
-       'interior_designer'::public.account_type, 'Studio for interiors', 8::smallint, 'residential', null,
+       'interior_designer'::public.persona_type, 'Studio for interiors', 8::smallint, 'residential', null,
        array['space_planning','styling'], null, array['arabic'], 'within_week',
        array['nasr_city'], false, 'cairo', 'nasr_city', 30::smallint) $$,
   'professional adds the required headline');
