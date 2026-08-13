@@ -7,31 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       audit_log: {
@@ -2063,6 +2038,59 @@ export type Database = {
           },
         ]
       }
+      saved_products: {
+        Row: {
+          created_at: string
+          note: string | null
+          organization_id: string
+          product_id: string
+          saved_by: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          organization_id: string
+          product_id: string
+          saved_by: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          organization_id?: string
+          product_id?: string
+          saved_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_products_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_published_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_saved_by_fkey"
+            columns: ["saved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string
@@ -2375,6 +2403,7 @@ export type Database = {
           id: string | null
           languages: string[] | null
           locality_id: string | null
+          persona: Database["public"]["Enums"]["persona_type"] | null
         }
         Relationships: []
       }
@@ -3015,6 +3044,62 @@ export type Database = {
           },
         ]
       }
+      saved_product_list: {
+        Row: {
+          brand: string | null
+          category: Database["public"]["Enums"]["product_category"] | null
+          image_ref: string | null
+          name: string | null
+          note: string | null
+          organization_id: string | null
+          product_id: string | null
+          saved_at: string | null
+          saved_by: string | null
+          short_description: string | null
+          sku: string | null
+          supplier_name: string | null
+          supplier_org_id: string | null
+          supplier_verified: boolean | null
+          unit: Database["public"]["Enums"]["product_unit"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_organization_id_fkey"
+            columns: ["supplier_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_published_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_saved_by_fkey"
+            columns: ["saved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       activate_project: {
@@ -3431,6 +3516,14 @@ export type Database = {
         Returns: undefined
       }
       review_start: { Args: { p_verification_id: string }; Returns: undefined }
+      save_product: {
+        Args: {
+          p_note?: string
+          p_organization_id: string
+          p_product_id: string
+        }
+        Returns: undefined
+      }
       set_customer_ownership: {
         Args: {
           p_change_assignee?: boolean
@@ -3545,6 +3638,10 @@ export type Database = {
           p_new_status?: Database["public"]["Enums"]["lead_status"]
         }
         Returns: number
+      }
+      unsave_product: {
+        Args: { p_organization_id: string; p_product_id: string }
+        Returns: undefined
       }
       update_customer: {
         Args: {
@@ -3858,9 +3955,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       affiliation_request_status: [

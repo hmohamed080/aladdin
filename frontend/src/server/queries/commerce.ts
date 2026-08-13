@@ -189,3 +189,38 @@ export async function listQuotationItems(
   if (error) throw error;
   return data ?? [];
 }
+
+// ---- Saved products (organization shortlist) -------------------------------
+export type SavedProductRow = Database["public"]["Views"]["saved_product_list"]["Row"];
+
+/**
+ * The calling organization's shortlist. RLS scopes rows to the caller's org, and
+ * the view's join to `catalog_published_products` means an item whose supplier
+ * later unpublished or deleted it simply drops out — no stale or leaked row.
+ */
+export async function listSavedProducts(
+  supabase: DB,
+  orgId: string,
+  f: { category?: ProductCategory } = {},
+): Promise<SavedProductRow[]> {
+  let q = supabase
+    .from("saved_product_list")
+    .select("*")
+    .eq("organization_id", orgId)
+    .order("saved_at", { ascending: false })
+    .limit(LIST_LIMIT);
+  if (f.category) q = q.eq("category", f.category);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** The saved product ids for this org, so the catalog can show its save state. */
+export async function savedProductIds(supabase: DB, orgId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("saved_products")
+    .select("product_id")
+    .eq("organization_id", orgId);
+  if (error) throw error;
+  return new Set((data ?? []).map((r) => r.product_id));
+}

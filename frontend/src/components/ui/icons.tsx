@@ -230,3 +230,97 @@ export const UserIcon = (p: IconProps) => (
     <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
   </Svg>
 );
+
+// --- Sprint 14: showroom buyer surfaces -------------------------------------
+
+export const ShoppingBagIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M6 2 4 6v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6l-2-4H6Z" />
+    <path d="M4 6h16" />
+    <path d="M16 10a4 4 0 0 1-8 0" />
+  </Svg>
+);
+
+export const InboxIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+    <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z" />
+  </Svg>
+);
+
+export const BookmarkIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z" />
+  </Svg>
+);
+
+export const BookmarkFilledIcon = (p: IconProps) => (
+  <Svg {...p} fill="currentColor">
+    <path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z" />
+  </Svg>
+);
+
+export const TruckIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M14 18V6a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h2" />
+    <path d="M14 9h4l3 3v5a1 1 0 0 1-1 1h-1" />
+    <path d="M8.5 18a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0ZM18.5 18a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
+  </Svg>
+);
+
+export const WrenchIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M14.7 6.3a4 4 0 0 0 5 5l-9 9a2.8 2.8 0 0 1-4-4l9-9a4 4 0 0 0-1 -1Z" />
+    <path d="M14.7 6.3 18 3l3 3-3.3 3.3" />
+  </Svg>
+);
+
+export const LandmarkIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 21h18" />
+    <path d="M4 10h16" />
+    <path d="m12 3 8 4H4l8-4Z" />
+    <path d="M7 10v8M12 10v8M17 10v8" />
+  </Svg>
+);
+
+export const BarChartIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 21h18" />
+    <path d="M7 21v-8M12 21V5M17 21v-5" />
+  </Svg>
+);
+
+export const SettingsIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+    <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-3-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.3-3l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 3 1.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.2a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1Z" />
+  </Svg>
+);
+
+export const FilterIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 5h18l-7 8v6l-4 2v-8L3 5Z" />
+  </Svg>
+);
+
+export const MapPinIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20 10c0 5-8 12-8 12s-8-7-8-12a8 8 0 0 1 16 0Z" />
+    <path d="M12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+  </Svg>
+);
+
+export const TrendingUpIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m3 17 6-6 4 4 8-8" />
+    <path d="M15 7h6v6" />
+  </Svg>
+);
+
+export const WalletIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 7a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    <path d="M16 12h4" />
+  </Svg>
+);
