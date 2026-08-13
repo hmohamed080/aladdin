@@ -52,7 +52,7 @@ from (values ('e1000000-0000-4000-8000-0000000000e1'::uuid),
 cross join unnest(array['terms','privacy','pilot']::public.consent_type[]) t(t);
 
 insert into public.onboarding_progress
-  (user_id, phone, selected_track, selected_account_type,
+  (user_id, phone, selected_track, selected_persona,
    profile_completed_at, contact_completed_at, account_type_completed_at, completed_at)
 values
   ('e1000000-0000-4000-8000-0000000000e1', '01012345678', 'consumer',     null,       now(), now(), now(), now()),
@@ -95,7 +95,7 @@ set local request.jwt.claims = '{"sub":"e2000000-0000-4000-8000-0000000000e2","r
 
 select lives_ok(
   $$ select public.individual_save_professional(
-       'engineer'::public.account_type, 'Structural engineer', 12::smallint, 'structural', null,
+       'engineer'::public.persona_type, 'Structural engineer', 12::smallint, 'structural', null,
        array['design_review','supervision'], null, array['arabic','english'], 'within_week',
        array['new_cairo'], false, 'cairo', 'new_cairo', 30::smallint) $$,
   'professional saves a complete profile');
@@ -150,13 +150,13 @@ select lives_ok(
   $$ select public.onboarding_select_account_type('business', null) $$,
   'the generic owner/manager choice (business track, no concrete type) is accepted');
 select is(
-  (select selected_account_type from public.onboarding_progress where user_id = 'e3000000-0000-4000-8000-0000000000e3'),
-  null, 'owner/manager records no concrete account type (it is a relationship, not a business type)');
+  (select selected_org_type from public.onboarding_progress where user_id = 'e3000000-0000-4000-8000-0000000000e3'),
+  null, 'owner/manager records no concrete business type (it is a relationship, not a business type)');
 select is(public.my_registration_state(), 'organization_setup_pending',
   'the owner/manager resumes into business onboarding');
 -- The real organization type is chosen (and validated) during business onboarding.
 select lives_ok(
-  $$ select public.business_save('Zayed Marble LLC', 'Zayed Marble', 'wholesaler'::public.account_type,
+  $$ select public.business_save('Zayed Marble LLC', 'Zayed Marble', 'wholesaler'::public.organization_type,
        null, 'giza', 'sheikh_zayed', 'Main branch', true) $$,
   'the owner then picks a REAL organization type during business onboarding');
 -- A consumer type on the business track is still refused.

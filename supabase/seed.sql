@@ -88,8 +88,11 @@ insert into public.organizations (id, name, slug, org_type, status, is_verified,
 values
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Nile Finishing Supplies', 'nile-finishing',
    'supplier', 'active', true, 'en', '11111111-1111-4111-8111-111111111111'),
+  -- A design studio's BUSINESS classification is `design_office`. The owner is
+  -- separately an individual `interior_designer` PERSONA — since Sprint 13 the two
+  -- values live in different enums and can no longer be confused.
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Delta Interiors Studio', 'delta-interiors',
-   'interior_designer', 'active', true, 'en', '33333333-3333-4333-8333-333333333333');
+   'design_office', 'active', true, 'en', '33333333-3333-4333-8333-333333333333');
 
 -- ---------------------------------------------------------------------------
 -- Branches (Org A has two; Org B has none for this fixture)

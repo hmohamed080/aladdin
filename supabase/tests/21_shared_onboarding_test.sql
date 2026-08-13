@@ -77,7 +77,7 @@ select throws_ok(
 select lives_ok(
   $$ select public.onboarding_select_account_type('professional','engineer') $$,
   'account-type step records the professional intent');
-select is((select selected_account_type::text from public.onboarding_progress where user_id='44444444-4444-4444-8444-444444444444'),
+select is((select selected_persona::text from public.onboarding_progress where user_id='44444444-4444-4444-8444-444444444444'),
   'engineer', 'the selected account type is recorded as intent');
 -- CRITICAL: intent never changes the canonical account type this sprint
 select is((select primary_account_type::text from public.users where id='44444444-4444-4444-8444-444444444444'),
@@ -98,7 +98,7 @@ set local request.jwt.claims = '{"sub":"44444444-4444-4444-8444-444444444444","r
 select lives_ok(
   $$ select public.onboarding_select_account_type('consumer', null) $$,
   're-selecting the consumer track is allowed (account type not silently locked)');
-select is((select selected_account_type from public.onboarding_progress where user_id='44444444-4444-4444-8444-444444444444'),
+select is((select selected_persona from public.onboarding_progress where user_id='44444444-4444-4444-8444-444444444444'),
   null, 'the consumer track stores a null concrete account type');
 select is((select public.my_registration_state()), 'consumer_onboarding_pending',
   'a consumer selection lands on the consumer handoff');

@@ -114,8 +114,10 @@ values
    'importer', 'pending_verification', false, 'en', '70000004-0000-4000-8000-000000000004'),
   ('9f000000-ffff-4fff-8fff-000000000004', 'Delta Wholesale Supply', 'delta-wholesale',
    'wholesaler', 'active', false, 'en', '70000005-0000-4000-8000-000000000005'),
+  -- A contracting BUSINESS is `contractor_company`; its owner is separately an
+  -- individual `contractor` PERSONA (two enums since Sprint 13, never one value).
   ('9a000000-aaaa-4aaa-8aaa-000000000005', 'Horizon Contracting', 'horizon-contracting',
-   'contractor', 'active', false, 'en', '70000006-0000-4000-8000-000000000006');
+   'contractor_company', 'active', false, 'en', '70000006-0000-4000-8000-000000000006');
 
 -- ---------------------------------------------------------------------------
 -- 3. Branches (one per new org)

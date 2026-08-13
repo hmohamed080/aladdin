@@ -33,7 +33,7 @@ select is(
   false, 'a client-created org defaults to unverified');
 
 -- ---- B4: account type is not platform authority --------------------------
-select throws_ok($$ select 'administrator'::public.account_type $$, '22P02', null,
+select throws_ok($$ select 'administrator'::public.persona_type $$, '22P02', null,
   'administrator is no longer a valid account_type (removed to end dual-authority)');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}';
