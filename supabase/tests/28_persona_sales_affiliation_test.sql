@@ -178,7 +178,7 @@ select throws_ok(
 -- ===========================================================================
 reset role;
 select is(
-  (select count(*)::int from public.organizations), 7,
+  (select count(*)::int from public.organizations), 12,
   '7: baseline organization count before any affiliation request');
 set local role authenticated;
 
@@ -190,7 +190,7 @@ select isnt(public.showroom_join_request_create(
 
 reset role;
 select is(
-  (select count(*)::int from public.organizations), 7,
+  (select count(*)::int from public.organizations), 12,
   '7: NO organization was created by the request');
 select is(
   (select count(*)::int from public.memberships m
@@ -381,7 +381,7 @@ select is(
 -- And submitting created no business and granted no access.
 reset role;
 select is(
-  (select count(*)::int from public.organizations), 7,
+  (select count(*)::int from public.organizations), 12,
   '10: submitting a referral creates NO organization');
 set local role authenticated;
 
@@ -409,7 +409,7 @@ select is(
   '11: approval LINKS to the existing organization instead of creating one');
 reset role;
 select is(
-  (select count(*)::int from public.organizations), 7,
+  (select count(*)::int from public.organizations), 12,
   '11: no duplicate business was created');
 set local role authenticated;
 -- Company name is deliberately NOT unique — two real showrooms may share one.

@@ -1430,3 +1430,104 @@ them. Real-browser production navigation measured 142–194 ms per route.
 ### Rollback
 One commit on `feature/showroom-mvp-completeness`, frontend-only, no migration. Reverting it
 restores the duplicate context resolution and the list-for-count dashboard reads.
+
+---
+
+## Sprint 14 — Showroom product-completeness pass (2026-08-15)
+
+Branch `feature/showroom-mvp-completeness` (PR #23). Not a new sprint: depth, usability, analytics
+and client-presentable quality on top of the module structure Sprint 14 already established.
+Reference set: `UI-UX/references/showroom/`. No `.pen` file touched.
+
+### The finding that mattered
+
+The Showroom modules were not sparse because of the components. `app._organization_public_directory()`
+filters on `is_verified`, and **every** pilot organization was seeded `is_verified = false` (with every
+pilot profile `hidden`) specifically so global `count(*)` assertions in pgTAP stayed frozen. Distributors,
+Institutions and Technicians were therefore **structurally empty** for the acceptance account no matter
+how good their UI was. Freezing global counts in tests had made the seed untouchable, which made the
+product undemonstrable.
+
+Fixed by scoping the two most brittle assertions to the record under test (`where id = …` /
+`where display_name like 'Nadia%'`) instead of a global count. Those assertions now prove *more* — the
+specific org/person leaves the directory — and stop blocking seed growth.
+
+### Acceptance account
+
+Switched from Delta Interiors Studio / Org A to the real Showroom/Dealer org, **Cairo Ceramics
+Showroom** (`hana@example.test`), in both manual UAT and the e2e suite. Org A is a supplier and Org B a
+design office; testing the buyer-first showroom IA through them only ever proved the pages render empty.
+
+### Seed (deterministic, synthetic)
+
+Extended `seed-pilot.sql`: 5 verified counterparties (3 distributors + 2 institutions) with owners,
+branches and published catalogues; 7 listed professional profiles; 12 purchase requests, 10 offers,
+7 orders (**EGP 1,103,100** over 6 months), 5 projects, 8 shortlisted products, and a sell-side chain.
+Product imagery is 12 local SVG **material swatches** under `frontend/public/demo/products` — a
+finishing catalogue is a catalogue of surfaces; no external host, no licensing question, deterministic.
+
+The showroom's sales book was split into `seed-showroom-sales.sql` (also in `config.toml` sql_paths).
+The e2e global setup truncates the four sales tables before every run; while that data lived inside
+`seed-pilot.sql` the truncate silently deleted it for good, leaving the acceptance account with empty
+pipeline panels after any e2e run. Global setup now re-applies that one file, from the same source of
+truth as `db reset`.
+
+### Terminology
+
+User-facing **Supplier → Distributor / المورّد → الموزّع** across every surface, applied to message
+VALUES only (keys, `{supplier}` placeholders, routes, columns and RPC identifiers are internal and
+unchanged). `showroom_dealer`'s Arabic label moved to "معرض / تاجر" so it no longer collides with the
+new meaning of موزّع. No schema terminology migration.
+
+### Charts — hand-written, no new dependency
+
+`components/ui/charts.tsx`: trend line, donut, ranked bars, funnel. Inline SVG renders on the server,
+ships no JavaScript, and inherits the theme because its fills are token variables. Required a
+categorical palette, added through governance as `--series-1…6` + `--chart-grid` in `tokens.css`
+(both themes, every value an existing brand primitive) and exposed as `series-*` in Tailwind. Every
+chart is `role="img"` with an `sr-only` transcript of its actual values; colour is always a second
+channel behind a text label.
+
+### Analytics data path
+
+One additive migration (`20260817090001`): `order_category_spend` resolves order value to product
+category through the quotation lines an order was created from — the only honest link, since an order
+line is a frozen snapshot carrying no `product_id`. Verified exact: the category split sums to the
+order total to the piastre. `order_list` and `project_list` gained appended columns (requester branch;
+branch + order value) so branch filtering and project value are real rather than approximated.
+
+### Defects found and fixed during browser review
+
+- `DataTable` clipped columns wider than their container (`overflow-hidden` with no scroller) — inside
+  a half-width dashboard card it hid the money column outright. Now scrolls within its own wrapper.
+- Money in a `StatTile` overflowed the two-column mobile grid and pushed the page sideways (23px).
+  Tiles now use the compact money format, with `truncate` as a guard.
+- `Projects` showed a branch column that was always "—" on the executing tab (it is the *client's*
+  branch, which this caller cannot name). Column is offered only where it resolves.
+- Arabic mixed numeral systems in one row (Arabic-Indic money beside a Latin `57%`). Added
+  `formatPercent`; shares now match the values beside them.
+- Fixture labels ("Nadia (Org B Owner)", "Hana (Cairo Ceramics Owner)") were reaching the client as
+  display copy. Replaced with plain synthetic names.
+- Team rendered **raw capability keys** (`org.manage`, `sales.read`) as chips. Replaced with localized
+  work groups via `capabilityGroups()` — a display mapping only; authorization is untouched.
+
+### Deliberately NOT built
+
+No ratings, no availability, no professional phone numbers, no geographic map, no project
+percentage-complete, no product price, no company location — none of those exist in the model, and a
+directory that invents them is worse than one that admits what it knows. No billing / notifications /
+integrations in Settings.
+
+### Validation
+- frontend typecheck ✅ · lint ✅ (0 errors, 0 warnings) · unit **216/216** ✅ (incl. new
+  `lib/org/roles.test.ts`, 8 tests, guarding that no raw capability key can reach the client)
+- pgTAP **729/729** ✅ after a clean `db reset` (5 files reconciled to the enlarged pilot world)
+- Playwright `showroom-mvp` **16 passed / 1 skipped** on chromium-desktop **and** chromium-mobile
+- Real-browser UAT as Cairo Ceramics across all 13 acceptance routes, EN + AR
+
+### Pre-existing failures, NOT caused by this pass (verified against a stashed baseline)
+- `shared-onboarding.spec.ts:44` and `business-onboarding.spec.ts:56` — a chain of assertions left
+  stale by an earlier sprint's onboarding copy rename. Three of them were repaired here (the specs had
+  to be touched anyway); the remainder are further down the same flow and are out of this pass's scope.
+- `pilot-uat-round-1.spec.ts:64` — two "Pending review" badges on the personal `/home` trip a
+  strict-mode locator. Fails identically at HEAD.

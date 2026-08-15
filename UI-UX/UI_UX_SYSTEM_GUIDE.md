@@ -76,6 +76,14 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 - **Every color exists in both light and dark** with adequate contrast in each — a token is incomplete if only one theme is defined.
 - Color is a **reinforcement**, never the sole signal (pair with icon/label/shape) — required for accessibility and RTL parity.
 - Do **not** introduce raw hex in components; add/adjust a token instead.
+- **Data-visualisation series (added Sprint 14):** a single accent cannot express a categorical chart — a spend-by-category donut needs as many distinguishable fills as it has categories. `--series-1…6` (+ `--chart-grid`) are the approved categorical ramp, exposed in Tailwind as `series-1…6`. Every value is an **existing brand primitive**, ordered so adjacent series differ in lightness as well as hue, and defined in **both** themes with the same hue per index (a chart must not change meaning when the theme flips). Series colours are **non-semantic** — `series-5` is not "bad"; success/warning/danger keep their meaning. Charts must always label their series in text: colour stays a second channel.
+
+## Charts
+- Charts are **inline SVG rendered on the server** (`components/ui/charts.tsx`) — no charting library, no client component, no runtime dependency. The four shapes the product needs (trend, proportion, ranked comparison, funnel) are a path, a dashed circle, a flex row and a list.
+- Every chart is `role="img"` with an `aria-label`, and carries an `sr-only` list of its **actual values** — a screen reader gets the data, not a description of a picture.
+- **Direction:** value/time axes stay LTR in both locales (an Arabic dashboard still reads a Jan→Jun trend left to right, and digits are LTR anyway). Ranked bars, legends and funnels are text lists — they follow document direction and grow from the inline start.
+- **Numerals:** anything shown beside formatted money must use the same numeral system (`formatPercent`, `formatCompactMoney`). Mixing Arabic-Indic money with a Latin `57%` in one row is a defect.
+- **Empty is a first-class state**: a chart with nothing behind it renders a sentence, never an empty axis pretending to be a measurement. No targets, forecasts or growth percentages unless the database actually produces them.
 
 ## Dark Mode Rules
 - The **only** theme axis is `mode: light/dark`. Platform/device/language are naming lanes, **not** theme axes — never fork a component per language for theming.

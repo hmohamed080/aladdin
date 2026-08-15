@@ -201,11 +201,11 @@ test.describe("Pilot UAT round 1 — Admin console", () => {
     // Users — list, search, detail (account/persona/status + memberships).
     await page.goto("/admin/users");
     await expect(page.getByRole("heading", { name: /^users$/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Hana \(Cairo Ceramics Owner\)/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Hana Mansour/ })).toBeVisible();
     await page.getByPlaceholder(/search by name/i).fill("hana");
     await page.getByRole("button", { name: /^search$/i }).click();
     await page.waitForURL(/q=hana/, { waitUntil: "commit" });
-    await page.getByRole("link", { name: /Hana \(Cairo Ceramics Owner\)/ }).click();
+    await page.getByRole("link", { name: /Hana Mansour/ }).click();
     await expect(page.getByText(/organization memberships/i)).toBeVisible();
     // Sprint 12: Hana is a BUSINESS-ONLY identity. Her showroom classification
     // lives on the organization, not on her, and Admin says so explicitly rather

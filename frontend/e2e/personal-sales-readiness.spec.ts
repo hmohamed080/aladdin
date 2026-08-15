@@ -439,9 +439,8 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
 
     // Select the Business → sign out → back in → the Business is restored.
     await switcher(page).click();
-    // EXACT accessible name: this fixture's personal display name is
-    // "Mostafa (Horizon Contracting Owner)", so a loose match hits both entries.
-    // A business entry reads "<org name> <relationship>".
+    // EXACT accessible name: a business entry reads "<org name> <relationship>",
+    // and an anchored match keeps this off the Personal entry above it.
     await page.getByRole("menuitem", { name: "Horizon Contracting Owner", exact: true }).click();
     await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
     await page.getByRole("button", { name: label((m) => m.common.signOut) }).click();

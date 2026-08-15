@@ -146,3 +146,70 @@ export async function professionalCount(supabase: DB, personas: PersonaType[]): 
   if (error) throw error;
   return count ?? 0;
 }
+
+export type OrgFacet = { products: number; categories: ProductCategory[] };
+export type ProductCategory = Database["public"]["Enums"]["product_category"];
+
+/**
+ * What each listed business actually SELLS, for the directory rows.
+ *
+ * A directory of names is an address book; a sourcing module has to answer "who
+ * can supply floor tiling" before the buyer opens anything. That answer already
+ * exists in the published catalog, so this reads two columns of it — ONE request
+ * for the whole visible page rather than one per row — and tallies here.
+ *
+ * Scoped to the ids actually being rendered: an unfiltered read would grow with
+ * the platform instead of with the page.
+ */
+export async function organizationProductFacets(
+  supabase: DB,
+  orgIds: string[],
+): Promise<Map<string, OrgFacet>> {
+  const out = new Map<string, OrgFacet>();
+  if (orgIds.length === 0) return out;
+
+  const { data, error } = await supabase
+    .from("catalog_published_products")
+    .select("organization_id, category")
+    .in("organization_id", orgIds);
+  if (error) throw error;
+
+  for (const row of data ?? []) {
+    if (!row.organization_id) continue;
+    const cur = out.get(row.organization_id) ?? { products: 0, categories: [] };
+    cur.products += 1;
+    if (row.category && !cur.categories.includes(row.category)) cur.categories.push(row.category);
+    out.set(row.organization_id, cur);
+  }
+  return out;
+}
+
+export type SharedWork = { orders: number; value: number };
+
+/**
+ * Orders exchanged between this organization and each counterparty, in EITHER
+ * direction — the "have we worked together" column on the Institutions module.
+ *
+ * This is relationship context the caller is already entitled to (they are a
+ * party to every order counted), not private information about the other
+ * business: it says how much work WE have done with THEM, and would read zero for
+ * any other viewer.
+ */
+export async function sharedWorkCounts(supabase: DB, orgId: string): Promise<Map<string, SharedWork>> {
+  const { data, error } = await supabase
+    .from("order_list")
+    .select("requester_org_id, supplier_org_id, total")
+    .or(`requester_org_id.eq.${orgId},supplier_org_id.eq.${orgId}`);
+  if (error) throw error;
+
+  const out = new Map<string, SharedWork>();
+  for (const r of data ?? []) {
+    const other = r.requester_org_id === orgId ? r.supplier_org_id : r.requester_org_id;
+    if (!other) continue;
+    const cur = out.get(other) ?? { orders: 0, value: 0 };
+    cur.orders += 1;
+    cur.value += Number(r.total ?? 0);
+    out.set(other, cur);
+  }
+  return out;
+}

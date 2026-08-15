@@ -45,7 +45,15 @@ function TileBody({ tile }: { tile: Tile }) {
         <tile.Icon size={20} />
       </span>
       <span className="min-w-0">
-        <span className="block font-display text-title leading-none text-fg tabular-nums">{tile.value}</span>
+        {/* `truncate` is a GUARD, not the plan. A tile is ~180px wide in the
+            two-column mobile grid, and a long value (a money figure, say) has no
+            natural break point — without this it overflowed the tile and pushed
+            the whole page sideways. Callers should still pass a value that fits:
+            use the compact money format on tiles, and keep the exact figure on
+            the record the tile links to. */}
+        <span className="block truncate font-display text-title leading-none text-fg tabular-nums">
+          {tile.value}
+        </span>
         <span className="mt-1 block truncate text-label text-fg-secondary">{tile.label}</span>
         {tile.hint ? <span className="mt-0.5 block truncate text-label text-fg-muted">{tile.hint}</span> : null}
       </span>

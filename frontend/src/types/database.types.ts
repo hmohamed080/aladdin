@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       audit_log: {
@@ -914,6 +939,13 @@ export type Database = {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "order_category_spend"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "order_list"
             referencedColumns: ["id"]
           },
@@ -1610,6 +1642,13 @@ export type Database = {
             foreignKeyName: "projects_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: true
+            referencedRelation: "order_category_spend"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "projects_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
             referencedRelation: "order_list"
             referencedColumns: ["id"]
           },
@@ -2275,6 +2314,41 @@ export type Database = {
           },
         ]
       }
+      order_category_spend: {
+        Row: {
+          amount: number | null
+          category: Database["public"]["Enums"]["product_category"] | null
+          confirmed_at: string | null
+          order_id: string | null
+          requester_branch_id: string | null
+          requester_org_id: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          supplier_org_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_orders_requester_branch"
+            columns: ["requester_org_id", "requester_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "orders_requester_org_id_fkey"
+            columns: ["requester_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_supplier_org_id_fkey"
+            columns: ["supplier_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_list: {
         Row: {
           completed_at: string | null
@@ -2284,6 +2358,7 @@ export type Database = {
           id: string | null
           item_count: number | null
           quotation_id: string | null
+          requester_branch_id: string | null
           requester_name: string | null
           requester_org_id: string | null
           rfq_id: string | null
@@ -2304,6 +2379,7 @@ export type Database = {
           id?: string | null
           item_count?: never
           quotation_id?: string | null
+          requester_branch_id?: string | null
           requester_name?: never
           requester_org_id?: string | null
           rfq_id?: string | null
@@ -2324,6 +2400,7 @@ export type Database = {
           id?: string | null
           item_count?: never
           quotation_id?: string | null
+          requester_branch_id?: string | null
           requester_name?: never
           requester_org_id?: string | null
           rfq_id?: string | null
@@ -2337,6 +2414,13 @@ export type Database = {
           version?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_orders_requester_branch"
+            columns: ["requester_org_id", "requester_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
           {
             foreignKeyName: "orders_quotation_id_fkey"
             columns: ["quotation_id"]
@@ -2410,6 +2494,7 @@ export type Database = {
       project_list: {
         Row: {
           activated_at: string | null
+          branch_id: string | null
           completed_at: string | null
           created_at: string | null
           executing_name: string | null
@@ -2417,6 +2502,7 @@ export type Database = {
           id: string | null
           location: string | null
           order_id: string | null
+          order_total: number | null
           requester_name: string | null
           requester_org_id: string | null
           start_date: string | null
@@ -2428,6 +2514,7 @@ export type Database = {
         }
         Insert: {
           activated_at?: string | null
+          branch_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           executing_name?: never
@@ -2435,6 +2522,7 @@ export type Database = {
           id?: string | null
           location?: string | null
           order_id?: string | null
+          order_total?: never
           requester_name?: never
           requester_org_id?: string | null
           start_date?: string | null
@@ -2446,6 +2534,7 @@ export type Database = {
         }
         Update: {
           activated_at?: string | null
+          branch_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           executing_name?: never
@@ -2453,6 +2542,7 @@ export type Database = {
           id?: string | null
           location?: string | null
           order_id?: string | null
+          order_total?: never
           requester_name?: never
           requester_org_id?: string | null
           start_date?: string | null
@@ -2464,11 +2554,25 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_projects_branch"
+            columns: ["requester_org_id", "branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
             foreignKeyName: "projects_executing_org_id_fkey"
             columns: ["executing_org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "order_category_spend"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "projects_order_id_fkey"
@@ -3955,6 +4059,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       affiliation_request_status: [

@@ -4,7 +4,8 @@ import { listProjects, type ProjectListRow } from "@/server/queries/execution";
 import { PageHeader } from "@/features/sales/page-parts";
 import { TabLinks, StatTiles } from "@/components/ui/stat-tiles";
 import { ProjectTable } from "@/features/execution/execution-lists";
-import { LayersIcon, ActivityIcon, CheckIcon, AlertIcon } from "@/components/ui/icons";
+import { formatCompactMoney } from "@/lib/ui/format";
+import { LayersIcon, ActivityIcon, CheckIcon, AlertIcon, WalletIcon } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,11 @@ function overdue(rows: ProjectListRow[]) {
  * Projects — delivery work, with the side this business executes leading.
  * The counterparty tab appears only when the business actually has projects being
  * delivered FOR it, so a pure executor never sees an empty second tab.
+ *
+ * The tiles measure the tab you are looking at, not the union of both: a manager
+ * asking "how much work do we have running" means the work on screen, and a
+ * figure that silently included the other perspective would not reconcile with
+ * the table under it.
  */
 export default async function ProjectsPage({
   searchParams,
@@ -43,6 +49,15 @@ export default async function ProjectsPage({
   const view = showIncoming && sp.view === "incoming" ? "incoming" : "executing";
   const rows = view === "executing" ? executing : incoming;
 
+  // `projects.branch_id` is always the REQUESTER-side branch. On the incoming tab
+  // that is this business's own branch and can be named from the workspace context
+  // already resolved for the shell (no extra request); on the executing tab it
+  // belongs to the client, whose branch names this caller cannot see — so the
+  // column is simply not offered there.
+  const branchNames =
+    view === "incoming" ? Object.fromEntries(org.branches.map((b) => [b.id, b.name])) : undefined;
+  const value = rows.reduce((s, p) => s + Number(p.order_total ?? 0), 0);
+
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
@@ -57,7 +72,9 @@ export default async function ProjectsPage({
           { label: m.execution.project.stat.planned, value: countBy(rows, "planned"), Icon: LayersIcon, tone: "info" },
           { label: m.execution.project.stat.completed, value: countBy(rows, "completed"), Icon: CheckIcon, tone: "success" },
           { label: m.execution.project.stat.overdue, value: overdue(rows), Icon: AlertIcon, tone: "danger" },
+          { label: m.reports.projectValue, value: formatCompactMoney(value, locale), Icon: WalletIcon },
         ]}
+        className="desktop:grid-cols-5"
       />
 
       <div>
@@ -79,6 +96,7 @@ export default async function ProjectsPage({
           perspective={view === "executing" ? "executing" : "requester"}
           locale={locale}
           m={m}
+          branchNames={branchNames}
         />
       </div>
     </div>

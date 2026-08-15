@@ -87,22 +87,50 @@ export function OrderTable({
   );
 }
 
+/**
+ * Delivery work as an operations table, not a list of titles.
+ *
+ * The columns are the questions a delivery manager actually asks of a project:
+ * where is it, who is it for, what stage is it at, what is it worth, and when is
+ * it due. Value comes from the ORDER the project delivers — a project's worth is
+ * not a field anyone types, and inventing an editable one would let the two
+ * numbers drift apart.
+ *
+ * There is deliberately no percentage-complete column. The reference screens show
+ * one; Aladdin's project model has three states (planned → active → completed) and
+ * no task or milestone table underneath them, so any percentage would be a number
+ * with nothing behind it. The lifecycle badge says exactly what is known.
+ */
 export function ProjectTable({
   projects,
   perspective,
   locale,
   m,
+  branchNames,
 }: {
   projects: ProjectListRow[];
   perspective: "executing" | "requester";
   locale: Locale;
   m: Messages;
+  /**
+   * Branch id → name for the branch column. Supplied ONLY where the branch is the
+   * caller's own — on a project this business EXECUTES, `branch_id` is the
+   * requester's branch, which the caller cannot see the name of, so the column
+   * would read "—" on every row. A column that is always empty is worse than no
+   * column: it implies data is missing rather than not applicable.
+   */
+  branchNames?: Record<string, string>;
 }) {
   const columns: Column<ProjectListRow>[] = [
     {
       key: "title",
       header: m.execution.project.column.project,
-      cell: (p) => <RecordCell title={p.title ?? "—"} href={`/b2b/projects/${p.id}`} />,
+      // The site sits under the title rather than in its own column: it is what
+      // identifies a project in conversation ("the Maadi one"), not an attribute
+      // you scan a column of.
+      cell: (p) => (
+        <RecordCell title={p.title ?? "—"} meta={p.location ?? undefined} href={`/b2b/projects/${p.id}`} />
+      ),
     },
     {
       key: "counterparty",
@@ -118,19 +146,41 @@ export function ProjectTable({
       cell: (p) => <ProjectStatusBadge status={p.status ?? "planned"} />,
     },
     {
-      key: "target",
-      header: m.execution.project.column.target,
+      key: "value",
+      header: m.execution.project.column.value,
       numeric: true,
-      cell: (p) => (p.target_date ? formatDate(p.target_date, locale) : "—"),
+      cell: (p) => (
+        <span dir="ltr" className="font-medium text-fg">
+          {formatMoney(p.order_total, locale)}
+        </span>
+      ),
     },
     {
-      key: "started",
-      header: m.execution.project.column.started,
+      key: "window",
+      header: m.execution.project.column.window,
       numeric: true,
       desktopOnly: true,
-      cell: (p) => (p.created_at ? formatDate(p.created_at, locale) : "—"),
+      // Start and target together, because a target date alone does not say
+      // whether the work has a runway or is already behind.
+      cell: (p) => (
+        <span dir="ltr" className="whitespace-nowrap">
+          {p.start_date ? formatDate(p.start_date, locale) : "—"}
+          {" → "}
+          {p.target_date ? formatDate(p.target_date, locale) : "—"}
+        </span>
+      ),
     },
   ];
+
+  if (branchNames) {
+    columns.push({
+      key: "branch",
+      header: m.execution.project.column.branch,
+      secondary: true,
+      desktopOnly: true,
+      cell: (p) => (p.branch_id && branchNames[p.branch_id]) || "—",
+    });
+  }
 
   return (
     <DataTable

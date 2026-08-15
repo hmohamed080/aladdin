@@ -3,14 +3,20 @@
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { Card, Badge, StatePanel } from "@/components/ui/primitives";
-import { PackageIcon, SearchIcon } from "@/components/ui/icons";
+import { SearchIcon, BadgeCheckIcon } from "@/components/ui/icons";
 import { SaveProductButton } from "@/features/commerce/save-product-button";
+import { ProductMedia } from "@/features/commerce/product-media";
 import type { CatalogRow } from "@/server/queries/commerce";
 
 /**
- * Responsive product-card grid for the professional B2B catalog. Each card shows
- * the product, its supplier identity, and links to the detail page where a quote
- * can be requested. Not a consumer marketplace: no prices, no add-to-cart.
+ * Responsive product-card grid for the professional B2B catalog.
+ *
+ * Each card answers four things and no more: what it is (image, name, brand),
+ * what kind of thing (category), who sells it (distributor + whether Aladdin has
+ * verified them), and how it is sold (unit). There is deliberately NO price and
+ * NO add-to-cart: Aladdin is consultation-first, the catalog carries no price
+ * column at all, and a real B2B price comes from a quote against a real quantity,
+ * not from a shelf label.
  *
  * The save toggle is the one interactive control on a card, and it sits OUTSIDE
  * the card's link — a nested <form> inside an <a> is invalid HTML and would make
@@ -44,17 +50,20 @@ export function CatalogGrid({
       {products.map((p) => (
         <li key={p.id}>
           <Card className="group flex h-full flex-col gap-sm transition-colors hover:border-strong">
-            <div className="flex items-start justify-between gap-sm">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-surface-2 text-fg-secondary">
-                <PackageIcon size={20} />
-              </span>
-              <div className="flex items-center gap-2">
+            <div className="relative">
+              <ProductMedia src={p.image_ref} alt={p.name ?? ""} />
+              {/* Overlaid so the image stays the full width of the card — the
+                  category is a label ON the product, not a row beside it. */}
+              <span className="absolute start-2 top-2">
                 <Badge tone="neutral">{t(`commerce.categories.${p.category}`)}</Badge>
-                {p.id ? (
+              </span>
+              {p.id ? (
+                <span className="absolute end-2 top-2">
                   <SaveProductButton orgId={orgId} productId={p.id} saved={saved.has(p.id)} compact />
-                ) : null}
-              </div>
+                </span>
+              ) : null}
             </div>
+
             <Link href={`/b2b/catalog/${p.id}`} className="flex min-w-0 flex-1 flex-col">
               <div className="min-w-0 flex-1">
                 <h3 className="line-clamp-2 font-medium text-fg group-hover:text-accent">{p.name}</h3>
@@ -67,8 +76,8 @@ export function CatalogGrid({
                 <span className="inline-flex min-w-0 items-center gap-1 text-fg-secondary">
                   <span className="truncate">{p.supplier_name}</span>
                   {p.supplier_verified ? (
-                    <span className="text-success" title={t("commerce.catalog.verifiedSupplier")}>
-                      ✓
+                    <span className="shrink-0 text-success" title={t("commerce.catalog.verifiedSupplier")}>
+                      <BadgeCheckIcon size={13} />
                     </span>
                   ) : null}
                 </span>

@@ -56,9 +56,16 @@ export function DataTable<T>({
 
   return (
     <div className={cn("min-w-0", className)}>
-      {/* Desktop / tablet: a real table. */}
+      {/* Desktop / tablet: a real table.
+          Two nested wrappers, each with one job: the outer clips the corners so
+          the border radius is respected, the inner SCROLLS. Without the scroller,
+          a table wider than its container is silently CLIPPED — inside a
+          half-width dashboard card that hid the money column outright, which is
+          far worse than a scrollbar. The scroll is contained here, so the page
+          itself still never moves sideways. */}
       <div className="hidden overflow-hidden rounded-md border bg-surface shadow-card tablet:block">
-        <table className="w-full border-collapse text-body">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[34rem] border-collapse text-body">
           <caption className="sr-only">{caption}</caption>
           <thead>
             <tr className="border-b bg-surface-2/50">
@@ -98,7 +105,8 @@ export function DataTable<T>({
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
 
       {/* Mobile: the same data as stacked cards. */}

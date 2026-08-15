@@ -28,10 +28,14 @@ export function FilterBar({
   basePath,
   search,
   selects = [],
+  clearLabel,
 }: {
   basePath: string;
   search?: { name: string; value: string; placeholder: string };
   selects?: FilterSelect[];
+  /** Shown only while at least one filter is set — a permanently visible
+   *  "clear" on an unfiltered toolbar is a control that does nothing. */
+  clearLabel?: string;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -94,6 +98,19 @@ export function FilterBar({
       {search ? (
         <Button type="submit" variant="outline">
           {t("common.search")}
+        </Button>
+      ) : null}
+
+      {clearLabel && (q || selects.some((s) => s.value)) ? (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            setQ("");
+            router.push(basePath);
+          }}
+        >
+          {clearLabel}
         </Button>
       ) : null}
     </form>

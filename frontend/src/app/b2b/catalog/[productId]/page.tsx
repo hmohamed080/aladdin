@@ -6,7 +6,8 @@ import { getCatalogProduct } from "@/server/queries/commerce";
 import { BackLink } from "@/features/sales/page-parts";
 import { Card, Field, Badge } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/controls";
-import { PackageIcon } from "@/components/ui/icons";
+import { BadgeCheckIcon } from "@/components/ui/icons";
+import { ProductMedia } from "@/features/commerce/product-media";
 
 export const dynamic = "force-dynamic";
 
@@ -36,11 +37,11 @@ export default async function CatalogProductPage({
       <BackLink href="/b2b/catalog">{m.commerce.catalog.backToCatalog}</BackLink>
 
       <Card>
-        <div className="flex items-start gap-md">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-surface-2 text-fg-secondary">
-            <PackageIcon size={24} />
-          </span>
-          <div className="min-w-0 flex-1">
+        {/* The material itself, at the size a buyer can actually judge it — the
+            card grid's thumbnail is for scanning, this is for deciding. */}
+        <div className="grid gap-md tablet:grid-cols-[minmax(0,15rem)_1fr] tablet:items-start">
+          <ProductMedia src={product.image_ref} alt={product.name ?? ""} />
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
               <h1 className="text-headline text-fg">{product.name}</h1>
               <Badge tone="neutral">{m.commerce.categories[product.category]}</Badge>
@@ -59,7 +60,11 @@ export default async function CatalogProductPage({
           <Field label={m.commerce.catalog.supplier}>
             <span className="inline-flex items-center gap-1">
               {product.supplier_name}
-              {product.supplier_verified ? <span className="text-success">✓</span> : null}
+              {product.supplier_verified ? (
+                <span className="text-success" title={m.commerce.catalog.verifiedSupplier}>
+                  <BadgeCheckIcon size={13} />
+                </span>
+              ) : null}
             </span>
           </Field>
         </dl>

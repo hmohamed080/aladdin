@@ -96,6 +96,26 @@
   --info: var(--lapis);
 
   --focus: var(--lumen-ink);
+
+  /* ---- Data-visualisation series (LIGHT) ----
+   * A categorical palette is the one thing a single-accent system cannot express:
+   * a spend-by-category donut needs as many distinguishable fills as it has
+   * categories, and re-using the accent for all of them says nothing. These are
+   * NOT new colours — every value is an existing brand primitive, ordered so that
+   * adjacent series stay distinguishable by LIGHTNESS as well as hue (the pairing
+   * still reads when printed greyscale or seen with a colour-vision deficiency).
+   * Series colours carry no semantic meaning; success/warning/danger keep theirs.
+   * Charts must always label their series — colour is a second channel, never the
+   * only one. Consumed via Tailwind as `series-1 … series-6`.
+   */
+  --series-1: var(--lumen-deep);
+  --series-2: var(--lapis);
+  --series-3: var(--verdigris-deep);
+  --series-4: var(--bronze-deep);
+  --series-5: var(--oxide);
+  --series-6: var(--stone);
+  /* Grid lines and axis rules — one step softer than a border. */
+  --chart-grid: var(--line-light);
 }
 
 .dark {
@@ -126,4 +146,18 @@
   --info: var(--lapis-bright);
 
   --focus: var(--lumen);
+
+  /* ---- Data-visualisation series (DARK) ----
+   * Same six hues in the same order, swapped to the brighter primitive of each
+   * pair so the fills keep their separation against Basalt instead of sinking
+   * into it. Series N is the same hue in both themes: a chart does not change
+   * meaning when the user flips the theme.
+   */
+  --series-1: var(--lumen);
+  --series-2: var(--lapis-bright);
+  --series-3: var(--verdigris-bright);
+  --series-4: var(--bronze);
+  --series-5: var(--oxide-bright);
+  --series-6: var(--on-dark-muted);
+  --chart-grid: var(--graphite);
 }

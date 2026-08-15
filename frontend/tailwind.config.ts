@@ -41,6 +41,20 @@ export default {
         info: "var(--info)",
         focus: "var(--focus)",
 
+        // ---- Categorical data-visualisation series (theme-aware) ----
+        // Six distinguishable fills for charts that plot more than one thing.
+        // Non-semantic by design: series-1 is not "good" and series-5 is not
+        // "bad" — semantic meaning stays with success/warning/danger.
+        series: {
+          1: "var(--series-1)",
+          2: "var(--series-2)",
+          3: "var(--series-3)",
+          4: "var(--series-4)",
+          5: "var(--series-5)",
+          6: "var(--series-6)",
+        },
+        "chart-grid": "var(--chart-grid)",
+
         // ---- Fixed primitives (brand artwork, mark, seals) ----
         brand: {
           basalt: "var(--basalt)",

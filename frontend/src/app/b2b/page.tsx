@@ -8,19 +8,22 @@ import {
   recentActivities,
   customerNamesFor,
 } from "@/server/queries/sales";
+import { recentRfqs, recentQuotations, type RfqStatus } from "@/server/queries/commerce";
 import {
-  recentRfqs,
-  recentQuotations,
-  countQuotations,
-  countSavedProducts,
-  type RfqStatus,
-} from "@/server/queries/commerce";
-import { countOrders, type OrderStatus } from "@/server/queries/execution";
+  purchaseSummary,
+  savedByCategory,
+  projectSummary,
+  type PurchaseSummary,
+  type ProjectSummary,
+} from "@/server/queries/reports";
 import { Card, StatePanel, SectionTitle } from "@/components/ui/primitives";
 import { StatTiles, type Tile } from "@/components/ui/stat-tiles";
+import { TrendLine, DonutSplit, RankedBars } from "@/components/ui/charts";
 import { QuickActions } from "@/features/home/quick-actions";
 import { RfqTable, QuotationTable } from "@/features/commerce/commerce-lists";
 import { HomeFollowUpList, HomeLeadList, HomeActivityList, EmptyLine } from "@/features/sales/home-widgets";
+import { formatMoney, PRODUCT_CATEGORIES } from "@/features/commerce/constants";
+import { formatMonth, formatCompactMoney, formatPercent } from "@/lib/ui/format";
 import {
   AlertIcon,
   ClockIcon,
@@ -30,6 +33,10 @@ import {
   InboxIcon,
   ClipboardIcon,
   BookmarkIcon,
+  WalletIcon,
+  LayersIcon,
+  TrendingUpIcon,
+  TruckIcon,
 } from "@/components/ui/icons";
 
 // Auth + organization context come from cookies, so this route is dynamic by
@@ -38,10 +45,26 @@ import {
 // never be served from a shared cache.
 export const dynamic = "force-dynamic";
 
-/** "Waiting on a supplier" — a request that is out and not yet closed. */
+/** "Waiting on a distributor" — a request that is out and not yet closed. */
 const OPEN_RFQ_STATUSES: readonly RfqStatus[] = ["submitted", "quoted"];
-/** An order that is committed but not finished. */
-const ACTIVE_ORDER_STATUSES: readonly OrderStatus[] = ["confirmed", "in_progress"];
+const TREND_MONTHS = 6;
+
+function sum(rec: Record<string, number>) {
+  return Object.values(rec).reduce((a, b) => a + b, 0);
+}
+
+/** What a caller with no purchasing rights sees — no query is issued for them. */
+const NO_PURCHASE: PurchaseSummary = {
+  requests: {},
+  offers: {},
+  orders: {},
+  orderValue: 0,
+  acceptedOfferValue: 0,
+  topDistributors: [],
+  trend: [],
+};
+const NO_PROJECTS: ProjectSummary = { executing: {}, incoming: {}, executingValue: 0 };
+const NO_CATEGORIES: Record<string, number> = {};
 
 /**
  * The workspace dashboard.
@@ -51,6 +74,20 @@ const ACTIVE_ORDER_STATUSES: readonly OrderStatus[] = ["confirmed", "in_progress
  * than from an account type: a member who buys sees the purchasing panels, a member
  * who sells sees the pipeline panels, and someone who does both sees both — in that
  * order. Nothing renders a section the caller has no records or rights for.
+ *
+ * WHAT A DASHBOARD IS FOR, AND WHAT IT IS NOT
+ * Three questions, in the order a buyer asks them: what needs me today (the
+ * tiles), how is the business trending (three charts), and what exactly is
+ * waiting (two record panels). Anything that answers a fourth question belongs in
+ * Reports, which is one click away — a dashboard that shows everything ranks
+ * nothing, and a strip of eleven panels is a filing cabinet, not a decision aid.
+ *
+ * COST
+ * The purchasing block now reads aggregate ROWS (status/total/date columns) where
+ * it previously read head-only COUNTS, because a trend line and a supplier
+ * ranking cannot be derived from a count. That is two extra round trips against
+ * three genuinely new decision-support widgets, and each read still selects only
+ * the three or four columns its aggregate needs — never the record sets.
  */
 export default async function B2BHomePage() {
   const ctx = await getPageContext();
@@ -66,35 +103,38 @@ export default async function B2BHomePage() {
   const buys = has("rfq.create", "order.create", "catalog.read", "quote.decide");
   const sells = has("sales.read", "sales.write", "sales.manage");
 
-  // A dashboard needs COUNTS for its tiles and a SHORT recent slice for its panels —
-  // never the underlying record sets. Each panel query returns its five rows AND the
-  // exact total in one trip; the tiles with no panel behind them (orders, shortlist)
-  // are head-only counts that put no rows on the wire at all. The page's cost is
-  // therefore flat as the business grows, where before every visit transferred up to
-  // a hundred requests, offers, orders and shortlist items to read `.length` off them.
   const EMPTY = { rows: [], total: 0 };
-  const [requests, offers, newOfferCount, activeOrderCount, savedCount, overdue, dueToday, open, activities] =
+
+  const [purchase, saved, projects, requests, offers, overdue, dueToday, open, activities] =
     await Promise.all([
+      // One call covers the purchasing tiles AND all three charts: the tallies,
+      // the committed value, the distributor ranking and the monthly trend are
+      // all aggregates of the same three reads.
+      buys ? purchaseSummary(supabase, org.organizationId, {}, TREND_MONTHS) : Promise.resolve(NO_PURCHASE),
+      // Doubles as the shortlist COUNT for its tile — one read, two answers.
+      buys ? savedByCategory(supabase, org.organizationId) : Promise.resolve(NO_CATEGORIES),
+      buys ? projectSummary(supabase, org.organizationId) : Promise.resolve(NO_PROJECTS),
       buys
         ? recentRfqs(supabase, org.organizationId, "requester", { statuses: OPEN_RFQ_STATUSES })
         : EMPTY,
       buys ? recentQuotations(supabase, org.organizationId, "requester") : EMPTY,
-      buys ? countQuotations(supabase, org.organizationId, "requester", ["submitted"]) : 0,
-      buys ? countOrders(supabase, org.organizationId, "requester", ACTIVE_ORDER_STATUSES) : 0,
-      buys ? countSavedProducts(supabase, org.organizationId) : 0,
       sells ? overdueFollowUps(supabase, org.organizationId, branchId) : Promise.resolve([]),
       sells ? followUpsDueToday(supabase, org.organizationId, branchId) : Promise.resolve([]),
       sells ? myOpenLeads(supabase, org.organizationId, branchId) : Promise.resolve([]),
       sells ? recentActivities(supabase, org.organizationId, branchId) : Promise.resolve([]),
     ]);
 
-  const openRequestCount = requests.total;
-
   // Customer names are only needed to LABEL the open leads above, so they are looked
   // up for exactly those leads rather than pulling the whole customer book.
   const custMap = Object.fromEntries(
     await customerNamesFor(supabase, open.map((l) => l.customer_id)),
   );
+
+  const newOfferCount = purchase.offers.submitted ?? 0;
+  const openRequestCount = (purchase.requests.submitted ?? 0) + (purchase.requests.quoted ?? 0);
+  const activeOrderCount = (purchase.orders.confirmed ?? 0) + (purchase.orders.in_progress ?? 0);
+  const savedCount = sum(saved);
+  const runningProjects = (projects.executing.active ?? 0) + (projects.incoming.active ?? 0);
 
   // Tiles lead with whatever is waiting on the caller — an overdue follow-up or an
   // undecided offer outranks a total, because a total needs no action.
@@ -137,6 +177,21 @@ export default async function B2BHomePage() {
       href: "/b2b/orders",
     });
     tiles.push({
+      label: m.home.tileSpend,
+      // Compact on a tile so it fits the two-column mobile grid; the exact
+      // figure is one click away on Reports, which this tile links to.
+      value: formatCompactMoney(purchase.orderValue, locale),
+      Icon: WalletIcon,
+      hint: m.home.tileSpendHint,
+      href: "/b2b/reports",
+    });
+    tiles.push({
+      label: m.home.tileProjects,
+      value: runningProjects,
+      Icon: LayersIcon,
+      href: "/b2b/projects",
+    });
+    tiles.push({
       label: m.home.tile.saved,
       value: savedCount,
       Icon: BookmarkIcon,
@@ -173,75 +228,135 @@ export default async function B2BHomePage() {
       <QuickActions m={m} capabilities={org.capabilities} />
 
       {buys ? (
-        <div className="grid gap-lg desktop:grid-cols-2 [&>*]:min-w-0">
+        <>
+          <SectionTitle icon={<WalletIcon size={18} />} action={seeAll("/b2b/reports", m.home.openReports)}>
+            {m.home.section.purchasing}
+          </SectionTitle>
+
           <Card>
-            <SectionTitle
-              icon={<InboxIcon size={18} />}
-              action={seeAll("/b2b/quotations", m.commerce.quotation.title)}
-            >
-              {m.home.latestOffers}
-            </SectionTitle>
+            <SectionTitle icon={<TrendingUpIcon size={18} />}>{m.home.spendTrend}</SectionTitle>
             <div className="mt-md">
-              <QuotationTable quotations={offers.rows} perspective="requester" locale={locale} m={m} />
+              <TrendLine
+                points={purchase.trend.map((b) => ({ label: formatMonth(b.month, locale), value: b.value }))}
+                emptyLabel={m.reports.noSpend}
+                ariaLabel={m.home.spendTrend}
+                formatValue={(v) => formatCompactMoney(v, locale)}
+              />
             </div>
           </Card>
 
-          <Card>
-            <SectionTitle
-              icon={<ShoppingBagIcon size={18} />}
-              action={seeAll("/b2b/rfqs", m.commerce.rfq.title)}
-            >
-              {m.home.activeRequests}
-            </SectionTitle>
-            <div className="mt-md">
-              <RfqTable rfqs={requests.rows} perspective="requester" locale={locale} m={m} />
-            </div>
-          </Card>
-        </div>
+          <div className="grid gap-lg desktop:grid-cols-2 [&>*]:min-w-0">
+            <Card>
+              <SectionTitle icon={<TruckIcon size={18} />}>{m.home.topDistributors}</SectionTitle>
+              <div className="mt-md">
+                <RankedBars
+                  colored
+                  emptyLabel={m.reports.noSuppliers}
+                  items={purchase.topDistributors.slice(0, 5).map((s) => ({
+                    label: s.name,
+                    value: s.value || s.orders,
+                    detail: formatMoney(s.value, locale),
+                  }))}
+                />
+              </div>
+            </Card>
+
+            <Card>
+              <SectionTitle
+                icon={<BookmarkIcon size={18} />}
+                action={seeAll("/b2b/saved", m.saved.title)}
+              >
+                {m.reports.shortlistByCategory}
+              </SectionTitle>
+              <div className="mt-md">
+                <DonutSplit
+                  slices={PRODUCT_CATEGORIES.map((c) => ({
+                    label: m.commerce.categories[c],
+                    value: saved[c] ?? 0,
+                  }))}
+                  emptyLabel={m.reports.noShortlist}
+                  ariaLabel={m.reports.shortlistByCategory}
+                  centerLabel={m.saved.title}
+                  formatValue={(v) => String(v)}
+                  formatShare={(p) => formatPercent(p, locale)}
+                />
+              </div>
+            </Card>
+          </div>
+
+          <div className="grid gap-lg desktop:grid-cols-2 [&>*]:min-w-0">
+            <Card>
+              <SectionTitle
+                icon={<InboxIcon size={18} />}
+                action={seeAll("/b2b/quotations", m.commerce.quotation.title)}
+              >
+                {m.home.latestOffers}
+              </SectionTitle>
+              <div className="mt-md">
+                <QuotationTable quotations={offers.rows} perspective="requester" locale={locale} m={m} />
+              </div>
+            </Card>
+
+            <Card>
+              <SectionTitle
+                icon={<ShoppingBagIcon size={18} />}
+                action={seeAll("/b2b/rfqs", m.commerce.rfq.title)}
+              >
+                {m.home.activeRequests}
+              </SectionTitle>
+              <div className="mt-md">
+                <RfqTable rfqs={requests.rows} perspective="requester" locale={locale} m={m} />
+              </div>
+            </Card>
+          </div>
+        </>
       ) : null}
 
       {sells ? (
-        <div className="grid gap-lg desktop:grid-cols-2 [&>*]:min-w-0">
-          <Card>
-            <SectionTitle
-              icon={<AlertIcon size={18} />}
-              action={seeAll("/b2b/follow-ups", m.followUps.title)}
-            >
-              {m.home.overdue}
-            </SectionTitle>
-            <div className="mt-md">
-              {overdue.length === 0 ? (
-                <EmptyLine>{m.home.nothingDue}</EmptyLine>
-              ) : (
-                <HomeFollowUpList items={overdue} tone="danger" />
-              )}
-            </div>
-          </Card>
+        <>
+          <SectionTitle icon={<TargetIcon size={18} />}>{m.home.section.pipeline}</SectionTitle>
+          <div className="grid gap-lg desktop:grid-cols-2 [&>*]:min-w-0">
+            <Card>
+              <SectionTitle
+                icon={<AlertIcon size={18} />}
+                action={seeAll("/b2b/follow-ups", m.followUps.title)}
+              >
+                {m.home.overdue}
+              </SectionTitle>
+              <div className="mt-md">
+                {overdue.length === 0 ? (
+                  <EmptyLine>{m.home.nothingDue}</EmptyLine>
+                ) : (
+                  <HomeFollowUpList items={overdue} tone="danger" />
+                )}
+              </div>
+            </Card>
 
-          <Card>
-            <SectionTitle icon={<TargetIcon size={18} />} action={seeAll("/b2b/leads", m.leads.title)}>
-              {m.home.myOpenLeads}
-            </SectionTitle>
-            <div className="mt-md">
-              {open.length === 0 ? (
-                <EmptyLine>{m.home.noOpenLeads}</EmptyLine>
-              ) : (
-                <HomeLeadList items={open} customerNames={custMap} />
-              )}
-            </div>
-          </Card>
+            <Card>
+              <SectionTitle icon={<TargetIcon size={18} />} action={seeAll("/b2b/leads", m.leads.title)}>
+                {m.home.myOpenLeads}
+              </SectionTitle>
+              <div className="mt-md">
+                {open.length === 0 ? (
+                  <EmptyLine>{m.home.noOpenLeads}</EmptyLine>
+                ) : (
+                  <HomeLeadList items={open} customerNames={custMap} />
+                )}
+              </div>
+            </Card>
 
-          <Card className="desktop:col-span-2">
-            <SectionTitle icon={<ActivityIcon size={18} />}>{m.home.recentActivity}</SectionTitle>
-            <div className="mt-md">
-              {activities.length === 0 ? (
-                <StatePanel icon={<ActivityIcon size={20} />} title={m.home.noActivity} body={m.home.startHint} />
-              ) : (
-                <HomeActivityList items={activities} />
-              )}
-            </div>
-          </Card>
-        </div>
+            <Card className="desktop:col-span-2">
+              <SectionTitle icon={<ActivityIcon size={18} />}>{m.home.recentActivity}</SectionTitle>
+              <div className="mt-md">
+                {activities.length === 0 ? (
+                  <StatePanel icon={<ActivityIcon size={20} />} title={m.home.noActivity} body={m.home.startHint} />
+                ) : (
+                  <HomeActivityList items={activities} />
+                )}
+              </div>
+            </Card>
+          </div>
+        </>
       ) : null}
     </div>
   );
