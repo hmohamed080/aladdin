@@ -2,6 +2,7 @@ import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import {
   listProfessionals,
+  professionalCount,
   TECHNICIAN_PERSONAS,
   CONSULTANT_PERSONAS,
   type PersonaType,
@@ -42,10 +43,13 @@ export default async function TechniciansPage({
   const group = sp.group === "consultants" ? "consultants" : "";
   const personas = personasFor(group);
 
+  // The tabs and tiles need two NUMBERS, not two more directories. Listing each
+  // group in full to read `.length` also meant that on the default tab one of those
+  // lists was the same query the table below already ran.
   const [rows, trades, consultants] = await Promise.all([
     listProfessionals(supabase, { personas, search: sp.q, persona: sp.persona }),
-    listProfessionals(supabase, { personas: TECHNICIAN_PERSONAS }),
-    listProfessionals(supabase, { personas: CONSULTANT_PERSONAS }),
+    professionalCount(supabase, TECHNICIAN_PERSONAS),
+    professionalCount(supabase, CONSULTANT_PERSONAS),
   ]);
 
   return (
@@ -54,8 +58,8 @@ export default async function TechniciansPage({
 
       <StatTiles
         tiles={[
-          { label: m.technicians.stat.trades, value: trades.length, Icon: WrenchIcon, tone: "accent" },
-          { label: m.technicians.stat.consultants, value: consultants.length, Icon: UsersIcon, tone: "info" },
+          { label: m.technicians.stat.trades, value: trades, Icon: WrenchIcon, tone: "accent" },
+          { label: m.technicians.stat.consultants, value: consultants, Icon: UsersIcon, tone: "info" },
         ]}
         className="tablet:grid-cols-2 desktop:grid-cols-2"
       />
@@ -67,8 +71,8 @@ export default async function TechniciansPage({
           current={group}
           label={m.technicians.title}
           tabs={[
-            { value: "", label: m.technicians.tab.trades, count: trades.length },
-            { value: "consultants", label: m.technicians.tab.consultants, count: consultants.length },
+            { value: "", label: m.technicians.tab.trades, count: trades },
+            { value: "consultants", label: m.technicians.tab.consultants, count: consultants },
           ]}
         />
         <FilterBar

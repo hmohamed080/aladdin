@@ -101,7 +101,15 @@ export async function listProfessionals(
   return data ?? [];
 }
 
-/** Counts per organization type across a module's allow-list, for its KPI strip. */
+/**
+ * Counts per organization type across a module's allow-list, for its KPI strip.
+ *
+ * ONE read of two narrow columns, tallied here. The obvious-looking alternative —
+ * a `head: true` count per tile — was measured and rejected: it turns one request
+ * into six, and on this stack a round trip costs far more than the two small columns
+ * it saves. The scale answer is a `group by` aggregate in the database; that is a
+ * migration, and this page does not need it at directory sizes.
+ */
 export async function organizationTypeCounts(
   supabase: DB,
   types: OrgType[],
@@ -122,4 +130,19 @@ export async function organizationTypeCounts(
     if (r.is_verified) verified += 1;
   }
   return { total: rows.length, verified, byType };
+}
+
+/**
+ * How many listed professionals fall in a persona group. Used for the Technicians
+ * tab/KPI counts, which previously re-ran the full directory LIST query — once for
+ * the visible table and again for each group's count, including a run that was
+ * byte-for-byte the query the table had already made.
+ */
+export async function professionalCount(supabase: DB, personas: PersonaType[]): Promise<number> {
+  const { count, error } = await supabase
+    .from("profile_public_directory")
+    .select("*", { count: "exact", head: true })
+    .in("persona", personas);
+  if (error) throw error;
+  return count ?? 0;
 }

@@ -1,11 +1,6 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
-import {
-  purchaseSummary,
-  sellSummary,
-  savedByCategory,
-  topSuppliers,
-} from "@/server/queries/reports";
+import { purchaseSummary, sellSummary, savedByCategory } from "@/server/queries/reports";
 import { PageHeader } from "@/features/sales/page-parts";
 import { Card, SectionTitle } from "@/components/ui/primitives";
 import { StatTiles } from "@/components/ui/stat-tiles";
@@ -46,12 +41,12 @@ export default async function ReportsPage() {
   const { supabase, org, locale } = ctx;
   const m = getMessages(locale);
 
-  const [purchase, sell, saved, suppliers] = await Promise.all([
+  const [purchase, sell, saved] = await Promise.all([
     purchaseSummary(supabase, org.organizationId),
     sellSummary(supabase, org.organizationId),
     savedByCategory(supabase, org.organizationId),
-    topSuppliers(supabase, org.organizationId),
   ]);
+  const suppliers = purchase.topSuppliers;
 
   const sells = sum(sell.quotesSent) > 0 || sell.ordersReceived > 0;
 

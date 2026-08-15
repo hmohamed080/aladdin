@@ -18,6 +18,8 @@ export type OrderListRow = Database["public"]["Views"]["order_list"]["Row"];
 export type OrderItemRow = Database["public"]["Tables"]["order_items"]["Row"];
 export type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
 export type ProjectListRow = Database["public"]["Views"]["project_list"]["Row"];
+/** The status values the order view actually carries — a filter cannot invent one. */
+export type OrderStatus = NonNullable<OrderListRow["status"]>;
 
 const LIST_LIMIT = 100;
 
@@ -39,6 +41,25 @@ export async function listOrders(
     .limit(LIST_LIMIT);
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * How many orders match, WITHOUT transferring them. `head: true` sends no rows —
+ * Postgres counts and returns the number in a header. A dashboard tile that shows
+ * "active orders" needs the number, not the orders.
+ */
+export async function countOrders(
+  supabase: DB,
+  orgId: string,
+  side: OrderSide,
+  statuses?: readonly OrderStatus[],
+): Promise<number> {
+  const col = side === "requester" ? "requester_org_id" : "supplier_org_id";
+  let q = supabase.from("order_list").select("*", { count: "exact", head: true }).eq(col, orgId);
+  if (statuses) q = q.in("status", statuses);
+  const { count, error } = await q;
+  if (error) throw error;
+  return count ?? 0;
 }
 
 export async function getOrder(supabase: DB, id: string): Promise<OrderRow | null> {

@@ -1337,3 +1337,96 @@ Two findings shaped everything after:
 One migration and three commits; `main` @ `678ba32` untouched. Reverting `20260816090001` drops
 `saved_products` and its RPCs and restores the seven-column profile directory — the two pgTAP
 approved-column guards must be reverted with it.
+
+---
+
+## 2026-08-15 — Sprint 14 acceptance: Showroom workspace loading latency
+
+Manual review reported the Showroom workspace loading "noticeably too slowly". Scoped to the
+Sprint 14 routes only; **PR #23 not merged**.
+
+### Measured first, so the fix aimed at the real cost
+
+Local Supabase, seeded demo data, identical harness for every number (time to last byte, medians of
+5–7 samples per route).
+
+| Mode | Cold (first hit) | Warm (repeat) | In-app RSC nav |
+| --- | --- | --- | --- |
+| `next dev` | 1.0 s – 27 s, wildly variable | 458–715 ms | 282–486 ms |
+| `next build && next start` | 150–340 ms | 160–221 ms | 156–221 ms |
+
+The dev cold figures are **on-demand webpack compilation, not a product regression** — the same
+route drops from 27 s to sub-second on its second hit, and production never pays it. Production warm
+render was already ~185 ms.
+
+**The real finding came from a decomposition, not from the route table.** A B2B page with ONE data
+query cost 178 ms; the dashboard with NINE cost 195 ms; the framework floor is 15 ms. So ~160 ms of
+every Showroom page was fixed identity/workspace-context cost and the page's own data was nearly
+free. Counting Supabase round trips per render (Kong access log) showed why: `2x /auth/v1/user`,
+`2x rpc/my_workspaces` — **the layout and the page each resolved the workspace context
+independently**, in a five-deep sequential chain, on every navigation.
+
+### Root causes and what changed
+
+1. **Context resolved twice per navigation, five hops deep** — the dominant cost on EVERY route.
+   `getServerSupabase`, `loadWorkspaces`, `loadWorkspaceContext` and `getPageContext` are now
+   `cache()`d per render, so layout and page share one resolution; `getUser()` and `my_workspaces()`
+   start together instead of chaining, as do the capability and branch reads. Request-scoped
+   deduplication only — no cross-request or cross-user caching, and RLS still governs every read.
+2. **Dashboard fetched record sets to read `.length` off them** — up to 100 RFQs, 100 quotations,
+   100 orders and the whole joined shortlist, for four numbers and two five-row panels. Panels now
+   ask for five rows *and* the exact count in one request; the tiles with no panel behind them are
+   head-only counts. Lead labels read the customers those leads name, not the org's 500-row book.
+3. **Reports read the same order set twice** — `topSuppliers` re-fetched what `purchaseSummary`
+   already had; folded into one read (3 order reads → 2 across the page).
+4. **Technicians ran the directory list three times**, one run byte-identical to the table's own
+   query, purely for two tab counts; now two head counts.
+
+### One optimization was measured and REVERTED
+
+Replacing the directories' single two-column count query with per-tile `head` counts turned one
+request into six and made `/b2b/suppliers` **slower** (167 ms → 209 ms). Round trips cost more here
+than the columns they save. Reverted to the single narrow read, with the reasoning recorded in the
+function; the scale answer is a `group by` aggregate in the database, which is a migration this page
+does not need yet.
+
+### `force-dynamic` kept
+
+Every B2B route reads cookies for auth and org context, so Next.js requires dynamic rendering
+regardless. The declarations were left in place (and the dashboard's now says why): they cost
+nothing and they state that these panels must never be served from a shared cache.
+
+### UX
+
+Only `b2b/loading.tsx` existed, so every route flashed a dashboard-shaped skeleton before becoming a
+table. Added `page-skeletons.tsx` (list / grid / panel archetypes, built from the existing
+`Skeleton` primitive — no new design language) and a `loading.tsx` per Showroom route. Verified in
+the browser: every route's prefetch payload carries its own `aria-busy` skeleton.
+
+### Result
+
+| Route | prod warm before | prod warm after |
+| --- | --- | --- |
+| median of all 11 | 185 ms | **168 ms** |
+| `/b2b/reports` | 193 ms | 187 ms (14 → 12 round trips) |
+| `/b2b/settings` | 178 ms | 168 ms |
+| `/b2b/projects` | 185 ms (p95 460) | 161 ms (p95 173) |
+| `/b2b` | 197 ms (p95 426) | 221 ms (p95 279) |
+
+`/b2b`'s median is unchanged-to-slightly-worse **at seed scale** — with one record per table there
+is no payload to save, so the count queries only add statements. The change is deliberate anyway:
+it makes the dashboard's cost flat as a real showroom's records grow, where the old shape grew with
+them. Real-browser production navigation measured 142–194 ms per route.
+
+### Validation
+- frontend typecheck ✅ · lint ✅ (0/0) · unit **208/208** ✅
+- Playwright `showroom-mvp`: **7 passed / 1 skipped** desktop **and** **7 passed / 1 skipped**
+  Pixel 5 (each project skips the other's viewport-specific test) — 0 failures
+- Dashboard counts verified against the database with temporary fixtures (7 RFQs across four
+  statuses, 3 shortlisted): tiles read 5 open / 3 saved, panel showed the 5 open rows and excluded
+  draft and closed. Fixtures removed afterwards.
+- Full-repo performance gate deliberately NOT run (out of scope for this acceptance).
+
+### Rollback
+One commit on `feature/showroom-mvp-completeness`, frontend-only, no migration. Reverting it
+restores the duplicate context resolution and the list-for-count dashboard reads.

@@ -331,6 +331,26 @@ export async function customerNameMap(
   return new Map((data ?? []).map((c) => [c.id, c.display_name]));
 }
 
+/**
+ * Names for a KNOWN set of customer ids. Use this when the caller already holds the
+ * rows it needs to label (a dashboard panel, a short list): it reads only those
+ * customers instead of the organization's whole book, and returns an empty map
+ * without a round trip when there is nothing to label. RLS still scopes the read.
+ */
+export async function customerNamesFor(
+  supabase: DB,
+  customerIds: (string | null)[],
+): Promise<Map<string, string>> {
+  const ids = [...new Set(customerIds.filter((id): id is string => Boolean(id)))];
+  if (ids.length === 0) return new Map();
+  const { data, error } = await supabase
+    .from("customers")
+    .select("id, display_name")
+    .in("id", ids);
+  if (error) throw error;
+  return new Map((data ?? []).map((c) => [c.id, c.display_name]));
+}
+
 /** Small helper: map branch ids to names. */
 export async function branchNameMap(
   supabase: DB,

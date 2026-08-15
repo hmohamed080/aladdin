@@ -22,6 +22,9 @@ export type PurchaseSummary = {
   orders: Record<string, number>;
   orderValue: number;
   acceptedOfferValue: number;
+  /** Who this organization actually buys from, by value. Derived from the same
+   *  order read as the totals above rather than a second pass over it. */
+  topSuppliers: { name: string; orders: number; value: number }[];
 };
 
 export type SellSummary = {
@@ -36,12 +39,19 @@ function tally(rows: { status: string | null }[]): Record<string, number> {
   return out;
 }
 
-/** What this organization spends and where it is in the buying chain. */
+/**
+ * What this organization spends and where it is in the buying chain.
+ *
+ * Every figure on the buying side of the report comes from these three reads. The
+ * supplier ranking is folded in here deliberately: it is an aggregate of the SAME
+ * orders as the totals, and asking the database for that set twice in one page
+ * render is pure waste. Each read selects only the columns the aggregates need.
+ */
 export async function purchaseSummary(supabase: DB, orgId: string): Promise<PurchaseSummary> {
   const [rfqs, quotes, orders] = await Promise.all([
     supabase.from("rfq_list").select("status").eq("requester_org_id", orgId),
     supabase.from("quotation_list").select("status, total").eq("requester_org_id", orgId),
-    supabase.from("order_list").select("status, total").eq("requester_org_id", orgId),
+    supabase.from("order_list").select("status, total, supplier_name").eq("requester_org_id", orgId),
   ]);
   if (rfqs.error) throw rfqs.error;
   if (quotes.error) throw quotes.error;
@@ -49,6 +59,15 @@ export async function purchaseSummary(supabase: DB, orgId: string): Promise<Purc
 
   const orderRows = orders.data ?? [];
   const quoteRows = quotes.data ?? [];
+
+  const byName = new Map<string, { orders: number; value: number }>();
+  for (const r of orderRows) {
+    const name = r.supplier_name ?? "—";
+    const cur = byName.get(name) ?? { orders: 0, value: 0 };
+    cur.orders += 1;
+    cur.value += Number(r.total ?? 0);
+    byName.set(name, cur);
+  }
 
   return {
     requests: tally(rfqs.data ?? []),
@@ -58,6 +77,10 @@ export async function purchaseSummary(supabase: DB, orgId: string): Promise<Purc
     acceptedOfferValue: quoteRows
       .filter((q) => q.status === "accepted")
       .reduce((s, q) => s + Number(q.total ?? 0), 0),
+    topSuppliers: [...byName.entries()]
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5),
   };
 }
 
@@ -90,27 +113,3 @@ export async function savedByCategory(supabase: DB, orgId: string): Promise<Reco
   return out;
 }
 
-/** Which suppliers this organization actually transacts with, by order count. */
-export async function topSuppliers(
-  supabase: DB,
-  orgId: string,
-): Promise<{ name: string; orders: number; value: number }[]> {
-  const { data, error } = await supabase
-    .from("order_list")
-    .select("supplier_name, total")
-    .eq("requester_org_id", orgId);
-  if (error) throw error;
-
-  const byName = new Map<string, { orders: number; value: number }>();
-  for (const r of data ?? []) {
-    const name = r.supplier_name ?? "—";
-    const cur = byName.get(name) ?? { orders: 0, value: 0 };
-    cur.orders += 1;
-    cur.value += Number(r.total ?? 0);
-    byName.set(name, cur);
-  }
-  return [...byName.entries()]
-    .map(([name, v]) => ({ name, ...v }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 5);
-}

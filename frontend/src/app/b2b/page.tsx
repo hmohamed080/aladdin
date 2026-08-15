@@ -6,10 +6,16 @@ import {
   overdueFollowUps,
   followUpsDueToday,
   recentActivities,
-  customerNameMap,
+  customerNamesFor,
 } from "@/server/queries/sales";
-import { listRfqs, listQuotations, listSavedProducts } from "@/server/queries/commerce";
-import { listOrders } from "@/server/queries/execution";
+import {
+  recentRfqs,
+  recentQuotations,
+  countQuotations,
+  countSavedProducts,
+  type RfqStatus,
+} from "@/server/queries/commerce";
+import { countOrders, type OrderStatus } from "@/server/queries/execution";
 import { Card, StatePanel, SectionTitle } from "@/components/ui/primitives";
 import { StatTiles, type Tile } from "@/components/ui/stat-tiles";
 import { QuickActions } from "@/features/home/quick-actions";
@@ -26,7 +32,16 @@ import {
   BookmarkIcon,
 } from "@/components/ui/icons";
 
+// Auth + organization context come from cookies, so this route is dynamic by
+// construction. The declaration stays because it states the intent explicitly:
+// these panels must reflect the caller's live records on every visit, and must
+// never be served from a shared cache.
 export const dynamic = "force-dynamic";
+
+/** "Waiting on a supplier" — a request that is out and not yet closed. */
+const OPEN_RFQ_STATUSES: readonly RfqStatus[] = ["submitted", "quoted"];
+/** An order that is committed but not finished. */
+const ACTIVE_ORDER_STATUSES: readonly OrderStatus[] = ["confirmed", "in_progress"];
 
 /**
  * The workspace dashboard.
@@ -51,24 +66,35 @@ export default async function B2BHomePage() {
   const buys = has("rfq.create", "order.create", "catalog.read", "quote.decide");
   const sells = has("sales.read", "sales.write", "sales.manage");
 
-  const [requests, offers, orders, saved, overdue, dueToday, open, activities, custNames] =
+  // A dashboard needs COUNTS for its tiles and a SHORT recent slice for its panels —
+  // never the underlying record sets. Each panel query returns its five rows AND the
+  // exact total in one trip; the tiles with no panel behind them (orders, shortlist)
+  // are head-only counts that put no rows on the wire at all. The page's cost is
+  // therefore flat as the business grows, where before every visit transferred up to
+  // a hundred requests, offers, orders and shortlist items to read `.length` off them.
+  const EMPTY = { rows: [], total: 0 };
+  const [requests, offers, newOfferCount, activeOrderCount, savedCount, overdue, dueToday, open, activities] =
     await Promise.all([
-      buys ? listRfqs(supabase, org.organizationId, "requester") : Promise.resolve([]),
-      buys ? listQuotations(supabase, org.organizationId, "requester") : Promise.resolve([]),
-      buys ? listOrders(supabase, org.organizationId, "requester") : Promise.resolve([]),
-      buys ? listSavedProducts(supabase, org.organizationId) : Promise.resolve([]),
+      buys
+        ? recentRfqs(supabase, org.organizationId, "requester", { statuses: OPEN_RFQ_STATUSES })
+        : EMPTY,
+      buys ? recentQuotations(supabase, org.organizationId, "requester") : EMPTY,
+      buys ? countQuotations(supabase, org.organizationId, "requester", ["submitted"]) : 0,
+      buys ? countOrders(supabase, org.organizationId, "requester", ACTIVE_ORDER_STATUSES) : 0,
+      buys ? countSavedProducts(supabase, org.organizationId) : 0,
       sells ? overdueFollowUps(supabase, org.organizationId, branchId) : Promise.resolve([]),
       sells ? followUpsDueToday(supabase, org.organizationId, branchId) : Promise.resolve([]),
       sells ? myOpenLeads(supabase, org.organizationId, branchId) : Promise.resolve([]),
       sells ? recentActivities(supabase, org.organizationId, branchId) : Promise.resolve([]),
-      sells ? customerNameMap(supabase, org.organizationId) : Promise.resolve([]),
     ]);
 
-  const custMap = Object.fromEntries(custNames);
+  const openRequestCount = requests.total;
 
-  const openRequests = requests.filter((r) => r.status === "submitted" || r.status === "quoted");
-  const newOffers = offers.filter((q) => q.status === "submitted");
-  const activeOrders = orders.filter((o) => o.status === "confirmed" || o.status === "in_progress");
+  // Customer names are only needed to LABEL the open leads above, so they are looked
+  // up for exactly those leads rather than pulling the whole customer book.
+  const custMap = Object.fromEntries(
+    await customerNamesFor(supabase, open.map((l) => l.customer_id)),
+  );
 
   // Tiles lead with whatever is waiting on the caller — an overdue follow-up or an
   // undecided offer outranks a total, because a total needs no action.
@@ -92,27 +118,27 @@ export default async function B2BHomePage() {
   if (buys) {
     tiles.push({
       label: m.home.tile.newOffers,
-      value: newOffers.length,
+      value: newOfferCount,
       Icon: InboxIcon,
-      tone: newOffers.length > 0 ? "accent" : "neutral",
+      tone: newOfferCount > 0 ? "accent" : "neutral",
       href: "/b2b/quotations",
     });
     tiles.push({
       label: m.home.tile.openRequests,
-      value: openRequests.length,
+      value: openRequestCount,
       Icon: ShoppingBagIcon,
       href: "/b2b/rfqs",
     });
     tiles.push({
       label: m.home.tile.activeOrders,
-      value: activeOrders.length,
+      value: activeOrderCount,
       Icon: ClipboardIcon,
       tone: "info",
       href: "/b2b/orders",
     });
     tiles.push({
       label: m.home.tile.saved,
-      value: saved.length,
+      value: savedCount,
       Icon: BookmarkIcon,
       href: "/b2b/saved",
     });
@@ -156,12 +182,7 @@ export default async function B2BHomePage() {
               {m.home.latestOffers}
             </SectionTitle>
             <div className="mt-md">
-              <QuotationTable
-                quotations={offers.slice(0, 5)}
-                perspective="requester"
-                locale={locale}
-                m={m}
-              />
+              <QuotationTable quotations={offers.rows} perspective="requester" locale={locale} m={m} />
             </div>
           </Card>
 
@@ -173,7 +194,7 @@ export default async function B2BHomePage() {
               {m.home.activeRequests}
             </SectionTitle>
             <div className="mt-md">
-              <RfqTable rfqs={openRequests.slice(0, 5)} perspective="requester" locale={locale} m={m} />
+              <RfqTable rfqs={requests.rows} perspective="requester" locale={locale} m={m} />
             </div>
           </Card>
         </div>

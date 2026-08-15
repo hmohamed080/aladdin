@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
@@ -92,23 +93,40 @@ export function resolveActiveBranch(
   return cookieValue && branches.some((b) => b.id === cookieValue) ? cookieValue : null;
 }
 
-export async function loadWorkspaceContext(
+/**
+ * `cache()`d for ONE server render: the B2B layout and the page inside it both
+ * need this context, and resolving it is a multi-hop chain against Supabase. Without
+ * memoization every navigation pays that chain twice. React scopes the cache to a
+ * single request, so nothing is shared between callers and the result can never
+ * outlive the response — this is deduplication, not caching, and it changes no
+ * authorization: RLS still governs every read the caller makes afterwards.
+ */
+export const loadWorkspaceContext = cache(async function loadWorkspaceContext(
   supabase: SupabaseClient<Database>,
 ): Promise<WorkspaceContext> {
-  // The caller. A manager can SEE other members' rows via RLS, so we MUST filter
-  // to the caller's own memberships — otherwise the org list duplicates and the
+  // The caller, and the caller's derived workspaces. Neither read depends on the
+  // other, so both are STARTED together rather than chained — but the identity is
+  // still what gates everything below, so an anonymous caller returns exactly as
+  // before and never has the workspaces result (or its failure) affect that.
+  const userPromise = supabase.auth.getUser();
+  const workspacesPromise = loadWorkspaces(supabase);
+
+  // A manager can SEE other members' rows via RLS, so we MUST filter to the
+  // caller's own memberships — otherwise the org list duplicates and the
   // capability lookup could resolve another member's row.
   const {
     data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { organizations: [], active: null, entries: [] };
+  } = await userPromise;
+  if (!user) {
+    void workspacesPromise.catch(() => {});
+    return { organizations: [], active: null, entries: [] };
+  }
 
   // The switcher's entries and this shell's active org come from the SAME derived
   // source, so what the caller sees and what the page renders can never disagree.
-  const { entries } = await loadWorkspaces(supabase);
+  const [{ entries }, store] = await Promise.all([workspacesPromise, cookies()]);
   const orgs = businessEntries(entries).map((b) => ({ id: b.organizationId, name: b.name }));
 
-  const store = await cookies();
   // B2B surfaces are business by definition: a Personal selection falls through to
   // a valid organization here rather than bouncing a caller off a link they
   // followed. Landing (not this) is what honors a Personal selection.
@@ -133,27 +151,31 @@ export async function loadWorkspaceContext(
     return { organizations: orgs, active: null, entries };
   }
 
-  // Capabilities for this membership.
-  const { data: caps, error: cErr } = await supabase
-    .from("membership_capabilities")
-    .select("capability_key")
-    .eq("membership_id", membership.id);
-  if (cErr) throw cErr;
-  const capabilities = (caps ?? []).map((c) => c.capability_key);
-  const canManageSales =
-    capabilities.includes("org.manage") || capabilities.includes("sales.manage");
-
-  // Branches the caller may act within.
-  let branches: { id: string; name: string }[] = [];
-  if (canManageSales || capabilities.includes("branch.manage")) {
-    const { data: all, error: bErr } = await supabase
+  // Capabilities for this membership, and the org's branch list. The branch list
+  // does not depend on the capabilities — only the DECISION to use it does — so the
+  // two are read together instead of chained, and RLS (not this ordering) is what
+  // decides whether the caller may see those branch rows at all.
+  const [capsResult, orgBranchesResult] = await Promise.all([
+    supabase.from("membership_capabilities").select("capability_key").eq("membership_id", membership.id),
+    supabase
       .from("branches")
       .select("id, name")
       .eq("organization_id", activeOrg.id)
       .is("deleted_at", null)
-      .order("name");
-    if (bErr) throw bErr;
-    branches = all ?? [];
+      .order("name"),
+  ]);
+  if (capsResult.error) throw capsResult.error;
+  const capabilities = (capsResult.data ?? []).map((c) => c.capability_key);
+  const canManageSales =
+    capabilities.includes("org.manage") || capabilities.includes("sales.manage");
+
+  // Branches the caller may act within: org-wide authority sees the whole org,
+  // anyone else sees ONLY their assigned branches — the org-wide list read above is
+  // discarded for them, never widened into their scope.
+  let branches: { id: string; name: string }[] = [];
+  if (canManageSales || capabilities.includes("branch.manage")) {
+    if (orgBranchesResult.error) throw orgBranchesResult.error;
+    branches = orgBranchesResult.data ?? [];
   } else {
     const { data: assigned, error: bErr } = await supabase
       .from("membership_branch_access")
@@ -182,4 +204,4 @@ export async function loadWorkspaceContext(
       activeBranchId,
     },
   };
-}
+});
