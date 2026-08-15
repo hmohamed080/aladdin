@@ -12,8 +12,6 @@ import {
   CalendarCheckIcon,
   SearchIcon,
   PackageIcon,
-  FileTextIcon,
-  ReceiptIcon,
   ClipboardIcon,
   LayersIcon,
   ShoppingBagIcon,

@@ -49,10 +49,10 @@ export function DataTable<T>({
   empty: ReactNode;
   className?: string;
 }) {
-  if (rows.length === 0) return <>{empty}</>;
+  const lead = columns[0];
+  if (rows.length === 0 || !lead) return <>{empty}</>;
 
-  const [lead, ...rest] = columns;
-  const cardColumns = rest.filter((c) => !c.secondary);
+  const cardColumns = columns.slice(1).filter((c) => !c.secondary);
 
   return (
     <div className={cn("min-w-0", className)}>
