@@ -48,7 +48,7 @@ export const CONSULTANT_PERSONAS: PersonaType[] = ["engineer", "interior_designe
 
 export async function listOrganizations(
   supabase: DB,
-  f: { types: OrgType[]; search?: string; type?: string },
+  f: { types: OrgType[]; search?: string; type?: string; excludeOrgId?: string },
 ): Promise<OrgDirectoryRow[]> {
   // A caller-supplied `type` may only ever narrow the module's own allow-list —
   // it can never be used to browse a category this directory does not cover.
@@ -61,6 +61,11 @@ export async function listOrganizations(
     .order("is_verified", { ascending: false })
     .order("name")
     .limit(LIST_LIMIT);
+
+  // A business is never its own counterparty. Listing yourself here is a dead end:
+  // the RFQ path already refuses a request addressed to your own organization, so
+  // the row could only ever lead to "this is your own product".
+  if (f.excludeOrgId) q = q.neq("id", f.excludeOrgId);
 
   if (f.search?.trim()) {
     const term = sanitizeSearchTerm(f.search);
@@ -100,11 +105,13 @@ export async function listProfessionals(
 export async function organizationTypeCounts(
   supabase: DB,
   types: OrgType[],
+  excludeOrgId?: string,
 ): Promise<{ total: number; verified: number; byType: Record<string, number> }> {
-  const { data, error } = await supabase
-    .from("organization_public_directory")
-    .select("org_type, is_verified")
-    .in("org_type", types);
+  // Must apply the same exclusion as the list, or the tiles would count a row the
+  // table below them deliberately does not show.
+  let q = supabase.from("organization_public_directory").select("org_type, is_verified").in("org_type", types);
+  if (excludeOrgId) q = q.neq("id", excludeOrgId);
+  const { data, error } = await q;
   if (error) throw error;
 
   const rows = data ?? [];

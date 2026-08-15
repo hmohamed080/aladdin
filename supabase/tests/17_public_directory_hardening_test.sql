@@ -41,9 +41,14 @@ select columns_are(
   'public'::name, 'organization_public_directory'::name,
   array['id','name','slug','org_type','is_verified','primary_locale','locality_id','logo_media_id'],
   'organization_public_directory still exposes only approved public columns');
+-- `persona` was added to the approved set in 20260816090001 (Sprint 14): the
+-- Technicians directory must filter to installer/technician professionals, and the
+-- persona is ALREADY the eligibility gate for appearing in this view at all, so
+-- surfacing it publishes no new fact about a person. Everything private
+-- (user_id, contacts, timestamps, deleted_at, verification) stays out.
 select columns_are(
   'public'::name, 'profile_public_directory'::name,
-  array['id','display_name','headline','bio','avatar_media_id','locality_id','languages'],
+  array['id','display_name','headline','bio','avatar_media_id','locality_id','languages','persona'],
   'profile_public_directory still exposes only approved display columns');
 
 -- --- 3. The backing readers are SECURITY DEFINER, in `app`, search_path pinned

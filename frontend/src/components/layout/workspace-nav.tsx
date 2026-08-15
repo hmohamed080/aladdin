@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
 import {
@@ -22,6 +22,8 @@ import {
   LandmarkIcon,
   BarChartIcon,
   SettingsIcon,
+  MenuIcon,
+  XIcon,
 } from "@/components/ui/icons";
 import type { NavKey, NavSection } from "@/lib/nav/modules";
 import { allowedNavSections } from "@/lib/nav/modules";
@@ -144,47 +146,130 @@ export function Sidebar({ allowed }: { allowed: readonly string[] }) {
 }
 
 /**
- * Mobile fixed bottom bar. At most five modules, taken in canonical order — which
- * is buyer-first by design, so a showroom gets Home · Purchase requests · Offers ·
- * Orders · Browse, and a sales-only rep falls through to their own first five.
+ * Mobile chrome: a fixed bottom bar of the four highest-priority modules plus a
+ * "More" sheet holding everything else.
+ *
+ * The sheet is not decoration — it is what makes the grouped IA safe on a phone.
+ * A bottom bar fits five targets, but the workspace now has up to seventeen
+ * modules across five sections, so truncating to the first five would leave a
+ * manager unable to reach Projects, Team, Reports or Settings on mobile at all.
+ * The sheet renders the SAME sections as the desktop rail, so both surfaces
+ * expose exactly the same set of modules.
  */
 export function MobileNav({ allowed }: { allowed: readonly string[] }) {
   const { t } = useI18n();
   const isActive = useActive();
-  const shown = allowedNavSections(allowed)
-    .flatMap((s) => s.keys)
-    .slice(0, 5);
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  const sections = allowedNavSections(allowed);
+  const flat = sections.flatMap((s) => s.keys);
+  const primary = flat.slice(0, 4);
+  const overflow = flat.slice(4);
+
+  // Any navigation closes the sheet — otherwise it would cover the page it just
+  // navigated to.
+  useEffect(() => setOpen(false), [pathname]);
+
+  // Escape closes it, matching the confirm dialog's behaviour.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const columns = overflow.length > 0 ? primary.length + 1 : primary.length;
 
   return (
-    <nav
-      aria-label={t("nav.workspace")}
-      className="fixed inset-x-0 bottom-0 z-sticky border-t bg-surface/95 backdrop-blur tablet:hidden"
-      style={{ zIndex: 100 }}
-    >
-      <ul
-        className="mx-auto grid max-w-lg"
-        style={{ gridTemplateColumns: `repeat(${Math.max(shown.length, 1)}, minmax(0, 1fr))` }}
+    <>
+      {open && overflow.length > 0 ? (
+        <div className="fixed inset-0 tablet:hidden" style={{ zIndex: 99 }}>
+          <button
+            type="button"
+            aria-label={t("common.close")}
+            onClick={() => setOpen(false)}
+            className="absolute inset-0 bg-brand-basalt/60"
+          />
+          <div className="absolute inset-x-0 bottom-14 max-h-[65dvh] overflow-y-auto rounded-t-lg border-t bg-surface px-3 pb-3 pt-2 shadow-card">
+            <nav aria-label={t("nav.more")} className="flex flex-col gap-1">
+              {sections.map(({ section, keys }) => {
+                const shown = keys.filter((k) => overflow.includes(k));
+                if (shown.length === 0) return null;
+                const labelKey = sectionLabel[section];
+                return (
+                  <div key={section} className="mt-md first:mt-0">
+                    {labelKey ? (
+                      <h2 className="px-3 pb-1.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-muted">
+                        {t(labelKey)}
+                      </h2>
+                    ) : null}
+                    <div className="flex flex-col gap-0.5">
+                      {shown.map((k) => {
+                        const item = ITEMS[k];
+                        return <NavLink key={k} item={item} active={isActive(item.href, item.exact)} />;
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+      ) : null}
+
+      <nav
+        aria-label={t("nav.workspace")}
+        className="fixed inset-x-0 bottom-0 z-sticky border-t bg-surface/95 backdrop-blur tablet:hidden"
+        style={{ zIndex: 100 }}
       >
-        {shown.map((k) => {
-          const { href, key, exact, Icon } = ITEMS[k];
-          const active = isActive(href, exact);
-          return (
-            <li key={k}>
-              <Link
-                href={href}
-                aria-current={active ? "page" : undefined}
+        <ul
+          className="mx-auto grid max-w-lg"
+          style={{ gridTemplateColumns: `repeat(${Math.max(columns, 1)}, minmax(0, 1fr))` }}
+        >
+          {primary.map((k) => {
+            const { href, key, exact, Icon } = ITEMS[k];
+            const active = isActive(href, exact);
+            return (
+              <li key={k}>
+                <Link
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex min-h-14 flex-col items-center justify-center gap-1 py-1.5 text-[0.6875rem] font-medium transition-colors",
+                    active ? "text-accent" : "text-fg-secondary",
+                  )}
+                >
+                  <Icon size={22} />
+                  <span className="max-w-full truncate px-0.5">{t(key)}</span>
+                </Link>
+              </li>
+            );
+          })}
+
+          {overflow.length > 0 ? (
+            <li>
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-expanded={open}
                 className={cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-1 py-1.5 text-[0.6875rem] font-medium transition-colors",
-                  active ? "text-accent" : "text-fg-secondary",
+                  "flex min-h-14 w-full flex-col items-center justify-center gap-1 py-1.5 text-[0.6875rem] font-medium transition-colors",
+                  // The sheet holds the active module when it is not one of the four.
+                  open || overflow.some((k) => isActive(ITEMS[k].href, ITEMS[k].exact))
+                    ? "text-accent"
+                    : "text-fg-secondary",
                 )}
               >
-                <Icon size={22} />
-                <span className="max-w-full truncate px-0.5">{t(key)}</span>
-              </Link>
+                {open ? <XIcon size={22} /> : <MenuIcon size={22} />}
+                <span className="max-w-full truncate px-0.5">{t("nav.more")}</span>
+              </button>
             </li>
-          );
-        })}
-      </ul>
-    </nav>
+          ) : null}
+        </ul>
+      </nav>
+    </>
   );
 }

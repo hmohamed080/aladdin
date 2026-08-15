@@ -28,13 +28,13 @@ export default async function SuppliersPage({
 }) {
   const ctx = await getPageContext();
   if (!ctx) return null;
-  const { supabase, locale } = ctx;
+  const { supabase, org, locale } = ctx;
   const m = getMessages(locale);
   const sp = await searchParams;
 
   const [rows, counts] = await Promise.all([
-    listOrganizations(supabase, { types: SUPPLIER_ORG_TYPES, search: sp.q, type: sp.type }),
-    organizationTypeCounts(supabase, SUPPLIER_ORG_TYPES),
+    listOrganizations(supabase, { types: SUPPLIER_ORG_TYPES, search: sp.q, type: sp.type, excludeOrgId: org.organizationId }),
+    organizationTypeCounts(supabase, SUPPLIER_ORG_TYPES, org.organizationId),
   ]);
 
   return (

@@ -202,7 +202,12 @@ $$;
 comment on function app._profile_public_directory() is
   'Internal SECURITY DEFINER reader backing public.profile_public_directory. Returns ONLY approved display columns of listed, active, non-deleted PERSONAL professional profiles, plus the persona that already gates listing (so the directory can be filtered to technicians, engineers, designers). A business-only identity (null persona) is never listed. Not in an exposed schema; PUBLIC execute revoked.';
 
+-- DROP destroyed the previous ACL, so the full grant set must be reasserted here,
+-- not just the revoke: the view is security_invoker, which means the CALLER needs
+-- EXECUTE on this reader. Reasserting only the revoke would leave the directory
+-- readable by nobody (42501 for every caller, anon and authenticated alike).
 revoke execute on function app._profile_public_directory() from public;
+grant  execute on function app._profile_public_directory() to anon, authenticated, service_role;
 
 create view public.profile_public_directory
   with (security_invoker = true) as
