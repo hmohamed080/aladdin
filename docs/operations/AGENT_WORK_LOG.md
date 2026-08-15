@@ -1265,3 +1265,75 @@ The UAT findings traced to two concrete facts: the shell capped content at 900px
 
 ### Rollback
 Two migrations and three commits on `feature/pilot-personal-sales-readiness`; `main` @ `e7fc5e0` is untouched. Reverting the type-separation migration is **not** a simple `git revert` — it changed column types and dropped an enum, so a down-migration would have to recreate `account_type` and re-cast four columns. The safe rollback is `supabase db reset` to the previous migration set on a local/staging database; nothing has been applied to production.
+
+---
+
+## 2026-08-15 — Sprint 14: Showroom MVP Completeness
+
+**Branch:** `feature/showroom-mvp-completeness` (from `main` @ `678ba32`) · **Migration:** `20260816090001` · No `.pen` change.
+
+**Goal:** make the Showroom/Dealer the strongest, most complete MVP account — audit the implemented
+surfaces against the supplied reference images, reorganize the IA, raise UI quality, add the missing
+modules.
+
+### Audit first (the required first step)
+Full write-up: [`../frontend/sprint-14-showroom-mvp-completeness.md`](../frontend/sprint-14-showroom-mvp-completeness.md).
+
+The reference images arrived as a loose `showroom/` folder at the repo root with no home; there was
+no existing reference-asset convention under `UI-UX/`, so they moved unmodified to
+**`UI-UX/references/showroom/`**.
+
+Two findings shaped everything after:
+
+1. **The "طلباتي / مشترياتي" confusion was not a labelling bug.** `/b2b/rfqs` and `/b2b/quotations`
+   each rendered the buy side and the sell side stacked in one page, so *no* label could be correct
+   for both halves. Renaming would have moved the ambiguity, not removed it.
+2. **Several reference patterns contradict the approved product direction** and were deliberately
+   NOT copied, with the reason recorded rather than left implicit: points/rewards tiers (no such
+   model, and Sprint 13 kept referral attribution *without* rewards), add-to-cart on product cards
+   (Aladdin is consultation-first, explicitly not a cart marketplace), supplier/technician star
+   ratings (no ratings model), paid-membership card (no subscription model), and "add new
+   supplier/technician/institution" buttons (these are directories of real registered organizations
+   and people — creating one from the buyer side would fork business identity).
+
+### What shipped
+- **IA:** eleven flat nav peers → five capability-derived sections (Overview · Buying · Network ·
+  Selling · Business); empty sections drop rather than render. Renamed `rfqs`→`purchaseRequests`,
+  `quotations`→`offers`, `organization`→`team`. **Route paths unchanged** — the ambiguity was in
+  structure and labels, and renaming paths would churn every detail route, back-link and spec for
+  no user-visible gain.
+- **Perspective separation** on RFQs, Quotations, Orders and Projects: one side leads, the other is
+  a tab shown only to an organization that holds that role or has records on that side.
+- **Six new modules:** Suppliers, Institutions (one component, two org-type slices), Technicians,
+  Saved products, Reports & analytics, Settings. Dashboard rebuilt buyer-first with a
+  "What do you want to do today?" ramp; Projects strengthened.
+- **One canonical UI set** — `data-table` (semantic table ≥ tablet, stacked cards below, from the
+  same column definitions), `stat-tiles` + `TabLinks`, `filter-bar`, `breakdown`. The per-feature
+  list components were rewritten onto it rather than kept alongside it.
+
+### Three defects the browser caught that the type system could not
+- **Directory ACL destroyed.** Adding `persona` changes the function's return type, forcing
+  DROP+CREATE — which drops the ACL. The first version reasserted only the REVOKE, so the
+  `security_invoker` view had no executable reader and Suppliers/Technicians/Institutions returned
+  **42501 for every caller**, anon and authenticated alike.
+- **Mobile lost eleven modules.** Grouping the nav while keeping a five-item bottom bar silently
+  made Projects, Team, Reports and Settings unreachable on a phone. Fixed with a **More sheet**
+  carrying the same sections as the desktop rail — not by editing the test that caught it.
+- **Self-listing dead end.** A business appeared in its own Suppliers directory, where the only
+  action leads to "this is your own product".
+
+### Validation
+- frontend typecheck ✅ · lint ✅ (0/0) · unit **208/208** ✅ (incl. rewritten `nav/modules.test.ts`) ·
+  bilingual parity gate ✅
+- `supabase db reset` ✅ from clean, both seeds · pgTAP **729/729** ✅ across 29 files
+- Playwright `showroom-mvp` + `orders-projects`: **21 passed / 0 failed / 0 retries**, desktop and
+  Pixel 5, English and Arabic
+- **Attribution done honestly:** two `sales.spec.ts` failures were verified **pre-existing on
+  `main`** by checking out `678ba32` and re-running; a third is a cold-build flake in an untouched
+  module. **pgTAP must run from a clean reset** — a preceding Playwright session leaves sales rows
+  and capability grants behind that fail two unrelated files.
+
+### Rollback
+One migration and three commits; `main` @ `678ba32` untouched. Reverting `20260816090001` drops
+`saved_products` and its RPCs and restores the seven-column profile directory — the two pgTAP
+approved-column guards must be reverted with it.
