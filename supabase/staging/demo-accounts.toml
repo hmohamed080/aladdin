@@ -1,0 +1,378 @@
+# ===========================================================================
+# The 26 STAGING demo accounts — the single source of truth for the manifest,
+# the email remap, and the automated validator.
+#
+# This file describes accounts that ALREADY EXIST in the seed files. It never
+# creates one. Every `id` here is a deterministic UUID owned by
+# supabase/seed.sql or supabase/seed-pilot.sql, and the validator fails if this
+# list and `auth.users` ever disagree — so an account cannot be added to a seed
+# without being described here, or described here without existing.
+#
+# It deliberately holds NO email addresses. `slug` is the only email-shaped
+# value, and it is a local-part fragment, not an address: the deliverable
+# address is composed at build time from the owner's own configured mailbox
+# (supabase/staging/demo-email.toml — gitignored). See demo-email.example.toml.
+#
+# Fields
+#   id        deterministic UUID from the seed files (never changed)
+#   slug      email tag fragment; must be unique, [a-z0-9-] only
+#   name      display name as seeded into profiles.display_name
+#   persona   users.primary_account_type, or "" for a business-only identity
+#   org       organizations.name, or "" for an identity with no organization
+#   org_type  organizations.org_type for `org`
+#   role      the RELATIONSHIP to the organization (owner/manager/member) or the
+#             personal standing — never an account type
+#   landing   the route the app resolves for this account (see the note below)
+#   data      the key rows this account can actually see, under RLS
+#   demo      what to show a client from this account
+#
+# LANDING is DERIVED, not configured. `landingFor()` in
+# frontend/src/lib/workspace/model.ts resolves it, and with no workspace cookie
+# set an identity that has BOTH a personal persona and an active membership
+# lands on /home — its business workspace is one click away in the workspace
+# switcher. That is why several org members below land on /home, not /b2b.
+# ===========================================================================
+
+# --- seed.sql — the pgTAP-pinned base fixtures -----------------------------
+
+[[account]]
+id       = "11111111-1111-4111-8111-111111111111"
+slug     = "amina-supplier-owner"
+seed_local = "a-owner"
+name     = "Amina Farouk"
+persona  = ""
+org      = "Nile Finishing Supplies"
+org_type = "supplier"
+role     = "owner"
+landing  = "/b2b"
+data     = "3 published products; 4 customers and 4 leads across the Cairo and Sheikh Zayed branches; 3 follow-ups; an inbound RFQ from Delta Interiors Studio, the quotation she sent, the resulting order and the active delivery project; a full 5-section workspace nav."
+demo     = "The supplier owner's whole day. Open Leads to show both branches at once, then the RFQ → quotation → order → project chain with Delta Interiors. Contrast with Karim, who sees only the Cairo half of the same book."
+
+[[account]]
+id       = "22222222-2222-4222-8222-222222222222"
+slug     = "karim-branch-sales"
+seed_local = "a-cairo"
+name     = "Karim Adel"
+persona  = "sales"
+org      = "Nile Finishing Supplies"
+org_type = "supplier"
+role     = "member (branch-limited to Cairo)"
+landing  = "/home"
+data     = "Personal salesperson profile at 100% completeness; a PENDING affiliation request to Cairo Ceramics Showroom; in the business workspace, strictly the Cairo branch slice — 2 customers, 2 leads, 2 follow-ups — and none of the Sheikh Zayed rows."
+demo     = "Branch isolation, proven live. Sign in beside Amina and show the same Leads screen returning fewer rows. Also the salesperson affiliation panel on /home with a real pending request."
+
+[[account]]
+id       = "33333333-3333-4333-8333-333333333333"
+slug     = "nadia-design-owner"
+seed_local = "b-owner"
+name     = "Nadia Salem"
+persona  = "interior_designer"
+org      = "Delta Interiors Studio"
+org_type = "design_office"
+role     = "owner"
+landing  = "/home"
+data     = "Personal interior-designer profile at 100%; in the studio workspace, 2 purchase requests (one closed, one awaiting a price), the quotation she accepted, the resulting order, an active project, and a 3-item saved-products shortlist."
+demo     = "The dual identity the product model is built on: a personal Interior Designer who ALSO owns a business, switching context without any persona switch. Then the buyer side of the value chain end to end."
+
+[[account]]
+id       = "44444444-4444-4444-8444-444444444444"
+slug     = "omar-consumer"
+seed_local = "consumer"
+name     = "Omar Zaki"
+persona  = "end_consumer"
+org      = ""
+org_type = ""
+role     = "personal account, no organization"
+landing  = "/home"
+data     = "Consumer profile at 100% — renovation intent, four interests, New Cairo location and budget band; the public catalogue of 16 published products; the verified-business and professional directories."
+demo     = "The B2C entry point: a consumer with a real stated need, browsing the catalogue and the technician directory. Shows what a consumer can and cannot see (no organization data at all)."
+
+[[account]]
+id       = "55555555-5555-4555-8555-555555555555"
+slug     = "platform-admin"
+seed_local = "admin"
+name     = "Platform Admin"
+persona  = "end_consumer"
+org      = ""
+org_type = ""
+role     = "platform administrator (platform_role_grants)"
+landing  = "/admin"
+data     = "The verification queue — 2 organizations and 3 individual professionals awaiting review; the full audit trail; every organization and user; platform-wide commerce (17 RFQs, 14 quotations, 10 orders, 5 projects)."
+demo     = "The Admin console. Work the verification queue, approve an organization and watch it appear in the public directory, then read the audit trail behind the Cairo Ceramics → Horizon chain."
+
+# --- seed-pilot.sql section 1 — the pilot world -----------------------------
+
+[[account]]
+id       = "70000001-0000-4000-8000-000000000001"
+slug     = "hana-showroom-owner"
+seed_local = "hana"
+name     = "Hana Mansour"
+persona  = ""
+org      = "Cairo Ceramics Showroom"
+org_type = "showroom_dealer"
+role     = "owner"
+landing  = "/b2b"
+data     = "The richest account: 12 purchase requests over six months, 10 received offers, 7 supplier orders, 2 incoming delivery projects, an 8-item shortlist, its own 4-product shelf, 4 outgoing sales quotations, 5 customers, 6 leads, 6 follow-ups, and a 4-person team with a pending invitation."
+demo     = "THE primary demo account. Buying, selling and delivery in one workspace, with a six-month purchase-value trend and a spend ranking that are real aggregates of the rows behind them."
+
+[[account]]
+id       = "70000002-0000-4000-8000-000000000002"
+slug     = "youssef-showroom-sales"
+seed_local = "youssef"
+name     = "Youssef Amin"
+persona  = "sales"
+org      = "Cairo Ceramics Showroom"
+org_type = "showroom_dealer"
+role     = "member (branch-limited to Nasr City Showroom)"
+landing  = "/home"
+data     = "Personal salesperson profile at 100%, with Cairo Ceramics showing as an ACTIVE showroom affiliation; in the workspace, the Nasr City sales book — 5 customers, 6 leads across every stage including one won and one lost, 6 follow-ups (2 overdue)."
+demo     = "The daily-active user. Start at the affiliation panel on /home, switch into the showroom, then work the overdue follow-ups and move a lead through its stages."
+
+[[account]]
+id       = "70000003-0000-4000-8000-000000000003"
+slug     = "tarek-manufacturer-owner"
+seed_local = "tarek"
+name     = "Tarek Halim"
+persona  = ""
+org      = "Egypt Marble Manufacturing"
+org_type = "manufacturer"
+role     = "owner"
+landing  = "/b2b"
+data     = "1 published product, 1 inbound RFQ from Cairo Ceramics, the EGP 415,000 quotation he won and its completed order; an organization verification sitting in the Admin queue as `submitted`."
+demo     = "Verification as a TRUST state, not an access gate: a business that is still pending review trades normally but is absent from the public directory. Pair with the Admin account to approve it live."
+
+[[account]]
+id       = "70000004-0000-4000-8000-000000000004"
+slug     = "sara-importer-owner"
+seed_local = "sara"
+name     = "Sara Nabil"
+persona  = ""
+org      = "Nile Import & Trade"
+org_type = "importer"
+role     = "owner"
+landing  = "/b2b"
+data     = "2 published imported products; an inbound RFQ from Cairo Ceramics with the quotation she has submitted and is awaiting a decision on; one completed order and its delivery project; an organization verification in the Admin queue."
+demo     = "The supplier side of the RFQ inbox: an offer that has been sent and is waiting on the buyer. Show the same quotation from Hana's side to prove both parties read one shared record."
+
+[[account]]
+id       = "70000005-0000-4000-8000-000000000005"
+slug     = "khaled-wholesaler-owner"
+seed_local = "khaled"
+name     = "Khaled Roushdy"
+persona  = ""
+org      = "Delta Wholesale Supply"
+org_type = "wholesaler"
+role     = "owner"
+landing  = "/b2b"
+data     = "3 published products; 3 inbound RFQs from Cairo Ceramics; 3 quotations — two accepted, one rejected on price; 2 orders (one completed, one in progress) and an active ceiling-board delivery project."
+demo     = "A distributor's inbox, including a LOST offer. The rejected LED quotation is the honest case most demos leave out."
+
+[[account]]
+id       = "70000006-0000-4000-8000-000000000006"
+slug     = "mostafa-contractor-owner"
+seed_local = "mostafa"
+name     = "Mostafa Bakr"
+persona  = "contractor"
+org      = "Horizon Contracting"
+org_type = "contractor_company"
+role     = "owner"
+landing  = "/home"
+data     = "Personal contractor profile at 100%; in the Horizon workspace, 2 RFQs (one quoted and accepted, one still awaiting a price from Cairo Ceramics), the EGP 143,000 quotation he accepted, the resulting in-progress order, an active villa project, and a 4-person team with Nour's pending invitation."
+demo     = "The buyer's half of the core value chain, plus people operations: show the pending invitation on the Team screen, then open Nour's invitation link in a private window."
+
+[[account]]
+id       = "70000007-0000-4000-8000-000000000007"
+slug     = "laila-contractor-manager"
+seed_local = "laila"
+name     = "Laila Shafik"
+persona  = "sales"
+org      = "Horizon Contracting"
+org_type = "contractor_company"
+role     = "manager"
+landing  = "/home"
+data     = "Personal salesperson profile at 100% with a SUBMITTED showroom referral awaiting platform review; in the workspace, the same Horizon commerce as the owner but WITHOUT org.manage — no Settings, no catalogue publishing."
+demo     = "\"Manager\" as a relationship, not an account type. Put her screen beside Mostafa's: same organization, same data, visibly fewer controls. Also the showroom-referral half of the affiliation panel."
+
+[[account]]
+id       = "70000008-0000-4000-8000-000000000008"
+slug     = "yasser-engineer"
+seed_local = "yasser"
+name     = "Yasser Fouad"
+persona  = "engineer"
+org      = "Horizon Contracting"
+org_type = "contractor_company"
+role     = "member (branch-limited to New Cairo Office)"
+landing  = "/home"
+data     = "Personal engineer profile at 100% with an approved professional verification (the verified badge); in the workspace, the active New Cairo villa project and the catalogue, and the ability to raise an RFQ — but no quotation decisions and no team management."
+demo     = "Capability scoping inside one organization. He can start a purchase request but cannot accept the offer that comes back — the decision stays with Mostafa or Laila."
+
+[[account]]
+id       = "70000009-0000-4000-8000-000000000009"
+slug     = "ahmed-installer"
+seed_local = "ahmed"
+name     = "Ahmed Sobhy"
+persona  = "installer_technician"
+org      = "Horizon Contracting"
+org_type = "contractor_company"
+role     = "member (branch-limited to New Cairo Office)"
+landing  = "/home"
+data     = "A LISTED public profile (tiling trade, 15 years) that appears in the Technicians directory; personal profile at 100%; in the workspace, project execution only — the active villa project, no commerce, no catalogue publishing."
+demo     = "The narrowest workspace in the demo, and the one identity that is BOTH an org member and publicly discoverable. Find him in the Technicians directory from Omar's consumer account, then sign in as him."
+
+[[account]]
+id       = "70000010-0000-4000-8000-000000000010"
+slug     = "nour-invited"
+seed_local = "nour"
+name     = "Nour Hegazy"
+persona  = "engineer"
+org      = ""
+org_type = "(invited to Horizon Contracting — not yet a member)"
+role     = "pending invitation, account not yet activated"
+landing  = "/onboarding (consent step)"
+data     = "Deliberately none. A PENDING invitation to Horizon Contracting (New Cairo Office, valid 14 days) and no memberships. `my_registration_state()` resolves to `consent_pending`, so she lands on an actionable consent form."
+demo     = "THE ONLY DELIBERATELY EMPTY ACCOUNT — it is the brand-new-user journey. Open her invitation link, accept consent, walk profile → contact → account type, and watch a real account come into existence. Everything else in this manifest is a populated account; this one is the flow that creates them."
+
+# --- seed-pilot.sql section 10 — distributors and listed professionals ------
+
+[[account]]
+id       = "71000001-0000-4000-8000-000000000001"
+slug     = "mahmoud-glass-owner"
+seed_local = "mahmoud"
+name     = "Mahmoud Ezzat"
+persona  = ""
+org      = "Alexandria Glass & Aluminium"
+org_type = "manufacturer"
+role     = "owner"
+landing  = "/b2b"
+data     = "2 published products; 2 inbound RFQs from Cairo Ceramics; 2 quotations (one accepted at EGP 268,000, one awaiting decision); a completed order and the completed glass-partition installation project he executed."
+demo     = "A manufacturer that also EXECUTES a project, not just supplies material — the order → project handover on the supplier side."
+
+[[account]]
+id       = "71000002-0000-4000-8000-000000000002"
+slug     = "rania-paints-owner"
+seed_local = "rania"
+name     = "Rania Gamal"
+persona  = ""
+org      = "Suez Paints & Coatings"
+org_type = "supplier"
+role     = "owner"
+landing  = "/b2b"
+data     = "2 published products; 2 inbound RFQs; 2 accepted quotations; 2 orders — one completed six months ago, one confirmed and not yet started."
+demo     = "An Arabic-primary supplier (the organization's primary_locale is `ar`). Good account for showing the RTL workspace against Mahmoud's English one."
+
+[[account]]
+id       = "71000003-0000-4000-8000-000000000003"
+slug     = "fady-sanitary-owner"
+seed_local = "fady"
+name     = "Fady Riad"
+persona  = ""
+org      = "Cairo Sanitary Ware Trading"
+org_type = "importer"
+role     = "owner"
+landing  = "/b2b"
+data     = "2 published products; 2 inbound RFQs; 2 quotations — one accepted, one for 100 basins still awaiting Cairo Ceramics' decision; a completed order."
+demo     = "The other side of Hana's open offers list. Show his submitted quotation, then accept it from Hana's account and watch both screens agree."
+
+[[account]]
+id       = "71000004-0000-4000-8000-000000000004"
+slug     = "dina-design-owner"
+seed_local = "dina"
+name     = "Dina Sherif"
+persona  = ""
+org      = "New Cairo Design Studio"
+org_type = "design_office"
+role     = "owner"
+landing  = "/b2b"
+data     = "2 purchase requests to Cairo Ceramics; 2 quotations she received and accepted (EGP 182,500 and EGP 240,000); 2 orders; 2 projects — one completed Maadi apartment, one planned villa marble package."
+demo     = "A design office as a BUYER of finishing materials — the professional-services demand side, and a planned (not yet active) project."
+
+[[account]]
+id       = "71000005-0000-4000-8000-000000000005"
+slug     = "hazem-showroom-owner"
+seed_local = "hazem"
+name     = "Hazem Lotfy"
+persona  = ""
+org      = "Zayed Home Showroom"
+org_type = "showroom_dealer"
+role     = "owner"
+landing  = "/b2b"
+data     = "2 published products; an inbound sample-order RFQ from Cairo Ceramics awaiting his price; his own outgoing RFQ to Cairo Ceramics and the quotation he received."
+demo     = "A PEER showroom — the same workspace as Hana's, seen from the other side of the same two transactions. Proves tenant isolation: he sees those two records and nothing else of hers."
+
+[[account]]
+id       = "71000006-0000-4000-8000-000000000006"
+slug     = "sayed-marble-fixer"
+seed_local = "sayed"
+name     = "Sayed Abdel-Rahman"
+persona  = "installer_technician"
+org      = ""
+org_type = ""
+role     = "listed independent professional"
+landing  = "/home"
+data     = "A LISTED public profile (marble and granite fixing) in the Technicians directory; personal profile at 100% — 18 years, service areas, availability, day rate band; an APPROVED professional verification showing the verified badge."
+demo     = "The trusted-match supply side. Find him in the directory as a consumer, then sign in as him to show the profile and the verified state behind that listing."
+
+[[account]]
+id       = "71000007-0000-4000-8000-000000000007"
+slug     = "fathy-electrician"
+seed_local = "m-fathy"
+name     = "Mahmoud Fathy"
+persona  = "installer_technician"
+org      = ""
+org_type = ""
+role     = "listed independent professional"
+landing  = "/home"
+data     = "A LISTED public profile (electrical installation and lighting); personal profile at 100%; no verification submitted — the `not verified` trust state."
+demo     = "The contrast case to Sayed: listed and fully complete, but not yet verified. Shows that completeness and verification are two independent signals, and neither blocks access."
+
+[[account]]
+id       = "71000008-0000-4000-8000-000000000008"
+slug     = "ibrahim-plumber"
+seed_local = "ibrahim"
+name     = "Ibrahim Nasr"
+persona  = "installer_technician"
+org      = ""
+org_type = ""
+role     = "listed independent professional"
+landing  = "/home"
+data     = "A LISTED public profile (plumbing and sanitary fitting); personal profile at 100%; a SUBMITTED professional verification awaiting review in the Admin queue."
+demo     = "The verification round trip. Show his pending badge, approve it from the Admin account, then reload his home and see the state change."
+
+[[account]]
+id       = "71000009-0000-4000-8000-000000000009"
+slug     = "wael-gypsum-fitter"
+seed_local = "wael"
+name     = "Wael Sobhy"
+persona  = "installer_technician"
+org      = ""
+org_type = ""
+role     = "listed independent professional"
+landing  = "/home"
+data     = "A LISTED public profile (gypsum board and false ceilings); personal profile at 100%; a `needs_more_info` verification carrying the reviewer's stated reason."
+demo     = "The third verification outcome, and the one that must read as actionable rather than punitive: the reason is shown to him and the account keeps working throughout."
+
+[[account]]
+id       = "71000010-0000-4000-8000-000000000010"
+slug     = "heba-interior-designer"
+seed_local = "heba"
+name     = "Heba Kamal"
+persona  = "interior_designer"
+org      = ""
+org_type = ""
+role     = "listed independent professional"
+landing  = "/home"
+data     = "A LISTED public profile (residential interior design) in the professionals directory; personal profile at 100% — remote-capable, so the travel-radius item is correctly excluded from her denominator."
+demo     = "An independent professional with NO organization — the personal-professional identity that holds zero businesses. Also the completeness rule that drops inapplicable items for a remote-only designer."
+
+[[account]]
+id       = "71000011-0000-4000-8000-000000000011"
+slug     = "amr-site-engineer"
+seed_local = "amr"
+name     = "Amr Selim"
+persona  = "engineer"
+org      = ""
+org_type = ""
+role     = "listed independent professional"
+landing  = "/home"
+data     = "A LISTED public profile (site and finishing engineering); personal profile at 100% — quantity take-offs, contractor coordination, Cairo and Giza service areas."
+demo     = "The consultation-first entry point: the engineer a consumer or contractor would find and engage before any product is chosen."

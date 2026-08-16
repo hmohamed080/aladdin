@@ -4,6 +4,65 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Making all 26 staging demo accounts usable
+
+**Date:** 2026-08-16 · **Branch:** `chore/staging-demo-accounts` · **Base:** `chore/vercel-services-deploy` @ `44a4cdd`
+
+### Objective
+Before the one-time staging seed runs on Supabase Cloud, make **every one of the 26 seeded auth users** a usable client-demo account: a deliverable sign-in address, and demo data that matches its persona, organization, role and RLS scope. No migration edits, no seed-file edits, no raw seed run against Cloud, no weakened RLS, no passwords, no auth bypass, and no real mailbox in git.
+
+### The audit came first, and it changed the scope
+The 26 accounts were **not** all populated. That was established by impersonating each user under RLS — `set_config('request.jwt.claims', …)` with `role = authenticated` inside a rolled-back transaction, so the real policies and the real RPCs decided every count — against a database holding **only the bundled seeds**.
+
+That last qualifier is the finding that mattered. `supabase/demo-seed.sql` had been applied to the local database by hand, and it is **not** in `config.toml [db.seed].sql_paths`, so it is **not** in the staging bundle. Locally, Org A looked populated. In the staging shape it was empty. Reading the SQL would have missed this entirely.
+
+| Gap | Accounts | Evidence |
+|---|---|---|
+| Zero rows in every module | `a-owner`, `a-cairo`, `b-owner`, `sara` | rfq/quo/ord/prj/cust/lead/fup all `0` |
+| Personal home is a blank profile | 14 accounts landing on `/home` | `onboarding_progress` **0 rows**, `individual_onboarding` **0 rows** repo-wide → ~8% completeness |
+| Nav offers modules that return nothing | `a-cairo` | holds superseded `sales.opportunity.*`; the RLS policy requires `sales.read` |
+| Empty salesperson affiliation panel | `a-cairo`, `laila` | `organization_join_requests` / `organization_referrals` both 0 rows |
+| No account can receive a sign-in code | **all 26** | every address is `@example.test`, a reserved TLD (RFC 6761); auth is Email OTP only |
+
+A second, non-obvious fact fell out of the same probe and is now recorded in the manifest: **14 of 26 accounts land on `/home`, not `/b2b`**, because `resolveWorkContext` prefers the Personal context whenever a personal persona exists. That is the documented model, not a defect — and it is the same behaviour a previous session recorded as the cause of the pre-existing `pilot-landing.spec.ts:65` failure.
+
+### What was built
+Everything is **staging-only and additive**. `config.toml [db.seed].sql_paths` is unchanged, so `supabase db reset`, the pgTAP snapshots and the Playwright fixtures see exactly what they saw before.
+
+- **`supabase/staging/demo-accounts.toml`** — the 26 accounts as the single source of truth for the manifest, the remap and the validator. Holds **no email addresses**; the validator fails if this list and `auth.users` ever drift apart.
+- **`supabase/staging/demo-enrichment.sql`** — the additive layer. Repairs three memberships' capabilities (granted the way the product's own people-ops UI grants them — no policy widened, and the legacy `sales.opportunity.*` rows are deliberately left in place as real history); gives Org A a supplier world split across its two branches so Karim's Cairo-only view is provably narrower than Amina's; gives Org B and Sara real commerce chains; writes the onboarding rows 14 personal accounts were missing; adds a four-outcome verification spread; and fills the two empty affiliation panels. New rows use a reserved `fa……` UUID prefix no seed file uses.
+- **Configurable demo email, failing closed** — `scripts/staging_demo.py` composes one unique address per account from a mailbox the owner configures (`supabase/staging/demo-email.toml`, gitignored; template committed). Without one, the build **refuses to write the cloud artifact**. Reserved domains are rejected — including `example.com` *and its subdomains*, which a unit test caught slipping through. `--rehearsal` writes a separate, clearly-named artifact so a practice run can never be mistaken for the cloud one.
+- **`supabase/staging/verify-staging-seed.sql`** — read-only, wrapped in a transaction that always rolls back. Population, address uniqueness/deliverability/GoTrue token columns, persona and tenancy linkage, commerce totals against their own line items — then all 26 accounts impersonated under RLS for landing route and non-emptiness.
+- **`scripts/rehearse_staging_seed.py`** — the whole one-time load, rehearsed locally against `db reset --no-seed`.
+
+### The one account left deliberately empty
+**Nour Hegazy** resolves to `consent_pending` and lands on an actionable consent form, not a workspace. She is the pending invitation and the only demo of how an account comes into existence; a finished profile would delete that. The verifier knows her by name and fails if she gains data — or if any other account loses it.
+
+### Passwordless was treated as a constraint, not an obstacle
+No demo password, no shared credential, no `generate_link` service-role workaround in the happy path. The accounts sign in exactly as a real user does. The previous runbook's option B (minting an OTP with the service-role key) is removed from the main flow in favour of addresses that actually receive mail.
+
+### Validation
+- **Local rehearsal PASSED** end to end (`python scripts/rehearse_staging_seed.py --isolated`):
+  - empty database + **28 migrations** replayed → `auth.users`/`organizations` = **0/0**
+  - **first apply succeeded** — 26 auth users · 26 profiles · 26 primary contacts · 12 organizations · 13 branches · 17 memberships · 250 capabilities · 14 onboarding_progress · 14 individual_onboarding · 21 products · 21 RFQs · 17 quotations · 12 orders · 7 projects · 9 customers · 10 leads · 10 follow-ups · 11 saved products · 6 verifications · 1 invitation · 1 join request · 1 referral · 29 audit entries
+  - **all 26 accounts verified** — every one resolved to the landing route the manifest claims, and every one had visible data. `a-owner` went from all-zeros to `rfq=1 quo=1 ord=1 prj=1 cust=4 lead=4`; `sara` from all-zeros to `rfq=2 quo=2 ord=1 prj=1`; all 14 `/home` accounts have their onboarding rows. Nour was correctly reported as the single exemption.
+  - **second apply REFUSED**, and the row counts were **byte-identical before and after** — zero rows written, which is the property that actually matters
+- **pgTAP 729/729 ✅ across 29 files, 0 failures**, on a clean `supabase start` (28 migrations + the three declared seeds). This is the number that proves the enrichment stayed out of the local reset path — it is identical to the Sprint 14 baseline, because `config.toml [db.seed].sql_paths` was not touched.
+- Python unit tests **20/20** ✅ (`python -m unittest discover -s scripts`) — one of them found and fixed a real hole in the reserved-domain check
+- frontend typecheck ✅ · lint ✅ (0 errors, 0 warnings) · unit **236/236** ✅
+- `scripts/check_doc_links.py` ✅ — 893 links / 106 files / 0 broken
+- E2E/Playwright, Lighthouse and the performance gate deliberately **not** run: no product code changed and no schema changed.
+
+Three defects surfaced during the rehearsal and were fixed in the verifier itself, not worked around: a plpgsql loop record named `r` shadowed every `rfqs r` alias; the report's temporary table was written while still impersonating a demo user (`authenticated` has no rights there, and should not); and psql does not interpolate `:vars` inside dollar-quoted bodies, so the rehearsal flag had to travel as a GUC.
+
+### Incident during this session
+`supabase db reset` invoked from the rehearsal driver removed the local database container, and the subsequent restart stalled for a long stretch on `public.ecr.aws` (Docker-side; `curl` reached the registry throughout, and a Docker Hub pull succeeded). The pinned devDependency CLI (2.110.0) and the machine's global CLI (2.113.0) also want **different Postgres image tags**, and only the global one's tag was cached. The rehearsal driver now resolves whichever `supabase` is on `PATH` before falling back to the pinned binary, so it starts the stack the same way the machine already does.
+
+### Not done, deliberately
+Nothing was pushed to Supabase, no remote project was touched, the seed was not executed, and the PR was not merged.
+
+---
+
 ## Session — Vercel Services deployment architecture (documentation reconciliation)
 
 **Date:** 2026-08-16 · **Branch:** `chore/vercel-services-deploy` · **Base:** `main` @ `c1fbad1` (PR #25 merged)

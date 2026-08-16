@@ -16,7 +16,10 @@
     "typecheck": "pnpm --filter frontend typecheck",
     "test": "pnpm --filter frontend test",
     "supabase": "supabase",
-    "staging:seed:build": "python scripts/build_staging_seed.py"
+    "staging:seed:build": "python scripts/build_staging_seed.py",
+    "staging:seed:rehearse": "python scripts/rehearse_staging_seed.py",
+    "staging:seed:docs": "python scripts/build_staging_seed.py --write-docs",
+    "staging:seed:test": "python -m unittest discover -s scripts -p \"test_*.py\""
   },
   "devDependencies": {
     "supabase": "2.110.0"

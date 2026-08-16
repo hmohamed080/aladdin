@@ -1,0 +1,69 @@
+# ===========================================================================
+# Demo-email mapping — TEMPLATE. Copy to `demo-email.toml` and fill in.
+#
+#   cp supabase/staging/demo-email.example.toml supabase/staging/demo-email.toml
+#
+# `demo-email.toml` is GITIGNORED. It names a real mailbox you control, which is
+# the one piece of this system that must never enter the repository. This file —
+# the template — carries placeholders only and IS committed.
+#
+# Why this exists
+# ---------------
+# All 26 seeded accounts use `@example.test`, a reserved TLD that can never
+# receive mail (RFC 6761). The application signs in with EMAIL OTP and nothing
+# else, so an address that cannot receive a code is an account nobody can open.
+# There is no password to fall back on and no bypass to add — the address IS the
+# credential path. Making the accounts usable therefore means making the
+# addresses deliverable, and only you know which mailbox that should be.
+#
+# The build FAILS CLOSED: without this file (or the equivalent environment
+# variable) `scripts/build_staging_seed.py` refuses to produce the cloud
+# artifact. It will not silently ship 26 unreachable accounts to staging.
+#
+# Alternatives to this file, in precedence order:
+#   1. --demo-email-base / --demo-email-domain on the command line
+#   2. STAGING_DEMO_EMAIL_BASE / STAGING_DEMO_EMAIL_DOMAIN in the environment
+#   3. this file
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# mode = "plus"  — ONE mailbox, 26 sub-addresses (recommended)
+# ---------------------------------------------------------------------------
+# Composes `<local>+<prefix>-<slug>@<domain>` from the single address below.
+# Gmail, Outlook, Fastmail, Proton and most providers deliver every one of them
+# to the same inbox, so you need no new mailboxes and no DNS.
+#
+# With base = "you@gmail.com" and prefix = "aladdin", Hana's address becomes
+#   you+aladdin-hana-showroom-owner@gmail.com
+#
+# NOTE for Supabase's BUILT-IN email service: it only delivers to addresses on
+# the project team. Use the address on your Supabase account here, or configure
+# custom SMTP first (runbook step 8).
+
+mode = "plus"
+base = "you@example.com"     # <-- REPLACE with a mailbox you actually control
+prefix = "aladdin"           # optional; the tag between the + and the slug
+
+# ---------------------------------------------------------------------------
+# mode = "domain" — a catch-all domain, one address per account
+# ---------------------------------------------------------------------------
+# Composes `<slug>@<domain>`, e.g. hana-showroom-owner@demo.yourcompany.com.
+# Use this when you own a domain with catch-all delivery configured; it produces
+# addresses that read better in a client-facing demo than plus-addressing does.
+#
+# mode = "domain"
+# domain = "demo.yourcompany.com"
+
+# ---------------------------------------------------------------------------
+# Per-account overrides (optional, works with either mode)
+# ---------------------------------------------------------------------------
+# Keyed by the `slug` in demo-accounts.toml. Use this to hand one account to a
+# specific person — a client who should sign in as the showroom owner during a
+# live session, say — while everything else lands in your own inbox.
+#
+# Overrides are validated exactly like generated addresses: they must be unique
+# across all 26 accounts and must not use a reserved, undeliverable TLD.
+
+# [overrides]
+# hana-showroom-owner = "client.demo@theircompany.com"
+# platform-admin      = "you+admin@example.com"

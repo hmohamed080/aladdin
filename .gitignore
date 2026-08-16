@@ -65,8 +65,14 @@ requirements*.txt
 supabase/.branches/
 supabase/.temp/
 .supabase/
-# Assembled by scripts/build_staging_seed.py — a build artifact, not source.
+# Assembled by scripts/build_staging_seed.py — build artifacts, not source.
+# The cloud one carries REAL demo email addresses; the manifests carry them too.
 supabase/.staging-seed.sql
+supabase/.staging-seed.rehearsal.sql
+supabase/.staging-demo-manifest.md
+supabase/.staging-demo-manifest.csv
+# Names a real mailbox. The committed template is demo-email.example.toml.
+supabase/staging/demo-email.toml
 
 # --- Data & generated artifacts (business/customer data never committed) ----
 data/imports/*
