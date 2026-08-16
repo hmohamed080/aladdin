@@ -70,7 +70,7 @@ Locked. Do not replace without a documented blocking reason recorded in an ADR. 
 - **Data platform:** Supabase — PostgreSQL · Auth · Storage · RLS · Realtime · Queues · FTS · pg_trgm · pgvector · PostGIS (where geo is required).
 - **Schema source of truth:** Supabase SQL migrations (`supabase/migrations/*.sql`). **No Alembic. No `Base.metadata.create_all()` in Staging/Production.** See `docs/decisions/ADR-0002-database-migrations.md`.
 - **Specialized service:** Python 3.12+ / FastAPI for AI orchestration, OCR, document processing, chunking, embeddings, RAG, evaluations, NLP, large-Excel processing, and background workers. **FastAPI is NOT the primary CRUD backend for the MVP.**
-- **Hosting:** Next.js → Vercel · FastAPI + workers → Railway (portable Docker) · Postgres/Auth/Storage/Realtime → Supabase · LLM/embeddings → OpenAI · OCR candidate → Azure Document Intelligence · errors → Sentry. See `docs/decisions/ADR-0004-deployment-platforms.md`.
+- **Hosting:** Next.js **and** FastAPI → **Vercel Services**, both declared in the repository-root `vercel.json` and shipped as one deployment (FastAPI is same-origin at `/api/backend`, still server-side-only) · Postgres/Auth/Storage/Realtime → Supabase · LLM/embeddings → OpenAI · OCR candidate → Azure Document Intelligence · errors → Sentry. Worker host is deliberately undecided. See `docs/decisions/ADR-0009-vercel-services-deployment.md` (supersedes ADR-0004 on hosting).
 
 ## Architectural style
 

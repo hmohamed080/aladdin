@@ -182,7 +182,7 @@ Webhooks are **idempotent** (dedupe by provider message id), verify signatures, 
 
 ## 13. FastAPI service endpoints (internal, server-to-server)
 
-Base: `${BACKEND_URL}` (Railway). Every request carries the caller's **Supabase JWT**; the service verifies it and derives identity. Reached only via the web BFF, never the browser.
+Base: **`/api/backend`** — same origin as the web app, routed by the root `vercel.json` to the `backend` Vercel Service ([ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)), so no absolute base URL is configured per environment. Every request carries the caller's **Supabase JWT**; the service verifies it and derives identity. Reached only via the web BFF, never the browser — same origin does not change that boundary.
 
 | Method | URL | Auth | Input | Output |
 |---|---|---|---|---|

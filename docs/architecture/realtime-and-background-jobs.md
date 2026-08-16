@@ -17,7 +17,7 @@ Draw the line between what happens live (Realtime) and what happens asynchronous
 - Inventory availability
 - Quotation status
 
-**Background jobs** (Supabase Queues + Railway workers) handle work that is slow, expensive, or external:
+**Background jobs** (Supabase Queues + Python workers) handle work that is slow, expensive, or external. No worker is implemented yet, and its **host is deliberately undecided** — a new ADR picks between Vercel Cron/Queues and a container host when the first one lands ([ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)):
 - OCR
 - Embeddings
 - Document chunking

@@ -11,13 +11,13 @@ Define how configuration and secrets are handled across Local, Staging, and Prod
 **Environments:** `Local` (developer machine + local Supabase) · `Staging` · `Production`. Development resembles production as closely as practical (12-factor).
 
 **Secret handling:**
-- Secrets live in each platform's secret store (Vercel, Railway, Supabase), **never in source control**.
+- Secrets live in each platform's secret store (Vercel, Supabase), **never in source control**. `.vercel/` — which `vercel link` fills with the project link and a pulled OIDC token — is gitignored.
 - `.env` files are gitignored; only `*.env.example` templates are committed, with placeholder values, documenting each variable's **purpose, exposure level (public/secret), and required/optional** status.
 - **No real Production secrets are used during foundation/dev tasks.**
 
 **Frontend:**
 - One validated env module (`frontend/src/lib/env/`). Components never read `process.env` directly.
-- Only `NEXT_PUBLIC_`-prefixed variables may reach the client; **service-role, OpenAI, OCR, Railway, and other server secrets are never exposed client-side.**
+- Only `NEXT_PUBLIC_`-prefixed variables may reach the client; **service-role, OpenAI, OCR, and other server secrets are never exposed client-side.**
 
 **Backend:**
 - `backend/app/config.py` (Pydantic Settings) is the only settings source; no `os.getenv`/`load_dotenv` in app code.

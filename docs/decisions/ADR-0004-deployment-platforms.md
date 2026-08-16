@@ -1,6 +1,12 @@
 # ADR-0004 — Deployment Platforms
 
-**Status:** Accepted · 2026-07-29
+**Status:** **Superseded (in part) by [ADR-0009](ADR-0009-vercel-services-deployment.md) · 2026-08-16** · originally Accepted 2026-07-29
+
+> **Superseded — read this first.** The **FastAPI service and Python workers rows below are no longer the current decision.** [ADR-0009](ADR-0009-vercel-services-deployment.md) deploys `frontend/` **and** `backend/` through **Vercel Services** from a single repository-root `vercel.json`; Railway is not used. The worker host is deferred to a future ADR.
+>
+> Everything else in this ADR — **Supabase** for Postgres/Auth/Storage/Realtime, **OpenAI**, **Azure Document Intelligence** as the OCR candidate, **Sentry**, the Local→Staging→Production environment split, and the portability requirement — **remains in force** and is carried forward by ADR-0009.
+>
+> The text below is preserved **unedited** as the historical record of the 2026-07-29 decision and its reasoning. Do not treat it as current guidance.
 
 ## Purpose
 

@@ -69,6 +69,12 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
+// Vercel Services cannot host Edge Function output, and this middleware has no
+// need for the Edge runtime: it does one network round trip to the Supabase auth
+// server and reads/writes cookies, both of which the Node runtime supports.
+// Node.js middleware is stable as of Next.js 15.5 (installed: 15.5.22).
+export const runtime = "nodejs";
+
 export const config = {
   // Run on everything except static assets and the health route.
   matcher: [

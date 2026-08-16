@@ -9,7 +9,7 @@
 | **Depends On** | ../architecture/realtime-and-background-jobs.md, 10_events.md |
 | **Related** | 08_api_contracts.md, 13_integrations.md |
 
-All asynchronous work for the MVP. **Specification only.** Per [realtime-and-background-jobs.md](../architecture/realtime-and-background-jobs.md): anything slow, expensive, or external runs **off the request path** via **Supabase Queues → Railway workers** (in `backend/app/workers/`). Request handlers stay fast; the UI reflects progress via Realtime ([10](10_events.md)).
+All asynchronous work for the MVP. **Specification only.** Per [realtime-and-background-jobs.md](../architecture/realtime-and-background-jobs.md): anything slow, expensive, or external runs **off the request path** via **Supabase Queues → Python workers** (in `backend/app/workers/`, currently interface-only; host undecided per [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)). Request handlers stay fast; the UI reflects progress via Realtime ([10](10_events.md)).
 
 ## 1. Principles
 

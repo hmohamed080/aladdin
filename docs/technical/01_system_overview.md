@@ -32,10 +32,10 @@ flowchart TB
     RT["Realtime"]
     Q["Queues"]
   end
-  subgraph FastAPI["Specialized FastAPI Service (Railway)"]
+  subgraph FastAPI["Specialized FastAPI Service (Vercel Services · /api/backend)"]
     AI["ai · retrieval · documents · ocr<br/>ingestion · embeddings"]
   end
-  subgraph Workers["Background Workers (Railway)"]
+  subgraph Workers["Background Workers (not built · host undecided)"]
     W["queue consumers"]
   end
   subgraph Ext["External"]
@@ -68,10 +68,10 @@ flowchart TB
 
 | Part | Runtime | Owns | Never does |
 |---|---|---|---|
-| **Web app** | Next.js App Router (Vercel) | All product CRUD & user flows; i18n/RTL; theming; PWA; the primary path to Supabase via `supabase-js` preserving the user JWT | Hold service-role secrets in client code; embed heavy AI/OCR inline |
+| **Web app** | Next.js App Router (Vercel Services) | All product CRUD & user flows; i18n/RTL; theming; PWA; the primary path to Supabase via `supabase-js` preserving the user JWT | Hold service-role secrets in client code; embed heavy AI/OCR inline |
 | **Data platform** | Supabase | System of record (Postgres), Auth, Storage, RLS, Realtime, Queues, search/vector/geo extensions | — (owns schema via migrations only) |
-| **Specialized service** | FastAPI (Railway) | AI orchestration, OCR, document processing, chunking, embeddings, RAG, evaluations, NLP, large-Excel, workers | Recreate application CRUD |
-| **Workers** | Railway (Docker) | Async/slow/external work off the request path | Run inside the web request loop |
+| **Specialized service** | FastAPI (Vercel Services, same origin at `/api/backend`) | AI orchestration, OCR, document processing, chunking, embeddings, RAG, evaluations, NLP, large-Excel | Recreate application CRUD; be called from the browser |
+| **Workers** | Not implemented; host undecided ([ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)) | Async/slow/external work off the request path | Run inside the web request loop |
 
 ## 2. Bounded contexts
 
