@@ -23,7 +23,10 @@ select throws_ok('select count(*) from public.audit_log', '42501', null,
 select throws_ok('select count(*) from public.organizations', '42501', null,
   'anon is denied access to the base organizations table');
 -- Public discovery happens ONLY via the curated view (active+verified orgs).
-select is((select count(*)::int from public.organization_public_directory), 2,
+-- 10 = 2 base fixtures + the 8 verified businesses of the Pilot world (the
+-- showroom, its distributors, its institutional counterparties). The two orgs
+-- left pending_verification are deliberately NOT among them.
+select is((select count(*)::int from public.organization_public_directory), 10,
   'anon sees active+verified orgs via the public directory view only');
 -- Anonymous writes are rejected.
 select throws_ok(

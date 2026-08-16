@@ -41,9 +41,14 @@ select columns_are(
   'public'::name, 'organization_public_directory'::name,
   array['id','name','slug','org_type','is_verified','primary_locale','locality_id','logo_media_id'],
   'organization_public_directory still exposes only approved public columns');
+-- `persona` was added to the approved set in 20260816090001 (Sprint 14): the
+-- Technicians directory must filter to installer/technician professionals, and the
+-- persona is ALREADY the eligibility gate for appearing in this view at all, so
+-- surfacing it publishes no new fact about a person. Everything private
+-- (user_id, contacts, timestamps, deleted_at, verification) stays out.
 select columns_are(
   'public'::name, 'profile_public_directory'::name,
-  array['id','display_name','headline','bio','avatar_media_id','locality_id','languages'],
+  array['id','display_name','headline','bio','avatar_media_id','locality_id','languages','persona'],
   'profile_public_directory still exposes only approved display columns');
 
 -- --- 3. The backing readers are SECURITY DEFINER, in `app`, search_path pinned
@@ -125,12 +130,15 @@ select ok(not has_table_privilege('anon', 'public.memberships', 'select'),
 -- --- 7. End-to-end: discovery still works, base tables still denied --------
 set local role anon;
 set local request.jwt.claims = '';
-select is((select count(*)::int from public.organization_public_directory), 2,
-  'anon still discovers the two active+verified orgs through the hardened view');
+select is((select count(*)::int from public.organization_public_directory), 10,
+  'anon still discovers every active+verified org through the hardened view');
 -- Sprint 12: the seeded supplier owner is a business-only identity, so the
 -- interior designer is the single listed PERSONAL professional.
-select is((select count(*)::int from public.profile_public_directory), 1,
-  'anon still discovers the listed personal professional profile through the hardened view');
+-- 8 = the base interior designer plus the Sprint-14 trades and consultants who
+-- chose to be discoverable. Business owners are business-only identities and are
+-- never listed here.
+select is((select count(*)::int from public.profile_public_directory), 8,
+  'anon still discovers the listed personal professional profiles through the hardened view');
 select is((select count(*)::int from public.profile_public_directory where display_name like 'Karim%'),
   0, 'a hidden professional is still absent after hardening');
 select throws_ok('select count(*) from public.organizations', '42501', null,

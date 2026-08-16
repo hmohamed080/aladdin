@@ -23,6 +23,9 @@ export type QuotationRow = Database["public"]["Tables"]["quotations"]["Row"];
 export type QuotationListRow = Database["public"]["Views"]["quotation_list"]["Row"];
 export type QuotationItemRow = Database["public"]["Tables"]["quotation_items"]["Row"];
 export type ProductCategory = Database["public"]["Enums"]["product_category"];
+/** The status values these views actually carry — a filter cannot invent one. */
+export type RfqStatus = NonNullable<RfqListRow["status"]>;
+export type QuotationStatus = NonNullable<QuotationListRow["status"]>;
 
 const LIST_LIMIT = 100;
 
@@ -104,6 +107,34 @@ export async function listRfqs(
   return data ?? [];
 }
 
+/**
+ * The most recent RFQs on one side, WITH how many match in total.
+ *
+ * A dashboard panel wants both: five rows to show and the real number for its tile.
+ * PostgREST returns an exact count alongside a limited result set, so this is one
+ * round trip that answers both questions — rather than a hundred rows fetched so the
+ * page can slice five off the front and call `.length` on the rest. Same view, same
+ * RLS, same ordering as `listRfqs`; only the row budget differs.
+ */
+export async function recentRfqs(
+  supabase: DB,
+  orgId: string,
+  side: RfqSide,
+  opts: { statuses?: readonly RfqStatus[]; limit?: number } = {},
+): Promise<{ rows: RfqListRow[]; total: number }> {
+  const col = side === "requester" ? "requester_org_id" : "supplier_org_id";
+  let q = supabase
+    .from("rfq_list")
+    .select("*", { count: "exact" })
+    .eq(col, orgId)
+    .order("updated_at", { ascending: false })
+    .limit(opts.limit ?? 5);
+  if (opts.statuses) q = q.in("status", opts.statuses);
+  const { data, error, count } = await q;
+  if (error) throw error;
+  return { rows: data ?? [], total: count ?? 0 };
+}
+
 export async function getRfq(supabase: DB, id: string): Promise<RfqRow | null> {
   const { data, error } = await supabase.from("rfqs").select("*").eq("id", id).maybeSingle();
   if (error) throw error;
@@ -158,6 +189,45 @@ export async function listQuotations(
   return data ?? [];
 }
 
+/** The most recent quotations on one side, with the matching total (see `recentRfqs`). */
+export async function recentQuotations(
+  supabase: DB,
+  orgId: string,
+  side: RfqSide,
+  opts: { statuses?: readonly QuotationStatus[]; limit?: number } = {},
+): Promise<{ rows: QuotationListRow[]; total: number }> {
+  const col = side === "supplier" ? "supplier_org_id" : "requester_org_id";
+  let q = supabase
+    .from("quotation_list")
+    .select("*", { count: "exact" })
+    .eq(col, orgId)
+    .order("updated_at", { ascending: false })
+    .limit(opts.limit ?? 5);
+  if (opts.statuses) q = q.in("status", opts.statuses);
+  const { data, error, count } = await q;
+  if (error) throw error;
+  return { rows: data ?? [], total: count ?? 0 };
+}
+
+/**
+ * How many quotations match, WITHOUT transferring them. `head: true` sends no rows
+ * at all — Postgres counts and returns the number in a header, which is what a KPI
+ * tile with no list behind it actually needs.
+ */
+export async function countQuotations(
+  supabase: DB,
+  orgId: string,
+  side: RfqSide,
+  statuses?: readonly QuotationStatus[],
+): Promise<number> {
+  const col = side === "supplier" ? "supplier_org_id" : "requester_org_id";
+  let q = supabase.from("quotation_list").select("*", { count: "exact", head: true }).eq(col, orgId);
+  if (statuses) q = q.in("status", statuses);
+  const { count, error } = await q;
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function getQuotation(supabase: DB, id: string): Promise<QuotationRow | null> {
   const { data, error } = await supabase.from("quotations").select("*").eq("id", id).maybeSingle();
   if (error) throw error;
@@ -188,4 +258,53 @@ export async function listQuotationItems(
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data ?? [];
+}
+
+// ---- Saved products (organization shortlist) -------------------------------
+export type SavedProductRow = Database["public"]["Views"]["saved_product_list"]["Row"];
+
+/**
+ * The calling organization's shortlist. RLS scopes rows to the caller's org, and
+ * the view's join to `catalog_published_products` means an item whose supplier
+ * later unpublished or deleted it simply drops out — no stale or leaked row.
+ */
+export async function listSavedProducts(
+  supabase: DB,
+  orgId: string,
+  f: { category?: ProductCategory } = {},
+): Promise<SavedProductRow[]> {
+  let q = supabase
+    .from("saved_product_list")
+    .select("*")
+    .eq("organization_id", orgId)
+    .order("saved_at", { ascending: false })
+    .limit(LIST_LIMIT);
+  if (f.category) q = q.eq("category", f.category);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * How many products are on the shortlist. The shortlist view joins through to the
+ * published catalog, so counting it via the list query meant materializing every
+ * joined row to read one number off `.length`.
+ */
+export async function countSavedProducts(supabase: DB, orgId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("saved_product_list")
+    .select("*", { count: "exact", head: true })
+    .eq("organization_id", orgId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/** The saved product ids for this org, so the catalog can show its save state. */
+export async function savedProductIds(supabase: DB, orgId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("saved_products")
+    .select("product_id")
+    .eq("organization_id", orgId);
+  if (error) throw error;
+  return new Set((data ?? []).map((r) => r.product_id));
 }

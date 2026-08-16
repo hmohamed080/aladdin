@@ -58,18 +58,18 @@ test.describe("business onboarding", () => {
     await registerFreshUser(page, request);
     await toAccountType(page, "Founder One");
 
-    // Choose Supplier (business track) → enters the shared business wizard.
-    await page.getByRole("button", { name: /supplier/i }).click();
+    // Choose Distributor (business track) → enters the shared business wizard.
+    await page.getByRole("button", { name: /distributor/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
     await page.waitForURL(/\/onboarding\/business$/, { waitUntil: "commit" });
     await noOverflow(page);
 
     // Step 1 — identity: an organization name is required to continue.
-    await expect(page.getByRole("heading", { name: /set up your organization/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /set up your business/i })).toBeVisible();
     await page.locator("#bname").fill("Nile Supply Co");
     await page.getByRole("button", { name: /^continue$/i }).click();
 
-    // Step 2 — business type (Supplier is pre-selected from the chosen account type).
+    // Step 2 — business type (Distributor is pre-selected from the chosen account type).
     await expect(page.getByRole("heading", { name: /what kind of business/i })).toBeVisible();
     await page.getByRole("button", { name: /^continue$/i }).click();
 

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -16,12 +17,20 @@ import type { Database } from "@/types/database.types";
  * isolation — never application filtering (ADR-0007/0008). The service-role key
  * is NEVER used here, and no access/refresh token is ever logged.
  *
- * A NEW client is created per request (never module-scoped), so one request can
- * never reuse another request's session. `setAll` is a no-op when called during
- * a Server Component render (cookies are read-only there); the middleware
- * refreshes the session cookie on navigation and propagates it on the response.
+ * ONE client per REQUEST (never module-scoped), so one request can never reuse
+ * another request's session. `cache()` is what makes "per request" exact: React
+ * scopes it to a single server render, so the layout and the page it wraps share
+ * one client instead of building two that read the same cookies — which is also
+ * what lets the context loaders below dedupe (they key on the client identity).
+ * It is NOT a data cache and nothing survives the response.
+ *
+ * `setAll` is a no-op when called during a Server Component render (cookies are
+ * read-only there); the middleware refreshes the session cookie on navigation and
+ * propagates it on the response.
  */
-export async function getServerSupabase(): Promise<SupabaseClient<Database>> {
+export const getServerSupabase = cache(async function getServerSupabase(): Promise<
+  SupabaseClient<Database>
+> {
   const cookieStore = await cookies();
   const env = readPublicEnv();
   return createServerClient<Database>(
@@ -44,7 +53,7 @@ export async function getServerSupabase(): Promise<SupabaseClient<Database>> {
       },
     },
   );
-}
+});
 
 /**
  * Explicit-token variant for trusted server/worker paths that already hold a

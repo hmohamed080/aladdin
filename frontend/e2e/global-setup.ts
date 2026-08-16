@@ -69,5 +69,13 @@ function psql(sql: string): void {
 export default function globalSetup(): void {
   psql(RESET_SQL);
   // cwd is the frontend package when run via `pnpm --filter frontend e2e`.
-  psql(readFileSync(path.resolve(process.cwd(), "../supabase/demo-seed.sql"), "utf8"));
+  const seed = (file: string) =>
+    psql(readFileSync(path.resolve(process.cwd(), `../supabase/${file}`), "utf8"));
+
+  seed("demo-seed.sql");
+  // The truncate above also removed the SHOWROOM's seeded sales book, which is
+  // pilot data, not E2E residue. Re-applying it from the same file `db reset` uses
+  // keeps the two paths identical — without this, running the suite left the
+  // showroom acceptance account with empty pipeline panels until a full reset.
+  seed("seed-showroom-sales.sql");
 }

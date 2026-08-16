@@ -7,6 +7,10 @@ export const IDENTITIES = {
   admin: "admin@example.test",
   consumer: "consumer@example.test",
   salesperson: "youssef@example.test",
+  /* Cairo Ceramics Showroom owner - the Showroom/Dealer acceptance workspace.
+     Org A is a supplier and Org B a design office; neither exercises the
+     buyer-first showroom IA the workspace is actually tuned for. */
+  showroom: "hana@example.test",
 } as const;
 
 const MAILPIT = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";

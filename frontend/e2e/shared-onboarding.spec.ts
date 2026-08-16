@@ -63,7 +63,9 @@ test.describe("shared onboarding", () => {
     await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
     await expect(page.getByText(/step 3 of 3/i)).toBeVisible();
     await noOverflow(page);
-    await page.getByRole("button", { name: /engineer \/ designer/i }).click();
+    // A single "Engineer / Designer" option was split into two personas in an
+    // earlier sprint; anchored so it cannot also match "Interior designer".
+    await page.getByRole("button", { name: /^engineer$/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
 
     // Step 4 — persona handoff: a professional now enters the Sprint 7.4 professional
@@ -124,13 +126,13 @@ test.describe("shared onboarding", () => {
     await page.getByRole("button", { name: /متابعة/ }).click();
     await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
 
-    // Choose Supplier (business) — Arabic label. Sprint 8: the business track now
+    // Choose Distributor (business) — Arabic label. Sprint 8: the business track now
     // enters the shared organization onboarding wizard (not the generic handoff).
-    await page.getByRole("button", { name: /مورّد/ }).click();
+    await page.getByRole("button", { name: /موزّع/ }).click();
     await page.getByRole("button", { name: /متابعة/ }).click();
     await page.waitForURL(/\/onboarding\/business$/, { waitUntil: "commit" });
     // The business identity step is shown (Arabic).
-    await expect(page.getByRole("heading", { name: /أنشئ مؤسستك/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /أنشئ نشاطك التجاري/ })).toBeVisible();
     await noOverflow(page);
   });
 

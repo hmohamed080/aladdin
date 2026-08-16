@@ -4,6 +4,43 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Showroom interaction refinement: sidebar display modes + horizontal card rails
+
+**Date:** 2026-08-16 · **Branch:** `feature/showroom-mvp-completeness` (same PR #23, unmerged) · **Base:** `main` @ `678ba32` · **Branch HEAD at start:** `a7ee372`
+
+### Objective
+The final interaction/UI pass before manual UAT. Supabase's workspace chrome was supplied as **interaction** reference only — none of its colors, typography, border system or branding was copied, and the Aladdin tokens, themes, spacing, type scale, accent behavior and component language are untouched. **No data, seed, analytics, architecture or performance work was redone**; the acceptance account stays `hana@example.test` / Cairo Ceramics Showroom and the seeded connected showroom world is intact. No migration, no schema change, no `.pen` change.
+
+### Sidebar: three display modes, one navigation
+The desktop sidebar now offers **Expanded · Collapsed · Expand on hover**, chosen from a compact control in the sidebar footer whose menu exposes exactly those three, localized EN/AR, with no internal terminology. They are three presentations of **one** navigation: `allowedNavSections(capabilities)` still produces the item set, so the grouping, order, capability filtering, icons, active-route rule and RTL mirroring are identical in all three, and a collapsed rail renders exactly as many links as an expanded one. Collapsed hides labels and section headings — grouping is carried by a rule instead of a word — while each item keeps its localized label as its **accessible name** plus a visual tooltip on hover *and* keyboard focus.
+
+**The structural decision** is the spacer/panel split in `sidebar-shell.tsx`: an outer flex child reserves the RESTING width, and an absolutely-positioned inner panel carries the VISUAL width. In expanded and collapsed they agree and nothing moves; in expand-on-hover they deliberately disagree, so the reveal floats **inward over the page** and the document does not reflow. Widening a flex child on hover instead would relayout the whole document on every pointer pass — that is both the "continuously resizing/shifting the body" the brief rules out and the usual source of hover flicker. Because the panel is `start-0` inside the spacer, the reveal direction falls out of writing direction for free: rightward in English, leftward in Arabic, inward in both. Hover/focus handlers live on the **panel**, not the spacer, so the pointer never crosses a seam between the thing that opened the reveal and the thing it opened into; `onFocusCapture`/`onBlurCapture` make the reveal reachable by keyboard alone, and an open control menu holds the reveal so it cannot collapse out from under a choice in progress.
+
+**Persistence is a cookie, not `localStorage`, and that is not a style preference.** The mode decides a WIDTH. Read from `localStorage` it would only be known after hydration, so every load would paint 15rem and snap to 3.5rem — precisely the flash the brief rules out. The cookie travels with the document request, `AppShell` resolves it server-side, and the first HTML byte already carries the right width (asserted directly in E2E against the raw response). It is written client-side rather than through a server action: nothing the server computes depends on it except a width, so a `revalidatePath` round trip to move a border would be waste. Still per-browser; **no database persistence**. **Mobile is untouched** — the three modes are `tablet:`-and-up, and the bottom bar + More sheet are unchanged.
+
+### Horizontal card rails
+One reusable `CardRail` (`components/ui/card-rail.tsx`), no carousel dependency: `overflow-x: auto` already provides trackpad, wheel and touch swipe, CSS scroll-snap keeps every stop on a card boundary, and the buttons exist for mouse and keyboard. Controls render **only when the content actually overflows** — on a wide desktop where everything fits they are absent, not greyed out — disable at each end, and move by whole cards (as many as currently fit), with smooth scrolling that respects `prefers-reduced-motion`. An overflowing rail is a focusable region so it is keyboard-reachable; one that fits adds no dead tab stop.
+
+**RTL is normalized explicitly rather than assumed.** `scrollLeft` is the one layout API that does not follow writing direction: in an RTL container it rests at 0 and travels **negative**. Every read goes through `Math.abs` so "distance travelled from the start" means the same in both directions, and every write flips its sign from the active direction. Nothing in the component assumes left means previous. Unit tests pin both signs, because getting this wrong makes the Arabic rail jump to the end on its first "next".
+
+### Where rails were applied — and deliberately not
+Applied to three dense **peer-card** groups: the dashboard KPI strip (a member who both buys and sells reaches **eight** tiles — two full grid rows before the first real panel), the dashboard "What do you want to do today?" action ramp (up to eight), and the Reports analytics summary strip. The Reports case also **retires a documented defect**: a comment there recorded that six tiles across truncated `EGP 1,103,100.00` at laptop width, which is why they were forced to four-plus-two. A railed card holds its width and scrolls instead of shrinking, so the figure now stays whole at every viewport. Module KPI strips of three or four tiles keep the grid — they already fit, and a rail there would add nothing while making a phone swipe for a number it could already see. **Not converted:** data tables, main report charts, forms, and the large operational lists (catalog grid, saved-products grid, the directories) — those are scanned and compared down the page, and hiding half of one behind a swipe is a regression, not a polish.
+
+### Validation
+Frontend typecheck ✓ · lint ✓ (0 errors, 0 warnings) · unit **230/230** ✓ (14 new: 6 `card-rail` covering fit/overflow/end-detection/both RTL signs/whole-card stepping, 8 `sidebar-shell` covering the three-mode menu, module survival across modes, accessible naming, active marking, hover vs collapsed distinctness, keyboard reveal, and cookie persistence) · targeted Playwright `showroom-interaction` **15 passed / 0 failed / 0 flaky** (7 declared `isMobile` skips) across chromium-desktop 1440x900 and Pixel 5 · regression `showroom-mvp` **24 passed / 0 failed** across both projects, English and Arabic · real-browser UAT as `hana@example.test` at 1440×900 through the real Email-OTP path — collapsed rail with working tooltips, Arabic RTL revealing inward from the right edge with the sidebar's outer edge pinned, the control menu showing exactly موسّع / مصغّر / التوسيع عند المرور with the active one checked, and both dashboard rails peeking their next card with correctly-mirrored arrows. Deliberately **not** run, per the brief: the broad audit, the full-repo integration/performance gate, Lighthouse, and pgTAP (no schema change). Pre-existing `sales.spec.ts` failures are unrelated and untouched.
+
+### Three defects found and fixed during validation
+1. **Rail arrows were wrong at rest.** The rail's `px-1` (shadow room) shifted the first scroll-snap position, so the first card parked at `scrollLeft: 4`, the rail never read as "at the start", and the previous arrow stayed enabled on a rail nobody had scrolled — a direct miss of the arrow-state-at-beginning requirement. Fixed with a matching `scroll-px-1`; scroll-padding is what declares the scrollport's optical edge when the container has padding.
+2. **A collapsed-rail tooltip would have been sliced off.** `overflow-y: auto` also clips horizontally, so an absolutely-positioned tooltip could not escape the scrolling rail. The tooltip is `position: fixed` with measured coordinates instead — verified in a real browser, not just asserted.
+3. **The rail scrollbar was visually wrong on Windows.** `scrollbar-width: thin` renders a CLASSIC, permanent grey bar in Windows Chrome — a horizontal rule under every rail that the design system never asked for. Only a real-browser pass surfaced this; headless never showed it. Now hidden, which costs nothing: the arrows appear on overflow, the next card peeks, and the region stays keyboard-scrollable.
+
+Two E2E defects were also fixed rather than retried: a `walk` loop that clicked an arrow which disabled itself mid-animation (`disabled:pointer-events-none` then sent the click through to the card underneath, burning the full test timeout — now waits for `scrollLeft` to stop moving), and an `isVisible()` guard that **silently skipped** the Arabic desktop rail test by racing the effect that measures overflow. The second was the more dangerous of the two: the run stayed green while nothing was checked. Both now fail loudly instead.
+
+### Files touched
+New: `lib/ui/sidebar-mode.ts`, `components/layout/sidebar-shell.tsx` (+test), `components/ui/card-rail.tsx` (+test), `e2e/showroom-interaction.spec.ts`. Changed: `components/layout/app-shell.tsx`, `components/layout/workspace-nav.tsx`, `components/ui/icons.tsx` (3 glyphs), `components/ui/stat-tiles.tsx` (opt-in `layout="rail"`), `features/home/quick-actions.tsx`, `app/b2b/page.tsx`, `app/b2b/reports/page.tsx`, `lib/i18n/messages/{en,ar}.ts`, `UI_UX_SYSTEM_GUIDE.md`, `RUNTIME_STATE.md`, this log.
+
+---
+
 ## Session — Pilot Account & Workspace Model (feature sprint)
 
 **Date:** 2026-08-12 · **Branch:** `feature/pilot-account-workspace-model` · **Base:** `main` @ `a0ff5f6` (PR #20 merged)
@@ -1265,3 +1302,269 @@ The UAT findings traced to two concrete facts: the shell capped content at 900px
 
 ### Rollback
 Two migrations and three commits on `feature/pilot-personal-sales-readiness`; `main` @ `e7fc5e0` is untouched. Reverting the type-separation migration is **not** a simple `git revert` — it changed column types and dropped an enum, so a down-migration would have to recreate `account_type` and re-cast four columns. The safe rollback is `supabase db reset` to the previous migration set on a local/staging database; nothing has been applied to production.
+
+---
+
+## 2026-08-15 — Sprint 14: Showroom MVP Completeness
+
+**Branch:** `feature/showroom-mvp-completeness` (from `main` @ `678ba32`) · **Migration:** `20260816090001` · No `.pen` change.
+
+**Goal:** make the Showroom/Dealer the strongest, most complete MVP account — audit the implemented
+surfaces against the supplied reference images, reorganize the IA, raise UI quality, add the missing
+modules.
+
+### Audit first (the required first step)
+Full write-up: [`../frontend/sprint-14-showroom-mvp-completeness.md`](../frontend/sprint-14-showroom-mvp-completeness.md).
+
+The reference images arrived as a loose `showroom/` folder at the repo root with no home; there was
+no existing reference-asset convention under `UI-UX/`, so they moved unmodified to
+**`UI-UX/references/showroom/`**.
+
+Two findings shaped everything after:
+
+1. **The "طلباتي / مشترياتي" confusion was not a labelling bug.** `/b2b/rfqs` and `/b2b/quotations`
+   each rendered the buy side and the sell side stacked in one page, so *no* label could be correct
+   for both halves. Renaming would have moved the ambiguity, not removed it.
+2. **Several reference patterns contradict the approved product direction** and were deliberately
+   NOT copied, with the reason recorded rather than left implicit: points/rewards tiers (no such
+   model, and Sprint 13 kept referral attribution *without* rewards), add-to-cart on product cards
+   (Aladdin is consultation-first, explicitly not a cart marketplace), supplier/technician star
+   ratings (no ratings model), paid-membership card (no subscription model), and "add new
+   supplier/technician/institution" buttons (these are directories of real registered organizations
+   and people — creating one from the buyer side would fork business identity).
+
+### What shipped
+- **IA:** eleven flat nav peers → five capability-derived sections (Overview · Buying · Network ·
+  Selling · Business); empty sections drop rather than render. Renamed `rfqs`→`purchaseRequests`,
+  `quotations`→`offers`, `organization`→`team`. **Route paths unchanged** — the ambiguity was in
+  structure and labels, and renaming paths would churn every detail route, back-link and spec for
+  no user-visible gain.
+- **Perspective separation** on RFQs, Quotations, Orders and Projects: one side leads, the other is
+  a tab shown only to an organization that holds that role or has records on that side.
+- **Six new modules:** Suppliers, Institutions (one component, two org-type slices), Technicians,
+  Saved products, Reports & analytics, Settings. Dashboard rebuilt buyer-first with a
+  "What do you want to do today?" ramp; Projects strengthened.
+- **One canonical UI set** — `data-table` (semantic table ≥ tablet, stacked cards below, from the
+  same column definitions), `stat-tiles` + `TabLinks`, `filter-bar`, `breakdown`. The per-feature
+  list components were rewritten onto it rather than kept alongside it.
+
+### Three defects the browser caught that the type system could not
+- **Directory ACL destroyed.** Adding `persona` changes the function's return type, forcing
+  DROP+CREATE — which drops the ACL. The first version reasserted only the REVOKE, so the
+  `security_invoker` view had no executable reader and Suppliers/Technicians/Institutions returned
+  **42501 for every caller**, anon and authenticated alike.
+- **Mobile lost eleven modules.** Grouping the nav while keeping a five-item bottom bar silently
+  made Projects, Team, Reports and Settings unreachable on a phone. Fixed with a **More sheet**
+  carrying the same sections as the desktop rail — not by editing the test that caught it.
+- **Self-listing dead end.** A business appeared in its own Suppliers directory, where the only
+  action leads to "this is your own product".
+
+### Validation
+- frontend typecheck ✅ · lint ✅ (0/0) · unit **208/208** ✅ (incl. rewritten `nav/modules.test.ts`) ·
+  bilingual parity gate ✅
+- `supabase db reset` ✅ from clean, both seeds · pgTAP **729/729** ✅ across 29 files
+- Playwright `showroom-mvp` + `orders-projects`: **21 passed / 0 failed / 0 retries**, desktop and
+  Pixel 5, English and Arabic
+- **Attribution done honestly:** two `sales.spec.ts` failures were verified **pre-existing on
+  `main`** by checking out `678ba32` and re-running; a third is a cold-build flake in an untouched
+  module. **pgTAP must run from a clean reset** — a preceding Playwright session leaves sales rows
+  and capability grants behind that fail two unrelated files.
+
+### Rollback
+One migration and three commits; `main` @ `678ba32` untouched. Reverting `20260816090001` drops
+`saved_products` and its RPCs and restores the seven-column profile directory — the two pgTAP
+approved-column guards must be reverted with it.
+
+---
+
+## 2026-08-15 — Sprint 14 acceptance: Showroom workspace loading latency
+
+Manual review reported the Showroom workspace loading "noticeably too slowly". Scoped to the
+Sprint 14 routes only; **PR #23 not merged**.
+
+### Measured first, so the fix aimed at the real cost
+
+Local Supabase, seeded demo data, identical harness for every number (time to last byte, medians of
+5–7 samples per route).
+
+| Mode | Cold (first hit) | Warm (repeat) | In-app RSC nav |
+| --- | --- | --- | --- |
+| `next dev` | 1.0 s – 27 s, wildly variable | 458–715 ms | 282–486 ms |
+| `next build && next start` | 150–340 ms | 160–221 ms | 156–221 ms |
+
+The dev cold figures are **on-demand webpack compilation, not a product regression** — the same
+route drops from 27 s to sub-second on its second hit, and production never pays it. Production warm
+render was already ~185 ms.
+
+**The real finding came from a decomposition, not from the route table.** A B2B page with ONE data
+query cost 178 ms; the dashboard with NINE cost 195 ms; the framework floor is 15 ms. So ~160 ms of
+every Showroom page was fixed identity/workspace-context cost and the page's own data was nearly
+free. Counting Supabase round trips per render (Kong access log) showed why: `2x /auth/v1/user`,
+`2x rpc/my_workspaces` — **the layout and the page each resolved the workspace context
+independently**, in a five-deep sequential chain, on every navigation.
+
+### Root causes and what changed
+
+1. **Context resolved twice per navigation, five hops deep** — the dominant cost on EVERY route.
+   `getServerSupabase`, `loadWorkspaces`, `loadWorkspaceContext` and `getPageContext` are now
+   `cache()`d per render, so layout and page share one resolution; `getUser()` and `my_workspaces()`
+   start together instead of chaining, as do the capability and branch reads. Request-scoped
+   deduplication only — no cross-request or cross-user caching, and RLS still governs every read.
+2. **Dashboard fetched record sets to read `.length` off them** — up to 100 RFQs, 100 quotations,
+   100 orders and the whole joined shortlist, for four numbers and two five-row panels. Panels now
+   ask for five rows *and* the exact count in one request; the tiles with no panel behind them are
+   head-only counts. Lead labels read the customers those leads name, not the org's 500-row book.
+3. **Reports read the same order set twice** — `topSuppliers` re-fetched what `purchaseSummary`
+   already had; folded into one read (3 order reads → 2 across the page).
+4. **Technicians ran the directory list three times**, one run byte-identical to the table's own
+   query, purely for two tab counts; now two head counts.
+
+### One optimization was measured and REVERTED
+
+Replacing the directories' single two-column count query with per-tile `head` counts turned one
+request into six and made `/b2b/suppliers` **slower** (167 ms → 209 ms). Round trips cost more here
+than the columns they save. Reverted to the single narrow read, with the reasoning recorded in the
+function; the scale answer is a `group by` aggregate in the database, which is a migration this page
+does not need yet.
+
+### `force-dynamic` kept
+
+Every B2B route reads cookies for auth and org context, so Next.js requires dynamic rendering
+regardless. The declarations were left in place (and the dashboard's now says why): they cost
+nothing and they state that these panels must never be served from a shared cache.
+
+### UX
+
+Only `b2b/loading.tsx` existed, so every route flashed a dashboard-shaped skeleton before becoming a
+table. Added `page-skeletons.tsx` (list / grid / panel archetypes, built from the existing
+`Skeleton` primitive — no new design language) and a `loading.tsx` per Showroom route. Verified in
+the browser: every route's prefetch payload carries its own `aria-busy` skeleton.
+
+### Result
+
+| Route | prod warm before | prod warm after |
+| --- | --- | --- |
+| median of all 11 | 185 ms | **168 ms** |
+| `/b2b/reports` | 193 ms | 187 ms (14 → 12 round trips) |
+| `/b2b/settings` | 178 ms | 168 ms |
+| `/b2b/projects` | 185 ms (p95 460) | 161 ms (p95 173) |
+| `/b2b` | 197 ms (p95 426) | 221 ms (p95 279) |
+
+`/b2b`'s median is unchanged-to-slightly-worse **at seed scale** — with one record per table there
+is no payload to save, so the count queries only add statements. The change is deliberate anyway:
+it makes the dashboard's cost flat as a real showroom's records grow, where the old shape grew with
+them. Real-browser production navigation measured 142–194 ms per route.
+
+### Validation
+- frontend typecheck ✅ · lint ✅ (0/0) · unit **208/208** ✅
+- Playwright `showroom-mvp`: **7 passed / 1 skipped** desktop **and** **7 passed / 1 skipped**
+  Pixel 5 (each project skips the other's viewport-specific test) — 0 failures
+- Dashboard counts verified against the database with temporary fixtures (7 RFQs across four
+  statuses, 3 shortlisted): tiles read 5 open / 3 saved, panel showed the 5 open rows and excluded
+  draft and closed. Fixtures removed afterwards.
+- Full-repo performance gate deliberately NOT run (out of scope for this acceptance).
+
+### Rollback
+One commit on `feature/showroom-mvp-completeness`, frontend-only, no migration. Reverting it
+restores the duplicate context resolution and the list-for-count dashboard reads.
+
+---
+
+## Sprint 14 — Showroom product-completeness pass (2026-08-15)
+
+Branch `feature/showroom-mvp-completeness` (PR #23). Not a new sprint: depth, usability, analytics
+and client-presentable quality on top of the module structure Sprint 14 already established.
+Reference set: `UI-UX/references/showroom/`. No `.pen` file touched.
+
+### The finding that mattered
+
+The Showroom modules were not sparse because of the components. `app._organization_public_directory()`
+filters on `is_verified`, and **every** pilot organization was seeded `is_verified = false` (with every
+pilot profile `hidden`) specifically so global `count(*)` assertions in pgTAP stayed frozen. Distributors,
+Institutions and Technicians were therefore **structurally empty** for the acceptance account no matter
+how good their UI was. Freezing global counts in tests had made the seed untouchable, which made the
+product undemonstrable.
+
+Fixed by scoping the two most brittle assertions to the record under test (`where id = …` /
+`where display_name like 'Nadia%'`) instead of a global count. Those assertions now prove *more* — the
+specific org/person leaves the directory — and stop blocking seed growth.
+
+### Acceptance account
+
+Switched from Delta Interiors Studio / Org A to the real Showroom/Dealer org, **Cairo Ceramics
+Showroom** (`hana@example.test`), in both manual UAT and the e2e suite. Org A is a supplier and Org B a
+design office; testing the buyer-first showroom IA through them only ever proved the pages render empty.
+
+### Seed (deterministic, synthetic)
+
+Extended `seed-pilot.sql`: 5 verified counterparties (3 distributors + 2 institutions) with owners,
+branches and published catalogues; 7 listed professional profiles; 12 purchase requests, 10 offers,
+7 orders (**EGP 1,103,100** over 6 months), 5 projects, 8 shortlisted products, and a sell-side chain.
+Product imagery is 12 local SVG **material swatches** under `frontend/public/demo/products` — a
+finishing catalogue is a catalogue of surfaces; no external host, no licensing question, deterministic.
+
+The showroom's sales book was split into `seed-showroom-sales.sql` (also in `config.toml` sql_paths).
+The e2e global setup truncates the four sales tables before every run; while that data lived inside
+`seed-pilot.sql` the truncate silently deleted it for good, leaving the acceptance account with empty
+pipeline panels after any e2e run. Global setup now re-applies that one file, from the same source of
+truth as `db reset`.
+
+### Terminology
+
+User-facing **Supplier → Distributor / المورّد → الموزّع** across every surface, applied to message
+VALUES only (keys, `{supplier}` placeholders, routes, columns and RPC identifiers are internal and
+unchanged). `showroom_dealer`'s Arabic label moved to "معرض / تاجر" so it no longer collides with the
+new meaning of موزّع. No schema terminology migration.
+
+### Charts — hand-written, no new dependency
+
+`components/ui/charts.tsx`: trend line, donut, ranked bars, funnel. Inline SVG renders on the server,
+ships no JavaScript, and inherits the theme because its fills are token variables. Required a
+categorical palette, added through governance as `--series-1…6` + `--chart-grid` in `tokens.css`
+(both themes, every value an existing brand primitive) and exposed as `series-*` in Tailwind. Every
+chart is `role="img"` with an `sr-only` transcript of its actual values; colour is always a second
+channel behind a text label.
+
+### Analytics data path
+
+One additive migration (`20260817090001`): `order_category_spend` resolves order value to product
+category through the quotation lines an order was created from — the only honest link, since an order
+line is a frozen snapshot carrying no `product_id`. Verified exact: the category split sums to the
+order total to the piastre. `order_list` and `project_list` gained appended columns (requester branch;
+branch + order value) so branch filtering and project value are real rather than approximated.
+
+### Defects found and fixed during browser review
+
+- `DataTable` clipped columns wider than their container (`overflow-hidden` with no scroller) — inside
+  a half-width dashboard card it hid the money column outright. Now scrolls within its own wrapper.
+- Money in a `StatTile` overflowed the two-column mobile grid and pushed the page sideways (23px).
+  Tiles now use the compact money format, with `truncate` as a guard.
+- `Projects` showed a branch column that was always "—" on the executing tab (it is the *client's*
+  branch, which this caller cannot name). Column is offered only where it resolves.
+- Arabic mixed numeral systems in one row (Arabic-Indic money beside a Latin `57%`). Added
+  `formatPercent`; shares now match the values beside them.
+- Fixture labels ("Nadia (Org B Owner)", "Hana (Cairo Ceramics Owner)") were reaching the client as
+  display copy. Replaced with plain synthetic names.
+- Team rendered **raw capability keys** (`org.manage`, `sales.read`) as chips. Replaced with localized
+  work groups via `capabilityGroups()` — a display mapping only; authorization is untouched.
+
+### Deliberately NOT built
+
+No ratings, no availability, no professional phone numbers, no geographic map, no project
+percentage-complete, no product price, no company location — none of those exist in the model, and a
+directory that invents them is worse than one that admits what it knows. No billing / notifications /
+integrations in Settings.
+
+### Validation
+- frontend typecheck ✅ · lint ✅ (0 errors, 0 warnings) · unit **216/216** ✅ (incl. new
+  `lib/org/roles.test.ts`, 8 tests, guarding that no raw capability key can reach the client)
+- pgTAP **729/729** ✅ after a clean `db reset` (5 files reconciled to the enlarged pilot world)
+- Playwright `showroom-mvp` **16 passed / 1 skipped** on chromium-desktop **and** chromium-mobile
+- Real-browser UAT as Cairo Ceramics across all 13 acceptance routes, EN + AR
+
+### Pre-existing failures, NOT caused by this pass (verified against a stashed baseline)
+- `shared-onboarding.spec.ts:44` and `business-onboarding.spec.ts:56` — a chain of assertions left
+  stale by an earlier sprint's onboarding copy rename. Three of them were repaired here (the specs had
+  to be touched anyway); the remainder are further down the same flow and are out of this pass's scope.
+- `pilot-uat-round-1.spec.ts:64` — two "Pending review" badges on the personal `/home` trip a
+  strict-mode locator. Fails identically at HEAD.

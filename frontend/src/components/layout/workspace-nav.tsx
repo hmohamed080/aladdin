@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
 import {
@@ -12,131 +12,348 @@ import {
   CalendarCheckIcon,
   SearchIcon,
   PackageIcon,
-  FileTextIcon,
-  ReceiptIcon,
   ClipboardIcon,
   LayersIcon,
-  BuildingIcon,
+  ShoppingBagIcon,
+  InboxIcon,
+  BookmarkIcon,
+  TruckIcon,
+  WrenchIcon,
+  LandmarkIcon,
+  BarChartIcon,
+  SettingsIcon,
+  MenuIcon,
+  XIcon,
 } from "@/components/ui/icons";
-import type { NavKey } from "@/lib/nav/modules";
+import type { NavKey, NavSection } from "@/lib/nav/modules";
+import { allowedNavSections } from "@/lib/nav/modules";
 
 /**
  * Primary workspace navigation — the implemented modules (no dead links). A
- * persistent icon+label rail on desktop/tablet (`Sidebar`) and a fixed bottom bar
- * on mobile (`MobileNav`). Both derive the active item from the pathname and
- * mirror correctly in RTL (leading/trailing via logical properties). Access is
- * still enforced server-side on every page.
+ * persistent grouped rail on desktop/tablet (`Sidebar`) and a fixed bottom bar on
+ * mobile (`MobileNav`). Both derive the active item from the pathname and mirror
+ * correctly in RTL (leading/trailing via logical properties). Access is still
+ * enforced server-side on every page.
+ *
+ * Sections come from `lib/nav/modules`; this file only knows how to draw them.
  */
 type Item = {
-  navKey: NavKey;
   href: string;
+  /** Translation key for the label. */
   key: string;
   exact: boolean;
   Icon: ComponentType<{ size?: number }>;
 };
 
-const ALL_ITEMS: Item[] = [
-  { navKey: "home", href: "/b2b", key: "nav.home", exact: true, Icon: HomeIcon },
-  { navKey: "customers", href: "/b2b/customers", key: "nav.customers", exact: false, Icon: UsersIcon },
-  { navKey: "leads", href: "/b2b/leads", key: "nav.leads", exact: false, Icon: TargetIcon },
-  { navKey: "followUps", href: "/b2b/follow-ups", key: "nav.followUps", exact: false, Icon: CalendarCheckIcon },
-  { navKey: "catalog", href: "/b2b/catalog", key: "nav.catalog", exact: false, Icon: SearchIcon },
-  { navKey: "products", href: "/b2b/products", key: "nav.products", exact: false, Icon: PackageIcon },
-  { navKey: "rfqs", href: "/b2b/rfqs", key: "nav.rfqs", exact: false, Icon: FileTextIcon },
-  { navKey: "quotations", href: "/b2b/quotations", key: "nav.quotations", exact: false, Icon: ReceiptIcon },
-  { navKey: "orders", href: "/b2b/orders", key: "nav.orders", exact: false, Icon: ClipboardIcon },
-  { navKey: "projects", href: "/b2b/projects", key: "nav.projects", exact: false, Icon: LayersIcon },
-  { navKey: "organization", href: "/b2b/organization", key: "nav.organization", exact: false, Icon: BuildingIcon },
-];
+const ITEMS: Record<NavKey, Item> = {
+  home: { href: "/b2b", key: "nav.home", exact: true, Icon: HomeIcon },
 
-/** Keep only the modules the caller may reach (order preserved). */
-function visibleItems(allowed: NavKey[]): Item[] {
-  const set = new Set(allowed);
-  return ALL_ITEMS.filter((i) => set.has(i.navKey));
-}
+  purchaseRequests: { href: "/b2b/rfqs", key: "nav.purchaseRequests", exact: false, Icon: ShoppingBagIcon },
+  offers: { href: "/b2b/quotations", key: "nav.offers", exact: false, Icon: InboxIcon },
+  orders: { href: "/b2b/orders", key: "nav.orders", exact: false, Icon: ClipboardIcon },
+  catalog: { href: "/b2b/catalog", key: "nav.catalog", exact: false, Icon: SearchIcon },
+  saved: { href: "/b2b/saved", key: "nav.saved", exact: false, Icon: BookmarkIcon },
 
-/** Mobile bottom bar shows at most 5 items; prioritize by canonical order. */
-function mobileItems(allowed: NavKey[]): Item[] {
-  return visibleItems(allowed).slice(0, 5);
-}
+  suppliers: { href: "/b2b/suppliers", key: "nav.suppliers", exact: false, Icon: TruckIcon },
+  technicians: { href: "/b2b/technicians", key: "nav.technicians", exact: false, Icon: WrenchIcon },
+  institutions: { href: "/b2b/institutions", key: "nav.institutions", exact: false, Icon: LandmarkIcon },
 
+  customers: { href: "/b2b/customers", key: "nav.customers", exact: false, Icon: UsersIcon },
+  leads: { href: "/b2b/leads", key: "nav.leads", exact: false, Icon: TargetIcon },
+  followUps: { href: "/b2b/follow-ups", key: "nav.followUps", exact: false, Icon: CalendarCheckIcon },
+  products: { href: "/b2b/products", key: "nav.products", exact: false, Icon: PackageIcon },
+
+  projects: { href: "/b2b/projects", key: "nav.projects", exact: false, Icon: LayersIcon },
+  team: { href: "/b2b/organization", key: "nav.team", exact: false, Icon: UsersIcon },
+  reports: { href: "/b2b/reports", key: "nav.reports", exact: false, Icon: BarChartIcon },
+  settings: { href: "/b2b/settings", key: "nav.settings", exact: false, Icon: SettingsIcon },
+};
+
+/**
+ * Two modules answer to `/b2b/rfqs` and `/b2b/quotations` respectively but no
+ * other item shares a prefix, so plain prefix matching is unambiguous.
+ */
 function useActive() {
   const pathname = usePathname();
   return (href: string, exact: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
 }
 
-/** Desktop/tablet vertical rail (rendered inside the persistent sidebar). */
-export function Sidebar({ allowed }: { allowed: NavKey[] }) {
+const sectionLabel: Record<NavSection, string | null> = {
+  overview: null, // Home stands alone above the first heading.
+  buying: "nav.section.buying",
+  network: "nav.section.network",
+  selling: "nav.section.selling",
+  business: "nav.section.business",
+};
+
+/**
+ * One navigation row.
+ *
+ * `narrow` is the icon-rail presentation, not a different link: the same href,
+ * the same active rule, the same capability gate. Only the label moves — out of
+ * the row and into a tooltip — so a collapsed rail can never expose a different
+ * set of modules than an expanded one.
+ *
+ * Accessibility in the narrow state: the localized label becomes the link's
+ * `aria-label`, so assistive tech reads exactly what the expanded rail shows.
+ * The tooltip is therefore purely visual (`aria-hidden`) — describing the link
+ * with the same string it is already named with would just stutter.
+ */
+function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow?: boolean }) {
+  const { t, dir } = useI18n();
+  const { href, key, Icon } = item;
+  const label = t(key);
+  const [tip, setTip] = useState<{ top: number; inlineStart: number } | null>(null);
+
+  /**
+   * The tooltip is `position: fixed`, and that is not a stylistic choice.
+   * The rail scrolls vertically, and a box with `overflow-y: auto` also clips
+   * horizontally — an absolutely-positioned tooltip at `start-full` would be
+   * sliced off at the rail's edge. Fixed positioning leaves the clipping context
+   * entirely, so the coordinates have to be measured rather than declared.
+   */
+  const place = (el: HTMLElement | null) => {
+    if (!el || !narrow) return;
+    const r = el.getBoundingClientRect();
+    setTip({
+      top: r.top + r.height / 2,
+      // Always inward, toward the content: past the trailing edge in LTR, past
+      // the leading edge in RTL. `inlineStart` is fed to the matching physical
+      // property below.
+      inlineStart: dir === "rtl" ? window.innerWidth - r.left : r.right,
+    });
+  };
+  const hide = () => setTip(null);
+
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      aria-label={narrow ? label : undefined}
+      onMouseEnter={(e) => place(e.currentTarget)}
+      onMouseLeave={hide}
+      onFocus={(e) => place(e.currentTarget)}
+      onBlur={hide}
+      className={cn(
+        "group relative flex items-center rounded-sm py-2 text-label font-medium transition-colors duration-fast",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
+        narrow ? "justify-center px-0" : "gap-3 px-3",
+        active ? "bg-surface-2 text-fg" : "text-fg-secondary hover:bg-surface-2/60 hover:text-fg",
+      )}
+    >
+      {/* The active marker is the ONLY cue left once labels are gone, so it stays
+          in both states rather than being an expanded-only flourish. */}
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute inset-y-1.5 start-0 w-0.5 rounded-pill bg-accent-solid transition-opacity",
+          active ? "opacity-100" : "opacity-0",
+        )}
+      />
+      <span className={cn("shrink-0", active ? "text-accent" : "text-fg-muted group-hover:text-fg-secondary")}>
+        <Icon size={19} />
+      </span>
+      {narrow ? (
+        tip ? (
+          <span
+            role="tooltip"
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-none fixed -translate-y-1/2 whitespace-nowrap",
+              "rounded-sm border border-strong bg-surface px-2 py-1 text-label text-fg shadow-lg",
+            )}
+            style={{
+              zIndex: 800,
+              top: tip.top,
+              ...(dir === "rtl"
+                ? { right: tip.inlineStart + 8 }
+                : { left: tip.inlineStart + 8 }),
+            }}
+          >
+            {label}
+          </span>
+        ) : null
+      ) : (
+        <span className="truncate">{label}</span>
+      )}
+    </Link>
+  );
+}
+
+/**
+ * Desktop/tablet vertical rail (rendered inside the persistent sidebar).
+ *
+ * `narrow` swaps the presentation only. The section list still comes from
+ * `allowedNavSections(allowed)`, so every capability-derived module survives the
+ * collapse — a narrow rail shows the same items, drawn smaller. Section headings
+ * have no room at 3.5rem, so the grouping is carried by a rule instead of a
+ * word; the groups themselves are unchanged and in the same order.
+ */
+export function Sidebar({ allowed, narrow = false }: { allowed: readonly string[]; narrow?: boolean }) {
   const { t } = useI18n();
   const isActive = useActive();
+  const sections = allowedNavSections(allowed);
+
   return (
     <nav aria-label={t("nav.workspace")} className="flex flex-col gap-1">
-      {visibleItems(allowed).map(({ href, key, exact, Icon }) => {
-        const active = isActive(href, exact);
+      {sections.map(({ section, keys }, i) => {
+        const labelKey = sectionLabel[section];
         return (
-          <Link
-            key={href}
-            href={href}
-            aria-current={active ? "page" : undefined}
+          <div
+            key={section}
             className={cn(
-              "group relative flex items-center gap-3 rounded-sm px-3 py-2.5 text-label font-medium transition-colors duration-fast",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-              active ? "bg-surface-2 text-fg" : "text-fg-secondary hover:bg-surface-2/60 hover:text-fg",
+              // Expanded groups are separated by their heading; narrow ones by a
+              // rule, which needs far less room around it than a word does.
+              labelKey && !narrow ? "mt-md first:mt-0" : undefined,
+              narrow && i > 0 && "mt-sm border-t pt-sm",
             )}
           >
-            <span
-              aria-hidden="true"
-              className={cn(
-                "absolute inset-y-1.5 start-0 w-0.5 rounded-pill bg-accent-solid transition-opacity",
-                active ? "opacity-100" : "opacity-0",
-              )}
-            />
-            <span className={cn(active ? "text-accent" : "text-fg-muted group-hover:text-fg-secondary")}>
-              <Icon size={20} />
-            </span>
-            {t(key)}
-          </Link>
+            {labelKey && !narrow ? (
+              <h2 className="px-3 pb-1.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-muted">
+                {t(labelKey)}
+              </h2>
+            ) : null}
+            <div className="flex flex-col gap-0.5">
+              {keys.map((k) => {
+                const item = ITEMS[k];
+                return (
+                  <NavLink key={k} item={item} active={isActive(item.href, item.exact)} narrow={narrow} />
+                );
+              })}
+            </div>
+          </div>
         );
       })}
     </nav>
   );
 }
 
-/** Mobile fixed bottom bar (at most five primary modules). */
-export function MobileNav({ allowed }: { allowed: NavKey[] }) {
+/**
+ * Mobile chrome: a fixed bottom bar of the four highest-priority modules plus a
+ * "More" sheet holding everything else.
+ *
+ * The sheet is not decoration — it is what makes the grouped IA safe on a phone.
+ * A bottom bar fits five targets, but the workspace now has up to seventeen
+ * modules across five sections, so truncating to the first five would leave a
+ * manager unable to reach Projects, Team, Reports or Settings on mobile at all.
+ * The sheet renders the SAME sections as the desktop rail, so both surfaces
+ * expose exactly the same set of modules.
+ */
+export function MobileNav({ allowed }: { allowed: readonly string[] }) {
   const { t } = useI18n();
   const isActive = useActive();
-  const shown = mobileItems(allowed);
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  const sections = allowedNavSections(allowed);
+  const flat = sections.flatMap((s) => s.keys);
+  const primary = flat.slice(0, 4);
+  const overflow = flat.slice(4);
+
+  // Any navigation closes the sheet — otherwise it would cover the page it just
+  // navigated to.
+  useEffect(() => setOpen(false), [pathname]);
+
+  // Escape closes it, matching the confirm dialog's behaviour.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const columns = overflow.length > 0 ? primary.length + 1 : primary.length;
+
   return (
-    <nav
-      aria-label={t("nav.workspace")}
-      className="fixed inset-x-0 bottom-0 z-sticky border-t bg-surface/95 backdrop-blur tablet:hidden"
-      style={{ zIndex: 100 }}
-    >
-      <ul
-        className="mx-auto grid max-w-lg"
-        style={{ gridTemplateColumns: `repeat(${Math.max(shown.length, 1)}, minmax(0, 1fr))` }}
+    <>
+      {open && overflow.length > 0 ? (
+        <div className="fixed inset-0 tablet:hidden" style={{ zIndex: 99 }}>
+          <button
+            type="button"
+            aria-label={t("common.close")}
+            onClick={() => setOpen(false)}
+            className="absolute inset-0 bg-brand-basalt/60"
+          />
+          <div className="absolute inset-x-0 bottom-14 max-h-[65dvh] overflow-y-auto rounded-t-lg border-t bg-surface px-3 pb-3 pt-2 shadow-card">
+            <nav aria-label={t("nav.more")} className="flex flex-col gap-1">
+              {sections.map(({ section, keys }) => {
+                const shown = keys.filter((k) => overflow.includes(k));
+                if (shown.length === 0) return null;
+                const labelKey = sectionLabel[section];
+                return (
+                  <div key={section} className="mt-md first:mt-0">
+                    {labelKey ? (
+                      <h2 className="px-3 pb-1.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-muted">
+                        {t(labelKey)}
+                      </h2>
+                    ) : null}
+                    <div className="flex flex-col gap-0.5">
+                      {shown.map((k) => {
+                        const item = ITEMS[k];
+                        return <NavLink key={k} item={item} active={isActive(item.href, item.exact)} />;
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+      ) : null}
+
+      <nav
+        aria-label={t("nav.workspace")}
+        className="fixed inset-x-0 bottom-0 z-sticky border-t bg-surface/95 backdrop-blur tablet:hidden"
+        style={{ zIndex: 100 }}
       >
-        {shown.map(({ href, key, exact, Icon }) => {
-          const active = isActive(href, exact);
-          return (
-            <li key={href}>
-              <Link
-                href={href}
-                aria-current={active ? "page" : undefined}
+        <ul
+          className="mx-auto grid max-w-lg"
+          style={{ gridTemplateColumns: `repeat(${Math.max(columns, 1)}, minmax(0, 1fr))` }}
+        >
+          {primary.map((k) => {
+            const { href, key, exact, Icon } = ITEMS[k];
+            const active = isActive(href, exact);
+            return (
+              <li key={k}>
+                <Link
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex min-h-14 flex-col items-center justify-center gap-1 py-1.5 text-[0.6875rem] font-medium transition-colors",
+                    active ? "text-accent" : "text-fg-secondary",
+                  )}
+                >
+                  <Icon size={22} />
+                  <span className="max-w-full truncate px-0.5">{t(key)}</span>
+                </Link>
+              </li>
+            );
+          })}
+
+          {overflow.length > 0 ? (
+            <li>
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-expanded={open}
                 className={cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-1 py-1.5 text-[0.6875rem] font-medium transition-colors",
-                  active ? "text-accent" : "text-fg-secondary",
+                  "flex min-h-14 w-full flex-col items-center justify-center gap-1 py-1.5 text-[0.6875rem] font-medium transition-colors",
+                  // The sheet holds the active module when it is not one of the four.
+                  open || overflow.some((k) => isActive(ITEMS[k].href, ITEMS[k].exact))
+                    ? "text-accent"
+                    : "text-fg-secondary",
                 )}
               >
-                <Icon size={22} />
-                <span className="max-w-full truncate px-0.5">{t(key)}</span>
-              </Link>
+                {open ? <XIcon size={22} /> : <MenuIcon size={22} />}
+                <span className="max-w-full truncate px-0.5">{t("nav.more")}</span>
+              </button>
             </li>
-          );
-        })}
-      </ul>
-    </nav>
+          ) : null}
+        </ul>
+      </nav>
+    </>
   );
 }

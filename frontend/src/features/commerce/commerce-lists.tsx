@@ -1,109 +1,162 @@
-"use client";
-
-import Link from "next/link";
-import { useI18n } from "@/lib/i18n/context";
+import type { Messages } from "@/lib/i18n/messages/en";
 import type { Locale } from "@/lib/i18n/locales";
-import { Card, StatePanel } from "@/components/ui/primitives";
+import { StatePanel } from "@/components/ui/primitives";
 import { FileTextIcon, ReceiptIcon } from "@/components/ui/icons";
 import { RfqStatusBadge, QuotationStatusBadge } from "@/features/commerce/badges";
+import { DataTable, RecordCell, type Column } from "@/components/ui/data-table";
 import { formatDate } from "@/lib/ui/format";
 import { formatMoney } from "@/features/commerce/constants";
 import type { RfqListRow, QuotationListRow } from "@/server/queries/commerce";
 
-/** RFQ list. `perspective` picks which counterparty name to emphasize. */
-export function RfqList({
+/**
+ * Purchase-request and offer tables.
+ *
+ * `perspective` is the whole point of these components. The same RFQ row means two
+ * different jobs depending on which side of it you sit: as the requester it is
+ * "a price I asked a supplier for", as the supplier it is "a price someone wants
+ * from me". Before Sprint 14 both were stacked on one page under one heading,
+ * which is why "my requests" and "my purchases" read as interchangeable. Each
+ * table now states one side and names its counterparty column accordingly.
+ *
+ * Server components — they take the resolved catalog, so no client bundle grows.
+ */
+export function RfqTable({
   rfqs,
   perspective,
   locale,
+  m,
 }: {
   rfqs: RfqListRow[];
   perspective: "requester" | "supplier";
   locale: Locale;
+  m: Messages;
 }) {
-  const { t } = useI18n();
-  if (rfqs.length === 0) {
-    return (
-      <StatePanel
-        icon={<FileTextIcon size={22} />}
-        title={t(`commerce.rfq.empty.${perspective}Title`)}
-        body={t(`commerce.rfq.empty.${perspective}Body`)}
-      />
-    );
-  }
+  const columns: Column<RfqListRow>[] = [
+    {
+      key: "title",
+      header: m.commerce.rfq.column.request,
+      cell: (r) => (
+        <RecordCell
+          title={r.title ?? "—"}
+          meta={m.commerce.rfq.itemCountShort.replace("{count}", String(r.item_count ?? 0))}
+          href={`/b2b/rfqs/${r.id}`}
+        />
+      ),
+    },
+    {
+      key: "counterparty",
+      header: perspective === "requester" ? m.commerce.rfq.column.supplier : m.commerce.rfq.column.requester,
+      cell: (r) => (perspective === "requester" ? r.supplier_name : r.requester_name) ?? "—",
+    },
+    {
+      key: "status",
+      header: m.commerce.rfq.column.status,
+      cell: (r) => <RfqStatusBadge status={r.status ?? "draft"} />,
+    },
+    {
+      key: "required",
+      header: m.commerce.rfq.column.requiredBy,
+      numeric: true,
+      desktopOnly: true,
+      cell: (r) => (r.required_date ? formatDate(r.required_date, locale) : "—"),
+    },
+    {
+      key: "updated",
+      header: m.commerce.rfq.column.updated,
+      numeric: true,
+      cell: (r) => (r.updated_at ? formatDate(r.updated_at, locale) : "—"),
+    },
+  ];
+
   return (
-    <div className="flex flex-col gap-sm">
-      {rfqs.map((r) => (
-        <Link key={r.id} href={`/b2b/rfqs/${r.id}`} className="block">
-          <Card pad="sm" className="transition-colors hover:border-strong">
-            <div className="flex items-start justify-between gap-md">
-              <div className="min-w-0">
-                <p className="truncate font-medium text-fg">{r.title}</p>
-                <p className="mt-0.5 text-label text-fg-muted">
-                  {perspective === "requester"
-                    ? t("commerce.rfq.toSupplier", { supplier: r.supplier_name ?? "—" })
-                    : t("commerce.rfq.fromRequester", { requester: r.requester_name ?? "—" })}
-                  {" · "}
-                  {t("commerce.rfq.itemCount", { count: r.item_count ?? 0 })}
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <RfqStatusBadge status={r.status ?? "draft"} />
-                {r.required_date ? (
-                  <span className="text-label text-fg-muted">{formatDate(r.required_date, locale)}</span>
-                ) : null}
-              </div>
-            </div>
-          </Card>
-        </Link>
-      ))}
-    </div>
+    <DataTable
+      columns={columns}
+      rows={rfqs}
+      rowKey={(r) => r.id ?? ""}
+      caption={m.commerce.rfq.title}
+      empty={
+        <StatePanel
+          icon={<FileTextIcon size={22} />}
+          title={m.commerce.rfq.empty[`${perspective}Title`]}
+          body={m.commerce.rfq.empty[`${perspective}Body`]}
+        />
+      }
+    />
   );
 }
 
-/** Quotation list. `perspective` = supplier (mine) or requester (received). */
-export function QuotationList({
+export function QuotationTable({
   quotations,
   perspective,
   locale,
+  m,
 }: {
   quotations: QuotationListRow[];
   perspective: "supplier" | "requester";
   locale: Locale;
+  m: Messages;
 }) {
-  const { t } = useI18n();
-  if (quotations.length === 0) {
-    return (
-      <StatePanel
-        icon={<ReceiptIcon size={22} />}
-        title={t(`commerce.quotation.empty.${perspective}Title`)}
-        body={t(`commerce.quotation.empty.${perspective}Body`)}
-      />
-    );
-  }
+  const columns: Column<QuotationListRow>[] = [
+    {
+      key: "rfq",
+      header: m.commerce.quotation.column.offer,
+      cell: (q) => (
+        <RecordCell
+          title={q.rfq_title ?? "—"}
+          meta={perspective === "requester" ? (q.supplier_name ?? undefined) : (q.requester_name ?? undefined)}
+          href={`/b2b/quotations/${q.id}`}
+        />
+      ),
+    },
+    {
+      key: "counterparty",
+      header:
+        perspective === "requester"
+          ? m.commerce.quotation.column.supplier
+          : m.commerce.quotation.column.requester,
+      secondary: true,
+      desktopOnly: true,
+      cell: (q) => (perspective === "requester" ? q.supplier_name : q.requester_name) ?? "—",
+    },
+    {
+      key: "total",
+      header: m.commerce.quotation.column.total,
+      numeric: true,
+      cell: (q) => formatMoney(q.total, locale),
+    },
+    {
+      key: "status",
+      header: m.commerce.quotation.column.status,
+      cell: (q) => <QuotationStatusBadge status={q.status ?? "draft"} />,
+    },
+    {
+      key: "validUntil",
+      header: m.commerce.quotation.column.validUntil,
+      numeric: true,
+      desktopOnly: true,
+      cell: (q) => (q.validity_date ? formatDate(q.validity_date, locale) : "—"),
+    },
+    {
+      key: "updated",
+      header: m.commerce.quotation.column.received,
+      numeric: true,
+      cell: (q) => (q.updated_at ? formatDate(q.updated_at, locale) : "—"),
+    },
+  ];
+
   return (
-    <div className="flex flex-col gap-sm">
-      {quotations.map((q) => (
-        <Link key={q.id} href={`/b2b/quotations/${q.id}`} className="block">
-          <Card pad="sm" className="transition-colors hover:border-strong">
-            <div className="flex items-start justify-between gap-md">
-              <div className="min-w-0">
-                <p className="truncate font-medium text-fg">{q.rfq_title}</p>
-                <p className="mt-0.5 text-label text-fg-muted">
-                  {perspective === "supplier"
-                    ? t("commerce.rfq.fromRequester", { requester: q.requester_name ?? "—" })
-                    : t("commerce.rfq.toSupplier", { supplier: q.supplier_name ?? "—" })}
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <QuotationStatusBadge status={q.status ?? "draft"} />
-                <span className="text-label font-medium tabular-nums text-fg" dir="ltr">
-                  {formatMoney(q.total, locale)}
-                </span>
-              </div>
-            </div>
-          </Card>
-        </Link>
-      ))}
-    </div>
+    <DataTable
+      columns={columns}
+      rows={quotations}
+      rowKey={(q) => q.id ?? ""}
+      caption={m.commerce.quotation.title}
+      empty={
+        <StatePanel
+          icon={<ReceiptIcon size={22} />}
+          title={m.commerce.quotation.empty[`${perspective}Title`]}
+          body={m.commerce.quotation.empty[`${perspective}Body`]}
+        />
+      }
+    />
   );
 }

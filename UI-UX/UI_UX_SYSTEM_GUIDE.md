@@ -76,6 +76,14 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 - **Every color exists in both light and dark** with adequate contrast in each — a token is incomplete if only one theme is defined.
 - Color is a **reinforcement**, never the sole signal (pair with icon/label/shape) — required for accessibility and RTL parity.
 - Do **not** introduce raw hex in components; add/adjust a token instead.
+- **Data-visualisation series (added Sprint 14):** a single accent cannot express a categorical chart — a spend-by-category donut needs as many distinguishable fills as it has categories. `--series-1…6` (+ `--chart-grid`) are the approved categorical ramp, exposed in Tailwind as `series-1…6`. Every value is an **existing brand primitive**, ordered so adjacent series differ in lightness as well as hue, and defined in **both** themes with the same hue per index (a chart must not change meaning when the theme flips). Series colours are **non-semantic** — `series-5` is not "bad"; success/warning/danger keep their meaning. Charts must always label their series in text: colour stays a second channel.
+
+## Charts
+- Charts are **inline SVG rendered on the server** (`components/ui/charts.tsx`) — no charting library, no client component, no runtime dependency. The four shapes the product needs (trend, proportion, ranked comparison, funnel) are a path, a dashed circle, a flex row and a list.
+- Every chart is `role="img"` with an `aria-label`, and carries an `sr-only` list of its **actual values** — a screen reader gets the data, not a description of a picture.
+- **Direction:** value/time axes stay LTR in both locales (an Arabic dashboard still reads a Jan→Jun trend left to right, and digits are LTR anyway). Ranked bars, legends and funnels are text lists — they follow document direction and grow from the inline start.
+- **Numerals:** anything shown beside formatted money must use the same numeral system (`formatPercent`, `formatCompactMoney`). Mixing Arabic-Indic money with a Latin `57%` in one row is a defect.
+- **Empty is a first-class state**: a chart with nothing behind it renders a sentence, never an empty axis pretending to be a measurement. No targets, forecasts or growth percentages unless the database actually produces them.
 
 ## Dark Mode Rules
 - The **only** theme axis is `mode: light/dark`. Platform/device/language are naming lanes, **not** theme axes — never fork a component per language for theming.
@@ -95,6 +103,29 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 - Reflects the user's **derived capabilities** — items the current account type / membership / permissions don't grant are hidden, not shown-disabled (authorization is also enforced server-side; the UI never implies access it can't grant).
 - Active item is unambiguous (token-based active state); collapsed state keeps icon + accessible label.
 - Mirrors to the **trailing edge in RTL**.
+
+### Desktop display modes (three, and only three)
+The desktop sidebar offers **Expanded · Collapsed · Expand on hover**, chosen from a compact control in the sidebar footer. These are **presentations of one navigation**, never different navigations: the capability-derived item set, the grouping and order, the active-route rule and the RTL mirroring are identical in all three. A mode that hid a module the user has the capability for would be a defect, not a density option.
+
+- **Expanded** — icons + labels + section headings at full width.
+- **Collapsed** — a narrow icon rail. Section headings have no room, so grouping is carried by a divider instead of a word. Every item keeps its localized label as its **accessible name**, plus a visual tooltip on hover *and* keyboard focus.
+- **Expand on hover** — rests collapsed and reveals on pointer entry or keyboard focus. The reveal **overlays inward over the content**; it must not resize the document, because widening a layout element on hover reflows the whole page on every pointer pass and is the usual source of hover flicker.
+
+**Direction.** The reveal always grows *inward toward the content* — rightward in English, leftward in Arabic — and the control's glyph stays direction-neutral rather than implying a side.
+
+**Persistence.** The chosen mode is a **per-browser** preference stored in a cookie, never in the database. A cookie (not `localStorage`) because the mode decides a **width**: read only after hydration it would paint the wrong layout first and snap. Nothing about this preference is account state.
+
+**Mobile is out of scope for these modes** — the phone keeps its bottom bar + More sheet unchanged.
+
+### Horizontal card rails
+For **dense groups of peer cards** that would otherwise wrap into several rows and push the real work below the fold — KPI/summary strips, the dashboard's action ramp, analytics summary groups. One reusable component, not a carousel library.
+
+- Cards stay side by side in one row and **hold their width instead of shrinking** — the reason a six-tile money strip no longer truncates its figures.
+- Overflow is contained inside the rail; the **page itself must never scroll sideways**.
+- Controls appear **only when the content actually overflows**, disable at each end, and move by a whole card group. Where everything fits on a wide desktop, no control is drawn at all.
+- CSS scroll snapping, smooth scrolling (respecting reduced motion), native trackpad/wheel and touch swipe. Controls are real buttons; an overflowing rail is keyboard-reachable.
+- **RTL is normalized explicitly.** `scrollLeft` does not follow writing direction — in RTL it rests at 0 and travels negative — so position is read as a distance (`Math.abs`) and every scroll flips its sign from the active direction. Never assume left means previous.
+- **Do not** convert data tables, main report charts, forms, or large operational lists into rails. Those are scanned and compared down the page; hiding half of one behind a swipe is a regression.
 
 ## Dashboard UX
 - Dashboards/cockpits are **action surfaces, not vanity walls.** Every tile answers "what should I do next?" and links to a real workflow (Sales cockpit → Opportunity/Need/Match/Follow-up/Quote/Pipeline/Task).
@@ -194,6 +225,10 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 
 ## Change History
 Newest first.
+
+### 2026-08-16 — Workspace sidebar display modes + horizontal card rails
+- **What:** Added two interaction rules to *Sidebar Behavior*. The desktop workspace sidebar now documents exactly three display modes (**Expanded · Collapsed · Expand on hover**) as presentations of ONE capability-derived navigation, with the hover reveal required to **overlay inward** rather than reflow the document, direction-neutral control iconography, and a **per-browser cookie** (not `localStorage`, not the database) because the preference decides a width. Added **Horizontal card rails** as an approved pattern for dense peer-card groups, including the explicit RTL `scrollLeft` normalization rule and the list of surfaces that must **never** become rails (data tables, main report charts, forms, large operational lists).
+- **Why:** The workspace needed Supabase-level chrome behavior without importing Supabase's visual language. Writing the rules down here — rather than leaving them in one component — is what stops the next surface from inventing a fourth sidebar mode or turning an operational list into a carousel. Existing tokens, themes, spacing, typography and accent behavior are unchanged; this is behavior, not restyling.
 
 ### 2026-08-01 — Finalized & hardened the Design System (v1.0.0)
 - **What:** Established the design system as a **versioned** system (`1.0.0`). Added canonical machine-readable tokens (`design/tokens/*.json`), `design/GOVERNANCE.md` (source-of-truth, versioning, component & AI-agent rules, measured AA contrast), `design/COMPONENT_INVENTORY.md`, `design/icons/README.md`, and `design/CHANGELOG.md`. Added the Design System Authority section and the measured-contrast + Muted-On-Sand accessibility notes here. Fixed a broken dark-theme primary token in the frontend and added motion/z-index/breakpoint tokens + `prefers-reduced-motion`.

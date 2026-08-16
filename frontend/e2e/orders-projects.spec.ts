@@ -28,10 +28,14 @@ test.describe("orders & projects workspace", () => {
     await signIn(page, request, IDENTITIES.manager);
   });
 
-  test("orders page renders with heading, empty states, and nav", async ({ page }) => {
+  test("orders page renders with heading, empty state, and nav", async ({ page }) => {
     await page.goto("/b2b/orders");
-    await expect(page.getByRole("heading", { name: /orders|الطلبات/i, level: 1 })).toBeVisible();
-    // Both perspective sections render (placed / received) with their empty states.
+    // Sprint 14 renamed this module to "Orders & purchases" / "طلبياتي ومشترياتي"
+    // and gave it ONE perspective (buying) with the selling side as a tab, so a
+    // single empty state is now correct where two stacked ones used to render.
+    await expect(
+      page.getByRole("heading", { name: /orders|طلبياتي/i, level: 1 }),
+    ).toBeVisible();
     await expect(page.getByText(/no orders (placed|received)|لا توجد طلبات/i).first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });
@@ -45,10 +49,14 @@ test.describe("orders & projects workspace", () => {
 
   test("navigation exposes Orders and Projects and they are reachable", async ({ page }) => {
     await page.goto("/b2b/orders");
-    // On mobile the rail collapses to a bottom bar; both expose the same links.
-    const ordersLink = page.getByRole("link", { name: /orders|الطلبات/i }).first();
-    const projectsLink = page.getByRole("link", { name: /projects|المشاريع/i }).first();
+    // On mobile the rail collapses to a four-item bottom bar plus a "More" sheet;
+    // Projects lives in the Business section, so it is behind More there.
+    const ordersLink = page.getByRole("link", { name: /orders|طلبياتي/i }).first();
     await expect(ordersLink).toBeVisible();
+    if (isMobile()) {
+      await page.getByRole("button", { name: /more|المزيد/i }).click();
+    }
+    const projectsLink = page.getByRole("link", { name: /projects|المشاريع/i }).first();
     await expect(projectsLink).toBeVisible();
     await projectsLink.click();
     await page.waitForURL(/\/b2b\/projects(\?|$)/, { waitUntil: "commit" });

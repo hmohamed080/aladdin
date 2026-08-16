@@ -12,7 +12,7 @@ import {
   setMemberStatusAction,
   type PeopleFormState,
 } from "@/server/actions/organization-forms";
-import { ROLE_PRESET_ORDER } from "@/lib/org/roles";
+import { ROLE_PRESET_ORDER, capabilityGroups } from "@/lib/org/roles";
 import type { OrgMember, OrgInvitation } from "@/server/queries/organization";
 
 const INITIAL: PeopleFormState = { ok: false };
@@ -215,16 +215,28 @@ export function PeopleManager({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5">
-                  {member.capabilities.length === 0 ? (
-                    <span className="text-label text-fg-muted">{t("org.role.none")}</span>
-                  ) : (
-                    member.capabilities.map((c) => (
-                      <span key={c} className="rounded-pill bg-surface-2 px-2 py-0.5 text-label text-fg-secondary">
-                        {c}
-                      </span>
-                    ))
-                  )}
+                {/* What this colleague can work on, in their own language.
+                    Deliberately NOT the raw capability keys: `org.members.manage`
+                    is an internal identifier that renders untranslated in Arabic,
+                    means nothing to the manager reading it, and puts the
+                    permission model on screen. The groups below are the same
+                    information as WORK. Authorization is untouched — the RPCs
+                    still check the keys themselves. */}
+                <div>
+                  <p className="text-label text-fg-muted">{t("org.modules")}</p>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {(() => {
+                      const groups = capabilityGroups(member.capabilities);
+                      if (groups.length === 0) {
+                        return <span className="text-label text-fg-muted">{t("org.noModules")}</span>;
+                      }
+                      return groups.map((g) => (
+                        <Badge key={g} tone={g === "manage" ? "accent" : "neutral"}>
+                          {t(`org.capabilityGroup.${g}`)}
+                        </Badge>
+                      ));
+                    })()}
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-2 border-t pt-md tablet:flex-row tablet:flex-wrap tablet:items-end">

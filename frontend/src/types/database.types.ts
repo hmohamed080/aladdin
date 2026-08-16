@@ -939,6 +939,13 @@ export type Database = {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "order_category_spend"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "order_list"
             referencedColumns: ["id"]
           },
@@ -1635,6 +1642,13 @@ export type Database = {
             foreignKeyName: "projects_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: true
+            referencedRelation: "order_category_spend"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "projects_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
             referencedRelation: "order_list"
             referencedColumns: ["id"]
           },
@@ -2063,6 +2077,59 @@ export type Database = {
           },
         ]
       }
+      saved_products: {
+        Row: {
+          created_at: string
+          note: string | null
+          organization_id: string
+          product_id: string
+          saved_by: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          organization_id: string
+          product_id: string
+          saved_by: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          organization_id?: string
+          product_id?: string
+          saved_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_products_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_published_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_saved_by_fkey"
+            columns: ["saved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string
@@ -2247,6 +2314,41 @@ export type Database = {
           },
         ]
       }
+      order_category_spend: {
+        Row: {
+          amount: number | null
+          category: Database["public"]["Enums"]["product_category"] | null
+          confirmed_at: string | null
+          order_id: string | null
+          requester_branch_id: string | null
+          requester_org_id: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          supplier_org_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_orders_requester_branch"
+            columns: ["requester_org_id", "requester_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "orders_requester_org_id_fkey"
+            columns: ["requester_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_supplier_org_id_fkey"
+            columns: ["supplier_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_list: {
         Row: {
           completed_at: string | null
@@ -2256,6 +2358,7 @@ export type Database = {
           id: string | null
           item_count: number | null
           quotation_id: string | null
+          requester_branch_id: string | null
           requester_name: string | null
           requester_org_id: string | null
           rfq_id: string | null
@@ -2276,6 +2379,7 @@ export type Database = {
           id?: string | null
           item_count?: never
           quotation_id?: string | null
+          requester_branch_id?: string | null
           requester_name?: never
           requester_org_id?: string | null
           rfq_id?: string | null
@@ -2296,6 +2400,7 @@ export type Database = {
           id?: string | null
           item_count?: never
           quotation_id?: string | null
+          requester_branch_id?: string | null
           requester_name?: never
           requester_org_id?: string | null
           rfq_id?: string | null
@@ -2309,6 +2414,13 @@ export type Database = {
           version?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_orders_requester_branch"
+            columns: ["requester_org_id", "requester_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
           {
             foreignKeyName: "orders_quotation_id_fkey"
             columns: ["quotation_id"]
@@ -2375,12 +2487,14 @@ export type Database = {
           id: string | null
           languages: string[] | null
           locality_id: string | null
+          persona: Database["public"]["Enums"]["persona_type"] | null
         }
         Relationships: []
       }
       project_list: {
         Row: {
           activated_at: string | null
+          branch_id: string | null
           completed_at: string | null
           created_at: string | null
           executing_name: string | null
@@ -2388,6 +2502,7 @@ export type Database = {
           id: string | null
           location: string | null
           order_id: string | null
+          order_total: number | null
           requester_name: string | null
           requester_org_id: string | null
           start_date: string | null
@@ -2399,6 +2514,7 @@ export type Database = {
         }
         Insert: {
           activated_at?: string | null
+          branch_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           executing_name?: never
@@ -2406,6 +2522,7 @@ export type Database = {
           id?: string | null
           location?: string | null
           order_id?: string | null
+          order_total?: never
           requester_name?: never
           requester_org_id?: string | null
           start_date?: string | null
@@ -2417,6 +2534,7 @@ export type Database = {
         }
         Update: {
           activated_at?: string | null
+          branch_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           executing_name?: never
@@ -2424,6 +2542,7 @@ export type Database = {
           id?: string | null
           location?: string | null
           order_id?: string | null
+          order_total?: never
           requester_name?: never
           requester_org_id?: string | null
           start_date?: string | null
@@ -2435,11 +2554,25 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_projects_branch"
+            columns: ["requester_org_id", "branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
             foreignKeyName: "projects_executing_org_id_fkey"
             columns: ["executing_org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "order_category_spend"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "projects_order_id_fkey"
@@ -3015,6 +3148,62 @@ export type Database = {
           },
         ]
       }
+      saved_product_list: {
+        Row: {
+          brand: string | null
+          category: Database["public"]["Enums"]["product_category"] | null
+          image_ref: string | null
+          name: string | null
+          note: string | null
+          organization_id: string | null
+          product_id: string | null
+          saved_at: string | null
+          saved_by: string | null
+          short_description: string | null
+          sku: string | null
+          supplier_name: string | null
+          supplier_org_id: string | null
+          supplier_verified: boolean | null
+          unit: Database["public"]["Enums"]["product_unit"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_organization_id_fkey"
+            columns: ["supplier_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_published_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_products_saved_by_fkey"
+            columns: ["saved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       activate_project: {
@@ -3431,6 +3620,14 @@ export type Database = {
         Returns: undefined
       }
       review_start: { Args: { p_verification_id: string }; Returns: undefined }
+      save_product: {
+        Args: {
+          p_note?: string
+          p_organization_id: string
+          p_product_id: string
+        }
+        Returns: undefined
+      }
       set_customer_ownership: {
         Args: {
           p_change_assignee?: boolean
@@ -3545,6 +3742,10 @@ export type Database = {
           p_new_status?: Database["public"]["Enums"]["lead_status"]
         }
         Returns: number
+      }
+      unsave_product: {
+        Args: { p_organization_id: string; p_product_id: string }
+        Returns: undefined
       }
       update_customer: {
         Args: {

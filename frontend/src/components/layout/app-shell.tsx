@@ -7,10 +7,11 @@ import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import { BranchSwitcher } from "@/components/layout/context-switchers";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { SignOutButton } from "@/components/layout/account-menu";
-import { Sidebar, MobileNav } from "@/components/layout/workspace-nav";
+import { MobileNav } from "@/components/layout/workspace-nav";
+import { SidebarShell } from "@/components/layout/sidebar-shell";
 import { Brand } from "@/components/layout/brand";
 import { SalesRealtime } from "@/features/sales/sales-realtime";
-import { allowedNavKeys } from "@/lib/nav/modules";
+import { SIDEBAR_MODE_COOKIE, resolveSidebarMode } from "@/lib/ui/sidebar-mode";
 
 /**
  * The B2B workspace chrome: a persistent left sidebar (brand + primary nav) on
@@ -33,18 +34,18 @@ export async function AppShell({
   const m = getMessages(locale);
   const active = workspace.active!;
   const orgWide = active.canManageSales || active.capabilities.includes("branch.manage");
-  const navKeys = allowedNavKeys(active.capabilities);
+  // Read on the server so the first paint already has the chosen width — the
+  // preference is layout, and discovering it after hydration is a visible flash.
+  const sidebarMode = resolveSidebarMode(store.get(SIDEBAR_MODE_COOKIE)?.value);
 
   return (
     <div className="flex min-h-dvh bg-canvas">
-      {/* Persistent sidebar (desktop / tablet). */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-e bg-surface px-3 py-lg tablet:flex">
-        <div className="px-2 pb-lg">
-          <Brand name={m.common.appName} size="md" />
-        </div>
-        <Sidebar allowed={navKeys} />
-        <p className="mt-auto px-3 pt-lg text-label text-fg-muted">{m.nav.workspace}</p>
-      </aside>
+      {/* Persistent sidebar (desktop / tablet). Owns its own display modes. */}
+      <SidebarShell
+        appName={m.common.appName}
+        allowed={active.capabilities}
+        mode={sidebarMode}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header
@@ -83,7 +84,7 @@ export async function AppShell({
           {children}
         </main>
 
-        <MobileNav allowed={navKeys} />
+        <MobileNav allowed={active.capabilities} />
       </div>
     </div>
   );
