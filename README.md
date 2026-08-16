@@ -30,7 +30,7 @@ Authority rules and the end-of-session checklist live in root [`AGENTS.md`](AGEN
 | Data platform | Supabase — Postgres, Auth, Storage, RLS, Realtime, Queues, FTS, pg_trgm, pgvector, PostGIS |
 | Schema source of truth | Supabase SQL migrations (`supabase/migrations/*.sql`) — **no Alembic** |
 | Specialized service | Python 3.12+ / FastAPI — AI, OCR, RAG, documents, embeddings, workers (**not** the CRUD backend) |
-| Hosting | Vercel (web) · Railway (FastAPI + workers, Docker) · Supabase (data) · OpenAI · Sentry |
+| Hosting | **Vercel Services** — web app + FastAPI in one deployment (root `vercel.json`) · Supabase (data) · OpenAI · Sentry |
 
 Rationale is recorded in ADRs: [ADR-0001](docs/decisions/ADR-0001-approved-architecture.md) · [ADR-0002](docs/decisions/ADR-0002-database-migrations.md) · [ADR-0003](docs/decisions/ADR-0003-agent-instruction-hierarchy.md) · [ADR-0004](docs/decisions/ADR-0004-deployment-platforms.md) · [ADR-0005](docs/decisions/ADR-0005-python-data-access.md).
 
@@ -150,7 +150,7 @@ Full model: [`docs/security/security-model.md`](docs/security/security-model.md)
 
 ## Deployment overview
 
-Vercel (web) · Railway (FastAPI + workers, Docker) · Supabase (data) · Sentry (errors). Staging before Production; backward-compatible migrations. Details: [`docs/operations/deployment-overview.md`](docs/operations/deployment-overview.md).
+**Vercel Services** hosts both the Next.js web app and the FastAPI service from the repository-root `vercel.json` — one deployment, one preview URL per PR, one rollback; FastAPI is same-origin at `/api/backend`. Plus Supabase (data) · Sentry (errors). Staging before Production; backward-compatible migrations. Details: [`docs/operations/deployment-overview.md`](docs/operations/deployment-overview.md) · [ADR-0009](docs/decisions/ADR-0009-vercel-services-deployment.md).
 
 ## Current status
 

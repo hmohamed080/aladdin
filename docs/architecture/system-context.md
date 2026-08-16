@@ -22,7 +22,7 @@ Show Aladdin's external actors and systems — who and what it talks to.
 | WhatsApp (OTP + operational messaging) | passwordless auth + notifications | server-side only |
 | Email provider | Email OTP / verification links, transactional email | server-side only |
 | Sentry | error monitoring | all services |
-| Vercel / Railway | hosting | ops |
+| Vercel (Services: web app + FastAPI) | hosting | ops |
 
 ## Rationale
 

@@ -70,9 +70,12 @@ The five files above are **persistent project memory and part of the core archit
 - [`decisions/ADR-0001-approved-architecture.md`](decisions/ADR-0001-approved-architecture.md)
 - [`decisions/ADR-0002-database-migrations.md`](decisions/ADR-0002-database-migrations.md)
 - [`decisions/ADR-0003-agent-instruction-hierarchy.md`](decisions/ADR-0003-agent-instruction-hierarchy.md)
-- [`decisions/ADR-0004-deployment-platforms.md`](decisions/ADR-0004-deployment-platforms.md)
+- [`decisions/ADR-0004-deployment-platforms.md`](decisions/ADR-0004-deployment-platforms.md) — **superseded in part by ADR-0009** (hosting)
 - [`decisions/ADR-0005-python-data-access.md`](decisions/ADR-0005-python-data-access.md)
 - [`decisions/ADR-0006-repository-governance.md`](decisions/ADR-0006-repository-governance.md)
+- [`decisions/ADR-0007-identity-and-tenancy-model.md`](decisions/ADR-0007-identity-and-tenancy-model.md)
+- [`decisions/ADR-0008-b2b-sales-domain-model.md`](decisions/ADR-0008-b2b-sales-domain-model.md)
+- [`decisions/ADR-0009-vercel-services-deployment.md`](decisions/ADR-0009-vercel-services-deployment.md) — Vercel Services for the web app **and** FastAPI
 - [`decisions/DECISION_LOG.md`](decisions/DECISION_LOG.md) — **one-screen index of all ADRs**
 - [`decisions/agent-instruction-migration.md`](decisions/agent-instruction-migration.md) — source→destination map
 

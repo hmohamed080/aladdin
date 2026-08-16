@@ -69,6 +69,6 @@ This file was built by a prior AI agent across sessions 01–04D, then taken ove
 
 ## Approved stack (see ADR-0001)
 
-**Next.js App Router** + React + TypeScript strict + Tailwind (frontend, `pnpm`) · **Supabase** Postgres/Auth/Storage/RLS/Realtime/pgvector (schema via `supabase/migrations`, ADR-0002) · **specialized FastAPI** service for AI/OCR/RAG/documents/workers only — *not* the CRUD backend (`uv`) · OpenAI. Hosting: Vercel + Railway + Supabase (ADR-0004). **Not Vite, not a React SPA.**
+**Next.js App Router** + React + TypeScript strict + Tailwind (frontend, `pnpm`) · **Supabase** Postgres/Auth/Storage/RLS/Realtime/pgvector (schema via `supabase/migrations`, ADR-0002) · **specialized FastAPI** service for AI/OCR/RAG/documents/workers only — *not* the CRUD backend (`uv`) · OpenAI. Hosting: **Vercel Services** (web app **and** FastAPI, both declared in the repository-root `vercel.json`, one deployment; FastAPI same-origin at `/api/backend` but still server-side-only) + Supabase (ADR-0009, superseding ADR-0004 — **not Railway**). **Not Vite, not a React SPA.**
 
 Config is centralized per service (`frontend/src/lib/env`, `backend/app/config.py`) — never read `process.env` / `os.getenv` directly in app code, and don't call `load_dotenv`. Fail fast on missing config; no silent defaults for secrets. Default to writing code yourself; justify every runtime dependency (see `AGENTS.md` "Dependency policy"). `pnpm` only for Node, `uv` only for Python.

@@ -5,9 +5,9 @@
 | | |
 |---|---|
 | **Status** | Living document (canonical project memory) |
-| **Version** | Living (canonical) · rev 2026-08-01 |
+| **Version** | Living (canonical) · rev 2026-08-16 |
 | **Owner** | Architecture |
-| **Last updated** | 2026-07-30 |
+| **Last updated** | 2026-08-16 (deployment targets reconciled to [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)) |
 | **Scope** | The **currently active** architecture of Aladdin — what is decided and in effect right now. |
 | **Authority** | Authoritative for the current architecture state. It **does not replace ADRs**: [ADRs](../decisions/) explain *why* a decision was made and are append-only; this guide explains *what is active now* and is updated continuously. On conflict, the newest **Accepted** ADR wins and this guide must be reconciled to it. |
 | **Update triggers** | Any change to module boundaries, data ownership, the multi-tenancy/identity/authorization model, migration ownership, the data-access approach, deployment targets, or the non-goals list. Every such change also updates an ADR, `RUNTIME_STATE.md`, and `AGENT_WORK_LOG.md`. |
@@ -95,7 +95,7 @@ Token/brand changes follow the design-system edit-order (token JSON first) and u
 Supabase Realtime carries live status for: notifications, opportunity/pipeline status, task updates, verification status, project activity, inventory availability, and quotation status. Realtime is a delivery channel, not a source of truth — the database remains authoritative.
 
 ## Queue / Background-Job Responsibilities
-- Heavy/slow/external work runs **off the request path** via Supabase Queues + Railway workers: OCR, embeddings, document chunking, Excel imports, PDF/document generation, email + operational WhatsApp delivery, and expensive analytics refreshes.
+- Heavy/slow/external work runs **off the request path** via Supabase Queues + Python workers: OCR, embeddings, document chunking, Excel imports, PDF/document generation, email + operational WhatsApp delivery, and expensive analytics refreshes. No worker is implemented yet and **its host is deliberately undecided** ([ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)).
 - Request handlers stay fast; the UI reflects progress via Realtime. Never run blocking AI/OCR/parsing in a request event loop.
 
 ## AI, OCR, RAG & Embedding Boundaries
@@ -123,12 +123,12 @@ Current decision (ADR-0005, refining ADR-0002 for the Private Pilot MVP):
 - **Fail fast** on missing required config; **no silent defaults for secrets**. Each service ships a `.env.example`. Real `.env` files are never committed. Detail: [`../security/secrets-and-environments.md`](../security/secrets-and-environments.md).
 
 ## Deployment Targets
-- **Vercel** — Next.js web app.
-- **Railway** — FastAPI service + workers (portable Docker).
+- **Vercel Services** — **both** the Next.js web app (`services.frontend`) and the FastAPI service (`services.backend`, Python runtime), declared in the repository-root `vercel.json` and shipped as **one deployment unit**: one preview URL per PR covering both, one rollback restoring both. Path rewrites put FastAPI same-origin at **`/api/backend`**, so there is no absolute backend URL to configure per environment. This does not relax the boundary — FastAPI is called from the **server side** of the web app, never the browser.
+- **Worker host — undecided.** `backend/app/workers/` is interface-only; a new ADR picks between Vercel Cron/Queues and a container host when the first worker is implemented. `backend/Dockerfile` is retained as the portability exit path.
 - **Supabase** — Postgres/Auth/Storage/Realtime/Queues.
 - **OpenAI** — LLM/embeddings. **Azure Document Intelligence** — OCR candidate. **Sentry** — error tracking.
 
-Staging precedes Production; migrations are backward-compatible. Detail: [ADR-0004](../decisions/ADR-0004-deployment-platforms.md) · [`../operations/deployment-overview.md`](../operations/deployment-overview.md).
+Staging precedes Production; migrations are backward-compatible. Detail: [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md) (supersedes [ADR-0004](../decisions/ADR-0004-deployment-platforms.md) on hosting) · [`../operations/deployment-overview.md`](../operations/deployment-overview.md).
 
 ## Observability
 Structured logging (`structlog` in FastAPI), Sentry for errors across web + service, and health endpoints (`/api/health` web, `/health` FastAPI). Detail: [`../operations/monitoring-and-observability.md`](../operations/monitoring-and-observability.md).
@@ -142,7 +142,7 @@ Structured logging (`structlog` in FastAPI), Sentry for errors across web + serv
 Ship the monolith; move to the next rung only against **measured** need:
 1. **Now** — modular monolith on the approved stack.
 2. **Vertical scaling + Postgres tuning** — indexes, read patterns, connection management.
-3. **Worker scale-out** — more Railway workers behind Supabase Queues for AI/OCR/import load.
+3. **Worker scale-out** — more worker instances behind Supabase Queues for AI/OCR/import load.
 4. **Service extraction** — extract a domain **only** when a measured bottleneck or team-scaling need justifies it, using the clean module boundaries already in place.
 
 Options are documented, not pre-built. Detail: [`scaling-strategy.md`](./scaling-strategy.md).

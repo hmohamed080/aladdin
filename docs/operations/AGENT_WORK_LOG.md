@@ -4,6 +4,44 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Vercel Services deployment architecture (documentation reconciliation)
+
+**Date:** 2026-08-16 · **Branch:** `chore/vercel-services-deploy` · **Base:** `main` @ `c1fbad1` (PR #25 merged)
+
+### Objective
+The owner decided that **both** `frontend/` (Next.js) and `backend/` (FastAPI) deploy through **Vercel Services**. Carry the already-validated working-tree changes onto a branch and reconcile the documentation, which still asserted three things that are now wrong. **No deployment, no push, no remote PR change.**
+
+### What the previous session got right, and why it is now superseded
+The preceding entry's conclusion — that nothing in `frontend/src` calls FastAPI at runtime — **still holds and was re-verified**; `backend/app` still registers exactly one router (`GET /health`). What changed is not the evidence but the **cost of acting on it.** That session reasoned inside a Vercel-project-per-service model, where deploying the backend meant a second platform account, a second secret store, a second rollback procedure, and cross-origin wiring. Under Vercel Services it costs **one entry in `vercel.json`**, and both services then share a deployment, a preview URL per PR, and a rollback. So the same facts now point the other way.
+
+Three documented claims were therefore withdrawn: **FastAPI must go to Railway**, **FastAPI is not required for staging**, and **no `vercel.json` is needed**.
+
+### Decision recorded as ADR-0009, not as an edit
+Per the ADR governance rule (append-only; a decision changes only via a new ADR), this is [**ADR-0009**](../decisions/ADR-0009-vercel-services-deployment.md). **ADR-0004 was not rewritten** — its body is preserved verbatim and carries a superseded banner naming exactly which rows lost force (FastAPI + workers hosting) and which remain in effect (Supabase, OpenAI, Azure DI, Sentry, the Local→Staging→Production split, the portability requirement). `DECISION_LOG.md` reflects both.
+
+### Two code facts the deployment depends on
+Both were already in the working tree and are kept:
+- **`middleware.ts` pins `runtime = "nodejs"`.** Vercel Services hosts no Edge Function output. The middleware never needed Edge — one Supabase auth round trip plus cookie reads/writes — and Node middleware is stable as of Next.js 15.5 (installed 15.5.22). Removing the export breaks the deploy.
+- **`.vercel/` is gitignored** — `vercel link` writes the project link there and pulls a short-lived OIDC token into it.
+
+### Two things deliberately left undecided rather than guessed
+- **Worker host.** `backend/app/workers/` is interface-only. A persistent queue consumer is a different deployment shape from a request-driven function, so ADR-0009 **declines to assign a host** and gates the choice (Vercel Cron/Queues vs. a container host) on a new ADR when the first worker exists. `backend/Dockerfile` is retained as the exit path and its header now says so, so it is not deleted as "unused".
+- **Backend `APP_ENV` stays unset for first staging.** `backend/app/config.py` fails fast at import when `APP_ENV` is `staging`/`production` and any of `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_JWT_SECRET`/`DATABASE_URL` is missing. Setting it today would force provisioning an **RLS-bypassing service-role key to serve a health check**. The runbook binds the flip to the same change that lands the first real endpoint.
+
+### One thing that cannot be verified without deploying — and is flagged as such
+Whether the `/api/backend(/.*)?` rewrite forwards the path **with or without** the prefix is not determinable from the repository, and `health.py` declares a plain `/health`. Rather than assert a guess, the runbook's smoke test lists check #0 (`GET /api/backend/health`) with **two distinct failure modes** and the one-place-only fix for each (Next.js 404 → rewrite order; FastAPI `{"detail":"Not Found"}` → prefix mismatch, fix in the router *or* the rewrite, not both).
+
+### Validation
+`pnpm install --frozen-lockfile` ✓ · frontend typecheck ✓ · lint ✓ (0 errors / 0 warnings) · unit **236/236** ✓ (25 files) · production `next build` ✓ · backend `ruff check` ✓ · `pytest` **10/10** ✓ · `scripts/check_doc_links.py` ✓ (**888 internal links across 105 files, 0 broken** — the check that matters most for a documentation change) · `vercel.json` parses as valid JSON ✓.
+
+**The middleware runtime change was verified at runtime, not just compiled.** `next build` emits `.next/server/middleware.js` + `middleware.js.nft.json` with an **empty `middleware-manifest.json`** — that is the Node-runtime artifact shape (an Edge middleware would instead appear in the manifest with `runtime: "edge"`), so the empty manifest is expected here and not a sign the middleware vanished. A `next start` smoke test confirms behavior is unchanged: `/api/health` 200, `/auth/sign-in` 200, and `/`·`/b2b`·`/b2b/rfqs`·`/admin`·`/home`·`/onboarding` all **307 to `/auth/sign-in`** with the `next=` parameter preserved and URL-encoded — identical to the pre-change results recorded in the previous session.
+
+Documentation-and-config change only: no schema change, no product feature touched, no `.pen` file changed. E2E/Lighthouse/pgTAP deliberately not run for the same reason as the prior deployment-only session.
+
+**Pushed with a PR to `main` open; NOT merged, nothing deployed manually, no Vercel/Supabase environment variable touched.** This PR **supersedes the two narrower open PRs #26** (`fix/vercel-backend-entrypoint`) **and #27** (`fix/vercel-frontend-node-middleware`) — both of their changes are contained here alongside the documentation reconciliation, and both were deliberately left open for the owner to close.
+
+---
+
 ## Session — First cloud STAGING deployment readiness (deployment-only)
 
 **Date:** 2026-08-16 · **Branch:** `chore/staging-deployment-readiness` · **Base:** `main` @ `944e954` (PR #23 merged)

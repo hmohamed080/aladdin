@@ -15,7 +15,7 @@ Ship the modular monolith. Reach for the next rung only when a measured bottlene
 | Web app CPU/latency | Vercel autoscaling; more Server Component caching | Edge runtime for hot routes |
 | DB read load | Indexes, query tuning, Postgres FTS/`pg_trgm` | Supabase read replicas |
 | Vector search cost | `pgvector` with proper filters/indexes | Dedicated vector store (only if pgvector proves insufficient) |
-| Heavy async volume | More Railway worker instances; Supabase Queues | Extract a worker service; managed queue |
+| Heavy async volume | More worker instances; Supabase Queues | Extract a worker service; managed queue |
 | A domain outgrows the monolith | Enforce module boundary; extract via the existing seam | Standalone service behind the same auth |
 | Full-text/search complexity | Postgres FTS | Search engine **only** with a proven requirement |
 

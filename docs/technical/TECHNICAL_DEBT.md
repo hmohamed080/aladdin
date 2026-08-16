@@ -67,7 +67,7 @@ The RLS/isolation spine, passwordless model, and tenant filtering are **not** de
 | **Minimum PR CI** (`.github/workflows/ci.yml`: `frontend`/`backend`/`docs`) added 2026-08-01 | **CD**, Docker-image + Supabase RLS/isolation CI jobs, and **SHA-pinning of actions** remain deferred ([`10_environment_and_cicd`](../engineering/10_environment_and_cicd.md)) |
 | ~~**Supabase RLS/isolation CI job**~~ | **Resolved; expanded 2026-08-03** — `.github/workflows/supabase-rls.yml` (check `supabase-rls`) resets/lints and runs **254 pgTAP** assertions plus real two-session last-owner and approval races, then repeats reset+pgTAP. Owner must retain `supabase-rls` as a required check. |
 | Branch protection required-checks selection | after CI runs once, select `frontend`/`backend`/`docs` in `main` protection (ADR-0006) |
-| Staging/Production cloud provisioning (Vercel/Railway/Supabase) | first deploy |
+| Staging/Production cloud provisioning (Vercel Services + Supabase) | first deploy |
 | `docker build` in CI + image scanning | with CI |
 | Preview-environment automation | later |
 

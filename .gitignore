@@ -12,6 +12,8 @@
 *.pem
 *.key
 secrets/
+# `vercel link` writes the project link here and pulls an OIDC token into it.
+.vercel/
 
 # --- AI-agent & tooling artifacts (must never enter a public repo) ----------
 .claude/

@@ -1,6 +1,6 @@
 # Staging Deployment Runbook
 
-**Status:** Living document · 2026-08-16 · First cloud STAGING deployment · Scope: **Staging only**
+**Status:** Living document · 2026-08-16 (rev. 2 — Vercel Services) · First cloud STAGING deployment · Scope: **Staging only**
 
 ## Purpose
 
@@ -10,23 +10,25 @@ Production is **not** covered here. Production must use **separate** infrastruct
 
 ## Current decision
 
-The first staging deployment is **two services**:
+Per [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md), staging is **one Vercel project running two services**, plus Supabase:
 
 | Component | Platform | Status for first staging |
 |---|---|---|
-| Next.js web app (`frontend/`) | **Vercel** | **Required** |
+| Next.js web app (`frontend/`) | **Vercel Services** (`services.frontend`) | **Required** |
+| FastAPI service (`backend/`) | **Vercel Services** (`services.backend`) | **Required** — deployed alongside the web app |
 | Postgres · Auth · Storage · RLS · RPC · Realtime | **Supabase Cloud** | **Required** |
-| FastAPI service (`backend/`) | Railway (ADR-0004) | **NOT REQUIRED — do not deploy** |
+| Python workers | — | Not implemented; host deferred to a future ADR |
 
-### Why FastAPI is not deployed
+> **Changed 2026-08-16.** An earlier revision of this runbook said FastAPI was *not required* for staging and was targeted at Railway, and that **no `vercel.json` was needed**. Both statements described the Vercel-project-per-service model that [ADR-0004](../decisions/ADR-0004-deployment-platforms.md) assumed. Under Vercel Services, `vercel.json` **is** the deployment definition and adding the backend costs one entry in it rather than a second platform account — so the backend now ships with the frontend, in the same deployment and the same rollback.
 
-`backend/` stays in the repository and keeps its CI job; it is simply not part of the deployed runtime yet. Three independent checks agree:
+### What the backend actually serves today
 
-- **No caller.** `frontend/src` contains no `fetch(` call at all. The web app reaches data only through `@supabase/ssr`.
-- **No configuration read.** `AI_SERVICE_URL` is declared in `frontend/src/lib/env/index.ts` but `parseServerEnv()` is never called outside its own module, so nothing resolves a backend base URL.
-- **No surface to call.** `backend/app` registers exactly one router — `GET /health` (`backend/app/api/v1/health.py`). There is no AI, OCR, RAG, or document endpoint yet.
+`backend/app` registers exactly one router — `GET /health` (`backend/app/api/v1/health.py`). There is no AI, OCR, RAG, or document endpoint yet, and `frontend/src` contains no `fetch(` call, so **nothing in the web app calls it at runtime**. Deploying it now is still worth doing: under Services it is one config entry, it keeps both halves in one preview URL per PR, and it makes the first real endpoint a code change rather than a platform-provisioning project.
 
-Deploying it now would add a host, a secret set, and a rollback story for an unreachable health check. Revisit when the first AI/OCR/document endpoint gains a caller; ADR-0004 already fixes Railway as its target.
+Two consequences follow from having *only* a health route, and they matter for how you configure it:
+
+- **Leave `APP_ENV` unset on the backend service.** `backend/app/config.py` fails fast at import time when `APP_ENV` is `staging`/`production` and any of `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `DATABASE_URL` is missing. Setting it today would force provisioning a **service-role key that bypasses RLS** just to serve a health check — a breach surface with no feature behind it. Flip `APP_ENV=staging` and provision the four secrets in the **same change** that lands the first real endpoint.
+- **Leave `ALLOWED_ORIGINS` at its default.** `vercel.json` routes the backend same-origin under `/api/backend`, so the browser issues no cross-origin preflight — and per [ADR-0001](../decisions/ADR-0001-approved-architecture.md) the service is called from the server side of the web app, never from the browser.
 
 ## Split of work
 
@@ -34,13 +36,13 @@ Deploying it now would add a host, a secret set, and a rollback story for an unr
 
 | # | Task | Where |
 |---|---|---|
-| 1 | Confirmed the runtime architecture (Vercel + Supabase only) | this document |
+| 1 | Confirmed the runtime architecture (Vercel Services × 2 + Supabase) and wrote the root `vercel.json` | `vercel.json`, [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md) |
 | 2 | Exported the env schemas and added the exposure-contract test — a service-role/secret-shaped name under `NEXT_PUBLIC_*` now fails the test suite | `frontend/src/lib/env/index.ts`, `frontend/src/lib/env/env.test.ts` |
 | 3 | Documented the staging value/source of every variable | [Environment contract](#environment-contract) |
 | 4 | Confirmed no code assumes `localhost:3000`, a callback URL, or Mailpit | [Cloud URL and auth readiness](#cloud-url-and-auth-readiness) |
 | 5 | Verified all migrations apply in order from an empty database | [Supabase readiness](#supabase-readiness) |
 | 6 | Added a one-time, guarded staging seed builder | `scripts/build_staging_seed.py` |
-| 7 | Confirmed Vercel settings and that **no `vercel.json` is needed** | [Vercel readiness](#vercel-readiness) |
+| 7 | Declared both services in the root `vercel.json` and pinned the middleware to the Node runtime | [Vercel readiness](#vercel-readiness) |
 | 8 | Ran typecheck, lint, unit tests, production build, production start smoke test | recorded in `AGENT_WORK_LOG.md` |
 
 ### OWNER MANUAL TASKS — browser and terminal, in this order
@@ -60,7 +62,9 @@ Exact variable names as they exist in the repository. `frontend/src/lib/env/inde
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Required** | **Public** | `pnpm supabase status` → `ANON_KEY` | Supabase → Settings → API → anon / publishable key | Vercel | Yes |
 | `NEXT_PUBLIC_SUPPORT_CONTACT` | Optional | **Public** | unset | Real support email or help-desk URL, or leave unset | Vercel | Yes |
 | `SUPABASE_SERVICE_ROLE_KEY` | Optional | **SECRET** | `pnpm supabase status` → `SERVICE_ROLE_KEY` | **Do not set on Vercel.** Owner keeps it in a password manager for the admin tasks below | nowhere (Vercel) | **Never** |
-| `AI_SERVICE_URL` | Optional | **SECRET** | `http://localhost:8000` | **Do not set** — FastAPI is not deployed | nowhere | **Never** |
+| `AI_SERVICE_URL` | Optional | **SECRET** | `http://localhost:8000` | **Do not set.** FastAPI *is* deployed, but `vercel.json` routes it same-origin at `/api/backend`, so no absolute base URL is needed — and nothing calls it yet | nowhere | **Never** |
+
+The **backend service** reads its own config through `backend/app/config.py`. For first staging it needs **no environment variables at all**: leave `APP_ENV` unset (defaults `local`) so the fail-fast validator does not demand `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_JWT_SECRET` / `DATABASE_URL` for a deployment whose only route is `GET /health`. See [What the backend actually serves today](#what-the-backend-actually-serves-today).
 
 Rules that hold regardless of environment:
 
@@ -110,19 +114,35 @@ It concatenates the seed files in the order `config.toml` already declares — s
 
 ## Vercel readiness
 
-Confirmed against `package.json`, `pnpm-workspace.yaml`, and `frontend/next.config.ts`:
+The deployment is defined by the repository-root **`vercel.json`**, not by project settings. Deploy from the **repository root** — do **not** set a Root Directory in the Vercel project; `vercel.json` declares each service's root itself, and setting both would put the same fact in two places.
+
+```jsonc
+{
+  "services": {
+    "frontend": { "root": "frontend", "framework": "nextjs" },
+    "backend":  { "root": "backend", "framework": "fastapi",
+                  "runtime": "python", "entrypoint": "app/main.py" }
+  },
+  "rewrites": [
+    { "source": "/api/backend(/.*)?", "destination": { "type": "service", "service": "backend" } },
+    { "source": "/(.*)",              "destination": { "type": "service", "service": "frontend" } }
+  ]
+}
+```
+
+Rewrites are ordered: the specific `/api/backend` prefix must stay **above** the `/(.*)` catch-all, or every request reaches Next.js.
 
 | Setting | Value | Why |
 |---|---|---|
-| Root Directory | `frontend` | The Next.js app; the only pnpm workspace package |
-| Include files outside Root Directory | **Enabled** | `pnpm-lock.yaml` and `pnpm-workspace.yaml` live at the repo root; install must resolve the workspace |
-| Framework Preset | **Next.js** (auto-detected) | `next@15` App Router, `next.config.ts` adds nothing build-relevant |
-| Install Command | **default** | Vercel runs `pnpm install` and honours `packageManager: pnpm@9.0.0` from the root `package.json` via corepack |
-| Build Command | **default** (`next build`) | `frontend/package.json` → `build` |
-| Output Directory | **default** (`.next`) | Standard App Router output; no `output: "export"`, no custom `distDir` |
-| Node.js Version | **22.x** | Root `engines.node: ">=20.0.0"`; 22.x is the current Vercel default |
+| Root Directory | **unset** (repo root) | `vercel.json` declares `services.*.root`; a project-level Root Directory would conflict with it |
+| Framework (frontend) | **`nextjs`**, declared in `vercel.json` | `next@15` App Router; `next.config.ts` adds nothing build-relevant |
+| Runtime (backend) | **`python`**, entrypoint `app/main.py` | `backend/app/main.py` exposes the ASGI `app`; `pyproject.toml` requires Python ≥3.12 |
+| Install / Build / Output | **default** | Vercel runs `pnpm install` honouring `packageManager: pnpm@9.0.0` via corepack; `next build` → `.next`. The root lockfile and `pnpm-workspace.yaml` resolve naturally because the deploy root *is* the repo root |
+| Node.js Version | **22.x** | Root `engines.node: ">=20.0.0"` |
 
-**No `vercel.json` is needed** and none was added — every setting above is either the platform default or a project-settings toggle. Adding one would duplicate settings in two places.
+**Middleware runtime is load-bearing.** `frontend/src/middleware.ts` pins `export const runtime = "nodejs"` because Vercel Services does not host Edge Function output. The middleware never needed Edge — one round trip to Supabase auth plus cookie reads/writes — and Node middleware is stable as of Next.js 15.5 (installed: 15.5.22). Removing that export breaks the deployment.
+
+**`.vercel/` is gitignored.** `vercel link` writes the project link there and pulls a short-lived OIDC token into it; it must never be committed.
 
 ---
 
@@ -242,8 +262,9 @@ Use the `email_otp` field from the response as the 6-digit code on `/auth/verify
 1. <https://vercel.com/new> → import the GitHub repository.
 2. Project name: **`aladdin-staging`**.
 3. Production Branch: **`main`**. Do not change branch protection on the repository.
-4. Apply the settings from [Vercel readiness](#vercel-readiness) — in particular **Root Directory `frontend`** *and* **Include source files outside of the Root Directory: enabled**. Without the second toggle the pnpm workspace install fails.
+4. **Leave Root Directory unset** so the project deploys from the repository root. The root `vercel.json` declares both services and their roots — see [Vercel readiness](#vercel-readiness). Setting a Root Directory here scopes the deploy to one subdirectory and the backend service is never built.
 5. Leave Install / Build / Output commands at their defaults.
+6. Confirm the build log shows **two services** built (`frontend` and `backend`). If only one appears, `vercel.json` was not picked up — check it is at the repository root and is valid JSON.
 
 ## 6. Enter the environment variables
 
@@ -259,12 +280,15 @@ Optional: `NEXT_PUBLIC_SUPPORT_CONTACT=<support email or help-desk URL>` — lea
 
 **Do not add** `SUPABASE_SERVICE_ROLE_KEY` or `AI_SERVICE_URL`. Nothing reads them, and the first is a full RLS bypass.
 
+**Do not add `APP_ENV` for the backend service either.** Leaving it unset keeps `backend/app/config.py`'s fail-fast validator satisfied without provisioning four secrets for a deployment whose only route is `GET /health`. See [What the backend actually serves today](#what-the-backend-actually-serves-today).
+
 Then **Deploy**, and copy the resulting URL back into Supabase **Site URL** ([step 3](#3-configure-supabase-auth)).
 
 ## 7. First cloud smoke test
 
 | # | Check | Expected |
 |---|---|---|
+| 0 | `GET /api/backend/health` | `200` `{"status":"ok","service":"backend","env":"local"}` — proves the backend service built and the rewrite routes to it. **See the note below if this 404s.** |
 | 1 | `GET /api/health` | `200` with `{"status":"ok","service":"frontend",…}` |
 | 2 | `/` | Landing renders; no environment error in the Vercel function logs |
 | 3 | `/auth/sign-in` | Renders in Arabic (RTL) by default, with the locale switch working |
@@ -275,7 +299,10 @@ Then **Deploy**, and copy the resulting URL back into Supabase **Site URL** ([st
 | 8 | Walk the demo world | Products, RFQs, quotations, orders, projects, people, and sales analytics all show seeded rows |
 | 9 | Sign out | Returns to `/auth/sign-in` |
 
-A failure at #6 is almost always the Magic Link template ([step 3](#3-configure-supabase-auth)). A failure at #2 with a configuration error means a `NEXT_PUBLIC_*` variable is missing — Vercel requires a **redeploy** after adding one.
+A failure at #6 is almost always the Magic Link template ([step 3](#3-configure-supabase-auth)). A failure at #2 with a configuration error means a `NEXT_PUBLIC_*` variable is missing — Vercel requires a **redeploy** after adding one. **Check #0 is the one step not yet verified against a real deployment**, and it has two distinct failure modes:
+
+- **The Next.js 404 page** → the catch-all rewrite matched first. Check rewrite order in `vercel.json` (`/api/backend` must precede `/(.*)`).
+- **A FastAPI JSON `{"detail":"Not Found"}`** → routing worked, but the service received the path **with** the `/api/backend` prefix still attached, while `backend/app/api/v1/health.py` declares plain `/health`. Fix it in **one** place, not both: either mount the router under an `/api/backend` prefix in `backend/app/main.py`, or add the prefix strip to the rewrite. Record whichever you choose here and in [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md).
 
 ## 8. Before Client UAT
 
@@ -293,7 +320,8 @@ The first cloud STAGING environment: which services exist, which variables they 
 
 - **Production rollout.** It requires **separate infrastructure** — its own Supabase project, its own Vercel project, its own secrets — and must never load the demo seeds. Not documented until staging is proven.
 - Custom SMTP, custom domain, preview-deployment auth, and per-environment CI/CD promotion gates.
-- FastAPI/Railway deployment, until an endpoint has a caller.
+- **Backend secret provisioning** — `APP_ENV=staging` plus `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_JWT_SECRET` / `DATABASE_URL`, landing with the first real AI/OCR/document endpoint.
+- **Worker hosting** — no worker is implemented; a new ADR picks the host ([ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)).
 
 ## Consequences
 

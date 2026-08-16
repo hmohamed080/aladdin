@@ -44,7 +44,8 @@ tests/
 ## Async & workloads
 
 - Use async I/O for HTTP, database, storage, OpenAI, and OCR providers.
-- **Never run blocking AI, OCR, or document parsing directly in the request event loop.** Long-running work goes through the approved queue/worker path (Supabase Queues + Railway workers). Request handlers stay fast.
+- **Never run blocking AI, OCR, or document parsing directly in the request event loop.** Long-running work goes through the approved queue/worker path (Supabase Queues + Python workers; no worker is implemented yet and its host is undecided — see `../docs/decisions/ADR-0009-vercel-services-deployment.md`). Request handlers stay fast.
+- **This service is deployed as the `backend` Vercel Service** (root `vercel.json`, entrypoint `app/main.py`), reachable same-origin at **`/api/backend`**. New routes are addressed under that prefix, and the service is still called **only from the server side of the web app, never the browser**.
 
 ## Security (extends root baseline)
 
