@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ComponentType } from "react";
 import { cn } from "@/lib/ui/cn";
+import { CardRail } from "@/components/ui/card-rail";
 
 /**
  * The KPI strip that opens every showroom module — one canonical implementation.
@@ -61,7 +62,53 @@ function TileBody({ tile }: { tile: Tile }) {
   );
 }
 
-export function StatTiles({ tiles, className }: { tiles: Tile[]; className?: string }) {
+/**
+ * `grid` is the default and stays right for the three-or-four-tile strips that
+ * open most modules — they fit, and a grid lets the eye compare them at a glance.
+ *
+ * `rail` is for the long strips (the dashboard's eight, Reports' six). Two things
+ * make it the better answer there: the row stays one row instead of pushing the
+ * real content below the fold, and a railed card does not SHRINK — which is what
+ * used to truncate "EGP 1,103,100.00" when six money tiles shared a laptop width.
+ * Where every tile fits, the rail renders no controls and is indistinguishable
+ * from a row of cards.
+ */
+export function StatTiles({
+  tiles,
+  className,
+  layout = "grid",
+  railLabel,
+}: {
+  tiles: Tile[];
+  className?: string;
+  layout?: "grid" | "rail";
+  /** Accessible name for the scroll region. Required by `layout="rail"`. */
+  railLabel?: string;
+}) {
+  const cards = tiles.map((tile) =>
+    tile.href ? (
+      <Link
+        key={tile.label}
+        href={tile.href}
+        className="flex items-center gap-3 rounded-md border bg-surface p-md shadow-card transition-colors hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+      >
+        <TileBody tile={tile} />
+      </Link>
+    ) : (
+      <div key={tile.label} className="flex items-center gap-3 rounded-md border bg-surface p-md shadow-card">
+        <TileBody tile={tile} />
+      </div>
+    ),
+  );
+
+  if (layout === "rail") {
+    return (
+      <CardRail label={railLabel ?? ""} itemWidth="13rem" className={className}>
+        {cards}
+      </CardRail>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -69,21 +116,7 @@ export function StatTiles({ tiles, className }: { tiles: Tile[]; className?: str
         className,
       )}
     >
-      {tiles.map((tile) =>
-        tile.href ? (
-          <Link
-            key={tile.label}
-            href={tile.href}
-            className="flex items-center gap-3 rounded-md border bg-surface p-md shadow-card transition-colors hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-          >
-            <TileBody tile={tile} />
-          </Link>
-        ) : (
-          <div key={tile.label} className="flex items-center gap-3 rounded-md border bg-surface p-md shadow-card">
-            <TileBody tile={tile} />
-          </div>
-        ),
-      )}
+      {cards}
     </div>
   );
 }

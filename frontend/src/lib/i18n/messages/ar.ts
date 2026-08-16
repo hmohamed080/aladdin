@@ -106,6 +106,16 @@ export const ar: Messages = {
     allBranches: "كل الفروع",
     allAssignedBranches: "كل فروعي",
     menu: "القائمة",
+    sidebar: {
+      control: "الشريط الجانبي",
+      expanded: "موسّع",
+      collapsed: "مصغّر",
+      hover: "التوسيع عند المرور",
+    },
+  },
+  rail: {
+    previous: "عرض السابق",
+    next: "عرض التالي",
   },
   personalHome: {
     greeting: "مرحبًا، {name}",

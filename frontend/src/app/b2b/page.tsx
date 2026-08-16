@@ -223,7 +223,12 @@ export default async function B2BHomePage() {
         <h1 className="text-headline text-fg">{m.home.title}</h1>
       </div>
 
-      {tiles.length > 0 ? <StatTiles tiles={tiles} /> : null}
+      {/* A member who both buys and sells reaches EIGHT tiles here. As a grid that
+          is two full rows before the first real panel; as a rail it is one row,
+          and on a wide desktop where all of them fit the controls never appear. */}
+      {tiles.length > 0 ? (
+        <StatTiles tiles={tiles} layout="rail" railLabel={m.home.title} />
+      ) : null}
 
       <QuickActions m={m} capabilities={org.capabilities} />
 

@@ -106,6 +106,16 @@ export const en = {
     allBranches: "All branches",
     allAssignedBranches: "All my branches",
     menu: "Menu",
+    sidebar: {
+      control: "Sidebar",
+      expanded: "Expanded",
+      collapsed: "Collapsed",
+      hover: "Expand on hover",
+    },
+  },
+  rail: {
+    previous: "Show previous",
+    next: "Show next",
   },
   personalHome: {
     greeting: "Welcome, {name}",

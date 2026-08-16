@@ -87,19 +87,63 @@ const sectionLabel: Record<NavSection, string | null> = {
   business: "nav.section.business",
 };
 
-function NavLink({ item, active }: { item: Item; active: boolean }) {
-  const { t } = useI18n();
+/**
+ * One navigation row.
+ *
+ * `narrow` is the icon-rail presentation, not a different link: the same href,
+ * the same active rule, the same capability gate. Only the label moves — out of
+ * the row and into a tooltip — so a collapsed rail can never expose a different
+ * set of modules than an expanded one.
+ *
+ * Accessibility in the narrow state: the localized label becomes the link's
+ * `aria-label`, so assistive tech reads exactly what the expanded rail shows.
+ * The tooltip is therefore purely visual (`aria-hidden`) — describing the link
+ * with the same string it is already named with would just stutter.
+ */
+function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow?: boolean }) {
+  const { t, dir } = useI18n();
   const { href, key, Icon } = item;
+  const label = t(key);
+  const [tip, setTip] = useState<{ top: number; inlineStart: number } | null>(null);
+
+  /**
+   * The tooltip is `position: fixed`, and that is not a stylistic choice.
+   * The rail scrolls vertically, and a box with `overflow-y: auto` also clips
+   * horizontally — an absolutely-positioned tooltip at `start-full` would be
+   * sliced off at the rail's edge. Fixed positioning leaves the clipping context
+   * entirely, so the coordinates have to be measured rather than declared.
+   */
+  const place = (el: HTMLElement | null) => {
+    if (!el || !narrow) return;
+    const r = el.getBoundingClientRect();
+    setTip({
+      top: r.top + r.height / 2,
+      // Always inward, toward the content: past the trailing edge in LTR, past
+      // the leading edge in RTL. `inlineStart` is fed to the matching physical
+      // property below.
+      inlineStart: dir === "rtl" ? window.innerWidth - r.left : r.right,
+    });
+  };
+  const hide = () => setTip(null);
+
   return (
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
+      aria-label={narrow ? label : undefined}
+      onMouseEnter={(e) => place(e.currentTarget)}
+      onMouseLeave={hide}
+      onFocus={(e) => place(e.currentTarget)}
+      onBlur={hide}
       className={cn(
-        "group relative flex items-center gap-3 rounded-sm px-3 py-2 text-label font-medium transition-colors duration-fast",
+        "group relative flex items-center rounded-sm py-2 text-label font-medium transition-colors duration-fast",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
+        narrow ? "justify-center px-0" : "gap-3 px-3",
         active ? "bg-surface-2 text-fg" : "text-fg-secondary hover:bg-surface-2/60 hover:text-fg",
       )}
     >
+      {/* The active marker is the ONLY cue left once labels are gone, so it stays
+          in both states rather than being an expanded-only flourish. */}
       <span
         aria-hidden="true"
         className={cn(
@@ -110,24 +154,62 @@ function NavLink({ item, active }: { item: Item; active: boolean }) {
       <span className={cn("shrink-0", active ? "text-accent" : "text-fg-muted group-hover:text-fg-secondary")}>
         <Icon size={19} />
       </span>
-      <span className="truncate">{t(key)}</span>
+      {narrow ? (
+        tip ? (
+          <span
+            role="tooltip"
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-none fixed -translate-y-1/2 whitespace-nowrap",
+              "rounded-sm border border-strong bg-surface px-2 py-1 text-label text-fg shadow-lg",
+            )}
+            style={{
+              zIndex: 800,
+              top: tip.top,
+              ...(dir === "rtl"
+                ? { right: tip.inlineStart + 8 }
+                : { left: tip.inlineStart + 8 }),
+            }}
+          >
+            {label}
+          </span>
+        ) : null
+      ) : (
+        <span className="truncate">{label}</span>
+      )}
     </Link>
   );
 }
 
-/** Desktop/tablet vertical rail (rendered inside the persistent sidebar). */
-export function Sidebar({ allowed }: { allowed: readonly string[] }) {
+/**
+ * Desktop/tablet vertical rail (rendered inside the persistent sidebar).
+ *
+ * `narrow` swaps the presentation only. The section list still comes from
+ * `allowedNavSections(allowed)`, so every capability-derived module survives the
+ * collapse — a narrow rail shows the same items, drawn smaller. Section headings
+ * have no room at 3.5rem, so the grouping is carried by a rule instead of a
+ * word; the groups themselves are unchanged and in the same order.
+ */
+export function Sidebar({ allowed, narrow = false }: { allowed: readonly string[]; narrow?: boolean }) {
   const { t } = useI18n();
   const isActive = useActive();
   const sections = allowedNavSections(allowed);
 
   return (
     <nav aria-label={t("nav.workspace")} className="flex flex-col gap-1">
-      {sections.map(({ section, keys }) => {
+      {sections.map(({ section, keys }, i) => {
         const labelKey = sectionLabel[section];
         return (
-          <div key={section} className={cn(labelKey ? "mt-md first:mt-0" : undefined)}>
-            {labelKey ? (
+          <div
+            key={section}
+            className={cn(
+              // Expanded groups are separated by their heading; narrow ones by a
+              // rule, which needs far less room around it than a word does.
+              labelKey && !narrow ? "mt-md first:mt-0" : undefined,
+              narrow && i > 0 && "mt-sm border-t pt-sm",
+            )}
+          >
+            {labelKey && !narrow ? (
               <h2 className="px-3 pb-1.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-muted">
                 {t(labelKey)}
               </h2>
@@ -135,7 +217,9 @@ export function Sidebar({ allowed }: { allowed: readonly string[] }) {
             <div className="flex flex-col gap-0.5">
               {keys.map((k) => {
                 const item = ITEMS[k];
-                return <NavLink key={k} item={item} active={isActive(item.href, item.exact)} />;
+                return (
+                  <NavLink key={k} item={item} active={isActive(item.href, item.exact)} narrow={narrow} />
+                );
               })}
             </div>
           </div>

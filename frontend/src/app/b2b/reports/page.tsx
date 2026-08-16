@@ -186,10 +186,15 @@ export default async function ReportsPage({
           { label: m.reports.stat.projects, value: totalProjects, Icon: LayersIcon, href: "/b2b/projects" },
           { label: m.reports.stat.saved, value: sum(saved), Icon: BookmarkIcon, href: "/b2b/saved" },
         ]}
-        /* Six across was tried and reverted: at a laptop width it squeezed the
-           committed-spend tile until "EGP 1,103,100.00" truncated to "EGP 1,103,10…",
-           which is the one number on this page nobody may misread. Four across
-           with a second row of two keeps every figure whole. */
+        /* Six across was tried and reverted once: at a laptop width it squeezed
+           the committed-spend tile until "EGP 1,103,100.00" truncated to
+           "EGP 1,103,10…", which is the one number on this page nobody may
+           misread. The rail settles that for good — a railed card holds its width
+           and scrolls instead of shrinking, so the figure stays whole at every
+           viewport, and on a wide screen where all six fit there is nothing to
+           scroll and no control is drawn. */
+        layout="rail"
+        railLabel={m.reports.title}
       />
 
       {/* ---------------------------------------------------------------- */}

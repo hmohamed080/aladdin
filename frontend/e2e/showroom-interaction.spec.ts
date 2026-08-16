@@ -1,0 +1,340 @@
+import { test, expect, type Page } from "@playwright/test";
+import { IDENTITIES, signIn } from "./helpers/auth";
+
+/**
+ * Sprint 14 refinement — workspace sidebar modes and horizontal card rails.
+ *
+ * Signed in as the Showroom/Dealer acceptance account (Cairo Ceramics, hana@),
+ * because these two patterns only earn their keep against a workspace that is
+ * actually dense: the showroom owner reaches every nav section and every
+ * dashboard tile, so a collapsed rail that silently dropped a module, or a rail
+ * whose arrows never settled, would show up here and nowhere else.
+ *
+ * What is asserted is BEHAVIOUR, not pixels: which modules survive a collapse,
+ * which direction a reveal grows, whether the preference outlives a reload, and
+ * whether any of it lets the page scroll sideways.
+ */
+
+/** The app's default locale is ARABIC, so English needs the cookie set explicitly. */
+async function prefs(page: Page, locale: "en" | "ar") {
+  await page.context().addCookies([{ name: "NEXT_LOCALE", value: locale, url: "http://127.0.0.1" }]);
+}
+
+const sidebar = (page: Page) => page.locator("[data-sidebar-mode]");
+const control = (page: Page) => page.getByTestId("sidebar-control");
+
+async function setMode(page: Page, mode: "expanded" | "collapsed" | "hover") {
+  await control(page).click();
+  await page.getByTestId(`sidebar-mode-${mode}`).click();
+  await expect(sidebar(page)).toHaveAttribute("data-sidebar-mode", mode);
+}
+
+/** Width of the element that actually RESERVES layout space in the shell. */
+async function restingWidth(page: Page): Promise<number> {
+  return (await sidebar(page).boundingBox())!.width;
+}
+
+/** Width of the visible panel — differs from the above only during a hover reveal. */
+async function panelWidth(page: Page): Promise<number> {
+  return (await sidebar(page).locator("> div").first().boundingBox())!.width;
+}
+
+/** The page itself must never scroll sideways, at any viewport, in any locale. */
+async function expectNoPageOverflow(page: Page) {
+  const overflow = await page.evaluate(() => {
+    const d = document.documentElement;
+    return d.scrollWidth - d.clientWidth;
+  });
+  expect(overflow).toBeLessThanOrEqual(1);
+}
+
+test.describe("Workspace sidebar display modes", () => {
+  test.skip(({ isMobile }) => !!isMobile, "Desktop modes do not apply to the mobile shell.");
+
+  test("offers exactly three modes and keeps every module reachable in each", async ({
+    page,
+    request,
+  }) => {
+    await prefs(page, "en");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b");
+
+    const links = sidebar(page).getByRole("link");
+    const expanded = await links.count();
+    expect(expanded).toBeGreaterThan(10); // A showroom owner reaches the full IA.
+
+    await control(page).click();
+    await expect(page.getByRole("menuitem")).toHaveText([
+      "Expanded",
+      "Collapsed",
+      "Expand on hover",
+    ]);
+    await page.keyboard.press("Escape");
+
+    // Collapsing is a change of PRESENTATION. Losing a route here would mean a
+    // user could not reach a module they have the capability for.
+    await setMode(page, "collapsed");
+    await expect(links).toHaveCount(expanded);
+    await setMode(page, "hover");
+    await expect(links).toHaveCount(expanded);
+  });
+
+  test("collapsed is a narrow rail that still names its items and marks the active route", async ({
+    page,
+    request,
+  }) => {
+    await prefs(page, "en");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b/catalog");
+
+    const wide = await restingWidth(page);
+    await setMode(page, "collapsed");
+    const narrow = await restingWidth(page);
+    expect(narrow).toBeLessThan(wide / 2);
+
+    // The label is gone from the screen but must survive as the accessible name.
+    const catalog = sidebar(page).getByRole("link", { name: "Browse products" });
+    await expect(catalog).toBeVisible();
+    await expect(catalog).toHaveAttribute("aria-current", "page");
+
+    // ...and come back visually on hover, as a tooltip. Located by CSS, not by
+    // role: the tooltip is `aria-hidden` on purpose (the link is already NAMED
+    // with the same string, so exposing both would make it stutter), and
+    // `getByRole` only sees the accessibility tree.
+    await catalog.hover();
+    await expect(sidebar(page).locator('[role="tooltip"]')).toHaveText("Browse products");
+  });
+
+  test("expand-on-hover overlays the page instead of reflowing it", async ({ page, request }) => {
+    await prefs(page, "en");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b");
+    await setMode(page, "hover");
+    // Park the pointer off the panel; choosing the mode left it hovering there,
+    // which is a real reveal and would make the assertion below vacuous.
+    await page.mouse.move(1000, 600);
+    await expect(sidebar(page)).toHaveAttribute("data-sidebar-open", "false");
+
+    const restingBefore = await restingWidth(page);
+    const mainBefore = (await page.locator("#main").boundingBox())!;
+
+    await sidebar(page).locator("> div").first().hover();
+    await expect(sidebar(page)).toHaveAttribute("data-sidebar-open", "true");
+    await expect.poll(() => panelWidth(page)).toBeGreaterThan(restingBefore * 2);
+
+    // The whole point: the panel grew, the document did not move.
+    expect(await restingWidth(page)).toBe(restingBefore);
+    const mainAfter = (await page.locator("#main").boundingBox())!;
+    expect(mainAfter.x).toBe(mainBefore.x);
+    expect(mainAfter.width).toBe(mainBefore.width);
+
+    await page.locator("#main").hover();
+    await expect(sidebar(page)).toHaveAttribute("data-sidebar-open", "false");
+  });
+
+  test("a keyboard alone can reveal and use the hover sidebar", async ({ page, request }) => {
+    await prefs(page, "en");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b");
+    await setMode(page, "hover");
+    // Choosing the mode leaves the pointer sitting on the panel, and in hover
+    // mode that is a legitimate reveal — park the pointer over the page first so
+    // what follows tests the KEYBOARD and not a leftover hover.
+    await page.mouse.move(1000, 600);
+    await expect(sidebar(page)).toHaveAttribute("data-sidebar-open", "false");
+
+    // Focus alone must open it — otherwise the rail is pointer-only.
+    await sidebar(page).getByRole("link", { name: "Home" }).focus();
+    await expect(sidebar(page)).toHaveAttribute("data-sidebar-open", "true");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/b2b$/);
+  });
+
+  test("the preference survives a reload without a flash of the wrong width", async ({
+    page,
+    request,
+  }) => {
+    await prefs(page, "en");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b");
+    await setMode(page, "collapsed");
+    const narrow = await restingWidth(page);
+
+    await page.reload();
+    await expect(sidebar(page)).toHaveAttribute("data-sidebar-mode", "collapsed");
+    expect(await restingWidth(page)).toBe(narrow);
+
+    // The width is server-rendered, so it is correct in the FIRST HTML response —
+    // this is what rules out the post-hydration snap.
+    const html = await (await page.request.get("/b2b")).text();
+    expect(html).toContain('data-sidebar-mode="collapsed"');
+
+    // And it carries across a navigation, not just a refresh.
+    await page.goto("/b2b/reports");
+    expect(await restingWidth(page)).toBe(narrow);
+  });
+
+  test("Arabic reveals inward from the correct edge", async ({ page, request }) => {
+    await prefs(page, "ar");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b");
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+
+    // RTL puts the sidebar on the RIGHT: its right edge hugs the viewport.
+    const viewport = page.viewportSize()!;
+    const box = (await sidebar(page).boundingBox())!;
+    expect(Math.round(box.x + box.width)).toBe(viewport.width);
+
+    await setMode(page, "hover");
+    await page.mouse.move(400, 600);
+    await expect(sidebar(page)).toHaveAttribute("data-sidebar-open", "false");
+    const railLeft = (await sidebar(page).boundingBox())!.x;
+    await sidebar(page).locator("> div").first().hover();
+    await expect(sidebar(page)).toHaveAttribute("data-sidebar-open", "true");
+
+    // Growing INWARD in RTL means the panel's left edge moves further left while
+    // its right edge stays pinned. A direction bug would push it off-screen right.
+    const panel = (await sidebar(page).locator("> div").first().boundingBox())!;
+    expect(panel.x).toBeLessThan(railLeft);
+    expect(Math.round(panel.x + panel.width)).toBe(viewport.width);
+    await expectNoPageOverflow(page);
+  });
+});
+
+test.describe("Horizontal card rails", () => {
+  test("dashboard rails scroll, settle their arrows, and never widen the page", async ({
+    page,
+    request,
+  }) => {
+    await prefs(page, "en");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b");
+
+    // Scope to ONE rail: the dashboard has two (tiles and the action ramp), and
+    // an unscoped `rail-next` could pair one rail's scroller with the other's arrow.
+    const root = page.getByTestId("card-rail").first();
+    const rail = root.getByRole("group", { name: "Your day at a glance" });
+    await expect(rail).toBeVisible();
+    await expectNoPageOverflow(page);
+
+    const next = root.getByTestId("rail-next");
+    const prev = root.getByTestId("rail-prev");
+
+    // Arrows appear only on real overflow, and overflow is measured in an effect
+    // AFTER mount — so this waits rather than sampling. A bare `isVisible()` here
+    // raced that effect and silently SKIPPED the whole test, which is worse than
+    // a failure: the run stays green while nothing is checked. The showroom's
+    // eight tiles overflow at every viewport this suite runs, so if this ever
+    // stops being true it should fail loudly and be re-thought, not skipped.
+    await expect(next).toBeVisible();
+
+    await expect(prev).toBeDisabled();
+    await expect(next).toBeEnabled();
+
+    const start = await rail.evaluate((el) => Math.abs(el.scrollLeft));
+    await next.click();
+    await expect.poll(() => rail.evaluate((el) => Math.abs(el.scrollLeft))).toBeGreaterThan(start);
+    await expect(prev).toBeEnabled();
+
+    // Walk to the end; `next` must disable itself exactly there.
+    //
+    // Settling is not a courtesy wait, and a fixed delay is not enough. Chrome's
+    // smooth-scroll duration scales with distance, so an enabled-check taken
+    // mid-animation describes where the rail WAS. If the animation then finishes
+    // and the arrow disables, `disabled:pointer-events-none` makes the click fall
+    // through to the card underneath and Playwright waits out the whole test
+    // timeout on a button that will never re-enable. So: wait until scrollLeft
+    // actually stops moving, then decide.
+    const settle = async () => {
+      let last = -1;
+      for (let i = 0; i < 40; i++) {
+        const now = await rail.evaluate((el) => Math.abs(el.scrollLeft));
+        if (now === last) return;
+        last = now;
+        await page.waitForTimeout(100);
+      }
+    };
+
+    const walk = async (button: typeof next) => {
+      for (let i = 0; i < 8; i++) {
+        await settle();
+        if (!(await button.isEnabled())) break;
+        await button.click();
+      }
+      await settle();
+    };
+
+    await walk(next);
+    await expect(next).toBeDisabled();
+    await expectNoPageOverflow(page);
+
+    // And back, symmetrically.
+    await walk(prev);
+    await expect(prev).toBeDisabled();
+    await expect(next).toBeEnabled();
+  });
+
+  test("the Arabic rail travels the other way and still bounds its arrows", async ({
+    page,
+    request,
+  }) => {
+    await prefs(page, "ar");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b");
+
+    const root = page.getByTestId("card-rail").first();
+    const rail = root.getByRole("group");
+    await expect(rail).toBeVisible();
+    const next = root.getByTestId("rail-next");
+    const prev = root.getByTestId("rail-prev");
+    await expect(next).toBeVisible();
+
+    await expect(prev).toBeDisabled();
+    // RTL scrollLeft goes NEGATIVE; the component reads the distance travelled,
+    // so "moved" means the absolute value grew regardless of sign.
+    await next.click();
+    await expect.poll(() => rail.evaluate((el) => Math.abs(el.scrollLeft))).toBeGreaterThan(0);
+    await expect(prev).toBeEnabled();
+    await expectNoPageOverflow(page);
+  });
+
+  test("Reports keeps its money figures whole inside the rail", async ({ page, request }) => {
+    await prefs(page, "en");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b/reports");
+
+    await expect(page.getByRole("group", { name: "Reports & analytics" })).toBeVisible();
+    await expectNoPageOverflow(page);
+  });
+});
+
+test.describe("Responsive shell", () => {
+  test("mobile keeps its own navigation and never shows the desktop rail", async ({
+    page,
+    request,
+    isMobile,
+  }) => {
+    test.skip(!isMobile, "Mobile-only assertion.");
+    await prefs(page, "en");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b");
+
+    // The three desktop modes must not leak onto the phone.
+    await expect(sidebar(page)).toBeHidden();
+    await expect(control(page)).toBeHidden();
+    await expect(page.getByRole("navigation", { name: "Workspace" }).last()).toBeVisible();
+    await expectNoPageOverflow(page);
+  });
+
+  test("tablet shows the sidebar and the rails stay contained", async ({ page, request }) => {
+    await page.setViewportSize({ width: 820, height: 1000 });
+    await prefs(page, "en");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b");
+
+    await expect(sidebar(page)).toBeVisible();
+    await expectNoPageOverflow(page);
+    await setMode(page, "collapsed");
+    await expectNoPageOverflow(page);
+  });
+});

@@ -330,3 +330,35 @@ export const MenuIcon = (p: IconProps) => (
     <path d="M4 6h16M4 12h16M4 18h16" />
   </Svg>
 );
+
+// --- Sprint 14 refinement: workspace chrome + horizontal rails ---------------
+
+/**
+ * The sidebar-display control. Deliberately direction-NEUTRAL: it is a panel
+ * with a rail, not an arrow, so it reads the same in Arabic and English and
+ * never implies "this collapses to the left".
+ */
+export const PanelIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M9.5 4v16" />
+  </Svg>
+);
+
+/**
+ * Rail arrows. Callers pick the glyph from the ACTIVE DIRECTION rather than
+ * hard-coding "previous = left": in Arabic, previous points right. Choosing the
+ * component at the call site keeps the SVG honest instead of relying on a CSS
+ * transform that mirrors the whole icon.
+ */
+export const ChevronLeftIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m15 5-7 7 7 7" />
+  </Svg>
+);
+
+export const ChevronRightIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m9 5 7 7-7 7" />
+  </Svg>
+);

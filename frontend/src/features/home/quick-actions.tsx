@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ComponentType } from "react";
 import type { Messages } from "@/lib/i18n/messages/en";
+import { CardRail } from "@/components/ui/card-rail";
 import {
   SearchIcon,
   ShoppingBagIcon,
@@ -98,27 +99,29 @@ export function QuickActions({
   return (
     <section aria-label={m.home.quickActions} className="flex flex-col gap-sm">
       <h2 className="text-title text-fg">{m.home.doToday}</h2>
-      <ul className="grid grid-cols-1 gap-sm tablet:grid-cols-2 desktop:grid-cols-3 [&>*]:min-w-0">
+      {/* An entry ramp is scanned once and then acted on, so it earns exactly one
+          row. A showroom owner sees eight of these; stacked three-across they
+          pushed the purchasing panels a full screen down the page. */}
+      <CardRail label={m.home.doToday} itemWidth="17rem">
         {actions.map((a) => (
-          <li key={a.href}>
-            <Link
-              href={a.href}
-              className="group flex h-full items-start gap-3 rounded-md border bg-surface p-md shadow-card transition-colors hover:border-strong hover:bg-surface-2/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+          <Link
+            key={a.href}
+            href={a.href}
+            className="group flex items-start gap-3 rounded-md border bg-surface p-md shadow-card transition-colors hover:border-strong hover:bg-surface-2/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+          >
+            <span
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-sm bg-accent-solid/12 text-accent"
+              aria-hidden="true"
             >
-              <span
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-sm bg-accent-solid/12 text-accent"
-                aria-hidden="true"
-              >
-                <a.Icon size={18} />
-              </span>
-              <span className="min-w-0">
-                <span className="block font-medium text-fg group-hover:text-accent">{a.label}</span>
-                <span className="mt-0.5 block text-label text-fg-secondary">{a.body}</span>
-              </span>
-            </Link>
-          </li>
+              <a.Icon size={18} />
+            </span>
+            <span className="min-w-0">
+              <span className="block font-medium text-fg group-hover:text-accent">{a.label}</span>
+              <span className="mt-0.5 block text-label text-fg-secondary">{a.body}</span>
+            </span>
+          </Link>
         ))}
-      </ul>
+      </CardRail>
     </section>
   );
 }

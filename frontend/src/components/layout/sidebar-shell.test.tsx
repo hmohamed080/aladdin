@@ -1,0 +1,88 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, screen } from "@testing-library/react";
+import { renderWithI18n } from "@/test/render";
+import { SidebarShell } from "./sidebar-shell";
+import { ar } from "@/lib/i18n/messages/ar";
+import { allowedNavKeys } from "@/lib/nav/modules";
+import { SIDEBAR_MODE_COOKIE } from "@/lib/ui/sidebar-mode";
+
+vi.mock("next/navigation", () => ({ usePathname: () => "/b2b/catalog" }));
+
+// A showroom owner — the manual-UAT account's shape, so the assertions below are
+// about the rail a real acceptance user actually sees.
+const CAPS = ["org.manage"];
+const MODULE_COUNT = allowedNavKeys(CAPS).length;
+
+function shell(mode: "expanded" | "collapsed" | "hover" = "expanded") {
+  return renderWithI18n(<SidebarShell appName="علاء الدين" allowed={CAPS} mode={mode} />);
+}
+
+beforeEach(() => {
+  document.cookie = `${SIDEBAR_MODE_COOKIE}=; max-age=0; path=/`;
+});
+
+describe("SidebarShell display modes", () => {
+  it("offers exactly the three documented modes, localized", () => {
+    shell();
+    fireEvent.click(screen.getByTestId("sidebar-control"));
+    const items = screen.getAllByRole("menuitem");
+    expect(items.map((i) => i.textContent)).toEqual([
+      ar.nav.sidebar.expanded,
+      ar.nav.sidebar.collapsed,
+      ar.nav.sidebar.hover,
+    ]);
+  });
+
+  it("keeps every capability-derived module reachable when collapsed", () => {
+    shell("collapsed");
+    // The collapsed rail is a different PRESENTATION, never a shorter menu.
+    expect(screen.getAllByRole("link")).toHaveLength(MODULE_COUNT);
+  });
+
+  it("names each collapsed item so the label survives the loss of visible text", () => {
+    shell("collapsed");
+    // Labels move into aria-label + tooltip; the module must still be findable.
+    expect(screen.getByRole("link", { name: ar.nav.catalog })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: ar.nav.reports })).toBeInTheDocument();
+  });
+
+  it("marks the active route in the collapsed rail", () => {
+    shell("collapsed");
+    expect(screen.getByRole("link", { name: ar.nav.catalog })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("rests collapsed in hover mode and reveals on pointer entry", () => {
+    const { container } = shell("hover");
+    const spacer = container.querySelector("[data-sidebar-mode]") as HTMLElement;
+    expect(spacer).toHaveAttribute("data-sidebar-open", "false");
+
+    fireEvent.mouseEnter(spacer.firstElementChild as HTMLElement);
+    expect(spacer).toHaveAttribute("data-sidebar-open", "true");
+
+    fireEvent.mouseLeave(spacer.firstElementChild as HTMLElement);
+    expect(spacer).toHaveAttribute("data-sidebar-open", "false");
+  });
+
+  it("reveals on keyboard focus so the rail is usable without a pointer", () => {
+    const { container } = shell("hover");
+    const spacer = container.querySelector("[data-sidebar-mode]") as HTMLElement;
+    fireEvent.focus(screen.getByRole("link", { name: ar.nav.catalog }), { bubbles: true });
+    expect(spacer).toHaveAttribute("data-sidebar-open", "true");
+  });
+
+  it("does not react to hover in collapsed mode — the two modes stay distinct", () => {
+    const { container } = shell("collapsed");
+    const spacer = container.querySelector("[data-sidebar-mode]") as HTMLElement;
+    fireEvent.mouseEnter(spacer.firstElementChild as HTMLElement);
+    expect(spacer).toHaveAttribute("data-sidebar-open", "false");
+  });
+
+  it("persists the chosen mode to this browser only, with no server round trip", () => {
+    shell();
+    fireEvent.click(screen.getByTestId("sidebar-control"));
+    fireEvent.click(screen.getByTestId("sidebar-mode-hover"));
+    expect(document.cookie).toContain(`${SIDEBAR_MODE_COOKIE}=hover`);
+    const spacer = document.querySelector("[data-sidebar-mode]") as HTMLElement;
+    expect(spacer).toHaveAttribute("data-sidebar-mode", "hover");
+  });
+});
