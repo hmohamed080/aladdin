@@ -57,6 +57,9 @@ The FastAPI app is therefore mounted under the prefix, on **one** side only:
 | 4 | Confirmed no code assumes `localhost:3000`, a callback URL, or Mailpit | [Cloud URL and auth readiness](#cloud-url-and-auth-readiness) |
 | 5 | Verified all migrations apply in order from an empty database | [Supabase readiness](#supabase-readiness) |
 | 6 | Added a one-time, guarded staging seed builder | `scripts/build_staging_seed.py` |
+| 6a | Audited all 26 seeded accounts by impersonating each under RLS, and closed every empty or dead-end demo experience with a staging-only additive layer | `supabase/staging/demo-enrichment.sql`, `supabase/staging/demo-accounts.toml` |
+| 6b | Made the demo mailbox configurable and the build **fail closed** without it — no real address in git | `scripts/staging_demo.py`, `supabase/staging/demo-email.example.toml` |
+| 6c | Added the automated 26-account verifier and the local one-time-load rehearsal | `supabase/staging/verify-staging-seed.sql`, `scripts/rehearse_staging_seed.py` |
 | 7 | Declared both services in the root `vercel.json` and pinned the middleware to the Node runtime | [Vercel readiness](#vercel-readiness) |
 | 8 | Ran typecheck, lint, unit tests, production build, production start smoke test | recorded in `AGENT_WORK_LOG.md` |
 
@@ -123,9 +126,31 @@ python scripts/build_staging_seed.py      # → supabase/.staging-seed.sql (giti
 
 It concatenates the seed files in the order `config.toml` already declares — so the list cannot drift — wraps them in a **single transaction**, and fronts them with a guard that refuses to run when `auth.users` or `public.organizations` is non-empty, or when migrations have not been pushed. Applying it twice is a clean error, never a partial load, and it can never overwrite a populated database.
 
-`supabase/demo-seed.sql` stays local-only: it is re-applied by the Playwright global setup, which truncates the sales tables first.
+`supabase/demo-seed.sql` stays local-only: it is re-applied by the Playwright global setup, which truncates the sales tables first. It is **not** part of the staging bundle — which is exactly why Org A looked populated locally and was empty in the staging rehearsal.
 
 **Production must never load any of these files.** Its data comes from real usage.
+
+### Making all 26 accounts usable as client demos
+
+The bundle above loads the world, but two things stood between it and a client-facing demo. Both were measured by impersonating all 26 seeded users under RLS against a database holding **only** the bundled seeds, not by reading the SQL.
+
+**1 — Eleven accounts had nothing to show.** `a-owner`, `a-cairo`, `b-owner` and `sara` returned zero rows in every module. Fourteen accounts land on `/home`, which is rendered almost entirely from `onboarding_progress` and `individual_onboarding` — **both empty repo-wide**, so those accounts opened on a blank profile at single-digit completeness. `a-cairo` held only the superseded `sales.opportunity.*` capabilities, so the nav offered Customers / Leads / Follow-ups while RLS returned nothing.
+
+The fix is a staging-only additive layer, [`supabase/staging/demo-enrichment.sql`](../../supabase/staging/demo-enrichment.sql), appended inside the same transaction. It is deliberately **absent from `config.toml [db.seed].sql_paths`**, so `supabase db reset`, the pgTAP snapshots and the Playwright fixtures are unchanged. It edits no migration and no historical seed file, touches no RLS policy, grant, or security-definer function, and preserves every existing UUID and relationship — new rows use a reserved `fa……` prefix that no seed file uses.
+
+**2 — No account could receive its sign-in code.** Every seeded address is `@example.test`, a reserved TLD that can never receive mail (RFC 6761). The app is passwordless — Email OTP and nothing else — so the address *is* the credential path, and there is no password or bypass to add instead. The loader therefore ends with a remap that repoints `auth.users.email`, `public.contacts.value` and the pending invitation onto addresses composed from a mailbox **you configure**:
+
+```toml
+# supabase/staging/demo-email.toml — GITIGNORED, copy from demo-email.example.toml
+mode = "plus"
+base = "you@yourmailbox.com"    # → you+aladdin-hana-showroom-owner@yourmailbox.com
+```
+
+The build **fails closed**: with no mapping it refuses to write the cloud artifact and prints how to supply one. Reserved domains (including the `example.com` in the template) are rejected rather than accepted, so a half-edited config cannot ship 26 unreachable accounts. `--rehearsal` builds a separate, clearly-named artifact for local practice without needing a real mailbox.
+
+**No real address enters the repository.** The committed manifest, [`staging-demo-accounts.md`](staging-demo-accounts.md), shows the composition pattern; the resolved addresses go to the gitignored `supabase/.staging-demo-manifest.md` / `.csv` at build time.
+
+One account is deliberately left empty: **Nour Hegazy** is the pending invitation and the brand-new-user journey. The verifier knows this by name and fails if she gains data — or if any other account loses it.
 
 ## Vercel readiness
 
@@ -237,40 +262,82 @@ Set the subject to `رمز الدخول إلى علاء الدين` to match loc
 
 Only after [step 2](#2-push-the-schema), and only against the empty staging database.
 
+#### 4a. Configure the demo mailbox — once, before anything else
+
+Every demo account signs in by Email OTP, so it needs an address that can actually receive a code.
+
+```bash
+cp supabase/staging/demo-email.example.toml supabase/staging/demo-email.toml
+```
+
+Edit it and set `base` to a mailbox you control. The file is **gitignored** — never commit it.
+
+> **The built-in Supabase email service only delivers to project team members.** Until you configure [custom SMTP](#8-before-client-uat), use the address on your Supabase account, or every code will be silently dropped.
+
+#### 4b. Generate the loader — the exact command
+
 ```bash
 python scripts/build_staging_seed.py
 ```
 
-Apply `supabase/.staging-seed.sql` once, either way:
+That is the whole build. It writes three files:
 
-- **psql:** `psql "<pooler connection string>" -f supabase/.staging-seed.sql`
-- **Dashboard:** SQL Editor → paste the file → Run.
+| File | Contents | Committed? |
+|---|---|---|
+| `supabase/.staging-seed.sql` | the one-time loader — seeds + enrichment + email remap, one transaction | no (gitignored) |
+| `supabase/.staging-demo-manifest.md` | all 26 accounts with their **real** addresses and what to demo | no (gitignored) |
+| `supabase/.staging-demo-manifest.csv` | the same, machine-readable | no (gitignored) |
 
-Expected outcome: it either succeeds, or it refuses with `Refusing to load the staging demo world: this database already has users or organizations.` — a refusal means the database is not empty and **nothing was written**.
+If it exits with `No demo email mapping configured — refusing to build the cloud staging seed`, step 4a was skipped. That refusal is the point: it is what stops 26 unreachable accounts reaching staging.
 
-### Signing in as a demo identity
-
-Every seeded address ends in `@example.test`, which cannot receive email. Pick one:
-
-**A — re-point the demo login to your own inbox (recommended; exercises the real flow).** In the SQL Editor, with an address you actually control:
-
-```sql
-update auth.users     set email = 'you+hana@example.com' where email = 'hana@example.test';
-update public.contacts set value = 'you+hana@example.com' where value = 'hana@example.test';
-```
-
-Then sign in normally at `/auth/sign-in`. Built-in SMTP delivers to project team members, so use the address on the Supabase account.
-
-**B — mint a code without sending email (any demo user).** From your terminal, with the service_role key:
+#### 4c. Apply it — ONCE
 
 ```bash
-curl -s -X POST "https://<project-ref>.supabase.co/auth/v1/admin/generate_link" \
-  -H "apikey: <service_role-key>" -H "Authorization: Bearer <service_role-key>" \
-  -H "Content-Type: application/json" \
-  -d '{"type":"magiclink","email":"hana@example.test"}'
+psql "<pooler connection string>" -f supabase/.staging-seed.sql
 ```
 
-Use the `email_otp` field from the response as the 6-digit code on `/auth/verify`.
+Or paste the file into the Dashboard SQL Editor and Run.
+
+Expected outcome: it either succeeds, or it refuses with `Refusing to load the staging demo world: this database already has users or organizations.` A refusal means the database was not empty and **nothing was written** — the whole load is one transaction.
+
+#### 4d. Verify — the exact commands
+
+```bash
+psql "<pooler connection string>" -f supabase/staging/verify-staging-seed.sql
+```
+
+Read-only, wrapped in a transaction that always rolls back. It fails loudly on the first problem and otherwise prints a 26-row table: display name, masked email, persona, workspaces, landing route, and the demo data that account can actually see. It checks:
+
+- **population** — 26 accounts, each with the user, profile and primary-contact rows the app reads;
+- **addresses** — unique, confirmed, non-reserved, GoTrue token columns non-NULL, and `public.contacts` in lockstep with `auth.users`;
+- **linkage** — persona values are personas (never business types), and no membership, capability, branch grant, lead or customer crosses an organization boundary;
+- **commerce** — every quotation and order total equals the sum of its own line items, every record names the same two parties as the record it descends from, and no accepted quotation is missing its order;
+- **landing and non-emptiness** — all 26 accounts impersonated under RLS: each must resolve to the landing route the manifest claims, and each must have something to show. Nour Hegazy is the one exemption, by name, because she *is* the new-user journey.
+
+A second, independent confirmation that the guard holds:
+
+```bash
+psql "<pooler connection string>" -f supabase/.staging-seed.sql   # must FAIL, writing nothing
+```
+
+Then open the manifest for the addresses and the demo script:
+
+```bash
+cat supabase/.staging-demo-manifest.md
+```
+
+> **Rehearse it locally first.**
+>
+> ```bash
+> python scripts/rehearse_staging_seed.py --isolated    # recommended
+> python scripts/rehearse_staging_seed.py               # uses your local Supabase stack
+> ```
+>
+> Both apply the bundle to a database holding migrations and nothing else, run the verifier, then apply the bundle a **second** time and assert the refusal wrote **zero** rows (row counts captured before and after and compared — a guard that raises after writing half a world is worse than no guard). Neither touches a remote project.
+>
+> `--isolated` runs in a throwaway container: it boots the same Supabase Postgres image, lets the real GoTrue build the `auth` schema, replays `supabase/migrations` in order, and deletes the container afterwards. It needs no Supabase CLI and leaves your local stack completely alone — useful because the pinned CLI and a globally installed one can want different Postgres image tags, and an uncached tag turns the rehearsal into a 1.7 GB download.
+>
+> The rehearsal bundle's addresses are deliberately undeliverable, so it passes `-v rehearsal=on` to skip the deliverability check **and only that check**. A real staging run passes no such variable.
 
 ## 5. Create the Vercel STAGING project
 
@@ -310,9 +377,10 @@ Then **Deploy**, and copy the resulting URL back into Supabase **Site URL** ([st
 | 4 | `/b2b` signed out | Redirects to `/auth/sign-in?next=/b2b` |
 | 5 | `/admin` signed out | Redirects to `/auth/sign-in?next=/admin` |
 | 6 | Request a code, then verify it | Email arrives showing a **6-digit code**, and it is accepted |
-| 7 | Signed in as the showroom owner | Lands on the showroom workspace |
+| 7 | Signed in as the showroom owner (`hana-showroom-owner` in the manifest) | Lands on `/b2b`, the showroom workspace |
 | 8 | Walk the demo world | Products, RFQs, quotations, orders, projects, people, and sales analytics all show seeded rows |
-| 9 | Sign out | Returns to `/auth/sign-in` |
+| 9 | Sign in as a `/home` account (e.g. `karim-branch-sales`) | Lands on the personal home with a **complete** profile, not a blank one — then the workspace switcher reaches `/b2b` |
+| 10 | Sign out | Returns to `/auth/sign-in` |
 
 A failure at #6 is almost always the Magic Link template ([step 3](#3-configure-supabase-auth)). A failure at #2 with a configuration error means a `NEXT_PUBLIC_*` variable is missing — Vercel requires a **redeploy** after adding one. **Check #0 was verified on the PR #28 Preview deployment (2026-08-16)** and resolved: the rewrite routes correctly, rewrite order is right, and **Vercel Services forwards the original path without stripping the matched prefix** — FastAPI receives the literal `/api/backend/health`. The app is therefore mounted under the prefix (see [Backend route mounting](#backend-route-mounting)). If #0 regresses:
 
