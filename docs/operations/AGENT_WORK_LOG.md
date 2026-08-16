@@ -28,11 +28,22 @@ Both were already in the working tree and are kept:
 - **Worker host.** `backend/app/workers/` is interface-only. A persistent queue consumer is a different deployment shape from a request-driven function, so ADR-0009 **declines to assign a host** and gates the choice (Vercel Cron/Queues vs. a container host) on a new ADR when the first worker exists. `backend/Dockerfile` is retained as the exit path and its header now says so, so it is not deleted as "unused".
 - **Backend `APP_ENV` stays unset for first staging.** `backend/app/config.py` fails fast at import when `APP_ENV` is `staging`/`production` and any of `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_JWT_SECRET`/`DATABASE_URL` is missing. Setting it today would force provisioning an **RLS-bypassing service-role key to serve a health check**. The runbook binds the flip to the same change that lands the first real endpoint.
 
-### One thing that cannot be verified without deploying — and is flagged as such
-Whether the `/api/backend(/.*)?` rewrite forwards the path **with or without** the prefix is not determinable from the repository, and `health.py` declares a plain `/health`. Rather than assert a guess, the runbook's smoke test lists check #0 (`GET /api/backend/health`) with **two distinct failure modes** and the one-place-only fix for each (Next.js 404 → rewrite order; FastAPI `{"detail":"Not Found"}` → prefix mismatch, fix in the router *or* the rewrite, not both).
+### The one open question — now answered on the Preview deployment
+Whether the `/api/backend(/.*)?` rewrite forwards the path **with or without** the prefix was not determinable from the repository, so rather than guess, the runbook's smoke check #0 listed **two distinct failure modes** and the one-place-only fix for each.
+
+**Owner tested PR #28's Preview and it came back the second way:** `GET /api/health` → `200` frontend, `GET /api/backend/health` → FastAPI's own `{"detail":"Not Found"}`. That single response proves four things at once — the rewrite routes to the backend service, rewrite order is correct, **Vercel Services preserves the original request path**, and FastAPI was receiving `/api/backend/health` while declaring only `/health`.
+
+**Fixed by mounting the app under the prefix, on one side only** (follow-up commit on the same branch):
+- `app/main.py` declares **`API_PREFIX = "/api/backend"`** and applies it at its single `include_router(api_v1_router, prefix=API_PREFIX)` call, plus the OpenAPI/docs/redoc URLs — and `swagger_ui_oauth2_redirect_url`, which FastAPI does **not** derive from `docs_url` and which was the one route left sitting outside the prefix.
+- **`app/api/v1/__init__.py`** (previously empty) is now the single aggregation point for v1 routers, so the prefix is structural rather than a convention each new router must remember.
+- `health.py` keeps its **bare** `/health`. The prefix string appears once in the codebase.
+- **`vercel.json` was not touched** — adding a strip there *and* mounting here would be two competing mechanisms.
+- **`root_path` was deliberately rejected:** it is for proxies that *strip* the prefix, the opposite of the observed behavior; using it would have left the routes unreachable.
+
+Tests grew 10 → 16 and pin the public contract rather than the internal one: `/api/backend/health` 200, bare `/health` **404** (proves one mechanism, not two), doubled `/api/backend/api/backend/health` 404, every OpenAPI path under the prefix, and **no app route at all** outside it (this last one is what caught the oauth2-redirect).
 
 ### Validation
-`pnpm install --frozen-lockfile` ✓ · frontend typecheck ✓ · lint ✓ (0 errors / 0 warnings) · unit **236/236** ✓ (25 files) · production `next build` ✓ · backend `ruff check` ✓ · `pytest` **10/10** ✓ · `scripts/check_doc_links.py` ✓ (**888 internal links across 105 files, 0 broken** — the check that matters most for a documentation change) · `vercel.json` parses as valid JSON ✓.
+`pnpm install --frozen-lockfile` ✓ · frontend typecheck ✓ · lint ✓ (0 errors / 0 warnings) · unit **236/236** ✓ (25 files) · production `next build` ✓ · backend `ruff check` ✓ · `pytest` **16/16** ✓ (10 before the routing fix) · `scripts/check_doc_links.py` ✓ (**888 internal links across 105 files, 0 broken** — the check that matters most for a documentation change) · `vercel.json` parses as valid JSON ✓.
 
 **The middleware runtime change was verified at runtime, not just compiled.** `next build` emits `.next/server/middleware.js` + `middleware.js.nft.json` with an **empty `middleware-manifest.json`** — that is the Node-runtime artifact shape (an Edge middleware would instead appear in the manifest with `runtime: "edge"`), so the empty manifest is expected here and not a sign the middleware vanished. A `next start` smoke test confirms behavior is unchanged: `/api/health` 200, `/auth/sign-in` 200, and `/`·`/b2b`·`/b2b/rfqs`·`/admin`·`/home`·`/onboarding` all **307 to `/auth/sign-in`** with the `next=` parameter preserved and URL-encoded — identical to the pre-change results recorded in the previous session.
 

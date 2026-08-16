@@ -30,6 +30,21 @@ Two consequences follow from having *only* a health route, and they matter for h
 - **Leave `APP_ENV` unset on the backend service.** `backend/app/config.py` fails fast at import time when `APP_ENV` is `staging`/`production` and any of `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `DATABASE_URL` is missing. Setting it today would force provisioning a **service-role key that bypasses RLS** just to serve a health check — a breach surface with no feature behind it. Flip `APP_ENV=staging` and provision the four secrets in the **same change** that lands the first real endpoint.
 - **Leave `ALLOWED_ORIGINS` at its default.** `vercel.json` routes the backend same-origin under `/api/backend`, so the browser issues no cross-origin preflight — and per [ADR-0001](../decisions/ADR-0001-approved-architecture.md) the service is called from the server side of the web app, never from the browser.
 
+### Backend route mounting
+
+**Vercel Services forwards the original request path** — it does not strip the matched rewrite prefix. Verified on the PR #28 Preview: `GET /api/backend/health` reached FastAPI, which answered with its own `{"detail":"Not Found"}` because the app then declared only `/health`.
+
+The FastAPI app is therefore mounted under the prefix, on **one** side only:
+
+| Where | What |
+|---|---|
+| `backend/app/main.py` | `API_PREFIX = "/api/backend"`, applied at the single `include_router(api_v1_router, prefix=API_PREFIX)` — plus the OpenAPI/docs/redoc/oauth2-redirect URLs, which would otherwise fall outside the prefix and be swallowed by the catch-all rewrite |
+| `backend/app/api/v1/__init__.py` | the one aggregation point for v1 routers |
+| `backend/app/api/v1/health.py` | keeps its **bare** `/health` path — route modules never repeat the prefix |
+| `vercel.json` | **unchanged** — no prefix strip; two mechanisms would compete |
+
+`root_path` is deliberately unused: it is for proxies that *strip* the prefix, which is the opposite of the observed behavior. `backend/tests/test_health.py` fails if a route is ever served bare, doubled, or mounted outside the prefix.
+
 ## Split of work
 
 ### AGENT / CODE TASKS — done on this branch
@@ -288,7 +303,7 @@ Then **Deploy**, and copy the resulting URL back into Supabase **Site URL** ([st
 
 | # | Check | Expected |
 |---|---|---|
-| 0 | `GET /api/backend/health` | `200` `{"status":"ok","service":"backend","env":"local"}` — proves the backend service built and the rewrite routes to it. **See the note below if this 404s.** |
+| 0 | `GET /api/backend/health` | `200` `{"status":"ok","service":"backend","env":"local"}` — proves the backend service built, the rewrite routes to it, and the app is mounted under the prefix |
 | 1 | `GET /api/health` | `200` with `{"status":"ok","service":"frontend",…}` |
 | 2 | `/` | Landing renders; no environment error in the Vercel function logs |
 | 3 | `/auth/sign-in` | Renders in Arabic (RTL) by default, with the locale switch working |
@@ -299,10 +314,10 @@ Then **Deploy**, and copy the resulting URL back into Supabase **Site URL** ([st
 | 8 | Walk the demo world | Products, RFQs, quotations, orders, projects, people, and sales analytics all show seeded rows |
 | 9 | Sign out | Returns to `/auth/sign-in` |
 
-A failure at #6 is almost always the Magic Link template ([step 3](#3-configure-supabase-auth)). A failure at #2 with a configuration error means a `NEXT_PUBLIC_*` variable is missing — Vercel requires a **redeploy** after adding one. **Check #0 is the one step not yet verified against a real deployment**, and it has two distinct failure modes:
+A failure at #6 is almost always the Magic Link template ([step 3](#3-configure-supabase-auth)). A failure at #2 with a configuration error means a `NEXT_PUBLIC_*` variable is missing — Vercel requires a **redeploy** after adding one. **Check #0 was verified on the PR #28 Preview deployment (2026-08-16)** and resolved: the rewrite routes correctly, rewrite order is right, and **Vercel Services forwards the original path without stripping the matched prefix** — FastAPI receives the literal `/api/backend/health`. The app is therefore mounted under the prefix (see [Backend route mounting](#backend-route-mounting)). If #0 regresses:
 
 - **The Next.js 404 page** → the catch-all rewrite matched first. Check rewrite order in `vercel.json` (`/api/backend` must precede `/(.*)`).
-- **A FastAPI JSON `{"detail":"Not Found"}`** → routing worked, but the service received the path **with** the `/api/backend` prefix still attached, while `backend/app/api/v1/health.py` declares plain `/health`. Fix it in **one** place, not both: either mount the router under an `/api/backend` prefix in `backend/app/main.py`, or add the prefix strip to the rewrite. Record whichever you choose here and in [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md).
+- **A FastAPI JSON `{"detail":"Not Found"}`** → the app is no longer mounted under the prefix. Check `API_PREFIX` and the single `include_router(...)` in `backend/app/main.py`. Do **not** also change the rewrite — the prefix is handled on exactly one side.
 
 ## 8. Before Client UAT
 

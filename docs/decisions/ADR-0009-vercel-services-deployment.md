@@ -42,6 +42,19 @@ The root `vercel.json` routes by path, so both services answer on **one origin**
 
 `/api/backend` is therefore the FastAPI base path, and it is **same-origin with the web app**. This does not relax the boundary in [ADR-0001](ADR-0001-approved-architecture.md): FastAPI remains the specialized AI/OCR/RAG/document service reached **from the server side of the web app, never from the browser**. Same-origin is a routing property, not an invitation to call it from client components.
 
+#### Vercel Services forwards the original path — verified
+
+**Verified on the PR #28 Preview deployment (2026-08-16):** `GET /api/backend/health` reached FastAPI and returned FastAPI's own `{"detail":"Not Found"}` — proving the rewrite routes correctly, that rewrite order is right, and that **Vercel Services does not strip the matched prefix**. The service receives the literal path `/api/backend/health`.
+
+The FastAPI app is therefore **mounted under the prefix**, in exactly one place:
+
+- `app/main.py` defines **`API_PREFIX = "/api/backend"`** and applies it at its single `include_router(api_v1_router, prefix=API_PREFIX)` call, along with the OpenAPI/docs/redoc/oauth2-redirect URLs.
+- `app/api/v1/__init__.py` is the **one aggregation point** for v1 routers. Route modules keep bare paths (`health.py` still declares `/health`); nothing else in the codebase repeats the prefix string.
+
+**`root_path` is deliberately not used.** It exists for proxies that *strip* the prefix before forwarding, which is the opposite of the observed behavior — using it here would leave the routes unreachable.
+
+**The Vercel rewrite was left unchanged.** The prefix is handled on exactly one side. Adding a strip to the rewrite *and* mounting in FastAPI would be two competing mechanisms.
+
 ### Consequences for application code
 
 Two code changes are load-bearing for this decision and ship with it:
@@ -85,10 +98,10 @@ Runtime hosting and routing for `frontend/` and `backend/`, plus the environment
 
 - The root **`vercel.json` is required** and is the source of truth for service roots, runtimes, and routing. Vercel project settings must not restate what it declares.
 - Vercel's **Root Directory setting no longer applies** — `vercel.json` declares each service's root, so the project is deployed from the repository root.
-- New backend routes are reachable at `/api/backend/<path>` and must be added with that prefix in mind.
+- New backend routes are reachable at `/api/backend/<path>`. **Add them to `app/api/v1/__init__.py`** with a bare path — never hardcode `/api/backend` on a router or an endpoint, which would double the prefix. `tests/test_health.py` enforces this: it fails if any route is served bare, doubled, or mounted outside the prefix.
 - Any new service added to the repository declares itself in `vercel.json`, and must still ship a Dockerfile and a documented rollback (carried over from ADR-0004).
 - The `backend/Dockerfile` is **kept deliberately** as the portability exit path even though Vercel does not build from it.
 
 ## Related files
 
-`vercel.json` · `frontend/src/middleware.ts` · `.gitignore` · [`../operations/deployment-overview.md`](../operations/deployment-overview.md) · [`../operations/staging-deployment-runbook.md`](../operations/staging-deployment-runbook.md) · [`../security/secrets-and-environments.md`](../security/secrets-and-environments.md) · `backend/Dockerfile` · [ADR-0004](ADR-0004-deployment-platforms.md)
+`vercel.json` · `frontend/src/middleware.ts` · `.gitignore` · `backend/app/main.py` · `backend/app/api/v1/__init__.py` · [`../operations/deployment-overview.md`](../operations/deployment-overview.md) · [`../operations/staging-deployment-runbook.md`](../operations/staging-deployment-runbook.md) · [`../security/secrets-and-environments.md`](../security/secrets-and-environments.md) · `backend/Dockerfile` · [ADR-0004](ADR-0004-deployment-platforms.md)

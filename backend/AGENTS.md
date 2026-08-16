@@ -45,7 +45,8 @@ tests/
 
 - Use async I/O for HTTP, database, storage, OpenAI, and OCR providers.
 - **Never run blocking AI, OCR, or document parsing directly in the request event loop.** Long-running work goes through the approved queue/worker path (Supabase Queues + Python workers; no worker is implemented yet and its host is undecided — see `../docs/decisions/ADR-0009-vercel-services-deployment.md`). Request handlers stay fast.
-- **This service is deployed as the `backend` Vercel Service** (root `vercel.json`, entrypoint `app/main.py`), reachable same-origin at **`/api/backend`**. New routes are addressed under that prefix, and the service is still called **only from the server side of the web app, never the browser**.
+- **This service is deployed as the `backend` Vercel Service** (root `vercel.json`, entrypoint `app/main.py`), reachable same-origin at **`/api/backend`**. It is still called **only from the server side of the web app, never the browser**.
+- **The `/api/backend` prefix is applied in exactly one place.** Vercel Services forwards the original path (verified), so `app/main.py` mounts the app under `API_PREFIX` at its single `include_router(...)` call. **Register new routers in `app/api/v1/__init__.py` with bare paths** (`/ocr`, not `/api/backend/ocr`) — hardcoding the prefix on a router or endpoint doubles it. Do not add a prefix strip to `vercel.json`, and do not use `root_path`. `tests/test_health.py` enforces all of this.
 
 ## Security (extends root baseline)
 
