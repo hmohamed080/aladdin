@@ -69,6 +69,14 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
+export const runtime = "nodejs";
+
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
+};
+
 export const config = {
   // Run on everything except static assets and the health route.
   matcher: [
