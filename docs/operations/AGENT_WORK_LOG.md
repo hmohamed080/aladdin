@@ -4,6 +4,58 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — First cloud STAGING deployment readiness (deployment-only)
+
+**Date:** 2026-08-16 · **Branch:** `chore/staging-deployment-readiness` · **Base:** `main` @ `944e954` (PR #23 merged)
+
+### Objective
+Prepare `main` for its first real cloud STAGING deployment. **No product feature added or changed, and nothing deployed remotely** — repository-side readiness only, ending in a PR the owner reviews before touching any cloud account.
+
+### The audit answered one question that decided the whole shape
+**Does the deployed Next.js app call FastAPI at runtime?** No — and three independent checks say so, which is why this is stated as a conclusion rather than a preference:
+- `frontend/src` contains **no `fetch(` call at all**. The web app reaches data only through `@supabase/ssr`.
+- `AI_SERVICE_URL` is declared in `lib/env/index.ts`, but `parseServerEnv()` — its only reader — is never called outside that module, so no code path resolves a backend base URL.
+- `backend/app` registers exactly one router: `GET /health`. There is no AI, OCR, RAG or document endpoint yet.
+
+So first staging is **two services: Vercel + Supabase Cloud.** `backend/` was **not refactored, not deleted, and keeps its CI job**; no Render/Railway/Fly configuration was added. ADR-0004 already fixes Railway as its target for when an endpoint gains a caller.
+
+### Cloud URL / auth readiness needed no code change
+The usual first-deployment breakages are all absent. `frontend/src` has no hardcoded `localhost`, no `NEXT_PUBLIC_SITE_URL` and no `window.location.origin`; `middleware.ts` builds every redirect from `request.nextUrl.clone()`, so the origin is whatever host served the request and localhost, the Vercel URL and a later custom domain all work unchanged. `server/actions/auth.ts` is pure OTP — `signInWithOtp` → `verifyOtp` with a typed six-digit code, **no `emailRedirectTo`, no `/auth/callback` route, no `exchangeCodeForSession`** — so a redirect-URL mistake cannot break sign-in at all. Mailpit appears only in `config.toml`.
+
+That relocates the real risk to somewhere much easier to miss: **the Magic Link email template.** `config.toml` points it at `supabase/templates/magic_link.html`, which renders `{{ .Token }}`, but `content_path` is a **local-only** setting. A hosted project silently falls back to Supabase's stock template, which prints a **link, not a code** — and the sign-in screen asks for six digits. Staging sign-in would be impossible with no error to explain it, so replacing the template is a required step in the runbook. The same section documents **leaving CAPTCHA off**: `[auth.captcha]` is commented out and no client sends a `captchaToken`, so enabling it in the dashboard would fail every OTP request.
+
+### Environment contract, enforced by a test rather than a convention
+`publicEnvSchema` and `serverEnvSchema` are now exported, and `env.test.ts` **enumerates them** instead of checking a hand-maintained list: every public key must be `NEXT_PUBLIC_`-prefixed, no public key may match `SECRET_NAME_PATTERN` (`SERVICE_ROLE|SECRET|PASSWORD|PRIVATE|JWT|DATABASE_URL|DB_URL|ACCESS_KEY|TOKEN`), and no server key may be public. This matters because `NEXT_PUBLIC_*` is **inlined into the client bundle at build time** — a credential placed there is published, not merely misconfigured, and rotation is the only remedy. A variable added to the wrong schema now fails CI. Staging provisions only `NEXT_PUBLIC_APP_ENV=staging` plus the Supabase URL and anon key; **neither `SUPABASE_SERVICE_ROLE_KEY` nor `AI_SERVICE_URL` is set on Vercel** — nothing reads them, and the first is a full RLS bypass.
+
+### Supabase: migrations verified, seeds made safe without editing them
+All **28 migrations apply in order from an empty database** (`supabase db reset`, which drops and replays). No historical migration was edited for deployment convenience. Remote schema deployment is `supabase db push` only; `db reset` is documented as local-only, never a remote command.
+
+The three seed files produce exactly the world worth inspecting in staging — Cairo Ceramics Showroom / `hana@example.test`, connected distributors, products, RFQs, quotations, orders, projects, technicians and professionals, people-ops with a pending invite, the Admin verification queue, and the sales analytics. But they are **not safe to hand to a hosted database as-is**: they run only under `db reset`, and every insert uses fixed UUIDs with no `ON CONFLICT` — including direct inserts into `auth.users` — so a second apply fails partway and leaves a half-built world.
+
+Rather than edit files pinned by pgTAP and the E2E fixtures, `scripts/build_staging_seed.py` **generates** a one-time loader: it reads the seed list from `config.toml`'s own `[db.seed].sql_paths` (so it cannot drift), concatenates them in that order into **one transaction**, and fronts them with a guard that refuses when `auth.users`/`public.organizations` is non-empty or when migrations have not been pushed. The output is gitignored — it is a build artifact, not source.
+
+**The guard ordering is deliberate:** existence (`to_regclass`) is checked *before* emptiness, because probing `select 1 from public.organizations` on an un-migrated database raises `relation does not exist`, which tells the operator nothing about what they actually did wrong.
+
+Rehearsed end to end against local Supabase: `db reset --no-seed` → apply → **26 auth users, 12 organizations, 16 products, 17 RFQs, 14 quotations, 10 orders, 5 projects** with `hana@example.test` owning Cairo Ceramics Showroom (`showroom_dealer`); a **second apply refused with zero rows written**; and an apply to a scratch un-migrated database refused with the "push migrations first" message.
+
+### Vercel
+Root Directory `frontend` **with "include source files outside the Root Directory" enabled** — the pnpm lockfile and workspace manifest live at the repo root, so install must resolve there. Next.js is auto-detected; install, build and output stay default; `packageManager: pnpm@9.0.0` pins pnpm via corepack; Node 22 satisfies `engines.node: ">=20"`. **No `vercel.json` is needed and none was added** — every setting is a platform default or a project-settings toggle, and a config file would duplicate them in two places.
+
+### Validation
+`pnpm install --frozen-lockfile` ✓ · frontend typecheck ✓ · lint ✓ (0 errors, 0 warnings) · unit **236/236** ✓ (6 new exposure-contract assertions) · `supabase db reset` ✓ from empty, all 28 migrations + 3 seeds · production `next build` ✓ — every route reports `ƒ` (dynamic, server-rendered on demand), so the build needs env **values** to parse but no Supabase connectivity · `next start` smoke ✓: `/api/health` 200 with the expected body, `/auth/sign-in`·`/auth/sign-up`·`/auth/support` 200, and `/`·`/b2b`·`/b2b/rfqs`·`/admin`·`/home`·`/onboarding` all 307 to `/auth/sign-in?next=…` · targeted authenticated Playwright `pilot-landing` against a production build: **6 passed / 2 failed**.
+
+**The two failures are pre-existing on `main` and not caused by this branch.** `pilot-landing.spec.ts:65` (en and ar) expects `youssef@example.test` to land on `/b2b`, but `resolveWorkContext` returns the Personal context whenever a personal persona exists and no workspace cookie is set, and the pilot seed gives Youssef `primary_account_type = 'sales'` **and** an active membership — so he lands `/home`. Two independent confirmations: this branch's entire diff is `.gitignore`, `frontend/.env.example`, `frontend/src/lib/env/{index,env.test}.ts`, `package.json` and documentation — it touches none of the landing, workspace, or seed code involved — and the pair reproduces identically after a canonical `supabase db reset`, so it is not an artefact of the staging-seed rehearsal either. Fixing it is a product decision (does a persona'd employee default to their business?) and is **out of scope for a deployment-only sprint** — recorded here so it is not rediscovered as a deployment problem.
+
+Deliberately **not** run, per the brief: repository-wide E2E, the integration/performance gate, Lighthouse, and pgTAP (no schema change). No `.pen` file changed.
+
+### Files touched
+New: `docs/operations/staging-deployment-runbook.md`, `scripts/build_staging_seed.py`. Changed: `frontend/src/lib/env/index.ts` (exported the schemas + `SECRET_NAME_PATTERN`; documented `AI_SERVICE_URL` as unprovisioned), `frontend/src/lib/env/env.test.ts`, `frontend/.env.example`, `.gitignore`, `package.json` (`staging:seed:build`), `docs/operations/RUNTIME_STATE.md`, `docs/operations/deployment-overview.md`, `docs/README.md`, this log.
+
+### What the owner must do next
+Everything requiring an account, billing or a secret: create the Supabase staging project, push migrations, replace the Magic Link template, load the demo world, create the Vercel `aladdin-staging` project against `main`, enter three environment variables, and run the smoke sequence. Steps 1–8 of [`staging-deployment-runbook.md`](./staging-deployment-runbook.md). Custom SMTP and a custom domain remain before Client UAT; Production is untouched and must use separate infrastructure.
+
+---
+
 ## Session — Showroom interaction refinement: sidebar display modes + horizontal card rails
 
 **Date:** 2026-08-16 · **Branch:** `feature/showroom-mvp-completeness` (same PR #23, unmerged) · **Base:** `main` @ `678ba32` · **Branch HEAD at start:** `a7ee372`

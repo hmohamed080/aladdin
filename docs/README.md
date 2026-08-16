@@ -92,6 +92,7 @@ The five files above are **persistent project memory and part of the core archit
 - [`operations/AGENT_WORK_LOG.md`](operations/AGENT_WORK_LOG.md) — **canonical** append-only session log
 - [`operations/RUNTIME_STATE.md`](operations/RUNTIME_STATE.md) — **canonical** live-state snapshot
 - [`operations/deployment-overview.md`](operations/deployment-overview.md)
+- [`operations/staging-deployment-runbook.md`](operations/staging-deployment-runbook.md) — first cloud STAGING setup: agent/code work vs. owner manual steps
 - [`operations/monitoring-and-observability.md`](operations/monitoring-and-observability.md)
 
 ## Guides
