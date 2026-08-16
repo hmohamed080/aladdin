@@ -15,7 +15,8 @@
     "lint": "pnpm --filter frontend lint",
     "typecheck": "pnpm --filter frontend typecheck",
     "test": "pnpm --filter frontend test",
-    "supabase": "supabase"
+    "supabase": "supabase",
+    "staging:seed:build": "python scripts/build_staging_seed.py"
   },
   "devDependencies": {
     "supabase": "2.110.0"

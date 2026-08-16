@@ -63,6 +63,8 @@ requirements*.txt
 supabase/.branches/
 supabase/.temp/
 .supabase/
+# Assembled by scripts/build_staging_seed.py — a build artifact, not source.
+supabase/.staging-seed.sql
 
 # --- Data & generated artifacts (business/customer data never committed) ----
 data/imports/*

@@ -10,7 +10,7 @@ import { z } from "zod";
  *   into a Client Component.
  */
 
-const publicEnvSchema = z.object({
+export const publicEnvSchema = z.object({
   NEXT_PUBLIC_APP_ENV: z
     .enum(["local", "staging", "production"])
     .default("local"),
@@ -22,11 +22,24 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_SUPPORT_CONTACT: z.string().trim().min(1).optional(),
 });
 
-const serverEnvSchema = z.object({
+export const serverEnvSchema = z.object({
   // Server-only. Never expose to the client.
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  // Base URL of the FastAPI AI/document service. No runtime caller exists yet —
+  // the web app reaches Postgres only through @supabase/ssr — so this stays
+  // optional and is NOT provisioned for the first staging deployment.
   AI_SERVICE_URL: z.string().url().optional(),
 });
+
+/**
+ * Names that must never appear on a browser-exposed variable. `NEXT_PUBLIC_*` is
+ * inlined into the client bundle at build time, so a credential placed there is
+ * published, not merely misconfigured — and rotating it is the only remedy.
+ * `env.test.ts` enumerates the schemas above against this list, so a variable
+ * added to the wrong schema fails CI instead of shipping.
+ */
+export const SECRET_NAME_PATTERN =
+  /(SERVICE_ROLE|SECRET|PASSWORD|PRIVATE|JWT|DATABASE_URL|DB_URL|ACCESS_KEY|TOKEN)/i;
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>;
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

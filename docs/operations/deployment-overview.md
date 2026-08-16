@@ -6,6 +6,8 @@
 
 Describe how Aladdin's services deploy and the discipline around releases (ADR-0004).
 
+> **First cloud STAGING:** the concrete, step-by-step setup — and the split between what the repository already does and what the owner must do by hand — is [`staging-deployment-runbook.md`](staging-deployment-runbook.md). Its audit found the deployed web app makes **no runtime call to FastAPI**, so first staging is **Vercel + Supabase Cloud only**; the Railway row below remains the target for when an AI/OCR/document endpoint gains a caller.
+
 ## Current decision
 
 | Component | Platform | Build/Deploy |
