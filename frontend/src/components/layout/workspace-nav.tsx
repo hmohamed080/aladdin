@@ -24,9 +24,13 @@ import {
   SettingsIcon,
   MenuIcon,
   XIcon,
+  StorefrontIcon,
+  DemandIcon,
+  FileTextIcon,
 } from "@/components/ui/icons";
 import type { NavKey, NavSection } from "@/lib/nav/modules";
-import { allowedNavSections } from "@/lib/nav/modules";
+import { allowedNavSections, navLabelKey } from "@/lib/nav/modules";
+import type { CommerceStance } from "@/lib/workspace/supply-side";
 
 /**
  * Primary workspace navigation — the implemented modules (no dead links). A
@@ -55,6 +59,7 @@ const ITEMS: Record<NavKey, Item> = {
   saved: { href: "/b2b/saved", key: "nav.saved", exact: false, Icon: BookmarkIcon },
 
   suppliers: { href: "/b2b/suppliers", key: "nav.suppliers", exact: false, Icon: TruckIcon },
+  buyers: { href: "/b2b/buyers", key: "nav.buyers", exact: false, Icon: StorefrontIcon },
   technicians: { href: "/b2b/technicians", key: "nav.technicians", exact: false, Icon: WrenchIcon },
   institutions: { href: "/b2b/institutions", key: "nav.institutions", exact: false, Icon: LandmarkIcon },
 
@@ -70,6 +75,28 @@ const ITEMS: Record<NavKey, Item> = {
 };
 
 /**
+ * Presentation overrides for the seller seat.
+ *
+ * The route and the gate are unchanged — see `lib/nav/modules` for why the same
+ * three modules carry two names. Only the two glyphs whose METAPHOR reverses are
+ * swapped: a shopping bag means "what I am going out to buy", which is exactly
+ * backwards for a distributor reading requests that arrived; and an inbox means
+ * "prices that came to me", which is backwards for prices it sent out. On a
+ * collapsed rail the glyph IS the label, so a wrong metaphor is a wrong label.
+ */
+const SELLER_ICONS: Partial<Record<NavKey, ComponentType<{ size?: number }>>> = {
+  purchaseRequests: DemandIcon,
+  offers: FileTextIcon,
+};
+
+function itemFor(key: NavKey, stance: CommerceStance): Item {
+  const base = ITEMS[key];
+  if (stance !== "seller") return base;
+  const Icon = SELLER_ICONS[key] ?? base.Icon;
+  return { ...base, key: navLabelKey(key, stance, base.key), Icon };
+}
+
+/**
  * Two modules answer to `/b2b/rfqs` and `/b2b/quotations` respectively but no
  * other item shares a prefix, so plain prefix matching is unambiguous.
  */
@@ -81,11 +108,23 @@ function useActive() {
 
 const sectionLabel: Record<NavSection, string | null> = {
   overview: null, // Home stands alone above the first heading.
+  supply: "nav.section.supply",
   buying: "nav.section.buying",
   network: "nav.section.network",
   selling: "nav.section.selling",
   business: "nav.section.business",
 };
+
+/**
+ * A seller's demoted Buying group is not the buyer's leading one, and calling
+ * both "Buying" would put the word twice on one rail (once over the commerce
+ * trio's supply counterpart, once over browse/shortlist). Under the seller
+ * layout it is what it actually is: sourcing.
+ */
+function sectionLabelKey(section: NavSection, stance: CommerceStance): string | null {
+  if (stance === "seller" && section === "buying") return "nav.section.sourcing";
+  return sectionLabel[section];
+}
 
 /**
  * One navigation row.
@@ -190,15 +229,23 @@ function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow
  * have no room at 3.5rem, so the grouping is carried by a rule instead of a
  * word; the groups themselves are unchanged and in the same order.
  */
-export function Sidebar({ allowed, narrow = false }: { allowed: readonly string[]; narrow?: boolean }) {
+export function Sidebar({
+  allowed,
+  narrow = false,
+  stance = "buyer",
+}: {
+  allowed: readonly string[];
+  narrow?: boolean;
+  stance?: CommerceStance;
+}) {
   const { t } = useI18n();
   const isActive = useActive();
-  const sections = allowedNavSections(allowed);
+  const sections = allowedNavSections(allowed, stance);
 
   return (
     <nav aria-label={t("nav.workspace")} className="flex flex-col gap-1">
       {sections.map(({ section, keys }, i) => {
-        const labelKey = sectionLabel[section];
+        const labelKey = sectionLabelKey(section, stance);
         return (
           <div
             key={section}
@@ -216,7 +263,7 @@ export function Sidebar({ allowed, narrow = false }: { allowed: readonly string[
             ) : null}
             <div className="flex flex-col gap-0.5">
               {keys.map((k) => {
-                const item = ITEMS[k];
+                const item = itemFor(k, stance);
                 return (
                   <NavLink key={k} item={item} active={isActive(item.href, item.exact)} narrow={narrow} />
                 );
@@ -240,13 +287,23 @@ export function Sidebar({ allowed, narrow = false }: { allowed: readonly string[
  * The sheet renders the SAME sections as the desktop rail, so both surfaces
  * expose exactly the same set of modules.
  */
-export function MobileNav({ allowed }: { allowed: readonly string[] }) {
+export function MobileNav({
+  allowed,
+  stance = "buyer",
+}: {
+  allowed: readonly string[];
+  stance?: CommerceStance;
+}) {
   const { t } = useI18n();
   const isActive = useActive();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const sections = allowedNavSections(allowed);
+  // The stance reorders the sections, so the four modules that earn a bottom-bar
+  // slot follow the stance too: a distributor's phone opens on incoming demand,
+  // not on purchase requests. The PATTERN — four plus a "More" sheet holding the
+  // same sections as the desktop rail — is unchanged.
+  const sections = allowedNavSections(allowed, stance);
   const flat = sections.flatMap((s) => s.keys);
   const primary = flat.slice(0, 4);
   const overflow = flat.slice(4);
@@ -282,7 +339,7 @@ export function MobileNav({ allowed }: { allowed: readonly string[] }) {
               {sections.map(({ section, keys }) => {
                 const shown = keys.filter((k) => overflow.includes(k));
                 if (shown.length === 0) return null;
-                const labelKey = sectionLabel[section];
+                const labelKey = sectionLabelKey(section, stance);
                 return (
                   <div key={section} className="mt-md first:mt-0">
                     {labelKey ? (
@@ -292,7 +349,7 @@ export function MobileNav({ allowed }: { allowed: readonly string[] }) {
                     ) : null}
                     <div className="flex flex-col gap-0.5">
                       {shown.map((k) => {
-                        const item = ITEMS[k];
+                        const item = itemFor(k, stance);
                         return <NavLink key={k} item={item} active={isActive(item.href, item.exact)} />;
                       })}
                     </div>
@@ -314,7 +371,7 @@ export function MobileNav({ allowed }: { allowed: readonly string[] }) {
           style={{ gridTemplateColumns: `repeat(${Math.max(columns, 1)}, minmax(0, 1fr))` }}
         >
           {primary.map((k) => {
-            const { href, key, exact, Icon } = ITEMS[k];
+            const { href, key, exact, Icon } = itemFor(k, stance);
             const active = isActive(href, exact);
             return (
               <li key={k}>

@@ -11,6 +11,18 @@ export const IDENTITIES = {
      Org A is a supplier and Org B a design office; neither exercises the
      buyer-first showroom IA the workspace is actually tuned for. */
   showroom: "hana@example.test",
+
+  /* The three SUPPLY-SIDE acceptance workspaces, in manual-priority order. All
+     three own an organization whose `org_type` puts it in the seller seat, and
+     all three have the seeded demand, quotations, orders and fulfilment work
+     that the supply-side surfaces exist to show (seed-pilot.sql section 11).
+
+     Note what these names are NOT: none of them is a "supplier account". The
+     classification lives on the ORGANIZATION, and `supplier` is the internal
+     identifier for the Distributor product concept — it is never user-facing. */
+  distributor: "rania@example.test", // Suez Paints & Coatings   (org_type supplier)
+  manufacturer: "mahmoud@example.test", // Alexandria Glass & Aluminium (org_type manufacturer)
+  importer: "fady@example.test", // Cairo Sanitary Ware Trading  (org_type importer)
 } as const;
 
 const MAILPIT = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";

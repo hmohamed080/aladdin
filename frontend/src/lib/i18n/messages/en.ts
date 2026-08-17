@@ -74,14 +74,24 @@ export const en = {
     home: "Home",
     section: {
       buying: "Buying",
+      // The supply-side workspace's leading group: demand in, prices out, orders
+      // fulfilled. Same modules as Buying, read from the seller's seat.
+      supply: "Supply",
+      // What "Buying" is called once it is the demoted group on a seller's rail.
+      sourcing: "Sourcing",
       network: "Network",
       selling: "Selling",
       business: "Business",
     },
     purchaseRequests: "Purchase requests",
     offers: "Incoming offers",
+    // Seller-seat names for the same three routes.
+    demand: "Incoming demand",
+    quotations: "Quotations",
+    salesOrders: "Orders",
     saved: "Saved products",
     suppliers: "Distributors",
+    buyers: "Customers & showrooms",
     technicians: "Technicians",
     institutions: "Institutions",
     team: "Team",
@@ -328,6 +338,14 @@ export const en = {
     title: "Team",
     subtitle: "Your salespeople and staff — who works here, what they can do, and which branch they cover.",
     noAccessBody: "You need the members-management capability to view and manage people here.",
+    /* Counted from the roster, never from a target. There is no quota model. */
+    stat: {
+      members: "People",
+      active: "Active",
+      pending: "Invitations pending",
+      pendingHint: "Sent, not yet accepted",
+      branches: "Branches",
+    },
     joinRequests: {
       title: "Requests to join",
       subtitle: "Salespeople who say they work here. Approving one gives them your sales tools.",
@@ -1175,6 +1193,175 @@ export const en = {
     deliveryRunning: "Delivery in progress",
     noProjects: "No delivery work running.",
   },
+
+  /**
+   * The supply-side workspace — Distributor, Manufacturer and Importer.
+   *
+   * TERMINOLOGY RULE: the internal identifier for the Distributor concept is
+   * `supplier`, and it must NEVER appear in copy. Nothing in this block, or in
+   * any string it reaches, says "supplier".
+   *
+   * `voice` is the only place the three organization types differ. Everything
+   * else is written once and shared, because they do the same work: receive
+   * demand, price it, fulfil it.
+   */
+  supply: {
+    title: "Your supply at a glance",
+    voice: {
+      distributor: {
+        subtitle: "Demand from showrooms and businesses, and how you are converting it.",
+        topProductsHint: "The lines you distribute most, by ordered value.",
+        productsSubtitle: "The products you distribute, and how buyers find them.",
+        demandSubtitle: "Businesses asking you to price and supply.",
+      },
+      manufacturer: {
+        subtitle: "Demand for what you manufacture, and how you are converting it.",
+        topProductsHint: "The lines you make most, by ordered value.",
+        productsSubtitle: "What you manufacture, and how buyers find it.",
+        demandSubtitle: "Businesses asking you to price and produce.",
+      },
+      importer: {
+        subtitle: "Demand for what you import, and how you are converting it.",
+        topProductsHint: "The lines you import most, by ordered value.",
+        productsSubtitle: "What you import and supply, and how buyers find it.",
+        demandSubtitle: "Businesses asking you to price and supply.",
+      },
+    },
+    section: {
+      demand: "What is waiting on you",
+      performance: "How the business is converting",
+      fulfilment: "What you are fulfilling",
+    },
+    tile: {
+      awaitingResponse: "Requests to answer",
+      awaitingResponseHint: "Nobody has priced these yet",
+      awaitingDecision: "Prices out for decision",
+      activeOrders: "Orders to fulfil",
+      orderValue: "Order value won",
+      orderValueHint: "Confirmed orders, all time",
+      completedOrders: "Orders completed",
+      customers: "Active customers",
+      customersHint: "Businesses that have ordered",
+      published: "Published products",
+      drafts: "Drafts",
+      draftsHint: "Not visible to buyers yet",
+      fulfilling: "Delivery running",
+    },
+    demand: {
+      title: "Incoming demand",
+      awaiting: "Waiting for your price",
+      awaitingHint: "Requests sent to you that nobody has answered yet.",
+      subtitle: "Requests sent to your business, and the ones you have answered.",
+      empty: "No requests are waiting on you right now.",
+      emptyBody: "Published products are how buyers find you. Keep your catalogue current.",
+    },
+    quotations: {
+      title: "Quotations",
+      latest: "Your latest quotations",
+      latestHint: "Prices you have sent, newest first.",
+      subtitle: "Prices you have sent out, and what came back.",
+    },
+    orders: {
+      title: "Orders",
+      active: "Orders in progress",
+      activeHint: "Confirmed and in-progress orders you are fulfilling.",
+      subtitle: "Orders placed with you, and the delivery work behind them.",
+    },
+    customers: {
+      title: "Customers & showrooms",
+      subtitle: "The businesses that ask you for prices and place orders with you.",
+      empty: "No customer has worked with you yet.",
+      emptyBody:
+        "A business appears here as soon as it sends you a request. Publishing products is how buyers find you.",
+      relationship: "Working relationship",
+      findMore: "Find more businesses",
+      findMoreBody: "Browse showrooms, contractors and design offices on Aladdin.",
+      column: {
+        business: "Business",
+        requests: "Requests",
+        quotations: "Quotations",
+        accepted: "Accepted",
+        orders: "Orders",
+        value: "Order value",
+        lastActivity: "Last activity",
+      },
+      stat: {
+        total: "Customers",
+        ordering: "Have ordered",
+        requesting: "Requests only",
+        value: "Order value",
+      },
+      unlisted: "Not publicly listed",
+      unlistedHint: "This business has not completed verification.",
+      scopeNote:
+        "These figures cover your own records with each business — the requests, quotations and orders you are a party to. Nothing private about the other business is shown.",
+    },
+    products: {
+      title: "Your products",
+      empty: "You have not added a product yet.",
+      emptyBody: "Buyers find you through your published products. Add your first one to get started.",
+      noMatch: "No product matches these filters.",
+      noMatchBody: "Try a different search, category or status.",
+      tab: { all: "All", published: "Published", draft: "Drafts" },
+      stat: {
+        total: "Products",
+        published: "Published",
+        draft: "Drafts",
+        requested: "Requested",
+        requestedHint: "Products with demand",
+      },
+      column: { demand: "Demand" },
+      /* One vs many, following the `directory.workedOrderOne` convention. Arabic
+         has richer plural rules than this, but "1 requests" is the error a reader
+         actually notices, and it is the one worth spending a key on until a real
+         pluralisation helper exists. */
+      demandRequests: "{count} requests",
+      demandRequestOne: "1 request",
+      demandNone: "No requests yet",
+      searchPlaceholder: "Search by name, code or brand…",
+      filterCategory: "Category",
+      filterStatus: "Status",
+      draftNotice: "Drafts are private. Publish a product to let buyers request it.",
+    },
+    chart: {
+      valueTrend: "Order value won, by month",
+      valueTrendHint: "Confirmed orders, by the month they were confirmed.",
+      funnel: "Demand to order",
+      funnelHint: "How much of the demand sent to you becomes an order.",
+      topProducts: "Your top products",
+      topCustomers: "Your top customers",
+      quotationsByStatus: "Quotations by status",
+      ordersByStatus: "Orders by status",
+      demandByStatus: "Incoming requests by status",
+      productDemand: "Most requested products",
+      productDemandHint: "By how many businesses have asked for them.",
+    },
+    funnel: { demand: "Requests received", quoted: "Quotations sent", ordered: "Orders won" },
+    acceptedValue: "Accepted quotation value",
+    awaitingDecisionValue: "Value out for decision",
+    action: {
+      answerDemand: "Answer a request",
+      answerDemandBody: "Price the requests businesses have sent you.",
+      quotations: "Your quotations",
+      quotationsBody: "Track what you have priced and what came back.",
+      addProduct: "Add a product",
+      addProductBody: "Publish a line so buyers can find and request it.",
+      products: "Manage products",
+      productsBody: "Your catalogue, its status and the demand behind it.",
+      customers: "Your customers",
+      customersBody: "The businesses that buy from you.",
+    },
+    empty: {
+      noOrders: "No confirmed orders yet.",
+      noProductSales: "No product has been ordered yet.",
+      noCustomers: "No customer has ordered yet.",
+      noActiveOrders: "Nothing in progress",
+      noActiveOrdersBody: "Orders you are fulfilling will appear here.",
+    },
+    scopeNote:
+      "Every figure here counts records your organization is a party to, and each one opens the record behind it.",
+  },
+
   customers: {
     title: "Customers",
     subtitle: "Everyone your team is working with.",

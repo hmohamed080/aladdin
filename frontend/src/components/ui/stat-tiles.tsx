@@ -124,6 +124,13 @@ export function StatTiles({
 /**
  * Status filter tabs expressed as links (`?status=…`), so the whole list stays a
  * server component and the filter survives a refresh or a shared URL.
+ *
+ * `keep` exists because tabs and a `FilterBar` share one query string. Without it,
+ * switching tab silently DROPS whatever the toolbar had set — a seller who
+ * searched their catalogue and then clicked "Drafts" would land on all drafts
+ * with the search box still showing their term. The two controls have to compose,
+ * so each tab link carries the sibling filters forward and changes only its own
+ * parameter.
  */
 export function TabLinks({
   basePath,
@@ -131,6 +138,7 @@ export function TabLinks({
   current,
   tabs,
   label,
+  keep,
 }: {
   basePath: string;
   param: string;
@@ -138,13 +146,23 @@ export function TabLinks({
   current: string;
   tabs: { value: string; label: string; count?: number }[];
   label: string;
+  /** Sibling query parameters to carry across a tab change. Empty values drop. */
+  keep?: Record<string, string | undefined>;
 }) {
+  const hrefFor = (value: string) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(keep ?? {})) if (v) qs.set(k, v);
+    if (value) qs.set(param, value);
+    const s = qs.toString();
+    return s ? `${basePath}?${s}` : basePath;
+  };
+
   return (
     <nav aria-label={label} className="mb-lg -mx-1 overflow-x-auto">
       <ul className="flex w-max min-w-full gap-1 border-b px-1">
         {tabs.map((tab) => {
           const active = tab.value === current;
-          const href = tab.value ? `${basePath}?${param}=${encodeURIComponent(tab.value)}` : basePath;
+          const href = hrefFor(tab.value);
           return (
             <li key={tab.value || "all"}>
               <Link

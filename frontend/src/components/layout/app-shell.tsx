@@ -12,6 +12,7 @@ import { SidebarShell } from "@/components/layout/sidebar-shell";
 import { Brand } from "@/components/layout/brand";
 import { SalesRealtime } from "@/features/sales/sales-realtime";
 import { SIDEBAR_MODE_COOKIE, resolveSidebarMode } from "@/lib/ui/sidebar-mode";
+import { commerceStance } from "@/lib/workspace/supply-side";
 
 /**
  * The B2B workspace chrome: a persistent left sidebar (brand + primary nav) on
@@ -37,6 +38,10 @@ export async function AppShell({
   // Read on the server so the first paint already has the chosen width — the
   // preference is layout, and discovering it after hydration is a visible flash.
   const sidebarMode = resolveSidebarMode(store.get(SIDEBAR_MODE_COOKIE)?.value);
+  // Which seat this organization leads from. Derived from the org's own
+  // classification on the server, so the first paint is already correct — it is a
+  // navigation ORDER, and rewriting the rail after hydration is a visible jump.
+  const stance = commerceStance(active.orgType);
 
   return (
     <div className="flex min-h-dvh bg-canvas">
@@ -45,6 +50,7 @@ export async function AppShell({
         appName={m.common.appName}
         allowed={active.capabilities}
         mode={sidebarMode}
+        stance={stance}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -84,7 +90,7 @@ export async function AppShell({
           {children}
         </main>
 
-        <MobileNav allowed={active.capabilities} />
+        <MobileNav allowed={active.capabilities} stance={stance} />
       </div>
     </div>
   );

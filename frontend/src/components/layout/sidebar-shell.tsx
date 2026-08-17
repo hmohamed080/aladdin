@@ -13,6 +13,7 @@ import {
 import { Sidebar } from "@/components/layout/workspace-nav";
 import { Brand } from "@/components/layout/brand";
 import { ApertureMark, CheckIcon, PanelIcon } from "@/components/ui/icons";
+import type { CommerceStance } from "@/lib/workspace/supply-side";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
@@ -41,10 +42,19 @@ export function SidebarShell({
   appName,
   allowed,
   mode: initialMode,
+  stance = "buyer",
 }: {
   appName: string;
   allowed: readonly string[];
   mode: SidebarMode;
+  /**
+   * Which seat this workspace leads from. It reaches only as far as `Sidebar`,
+   * which uses it to order and label the modules. Every display mode, the hover
+   * reveal, the RTL geometry and the mode cookie are stance-independent — this is
+   * ONE sidebar serving every B2B organization, not a Showroom one and a
+   * Distributor one.
+   */
+  stance?: CommerceStance;
 }) {
   const { t } = useI18n();
   const [mode, setMode] = useState<SidebarMode>(initialMode);
@@ -139,7 +149,7 @@ export function SidebarShell({
         {/* The grouped rail can exceed the viewport on a short screen, so it owns
             its own scroll rather than clipping the last section. */}
         <div className={cn("min-h-0 flex-1 overflow-y-auto pb-lg", narrow ? "px-2" : "px-3")}>
-          <Sidebar allowed={allowed} narrow={narrow} />
+          <Sidebar allowed={allowed} narrow={narrow} stance={stance} />
         </div>
 
         <div className="relative border-t p-2">

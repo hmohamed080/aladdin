@@ -1842,3 +1842,85 @@ product visibility is honoured here automatically.
   planned AI/OCR/RAG/document work must not become blocking HTTP work inside these request handlers.
 - Hosted Supabase SMTP/Resend settings and the hosted Magic Link template are dashboard-only state and
   cannot be read with the repo's authenticated tooling — listed as manual owner checks.
+
+---
+
+## 2026-08-17 — Sprint 15: shared SUPPLY-SIDE B2B workspace (Distributor · Manufacturer · Importer)
+
+Branch `feature/supply-side-b2b-mvp`. Reference set: `UI-UX/references/Distributor/` (12 screens,
+now tracked, matching the existing `references/showroom/` convention). No `.pen` file touched.
+
+### The audit finding the sprint turned on
+`listRfqs`, `listQuotations`, `listOrders` and `listProjects` have **always** taken a side parameter
+(`"requester" | "supplier"`), and every commerce record names both parties. The supply side was never
+missing from the backend — it was buried as a secondary tab behind a buyer-first IA built for the
+Showroom. So this was not "build a second app"; it was "make the seat a first-class derived property".
+
+Reference → Aladdin mapping: Dashboard/Products/Quotes+Orders/Analytics/Sales reps → REORGANIZE or
+IMPLEMENT over existing modules · "New Opportunities" → the existing RFQ domain presented as incoming
+demand, **no new marketplace domain invented** · customer network → new `/b2b/buyers` · Messages,
+Reels, invoices/collections, wallet, commissions, carrier tracking, Egypt map → **DEFERRED, not faked**.
+
+### What was built
+- **`lib/workspace/supply-side.ts`** (pure, 11 unit tests) — `commerceStance(orgType)`, `supplyVoice()`.
+  `OrgContext` gained `orgType` at **zero extra reads** (the workspace entries already select it).
+  Stance is a PRESENTATION DEFAULT: it grants no authority, hides no module, never touches `users`.
+- **One shared sidebar, two orderings.** `lib/nav/modules.ts` now returns stance-ordered sections;
+  the commerce trio keeps the same hrefs/gates and swaps labels (Incoming demand / Quotations /
+  Orders). `SidebarShell`, its three display modes, RTL geometry, the mode cookie, tooltips and the
+  mobile sheet are **unchanged and shared** — no Showroom/Distributor split exists.
+- **`CardRail` reused as-is** for the dashboard KPI group and quick actions. No second carousel.
+- **Supply dashboard** (`features/home/supply-dashboard.tsx`), sibling to the extracted
+  `buyer-dashboard.tsx`; `/b2b/page.tsx` is now a thin stance selector.
+- **`supplySummary()`** — one call covering tiles, funnel, trend, top products and top customers from
+  three list-view reads plus one conditional line-item pass. Deliberately NOT `purchaseSummary` with
+  columns swapped; the seats are asymmetric (see the type's doc comment).
+- **Products** rebuilt on shared `DataTable`: KPI rail, status tabs, search + category filter, media,
+  and per-product **demand** (`productDemand`, counted per REQUEST not per line).
+- **`/b2b/buyers`** — customer network from `customerOrganizations()`. Every figure counts records the
+  caller is a party to; the only counterparty columns come from the hardened public directory.
+  Unlisted customers are MARKED, never dropped.
+- **`SupplyReport`** leads `/b2b/reports`; the purchasing report stays below in full.
+- **Team page** gained an honest roster KPI strip (zero extra reads). The reference's per-rep sales
+  TARGETS and leaderboard were refused — no quota/commission model exists, and a leaderboard built
+  from fiction would be used to manage real people.
+
+### Deliberate refusals (each has a concrete reason, not a scope preference)
+No stock/warehouse/reorder/margin on Products · no Egypt sales map (`locality_id` has no locality
+table and no coordinates) · no AI "smart insight" · no invoices/collections/wallet · no carrier
+tracking on fulfilment (order + project state only) · no growth badges anywhere (no comparison period
+exists) · supply-side report offers **no branch filter** because `requester_branch_id` is the BUYER's
+branch and filtering by it would answer the question wrongly rather than not at all.
+
+### Seed — `seed-pilot.sql` section 11
+Sections 1-10 only ever reached the supply side as the far end of chains the showroom had already
+FINISHED, so `submitted` RFQs, undecided quotations and in-progress orders were all unreachable and
+each org had exactly one customer. Section 11 adds commerce **between businesses that already exist**
+— no new orgs, people, branches or memberships — plus one published and one draft product each.
+Result per acceptance account (published/draft/awaiting/undecided/active orders/completed/customers/projects):
+Distributor 3/1/**3**/1/2/2/**3**/1 · Manufacturer 3/1/2/2/1/1/2/1 · Importer 3/1/2/2/1/1/2/1.
+
+Acceptance accounts: `rania@example.test` (Suez Paints, Distributor) · `mahmoud@example.test`
+(Alexandria Glass, Manufacturer) · `fady@example.test` (Cairo Sanitary Ware, Importer).
+
+### Validation (feature-first, as scoped)
+typecheck ✅ · lint ✅ · vitest **254/254** ✅ · clean `supabase db reset` + pgTAP **747/747** ✅
+(seed change disturbed no fixture) · new `e2e/supply-side-mvp.spec.ts`: **31 desktop + 30 mobile** ✅
+across all three org types, EN + AR, asserting real data, no console errors, no horizontal overflow,
+all three sidebar modes with cookie persistence, the shared CardRail by test id, and that `Supplier`
+never reaches user-facing copy · showroom regression `showroom-mvp` + `showroom-interaction`
+**26/26** ✅ — the buyer seat is untouched.
+
+Not run, per scope: full repository E2E, final cross-account integration gate, performance gate.
+
+### One assertion corrected during validation, worth recording
+The first spec demanded the purchasing trend CHART on a supply-side report. It failed for all three —
+correctly: none of them has bought anything, so `TrendLine` renders its honest "no committed spend"
+panel. The assertion was wrong, not the code, and was changed to assert the purchasing SECTION plus
+that empty state. Demanding the chart would have been demanding the page draw data that does not exist.
+
+### Unfinished / next
+- Cross-account integration gate (Showroom publishes → RFQ → quote → accept → order → supply-side
+  progresses → Showroom observes) is now manually testable end to end but was **not** run, per scope.
+- `sellSummary()` is now redundant with `supplySummary()` on the seller path; it still backs the
+  buyer-seat report's small sell-side card. Collapse the two when the buyer report is next revisited.

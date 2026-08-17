@@ -59,6 +59,54 @@ export type SellSummary = {
   ordersReceivedValue: number;
 };
 
+/**
+ * The supply side of the very same chain — what a Distributor, Manufacturer or
+ * Importer sees looking the other way down it.
+ *
+ * WHY THIS IS NOT `PurchaseSummary` WITH THE COLUMNS SWAPPED
+ * The seats are not symmetrical, because the two parties do different work:
+ *
+ *   - A buyer's RFQ tally answers "what have I asked for". A SELLER's answers
+ *     "what has been asked OF me", and the status that matters is `submitted` —
+ *     a request nobody has priced yet. That is the seller's one genuinely
+ *     time-critical number and it has no counterpart on the buying side, where
+ *     `submitted` merely means "sent, waiting".
+ *   - A buyer's `topDistributors` ranks who it spends with. A seller's
+ *     `topCustomers` ranks who spends with IT — same shape, opposite direction,
+ *     and derived from the same single order read.
+ *   - `topProducts` exists only here. A buyer's spend splits by CATEGORY (it
+ *     buys across a sector); a seller's revenue splits by ITS OWN PRODUCTS, and
+ *     "which of my lines actually sell" is the question the catalog module is
+ *     downstream of.
+ *
+ * Reads: three list views plus, only when there are orders to explain, one pass
+ * over their line items. Every one is RLS-scoped, so a caller sees exactly the
+ * records it could open by hand.
+ */
+export type SupplySummary = {
+  /** Requests addressed to this organization, by status. */
+  demand: Record<string, number>;
+  /** Requests submitted and not yet answered — the seller's work queue. */
+  awaitingResponse: number;
+  /** Quotations this organization has sent, by status. */
+  quotations: Record<string, number>;
+  /** Sent, undecided — value is committed here but not yet won. */
+  awaitingDecision: number;
+  awaitingDecisionValue: number;
+  acceptedValue: number;
+  /** Orders this organization must fulfil, by status. */
+  orders: Record<string, number>;
+  orderValue: number;
+  /** Distinct organizations that have placed an order with this one. */
+  activeCustomers: number;
+  /** Who buys from this organization, by value. */
+  topCustomers: { name: string; orders: number; value: number }[];
+  /** This organization's own products, ranked by ordered value. */
+  topProducts: { name: string; quantity: number; value: number }[];
+  /** Order value won per calendar month, oldest first. */
+  trend: TrendBucket[];
+};
+
 export type ProjectSummary = {
   /** Projects this organization delivers, by status. */
   executing: Record<string, number>;
@@ -254,6 +302,139 @@ export async function sellSummary(supabase: DB, orgId: string, f: ReportFilters 
     ordersReceived: orderRows.length,
     ordersReceivedValue: orderRows.reduce((s, o) => s + Number(o.total ?? 0), 0),
   };
+}
+
+/**
+ * Everything the supply-side dashboard and report need, in one call.
+ *
+ * Structured exactly like `purchaseSummary` and for the same reason: the tiles,
+ * the funnel, the customer ranking, the product ranking and the monthly trend are
+ * all aggregates of the SAME three record sets, and asking the database for them
+ * five times to render one page is pure waste. Each read selects only the columns
+ * its aggregates need — never the record sets themselves, which the module lists
+ * fetch separately and with their own pagination.
+ *
+ * The line-item read is conditional on purpose: it is the only query here whose
+ * cost scales with history rather than with the page, so an organization that has
+ * not yet won an order pays nothing for a product ranking it has no data for.
+ */
+export async function supplySummary(
+  supabase: DB,
+  orgId: string,
+  f: ReportFilters = {},
+  trendMonths = 6,
+): Promise<SupplySummary> {
+  const categoryOrderIds = await orderIdsInCategory(supabase, orgId, "supplier_org_id", f.category);
+
+  let rfqQ = supabase.from("rfq_list").select("status").eq("supplier_org_id", orgId);
+  let quoteQ = supabase
+    .from("quotation_list")
+    .select("status, total")
+    .eq("supplier_org_id", orgId);
+  let orderQ = supabase
+    .from("order_list")
+    .select("id, status, total, requester_name, requester_org_id, confirmed_at")
+    .eq("supplier_org_id", orgId);
+
+  if (f.from) {
+    rfqQ = rfqQ.gte("created_at", f.from);
+    quoteQ = quoteQ.gte("created_at", f.from);
+    orderQ = orderQ.gte("confirmed_at", f.from);
+  }
+  if (f.to) {
+    rfqQ = rfqQ.lte("created_at", endOfDay(f.to));
+    quoteQ = quoteQ.lte("created_at", endOfDay(f.to));
+    orderQ = orderQ.lte("confirmed_at", endOfDay(f.to));
+  }
+  // A branch filter cannot be honoured on ANY of these three from the seller's
+  // seat: `requester_branch_id` is the BUYER's branch, and naming the buyer's
+  // depot as though it were the seller's would be a wrong answer rather than a
+  // missing one. The supply-side report therefore does not offer the filter (see
+  // the page), and this query deliberately ignores it if one is passed.
+  if (categoryOrderIds) orderQ = orderQ.in("id", categoryOrderIds);
+
+  const [rfqs, quotes, orders] = await Promise.all([rfqQ, quoteQ, orderQ]);
+  if (rfqs.error) throw rfqs.error;
+  if (quotes.error) throw quotes.error;
+  if (orders.error) throw orders.error;
+
+  const rfqRows = rfqs.data ?? [];
+  const quoteRows = quotes.data ?? [];
+  const orderRows = orders.data ?? [];
+
+  const byCustomer = new Map<string, { orders: number; value: number }>();
+  const customerIds = new Set<string>();
+  for (const r of orderRows) {
+    const name = r.requester_name ?? "—";
+    const cur = byCustomer.get(name) ?? { orders: 0, value: 0 };
+    cur.orders += 1;
+    cur.value += Number(r.total ?? 0);
+    byCustomer.set(name, cur);
+    if (r.requester_org_id) customerIds.add(r.requester_org_id);
+  }
+
+  const undecided = quoteRows.filter((q) => q.status === "submitted");
+
+  return {
+    demand: tally(rfqRows),
+    // Counted from the same rows as the tally rather than a second head query —
+    // it IS the tally's `submitted` bucket, named because it is the number the
+    // dashboard leads with.
+    awaitingResponse: rfqRows.filter((r) => r.status === "submitted").length,
+    quotations: tally(quoteRows),
+    awaitingDecision: undecided.length,
+    awaitingDecisionValue: undecided.reduce((s, q) => s + Number(q.total ?? 0), 0),
+    acceptedValue: quoteRows
+      .filter((q) => q.status === "accepted")
+      .reduce((s, q) => s + Number(q.total ?? 0), 0),
+    orders: tally(orderRows),
+    orderValue: orderRows.reduce((s, o) => s + Number(o.total ?? 0), 0),
+    activeCustomers: customerIds.size,
+    topCustomers: [...byCustomer.entries()]
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6),
+    topProducts: await topOrderedProducts(
+      supabase,
+      orderRows.map((o) => o.id).filter((id): id is string => !!id),
+    ),
+    trend: monthlyTrend(orderRows, trendMonths),
+  };
+}
+
+/**
+ * This organization's own lines, ranked by ordered value.
+ *
+ * Ranked on `order_items.product_name`, which is a frozen SNAPSHOT of what was
+ * actually sold rather than a live foreign key — an order line deliberately keeps
+ * no product id, so that renaming or unpublishing a product cannot rewrite
+ * history. The consequence is that a product renamed mid-life ranks as two lines;
+ * that is the honest reading of the records, and inventing a join back to
+ * `products` would silently merge two different things that were sold under two
+ * different names.
+ */
+async function topOrderedProducts(
+  supabase: DB,
+  orderIds: string[],
+): Promise<{ name: string; quantity: number; value: number }[]> {
+  if (orderIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("order_items")
+    .select("product_name, quantity, line_total")
+    .in("order_id", orderIds);
+  if (error) throw error;
+
+  const byProduct = new Map<string, { quantity: number; value: number }>();
+  for (const r of data ?? []) {
+    const cur = byProduct.get(r.product_name) ?? { quantity: 0, value: 0 };
+    cur.quantity += Number(r.quantity ?? 0);
+    cur.value += Number(r.line_total ?? 0);
+    byProduct.set(r.product_name, cur);
+  }
+  return [...byProduct.entries()]
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6);
 }
 
 /**

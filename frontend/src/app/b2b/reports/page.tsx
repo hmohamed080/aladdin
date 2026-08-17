@@ -3,6 +3,7 @@ import { getMessages } from "@/lib/i18n/translate";
 import {
   purchaseSummary,
   sellSummary,
+  supplySummary,
   savedByCategory,
   spendByCategory,
   projectSummary,
@@ -10,6 +11,8 @@ import {
   type ReportFilters,
   type ProductCategory,
 } from "@/server/queries/reports";
+import { commerceStance, supplyVoice } from "@/lib/workspace/supply-side";
+import { SupplyReport } from "@/features/reports/supply-report";
 import { PageHeader } from "@/features/sales/page-parts";
 import { Card, SectionTitle } from "@/components/ui/primitives";
 import { StatTiles } from "@/components/ui/stat-tiles";
@@ -109,9 +112,16 @@ export default async function ReportsPage({
   const caps = new Set(org.capabilities);
   const runsSales = caps.has("org.manage") || ["sales.read", "sales.write", "sales.manage"].some((c) => caps.has(c));
 
-  const [purchase, sell, saved, byCategory, projects, sales] = await Promise.all([
+  // A supply-side organization gets its own analytics FIRST. The purchasing
+  // report stays below it in full — a distributor buys raw materials, and cutting
+  // that off would answer half its questions. Nothing is duplicated: the two
+  // halves read opposite ends of the same records.
+  const isSeller = commerceStance(org.orgType) === "seller";
+
+  const [purchase, sell, supply, saved, byCategory, projects, sales] = await Promise.all([
     purchaseSummary(supabase, org.organizationId, filters, trendMonths),
     sellSummary(supabase, org.organizationId, filters),
+    isSeller ? supplySummary(supabase, org.organizationId, filters, trendMonths) : Promise.resolve(null),
     savedByCategory(supabase, org.organizationId),
     spendByCategory(supabase, org.organizationId, filters),
     projectSummary(supabase, org.organizationId, filters),
@@ -123,8 +133,11 @@ export default async function ReportsPage({
   const totalOrders = sum(purchase.orders);
   const totalProjects = sum(projects.executing) + sum(projects.incoming);
   // A business that has never quoted anybody gets no sell-side section at all,
-  // rather than a card full of zeros.
-  const sells = sum(sell.quotesSent) > 0 || sell.ordersReceived > 0;
+  // rather than a card full of zeros. It is also suppressed for a supply-side
+  // organization: `SupplyReport` above already covers the same three numbers in
+  // full, and repeating them lower down as a one-card summary would let the page
+  // state the same figure twice under two different headings.
+  const sells = !supply && (sum(sell.quotesSent) > 0 || sell.ordersReceived > 0);
   const hasPipeline = runsSales && (sum(sales.leadsByStage) > 0 || sales.customers > 0 || sales.won > 0);
 
   const money = (v: number) => formatMoney(v, locale);
@@ -171,6 +184,19 @@ export default async function ReportsPage({
         ]}
       />
 
+      {/* The supply-side analytics lead for a seller, and are absent entirely for
+          a buyer — not rendered empty, not rendered with zeros. */}
+      {supply ? (
+        <SupplyReport supply={supply} voice={supplyVoice(org.orgType)} m={m} locale={locale} />
+      ) : null}
+
+      {/* For a seller the tiles below are the PURCHASING figures, not the page
+          summary, so the heading moves above them. A buyer's page is unchanged:
+          there the same tiles ARE the summary and the heading follows. */}
+      {supply ? (
+        <SectionTitle icon={<WalletIcon size={18} />}>{m.reports.section.purchasing}</SectionTitle>
+      ) : null}
+
       <StatTiles
         tiles={[
           {
@@ -198,7 +224,9 @@ export default async function ReportsPage({
       />
 
       {/* ---------------------------------------------------------------- */}
-      <SectionTitle icon={<WalletIcon size={18} />}>{m.reports.section.purchasing}</SectionTitle>
+      {supply ? null : (
+        <SectionTitle icon={<WalletIcon size={18} />}>{m.reports.section.purchasing}</SectionTitle>
+      )}
 
       <Card>
         <SectionTitle icon={<TrendingUpIcon size={18} />}>{m.reports.chart.spendTrend}</SectionTitle>

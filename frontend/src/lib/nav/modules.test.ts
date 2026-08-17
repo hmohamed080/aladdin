@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { allowedNavKeys, allowedNavSections, NAV_ORDER } from "./modules";
+import { allowedNavKeys, allowedNavSections, navLabelKey, navOrder, NAV_ORDER } from "./modules";
 import { ROLE_PRESETS } from "@/lib/org/roles";
 
 /**
@@ -88,5 +88,74 @@ describe("allowedNavSections", () => {
     const names = sections.map((s) => s.section);
     expect(names).toContain("selling");
     expect(names).not.toContain("buying");
+  });
+});
+
+/**
+ * THE SUPPLY-SIDE STANCE
+ *
+ * The contract these pin is that Distributor, Manufacturer and Importer get the
+ * SAME navigation as a Showroom, reordered and relabelled — not a second one. So
+ * the assertions are deliberately about identity (same hrefs, same gates, same
+ * component) as much as about difference (order, labels).
+ */
+describe("seller stance", () => {
+  it("leads with Supply and demotes Buying, without dropping either", () => {
+    const sections = allowedNavSections(["org.manage"], "seller");
+    expect(sections.map((s) => s.section)).toEqual([
+      "overview",
+      "supply",
+      "network",
+      "selling",
+      "buying",
+      "business",
+    ]);
+  });
+
+  it("puts the commerce trio ahead of everything but Home", () => {
+    const keys = allowedNavKeys(["org.manage"], "seller");
+    expect(keys[0]).toBe("home");
+    expect(keys.slice(1, 4)).toEqual(["purchaseRequests", "offers", "orders"]);
+  });
+
+  it("moves products into Supply for a seller and leaves it in Selling for a buyer", () => {
+    const supply = allowedNavSections(["org.manage"], "seller").find((s) => s.section === "supply");
+    expect(supply?.keys).toContain("products");
+    const selling = allowedNavSections(["org.manage"], "buyer").find((s) => s.section === "selling");
+    expect(selling?.keys).toContain("products");
+  });
+
+  it("adds the customer/showroom directory only on the seller layout", () => {
+    expect(allowedNavKeys(["org.manage"], "seller")).toContain("buyers");
+    expect(allowedNavKeys(["org.manage"], "buyer")).not.toContain("buyers");
+  });
+
+  it("still gates every module on the same capabilities as the buyer layout", () => {
+    // A distributor's salesperson must not reach products or people-ops just
+    // because the workspace reordered itself.
+    const keys = allowedNavKeys(ROLE_PRESETS.sales_rep, "seller");
+    expect(keys).toContain("customers");
+    expect(keys).not.toContain("products");
+    expect(keys).not.toContain("team");
+  });
+
+  it("exposes exactly the buyer's modules plus the customer directory", () => {
+    // Proof there is no second, drifting module set: the two layouts hold the
+    // same keys, in different places.
+    const seller = new Set(navOrder("seller"));
+    const buyer = new Set(NAV_ORDER);
+    for (const k of buyer) expect(seller.has(k)).toBe(true);
+    expect([...seller].filter((k) => !buyer.has(k))).toEqual(["buyers"]);
+  });
+
+  it("relabels the commerce trio without changing which module it is", () => {
+    expect(navLabelKey("purchaseRequests", "seller", "nav.purchaseRequests")).toBe("nav.demand");
+    expect(navLabelKey("offers", "seller", "nav.offers")).toBe("nav.quotations");
+    expect(navLabelKey("orders", "seller", "nav.orders")).toBe("nav.salesOrders");
+    // Anything without an override falls through untouched.
+    expect(navLabelKey("settings", "seller", "nav.settings")).toBe("nav.settings");
+    expect(navLabelKey("purchaseRequests", "buyer", "nav.purchaseRequests")).toBe(
+      "nav.purchaseRequests",
+    );
   });
 });

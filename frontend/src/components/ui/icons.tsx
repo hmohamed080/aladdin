@@ -284,6 +284,30 @@ export const LandmarkIcon = (p: IconProps) => (
   </Svg>
 );
 
+/**
+ * A shop front with an awning — the customer/showroom network, i.e. the
+ * businesses a supply-side organization sells INTO. Deliberately distinct from
+ * `TruckIcon` (the distributors it buys from) and `BuildingIcon` (institutions):
+ * on a collapsed rail the glyph is the only label there is, so the three
+ * directories must not read as the same mark.
+ */
+export const StorefrontIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 9V20a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9" />
+    <path d="M3 9h18l-1.4-4.3A1 1 0 0 0 18.65 4H5.35a1 1 0 0 0-.95.7L3 9Z" />
+    <path d="M9.5 21v-5.5h5V21" />
+  </Svg>
+);
+
+/** Demand coming toward you — the incoming-RFQ / opportunity module. */
+export const DemandIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 12h9" />
+  </Svg>
+);
+
 export const BarChartIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 21h18" />
