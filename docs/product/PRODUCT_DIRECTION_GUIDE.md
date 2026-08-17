@@ -252,7 +252,7 @@ Product-Owner decisions taken on 2026-08-08 that are **still valid against the i
 - **Customer-need capture uses progressive disclosure** (surface not yet built): customer/opportunity, category, use case, and location first; quantity, budget, style, finish, and colour optional; required date/urgency, notes, and relevant attachments last. Never present the whole form at once.
 - **Deferred B2B capabilities** — see *Deferred Scope* below.
 
-**Superseded on reconciliation — deliberately NOT carried over** (the implemented product is authoritative; the original wording is preserved on the `archive/product-decisions-20260808` branch, commit `d7f947e`):
+**Superseded on reconciliation — deliberately NOT carried over.** The historical 2026-08-08 decisions were reconciled from commit `d7f947e`; the implemented product is authoritative, and the current canonical product decisions and supersession outcomes are recorded in this guide:
 
 | 2026-08-08 decision | Superseded by |
 |---|---|
@@ -338,7 +338,7 @@ Installation & service marketplace, industrial/RFQ at scale, deeper supplier/tec
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
 
 ### 2026-08-17 — Reconciled the 2026-08-08 Private-Pilot B2B decisions onto main
-- **What:** Recovered the approved 2026-08-08 product decisions from a local-only commit (`d7f947e`, now archived on `archive/product-decisions-20260808`) and ported **only** what survives against the implemented product: the free-Pilot / no-payment boundary, Arabic-default with exact English parity, progressive-disclosure need capture, and the deferred advanced-B2B capabilities. Recorded the superseded decisions and what replaced each of them in *Private-Pilot B2B Scope Boundaries*.
+- **What:** Recovered the approved 2026-08-08 product decisions from commit `d7f947e` and ported **only** what survives against the implemented product: the free-Pilot / no-payment boundary, Arabic-default with exact English parity, progressive-disclosure need capture, and the deferred advanced-B2B capabilities. Recorded the superseded decisions and what replaced each of them in *Private-Pilot B2B Scope Boundaries*.
 - **Why:** Those decisions were approved but never reached `main`, while Sprints 9–14 implemented the B2B workflow differently. Reconciling — rather than merging the stale commit — keeps the implemented product authoritative and stops the lost decisions from being re-litigated.
 - **Approved by:** Product Owner (2026-08-08 B2B closure); reconciliation scope confirmed 2026-08-17.
 

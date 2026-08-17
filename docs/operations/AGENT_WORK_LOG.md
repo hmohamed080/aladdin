@@ -4,6 +4,28 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Distributor terminology closeout
+
+**Date:** 2026-08-17 · **Branch:** `chore/distributor-terminology-closeout` · **Base:** `main` @ `474a6f0`
+
+### Arabic Distributor terminology is now diacritic-free
+The shipped Arabic labels carried `U+0651 ARABIC SHADDA` — `الموزّع` / `الموزّعون` / `الموزّعين`. Both spellings are correct Arabic, but the approved convention is diacritic-free, so the shadda was removed from the Distributor **noun** only.
+
+The replacement matched the stem `م + و + ز + SHADDA + ع` rather than a word list. That skeleton is what makes it safe:
+
+- **Grammar is preserved automatically.** Prefixes (`ال`, `لل`) and suffixes (`ون`, `ين`) ride along untouched, so definite/indefinite, singular/plural and nominative vs. accusative/genitive survive the edit — `الموزّعين` became `الموزعين`, **not** `الموزعون`.
+- **Same-root verbs are structurally excluded.** `يوزّع` and `وزّع` ("distributes" / "distribute", `ar.ts:809, 815, 820`) have no meem before the waw, so the pattern cannot reach them. They keep their shadda deliberately — they are not the Distributor term.
+- **Proof that nothing else moved:** for every file the drop in *total* `U+0651` count equals the number of Distributor replacements exactly (39/39, 2/2, 1/1, 2/2). Any unrelated Arabic word losing a shadda would have broken that equality and aborted the run.
+
+**44 strings across 4 files.** The two E2E specs matter as much as the messages file: `showroom-mvp.spec.ts:425` asserts `toHaveText("الموزعون")` and `shared-onboarding.spec.ts:131` matches a button by `/موزع/` — changing `ar.ts` alone would have broken both. `RUNTIME_STATE.md` describes the live labels and was updated with them; `المورّد` there keeps its shadda because it is a *different word*, quoted as the term Distributor replaced.
+
+`supplier` remains the internal identifier — enum, columns, message keys, `{supplier}` placeholders and route paths are all unchanged, and it is still never user-facing copy. The previous entry below quotes the old shadda-bearing strings; that record is accurate for the session it describes and was left alone.
+
+### The archive branch is no longer load-bearing
+`PRODUCT_DIRECTION_GUIDE.md` claimed the original wording was "preserved on the `archive/product-decisions-20260808` branch". That made canonical project memory depend on a temporary ref. Both references now state that the historical 2026-08-08 decisions were reconciled from commit `d7f947e` and that this guide holds the current decisions and supersession outcomes. **`archive/product-decisions-20260808` can be deleted once this merges.** No archived content was restored.
+
+---
+
 ## Session — Reconciling the lost 2026-08-08 product decisions
 
 **Date:** 2026-08-17 · **Branch:** `docs/reconcile-product-decisions` · **Base:** `main` @ `e914f88`
