@@ -111,6 +111,14 @@ The two taxonomies now live in **two disjoint database types**, so the rule abov
 
 `users.primary_account_type` is a `persona_type` and `organizations.org_type` is an `organization_type`, so **`user.primary_account_type = 'supplier'` and `organizations.org_type = 'engineer'` are type errors** — in every code path, including a direct SQL statement by a superuser. The shared `account_type` enum is **dropped**; the transitional debt it represented is closed, not documented.
 
+**Terminology — `supplier` is displayed as "Distributor".** The identifier and the label are deliberately different, so read every `supplier` in this guide as the internal name only:
+
+| Internal identifier | User-facing English | User-facing Arabic |
+|---|---|---|
+| `supplier` | **Distributor** | **الموزع** |
+
+The identifier is canonical in the database enum, code, and API and **is not renamed**; the display terms are what users read in both locales. Never surface `supplier` in the UI, and never introduce a `distributor` enum value or column.
+
 Two nuances worth knowing:
 - **A business whose classification shared a persona spelling kept its identity, under a business-shaped name.** A design studio typed `interior_designer` is now `design_office`; a contracting company typed `contractor` is now `contractor_company`. The owner of either may separately hold the matching *personal* persona — the two values now coexist honestly instead of colliding.
 - **The registration CHOICE is the one place the taxonomies meet**, because the card the person taps either claims a persona or names a business to create. `onboarding_progress` therefore records it in two separate typed columns (`selected_persona`, `selected_org_type`), mutually exclusive and consistent with the track — never one union column.
@@ -235,8 +243,30 @@ AI **drafts and ranks; it never auto-sends** or takes irreversible action on a u
 ## MVP Boundaries
 See [`mvp-scope.md`](./mvp-scope.md) for the authoritative list and order. In short: passwordless auth, onboarding/profiles, roles, portfolio, catalog, smart search, AI assistant, notifications, subscription, advertisement, admin — plus the core value journey — built **Sales-first** (05C → 05A → 05B → 05D → 05E).
 
+## Private-Pilot B2B Scope Boundaries (approved 2026-08-08 · reconciled 2026-08-17)
+
+Product-Owner decisions taken on 2026-08-08 that are **still valid against the implemented product**. They were approved before the Sprint 9–14 B2B implementation landed; each one below was re-checked against current `main` and only the surviving decisions are recorded here.
+
+- **The Pilot is free.** Eligible activated users use the service at no cost; **no online payment is collected and there is no checkout**. Packages may be described informationally. Upgrading extends the **same canonical identity**. See [`mvp-scope.md`](./mvp-scope.md).
+- **Arabic is the default language**, English a first-class alternative with **exact information and action parity** — same data, same actions, correct RTL/LTR, no mixed-language UI beyond approved brand and technical terms.
+- **Customer-need capture uses progressive disclosure** (surface not yet built): customer/opportunity, category, use case, and location first; quantity, budget, style, finish, and colour optional; required date/urgency, notes, and relevant attachments last. Never present the whole form at once.
+- **Deferred B2B capabilities** — see *Deferred Scope* below.
+
+**Superseded on reconciliation — deliberately NOT carried over** (the implemented product is authoritative; the original wording is preserved on the `archive/product-decisions-20260808` branch, commit `d7f947e`):
+
+| 2026-08-08 decision | Superseded by |
+|---|---|
+| Opportunity pipeline `new → contacted → needs_captured → products_shared → quote_sent → won`/`lost` | The implemented **Lead** pipeline (`lead_stage`, `lead_status`, `transition_lead`) — [ADR-0008](../decisions/ADR-0008-b2b-sales-domain-model.md), [11](../technical/11_state_machines.md) §4a |
+| "Quote Comparison is not MVP" | The implemented **buyer-first** quotations surface, which compares received offers before deciding (`frontend/src/app/b2b/quotations`) |
+| Projects Lite statuses *Draft · Active · On Hold · Completed · Cancelled* | Implemented `project_status` (`planned`, `active`, `completed`) |
+| Availability vocabulary *Available · Limited · Out of Stock · Coming Soon · Hidden* | Implemented catalog model (`product_status`: `draft`, `published`) |
+| "Admin activates accounts manually" | **Activation vs. Verification** (2026-08-11) — completing onboarding activates the account; review is never the activation gate |
+| B2B responsive contract (desktop sidebar · tablet rail/drawer · one-column mobile) | Already represented, in more depth, by [`UI_UX_SYSTEM_GUIDE.md`](../../UI-UX/UI_UX_SYSTEM_GUIDE.md) *Sidebar Behavior* + *Responsive Design Rules* (rev 2026-08-16) |
+| Product-match / Smart-Share AI rules (human-reviewable explanation, price is not the primary rank, never invent availability, human sends) | Already represented by *AI Principles*, *Human-Review Requirements*, and *Consultation-First Principle* above |
+
 ## Deferred Scope (explicitly out of MVP)
 - Payments, escrow, milestones, and disputes (designed later; **not** MVP).
+- Advanced B2B administration: configurable permission engines, workflow automation, sales forecasting, competitor intelligence, and enterprise administration (approved 2026-08-08). Basic membership roles, operational analytics, and org/branch management stay in MVP.
 - Marketplace checkout / add-to-cart commerce (never).
 - A generic, configurable horizontal CRM (never).
 - Price-war reverse-auction bidding (never).
@@ -306,6 +336,11 @@ Installation & service marketplace, industrial/RFQ at scale, deeper supplier/tec
 
 ## Change History
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
+
+### 2026-08-17 — Reconciled the 2026-08-08 Private-Pilot B2B decisions onto main
+- **What:** Recovered the approved 2026-08-08 product decisions from a local-only commit (`d7f947e`, now archived on `archive/product-decisions-20260808`) and ported **only** what survives against the implemented product: the free-Pilot / no-payment boundary, Arabic-default with exact English parity, progressive-disclosure need capture, and the deferred advanced-B2B capabilities. Recorded the superseded decisions and what replaced each of them in *Private-Pilot B2B Scope Boundaries*.
+- **Why:** Those decisions were approved but never reached `main`, while Sprints 9–14 implemented the B2B workflow differently. Reconciling — rather than merging the stale commit — keeps the implemented product authoritative and stops the lost decisions from being re-litigated.
+- **Approved by:** Product Owner (2026-08-08 B2B closure); reconciliation scope confirmed 2026-08-17.
 
 ### 2026-08-12 — Account & Workspace Model implemented
 - **What:** The model recorded in the two entries below is now **built**, not just documented. `users.primary_account_type` is **nullable, has no default, and means personal persona only**; a **business-only identity legitimately has no personal persona**, which the old `not null default 'end_consumer'` column could not even represent. `organizations.org_type` remains the sole business classification and is never mirrored onto a user; `request_account_upgrade` refuses business values outright. Business creation moved to a **per-attempt draft** (`business_creation_drafts`) whose id is both the resume handle and the **idempotency key**, replacing the one-draft-per-user shape that structurally prevented a second business — so retries return the same organization while a new draft legitimately creates another. Registration became a **direct Personal-or-Business choice** with concrete business types; the generic **"Organization owner / manager" entry is no longer offered** and the owner/manager confirmation is gone (the creator *is* the owner). An existing user can **add a business** from the workspace menu with no second sign-up, and a **workspace switcher** changes the active work context — Personal or any organization with an active membership — without ever touching persona or membership. Landing is deterministic, and merely belonging to an organization no longer evicts a person from their personal `/home`.

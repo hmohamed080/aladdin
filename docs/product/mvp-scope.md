@@ -21,9 +21,11 @@ State what the Private Pilot MVP includes, in what order, and what is explicitly
 4. **05D — Supplier/Showroom/Product operations**: Catalog → Availability → Requests → Quotes → Orders → Campaigns.
 5. **05E — B2B Cockpit & Admin completion** (dashboards last, after inner workflows exist).
 
-**Roles (kept separate):** End Consumer · Installer/Technician · Engineer · Interior Designer · Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · Sales · Contractor · Trainer · Trainee · Administrator. A user holds **one current primary account type** (personal persona); the **business classifications** in this list are canonically `organizations.org_type`, reached through organization membership — one user may own organizations of several different types at once.
+**Roles (kept separate):** End Consumer · Installer/Technician · Engineer · Interior Designer · Showroom/Dealer · Supplier · Manufacturer · Importer · Wholesaler · Sales · Contractor · Trainer · Trainee · Administrator. A user holds **one current primary account type** (personal persona); the **business classifications** in this list are canonically `organizations.org_type`, reached through organization membership — one user may own organizations of several different types at once. The `supplier` classification is user-facing **"Distributor"** in English and **"الموزع"** in Arabic; `supplier` is the internal identifier only ([terminology](./PRODUCT_DIRECTION_GUIDE.md#the-separation-is-enforced-by-the-type-system-sprint-13)).
 
-**Cross-cutting MVP requirements:** English (LTR) + Arabic (RTL); Light + Dark; responsive Desktop/Tablet/Mobile (PWA); Egyptian data conventions (localities, EGP).
+**Cross-cutting MVP requirements:** English (LTR) + Arabic (RTL); Light + Dark; responsive Desktop/Tablet/Mobile (PWA); Egyptian data conventions (localities, EGP). **Arabic is the default language** and English is a first-class alternative with **exact information and action parity** — the same data, the same actions, correct RTL/LTR, and no mixed-language UI beyond approved brand and technical terms.
+
+**Private Pilot subscription boundary:** eligible activated users use the service **free** during the Pilot. **No online payment is collected and there is no checkout**; future packages may be described informationally only. Upgrading an account extends the **same canonical identity** — it never creates a second user. (Account *activation* itself follows [`PRODUCT_DIRECTION_GUIDE.md` → Activation vs. Verification](./PRODUCT_DIRECTION_GUIDE.md), not a payment or a review gate.)
 
 ## Rationale
 
