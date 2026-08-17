@@ -111,6 +111,14 @@ The two taxonomies now live in **two disjoint database types**, so the rule abov
 
 `users.primary_account_type` is a `persona_type` and `organizations.org_type` is an `organization_type`, so **`user.primary_account_type = 'supplier'` and `organizations.org_type = 'engineer'` are type errors** — in every code path, including a direct SQL statement by a superuser. The shared `account_type` enum is **dropped**; the transitional debt it represented is closed, not documented.
 
+**Terminology — `supplier` is displayed as "Distributor".** The identifier and the label are deliberately different, so read every `supplier` in this guide as the internal name only:
+
+| Internal identifier | User-facing English | User-facing Arabic |
+|---|---|---|
+| `supplier` | **Distributor** | **الموزع** |
+
+The identifier is canonical in the database enum, code, and API and **is not renamed**; the display terms are what users read in both locales. Never surface `supplier` in the UI, and never introduce a `distributor` enum value or column.
+
 Two nuances worth knowing:
 - **A business whose classification shared a persona spelling kept its identity, under a business-shaped name.** A design studio typed `interior_designer` is now `design_office`; a contracting company typed `contractor` is now `contractor_company`. The owner of either may separately hold the matching *personal* persona — the two values now coexist honestly instead of colliding.
 - **The registration CHOICE is the one place the taxonomies meet**, because the card the person taps either claims a persona or names a business to create. `onboarding_progress` therefore records it in two separate typed columns (`selected_persona`, `selected_org_type`), mutually exclusive and consistent with the track — never one union column.
