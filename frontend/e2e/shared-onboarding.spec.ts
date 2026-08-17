@@ -128,7 +128,7 @@ test.describe("shared onboarding", () => {
 
     // Choose Distributor (business) — Arabic label. Sprint 8: the business track now
     // enters the shared organization onboarding wizard (not the generic handoff).
-    await page.getByRole("button", { name: /موزّع/ }).click();
+    await page.getByRole("button", { name: /موزع/ }).click();
     await page.getByRole("button", { name: /متابعة/ }).click();
     await page.waitForURL(/\/onboarding\/business$/, { waitUntil: "commit" });
     // The business identity step is shown (Arabic).

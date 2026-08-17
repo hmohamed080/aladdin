@@ -420,9 +420,9 @@ test.describe("showroom workspace", () => {
       expect(heading.match(/[A-Za-z]{3,}/g) ?? [], `English heading on ${route}: ${heading}`).toEqual([]);
     }
 
-    // Arabic terminology: الموزّع replaced المورّد everywhere user-facing.
+    // Arabic terminology: الموزع replaced المورّد everywhere user-facing.
     await page.goto("/b2b/suppliers");
-    await expect(page.locator("main h1")).toHaveText("الموزّعون");
+    await expect(page.locator("main h1")).toHaveText("الموزعون");
     const body = await page.locator("main").innerText();
     expect(body, "المورّد still appears in Arabic").not.toMatch(/مورّد|الموردين|الموردون/);
   });
