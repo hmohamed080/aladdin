@@ -4,6 +4,37 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Reconciling the lost 2026-08-08 product decisions
+
+**Date:** 2026-08-17 · **Branch:** `docs/reconcile-product-decisions` · **Base:** `main` @ `e914f88`
+
+### What happened
+Branch cleanup found that `docs/technical-finalization` carried **one local-only commit** (`d7f947e`, 2026-08-08) whose approved product decisions had never reached `main` — PR #1 merged on 2026-08-02, six days before that commit was written, so GitHub reported the remote branch as *Ahead 0* while the work sat only on a laptop. The commit was pushed to `archive/product-decisions-20260808` as a safety copy. PR #31, opened from that archival branch, was **closed unmerged** on purpose: it conflicts with `main` and predates the current Vercel Services architecture.
+
+### Reconciled, not merged
+Each 2026-08-08 decision was re-checked against the *implemented* product rather than cherry-picked. Sprints 9–14 had already built the B2B workflow differently, so most of the commit is obsolete:
+
+| Decision | Outcome |
+|---|---|
+| Free Pilot / no payment collected | **Ported** — `mvp-scope.md`, `PRODUCT_DIRECTION_GUIDE.md` |
+| Arabic default + exact English parity | **Ported** (matches `APP_DEFAULT_LOCALE = "ar"`, previously undocumented in product memory) |
+| Progressive-disclosure need capture | **Ported** — surface not yet built, nothing contradicts it |
+| Deferred advanced B2B administration | **Ported** — new *Deferred Scope* bullet |
+| `needs_captured → products_shared → quote_sent` pipeline | **Superseded** by the implemented `lead_stage` / `transition_lead` (ADR-0008) |
+| "Quote Comparison is not MVP" | **Superseded** — the buyer-first quotations surface compares received offers |
+| Projects Lite + availability vocabularies | **Superseded** by `project_status` and `product_status` |
+| "Admin activates accounts manually" | **Superseded** by *Activation vs. Verification* (2026-08-11) |
+| B2B responsive contract · AI match/share rules | **Already represented**, in more depth, by the UI/UX guide and *AI Principles* |
+
+The superseded set is recorded in a table in `PRODUCT_DIRECTION_GUIDE.md` — naming what replaced each one is what stops the next agent from re-importing the archive branch.
+
+### Not done, deliberately
+The commit's `design/CHANGELOG.md` and `design/COMPONENT_INVENTORY.md` edits claim fifteen Draft Pencil masters exist in `design.pen`. `.pen` files are gitignored and encrypted, so that claim is **unverifiable from the repository** and was not ported. Separately, both files still open with "No product components are implemented yet" while `frontend/src/components/` holds 26 files — a pre-existing staleness on `main`, left for a design-scoped session.
+
+**Validation:** `python scripts/check_doc_links.py` → 898 internal links across 106 files, 0 broken. Documentation only: no code, config, migrations, Supabase, Vercel or `.pen` changes.
+
+---
+
 ## Session — Making all 26 staging demo accounts usable
 
 **Date:** 2026-08-16 · **Branch:** `chore/staging-demo-accounts` · **Base:** `chore/vercel-services-deploy` @ `44a4cdd`
