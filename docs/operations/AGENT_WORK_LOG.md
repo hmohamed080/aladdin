@@ -1728,3 +1728,64 @@ integrations in Settings.
   to be touched anyway); the remainder are further down the same flow and are out of this pass's scope.
 - `pilot-uat-round-1.spec.ts:64` — two "Pending review" badges on the personal `/home` trip a
   strict-mode locator. Fails identically at HEAD.
+
+---
+
+## 2026-08-17 — Staging cloud audit & catalog view hardening
+
+Short audit of the ACTUAL hosted staging state after the owner's manual Vercel / Supabase / Resend
+changes. Scope was deliberately narrow: verify live state, fix only confirmed blockers.
+
+### Verified as already correct (no change made)
+- Hosted staging migration parity is **exact** — 28/28 local migrations applied remotely, zero drift.
+- Vercel project `aladdin-staging` is `framework: services`, one root `vercel.json`, no per-service
+  `vercel.json` and no `.vercel` overrides. Latest production deployment READY on `1c6b002`
+  (`lambdaRuntimeStats: nodejs 4, python 1` — both services genuinely deployed).
+- `/api/health`, `/api/backend/health`, `/auth/sign-in` and `/` all return 200 anonymously.
+- Vercel holds **only three env vars**, all `NEXT_PUBLIC_*` (Production + Preview). No service-role
+  key, no Resend key, no backend secret is stored on Vercel at all. `SUPABASE_SERVICE_ROLE_KEY` is
+  `.optional()` in `frontend/src/lib/env` and referenced by zero runtime modules, so its absence is
+  correct rather than an oversight.
+- No secret-shaped value in the rendered HTML or any JS chunk; nothing secret-shaped in Git.
+- Deployment Protection = Vercel Authentication, `all_except_custom_domains` (previews protected,
+  production alias public). Left as-is.
+
+### Fixed — `public.catalog_published_products` (Advisor rule 0010, CRITICAL)
+Created `with (security_invoker = false)` in `20260810090001` (NOT edited — forward-only migration
+`20260817100000_catalog_view_invoker_hardening.sql`).
+
+The flag could not simply be flipped: the view joins `products` to `organizations`, and under invoker
+rights the `organizations` half collapses to the caller's own orgs, silently emptying the cross-tenant
+marketplace. But the definer rights were only ever buying the supplier's **public identity** columns —
+policy `products_select_published` already grants every authenticated caller cross-tenant SELECT on
+`status='published' and deleted_at is null`, byte-for-byte the view's own filter.
+
+So the fix applies the established public-directory pattern (`20260805100000`) at the narrowest
+possible scope: the view becomes `security_invoker = true` and reads `products` under the caller's own
+RLS, and **only** the supplier-identity half moves into `app._catalog_supplier_identity()` — SECURITY
+DEFINER, `search_path` pinned empty, four approved columns, PUBLIC execute revoked, EXECUTE granted to
+`authenticated` only. An `exists (published, non-deleted product)` clause keeps the set of revealed
+organizations exactly equal to what the old view revealed. Dependent `public.saved_product_list` was
+dropped and recreated verbatim (explicit drop, not CASCADE).
+
+Net effect: products RLS is now genuinely enforced instead of bypassed, so a future policy narrowing
+product visibility is honoured here automatically.
+
+### Validation
+- clean `supabase db reset` ✅ · pgTAP **747/747** ✅ across 30 files, including the pre-existing
+  catalog assertions in `23_catalog_rfq_quotation_test.sql` (cross-tenant published visible, draft
+  hidden, supplier identity resolves) and new `29_catalog_view_invoker_hardening_test.sql` (18 tests)
+- Advisor rule 0010 replicated as SQL over `pg_class.reloptions`: **zero** SECURITY DEFINER views
+  remain in `public` / `graphql_public`
+- `EXPLAIN ANALYZE` on the rebuilt view: hash join, function scanned once (not per-row), index scan on
+  `ix_products_org_status` — no correlated-call pathology
+- No frontend/backend code changed, so typecheck/lint/E2E were not rerun (view contract is identical)
+
+### Flagged, not changed
+- Backend health reports `"env":"local"` (APP_ENV unset on Vercel). Safe for a health-only service;
+  clean up when the first real backend endpoint lands rather than provisioning secrets to change a
+  string.
+- FastAPI is currently request-driven only and appropriate as deployed. **Boundary to hold:** the
+  planned AI/OCR/RAG/document work must not become blocking HTTP work inside these request handlers.
+- Hosted Supabase SMTP/Resend settings and the hosted Magic Link template are dashboard-only state and
+  cannot be read with the repo's authenticated tooling — listed as manual owner checks.
