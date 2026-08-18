@@ -111,11 +111,26 @@ export async function ownProductCounts(
   return { total: rows.length, published, draft: rows.length - published };
 }
 
-export type ProductDemand = { requests: number; orderedQuantity: number };
+export type ProductDemand = { requests: number };
 
 /**
- * Per-product demand: how often each of this organization's products has been
- * ASKED FOR, and how much of it has been ordered.
+ * PostgREST puts an `in` list in the QUERY STRING, so a filter built from every
+ * id an organization owns stops being a slow request and becomes a FAILED one
+ * once the URL outgrows the gateway's header limit — a few hundred UUIDs is all
+ * it takes. Splitting the list into fixed batches keeps the result byte-for-byte
+ * identical at any history size, which a `limit` would not.
+ */
+const IN_BATCH = 100;
+
+export function batches<T>(items: readonly T[], size = IN_BATCH): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Per-product demand: how many DISTINCT requests each of this organization's
+ * products has been asked for in.
  *
  * This is the one piece of context that turns a product list into a product
  * MANAGEMENT surface — "this line gets requested and never converts" is a
@@ -123,10 +138,14 @@ export type ProductDemand = { requests: number; orderedQuantity: number };
  *
  * Two bounded reads rather than a nested join: the org's own RFQ ids, then their
  * line items. Requests come from `rfq_items.product_id`, which is a live
- * reference — an RFQ names a catalog product. Quantities come from the same
- * place; ORDER lines deliberately cannot be used here, because an order item is a
- * frozen snapshot with no product id (see `topOrderedProducts`), and matching one
- * back by name would attribute a renamed product's history to the wrong row.
+ * reference — an RFQ names a catalog product.
+ *
+ * Quantity is deliberately NOT reported here. `rfq_items.quantity` is what was
+ * ASKED FOR, not what was sold, and ORDER lines cannot supply the real figure:
+ * an order item is a frozen snapshot carrying no product id (see
+ * `topOrderedProducts`), so matching one back by name would attribute a renamed
+ * product's history to the wrong row. A number that looks like sales but counts
+ * enquiries is worse than no number.
  */
 export async function productDemand(
   supabase: DB,
@@ -142,30 +161,30 @@ export async function productDemand(
   const out = new Map<string, ProductDemand>();
   if (ids.length === 0) return out;
 
-  const { data, error } = await supabase
-    .from("rfq_items")
-    .select("rfq_id, product_id, quantity")
-    .in("rfq_id", ids);
-  if (error) throw error;
+  const results = await Promise.all(
+    batches(ids).map((batch) =>
+      supabase.from("rfq_items").select("rfq_id, product_id").in("rfq_id", batch),
+    ),
+  );
 
   // Counted per REQUEST, not per line: an RFQ that lists the same product twice
   // (two finishes, two delivery dates) is still one business asking once, and a
   // "requested 2 times" that means "one request, itemised twice" is a number a
-  // seller would act on wrongly.
+  // seller would act on wrongly. Batching cannot disturb this — the dedup is by
+  // rfq id, so it does not care which batch a line arrived in.
   const seen = new Map<string, Set<string>>();
-  for (const item of data ?? []) {
-    // A free-text line (no catalog product behind it) is real demand, but it is
-    // not demand for a PRODUCT, so it belongs to no row here.
-    if (!item.product_id) continue;
-    const cur = out.get(item.product_id) ?? { requests: 0, orderedQuantity: 0 };
-    cur.orderedQuantity += Number(item.quantity ?? 0);
-    const rfqSet = seen.get(item.product_id) ?? new Set<string>();
-    if (item.rfq_id && !rfqSet.has(item.rfq_id)) {
+  for (const { data, error } of results) {
+    if (error) throw error;
+    for (const item of data ?? []) {
+      // A free-text line (no catalog product behind it) is real demand, but it is
+      // not demand for a PRODUCT, so it belongs to no row here.
+      if (!item.product_id || !item.rfq_id) continue;
+      const rfqSet = seen.get(item.product_id) ?? new Set<string>();
+      seen.set(item.product_id, rfqSet);
+      if (rfqSet.has(item.rfq_id)) continue;
       rfqSet.add(item.rfq_id);
-      cur.requests += 1;
+      out.set(item.product_id, { requests: (out.get(item.product_id)?.requests ?? 0) + 1 });
     }
-    seen.set(item.product_id, rfqSet);
-    out.set(item.product_id, cur);
   }
   return out;
 }

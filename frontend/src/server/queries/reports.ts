@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
+import { batches } from "@/server/queries/commerce";
 
 /**
  * Read models for Reports & Analytics.
@@ -418,18 +419,24 @@ async function topOrderedProducts(
   orderIds: string[],
 ): Promise<{ name: string; quantity: number; value: number }[]> {
   if (orderIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from("order_items")
-    .select("product_name, quantity, line_total")
-    .in("order_id", orderIds);
-  if (error) throw error;
+  // Batched because the id list travels in the URL: an organization with a few
+  // hundred orders would otherwise build a request the gateway rejects outright,
+  // turning a busy seller's dashboard into an error page. See `batches`.
+  const results = await Promise.all(
+    batches(orderIds).map((batch) =>
+      supabase.from("order_items").select("product_name, quantity, line_total").in("order_id", batch),
+    ),
+  );
 
   const byProduct = new Map<string, { quantity: number; value: number }>();
-  for (const r of data ?? []) {
-    const cur = byProduct.get(r.product_name) ?? { quantity: 0, value: 0 };
-    cur.quantity += Number(r.quantity ?? 0);
-    cur.value += Number(r.line_total ?? 0);
-    byProduct.set(r.product_name, cur);
+  for (const { data, error } of results) {
+    if (error) throw error;
+    for (const r of data ?? []) {
+      const cur = byProduct.get(r.product_name) ?? { quantity: 0, value: 0 };
+      cur.quantity += Number(r.quantity ?? 0);
+      cur.value += Number(r.line_total ?? 0);
+      byProduct.set(r.product_name, cur);
+    }
   }
   return [...byProduct.entries()]
     .map(([name, v]) => ({ name, ...v }))
