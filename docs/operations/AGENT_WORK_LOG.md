@@ -4,6 +4,49 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Visual UAT fix round 1: Arabic numerals and the compact sidebar
+
+**Date:** 2026-08-18 · **Branch:** `feature/supply-side-b2b-mvp` (PR #34) · **Base:** `main`
+
+Two defects found in real-browser UAT. Both were fixed at the shared layer rather than at the surfaces where they were spotted, because each was the symptom of one missing rule.
+
+### Arabic numerals: the bug was a missing formatter, not a wrong locale
+
+The Arabic UI mixed numeral systems on the same screen — ١٢ in a panel that happened to route through `Intl`, `12` in the panel beside it. The cause was not that `ar-EG` was wrong; it was that **most numbers never reached a formatter at all**. A bare `{count}` in JSX stringifies through `Number.prototype.toString`, which is locale-blind.
+
+There were three distinct leak paths, and all three are now closed:
+
+1. **Shared primitives rendered raw numbers.** `KpiStrip`, `PageHead`/`PageHeader` (the count pill), `PanelRow`, `StatTiles`, `TabLinks`, `RankedBars`, `Funnel`, and the Admin console's `AdminHeader`/`StatTile`/`DistList` all printed `number` props directly. Each now takes a **required** `locale` and formats numeric values itself. Required, not optional-with-a-default: a default would be a silent wrong answer, and requiring it made the compiler enumerate all **88 call sites** rather than leaving the sweep to grep.
+2. **`createTranslator` coerced numeric interpolation with `String(val)`.** This was the single largest source. `t("execution.order.itemCount", { count: items.length })` localised every word of the sentence and then printed `1 عنصر`. The translator now formats a `number` for its bound locale and substitutes a `string` verbatim — which is also what keeps identifiers safe.
+3. **Duplicate formatter implementations.** `features/commerce/constants.ts` had its own `formatMoney`/`formatQuantity`, `products-table.tsx` built its own `Intl.NumberFormat`, and `supply-report.tsx` inlined a second copy of `orderCountLabel` with `String(c.orders)` — which is exactly where a Latin `2` survived into `2 طلبيات` on an otherwise fully-localized report. All now route through `lib/ui/format.ts`. **There is no `new Intl.` anywhere in `src/` outside that one file.**
+
+`lib/ui/format.ts` is the single layer. Two decisions in it are worth keeping:
+
+- **The locale tag is `ar-EG-u-nu-arab`, not `ar-EG`.** CLDR's default numbering system for Egypt has moved between `arab` and `latn` across ICU versions, and the server's Node, the browser's ICU and a CI container need not agree. Pinning the numbering system in the tag makes every runtime produce the same digits. The calendar is pinned to `gregory` for the same reason. Formatter instances are memoized per (tag, options) — a fifty-row table with four money columns would otherwise construct two hundred `Intl` objects per render.
+- **Identifiers are the explicit exception.** `formatIdentifier()` passes `ORD-1256`, SKUs, UUIDs, emails and URLs through unchanged in every locale. It is a function rather than "just don't call a formatter" so the intent is greppable and a reviewer can tell a deliberate exemption from an oversight.
+
+### The sidebar leaked its own mode name, and only during a hover
+
+The compact rail's nav items were already icon-only. The defect was the **mode control at the foot**: its label was gated on `narrow`, which is momentary. In expand-on-hover the panel widens the instant the pointer crosses it, so reaching for the control made it print `التوسيع عند المرور` — the name of the mode you were already in.
+
+The label is now gated on `mode === "expanded"` — the CHOSEN mode, not the current width. Collapsed and expand-on-hover keep the closed control icon-only through every phase of the reveal; the mode names still exist inside the menu the control opens, where the user is actually choosing between them. The accessible name gained the active mode (`"الشريط الجانبي: مصغّر"`), so a screen-reader user is told more than the sighted user sees, not less.
+
+### Validation
+
+Frontend typecheck ✓ · lint ✓ (0 errors, 0 warnings) · unit **295/295** ✓ (20 new formatter tests asserting digits rather than separators — pinning ICU's grouping marks would break the suite on a Node upgrade for no user-visible reason; 3 translator-interpolation tests; 6 sidebar tests covering the collapsed and mid-reveal control).
+
+Real-browser UAT through the real Email-OTP path:
+
+- **`rania@example.test`** (Distributor, Arabic) — dashboard, orders, order detail, reports, products, quotations, suppliers, organization, settings and catalog each scanned with a DOM probe for Latin digits in `#main`: **zero**, on every one. All three sidebar modes exercised; the hover reveal floats the panel to 240px while the spacer stays at 56px (no page reflow), shows 17–18 labels with **no duplicates**, no `role="tooltip"` and no `title` attributes.
+- **`mahmoud@example.test`** (Manufacturer, English) — zero Arabic-Indic digits; `EGP 896.8K`, `Sep 24, 2026`, counts all Western.
+- **`hana@example.test`** (Showroom) and **`admin@example.test`** (Admin console, both locales) — collapsed rail `innerText` is the empty string, aria-labels intact. The Admin console keeps its fixed labelled aside: it has no compact mode, so the icon-only contract does not apply to it.
+
+The only Latin digits found anywhere in Arabic were **product names and seeded test-account display names** (`Porcelain Floor Tile 60×60`, `Sales Refers 1787049063346`) — content, correctly left alone.
+
+**Not run, per the brief:** full E2E, pgTAP (no schema change), performance, the persona matrix. A hydration warning in the dev console is caused by a browser extension injecting `data-gr-ext-installed` onto `<body>`; it is not from this branch.
+
+---
+
 ## Session — Distributor terminology closeout
 
 **Date:** 2026-08-17 · **Branch:** `chore/distributor-terminology-closeout` · **Base:** `main` @ `474a6f0`

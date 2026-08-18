@@ -45,6 +45,7 @@ export default async function LeadsPage({
   return (
     <div className="pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
         Icon={TargetIcon}
         title={m.leads.title}
         subtitle={m.leads.subtitle}

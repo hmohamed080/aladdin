@@ -70,6 +70,7 @@ export default async function TechniciansPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
         Icon={WrenchIcon}
         title={m.technicians.title}
         subtitle={consultants ? m.technicians.consultantsSubtitle : m.technicians.subtitle}
@@ -77,6 +78,7 @@ export default async function TechniciansPage({
       />
 
       <StatTiles
+        locale={locale}
         layout="strip"
         tiles={[
           { label: m.technicians.stat.trades, value: tradeCount, Icon: WrenchIcon, tone: "accent" },
@@ -88,6 +90,7 @@ export default async function TechniciansPage({
 
       <div>
         <TabLinks
+          locale={locale}
           basePath="/b2b/technicians"
           param="group"
           current={group}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
-import { formatDate } from "@/lib/ui/format";
+import { formatDate, formatCount } from "@/lib/ui/format";
 import { SectionTitle } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -43,7 +43,7 @@ export function FollowUpsBoard({
         return (
           <section key={s.key}>
             <SectionTitle className="mb-sm">
-              {s.label} <span className="text-fg-muted">({items.length})</span>
+              {s.label} <span className="text-fg-muted">({formatCount(items.length, locale)})</span>
             </SectionTitle>
             <ul className="flex flex-col gap-sm">
               {items.map((f) => (

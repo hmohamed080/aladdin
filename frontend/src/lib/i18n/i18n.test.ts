@@ -193,6 +193,31 @@ describe("translate()", () => {
     const t = createTranslator("en");
     expect(t("nope.not.here")).toBe("nope.not.here");
   });
+
+  /**
+   * The interpolation contract, which used to be `String(val)` and was the
+   * single largest source of Latin digits in the Arabic UI.
+   */
+  describe("numeric interpolation follows the bound locale", () => {
+    it("renders an Arabic message's count in Arabic-Indic digits", () => {
+      const out = createTranslator("ar")("execution.order.itemCount", { count: 12 });
+      expect(out).toContain("١٢");
+      expect(out).not.toMatch(/[0-9]/);
+    });
+
+    it("keeps the same count Western in English", () => {
+      const out = createTranslator("en")("execution.order.itemCount", { count: 12 });
+      expect(out).toContain("12");
+      expect(out).not.toMatch(/[٠-٩]/);
+    });
+
+    it("substitutes a STRING verbatim, so identifiers survive Arabic", () => {
+      // ORD-1256 is a reference, not a quantity: a caller passes it as a string
+      // and it must come out byte-identical in both locales.
+      const ar = createTranslator("ar")("execution.order.itemCount", { count: "ORD-1256" });
+      expect(ar).toContain("ORD-1256");
+    });
+  });
 });
 
 describe("locale policy", () => {

@@ -57,6 +57,7 @@ export default async function CustomersNetworkPage() {
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
         Icon={StorefrontIcon}
         title={m.supply.customers.title}
         subtitle={m.supply.customers.subtitle}
@@ -64,6 +65,7 @@ export default async function CustomersNetworkPage() {
       />
 
       <StatTiles
+        locale={locale}
         layout="strip"
         tiles={[
           {

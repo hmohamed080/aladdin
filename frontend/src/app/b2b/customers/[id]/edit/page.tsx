@@ -53,7 +53,7 @@ export default async function CustomerEditPage({ params }: { params: Promise<{ i
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <div>
         <BackLink href={`/b2b/customers/${id}`}>{customer.display_name}</BackLink>
-        <PageHeader title={m.customers.editTitle} />
+        <PageHeader locale={locale} title={m.customers.editTitle} />
       </div>
       <CustomerEditForm customer={customer} branchName={branchName} assigneeName={assigneeName} />
 

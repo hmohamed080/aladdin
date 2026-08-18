@@ -250,6 +250,7 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHead
+        locale={locale}
         Icon={GaugeIcon}
         eyebrow={`${m.home.greeting} · ${org.organizationName}`}
         title={m.supply.title}
@@ -270,7 +271,7 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
         }
       />
 
-      <KpiStrip items={kpis} columns={5} />
+      <KpiStrip locale={locale} items={kpis} columns={5} />
 
       {supply ? (
         <>
@@ -285,6 +286,7 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
                   <Panel title={m.supply.chart.demandByStatus} Icon={DemandIcon}>
                     {demandStatuses.map((s) => (
                       <PanelRow
+                        locale={locale}
                         key={s}
                         label={m.commerce.rfqStatus[s]}
                         value={supply.demand[s] ?? 0}
@@ -305,12 +307,14 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
                       action={seeAll("/b2b/products", m.common.view)}
                     >
                       <PanelRow
+                        locale={locale}
                         label={m.supply.products.stat.published}
                         value={products.published}
                         tone="success"
                         href="/b2b/products?status=published"
                       />
                       <PanelRow
+                        locale={locale}
                         label={m.supply.products.stat.draft}
                         value={products.draft}
                         tone={products.draft > 0 ? "warning" : "neutral"}
@@ -361,6 +365,7 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
                     hint={m.supply.chart.funnelHint}
                   >
                     <Funnel
+                      locale={locale}
                       steps={[
                         { label: m.supply.funnel.demand, value: sumOf(supply.demand) },
                         { label: m.supply.funnel.quoted, value: sumOf(supply.quotations) },
@@ -375,6 +380,7 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
 
                   <Panel title={m.supply.chart.quotationsByStatus} Icon={FileTextIcon}>
                     <RankedBars
+                      locale={locale}
                       emptyLabel={m.reports.noData}
                       items={QUOTE_STATUSES.map((s) => ({
                         label: m.commerce.quotationStatus[s],
@@ -414,6 +420,7 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
                   hint={m.supply.voice[voice].topProductsHint}
                 >
                   <RankedBars
+                    locale={locale}
                     colored
                     emptyLabel={m.supply.empty.noProductSales}
                     items={supply.topProducts.slice(0, 5).map((p) => ({
@@ -430,6 +437,7 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
                   action={seeAll("/b2b/buyers", m.supply.customers.title)}
                 >
                   <RankedBars
+                    locale={locale}
                     colored
                     emptyLabel={m.supply.empty.noCustomers}
                     items={supply.topCustomers.slice(0, 5).map((c) => ({

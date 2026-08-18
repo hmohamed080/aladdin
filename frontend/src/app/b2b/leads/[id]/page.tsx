@@ -10,7 +10,7 @@ import {
   memberNameMap,
 } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
-import { formatDate } from "@/lib/ui/format";
+import { formatDate, formatCount } from "@/lib/ui/format";
 import { PageHeader } from "@/components/ui/workspace-layout";
 import { BackLink, FlashSuccess } from "@/features/sales/page-parts";
 import { Card, Field, StatePanel, SectionTitle } from "@/components/ui/primitives";
@@ -70,7 +70,7 @@ export default async function LeadDetailPage({
         <BackLink href="/b2b/leads">{m.leads.title}</BackLink>
         {created ? <FlashSuccess messageKey="leads.created" /> : null}
         {updated ? <FlashSuccess messageKey="leads.updated" /> : null}
-        <PageHeader title={lead.title} />
+        <PageHeader locale={locale} title={lead.title} />
         <div className="flex flex-wrap items-center gap-1">
           <StageBadge stage={lead.stage} />
           <StatusBadge status={lead.status} />
@@ -177,7 +177,7 @@ export default async function LeadDetailPage({
             {doneFollowUps.length > 0 ? (
               <details className="mt-md">
                 <summary className="cursor-pointer text-label text-fg-secondary">
-                  {m.leads.completedFollowUps} ({doneFollowUps.length})
+                  {m.leads.completedFollowUps} ({formatCount(doneFollowUps.length, locale)})
                 </summary>
                 <ul className="mt-sm flex flex-col divide-y">
                   {doneFollowUps.map((f) => (

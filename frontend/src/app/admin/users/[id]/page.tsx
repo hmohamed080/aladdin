@@ -29,7 +29,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
         ← {m.admin.users.title}
       </Link>
       <div className="flex flex-wrap items-center gap-md">
-        <AdminHeader title={user.displayName || m.admin.users.unnamed} subtitle={user.headline ?? undefined} />
+        <AdminHeader locale={locale} title={user.displayName || m.admin.users.unnamed} subtitle={user.headline ?? undefined} />
         <div className="flex items-center gap-2">
           <StatusBadge status={user.status} label={statusLabels[user.status] ?? user.status} />
           {user.isVerified ? <Badge tone="success">{m.admin.users.verified}</Badge> : null}

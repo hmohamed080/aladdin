@@ -40,10 +40,11 @@ export default async function SavedProductsPage({
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
-      <PageHeader Icon={BookmarkIcon} title={m.saved.title} subtitle={m.saved.subtitle} count={all.length} />
+      <PageHeader locale={locale} Icon={BookmarkIcon} title={m.saved.title} subtitle={m.saved.subtitle} count={all.length} />
 
       {present.length > 1 ? (
         <TabLinks
+          locale={locale}
           basePath="/b2b/saved"
           param="category"
           current={category}

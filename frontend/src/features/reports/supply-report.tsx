@@ -7,6 +7,7 @@ import { TrendLine, DonutSplit, RankedBars, Funnel } from "@/components/ui/chart
 import { formatMoney } from "@/features/commerce/constants";
 import { formatMonth, formatCompactMoney, formatPercent } from "@/lib/ui/format";
 import type { SupplyVoice } from "@/lib/workspace/supply-side";
+import { orderCountLabel } from "@/features/directory/directory-tables";
 import {
   DemandIcon,
   FileTextIcon,
@@ -77,6 +78,7 @@ export function SupplyReport({
       <SectionTitle icon={<WalletIcon size={18} />}>{m.supply.section.performance}</SectionTitle>
 
       <StatTiles
+        locale={locale}
         tiles={[
           {
             label: m.supply.tile.orderValue,
@@ -147,6 +149,7 @@ export function SupplyReport({
           <p className="mt-1 text-label text-fg-muted">{m.supply.chart.funnelHint}</p>
           <div className="mt-md">
             <Funnel
+              locale={locale}
               steps={[
                 { label: m.supply.funnel.demand, value: totalDemand },
                 { label: m.supply.funnel.quoted, value: totalQuotes },
@@ -181,6 +184,7 @@ export function SupplyReport({
           <SectionTitle icon={<StorefrontIcon size={18} />}>{m.supply.chart.topCustomers}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               colored
               emptyLabel={m.supply.empty.noCustomers}
               items={supply.topCustomers.map((c) => ({
@@ -189,10 +193,11 @@ export function SupplyReport({
                 detail: money(c.value),
                 // Value alone cannot tell a standing relationship from one large
                 // order; the count is what separates them.
-                meta:
-                  c.orders === 1
-                    ? m.directory.workedOrderOne
-                    : m.directory.workedOrders.replace("{count}", String(c.orders)),
+                // The shared label, not a second copy of it: this line used to
+                // inline the same one-vs-many rule with `String(c.orders)`, which
+                // is how a Latin "2" survived into "2 طلبيات" on an otherwise
+                // fully-localized Arabic report.
+                meta: orderCountLabel(c.orders, m, locale),
               }))}
             />
           </div>
@@ -202,6 +207,7 @@ export function SupplyReport({
           <SectionTitle icon={<DemandIcon size={18} />}>{m.supply.chart.demandByStatus}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noData}
               items={RFQ_STATUSES.map((s) => ({
                 label: m.commerce.rfqStatus[s],
@@ -220,6 +226,7 @@ export function SupplyReport({
           </SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noData}
               items={QUOTE_STATUSES.map((s) => ({
                 label: m.commerce.quotationStatus[s],
@@ -239,6 +246,7 @@ export function SupplyReport({
           <SectionTitle icon={<ClipboardIcon size={18} />}>{m.supply.chart.ordersByStatus}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noData}
               items={ORDER_STATUSES.map((s) => ({
                 label: m.execution.orderStatus[s],

@@ -11,7 +11,7 @@ import {
   memberNameMap,
 } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
-import { formatDate } from "@/lib/ui/format";
+import { formatDate, formatCount } from "@/lib/ui/format";
 import { PageHeader } from "@/components/ui/workspace-layout";
 import { BackLink, FlashSuccess } from "@/features/sales/page-parts";
 import { Card, Field, StatePanel, SectionTitle } from "@/components/ui/primitives";
@@ -70,7 +70,7 @@ export default async function CustomerDetailPage({
         {created ? <FlashSuccess messageKey="customers.created" /> : null}
         {updated ? <FlashSuccess messageKey="customers.updated" /> : null}
         {archived ? <FlashSuccess messageKey="customers.archived" /> : null}
-        <PageHeader title={customer.display_name} />
+        <PageHeader locale={locale} title={customer.display_name} />
       </div>
 
       <div className="grid gap-lg desktop:grid-cols-3 [&>*]:min-w-0">
@@ -187,7 +187,7 @@ export default async function CustomerDetailPage({
               {doneFollowUps.length > 0 ? (
                 <details className="mt-md">
                   <summary className="cursor-pointer text-label text-fg-secondary">
-                    {m.followUps.completed} ({doneFollowUps.length})
+                    {m.followUps.completed} ({formatCount(doneFollowUps.length, locale)})
                   </summary>
                   <ul className="mt-sm flex flex-col divide-y">
                     {doneFollowUps.map((f) => (

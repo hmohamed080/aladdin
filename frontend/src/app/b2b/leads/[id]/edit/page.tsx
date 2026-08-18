@@ -52,7 +52,7 @@ export default async function LeadEditPage({ params }: { params: Promise<{ id: s
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <div>
         <BackLink href={`/b2b/leads/${id}`}>{lead.title}</BackLink>
-        <PageHeader title={m.leads.editTitle} />
+        <PageHeader locale={locale} title={m.leads.editTitle} />
       </div>
       <LeadEditForm lead={lead} />
 

@@ -38,6 +38,7 @@ export default async function AdminVerificationsPage({
     <div className="flex flex-col gap-lg">
       <div className="flex flex-wrap items-center justify-between gap-md">
         <AdminHeader
+          locale={locale}
           title={m.admin.review.title}
           subtitle={pendingOnly ? m.admin.review.pendingSubtitle : m.admin.review.allSubtitle}
           count={rows.length}
@@ -80,7 +81,7 @@ export default async function AdminVerificationsPage({
         </div>
       )}
 
-      <ReferralReview rows={referrals} m={m} />
+      <ReferralReview rows={referrals} m={m} locale={locale} />
     </div>
   );
 }

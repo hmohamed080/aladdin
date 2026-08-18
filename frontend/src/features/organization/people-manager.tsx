@@ -14,6 +14,7 @@ import {
 } from "@/server/actions/organization-forms";
 import { ROLE_PRESET_ORDER, capabilityGroups } from "@/lib/org/roles";
 import type { OrgMember, OrgInvitation } from "@/server/queries/organization";
+import { formatCount } from "@/lib/ui/format";
 
 const INITIAL: PeopleFormState = { ok: false };
 
@@ -166,7 +167,7 @@ export function PeopleManager({
   invitations: OrgInvitation[];
   branches: Branch[];
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const branchName = (id: string | null) => branches.find((b) => b.id === id)?.name ?? null;
   const [showAccepted, setShowAccepted] = useState(false);
   const openInvites = invitations.filter((i) => i.status === "pending" || i.status === "expired");
@@ -178,7 +179,7 @@ export function PeopleManager({
 
       <section className="flex flex-col gap-md">
         <h2 className="text-title text-fg">
-          {t("org.members.title")} <span className="text-fg-muted">({members.length})</span>
+          {t("org.members.title")} <span className="text-fg-muted">({formatCount(members.length, locale)})</span>
         </h2>
         {members.length === 0 ? (
           <StatePanel title={t("org.members.empty")} icon={<UsersIcon size={22} />} />
@@ -255,7 +256,7 @@ export function PeopleManager({
       <section className="flex flex-col gap-md">
         <div className="flex flex-wrap items-center justify-between gap-md">
           <h2 className="text-title text-fg">
-            {t("org.invites.title")} <span className="text-fg-muted">({openInvites.length})</span>
+            {t("org.invites.title")} <span className="text-fg-muted">({formatCount(openInvites.length, locale)})</span>
           </h2>
           {invitations.length > openInvites.length ? (
             <Button variant="ghost" size="sm" onClick={() => setShowAccepted((v) => !v)}>

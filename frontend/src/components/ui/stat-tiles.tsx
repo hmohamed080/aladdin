@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ComponentType } from "react";
 import { cn } from "@/lib/ui/cn";
+import type { Locale } from "@/lib/i18n/locales";
+import { formatCount, formatNumber } from "@/lib/ui/format";
 import { CardRail } from "@/components/ui/card-rail";
 import { KpiStrip, type Kpi } from "@/components/ui/workspace-layout";
 
@@ -37,7 +39,7 @@ const chip: Record<Tone, string> = {
   info: "bg-info/15 text-info",
 };
 
-function TileBody({ tile }: { tile: Tile }) {
+function TileBody({ tile, locale }: { tile: Tile; locale: Locale }) {
   return (
     <>
       <span
@@ -54,7 +56,7 @@ function TileBody({ tile }: { tile: Tile }) {
             use the compact money format on tiles, and keep the exact figure on
             the record the tile links to. */}
         <span className="block truncate font-display text-title leading-none text-fg tabular-nums">
-          {tile.value}
+          {typeof tile.value === "number" ? formatNumber(tile.value, locale) : tile.value}
         </span>
         <span className="mt-1 block truncate text-label text-fg-secondary">{tile.label}</span>
         {tile.hint ? <span className="mt-0.5 block truncate text-label text-fg-muted">{tile.hint}</span> : null}
@@ -83,12 +85,19 @@ function TileBody({ tile }: { tile: Tile }) {
  */
 export function StatTiles({
   tiles,
+  locale,
   className,
   layout = "grid",
   railLabel,
   columns,
 }: {
   tiles: Tile[];
+  /**
+   * Every tile value that arrives as a number is formatted for this locale. A
+   * caller that has already formatted its own value (compact money, say) passes
+   * a string and is left alone.
+   */
+  locale: Locale;
   className?: string;
   layout?: "grid" | "rail" | "strip";
   /** Accessible name for the scroll region. Required by `layout="rail"`. */
@@ -107,7 +116,7 @@ export function StatTiles({
       foot: t.hint,
       href: t.href,
     }));
-    return <KpiStrip items={items} columns={columns} className={className} />;
+    return <KpiStrip items={items} locale={locale} columns={columns} className={className} />;
   }
 
   const cards = tiles.map((tile) =>
@@ -117,11 +126,11 @@ export function StatTiles({
         href={tile.href}
         className="flex items-center gap-3 rounded-md border bg-surface p-md shadow-card transition-colors hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
       >
-        <TileBody tile={tile} />
+        <TileBody tile={tile} locale={locale} />
       </Link>
     ) : (
       <div key={tile.label} className="flex items-center gap-3 rounded-md border bg-surface p-md shadow-card">
-        <TileBody tile={tile} />
+        <TileBody tile={tile} locale={locale} />
       </div>
     ),
   );
@@ -163,6 +172,7 @@ export function TabLinks({
   current,
   tabs,
   label,
+  locale,
   keep,
 }: {
   basePath: string;
@@ -171,6 +181,8 @@ export function TabLinks({
   current: string;
   tabs: { value: string; label: string; count?: number }[];
   label: string;
+  /** The per-tab count pills are user-facing numbers, so they follow the reader. */
+  locale: Locale;
   /** Sibling query parameters to carry across a tab change. Empty values drop. */
   keep?: Record<string, string | undefined>;
 }) {
@@ -213,7 +225,7 @@ export function TabLinks({
                       active ? "bg-accent-solid/15 text-accent" : "bg-surface-2 text-fg-muted",
                     )}
                   >
-                    {tab.count}
+                    {formatCount(tab.count, locale)}
                   </span>
                 ) : null}
               </Link>

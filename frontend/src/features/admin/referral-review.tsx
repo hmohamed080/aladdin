@@ -4,6 +4,8 @@ import { BuildingIcon } from "@/components/ui/icons";
 import { approveReferral, rejectReferral } from "@/server/actions/affiliation";
 import type { AdminReferralRow } from "@/server/queries/affiliation";
 import type { Messages } from "@/lib/i18n/messages/en";
+import type { Locale } from "@/lib/i18n/locales";
+import { formatCount } from "@/lib/ui/format";
 
 /**
  * Referred showrooms, on the EXISTING Admin verification surface.
@@ -22,7 +24,15 @@ import type { Messages } from "@/lib/i18n/messages/en";
  * member of the resulting organization, and a referred business that nobody has
  * claimed simply has no owner yet.
  */
-export function ReferralReview({ rows, m }: { rows: AdminReferralRow[]; m: Messages }) {
+export function ReferralReview({
+  rows,
+  m,
+  locale,
+}: {
+  rows: AdminReferralRow[];
+  m: Messages;
+  locale: Locale;
+}) {
   const copy = m.admin.referrals;
   const statusLabels = copy.status as Record<string, string>;
   const govLabels = m.onboarding.consumer.governorates as Record<string, string>;
@@ -94,7 +104,7 @@ export function ReferralReview({ rows, m }: { rows: AdminReferralRow[]; m: Messa
                           <p className="text-body font-medium text-fg">{copy.possibleDuplicate}</p>
                           <p className="text-body text-fg-secondary">
                             {copy.matches}: {r.matchName}
-                            {r.matchCount > 1 ? ` (+${r.matchCount - 1})` : ""}
+                            {r.matchCount > 1 ? ` (+${formatCount(r.matchCount - 1, locale)})` : ""}
                           </p>
                           <form action={approveReferral}>
                             <input type="hidden" name="referralId" value={r.id} />

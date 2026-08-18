@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import { cn } from "@/lib/ui/cn";
+import type { Locale } from "@/lib/i18n/locales";
+import { formatCount, formatNumber } from "@/lib/ui/format";
 import { PlusIcon } from "@/components/ui/icons";
 
 /**
@@ -44,6 +46,7 @@ export function PageHead({
   Icon,
   eyebrow,
   count,
+  locale,
   actions,
   toolbar,
 }: {
@@ -54,6 +57,16 @@ export function PageHead({
   eyebrow?: string;
   /** Record count, shown as a pill beside the title. */
   count?: number;
+  /**
+   * REQUIRED, even on a head with no count.
+   *
+   * It is required rather than optional-with-a-default precisely because a
+   * default would be a silent wrong answer: a head that forgot to pass it would
+   * print Latin digits in an Arabic workspace and look plausible. Required, the
+   * compiler proves that every page head in the app renders its count in the
+   * reader's own numerals.
+   */
+  locale: Locale;
   /** Primary actions (a create button, a link out). */
   actions?: ReactNode;
   /** Secondary controls that belong to the whole page (sort, export, help). */
@@ -76,7 +89,7 @@ export function PageHead({
             <h1 className="truncate text-headline text-fg">{title}</h1>
             {typeof count === "number" ? (
               <span className="inline-flex min-w-6 shrink-0 items-center justify-center rounded-pill bg-surface-2 px-2 py-0.5 text-label font-medium text-fg-secondary tabular-nums">
-                {count}
+                {formatCount(count, locale)}
               </span>
             ) : null}
           </div>
@@ -145,10 +158,18 @@ const kpiChip: Record<KpiTone, string> = {
  */
 export function KpiStrip({
   items,
+  locale,
   columns,
   className,
 }: {
   items: Kpi[];
+  /**
+   * A `Kpi.value` may arrive as an already-formatted string (compact money, from
+   * a caller that knows the shape it wants) or as a RAW NUMBER, which is the
+   * common case for a count. The raw ones are formatted here so that no page can
+   * put "12" next to "١٢" on the same strip.
+   */
+  locale: Locale;
   /**
    * Cells per row on desktop. Left unset it follows the item count up to six, so
    * a four-KPI module gets four full-width cells rather than four cells and a gap
@@ -195,7 +216,7 @@ export function KpiStrip({
                     real fix is on the caller, which should pass money to a KPI
                     in the compact format (see `formatCompactMoney`). */}
                 <span className="min-w-0 break-words font-display text-headline leading-tight text-fg tabular-nums">
-                  {item.value}
+                  {typeof item.value === "number" ? formatNumber(item.value, locale) : item.value}
                 </span>
                 {item.unit ? (
                   <span className="shrink-0 text-label text-fg-muted">{item.unit}</span>
@@ -319,11 +340,14 @@ export function Panel({
 export function PanelRow({
   label,
   value,
+  locale,
   tone,
   href,
 }: {
   label: string;
+  /** A number is formatted for `locale`; anything else renders as given. */
   value: ReactNode;
+  locale: Locale;
   tone?: KpiTone;
   href?: string;
 }) {
@@ -348,7 +372,9 @@ export function PanelRow({
         {dot}
         <span className="truncate">{label}</span>
       </span>
-      <span className="shrink-0 text-body font-medium tabular-nums text-fg">{value}</span>
+      <span className="shrink-0 text-body font-medium tabular-nums text-fg">
+        {typeof value === "number" ? formatNumber(value, locale) : value}
+      </span>
     </>
   );
 
@@ -473,6 +499,7 @@ export function PageHeader({
   title,
   subtitle,
   count,
+  locale,
   action,
   Icon,
   eyebrow,
@@ -482,6 +509,8 @@ export function PageHeader({
   subtitle?: string;
   /** Result/record count shown as a subtle pill beside the title. */
   count?: number;
+  /** Required for the same reason `PageHead` requires it. */
+  locale: Locale;
   action?: { href: string; label: string };
   /** The module's own glyph — the same one the sidebar draws for this route. */
   Icon?: ComponentType<{ size?: number }>;
@@ -494,6 +523,7 @@ export function PageHeader({
       title={title}
       subtitle={subtitle}
       count={count}
+      locale={locale}
       Icon={Icon}
       eyebrow={eyebrow}
       toolbar={toolbar}

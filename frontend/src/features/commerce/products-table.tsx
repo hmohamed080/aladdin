@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Messages } from "@/lib/i18n/messages/en";
 import type { Locale } from "@/lib/i18n/locales";
+import { formatCount } from "@/lib/ui/format";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatePanel } from "@/components/ui/primitives";
 import { PackageIcon } from "@/components/ui/icons";
@@ -50,7 +51,9 @@ export function ProductsTable({
   emptyTitle: string;
   emptyBody: string;
 }) {
-  const number = (n: number) => new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-EG").format(n);
+  // No local `Intl` instance: a table that formats its own numbers is how the
+  // two numeral systems got onto one page in the first place.
+  const number = (n: number) => formatCount(n, locale);
 
   const columns: Column<ProductRow>[] = [
     {

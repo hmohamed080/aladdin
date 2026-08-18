@@ -4,7 +4,7 @@ import { StatePanel } from "@/components/ui/primitives";
 import { FileTextIcon, ReceiptIcon } from "@/components/ui/icons";
 import { RfqStatusBadge, QuotationStatusBadge } from "@/features/commerce/badges";
 import { DataTable, RecordCell, type Column } from "@/components/ui/data-table";
-import { formatDate } from "@/lib/ui/format";
+import { formatDate, formatCount } from "@/lib/ui/format";
 import { formatMoney } from "@/features/commerce/constants";
 import type { RfqListRow, QuotationListRow } from "@/server/queries/commerce";
 
@@ -38,7 +38,7 @@ export function RfqTable({
       cell: (r) => (
         <RecordCell
           title={r.title ?? "—"}
-          meta={m.commerce.rfq.itemCountShort.replace("{count}", String(r.item_count ?? 0))}
+          meta={m.commerce.rfq.itemCountShort.replace("{count}", formatCount(r.item_count ?? 0, locale))}
           href={`/b2b/rfqs/${r.id}`}
         />
       ),

@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/workspace-layout";
 import { TabLinks, StatTiles } from "@/components/ui/stat-tiles";
 import { WorkPane, Panel } from "@/components/ui/workspace-layout";
 import { DonutSplit } from "@/components/ui/charts";
-import { formatPercent } from "@/lib/ui/format";
+import { formatPercent, formatNumber } from "@/lib/ui/format";
 import { RfqTable } from "@/features/commerce/commerce-lists";
 import {
   ShoppingBagIcon,
@@ -96,6 +96,7 @@ export default async function PurchaseRequestsPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
         Icon={leadsWithDemand ? DemandIcon : ShoppingBagIcon}
         title={leadsWithDemand ? m.supply.demand.title : m.commerce.rfq.title}
         subtitle={
@@ -117,6 +118,7 @@ export default async function PurchaseRequestsPage({
           is merely informational. Reusing one label for both would make the
           urgent bucket unreadable in one of the two seats. */}
       <StatTiles
+        locale={locale}
         layout="strip"
         tiles={[
           {
@@ -164,7 +166,7 @@ export default async function PurchaseRequestsPage({
                 emptyLabel={m.reports.noData}
                 ariaLabel={m.supply.chart.demandByStatus}
                 centerLabel={onDemand ? m.supply.demand.title : m.commerce.rfq.title}
-                formatValue={(v) => String(v)}
+                formatValue={(v) => formatNumber(v, locale)}
                 formatShare={(pct) => formatPercent(pct, locale)}
               />
             </Panel>
@@ -197,6 +199,7 @@ export default async function PurchaseRequestsPage({
       >
         {canRespond ? (
           <TabLinks
+            locale={locale}
             basePath="/b2b/rfqs"
             param="view"
             current={view === defaultView ? "" : otherView}

@@ -20,13 +20,13 @@ export function WizardProgress({ current, total, label }: { current: number; tot
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-label font-medium text-fg-muted">
-        {t("onboarding.stepLabel", { current: String(current + 1), total: String(total) })}
+        {t("onboarding.stepLabel", { current: current + 1, total })}
         <span className="mx-2 text-border-strong" aria-hidden="true">·</span>
         <span className="text-fg-secondary">{label}</span>
       </p>
       <ol
         className="flex items-center gap-2"
-        aria-label={t("onboarding.stepLabel", { current: String(current + 1), total: String(total) })}
+        aria-label={t("onboarding.stepLabel", { current: current + 1, total })}
       >
         {Array.from({ length: total }).map((_, i) => (
           <li

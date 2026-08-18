@@ -18,7 +18,7 @@ export default async function NewProductPage() {
   return (
     <div className="pb-16 tablet:pb-0">
       <BackLink href="/b2b/products">{m.commerce.products.title}</BackLink>
-      <PageHeader title={m.commerce.products.newTitle} subtitle={m.commerce.products.newSubtitle} />
+      <PageHeader locale={locale} title={m.commerce.products.newTitle} subtitle={m.commerce.products.newSubtitle} />
       {canWrite ? (
         <ProductForm orgId={org.organizationId} />
       ) : (

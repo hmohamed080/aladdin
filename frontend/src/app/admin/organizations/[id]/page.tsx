@@ -30,7 +30,7 @@ export default async function AdminOrgDetailPage({ params }: { params: Promise<{
         ← {m.admin.orgs.title}
       </Link>
       <div className="flex flex-wrap items-center gap-md">
-        <AdminHeader title={org.name} subtitle={typeLabels[org.orgType] ?? org.orgType} />
+        <AdminHeader locale={locale} title={org.name} subtitle={typeLabels[org.orgType] ?? org.orgType} />
         <div className="flex items-center gap-2">
           <StatusBadge status={org.status} label={statusLabels[org.status] ?? org.status} />
           {org.isVerified ? <Badge tone="success">{m.admin.orgs.verified}</Badge> : null}

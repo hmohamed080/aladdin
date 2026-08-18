@@ -29,7 +29,7 @@ export default async function NewCustomerPage() {
   return (
     <div className="pb-16 tablet:pb-0">
       <BackLink href="/b2b/customers">{m.customers.title}</BackLink>
-      <PageHeader title={m.customers.createTitle} />
+      <PageHeader locale={locale} title={m.customers.createTitle} />
       <CustomerForm
         orgId={org.organizationId}
         branches={org.branches}

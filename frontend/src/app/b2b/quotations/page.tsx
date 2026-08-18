@@ -4,7 +4,7 @@ import { getMessages } from "@/lib/i18n/translate";
 import { listQuotations, type QuotationListRow } from "@/server/queries/commerce";
 import { commerceStance } from "@/lib/workspace/supply-side";
 import { formatMoney } from "@/features/commerce/constants";
-import { formatCompactMoney, formatPercent } from "@/lib/ui/format";
+import { formatCompactMoney, formatPercent, formatNumber } from "@/lib/ui/format";
 import { PageHeader } from "@/components/ui/workspace-layout";
 import { TabLinks, StatTiles } from "@/components/ui/stat-tiles";
 import { WorkPane, Panel, PanelRow } from "@/components/ui/workspace-layout";
@@ -77,6 +77,7 @@ export default async function QuotationsPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
         Icon={leadsWithSent ? FileTextIcon : InboxIcon}
         title={leadsWithSent ? m.supply.quotations.title : m.commerce.quotation.title}
         subtitle={leadsWithSent ? m.supply.quotations.subtitle : m.commerce.quotation.subtitle}
@@ -92,6 +93,7 @@ export default async function QuotationsPage({
       />
 
       <StatTiles
+        locale={locale}
         layout="strip"
         tiles={[
           {
@@ -151,7 +153,7 @@ export default async function QuotationsPage({
                 emptyLabel={m.reports.noData}
                 ariaLabel={m.supply.chart.quotationsByStatus}
                 centerLabel={m.commerce.quotation.stat.total}
-                formatValue={(v) => String(v)}
+                formatValue={(v) => formatNumber(v, locale)}
                 formatShare={(pct) => formatPercent(pct, locale)}
               />
             </Panel>
@@ -159,11 +161,13 @@ export default async function QuotationsPage({
             {onSent ? (
               <Panel title={m.supply.acceptedValue} Icon={WalletIcon}>
                 <PanelRow
+                  locale={locale}
                   label={m.commerce.quotationStatus.accepted}
                   value={formatMoney(valueOf(rows, "accepted"), locale)}
                   tone="success"
                 />
                 <PanelRow
+                  locale={locale}
                   label={m.commerce.quotationStatus.submitted}
                   value={formatMoney(valueOf(rows, "submitted"), locale)}
                   tone="warning"
@@ -175,6 +179,7 @@ export default async function QuotationsPage({
       >
         {canQuote ? (
           <TabLinks
+            locale={locale}
             basePath="/b2b/quotations"
             param="view"
             current={view === defaultView ? "" : otherView}

@@ -42,6 +42,7 @@ export default async function CatalogPage({
   return (
     <div className="pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
         Icon={SearchIcon}
         title={m.commerce.catalog.title}
         subtitle={supplierName ?? m.commerce.catalog.subtitle}

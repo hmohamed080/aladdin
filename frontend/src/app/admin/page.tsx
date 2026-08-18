@@ -4,6 +4,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { adminSummary } from "@/server/queries/admin";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
+import { formatCount } from "@/lib/ui/format";
 import { Card, SectionTitle } from "@/components/ui/primitives";
 import { AdminHeader, StatTile, DistList } from "@/features/admin/parts";
 import { AuditFeed } from "@/features/admin/audit-feed";
@@ -38,30 +39,35 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="flex flex-col gap-xl">
-      <AdminHeader title={m.admin.dashboard.title} subtitle={m.admin.dashboard.subtitle} />
+      <AdminHeader locale={locale} title={m.admin.dashboard.title} subtitle={m.admin.dashboard.subtitle} />
 
       <section className="grid grid-cols-2 gap-md tablet:grid-cols-4">
-        <StatTile label={m.admin.dashboard.totalUsers} value={totalUsers} />
-        <StatTile label={m.admin.dashboard.totalOrgs} value={s.orgsTotal} hint={`${s.orgsVerified} ${m.admin.dashboard.verified}`} />
+        <StatTile locale={locale} label={m.admin.dashboard.totalUsers} value={totalUsers} />
+        <StatTile
+          locale={locale}
+          label={m.admin.dashboard.totalOrgs}
+          value={s.orgsTotal}
+          hint={`${formatCount(s.orgsVerified, locale)} ${m.admin.dashboard.verified}`}
+        />
         <Link href="/admin/verifications" className="contents">
-          <StatTile label={m.admin.dashboard.pendingReviews} value={s.pendingVerifications} />
+          <StatTile locale={locale} label={m.admin.dashboard.pendingReviews} value={s.pendingVerifications} />
         </Link>
-        <StatTile label={m.admin.dashboard.activeUsers} value={s.usersByStatus.active ?? 0} />
+        <StatTile locale={locale} label={m.admin.dashboard.activeUsers} value={s.usersByStatus.active ?? 0} />
       </section>
 
       <section className="grid gap-lg tablet:grid-cols-2">
         <Card className="flex flex-col gap-md">
           <SectionTitle>{m.admin.dashboard.usersByType}</SectionTitle>
-          <DistList entries={typeEntries} />
+          <DistList locale={locale} entries={typeEntries} />
         </Card>
         <div className="flex flex-col gap-lg">
           <Card className="flex flex-col gap-md">
             <SectionTitle>{m.admin.dashboard.usersByStatus}</SectionTitle>
-            <DistList entries={statusEntries} />
+            <DistList locale={locale} entries={statusEntries} />
           </Card>
           <Card className="flex flex-col gap-md">
             <SectionTitle>{m.admin.dashboard.orgsByStatus}</SectionTitle>
-            <DistList entries={orgStatusEntries} />
+            <DistList locale={locale} entries={orgStatusEntries} />
           </Card>
         </div>
       </section>

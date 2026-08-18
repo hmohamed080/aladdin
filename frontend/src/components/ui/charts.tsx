@@ -1,4 +1,6 @@
 import { cn } from "@/lib/ui/cn";
+import type { Locale } from "@/lib/i18n/locales";
+import { formatNumber } from "@/lib/ui/format";
 
 /**
  * The workspace's chart primitives.
@@ -324,11 +326,18 @@ export type RankedItem = {
  */
 export function RankedBars({
   items,
+  locale,
   emptyLabel,
   colored = false,
   className,
 }: {
   items: RankedItem[];
+  /**
+   * A row with no `detail` prints its raw `value`, and a raw number is Latin
+   * digits in every locale. The locale is required rather than inferred so a
+   * ranked list can never disagree with the money figure in the panel above it.
+   */
+  locale: Locale;
   emptyLabel: string;
   /** Give each row its own series colour (use for entities, not for statuses). */
   colored?: boolean;
@@ -345,7 +354,7 @@ export function RankedBars({
           <div className="flex items-baseline justify-between gap-md">
             <span className="min-w-0 truncate text-body text-fg-secondary">{item.label}</span>
             <span className="shrink-0 text-label font-medium tabular-nums text-fg" dir="ltr">
-              {item.detail ?? item.value}
+              {item.detail ?? formatNumber(item.value, locale)}
             </span>
           </div>
           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-pill bg-surface-2">
@@ -377,10 +386,12 @@ export type FunnelStep = { label: string; value: number };
  */
 export function Funnel({
   steps,
+  locale,
   emptyLabel,
   ofFirstLabel,
 }: {
   steps: FunnelStep[];
+  locale: Locale;
   emptyLabel: string;
   /** Renders the drop-off line, e.g. "48% of requests sent". */
   ofFirstLabel: (pct: number) => string;
@@ -397,7 +408,7 @@ export function Funnel({
             <div className="flex items-baseline justify-between gap-md">
               <span className="min-w-0 truncate text-body text-fg-secondary">{s.label}</span>
               <span className="shrink-0 text-label font-medium tabular-nums text-fg" dir="ltr">
-                {s.value}
+                {formatNumber(s.value, locale)}
               </span>
             </div>
             <div className="mt-1 h-2.5 w-full overflow-hidden rounded-pill bg-surface-2">

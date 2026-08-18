@@ -9,7 +9,7 @@ import { DonutSplit } from "@/components/ui/charts";
 import { OrderTable } from "@/features/execution/execution-lists";
 import { ClipboardIcon, ActivityIcon, CheckIcon, WalletIcon } from "@/components/ui/icons";
 import { commerceStance } from "@/lib/workspace/supply-side";
-import { formatPercent, formatCompactMoney } from "@/lib/ui/format";
+import { formatPercent, formatCompactMoney, formatNumber } from "@/lib/ui/format";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +67,7 @@ export default async function OrdersPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
         Icon={ClipboardIcon}
         title={leadsWithReceived ? m.supply.orders.title : m.execution.order.title}
         subtitle={leadsWithReceived ? m.supply.orders.subtitle : m.execution.order.subtitle}
@@ -79,6 +80,7 @@ export default async function OrdersPage({
       />
 
       <StatTiles
+        locale={locale}
         layout="strip"
         tiles={[
           { label: m.execution.order.stat.confirmed, value: countBy(rows, "confirmed"), Icon: ClipboardIcon, tone: "info" },
@@ -107,7 +109,7 @@ export default async function OrdersPage({
               emptyLabel={m.reports.noData}
               ariaLabel={m.supply.chart.ordersByStatus}
               centerLabel={leadsWithReceived ? m.supply.orders.title : m.execution.order.title}
-              formatValue={(v) => String(v)}
+              formatValue={(v) => formatNumber(v, locale)}
               formatShare={(pct) => formatPercent(pct, locale)}
             />
           </Panel>
@@ -115,6 +117,7 @@ export default async function OrdersPage({
       >
         {showSellSide ? (
           <TabLinks
+            locale={locale}
             basePath="/b2b/orders"
             param="view"
             current={view === defaultView ? "" : otherView}

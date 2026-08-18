@@ -43,7 +43,7 @@ export default async function FollowUpEditPage({ params }: { params: Promise<{ i
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <div>
         <BackLink href="/b2b/follow-ups">{m.followUps.title}</BackLink>
-        <PageHeader title={m.followUps.editTitle} />
+        <PageHeader locale={locale} title={m.followUps.editTitle} />
       </div>
       {followUp.status === "open" ? (
         <>

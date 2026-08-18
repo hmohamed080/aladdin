@@ -61,6 +61,7 @@ export default async function ProjectsPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
         Icon={LayersIcon}
         title={m.execution.project.title}
         subtitle={m.execution.project.subtitle}
@@ -68,6 +69,7 @@ export default async function ProjectsPage({
       />
 
       <StatTiles
+        locale={locale}
         layout="strip"
         tiles={[
           { label: m.execution.project.stat.active, value: countBy(rows, "active"), Icon: ActivityIcon, tone: "accent" },
@@ -82,6 +84,7 @@ export default async function ProjectsPage({
       <div>
         {showIncoming ? (
           <TabLinks
+            locale={locale}
             basePath="/b2b/projects"
             param="view"
             current={view === "executing" ? "" : "incoming"}

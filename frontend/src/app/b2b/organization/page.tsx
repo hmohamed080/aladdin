@@ -40,7 +40,7 @@ export default async function OrganizationPeoplePage() {
   if (!canManageMembers) {
     return (
       <div className="flex flex-col gap-lg">
-        <PageHeader Icon={UsersIcon} title={m.org.title} subtitle={m.org.subtitle} />
+        <PageHeader locale={locale} Icon={UsersIcon} title={m.org.title} subtitle={m.org.subtitle} />
         <StatePanel tone="warning" title={m.org.error.notAuthorized} body={m.org.noAccessBody} />
       </div>
     );
@@ -61,11 +61,12 @@ export default async function OrganizationPeoplePage() {
 
   return (
     <div className="flex flex-col gap-xl pb-16 tablet:pb-0">
-      <PageHeader Icon={UsersIcon} title={m.org.title} subtitle={m.org.subtitle} />
+      <PageHeader locale={locale} Icon={UsersIcon} title={m.org.title} subtitle={m.org.subtitle} />
 
       {/* Every figure is counted from the roster already loaded above — no extra
           read, and nothing here that the records do not already state. */}
       <StatTiles
+        locale={locale}
         layout="strip"
         tiles={[
           { label: m.org.stat.members, value: members.length, Icon: UsersIcon, tone: "accent" },
@@ -87,7 +88,7 @@ export default async function OrganizationPeoplePage() {
       />
       {/* People who asked to join THIS business (Sprint 13). Same surface, same
           org.members.manage capability — joining a business happens in one place. */}
-      <JoinRequests requests={joinRequests} branches={branches} m={m} />
+      <JoinRequests requests={joinRequests} branches={branches} m={m} locale={locale} />
       <PeopleManager
         orgId={org.organizationId}
         members={members}

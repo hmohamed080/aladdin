@@ -1,14 +1,29 @@
 import type { ReactNode } from "react";
+import type { Locale } from "@/lib/i18n/locales";
+import { formatCount, formatNumber } from "@/lib/ui/format";
 import { Badge, Card } from "@/components/ui/primitives";
 
 /** Compact page header for the admin console. */
-export function AdminHeader({ title, subtitle, count }: { title: string; subtitle?: string; count?: number }) {
+export function AdminHeader({
+  title,
+  subtitle,
+  count,
+  locale,
+}: {
+  title: string;
+  subtitle?: string;
+  count?: number;
+  /** The console is bilingual like every other surface; its counts follow suit. */
+  locale: Locale;
+}) {
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center gap-2">
         <h1 className="text-title text-fg">{title}</h1>
         {typeof count === "number" ? (
-          <span className="rounded-pill bg-surface-2 px-2 py-0.5 text-label text-fg-secondary">{count}</span>
+          <span className="rounded-pill bg-surface-2 px-2 py-0.5 text-label text-fg-secondary">
+            {formatCount(count, locale)}
+          </span>
         ) : null}
       </div>
       {subtitle ? <p className="text-body text-fg-secondary">{subtitle}</p> : null}
@@ -16,19 +31,37 @@ export function AdminHeader({ title, subtitle, count }: { title: string; subtitl
   );
 }
 
-/** A single KPI tile. */
-export function StatTile({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
+/** A single KPI tile. A numeric `value` is formatted for `locale`. */
+export function StatTile({
+  label,
+  value,
+  hint,
+  locale,
+}: {
+  label: string;
+  value: ReactNode;
+  hint?: string;
+  locale: Locale;
+}) {
   return (
     <Card pad="sm" className="flex flex-col gap-0.5">
       <span className="text-label text-fg-muted">{label}</span>
-      <span className="text-headline font-semibold text-fg">{value}</span>
+      <span className="text-headline font-semibold text-fg tabular-nums">
+        {typeof value === "number" ? formatNumber(value, locale) : value}
+      </span>
       {hint ? <span className="text-label text-fg-muted">{hint}</span> : null}
     </Card>
   );
 }
 
 /** Horizontal distribution of labelled counts. */
-export function DistList({ entries }: { entries: { label: string; value: number }[] }) {
+export function DistList({
+  entries,
+  locale,
+}: {
+  entries: { label: string; value: number }[];
+  locale: Locale;
+}) {
   const max = Math.max(1, ...entries.map((e) => e.value));
   return (
     <div className="flex flex-col gap-2">
@@ -41,7 +74,9 @@ export function DistList({ entries }: { entries: { label: string; value: number 
               style={{ width: `${(e.value / max) * 100}%` }}
             />
           </div>
-          <span className="w-8 shrink-0 text-end text-label font-medium text-fg">{e.value}</span>
+          <span className="w-8 shrink-0 text-end text-label font-medium text-fg tabular-nums">
+            {formatCount(e.value, locale)}
+          </span>
         </div>
       ))}
     </div>

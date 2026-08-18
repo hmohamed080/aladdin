@@ -25,7 +25,7 @@ export default async function NewRfqPage({
     return (
       <div className="pb-16 tablet:pb-0">
         <BackLink href="/b2b/catalog">{m.commerce.catalog.title}</BackLink>
-        <PageHeader title={m.commerce.rfq.newTitle} />
+        <PageHeader locale={locale} title={m.commerce.rfq.newTitle} />
         <StatePanel title={m.commerce.rfq.startFromCatalogTitle} body={m.commerce.rfq.startFromCatalogBody} />
       </div>
     );
@@ -42,7 +42,7 @@ export default async function NewRfqPage({
   return (
     <div className="pb-16 tablet:pb-0">
       <BackLink href={`/b2b/catalog/${product.id}`}>{product.name}</BackLink>
-      <PageHeader title={m.commerce.rfq.newTitle} subtitle={m.commerce.rfq.newSubtitle} />
+      <PageHeader locale={locale} title={m.commerce.rfq.newTitle} subtitle={m.commerce.rfq.newSubtitle} />
       {isOwnOrg ? (
         <StatePanel title={m.commerce.rfq.selfRfqTitle} body={m.commerce.rfq.selfRfqBody} />
       ) : !canRfq ? (

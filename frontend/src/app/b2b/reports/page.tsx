@@ -145,7 +145,7 @@ export default async function ReportsPage({
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
-      <PageHeader Icon={BarChartIcon} title={m.reports.title} subtitle={m.reports.subtitle} />
+      <PageHeader locale={locale} Icon={BarChartIcon} title={m.reports.title} subtitle={m.reports.subtitle} />
 
       <FilterBar
         basePath="/b2b/reports"
@@ -199,6 +199,7 @@ export default async function ReportsPage({
       ) : null}
 
       <StatTiles
+        locale={locale}
         tiles={[
           {
             label: m.reports.stat.spend,
@@ -268,6 +269,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<TruckIcon size={18} />}>{m.reports.topSuppliers}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               colored
               emptyLabel={m.reports.noSuppliers}
               items={purchase.topDistributors.map((s) => ({
@@ -277,7 +279,7 @@ export default async function ReportsPage({
                 // How many orders, not how many line items — the bar is ranked by
                 // value, and the count is what tells a buyer whether that value is
                 // one big purchase or a standing relationship.
-                meta: orderCountLabel(s.orders, m),
+                meta: orderCountLabel(s.orders, m, locale),
               }))}
             />
           </div>
@@ -287,6 +289,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<ActivityIcon size={18} />}>{m.reports.chart.funnel}</SectionTitle>
           <div className="mt-md">
             <Funnel
+              locale={locale}
               steps={[
                 { label: m.reports.funnel.requests, value: totalRequests },
                 { label: m.reports.funnel.offers, value: totalOffers },
@@ -302,6 +305,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<ClipboardIcon size={18} />}>{m.reports.ordersByStatus}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noData}
               items={ORDER_STATUSES.map((s) => ({
                 label: m.execution.orderStatus[s],
@@ -315,6 +319,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<ShoppingBagIcon size={18} />}>{m.reports.requestsByStatus}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noData}
               items={RFQ_STATUSES.map((s) => ({
                 label: m.commerce.rfqStatus[s],
@@ -328,6 +333,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<InboxIcon size={18} />}>{m.reports.offersByStatus}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noData}
               items={QUOTE_STATUSES.map((s) => ({
                 label: m.commerce.quotationStatus[s],
@@ -353,6 +359,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<LayersIcon size={18} />}>{m.reports.projectsByStatus}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noProjects}
               items={PROJECT_STATUSES.map((s) => ({
                 label: m.execution.projectStatus[s],
@@ -372,6 +379,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<TruckIcon size={18} />}>{m.reports.projectsIncoming}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noProjects}
               items={PROJECT_STATUSES.map((s) => ({
                 label: m.execution.projectStatus[s],
@@ -385,6 +393,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<BookmarkIcon size={18} />}>{m.reports.shortlistByCategory}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               colored
               emptyLabel={m.reports.noShortlist}
               items={PRODUCT_CATEGORIES.map((c) => ({
@@ -400,6 +409,7 @@ export default async function ReportsPage({
             <SectionTitle icon={<TrendingUpIcon size={18} />}>{m.reports.sellSide}</SectionTitle>
             <div className="mt-md">
               <RankedBars
+                locale={locale}
                 emptyLabel={m.reports.noData}
                 items={QUOTE_STATUSES.map((s) => ({
                   label: m.commerce.quotationStatus[s],
@@ -428,6 +438,7 @@ export default async function ReportsPage({
               <SectionTitle icon={<TrendingUpIcon size={18} />}>{m.reports.leadsByStage}</SectionTitle>
               <div className="mt-md">
                 <RankedBars
+                  locale={locale}
                   colored
                   emptyLabel={m.reports.noData}
                   items={LEAD_STAGES.map((s) => ({
@@ -441,6 +452,7 @@ export default async function ReportsPage({
               <SectionTitle icon={<UsersIcon size={18} />}>{m.reports.activeCustomers}</SectionTitle>
               <div className="mt-md">
                 <RankedBars
+                  locale={locale}
                   emptyLabel={m.reports.noData}
                   items={[
                     { label: m.reports.activeCustomers, value: sales.customers },

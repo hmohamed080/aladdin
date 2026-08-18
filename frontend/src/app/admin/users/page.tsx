@@ -26,7 +26,7 @@ export default async function AdminUsersPage({
 
   return (
     <div className="flex flex-col gap-lg">
-      <AdminHeader title={m.admin.users.title} subtitle={m.admin.users.subtitle} count={users.length} />
+      <AdminHeader locale={locale} title={m.admin.users.title} subtitle={m.admin.users.subtitle} count={users.length} />
 
       <form method="get" className="flex gap-sm">
         <input

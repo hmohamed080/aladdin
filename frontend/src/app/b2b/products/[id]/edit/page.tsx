@@ -24,7 +24,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   return (
     <div className="pb-16 tablet:pb-0">
       <BackLink href={`/b2b/products/${product.id}`}>{product.name}</BackLink>
-      <PageHeader title={m.commerce.products.editTitle} />
+      <PageHeader locale={locale} title={m.commerce.products.editTitle} />
       {canWrite ? (
         <ProductForm orgId={org.organizationId} product={product} />
       ) : (

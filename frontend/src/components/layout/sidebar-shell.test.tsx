@@ -88,6 +88,62 @@ describe("SidebarShell display modes", () => {
     expect(spacer).toHaveAttribute("data-sidebar-open", "false");
   });
 
+  /**
+   * The compact rail's contract, in one place: NOTHING beside an icon is painted.
+   * That covers the nav items (already the case) and — the UAT finding — the
+   * sidebar-mode control at the foot, which used to print the name of the mode
+   * you were already in the moment a hover reveal widened the panel.
+   */
+  describe("compact rail is icon-only, including its own mode control", () => {
+    const modeNames = [ar.nav.sidebar.expanded, ar.nav.sidebar.collapsed, ar.nav.sidebar.hover];
+
+    it("paints no mode name on the closed control when collapsed", () => {
+      shell("collapsed");
+      expect(screen.getByTestId("sidebar-control").textContent).toBe("");
+    });
+
+    it("paints no mode name on the closed control in expand-on-hover, before OR during the reveal", () => {
+      const { container } = shell("hover");
+      const spacer = container.querySelector("[data-sidebar-mode]") as HTMLElement;
+      const control = screen.getByTestId("sidebar-control");
+
+      expect(control.textContent).toBe("");
+
+      // The reveal is exactly when the old code leaked "التوسيع عند المرور".
+      fireEvent.mouseEnter(spacer.firstElementChild as HTMLElement);
+      expect(spacer).toHaveAttribute("data-sidebar-open", "true");
+      expect(control.textContent).toBe("");
+    });
+
+    it("renders no mode name anywhere on a collapsed rail while its menu is shut", () => {
+      const { container } = shell("collapsed");
+      for (const name of modeNames) expect(container.textContent).not.toContain(name);
+    });
+
+    it("keeps the control's accessible name — and names the active mode in it", () => {
+      shell("collapsed");
+      // Visible text is what goes; the accessible name gains the mode, so a
+      // screen-reader user is told strictly more than the sighted user sees.
+      expect(
+        screen.getByRole("button", {
+          name: `${ar.nav.sidebar.control}: ${ar.nav.sidebar.collapsed}`,
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("still offers the mode names inside the menu the control opens", () => {
+      shell("collapsed");
+      fireEvent.click(screen.getByTestId("sidebar-control"));
+      // Removing the caption must not remove the ability to CHANGE the mode.
+      expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(modeNames);
+    });
+
+    it("keeps the label on a deliberately expanded sidebar", () => {
+      shell("expanded");
+      expect(screen.getByTestId("sidebar-control").textContent).toBe(ar.nav.sidebar.expanded);
+    });
+  });
+
   it("persists the chosen mode to this browser only, with no server round trip", () => {
     shell();
     fireEvent.click(screen.getByTestId("sidebar-control"));

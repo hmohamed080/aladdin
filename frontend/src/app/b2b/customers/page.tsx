@@ -39,6 +39,7 @@ export default async function CustomersPage({
   return (
     <div className="pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
         Icon={UsersIcon}
         title={m.customers.title}
         subtitle={m.customers.subtitle}

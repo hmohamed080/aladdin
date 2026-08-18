@@ -100,6 +100,24 @@ export function SidebarShell({
 
   const hoverMode = mode === "hover";
 
+  /**
+   * The mode control's own label is tied to the CHOSEN mode, not to whether the
+   * panel happens to be wide at this instant.
+   *
+   * This is the difference that produced the UAT finding. `narrow` is momentary:
+   * in expand-on-hover the panel widens the moment the pointer crosses it, so a
+   * label gated on `narrow` appeared beside the control the instant you reached
+   * for it — and what it printed was "التوسيع عند المرور", the name of the mode
+   * you were already in. A control that announces its own state as a caption is
+   * noise on a rail whose entire premise is that it stays out of the way.
+   *
+   * Only a deliberately expanded sidebar shows the mode in text. Collapsed and
+   * expand-on-hover both keep the closed control icon-only, in every phase of the
+   * reveal. The mode NAMES still exist where they are actually needed — inside
+   * the menu the control opens, where the user is choosing between them.
+   */
+  const showModeLabel = mode === "expanded";
+
   return (
     <div
       className="sticky top-0 hidden h-dvh shrink-0 tablet:block"
@@ -158,17 +176,21 @@ export function SidebarShell({
             onClick={() => setMenuOpen((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            aria-label={t("nav.sidebar.control")}
+            /* The accessible name carries what the icon cannot: what this control
+               is AND which mode is currently active. That is the whole reason the
+               visible caption can go — nothing is lost for a screen reader, only
+               the painted text disappears. */
+            aria-label={`${t("nav.sidebar.control")}: ${t(sidebarModeLabelKey(mode))}`}
             data-testid="sidebar-control"
             className={cn(
               "flex w-full items-center rounded-sm py-2 text-label font-medium text-fg-secondary transition-colors",
               "hover:bg-surface-2/60 hover:text-fg",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-              narrow ? "justify-center px-0" : "gap-3 px-3",
+              showModeLabel ? "gap-3 px-3" : "justify-center px-0",
             )}
           >
             <PanelIcon size={19} className="shrink-0 text-fg-muted" />
-            {narrow ? null : <span className="truncate">{t(sidebarModeLabelKey(mode))}</span>}
+            {showModeLabel ? <span className="truncate">{t(sidebarModeLabelKey(mode))}</span> : null}
           </button>
 
           {menuOpen ? (

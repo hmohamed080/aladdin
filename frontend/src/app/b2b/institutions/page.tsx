@@ -57,9 +57,10 @@ export default async function InstitutionsPage({
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
-      <PageHeader Icon={LandmarkIcon} title={m.institutions.title} subtitle={m.institutions.subtitle} count={rows.length} />
+      <PageHeader locale={locale} Icon={LandmarkIcon} title={m.institutions.title} subtitle={m.institutions.subtitle} count={rows.length} />
 
       <StatTiles
+        locale={locale}
         layout="strip"
         tiles={[
           { label: m.institutions.stat.total, value: counts.total, Icon: LandmarkIcon, tone: "accent" },
@@ -85,6 +86,7 @@ export default async function InstitutionsPage({
           ]}
         />
         <OrganizationDirectoryTable
+          locale={locale}
           rows={rows}
           m={m}
           sharedWork={worked}

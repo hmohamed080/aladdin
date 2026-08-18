@@ -63,9 +63,10 @@ export default async function DistributorsPage({
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
-      <PageHeader Icon={TruckIcon} title={m.suppliers.title} subtitle={m.suppliers.subtitle} count={rows.length} />
+      <PageHeader locale={locale} Icon={TruckIcon} title={m.suppliers.title} subtitle={m.suppliers.subtitle} count={rows.length} />
 
       <StatTiles
+        locale={locale}
         layout="strip"
         tiles={[
           { label: m.suppliers.stat.total, value: counts.total, Icon: TruckIcon, tone: "accent" },
@@ -91,6 +92,7 @@ export default async function DistributorsPage({
           ]}
         />
         <OrganizationDirectoryTable
+          locale={locale}
           rows={rows}
           m={m}
           facets={facets}

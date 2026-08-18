@@ -23,7 +23,7 @@ import { QuickActions } from "@/features/home/quick-actions";
 import { RfqTable, QuotationTable } from "@/features/commerce/commerce-lists";
 import { HomeFollowUpList, HomeLeadList, HomeActivityList, EmptyLine } from "@/features/sales/home-widgets";
 import { formatMoney, PRODUCT_CATEGORIES } from "@/features/commerce/constants";
-import { formatMonth, formatCompactMoney, formatPercent } from "@/lib/ui/format";
+import { formatMonth, formatCompactMoney, formatPercent, formatNumber } from "@/lib/ui/format";
 import {
   AlertIcon,
   ClockIcon,
@@ -226,7 +226,7 @@ export async function BuyerDashboard({ ctx }: { ctx: PageContext }) {
           is two full rows before the first real panel; as a rail it is one row,
           and on a wide desktop where all of them fit the controls never appear. */}
       {tiles.length > 0 ? (
-        <StatTiles tiles={tiles} layout="rail" railLabel={m.home.title} />
+        <StatTiles locale={locale} tiles={tiles} layout="rail" railLabel={m.home.title} />
       ) : null}
 
       <QuickActions m={m} capabilities={org.capabilities} stance="buyer" />
@@ -254,6 +254,7 @@ export async function BuyerDashboard({ ctx }: { ctx: PageContext }) {
               <SectionTitle icon={<TruckIcon size={18} />}>{m.home.topDistributors}</SectionTitle>
               <div className="mt-md">
                 <RankedBars
+                  locale={locale}
                   colored
                   emptyLabel={m.reports.noSuppliers}
                   items={purchase.topDistributors.slice(0, 5).map((s) => ({
@@ -281,7 +282,7 @@ export async function BuyerDashboard({ ctx }: { ctx: PageContext }) {
                   emptyLabel={m.reports.noShortlist}
                   ariaLabel={m.reports.shortlistByCategory}
                   centerLabel={m.saved.title}
-                  formatValue={(v) => String(v)}
+                  formatValue={(v) => formatNumber(v, locale)}
                   formatShare={(p) => formatPercent(p, locale)}
                 />
               </div>

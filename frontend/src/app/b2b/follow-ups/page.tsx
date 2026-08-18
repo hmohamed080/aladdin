@@ -52,7 +52,7 @@ export default async function FollowUpsPage({
   return (
     <div className="pb-16 tablet:pb-0">
       {updated ? <FlashSuccess messageKey="followUps.updated" /> : null}
-      <PageHeader Icon={CalendarCheckIcon} title={m.followUps.title} subtitle={m.followUps.subtitle} count={open.length} />
+      <PageHeader locale={locale} Icon={CalendarCheckIcon} title={m.followUps.title} subtitle={m.followUps.subtitle} count={open.length} />
       {all.length === 0 ? (
         <StatePanel icon={<CalendarCheckIcon size={20} />} title={m.followUps.empty} body={m.followUps.noDue} />
       ) : (

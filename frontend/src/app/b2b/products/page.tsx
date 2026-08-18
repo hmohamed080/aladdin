@@ -85,7 +85,7 @@ export default async function ProductsPage({
   if (!canWrite && counts.total === 0) {
     return (
       <div className="pb-16 tablet:pb-0">
-        <PageHeader title={m.commerce.products.title} subtitle={m.commerce.products.subtitle} />
+        <PageHeader locale={locale} title={m.commerce.products.title} subtitle={m.commerce.products.subtitle} />
         <StatePanel
           title={m.commerce.products.noAccessTitle}
           body={m.commerce.products.noAccessBody}
@@ -97,6 +97,7 @@ export default async function ProductsPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
         Icon={PackageIcon}
         title={isSeller ? m.supply.products.title : m.commerce.products.title}
         subtitle={
@@ -116,6 +117,7 @@ export default async function ProductsPage({
       />
 
       <StatTiles
+        locale={locale}
         layout="strip"
         tiles={[
           { label: m.supply.products.stat.total, value: counts.total, Icon: PackageIcon, tone: "accent" },
@@ -150,6 +152,7 @@ export default async function ProductsPage({
 
       <div>
         <TabLinks
+          locale={locale}
           basePath="/b2b/products"
           param="status"
           current={status ?? ""}

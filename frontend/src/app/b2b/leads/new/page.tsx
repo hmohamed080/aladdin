@@ -45,7 +45,7 @@ export default async function NewLeadPage({
   return (
     <div className="pb-16 tablet:pb-0">
       <BackLink href="/b2b/leads">{m.leads.title}</BackLink>
-      <PageHeader title={m.leads.createTitle} />
+      <PageHeader locale={locale} title={m.leads.createTitle} />
       <LeadForm
         orgId={org.organizationId}
         branches={org.branches}
