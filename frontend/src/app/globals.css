@@ -28,6 +28,74 @@
     outline-offset: 2px;
   }
 
+  /* ------------------------------------------------------------------
+   * SCROLLBARS — one treatment for the whole product.
+   *
+   * Three problems this fixes, all of them global, none of them worth a
+   * per-component hack:
+   *   1. Windows Chrome paints CLASSIC scrollbars with STEPPER ARROWS at both
+   *      ends. Two 17px triangles on every table, rail, dropdown and sidebar is
+   *      a control the design system never specified. `::-webkit-scrollbar-button`
+   *      is the only way to remove them, and it must be a `display:none` with
+   *      zero box — `width/height:0` alone still reserves a paint slot in some
+   *      Blink builds.
+   *   2. In dark mode the native gutter stayed LIGHT, so a Basalt sidebar had a
+   *      white bar down its edge (UI-UX/references/GlobalShell/sidebar-dark-
+   *      scrollbar). The colours are tokens, so the theme flips them for free.
+   *   3. Firefox has no ::-webkit pseudo-elements at all; `scrollbar-width` +
+   *      `scrollbar-color` are its supported equivalents and are set alongside.
+   *
+   * The bar is deliberately NOT hidden. It is the only affordance that tells a
+   * user there is more content below or beside what they can see; hiding it is
+   * how a dense workspace loses half its rows silently. Wheel, touch, keyboard
+   * and drag behaviour are all untouched — this is pure presentation.
+   *
+   * Applied to `*` rather than to a list of components so a scroll container
+   * added later inherits it without anyone remembering to opt in.
+   * ------------------------------------------------------------------ */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 9999px;
+    /* A transparent border clipped to the padding box insets the thumb inside
+       its own track, which is what keeps a 10px bar from reading as a slab. */
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover,
+  ::-webkit-scrollbar-thumb:active {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
+  /* The stepper arrows, in every corner they can appear in. */
+  ::-webkit-scrollbar-button,
+  ::-webkit-scrollbar-button:single-button,
+  ::-webkit-scrollbar-button:double-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  /* Where a vertical and a horizontal bar meet, so the square is not a
+     leftover patch of native canvas. */
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
   /* Respect the OS reduced-motion preference: collapse animation/transition
      to near-instant while keeping state changes perceivable. */
   @media (prefers-reduced-motion: reduce) {

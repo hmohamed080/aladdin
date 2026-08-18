@@ -7,21 +7,37 @@ import { en } from "@/lib/i18n/messages/en";
 
 /**
  * The rail's behaviour is entirely geometric, and happy-dom lays nothing out —
- * every box is 0×0. So the scroll geometry is stubbed on the prototype to
- * describe the two situations that actually matter: content that fits, and
- * content that does not. What is being tested is the DECISION the component
- * makes from that geometry, which is the part that can regress.
+ * every box is 0×0. So the scroll geometry is MODELLED here rather than stubbed
+ * flat: the track is a 400px window, cards are 200px wide, and each card's rect
+ * is derived from its index and the current scroll travel. That is what lets the
+ * one-card-per-click rule be tested at all, because the component now reads
+ * where the adjacent card IS instead of multiplying a width by a count.
+ *
+ * The RTL model is the mirror of the LTR one: the rail rests at scrollLeft 0 and
+ * travels NEGATIVE, and a card's distance from the start is measured from the
+ * track's RIGHT edge inward.
  */
+const TRACK = 400;
+const CARD = 200;
+
 const geometry = { scrollWidth: 0, clientWidth: 0, scrollLeft: 0 };
+/** Which writing direction the current render is in — mirrors the locale used. */
+let rtl = true;
+
 const scrolls: ScrollToOptions[] = [];
 const scrollBy = vi.fn((opts: ScrollToOptions) => {
   scrolls.push(opts);
 });
 
+function rect(left: number, width: number): DOMRect {
+  return { left, right: left + width, width, height: 100, top: 0, bottom: 100, x: left, y: 0 } as DOMRect;
+}
+
 beforeEach(() => {
   geometry.scrollWidth = 1000;
-  geometry.clientWidth = 400;
+  geometry.clientWidth = TRACK;
   geometry.scrollLeft = 0;
+  rtl = true;
   scrolls.length = 0;
   scrollBy.mockClear();
 
@@ -51,7 +67,18 @@ beforeEach(() => {
   // `scrollBy` is overloaded (options OR x,y); the rail only ever calls the
   // options form, so the spy is narrowed to it and cast into the slot.
   HTMLElement.prototype.scrollBy = scrollBy as unknown as HTMLElement["scrollBy"];
-  HTMLElement.prototype.getBoundingClientRect = () => ({ width: 200, height: 100 }) as DOMRect;
+
+  HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement): DOMRect {
+    const parent = this.parentElement;
+    const isCard = parent?.getAttribute("role") === "group";
+    if (!isCard) return rect(0, TRACK);
+    const i = Array.prototype.indexOf.call(parent!.children, this);
+    const travelled = Math.abs(geometry.scrollLeft);
+    // Distance of this card's LOGICAL start edge from the track's, then placed
+    // physically according to direction.
+    const lead = i * CARD - travelled;
+    return rtl ? rect(TRACK - lead - CARD, CARD) : rect(lead, CARD);
+  };
 });
 
 afterEach(() => {
@@ -64,14 +91,15 @@ function Cards() {
       <div>one</div>
       <div>two</div>
       <div>three</div>
+      <div>four</div>
+      <div>five</div>
     </>
   );
 }
 
 describe("CardRail", () => {
   it("shows no controls and adds no tab stop when the cards already fit", () => {
-    geometry.scrollWidth = 400;
-    geometry.clientWidth = 400;
+    geometry.scrollWidth = TRACK;
     renderWithI18n(
       <CardRail label="مجموعة">
         <Cards />
@@ -108,7 +136,8 @@ describe("CardRail", () => {
     expect(screen.getByLabelText(ar.rail.previous)).toBeEnabled();
   });
 
-  it("scrolls toward increasing scrollLeft for next in LTR", () => {
+  it("advances exactly ONE card per click in LTR, whatever fits on screen", () => {
+    rtl = false;
     renderWithI18n(
       <CardRail label="group">
         <Cards />
@@ -117,10 +146,12 @@ describe("CardRail", () => {
     );
     fireEvent.click(screen.getByLabelText(en.rail.next));
     expect(scrollBy).toHaveBeenCalledTimes(1);
-    expect(scrolls[0]?.left).toBeGreaterThan(0);
+    // Two cards fit in the 400px window. A pager would move 400; a swipe moves
+    // one card — and that is the whole point of this component's arrows.
+    expect(scrolls[0]?.left).toBe(CARD);
   });
 
-  it("scrolls toward decreasing scrollLeft for next in RTL", () => {
+  it("advances exactly ONE card per click in RTL, with the opposite sign", () => {
     renderWithI18n(
       <CardRail label="مجموعة">
         <Cards />
@@ -130,10 +161,12 @@ describe("CardRail", () => {
     expect(scrollBy).toHaveBeenCalledTimes(1);
     // Same logical intent, opposite physical sign. Getting this wrong makes the
     // Arabic rail jump to the end on the first "next".
-    expect(scrolls[0]?.left).toBeLessThan(0);
+    expect(scrolls[0]?.left).toBe(-CARD);
   });
 
-  it("moves by whole cards rather than an arbitrary pixel amount", () => {
+  it("keeps advancing one card at a time from a mid-rail position", () => {
+    rtl = false;
+    geometry.scrollLeft = CARD; // parked on card 2
     renderWithI18n(
       <CardRail label="group">
         <Cards />
@@ -141,7 +174,21 @@ describe("CardRail", () => {
       "en",
     );
     fireEvent.click(screen.getByLabelText(en.rail.next));
-    // 400px viewport / 200px cards = 2 per view; gap is 0 in the stubbed style.
-    expect(scrolls[0]?.left).toBe(400);
+    // Card 3 is one card ahead — not the last card, not two ahead.
+    expect(scrolls[0]?.left).toBe(CARD);
+  });
+
+  it("steps back exactly one card", () => {
+    rtl = false;
+    geometry.scrollLeft = CARD * 2; // parked on card 3
+    renderWithI18n(
+      <CardRail label="group">
+        <Cards />
+      </CardRail>,
+      "en",
+    );
+    fireEvent.scroll(screen.getByRole("group"));
+    fireEvent.click(screen.getByLabelText(en.rail.previous));
+    expect(scrolls[0]?.left).toBe(-CARD);
   });
 });

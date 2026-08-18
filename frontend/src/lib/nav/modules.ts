@@ -25,7 +25,7 @@
  *      and "Incoming demand" from the seller's. The href, the capability gate and
  *      the active rule are identical; only the word changes.
  *
- * Everything else — the rail, the collapse modes, the tooltips, the mobile sheet,
+ * Everything else — the rail, the collapse modes, the hover affordance, the mobile sheet,
  * the capability filter — is shared verbatim. There is deliberately no
  * `showroomNav` / `distributorNav` split to drift apart.
  *

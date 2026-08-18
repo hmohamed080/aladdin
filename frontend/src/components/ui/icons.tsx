@@ -386,3 +386,47 @@ export const ChevronRightIcon = (p: IconProps) => (
     <path d="m9 5 7 7-7 7" />
   </Svg>
 );
+
+/** The ⌘/command glyph — the palette's leading mark, matching the reference. */
+export const CommandIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M15 6a3 3 0 1 1 3 3h-3V6Z" />
+    <path d="M9 6a3 3 0 1 0-3 3h3V6Z" />
+    <path d="M15 18a3 3 0 1 0 3-3h-3v3Z" />
+    <path d="M9 18a3 3 0 1 1-3-3h3v3Z" />
+    <path d="M9 9h6v6H9z" />
+  </Svg>
+);
+
+/** A display — the "System" appearance option in the profile menu. */
+export const MonitorIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2.5" y="4" width="19" height="12.5" rx="2" />
+    <path d="M8.5 21h7M12 16.5V21" />
+  </Svg>
+);
+
+/** A bell — notifications. Only rendered where a real surface exists. */
+export const BellIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M18 8.5a6 6 0 1 0-12 0c0 5-2 6.5-2 6.5h16s-2-1.5-2-6.5" />
+    <path d="M13.7 19a2 2 0 0 1-3.4 0" />
+  </Svg>
+);
+
+/** A globe — the language row in the profile menu. */
+export const GlobeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18" />
+    <path d="M12 3c2.5 2.7 3.8 5.7 3.8 9S14.5 18.3 12 21c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z" />
+  </Svg>
+);
+
+/** A corner arrow — the "press Enter to open" affordance on a search result. */
+export const EnterKeyIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20 5v6a3 3 0 0 1-3 3H5" />
+    <path d="m9 10-4 4 4 4" />
+  </Svg>
+);

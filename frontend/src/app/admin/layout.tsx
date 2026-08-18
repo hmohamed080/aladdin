@@ -3,13 +3,11 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/context";
-import { THEME_COOKIE } from "@/lib/theme/config";
 import { getMessages } from "@/lib/i18n/translate";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadPlatformRole } from "@/server/queries/platform";
 import { Brand } from "@/components/layout/brand";
-import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
-import { SignOutButton } from "@/components/layout/account-menu";
+import { AppHeader } from "@/components/layout/app-header";
 import { Badge } from "@/components/ui/primitives";
 import { AdminSidebar, AdminTopNav } from "@/components/admin/admin-nav";
 
@@ -30,7 +28,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const dir = directionFor(locale);
-  const theme = store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light";
   const m = getMessages(locale);
 
   return (
@@ -50,19 +47,17 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-header border-b bg-surface/85 backdrop-blur" style={{ zIndex: 200 }}>
-            <div className="flex flex-wrap items-center gap-md px-md py-2">
-              <span className="flex items-center gap-2 tablet:hidden">
-                <Brand name={m.common.appName} size="sm" />
-                <Badge tone="accent">{m.admin.title}</Badge>
-              </span>
-              <div className="ms-auto flex items-center gap-sm">
-                <LanguageSwitch />
-                <ThemeSwitch current={theme} />
-                <SignOutButton />
-              </div>
-            </div>
-          </header>
+          <AppHeader
+            appName={m.common.appName}
+            /* The console has no organization behind it, so the palette offers
+               Admin destinations (server-gated on platform role) and nothing
+               else. Admin record search is deliberately not wired here: the
+               console's own lists are the searchable surface, and a second path
+               into platform-wide data is a second place to get the gate wrong. */
+            hasWorkspace={false}
+            workspaceLabel={m.admin.title}
+            context={<Badge tone="accent">{m.admin.roleLabel[role]}</Badge>}
+          />
 
           <AdminTopNav />
 

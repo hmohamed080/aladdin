@@ -115,6 +115,15 @@
   --series-5: var(--oxide);
   --series-6: var(--stone);
   /* Grid lines and axis rules — one step softer than a border. */
+  /* ---- Scrollbars (LIGHT) ----
+   * One treatment for every scroll container in the product (see globals.css).
+   * The track is one step below the canvas so a scrollable region reads as a
+   * recess; the thumb is a neutral that is clearly visible without competing
+   * with content. Never the accent — a scrollbar is chrome, not a signal.
+   */
+  --scrollbar-track: #e6e1d6;
+  --scrollbar-thumb: #bab2a2;
+  --scrollbar-thumb-hover: #9a917f;
   --chart-grid: var(--line-light);
 }
 
@@ -159,5 +168,13 @@
   --series-4: var(--bronze);
   --series-5: var(--oxide-bright);
   --series-6: var(--on-dark-muted);
+  /* ---- Scrollbars (DARK) ----
+   * The whole reason this block exists: with no rule, Windows Chrome paints its
+   * NATIVE light scrollbar next to a Basalt sidebar — a white gutter down the
+   * side of a dark workspace. Track sits just above Basalt, thumb well above it.
+   */
+  --scrollbar-track: #171d21;
+  --scrollbar-thumb: #3b464d;
+  --scrollbar-thumb-hover: #55636c;
   --chart-grid: var(--graphite);
 }

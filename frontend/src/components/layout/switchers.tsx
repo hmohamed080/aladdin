@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { setLocale, setTheme } from "@/server/actions/preferences";
 import { Button } from "@/components/ui/controls";
@@ -35,25 +35,45 @@ export function LanguageSwitch() {
   );
 }
 
-/** Toggle light <-> dark (cookie-backed). Reads current from the <html> class. */
+/**
+ * Binary light/dark toggle for the surfaces OUTSIDE the authenticated shell —
+ * auth, onboarding, business creation, and the settings page. Inside the
+ * workspace the same preference is set from the profile menu, which offers the
+ * full System/Light/Dark choice; both write the SAME cookie through the SAME
+ * action, so there is one theme system and not two.
+ *
+ * `current` is the server's guess and only seeds the first paint. Because the
+ * preference may be `system`, the resolved theme can differ from that guess by
+ * the time the script in <head> has run — so after mount the control reads the
+ * live `.dark` class and follows it. Toggling always writes an EXPLICIT choice:
+ * a user reaching for this control is overriding their OS on purpose.
+ */
 export function ThemeSwitch({ current }: { current: "light" | "dark" }) {
   const { t } = useI18n();
   const [pending, start] = useTransition();
-  const next = current === "dark" ? "light" : "dark";
+  const [theme, setThemeState] = useState<"light" | "dark">(current);
+
+  useEffect(() => {
+    setThemeState(document.documentElement.classList.contains("dark") ? "dark" : "light");
+  }, []);
+
+  const next = theme === "dark" ? "light" : "dark";
   return (
     <Button
       variant="ghost"
       size="sm"
-      aria-label={`${t("nav.theme")}: ${current === "dark" ? t("nav.themeLight") : t("nav.themeDark")}`}
+      aria-label={`${t("nav.theme")}: ${theme === "dark" ? t("nav.themeLight") : t("nav.themeDark")}`}
       disabled={pending}
       onClick={() =>
         start(async () => {
           document.documentElement.classList.toggle("dark", next === "dark");
+          document.documentElement.setAttribute("data-theme-pref", next);
+          setThemeState(next);
           await setTheme(next);
         })
       }
     >
-      {current === "dark" ? <SunIcon size={18} /> : <MoonIcon size={18} />}
+      {theme === "dark" ? <SunIcon size={18} /> : <MoonIcon size={18} />}
     </Button>
   );
 }

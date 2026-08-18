@@ -130,55 +130,44 @@ function sectionLabelKey(section: NavSection, stance: CommerceStance): string | 
  * One navigation row.
  *
  * `narrow` is the icon-rail presentation, not a different link: the same href,
- * the same active rule, the same capability gate. Only the label moves — out of
- * the row and into a tooltip — so a collapsed rail can never expose a different
- * set of modules than an expanded one.
+ * the same active rule, the same capability gate. Only the label is dropped, so
+ * a collapsed rail can never expose a different set of modules than an expanded
+ * one.
  *
- * Accessibility in the narrow state: the localized label becomes the link's
- * `aria-label`, so assistive tech reads exactly what the expanded rail shows.
- * The tooltip is therefore purely visual (`aria-hidden`) — describing the link
- * with the same string it is already named with would just stutter.
+ * WHY THERE IS NO VISIBLE TOOLTIP ANY MORE
+ * The collapsed rail used to grow a floating label beside whichever icon the
+ * pointer touched. Two problems, and neither was cosmetic: the label appeared
+ * OUTSIDE the rail, over page content, so a glance down the icons flickered a
+ * box in and out over the workspace; and in "expand on hover" mode the rail was
+ * already opening to show that exact word, so the tooltip raced the reveal and
+ * the same label rendered twice in two places. What a user needs from a hover on
+ * an icon rail is to know WHICH target they are on — that is a surface cue, not
+ * a caption. So the hover now lights the icon's own tile.
+ *
+ * Nothing is lost for assistive technology: the localized label is still the
+ * link's `aria-label` in the narrow state, so a screen reader announces exactly
+ * what the expanded rail shows. The change is purely to what is PAINTED.
+ *
+ * Keyboard parity is deliberate — `focus-visible` gets the same lit tile plus a
+ * focus ring, because a keyboard user moving down a rail of unlabelled icons has
+ * strictly more need of "you are here" than a mouse user does.
  */
 function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow?: boolean }) {
-  const { t, dir } = useI18n();
+  const { t } = useI18n();
   const { href, key, Icon } = item;
   const label = t(key);
-  const [tip, setTip] = useState<{ top: number; inlineStart: number } | null>(null);
-
-  /**
-   * The tooltip is `position: fixed`, and that is not a stylistic choice.
-   * The rail scrolls vertically, and a box with `overflow-y: auto` also clips
-   * horizontally — an absolutely-positioned tooltip at `start-full` would be
-   * sliced off at the rail's edge. Fixed positioning leaves the clipping context
-   * entirely, so the coordinates have to be measured rather than declared.
-   */
-  const place = (el: HTMLElement | null) => {
-    if (!el || !narrow) return;
-    const r = el.getBoundingClientRect();
-    setTip({
-      top: r.top + r.height / 2,
-      // Always inward, toward the content: past the trailing edge in LTR, past
-      // the leading edge in RTL. `inlineStart` is fed to the matching physical
-      // property below.
-      inlineStart: dir === "rtl" ? window.innerWidth - r.left : r.right,
-    });
-  };
-  const hide = () => setTip(null);
 
   return (
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
       aria-label={narrow ? label : undefined}
-      onMouseEnter={(e) => place(e.currentTarget)}
-      onMouseLeave={hide}
-      onFocus={(e) => place(e.currentTarget)}
-      onBlur={hide}
       className={cn(
-        "group relative flex items-center rounded-sm py-2 text-label font-medium transition-colors duration-fast",
+        "group relative flex items-center rounded-sm text-label font-medium",
+        "transition-[background-color,color,box-shadow] duration-fast ease-standard motion-reduce:transition-none",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-        narrow ? "justify-center px-0" : "gap-3 px-3",
-        active ? "bg-surface-2 text-fg" : "text-fg-secondary hover:bg-surface-2/60 hover:text-fg",
+        narrow ? "justify-center px-0 py-0.5" : "gap-3 px-3 py-2",
+        !narrow && (active ? "bg-surface-2 text-fg" : "text-fg-secondary hover:bg-surface-2/60 hover:text-fg"),
       )}
     >
       {/* The active marker is the ONLY cue left once labels are gone, so it stays
@@ -190,32 +179,26 @@ function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow
           active ? "opacity-100" : "opacity-0",
         )}
       />
-      <span className={cn("shrink-0", active ? "text-accent" : "text-fg-muted group-hover:text-fg-secondary")}>
+      <span
+        className={cn(
+          "shrink-0",
+          // The hover/focus target on a collapsed rail. A tile rather than a
+          // colour change: at 3.5rem the glyph is small and a hue shift alone is
+          // easy to miss, whereas a raised square under the pointer is
+          // unambiguous about which of nine icons is armed. Sized so the lit
+          // tiles form an even column instead of touching each other.
+          narrow &&
+            "grid h-9 w-9 place-items-center rounded-sm transition-[background-color,box-shadow] duration-fast ease-standard motion-reduce:transition-none",
+          narrow && !active && "group-hover:bg-surface-2 group-hover:shadow-sm group-focus-visible:bg-surface-2",
+          // An active item already owns a tile; hovering it deepens rather than
+          // re-announces, so the active/hover distinction survives the collapse.
+          narrow && active && "bg-accent-solid/15 group-hover:bg-accent-solid/25",
+          active ? "text-accent" : "text-fg-muted group-hover:text-fg",
+        )}
+      >
         <Icon size={19} />
       </span>
-      {narrow ? (
-        tip ? (
-          <span
-            role="tooltip"
-            aria-hidden="true"
-            className={cn(
-              "pointer-events-none fixed -translate-y-1/2 whitespace-nowrap",
-              "rounded-sm border border-strong bg-surface px-2 py-1 text-label text-fg shadow-lg",
-            )}
-            style={{
-              zIndex: 800,
-              top: tip.top,
-              ...(dir === "rtl"
-                ? { right: tip.inlineStart + 8 }
-                : { left: tip.inlineStart + 8 }),
-            }}
-          >
-            {label}
-          </span>
-        ) : null
-      ) : (
-        <span className="truncate">{label}</span>
-      )}
+      {narrow ? null : <span className="truncate">{label}</span>}
     </Link>
   );
 }

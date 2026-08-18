@@ -15,7 +15,8 @@ export const SIDEBAR_MODE_COOKIE = "aladdin-sidebar";
 
 /**
  * `expanded` — icons + labels + section headings, fixed width.
- * `collapsed` — permanent icon rail; labels live in tooltips.
+ * `collapsed` — permanent icon rail; labels live in the accessible name only,
+ *                and hover/focus lights the icon's own tile (no visible caption).
  * `hover`     — rests collapsed, reveals over the page while pointed at or focused.
  */
 export type SidebarMode = "expanded" | "collapsed" | "hover";

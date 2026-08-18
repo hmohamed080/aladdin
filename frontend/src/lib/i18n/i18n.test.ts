@@ -30,6 +30,9 @@ const ARABIC = /[؀-ۿ]/;
 const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   "auth.emailPlaceholder",
   "onboarding.contact.phonePlaceholder",
+  // A KEYCAP legend, not prose. The Enter key is engraved "Enter" on Arabic
+  // keyboards too, so translating it would name a key the user cannot find.
+  "search.enter",
 ]);
 
 describe("i18n catalogs", () => {

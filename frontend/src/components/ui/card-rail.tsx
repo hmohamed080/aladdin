@@ -75,19 +75,58 @@ export function CardRail({
     };
   }, [measure, children]);
 
-  /** Move by whole cards — as many as currently fit, never a raw pixel guess. */
-  const page = (direction: 1 | -1) => {
+  /**
+   * ONE CARD PER CLICK — the arrow is a "next item", not a "next page".
+   *
+   * The previous implementation multiplied a card's width by how many fit and
+   * scrolled that far, so on a wide desktop a single click on a four-up rail
+   * jumped four cards — usually straight to the end. That is a pager. What a
+   * user reaches for here is the mobile-swipe gesture: show me the next one.
+   *
+   * WHY GEOMETRY, NOT ARITHMETIC
+   * Nothing below computes a distance from a width and a gap. It measures where
+   * each card actually IS relative to the rail and scrolls to the adjacent one.
+   * That survives everything arithmetic gets wrong: a mixed-width card, a
+   * different `gap` from a caller, the 4px scroll padding, fractional layout,
+   * and a browser mid-way through a smooth scroll.
+   *
+   * RTL falls out for free. `leadDistance` measures from the rail's LOGICAL
+   * start edge — the left edge in English, the right edge in Arabic — so "the
+   * first card that begins after where we are" means the same sentence in both,
+   * and only the sign of the final `scrollBy` differs.
+   */
+  const leadDistance = (track: HTMLElement, card: HTMLElement, rtl: boolean) => {
+    const t = track.getBoundingClientRect();
+    const c = card.getBoundingClientRect();
+    return rtl ? t.right - c.right : c.left - t.left;
+  };
+
+  const step = (direction: 1 | -1) => {
     const el = track.current;
     if (!el) return;
-    const first = el.firstElementChild as HTMLElement | null;
-    const gap = parseFloat(getComputedStyle(el).columnGap || "0") || 0;
-    const step = first ? first.getBoundingClientRect().width + gap : el.clientWidth;
-    const perView = Math.max(1, Math.floor(el.clientWidth / Math.max(step, 1)));
-    const distance = step * perView;
+    const rtl = dir === "rtl";
+    const cards = Array.from(el.children) as HTMLElement[];
+    if (cards.length === 0) return;
+
+    // Slack has to clear the rail's own 4px inline padding: a card snapped to
+    // the start sits at distance 4, and treating that as "ahead of us" would
+    // make every click scroll by zero.
+    const SLACK = 6;
+    const distances = cards.map((c) => leadDistance(el, c, rtl));
+
+    // Ascending by construction, so "the next one" is the first card that starts
+    // after the current position, and "the previous one" is the last card that
+    // starts before it — never two, never the end of the rail.
+    const target =
+      direction === 1
+        ? distances.find((d) => d > SLACK)
+        : [...distances].reverse().find((d) => d < -SLACK);
+    if (target === undefined || target === 0) return;
+
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     el.scrollBy({
-      // In RTL the logical "next" is a DECREASING scrollLeft, hence the flip.
-      left: (dir === "rtl" ? -1 : 1) * direction * distance,
+      // In RTL the logical "forward" is a DECREASING scrollLeft, hence the flip.
+      left: (rtl ? -1 : 1) * target,
       behavior: reduce ? "auto" : "smooth",
     });
   };
@@ -147,7 +186,7 @@ export function CardRail({
         <>
           <button
             type="button"
-            onClick={() => page(-1)}
+            onClick={() => step(-1)}
             disabled={atStart}
             aria-label={t("rail.previous")}
             data-testid="rail-prev"
@@ -157,7 +196,7 @@ export function CardRail({
           </button>
           <button
             type="button"
-            onClick={() => page(1)}
+            onClick={() => step(1)}
             disabled={atEnd}
             aria-label={t("rail.next")}
             data-testid="rail-next"

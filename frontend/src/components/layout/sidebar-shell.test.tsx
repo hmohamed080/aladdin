@@ -41,9 +41,20 @@ describe("SidebarShell display modes", () => {
 
   it("names each collapsed item so the label survives the loss of visible text", () => {
     shell("collapsed");
-    // Labels move into aria-label + tooltip; the module must still be findable.
+    // Labels move into aria-label only — no visible tooltip is painted — so the
+    // module must still be findable by its accessible name.
     expect(screen.getByRole("link", { name: ar.nav.catalog })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: ar.nav.reports })).toBeInTheDocument();
+  });
+
+  it("paints no visible label beside a hovered collapsed icon", () => {
+    shell("collapsed");
+    const link = screen.getByRole("link", { name: ar.nav.catalog });
+    fireEvent.mouseEnter(link);
+    // The hover cue is a surface on the icon, never a floating caption over the
+    // page — and never the module name rendered twice in hover-reveal mode.
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    expect(link.textContent).toBe("");
   });
 
   it("marks the active route in the collapsed rail", () => {
