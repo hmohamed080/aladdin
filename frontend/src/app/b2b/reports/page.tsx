@@ -213,15 +213,19 @@ export default async function ReportsPage({
           { label: m.reports.stat.projects, value: totalProjects, Icon: LayersIcon, href: "/b2b/projects" },
           { label: m.reports.stat.saved, value: sum(saved), Icon: BookmarkIcon, href: "/b2b/saved" },
         ]}
-        /* Six across was tried and reverted once: at a laptop width it squeezed
-           the committed-spend tile until "EGP 1,103,100.00" truncated to
-           "EGP 1,103,10…", which is the one number on this page nobody may
-           misread. The rail settles that for good — a railed card holds its width
-           and scrolls instead of shrinking, so the figure stays whole at every
-           viewport, and on a wide screen where all six fit there is nothing to
-           scroll and no control is drawn. */
-        layout="rail"
-        railLabel={m.reports.title}
+        /* HISTORY, because this cell has moved twice.
+           Six tiles across a laptop width once squeezed the committed-spend
+           figure until "EGP 1,103,100.00" truncated to "EGP 1,103,10…" — the one
+           number on this page nobody may misread — and the fix at the time was a
+           rail, whose cards hold their width instead of shrinking.
+           The strip supersedes it on both counts: money on a KPI is now formatted
+           COMPACT (`formatCompactMoney`, three tiles above), and the strip's value
+           wraps rather than truncating, so a long figure can no longer be
+           silently clipped into a different number. Three across keeps every cell
+           roomy, and the page now opens the same way every other module does
+           instead of being the one screen with a carousel on it. */
+        layout="strip"
+        columns={3}
       />
 
       {/* ---------------------------------------------------------------- */}

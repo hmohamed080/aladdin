@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
+import { cn } from "@/lib/ui/cn";
 import { Brand } from "@/components/layout/brand";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { ProfileMenu } from "@/components/layout/profile-menu";
@@ -49,6 +50,8 @@ export async function AppHeader({
   hasWorkspace,
   workspaceLabel,
   preferencesHref,
+  brand = "sidebar",
+  width = "full",
 }: {
   appName: string;
   /** Workspace/branch switchers, an Admin badge — whatever names the context. */
@@ -63,6 +66,23 @@ export async function AppHeader({
   /** Localized name of the active work context, shown in the profile menu. */
   workspaceLabel?: string | null;
   preferencesHref?: string;
+  /**
+   * Who draws the wordmark at desktop width. `"sidebar"` (the default) is right
+   * wherever a persistent rail or aside already carries it — the B2B workspace
+   * and the Admin console — and the header then shows it only on a phone, where
+   * that rail is hidden. `"header"` is for a surface with no rail at all: the
+   * personal `/home` workspace, which would otherwise open with no Aladdin mark
+   * anywhere on the page.
+   */
+  brand?: "sidebar" | "header";
+  /**
+   * `"content"` constrains the header row to the same column the page content
+   * uses. It matters only where the page itself is a centred column with no
+   * sidebar beside it — the personal `/home` workspace — because there a
+   * full-bleed header puts the avatar and the switcher out at the window edges
+   * while everything they belong to starts 170px inboard.
+   */
+  width?: "full" | "content";
 }) {
   const [identity, canAdmin, store] = await Promise.all([
     loadAccountIdentity(),
@@ -73,10 +93,13 @@ export async function AppHeader({
 
   return (
     <header className="sticky top-0 z-header border-b bg-surface/85 backdrop-blur" style={{ zIndex: 200 }}>
-      <div className="flex min-w-0 items-center gap-sm px-md py-2 tablet:gap-md">
-        {/* The sidebar carries the brand from `tablet` up; on a phone there is no
-            sidebar, so the header has to. */}
-        <span className="shrink-0 tablet:hidden">
+      <div
+        className={cn(
+          "flex min-w-0 items-center gap-sm px-md py-2 tablet:gap-md",
+          width === "content" && "mx-auto w-full max-w-[1120px]",
+        )}
+      >
+        <span className={cn("shrink-0", brand === "sidebar" && "tablet:hidden")}>
           <Brand name={appName} size="sm" />
         </span>
 
@@ -111,7 +134,14 @@ export async function AppHeader({
       {/* The context row on mobile. Kept out of the flow entirely when there is
           no context to show, so a personal account does not carry an empty bar. */}
       {context ? (
-        <div className="flex min-w-0 items-center gap-sm border-t px-md py-2 tablet:hidden">{context}</div>
+        <div
+          className={cn(
+            "flex min-w-0 items-center gap-sm border-t px-md py-2 tablet:hidden",
+            width === "content" && "mx-auto w-full max-w-[1120px]",
+          )}
+        >
+          {context}
+        </div>
       ) : null}
     </header>
   );

@@ -8,9 +8,8 @@ import { WorkPane, Panel } from "@/components/ui/workspace-layout";
 import { DonutSplit } from "@/components/ui/charts";
 import { OrderTable } from "@/features/execution/execution-lists";
 import { ClipboardIcon, ActivityIcon, CheckIcon, WalletIcon } from "@/components/ui/icons";
-import { formatMoney } from "@/features/commerce/constants";
 import { commerceStance } from "@/lib/workspace/supply-side";
-import { formatPercent } from "@/lib/ui/format";
+import { formatPercent, formatCompactMoney } from "@/lib/ui/format";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +84,15 @@ export default async function OrdersPage({
           { label: m.execution.order.stat.confirmed, value: countBy(rows, "confirmed"), Icon: ClipboardIcon, tone: "info" },
           { label: m.execution.order.stat.inProgress, value: countBy(rows, "in_progress"), Icon: ActivityIcon, tone: "accent" },
           { label: m.execution.order.stat.completed, value: countBy(rows, "completed"), Icon: CheckIcon, tone: "success" },
-          { label: m.execution.order.stat.value, value: formatMoney(totalValue, locale), Icon: WalletIcon },
+          {
+            label: m.execution.order.stat.value,
+            // COMPACT on a KPI cell. The exact figure is one click away on
+            // Reports; a seven-figure EGP total at display size in a quarter-
+            // width cell is how a number ends up wrapped or, worse, clipped.
+            value: formatCompactMoney(totalValue, locale),
+            Icon: WalletIcon,
+            tone: "accent",
+          },
         ]}
       />
 
@@ -99,7 +106,7 @@ export default async function OrdersPage({
               }))}
               emptyLabel={m.reports.noData}
               ariaLabel={m.supply.chart.ordersByStatus}
-              centerLabel={m.execution.order.title}
+              centerLabel={leadsWithReceived ? m.supply.orders.title : m.execution.order.title}
               formatValue={(v) => String(v)}
               formatShare={(pct) => formatPercent(pct, locale)}
             />

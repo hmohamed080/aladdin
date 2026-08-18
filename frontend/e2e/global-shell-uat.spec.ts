@@ -153,7 +153,9 @@ test.describe("shared shell regression (Showroom)", () => {
     test.skip(Boolean(test.info().project.use.isMobile), "arrows are a pointer/keyboard control");
     await prefs(page, "en");
     await signIn(page, request, IDENTITIES.showroom);
-    await page.goto("/b2b/reports");
+    // The buyer dashboard, where a rail of peer entry-ramp cards is still the
+    // right shape — the seller surfaces moved their KPI groups to the strip.
+    await page.goto("/b2b");
 
     const rail = page.getByTestId("card-rail").first();
     await expect(rail).toBeVisible();

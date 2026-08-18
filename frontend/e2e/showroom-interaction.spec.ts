@@ -303,12 +303,25 @@ test.describe("Horizontal card rails", () => {
     await expectNoPageOverflow(page);
   });
 
-  test("Reports keeps its money figures whole inside the rail", async ({ page, request }) => {
+  test("Reports keeps its money figures whole", async ({ page, request }) => {
     await prefs(page, "en");
     await signIn(page, request, IDENTITIES.showroom);
     await page.goto("/b2b/reports");
 
-    await expect(page.getByRole("group", { name: "Reports & analytics" })).toBeVisible();
+    // The rail this used to assert has been replaced by the shared KPI strip,
+    // but the DEFECT it was written for is the one that matters and is still
+    // guarded here: a committed-spend figure clipped mid-string does not look
+    // clipped, it looks like a smaller number. Two things now prevent it — the
+    // value is formatted compact, and the strip wraps instead of truncating —
+    // so the check is that the rendered figure is COMPLETE, not that a
+    // particular container is on the page.
+    const value = page
+      .locator("main")
+      .getByText(/^EGP\s?[\d.,]+[KM]?$/)
+      .first();
+    await expect(value).toBeVisible();
+    const clipped = await value.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+    expect(clipped, "the money figure is clipped by its cell").toBe(false);
     await expectNoPageOverflow(page);
   });
 });

@@ -1924,3 +1924,85 @@ that empty state. Demanding the chart would have been demanding the page draw da
   progresses → Showroom observes) is now manually testable end to end but was **not** run, per scope.
 - `sellSummary()` is now redundant with `supplySummary()` on the seller path; it still backs the
   buyer-seat report's small sell-side card. Collapse the two when the buyer report is next revisited.
+
+---
+
+## 2026-08-18 — Pre-UAT shell + supply-side visual pass (`feature/supply-side-b2b-mvp`, PR #34)
+
+One correction pass over the authenticated shell and the seller surfaces, on the same branch and the
+same PR. **No migration, no schema change, no seed change, no RLS change.**
+
+### Global shell
+- **One shared `AppHeader`** replaces three drifting header bars (B2B · personal `/home` · Admin).
+  Everything surface-specific arrives as a SLOT (`context`, `actions`), so there is no persona clone.
+  It is deliberately NOT applied to sign-in / sign-up / OTP / onboarding — those keep their own
+  minimal chrome and the standalone language/theme switches. **No notification bell**: no
+  notification model exists, and a bell that opens nothing is a lie in the chrome.
+- **Global search / command palette** (`Ctrl/Cmd+K`, click, Escape, ↑/↓, Enter). Two result families:
+  navigation results are LOCAL (from the same `allowedNavSections` the sidebar draws from, so they
+  are instant), record results are server-side, debounced 250 ms, request-id guarded, RLS-scoped,
+  pinned to the active organization, and **capability-gated per entity group**. The gate is a pure
+  module — `lib/search/scope.ts` — unit-tested against `lib/nav/modules` so search can never become a
+  back door into a module the sidebar hides. Platform-admin destinations are gated by a
+  SERVER-resolved role, never a client flag. A personal account issues no record query at all.
+  Bounded: 6 rows per group, minimum 2-character query, `sanitizeSearchTerm` on every term.
+- **Profile/account menu**: signed-in identity (display name + the ONE verified contact — the auth
+  model verifies email OR WhatsApp, so an email row is not assumed), work context as read-only
+  CONTEXT (not a second workspace switcher), profile + preferences links, AR/EN language,
+  System/Light/Dark appearance, log out. Theme preference gained `system` with a blocking pre-paint
+  script in `<head>` and a `ThemeSync` listener; one theme system, not two. Language and sign-out
+  moved OUT of the header row into this menu on every authenticated surface.
+- **Collapsed sidebar**: the floating hover caption is gone; hover/focus now lights the icon's own
+  tile. `aria-label`, active state and every capability-derived module are unchanged. The caption was
+  painting over page content and, in expand-on-hover mode, racing the reveal to show the same word twice.
+- **CardRail**: one arrow click = exactly ONE card, measured from real adjacent-child geometry rather
+  than `cardWidth × cardsPerView` (which on a wide desktop jumped to the end). RTL falls out of the
+  same measurement; six unit tests cover both directions and a mid-rail position.
+- **Scrollbars, globally**: stepper arrows removed, dark-mode track/thumb tokenised, Firefox served
+  via `scrollbar-width`/`scrollbar-color`. **The trap:** Blink IGNORES every `::-webkit-scrollbar-*`
+  rule the moment `scrollbar-width` or `scrollbar-color` matches the element — setting both, the
+  obvious "belt and braces" version, silently disables the arrow removal. The standard properties are
+  therefore fenced behind `@supports not selector(::-webkit-scrollbar)`.
+
+### Supply-side visual fidelity (reference: `UI-UX/references/Distributor`, structure only)
+New shared, server-safe `components/ui/workspace-layout.tsx`: `PageHead` (banded head + module
+glyph), `KpiStrip` (ONE bordered instrument with hairline seams), `WorkPane` (wide working column +
+narrow context column), `Panel`/`PanelRow`, `NextSteps`, `Band`. `PageHeader` is now a thin adapter
+over `PageHead` and moved out of the `"use client"` module so pages can pass a glyph; `StatTiles`
+gained `layout="strip"`. The supply dashboard was rebuilt to the reference SHAPE — banded head, five
+KPIs (not nine railed tiles), a demand queue with a status/catalogue context column, a performance
+band, and a real next-steps row. RFQs/quotations/orders gained a real status donut beside their
+tables. Reports (both the buyer strip and `SupplyReport`) moved from the rail to the strip.
+
+**Still deliberately absent, each because no model backs it:** wallet · invoices/collections · Reels ·
+chat/messages · carrier tracking · maps · quotas · warehouse/ERP · growth badges (no comparison
+period exists in the database).
+
+### Two real defects found and fixed during validation
+1. **The language switch never re-rendered the page.** `revalidatePath` clears the server cache but
+   does not pull a fresh RSC payload for the ROOT layout, which owns `<html lang>`/`<html dir>` — so
+   the cookie flipped, `dir` flipped imperatively, and every string stayed in the old language: an
+   RTL shell full of English. Both language controls now reload the document. This was pre-existing
+   (it is behind the long-standing `sales.spec` language-switch failure), not introduced here.
+2. **`truncate` on a KPI value is a correctness bug, not a layout one.** `EGP 289,600.00` clipped
+   mid-string renders as a perfectly plausible smaller number. The strip's value now wraps, and
+   money on a KPI is formatted compact at the caller.
+
+### Validation
+typecheck ✅ · lint ✅ (0/0) · vitest **266/266** ✅ (new: `lib/search/scope`, rewritten `card-rail`,
+extended `sidebar-shell`) · new `e2e/global-shell-uat.spec.ts` **16 passed** across desktop + Pixel 5
+(Distributor AR, Manufacturer EN, Importer AR, collapsed-rail hover, one-card rail, header search +
+account menu, locale switch, personal `/home` palette exposing no business records, Admin gating,
+non-staff never offered Admin, mobile) · regression `supply-side-mvp` + `showroom-mvp` +
+`showroom-interaction` **122 passed** after four assertions were updated to the intended new
+behaviour (no collapsed tooltip, KPI strip instead of the dashboard rail, language control now in the
+account menu, Reports money-figure check rewritten to assert the FIGURE rather than the container).
+Real-browser review as `rania@example.test` in Arabic, light and dark.
+
+Not run, per scope: full repository E2E, Lighthouse/performance, pgTAP (no schema or RLS change).
+
+### Unfinished / next
+- `/b2b/settings` still carries the binary `ThemeSwitch`, which cannot express "System". Harmless
+  (same cookie, same action, and it now reads the live theme) but worth reconciling with the account
+  menu's three-way control next time settings is touched.
+- The reference's per-product media/thumbnails are placeholders; no image pipeline exists yet.

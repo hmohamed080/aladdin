@@ -118,11 +118,14 @@ export function SupplyReport({
             tone: "success",
           },
         ]}
-        /* Six tiles. As a grid at laptop width the money figures squeeze and
-           truncate; as the shared rail each card holds its width and the row
-           scrolls, and where all six fit no control is drawn. */
-        layout="rail"
-        railLabel={m.supply.section.performance}
+        /* Six tiles, three across. The rail this replaced existed because the
+           money figures truncated in a six-across grid; both halves of that are
+           now fixed at the source — every money KPI is compact, and the strip's
+           value wraps instead of clipping into a plausible wrong number. Two
+           rows of three read as one instrument, which a scrollable row of six
+           never did. */
+        layout="strip"
+        columns={3}
       />
 
       <Card>

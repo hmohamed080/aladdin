@@ -39,6 +39,10 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
       <div className="flex min-h-dvh flex-col bg-canvas">
         <AppHeader
           appName={m.common.appName}
+          /* No sidebar on the personal surface, so the header owns the mark —
+             and its row follows the same 1120px column the content uses. */
+          brand="header"
+          width="content"
           /* No business workspace here, so the palette is navigation-only and
              the record search never runs — a personal account has no B2B
              records to find, and the action returns nothing for it by

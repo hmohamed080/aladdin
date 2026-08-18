@@ -186,8 +186,15 @@ export function KpiStrip({
                   <item.Icon size={17} />
                 </span>
               </div>
-              <div className="mt-1.5 flex items-baseline gap-1.5">
-                <span className="truncate font-display text-headline leading-none text-fg tabular-nums">
+              <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5">
+                {/* NOT `truncate`, and this is a correctness rule rather than a
+                    layout preference: truncating a number does not look
+                    truncated, it looks like a SMALLER NUMBER. "EGP 289,600.00"
+                    clipped mid-string reads as a perfectly plausible figure
+                    that happens to be wrong. Wrapping is ugly at worst; the
+                    real fix is on the caller, which should pass money to a KPI
+                    in the compact format (see `formatCompactMoney`). */}
+                <span className="min-w-0 break-words font-display text-headline leading-tight text-fg tabular-nums">
                   {item.value}
                 </span>
                 {item.unit ? (
@@ -195,7 +202,10 @@ export function KpiStrip({
                 ) : null}
               </div>
               {item.foot ? (
-                <p className="mt-1.5 truncate text-label text-fg-muted">{item.foot}</p>
+                // Two lines, then clip. One line truncated at "Confirmed and
+                // in-progress o…" tells the reader nothing they did not already
+                // know from the label above it.
+                <p className="mt-1.5 line-clamp-2 text-label text-fg-muted">{item.foot}</p>
               ) : null}
             </>
           );

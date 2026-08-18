@@ -363,10 +363,6 @@ test.describe("shared B2B chrome on a supply-side workspace", () => {
     await expect(strip).toBeVisible();
     await expect(strip.locator("> *")).toHaveCount(5);
 
-    // And the shared rail is still the shared rail where a rail is right — the
-    // Reports analytics strip — so this sprint did not fork the primitive.
-    await page.goto("/b2b/reports");
-    await expect(page.getByTestId("card-rail").first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });
 
