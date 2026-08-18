@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
@@ -194,6 +195,14 @@ export function GlobalSearch({
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  // The overlay is PORTALLED to <body>, and that is not a preference.
+  // The shared header paints itself with `backdrop-blur`, and a backdrop filter
+  // makes its element a containing block for every `position: fixed`
+  // descendant — so an overlay rendered in place is positioned against the
+  // HEADER rather than the viewport, and lands visibly off-centre (and, on a
+  // narrower shell, clipped). `mounted` gates it because `document` does not
+  // exist during SSR.
+  const [mounted, setMounted] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const requestId = useRef(0);
 
@@ -317,6 +326,8 @@ export function GlobalSearch({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
     if (open) requestAnimationFrame(() => input.current?.focus());
   }, [open]);
@@ -411,7 +422,8 @@ export function GlobalSearch({
         </kbd>
       </button>
 
-      {open ? (
+      {open && mounted
+        ? createPortal(
         <div className="fixed inset-0" style={{ zIndex: 500 }} role="presentation">
           <button
             type="button"
@@ -441,7 +453,7 @@ export function GlobalSearch({
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onInputKey}
                 dir={dir}
-                type="search"
+                type="text"
                 autoComplete="off"
                 spellCheck={false}
                 data-testid="global-search-input"
@@ -542,8 +554,10 @@ export function GlobalSearch({
               </span>
             </div>
           </div>
-        </div>
-      ) : null}
+        </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

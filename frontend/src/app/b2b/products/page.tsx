@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import {
@@ -8,7 +9,7 @@ import {
 } from "@/server/queries/commerce";
 import { commerceStance, supplyVoice } from "@/lib/workspace/supply-side";
 import { PRODUCT_CATEGORIES } from "@/features/commerce/constants";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { StatePanel } from "@/components/ui/primitives";
 import { StatTiles, TabLinks } from "@/components/ui/stat-tiles";
 import { FilterBar } from "@/components/ui/filter-bar";
@@ -96,6 +97,7 @@ export default async function ProductsPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        Icon={PackageIcon}
         title={isSeller ? m.supply.products.title : m.commerce.products.title}
         subtitle={
           isSeller
@@ -104,9 +106,17 @@ export default async function ProductsPage({
         }
         count={products.length}
         action={canWrite ? { href: "/b2b/products/new", label: m.commerce.products.new } : undefined}
+        toolbar={
+          isSeller ? (
+            <Link href="/b2b/rfqs" className="text-label font-medium text-accent hover:underline">
+              {m.supply.demand.title} →
+            </Link>
+          ) : undefined
+        }
       />
 
       <StatTiles
+        layout="strip"
         tiles={[
           { label: m.supply.products.stat.total, value: counts.total, Icon: PackageIcon, tone: "accent" },
           {

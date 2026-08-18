@@ -1,13 +1,16 @@
+import Link from "next/link";
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listQuotations, type QuotationListRow } from "@/server/queries/commerce";
 import { commerceStance } from "@/lib/workspace/supply-side";
 import { formatMoney } from "@/features/commerce/constants";
-import { formatCompactMoney } from "@/lib/ui/format";
-import { PageHeader } from "@/features/sales/page-parts";
+import { formatCompactMoney, formatPercent } from "@/lib/ui/format";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { TabLinks, StatTiles } from "@/components/ui/stat-tiles";
+import { WorkPane, Panel, PanelRow } from "@/components/ui/workspace-layout";
+import { DonutSplit } from "@/components/ui/charts";
 import { QuotationTable } from "@/features/commerce/commerce-lists";
-import { InboxIcon, ClockIcon, CheckIcon, XIcon, WalletIcon } from "@/components/ui/icons";
+import { InboxIcon, ClockIcon, CheckIcon, XIcon, WalletIcon, FileTextIcon } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -74,12 +77,22 @@ export default async function QuotationsPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        Icon={leadsWithSent ? FileTextIcon : InboxIcon}
         title={leadsWithSent ? m.supply.quotations.title : m.commerce.quotation.title}
         subtitle={leadsWithSent ? m.supply.quotations.subtitle : m.commerce.quotation.subtitle}
         count={rows.length}
+        toolbar={
+          <Link
+            href="/b2b/reports"
+            className="text-label font-medium text-accent hover:underline"
+          >
+            {m.home.openReports} →
+          </Link>
+        }
       />
 
       <StatTiles
+        layout="strip"
         tiles={[
           {
             label: onSent ? m.supply.tile.awaitingDecision : m.commerce.quotation.stat.awaiting,
@@ -121,7 +134,45 @@ export default async function QuotationsPage({
         ]}
       />
 
-      <div>
+      <WorkPane
+        asideWidth="wide"
+        aside={
+          /* The reference puts a status donut and a short ranking beside its
+             commercial tables. Both are honest here because both are read from
+             the rows already on screen — no second query, and nothing that is
+             not already in the list below. */
+          <>
+            <Panel title={m.supply.chart.quotationsByStatus} Icon={FileTextIcon}>
+              <DonutSplit
+                slices={QUOTATION_STATUSES.map((s) => ({
+                  label: m.commerce.quotationStatus[s],
+                  value: countBy(rows, s),
+                }))}
+                emptyLabel={m.reports.noData}
+                ariaLabel={m.supply.chart.quotationsByStatus}
+                centerLabel={m.commerce.quotation.stat.total}
+                formatValue={(v) => String(v)}
+                formatShare={(pct) => formatPercent(pct, locale)}
+              />
+            </Panel>
+
+            {onSent ? (
+              <Panel title={m.supply.acceptedValue} Icon={WalletIcon}>
+                <PanelRow
+                  label={m.commerce.quotationStatus.accepted}
+                  value={formatMoney(valueOf(rows, "accepted"), locale)}
+                  tone="success"
+                />
+                <PanelRow
+                  label={m.commerce.quotationStatus.submitted}
+                  value={formatMoney(valueOf(rows, "submitted"), locale)}
+                  tone="warning"
+                />
+              </Panel>
+            ) : null}
+          </>
+        }
+      >
         {canQuote ? (
           <TabLinks
             basePath="/b2b/quotations"
@@ -141,7 +192,10 @@ export default async function QuotationsPage({
           locale={locale}
           m={m}
         />
-      </div>
+      </WorkPane>
     </div>
   );
 }
+
+/** The four states a quotation can be in — the donut may not invent a fifth. */
+const QUOTATION_STATUSES = ["draft", "submitted", "accepted", "rejected"] as const;

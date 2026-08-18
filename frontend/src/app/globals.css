@@ -52,10 +52,22 @@
    *
    * Applied to `*` rather than to a list of components so a scroll container
    * added later inherits it without anyone remembering to opt in.
+   *
+   * THE ONE TRAP, AND IT COST A ROUND OF QA
+   * The standard properties and the legacy pseudo-elements are NOT additive in
+   * Blink: the moment `scrollbar-width` or `scrollbar-color` matches an element,
+   * Chrome ignores every `::-webkit-scrollbar-*` rule for it. Setting both — the
+   * obvious "belt and braces" version of this file — therefore does the exact
+   * opposite of what it looks like: it silently disables the arrow removal and
+   * leaves Chrome drawing its classic scrollbar, buttons and all, merely tinted.
+   * So the standard properties are fenced behind a feature query that is FALSE
+   * in Blink and Safari and TRUE in Firefox, and the two mechanisms never meet.
    * ------------------------------------------------------------------ */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    }
   }
 
   ::-webkit-scrollbar {

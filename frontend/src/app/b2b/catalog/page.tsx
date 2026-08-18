@@ -1,7 +1,8 @@
 import { getPageContext } from "@/server/queries/page-context";
+import { SearchIcon } from "@/components/ui/icons";
 import { getMessages } from "@/lib/i18n/translate";
 import { listCatalog, savedProductIds, type ProductCategory } from "@/server/queries/commerce";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { CatalogGrid } from "@/features/commerce/catalog-grid";
 import { PRODUCT_CATEGORIES } from "@/features/commerce/constants";
@@ -41,6 +42,7 @@ export default async function CatalogPage({
   return (
     <div className="pb-16 tablet:pb-0">
       <PageHeader
+        Icon={SearchIcon}
         title={m.commerce.catalog.title}
         subtitle={supplierName ?? m.commerce.catalog.subtitle}
         count={products.length}

@@ -1,7 +1,7 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listCustomers, branchNameMap, memberNameMap } from "@/server/queries/sales";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { StatePanel } from "@/components/ui/primitives";
 import { UsersIcon } from "@/components/ui/icons";
 import { CustomersTable } from "@/features/sales/customers-table";
@@ -39,6 +39,7 @@ export default async function CustomersPage({
   return (
     <div className="pb-16 tablet:pb-0">
       <PageHeader
+        Icon={UsersIcon}
         title={m.customers.title}
         subtitle={m.customers.subtitle}
         count={customers.length}

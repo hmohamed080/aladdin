@@ -62,7 +62,7 @@ export function ProfileMenu({
 }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [, start] = useTransition();
   const [theme, setThemeState] = useState<ThemePreference>(themePreference);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -97,11 +97,36 @@ export function ProfileMenu({
   }, [open]);
 
   const chooseLocale = (next: Locale) => {
-    if (next === locale) return;
+    // Deliberately NO `next === locale` early return. `locale` is a prop from
+    // the server layout, and the one thing this control must never depend on is
+    // that prop having already caught up: re-writing the same cookie is
+    // idempotent and costs one round trip, whereas a stale comparison silently
+    // turns the button into a no-op — a control that does nothing, with no way
+    // for the user to tell why.
+    // The menu CLOSES on a language change and stays open on a theme change,
+    // and the asymmetry is deliberate. A theme flips instantly and in place, so
+    // keeping the menu up lets the user compare and pick again. A language
+    // change revalidates the whole layout and re-renders every string on the
+    // page underneath — holding a menu open across that leaves a stale panel
+    // floating over a page that has already moved on.
+    setOpen(false);
     start(async () => {
-      document.documentElement.setAttribute("dir", next === "ar" ? "rtl" : "ltr");
-      document.documentElement.setAttribute("lang", next);
       await setLocale(next);
+      // A FULL reload, and not a router refresh.
+      //
+      // The locale lives in a cookie and is read by the ROOT layout, which also
+      // owns `<html lang>` and `<html dir>`. Neither `revalidatePath` in the
+      // action nor `router.refresh()` here reliably re-renders that root element
+      // for the page the user is standing on — which is the long-standing
+      // language-switch defect: the cookie flipped, the next cold load was
+      // Arabic, and the page in front of the user stayed English. Patching it by
+      // setting `dir`/`lang` imperatively only made the mismatch look
+      // deliberate: an RTL layout full of English strings.
+      //
+      // A language change is a rare, whole-document event. Reloading is the one
+      // path that is guaranteed correct for every string, both directions, the
+      // font stack and the server-rendered markup at once.
+      window.location.reload();
     });
   };
 
@@ -200,7 +225,6 @@ export function ProfileMenu({
                 <Segment
                   key={value}
                   selected={value === locale}
-                  disabled={pending}
                   onSelect={() => chooseLocale(value)}
                   testId={`locale-${value}`}
                 >
@@ -221,7 +245,6 @@ export function ProfileMenu({
                   <Segment
                     key={value}
                     selected={value === theme}
-                    disabled={pending}
                     onSelect={() => chooseTheme(value)}
                     testId={`theme-${value}`}
                   >
@@ -292,13 +315,11 @@ function SegmentedGroup({ label, children }: { label: string; children: React.Re
 
 function Segment({
   selected,
-  disabled,
   onSelect,
   children,
   testId,
 }: {
   selected: boolean;
-  disabled?: boolean;
   onSelect: () => void;
   children: React.ReactNode;
   testId: string;
@@ -308,13 +329,11 @@ function Segment({
       type="button"
       role="radio"
       aria-checked={selected}
-      disabled={disabled}
       onClick={onSelect}
       data-testid={testId}
       className={cn(
         "flex flex-1 items-center justify-center gap-1.5 rounded-sm border px-2 py-1.5 text-label font-medium transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-        "disabled:opacity-60",
         selected
           ? "border-accent-solid/50 bg-accent-solid/15 text-accent"
           : "border-transparent bg-surface-2/60 text-fg-secondary hover:bg-surface-2 hover:text-fg",

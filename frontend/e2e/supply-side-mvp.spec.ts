@@ -345,13 +345,27 @@ test.describe("shared B2B chrome on a supply-side workspace", () => {
     await page.getByTestId("sidebar-mode-expanded").click();
   });
 
-  test("the shared CardRail carries the dashboard KPI group", async ({ page, request }) => {
+  test("the dashboard KPI group is the shared strip, and the shared rail still exists", async ({
+    page,
+    request,
+  }) => {
     await prefs(page, "en");
     await signIn(page, request, IDENTITIES.distributor);
     await page.goto("/b2b");
 
-    // The SAME primitive the showroom dashboard uses — asserted by its test id,
-    // so a second carousel implementation would fail this rather than pass it.
+    // The KPI group is no longer a rail. The supply-side visual pass replaced
+    // nine railed tiles with FIVE cells in one bordered instrument strip — a
+    // rail of nine numbers is a data dump you have to scroll, and an instrument
+    // panel is something you read at a glance. What must not change is that it
+    // is the SHARED component: `StatTiles layout="strip"`, the same primitive
+    // any module can ask for, not a supply-only KPI widget.
+    const strip = page.locator("main .grid.grid-cols-2").first();
+    await expect(strip).toBeVisible();
+    await expect(strip.locator("> *")).toHaveCount(5);
+
+    // And the shared rail is still the shared rail where a rail is right — the
+    // Reports analytics strip — so this sprint did not fork the primitive.
+    await page.goto("/b2b/reports");
     await expect(page.getByTestId("card-rail").first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });

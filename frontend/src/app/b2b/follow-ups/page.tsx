@@ -2,7 +2,8 @@ import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listFollowUps, customerNameMap, memberNameMap } from "@/server/queries/sales";
 import { canAssign } from "@/server/queries/context";
-import { PageHeader, FlashSuccess } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
+import { FlashSuccess } from "@/features/sales/page-parts";
 import { StatePanel } from "@/components/ui/primitives";
 import { CalendarCheckIcon } from "@/components/ui/icons";
 import { FollowUpsBoard } from "@/features/sales/follow-ups-board";
@@ -51,7 +52,7 @@ export default async function FollowUpsPage({
   return (
     <div className="pb-16 tablet:pb-0">
       {updated ? <FlashSuccess messageKey="followUps.updated" /> : null}
-      <PageHeader title={m.followUps.title} subtitle={m.followUps.subtitle} count={open.length} />
+      <PageHeader Icon={CalendarCheckIcon} title={m.followUps.title} subtitle={m.followUps.subtitle} count={open.length} />
       {all.length === 0 ? (
         <StatePanel icon={<CalendarCheckIcon size={20} />} title={m.followUps.empty} body={m.followUps.noDue} />
       ) : (

@@ -432,7 +432,7 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     // "Personal" as its subtitle, so an anchored match would never hit it.
     await page.getByRole("menuitem").filter({ hasText: /personal/i }).click();
     await page.waitForURL(/\/home$/, { waitUntil: "commit" });
-    await page.getByRole("button", { name: label((m) => m.common.signOut) }).click();
+    await signOutFromAccountMenu(page);
     await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
     await signIn(page, request, "mostafa@example.test", /\/home$/);
     await expect(page).toHaveURL(/\/home$/);
@@ -443,7 +443,7 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     // and an anchored match keeps this off the Personal entry above it.
     await page.getByRole("menuitem", { name: "Horizon Contracting Owner", exact: true }).click();
     await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
-    await page.getByRole("button", { name: label((m) => m.common.signOut) }).click();
+    await signOutFromAccountMenu(page);
     await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
     await signIn(page, request, "mostafa@example.test", /\/b2b(\/|$)/);
     await expect(page).toHaveURL(/\/b2b(\/|$)/);
@@ -525,14 +525,31 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     await noOverflow(page);
   });
 
-  /* ===== Locale switching updates every visible string on a changed page ==== */
+  /**
+ * Sign out through the account menu.
+ *
+ * The control moved there in the shared-header pass: the header carries search,
+ * work context and the avatar, and everything about the PERSON — profile,
+ * language, appearance, sign-out — lives behind the avatar. There is exactly one
+ * sign-out control in the authenticated product, and it still posts to the same
+ * trusted server action.
+ */
+async function signOutFromAccountMenu(page: Page) {
+  await page.getByTestId("profile-menu-trigger").click();
+  await page.getByTestId("profile-sign-out").click();
+}
+
+/* ===== Locale switching updates every visible string on a changed page ==== */
   test("9 — switching locale on the personal home re-renders all copy", async ({ page, request }) => {
     await prefs(page, "en");
     await registerSalesperson(page, request, "Locale Switch Tester", "Showroom sales");
     await expect(page.getByRole("heading", { name: /your sales setup/i })).toBeVisible();
 
-    // The switch is labelled "Language" (it toggles to the other locale).
-    await page.getByRole("button", { name: /^language$/i }).click();
+    // Language now lives in the account menu, next to appearance — the header's
+    // loose language/theme/sign-out trio is gone from every authenticated
+    // surface. Same cookie, same server action, one place to find it.
+    await page.getByTestId("profile-menu-trigger").click();
+    await page.getByTestId("locale-ar").click();
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.getByRole("heading", { name: /إعداد المبيعات/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: /your sales setup/i })).toHaveCount(0);

@@ -2,7 +2,7 @@ import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listOrgMembers, listOrgInvitations } from "@/server/queries/organization";
 import { listJoinRequests } from "@/server/queries/affiliation";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { StatePanel } from "@/components/ui/primitives";
 import { StatTiles } from "@/components/ui/stat-tiles";
 import { PeopleManager } from "@/features/organization/people-manager";
@@ -40,7 +40,7 @@ export default async function OrganizationPeoplePage() {
   if (!canManageMembers) {
     return (
       <div className="flex flex-col gap-lg">
-        <PageHeader title={m.org.title} subtitle={m.org.subtitle} />
+        <PageHeader Icon={UsersIcon} title={m.org.title} subtitle={m.org.subtitle} />
         <StatePanel tone="warning" title={m.org.error.notAuthorized} body={m.org.noAccessBody} />
       </div>
     );
@@ -61,11 +61,12 @@ export default async function OrganizationPeoplePage() {
 
   return (
     <div className="flex flex-col gap-xl pb-16 tablet:pb-0">
-      <PageHeader title={m.org.title} subtitle={m.org.subtitle} />
+      <PageHeader Icon={UsersIcon} title={m.org.title} subtitle={m.org.subtitle} />
 
       {/* Every figure is counted from the roster already loaded above — no extra
           read, and nothing here that the records do not already state. */}
       <StatTiles
+        layout="strip"
         tiles={[
           { label: m.org.stat.members, value: members.length, Icon: UsersIcon, tone: "accent" },
           {

@@ -13,7 +13,7 @@ import {
 } from "@/server/queries/reports";
 import { commerceStance, supplyVoice } from "@/lib/workspace/supply-side";
 import { SupplyReport } from "@/features/reports/supply-report";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { Card, SectionTitle } from "@/components/ui/primitives";
 import { StatTiles } from "@/components/ui/stat-tiles";
 import { FilterBar } from "@/components/ui/filter-bar";
@@ -32,6 +32,7 @@ import {
   LayersIcon,
   UsersIcon,
   ActivityIcon,
+  BarChartIcon,
 } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
@@ -144,7 +145,7 @@ export default async function ReportsPage({
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
-      <PageHeader title={m.reports.title} subtitle={m.reports.subtitle} />
+      <PageHeader Icon={BarChartIcon} title={m.reports.title} subtitle={m.reports.subtitle} />
 
       <FilterBar
         basePath="/b2b/reports"

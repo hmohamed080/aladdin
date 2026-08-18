@@ -97,12 +97,17 @@ test.describe("Workspace sidebar display modes", () => {
     await expect(catalog).toBeVisible();
     await expect(catalog).toHaveAttribute("aria-current", "page");
 
-    // ...and come back visually on hover, as a tooltip. Located by CSS, not by
-    // role: the tooltip is `aria-hidden` on purpose (the link is already NAMED
-    // with the same string, so exposing both would make it stutter), and
-    // `getByRole` only sees the accessibility tree.
+    // Hovering must NOT bring the word back as a floating caption.
+    //
+    // It used to. Two problems, and neither was cosmetic: the caption rendered
+    // outside the rail, over page content, so running the pointer down the icons
+    // flashed a box in and out over the workspace; and in expand-on-hover mode
+    // the rail was already opening to show that exact word, so the same label
+    // appeared twice in two places. The hover cue is now the icon's own tile.
+    // The accessible name above is what carries the label.
     await catalog.hover();
-    await expect(sidebar(page).locator('[role="tooltip"]')).toHaveText("Browse products");
+    await expect(sidebar(page).locator('[role="tooltip"]')).toHaveCount(0);
+    await expect(catalog).toHaveText("");
   });
 
   test("expand-on-hover overlays the page instead of reflowing it", async ({ page, request }) => {

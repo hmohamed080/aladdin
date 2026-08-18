@@ -11,7 +11,8 @@ import {
 } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
 import { formatDate } from "@/lib/ui/format";
-import { PageHeader, BackLink, FlashSuccess } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
+import { BackLink, FlashSuccess } from "@/features/sales/page-parts";
 import { Card, Field, StatePanel, SectionTitle } from "@/components/ui/primitives";
 import { StageBadge, StatusBadge, PriorityBadge, FollowUpStatusBadge } from "@/features/sales/badges";
 import Link from "next/link";

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ComponentType } from "react";
 import { cn } from "@/lib/ui/cn";
 import { CardRail } from "@/components/ui/card-rail";
+import { KpiStrip, type Kpi } from "@/components/ui/workspace-layout";
 
 /**
  * The KPI strip that opens every showroom module — one canonical implementation.
@@ -63,8 +64,15 @@ function TileBody({ tile }: { tile: Tile }) {
 }
 
 /**
- * `grid` is the default and stays right for the three-or-four-tile strips that
- * open most modules — they fit, and a grid lets the eye compare them at a glance.
+ * `strip` is the dense presentation the supply-side reference is built around:
+ * one bordered instrument panel with hairline seams instead of a row of separate
+ * floating cards. It is what every module that opens with three-to-six real
+ * counts should use — the numbers read as ONE reading of the business rather
+ * than as six unrelated cards, and it costs a third less vertical space, which
+ * is the difference between the first list row being above or below the fold.
+ *
+ * `grid` is the older default and stays right for the three-or-four-tile strips
+ * that open most modules — they fit, and a grid lets the eye compare them at a glance.
  *
  * `rail` is for the long strips (the dashboard's eight, Reports' six). Two things
  * make it the better answer there: the row stays one row instead of pushing the
@@ -78,13 +86,30 @@ export function StatTiles({
   className,
   layout = "grid",
   railLabel,
+  columns,
 }: {
   tiles: Tile[];
   className?: string;
-  layout?: "grid" | "rail";
+  layout?: "grid" | "rail" | "strip";
   /** Accessible name for the scroll region. Required by `layout="rail"`. */
   railLabel?: string;
+  /** Cells per row on desktop; follows the tile count when unset. `strip` only. */
+  columns?: 2 | 3 | 4 | 5 | 6;
 }) {
+  if (layout === "strip") {
+    // One shape of data, two presentations: `Tile.hint` is the same sentence a
+    // `Kpi.foot` carries, so the mapping is a rename and not a translation.
+    const items: Kpi[] = tiles.map((t) => ({
+      label: t.label,
+      value: t.value,
+      Icon: t.Icon,
+      tone: t.tone,
+      foot: t.hint,
+      href: t.href,
+    }));
+    return <KpiStrip items={items} columns={columns} className={className} />;
+  }
+
   const cards = tiles.map((tile) =>
     tile.href ? (
       <Link
@@ -158,7 +183,11 @@ export function TabLinks({
   };
 
   return (
-    <nav aria-label={label} className="mb-lg -mx-1 overflow-x-auto">
+    /* `overflow-y-hidden` is not redundant: a lone `overflow-x: auto` makes the
+       OTHER axis `auto` too, and the tab row's bottom rule is a pixel outside its
+       box — enough for Chrome to paint a stub vertical scrollbar beside the
+       tabs. It has nothing to scroll to; it is pure artifact. */
+    <nav aria-label={label} className="mb-lg -mx-1 overflow-x-auto overflow-y-hidden">
       <ul className="flex w-max min-w-full gap-1 border-b px-1">
         {tabs.map((tab) => {
           const active = tab.value === current;

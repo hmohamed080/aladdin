@@ -2,7 +2,8 @@ import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listOrgMembers } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
-import { PageHeader, BackLink } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
+import { BackLink } from "@/features/sales/page-parts";
 import { StatePanel } from "@/components/ui/primitives";
 import { LeadForm } from "@/features/sales/lead-form";
 

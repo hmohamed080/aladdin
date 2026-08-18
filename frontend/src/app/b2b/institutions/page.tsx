@@ -6,7 +6,7 @@ import {
   sharedWorkCounts,
   INSTITUTION_ORG_TYPES,
 } from "@/server/queries/directory";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { StatTiles } from "@/components/ui/stat-tiles";
 import { OrganizationDirectoryTable } from "@/features/directory/directory-tables";
@@ -57,9 +57,10 @@ export default async function InstitutionsPage({
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
-      <PageHeader title={m.institutions.title} subtitle={m.institutions.subtitle} count={rows.length} />
+      <PageHeader Icon={LandmarkIcon} title={m.institutions.title} subtitle={m.institutions.subtitle} count={rows.length} />
 
       <StatTiles
+        layout="strip"
         tiles={[
           { label: m.institutions.stat.total, value: counts.total, Icon: LandmarkIcon, tone: "accent" },
           { label: m.institutions.stat.verified, value: counts.verified, Icon: BadgeCheckIcon, tone: "success" },

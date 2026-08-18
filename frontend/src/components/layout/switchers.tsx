@@ -6,7 +6,7 @@ import { setLocale, setTheme } from "@/server/actions/preferences";
 import { Button } from "@/components/ui/controls";
 import { SunIcon, MoonIcon } from "@/components/ui/icons";
 
-/** Toggle Arabic <-> English (cookie-backed; re-renders the server layout). */
+/** Toggle Arabic <-> English (cookie-backed; reloads so the root layout re-renders). */
 export function LanguageSwitch() {
   const { locale, t } = useI18n();
   const [pending, start] = useTransition();
@@ -19,14 +19,12 @@ export function LanguageSwitch() {
       disabled={pending}
       onClick={() =>
         start(async () => {
-          // React does not patch <html> attributes on a client-side re-render, so
-          // revalidatePath alone updates the translated text but leaves <html dir>
-          // stale in production (dev masks this with a fuller refresh). Flip the
-          // direction/lang client-side immediately — mirroring ThemeSwitch — then
-          // persist server-side so SSR stays correct on the next load.
-          document.documentElement.setAttribute("dir", next === "ar" ? "rtl" : "ltr");
-          document.documentElement.setAttribute("lang", next);
           await setLocale(next);
+          // See `ProfileMenu.chooseLocale`: the root layout owns `<html lang>`
+          // and `<html dir>` and is not reliably re-rendered for the current
+          // page by a revalidation, so a language switch reloads the document
+          // rather than leaving an RTL shell full of English strings.
+          window.location.reload();
         })
       }
     >

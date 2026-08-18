@@ -1,12 +1,16 @@
+import Link from "next/link";
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listOrders, type OrderListRow } from "@/server/queries/execution";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { TabLinks, StatTiles } from "@/components/ui/stat-tiles";
+import { WorkPane, Panel } from "@/components/ui/workspace-layout";
+import { DonutSplit } from "@/components/ui/charts";
 import { OrderTable } from "@/features/execution/execution-lists";
 import { ClipboardIcon, ActivityIcon, CheckIcon, WalletIcon } from "@/components/ui/icons";
 import { formatMoney } from "@/features/commerce/constants";
 import { commerceStance } from "@/lib/workspace/supply-side";
+import { formatPercent } from "@/lib/ui/format";
 
 export const dynamic = "force-dynamic";
 
@@ -64,12 +68,19 @@ export default async function OrdersPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        Icon={ClipboardIcon}
         title={leadsWithReceived ? m.supply.orders.title : m.execution.order.title}
         subtitle={leadsWithReceived ? m.supply.orders.subtitle : m.execution.order.subtitle}
         count={rows.length}
+        toolbar={
+          <Link href="/b2b/projects" className="text-label font-medium text-accent hover:underline">
+            {m.nav.projects} →
+          </Link>
+        }
       />
 
       <StatTiles
+        layout="strip"
         tiles={[
           { label: m.execution.order.stat.confirmed, value: countBy(rows, "confirmed"), Icon: ClipboardIcon, tone: "info" },
           { label: m.execution.order.stat.inProgress, value: countBy(rows, "in_progress"), Icon: ActivityIcon, tone: "accent" },
@@ -78,7 +89,23 @@ export default async function OrdersPage({
         ]}
       />
 
-      <div>
+      <WorkPane
+        aside={
+          <Panel title={m.supply.chart.ordersByStatus} Icon={ClipboardIcon}>
+            <DonutSplit
+              slices={ORDER_STATUSES.map((s) => ({
+                label: m.execution.orderStatus[s],
+                value: countBy(rows, s),
+              }))}
+              emptyLabel={m.reports.noData}
+              ariaLabel={m.supply.chart.ordersByStatus}
+              centerLabel={m.execution.order.title}
+              formatValue={(v) => String(v)}
+              formatShare={(pct) => formatPercent(pct, locale)}
+            />
+          </Panel>
+        }
+      >
         {showSellSide ? (
           <TabLinks
             basePath="/b2b/orders"
@@ -98,7 +125,10 @@ export default async function OrdersPage({
           locale={locale}
           m={m}
         />
-      </div>
+      </WorkPane>
     </div>
   );
 }
+
+/** The states an order can be in — the donut may not invent one. */
+const ORDER_STATUSES = ["confirmed", "in_progress", "completed", "cancelled"] as const;

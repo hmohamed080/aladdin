@@ -1,7 +1,7 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listProjects, type ProjectListRow } from "@/server/queries/execution";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { TabLinks, StatTiles } from "@/components/ui/stat-tiles";
 import { ProjectTable } from "@/features/execution/execution-lists";
 import { formatCompactMoney } from "@/lib/ui/format";
@@ -61,12 +61,14 @@ export default async function ProjectsPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        Icon={LayersIcon}
         title={m.execution.project.title}
         subtitle={m.execution.project.subtitle}
         count={rows.length}
       />
 
       <StatTiles
+        layout="strip"
         tiles={[
           { label: m.execution.project.stat.active, value: countBy(rows, "active"), Icon: ActivityIcon, tone: "accent" },
           { label: m.execution.project.stat.planned, value: countBy(rows, "planned"), Icon: LayersIcon, tone: "info" },

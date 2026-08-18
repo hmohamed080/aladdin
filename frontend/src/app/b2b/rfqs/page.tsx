@@ -1,9 +1,13 @@
+import Link from "next/link";
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listRfqs, type RfqListRow } from "@/server/queries/commerce";
 import { commerceStance, supplyVoice } from "@/lib/workspace/supply-side";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { TabLinks, StatTiles } from "@/components/ui/stat-tiles";
+import { WorkPane, Panel } from "@/components/ui/workspace-layout";
+import { DonutSplit } from "@/components/ui/charts";
+import { formatPercent } from "@/lib/ui/format";
 import { RfqTable } from "@/features/commerce/commerce-lists";
 import {
   ShoppingBagIcon,
@@ -11,6 +15,7 @@ import {
   ReceiptIcon,
   CheckIcon,
   DemandIcon,
+  FileTextIcon,
 } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
@@ -91,6 +96,7 @@ export default async function PurchaseRequestsPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        Icon={leadsWithDemand ? DemandIcon : ShoppingBagIcon}
         title={leadsWithDemand ? m.supply.demand.title : m.commerce.rfq.title}
         subtitle={
           leadsWithDemand
@@ -98,6 +104,11 @@ export default async function PurchaseRequestsPage({
             : m.commerce.rfq.subtitle
         }
         count={rows.length}
+        toolbar={
+          <Link href="/b2b/quotations" className="text-label font-medium text-accent hover:underline">
+            {leadsWithDemand ? m.supply.quotations.title : m.commerce.quotation.title} →
+          </Link>
+        }
       />
 
       {/* The tiles describe the VIEW, not the module. On the demand side
@@ -106,6 +117,7 @@ export default async function PurchaseRequestsPage({
           is merely informational. Reusing one label for both would make the
           urgent bucket unreadable in one of the two seats. */}
       <StatTiles
+        layout="strip"
         tiles={[
           {
             label: onDemand ? m.supply.tile.awaitingResponse : m.commerce.rfq.stat.open,
@@ -140,7 +152,49 @@ export default async function PurchaseRequestsPage({
         ]}
       />
 
-      <div>
+      <WorkPane
+        aside={
+          <>
+            <Panel title={m.supply.chart.demandByStatus} Icon={DemandIcon}>
+              <DonutSplit
+                slices={RFQ_STATUSES.map((s) => ({
+                  label: m.commerce.rfqStatus[s],
+                  value: countBy(rows, s),
+                }))}
+                emptyLabel={m.reports.noData}
+                ariaLabel={m.supply.chart.demandByStatus}
+                centerLabel={onDemand ? m.supply.demand.title : m.commerce.rfq.title}
+                formatValue={(v) => String(v)}
+                formatShare={(pct) => formatPercent(pct, locale)}
+              />
+            </Panel>
+
+            {onDemand ? (
+              /* The reference's "how opportunities work" panel, pointed at the
+                 real mechanism: demand arrives because products are published,
+                 and it is answered with a quotation. Two links, both to routes
+                 that exist. */
+              <Panel title={m.supply.action.quotations} Icon={FileTextIcon}>
+                <p className="text-label text-fg-secondary">{m.supply.action.quotationsBody}</p>
+                <div className="mt-sm flex flex-col gap-1 border-t pt-sm">
+                  <Link
+                    href="/b2b/quotations"
+                    className="text-label font-medium text-accent hover:underline"
+                  >
+                    {m.supply.quotations.title} →
+                  </Link>
+                  <Link
+                    href="/b2b/products"
+                    className="text-label font-medium text-accent hover:underline"
+                  >
+                    {m.supply.products.title} →
+                  </Link>
+                </div>
+              </Panel>
+            ) : null}
+          </>
+        }
+      >
         {canRespond ? (
           <TabLinks
             basePath="/b2b/rfqs"
@@ -155,7 +209,10 @@ export default async function PurchaseRequestsPage({
         ) : null}
 
         <RfqTable rfqs={rows} perspective={onDemand ? "supplier" : "requester"} locale={locale} m={m} />
-      </div>
+      </WorkPane>
     </div>
   );
 }
+
+/** The states an RFQ can be in — the donut may not invent one. */
+const RFQ_STATUSES = ["draft", "submitted", "quoted", "closed", "cancelled"] as const;

@@ -4,7 +4,7 @@ import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { THEME_COOKIE } from "@/lib/theme/config";
 import { allowedNavKeys } from "@/lib/nav/modules";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { Card, SectionTitle, Field, Badge } from "@/components/ui/primitives";
 import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import {
@@ -72,7 +72,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
-      <PageHeader title={m.settings.title} subtitle={m.settings.subtitle} />
+      <PageHeader Icon={SettingsIcon} title={m.settings.title} subtitle={m.settings.subtitle} />
 
       {/* ---------------------------- Business ---------------------------- */}
       <SectionTitle icon={<BuildingIcon size={18} />}>{m.settings.group.business}</SectionTitle>

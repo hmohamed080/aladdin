@@ -1,8 +1,9 @@
 import { getPageContext } from "@/server/queries/page-context";
+import { BookmarkIcon } from "@/components/ui/icons";
 import { getMessages } from "@/lib/i18n/translate";
 import { listSavedProducts, type ProductCategory } from "@/server/queries/commerce";
 import { PRODUCT_CATEGORIES } from "@/features/commerce/constants";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { SavedGrid } from "@/features/commerce/saved-grid";
 
@@ -39,7 +40,7 @@ export default async function SavedProductsPage({
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
-      <PageHeader title={m.saved.title} subtitle={m.saved.subtitle} count={all.length} />
+      <PageHeader Icon={BookmarkIcon} title={m.saved.title} subtitle={m.saved.subtitle} count={all.length} />
 
       {present.length > 1 ? (
         <TabLinks

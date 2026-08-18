@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { customerOrganizations } from "@/server/queries/directory";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { Card, SectionTitle } from "@/components/ui/primitives";
 import { StatTiles } from "@/components/ui/stat-tiles";
 import { CustomerNetworkTable } from "@/features/directory/customer-table";
@@ -57,12 +57,14 @@ export default async function CustomersNetworkPage() {
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        Icon={StorefrontIcon}
         title={m.supply.customers.title}
         subtitle={m.supply.customers.subtitle}
         count={rows.length}
       />
 
       <StatTiles
+        layout="strip"
         tiles={[
           {
             label: m.supply.customers.stat.total,
