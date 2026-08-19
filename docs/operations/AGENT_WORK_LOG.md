@@ -2049,3 +2049,139 @@ Not run, per scope: full repository E2E, Lighthouse/performance, pgTAP (no schem
   (same cookie, same action, and it now reads the live theme) but worth reconciling with the account
   menu's three-way control next time settings is touched.
 - The reference's per-product media/thumbnails are placeholders; no image pipeline exists yet.
+
+---
+
+## Session · Visual UAT round 2 — global shell + Pilot scope
+**Branch** `feature/supply-side-b2b-mvp` · **PR** #34 (updated, NOT merged)
+
+Seven product-wide findings from UAT round 2. Discovery was deliberately scoped to the shared
+components named in the brief — no second repository audit.
+
+### Dark mode rebuilt on a neutral ground (the largest change)
+The dark theme was painted on **Basalt**, which is a BRAND colour — a cool blue-black stone that is
+right for the Aperture mark, the auth panel and every modal scrim, and wrong as a workspace ground.
+At `#0e1113` it is close enough to pure black that a full-height sidebar and an empty table region
+both read as dead space, while the jump up to `#1b2226` was large enough that every card looked like
+it was floating in a hole.
+
+A new **Carbon** primitive ramp is now the dark ground: neutral (no blue cast), starting at charcoal
+rather than near-black, stepping a few points of lightness at a time. Borders sit only just above the
+surface they divide — that is what removes the drawn-grid look — and contrast is carried by the TEXT,
+where the ratios actually have to hold (`15.7 / 7.7 / 4.8 : 1` on both canvas and surface). Basalt is
+untouched; the brand does not move.
+
+**Shadows are now theme-aware tokens** (`--shadow-raised` / `--shadow-card` / `--shadow-overlay`,
+mapped onto Tailwind's `sm` / `card` / `lg`). The old `shadow-card` was one fixed warm near-black at
+4%, tuned against Limestone and invisible on a charcoal ground — which is the real reason dark cards
+had no edge and dropdowns did not lift off the page. Overriding Tailwind's own `sm`/`lg` is
+deliberate: every menu, popover and rail in the product already reaches for those names.
+
+Light mode is unchanged (verified: `body` still resolves to `#f4f1ea`).
+
+### CardRail — the defect was consecutive clicks, not the step size
+One card per click was already correct **at rest** (a previous session replaced the pager arithmetic
+with geometry). What was still broken was clicking faster than the smooth scroll animates: 150ms in,
+the cards are at drifting intermediate positions, so a second click concluded that "the next card
+from here" was the one the first click was already travelling to, and commanded a move that merely
+finished it. **Three fast clicks advanced one card.**
+
+The rail now holds the travel distance it COMMITTED to and reasons about which card is next from
+where it is *headed*, while still measuring the distance it commands from live geometry (which is the
+frame `scrollBy` works in). The commitment is released on arrival and on any user-driven scroll
+(wheel / touch / pointer / keys), so an arrow can never fight a swipe. The rail's own scroll-padding
+is now read rather than assumed, so a card lands on its snap position instead of 4px past it and
+drifting further with every click.
+
+### Invitations by EMAIL or PHONE (schema + RPC change)
+The people a showroom or distributor needs in their workspace — a branch salesperson, a fitter, a
+driver — are on WhatsApp and frequently have no work email. `organization_invitations` now carries a
+`phone` column, `email` is nullable, and **exactly one** is set per row (`ck_invitation_contact`), so
+acceptance always has one rule to check.
+
+**Nothing claims a message was sent that was not.** Email invitations reuse the existing email path.
+There is no SMS/WhatsApp sender configured here, so a phone invitation is created, tokenized, and the
+link handed back with a one-press copy and copy that says plainly: *"we don't send text messages yet
+— copy this link and send it on WhatsApp or however you normally reach them."* No new paid provider
+was introduced, and tokens are never logged.
+
+**The acceptance rule, stated honestly.** An email invitation stays bound to its verified address. A
+phone invitation binds to a confirmed phone WHEN THE ACCEPTOR HAS ONE — which starts protecting these
+invitations the day WhatsApp OTP is enabled, with no further migration — and otherwise rests on the
+unguessable single-use token, with a verified contact of some kind still required. That second branch
+is a bearer credential and is documented as one in the migration header and pinned by a pgTAP
+assertion, so weakening or tightening it later is a conscious decision rather than a silent drift.
+
+**A regression introduced and caught in validation:** the first version of `invitation_create` put
+`p_phone` third, which silently rebound every existing POSITIONAL caller — a branch uuid arriving
+where a phone was expected. `20_account_registration_test.sql` went from green to 10 failures. The
+parameter now goes LAST, and the migration also drops the intermediate 4-arg signature so a database
+that ran the earlier version does not keep both overloads and fail every named-argument call as
+ambiguous.
+
+### Finance / accounting in Pilot: there was none to remove
+Audited and confirmed: **no** invoice, collection, payment, receivable, wallet, payout, commission,
+settlement or accounting module exists in this repository — no route, no nav entry, no table, no
+i18n block. The Arabic strings quoted in the brief appear nowhere in the codebase; they are in the
+Distributor REFERENCE screenshots, which were never built.
+
+Two real vocabulary problems did exist and are fixed:
+- `WalletIcon` was the glyph beside **order value**, **quotation total** and **project value** — the
+  commercial figures the brief explicitly says to KEEP. A purse next to "total order value" invites a
+  manager to look for a balance, a top-up and a payout that do not exist. Replaced everywhere with a
+  neutral `MoneyIcon` (banknotes), and `WalletIcon` deleted so it cannot drift back into a value slot.
+- One string named a finance artefact even while denying it ("No invoice or payment is created") —
+  reworded in both catalogs.
+
+### Header, theme switch, sidebar
+- A direct **Light/Dark** switch now sits in the shared header, immediately before the avatar, at
+  every width. It is a pair of segments rather than one toggle because a lone moon icon cannot say
+  whether it means "you are in dark" or "press for dark", and either reading is common enough that
+  half the audience would read the current theme backwards. It owns **no state**: both it and the
+  profile menu now write through one `applyThemePreference` helper and one cookie, and the menu keeps
+  the full System/Light/Dark preference.
+- The B2B header's workspace switcher now shows the organization's **user-facing type** under its
+  name (*Distributor*, *Showroom / Dealer*, …) from the `orgType` catalog. Never the internal
+  `supplier` identifier; an unrecognized type renders nothing rather than a raw key.
+- **Sidebar bottom control.** Two defects. It sat 4px inboard of the navigation icons because its
+  padding was set in `sidebar-shell` while the nav rows' was set in `workspace-nav`; both now derive
+  from one `lib/ui/nav-geometry` module, so they cannot disagree by construction and Arabic is the
+  mirror of English with no direction-specific rule. And per the round-2 follow-up it is now
+  **icon-only in every mode, expanded included** — a control captioning a state the user can see is
+  noise. The mode names live in the menu it opens; the `aria-label` still names the control AND the
+  active mode.
+  The trap worth remembering: icon-only must not become icon-CENTRED. An expanded panel is 15rem
+  wide, so `justify-center` would have moved the glyph ~120px out of the column — trading a 4px
+  misalignment for a far worse one. The row keeps its start inset and simply has nothing after the
+  icon.
+
+### Validation
+typecheck OK · lint OK (0/0) · vitest **301/301** (4 new CardRail regressions incl. mid-animation
+consecutive clicks, boundary, and manual-scroll release; 2 new sidebar assertions incl. the inverted
+icon-only contract) · pgTAP `20_account_registration` and new `30_invitation_contact_channel`
+**16/16**, both re-run on a **from-scratch database** (all migrations replayed in order + all three
+seeds).
+
+Real-browser acceptance (Chrome, local dev): Distributor `rania@example.test` AR+EN, dark and light —
+header theme switch, org type in the header, invitation Email/Phone with a real phone invitation
+created end-to-end (`+201002003040` stored normalized, no email, pending) and shown masked as
+`+20•••40`; Showroom `hazem@example.test` — CardRail proven one-card-per-click **and** one-card-per-
+click when clicked 90ms apart mid-animation, in BOTH directions, with the boundary arrow disabling
+correctly and no page overflow; sidebar icon column measured at **33.5px for the control and all 17
+nav icons** in LTR and **1444.5px** in RTL, in expanded, collapsed, and mid-hover-reveal.
+
+**Environment notes for the next session:** `supabase db reset` fails on this machine — the CLI times
+out reaching `127.0.0.1:54322` even though the container is healthy, and on one run it dropped the
+database and left the `auth` schema a stub. Recovery: apply migrations via
+`docker exec -i supabase_db_aladdin psql`, then `docker restart supabase_auth_aladdin` so GoTrue
+re-runs its own auth migrations, then load the seeds. Also: `pnpm dev` and Playwright's `next build`
+share `.next`, so running both concurrently poisons the build with a `Cannot find module './NNNN.js'`
+— stop dev and `rm -rf .next` first.
+
+### Unfinished / next
+- `/b2b/settings` still carries the binary `ThemeSwitch` that cannot express "System" — now a THIRD
+  theme control alongside the header switch and the account menu. All three share one cookie and one
+  helper, so it is correct, but it should be reconciled to the three-way control next time settings
+  is touched.
+- Phone invitations are bearer-token invitations until phone identity exists. The matching branch is
+  already written and tested; enabling WhatsApp OTP turns it on with no migration.

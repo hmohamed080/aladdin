@@ -102,6 +102,20 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 - Dark is a **first-class, designed** theme (not an inverted filter): surfaces use layered elevation, borders shift to `$border-strong` equivalents, and contrast is re-verified against WCAG AA in dark.
 - **Admin surfaces are intentionally dark** by default — keep that deliberate, don't "fix" it to light.
 - Implement via a `dark` class on `<html>` (Tailwind `darkMode: "class"`); tokens resolve per theme.
+- **The dark GROUND is the Carbon ramp, never Basalt.** Basalt is a brand colour — the Aperture mark,
+  the auth brand panel, modal scrims. It is not a workspace ground: at `#0e1113` a full-height sidebar
+  and an empty table region both read as dead space, and the jump from it to the card surface made
+  every panel look like it was floating in a hole. Carbon is neutral (no blue cast), starts at
+  charcoal rather than near-black, and steps a few points of lightness at a time:
+  `--carbon` canvas → `--carbon-2` surface → `--carbon-3` state layer, with `--carbon-line` borders
+  sitting only just above the surface they divide. **Contrast is carried by the TEXT**
+  (15.7 / 7.7 / 4.8 : 1 on both canvas and surface), not by making surfaces lighter — a dark theme
+  whose cards are obviously lighter than the page has drifted halfway to white by the fifth nesting.
+- **Elevation is a LEVEL, not a colour.** `shadow-sm` / `shadow-card` / `shadow-lg` all resolve
+  through `--shadow-raised` / `--shadow-card` / `--shadow-overlay`, which each theme defines for
+  itself: a warm 4% wash on Limestone, a deeper and tighter black on Carbon. Never hardcode a shadow
+  in a component — a single fixed shadow tuned for light is invisible on a dark ground, which is
+  exactly how dark cards ended up with no edge and dropdowns that did not lift off the page.
 
 ## Navigation System
 - **Surface-appropriate navigation:** B2C = discovery-style top navigation + prominent search; B2B/Admin = **workspace shell with a sidebar**.
