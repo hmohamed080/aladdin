@@ -2345,3 +2345,58 @@ container becomes scrollable), the thumb colours and their hover/active step, th
 Verified in Chrome: injected a deliberately over-flowing box and read it in both themes — horizontal
 and vertical thumbs only, no track, no arrows, container surface showing through the gutter; plus the
 real sidebar and page bars in light. typecheck, lint, 315 unit tests green.
+
+## Session · One shell: full-width top header, sidebar beneath it
+**Branch** `feature/supply-side-b2b-mvp` · **PR** #34 (updated, NOT merged) · frontend only
+
+### The hierarchy was inverted, and the brand paid for it
+The header used to be a child of the CONTENT column, so the sidebar was the page's top-level element
+and the header a component of one region inside it. That is backwards — the header is global chrome,
+the sidebar navigates the region below it — and it had consequences: the brand lived in the sidebar,
+so a collapsed rail reduced the product's mark to a 26px glyph and a `brand` prop existed purely to
+decide which component was drawing it.
+
+Now, on **all three** authenticated surfaces (B2B workspace, personal `/home`, Admin console):
+header → then a row of sidebar/rail + main. The header spans the viewport, always carries the mark
+(a link to `/`), and `--app-header-h` (3rem) is a token because two things must agree on it — the
+header's own height and the sticky offset/height of the rail beneath it.
+
+### Supabase-direction density, Aladdin tokens
+One 48px row; 28px controls; breadcrumb `/` separators (`HeaderSeparator`) between the mark, the
+workspace and the branch — the branch is a scope INSIDE the organization, so it reads as the next
+crumb, not a second unrelated chip. The workspace trigger lost its border and its second line (the
+org type moved into `title`, still reachable, no longer costing a two-line control); the branch
+control is a 28px select or a plain label; search is 28px and narrower. Their hover states now
+actually paint, via `surface-hover` — every one of them was carrying a dead `/60` modifier.
+
+### The theme control is one icon again
+`ThemeSwitch` — the control the auth, onboarding, business-creation and settings surfaces already
+used — is what the header carries, with a `compact` variant for the 48px row. The two-segment pill
+(`theme-toggle.tsx`) is deleted. ThemeSwitch was rewired to `useThemeState` + `applyThemePreference`
+first: its old local-state-at-mount is exactly the defect fixed in 742f599, and promoting it into the
+header unfixed would have brought the disagreeing-controls bug back with it. e2e updated to press one
+button twice rather than two segments.
+
+### NOT built, because there is nothing real behind them
+- **Chat** — no messaging model. No table, no query, no component, nothing in git history.
+- **Notifications** — same. `src/features/notifications/` is an empty scaffold (a README only).
+- **System Points** — no points model anywhere: not in `supabase/migrations` (33 tables, none), not
+  in the frontend, not in history. The only "points" in the codebase are chart data points.
+The brief itself said to use real data only and invent no counters, so each of these would have to be
+a control that opens nothing. `actions` (header) and the nav module list (sidebar) are the slots they
+belong in the moment the data exists. **Help** WAS added: it points at `/auth/support`, which exists,
+stays reachable while signed in, and shows a real support contact or an honest unavailable state.
+**Feedback** was not: there is no feedback destination to point at.
+
+### Trade-off taken deliberately
+`/home`'s header row was constrained to the 1120px content column (a fix from an earlier round, so the
+avatar did not sit at the window edge while content started inboard). "Spans the full viewport width"
+overrides that: one shell, one geometry, on every surface.
+
+### Validation
+typecheck · lint · 315 unit tests — green. Full E2E not run.
+Real browser: **B2B** (light EN, dark AR/RTL) — header 49px full-bleed, sidebar top exactly 49px,
+brand in the header, breadcrumb separators, mirrored correctly in RTL. **Admin** (light) and
+**personal /home** (dark) — same shell, rail top at 49px, one-icon theme switch showing the theme you
+would GET. Admin/home were driven headlessly against the running dev server in a throwaway context,
+so the acceptance browser session was untouched.

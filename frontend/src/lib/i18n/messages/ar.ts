@@ -105,6 +105,7 @@ export const ar: Messages = {
     account: "الحساب",
     language: "اللغة",
     theme: "المظهر",
+    help: "المساعدة والدعم",
     themeLight: "فاتح",
     themeDark: "داكن",
     organization: "المؤسسة",

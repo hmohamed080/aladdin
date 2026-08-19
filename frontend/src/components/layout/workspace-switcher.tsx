@@ -96,13 +96,20 @@ export function WorkspaceSwitcher({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t("workspace.switch")}
+        /* The type has to stay REACHABLE even though it no longer has a second
+           line to sit on: two of your businesses can share a trading name, and
+           this is where you check which one you are about to file a quote under.
+           Hover and assistive tech both get it; the 48px row does not pay for it. */
+        title={typeLabel ? `${activeLabel} · ${typeLabel}` : activeLabel}
         data-testid="workspace-switcher"
         className={cn(
-          // The cap is responsive: at 393px the trigger shares one header row with
-          // the language, theme and sign-out controls, and a fixed 14rem cap pushes
-          // that row past the viewport. It still truncates its label either way.
-          "flex min-w-0 max-w-32 items-center gap-2 rounded-md border border-strong px-2.5 py-1.5 text-label font-medium text-fg tablet:max-w-56",
-          "transition-colors hover:bg-surface-2/60 disabled:opacity-60",
+          // A CRUMB, not a boxed control: no border, one 28px line, revealed by
+          // hover. In a 48px bar a bordered two-line chip reads as a form field
+          // parked in the chrome, and it was the tallest thing in the row. The
+          // cap stays responsive — at 393px this trigger shares its row with the
+          // search, help, theme and avatar controls.
+          "flex h-7 min-w-0 max-w-32 items-center gap-1.5 rounded-sm px-2 text-label font-medium text-fg tablet:max-w-56",
+          "transition-colors hover:bg-surface-hover disabled:opacity-60",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
         )}
       >
@@ -111,18 +118,11 @@ export function WorkspaceSwitcher({
         ) : (
           <BuildingIcon size={16} className="shrink-0 text-fg-muted" />
         )}
-        <span className="flex min-w-0 flex-col items-start leading-tight">
-          <span className="max-w-full truncate">{activeLabel}</span>
-          {/* Desktop only. On a phone this trigger shares one row with the rest of
-              the header and a second line costs more than it tells — the name is
-              already the answer to "where am I", and the type is the tie-breaker
-              you only need when two of your businesses read alike. */}
-          {typeLabel ? (
-            <span className="hidden max-w-full truncate text-[0.6875rem] font-normal text-fg-muted desktop:block">
-              {typeLabel}
-            </span>
-          ) : null}
-        </span>
+        {/* One line only. The type used to sit under the name on desktop, which
+            forced a two-line trigger; the name is already the answer to "where
+            am I", and the type is a tie-breaker you need when CHOOSING — where
+            it still is, on every row of the menu below. */}
+        <span className="max-w-full truncate">{activeLabel}</span>
         <ChevronDownIcon size={14} className="shrink-0 text-fg-muted" />
       </button>
 
@@ -149,7 +149,7 @@ export function WorkspaceSwitcher({
                     aria-current={selected ? "true" : undefined}
                     className={cn(
                       "flex w-full items-center gap-2.5 px-3 py-2 text-start transition-colors",
-                      "hover:bg-surface-2/70 focus-visible:outline-none focus-visible:bg-surface-2/70",
+                      "hover:bg-surface-hover focus-visible:outline-none focus-visible:bg-surface-hover",
                       selected && "bg-accent-solid/10",
                     )}
                   >
@@ -186,7 +186,7 @@ export function WorkspaceSwitcher({
             <a
               href="/business/new"
               role="menuitem"
-              className="flex w-full items-center gap-2.5 px-3 py-2.5 text-start text-body font-medium text-accent transition-colors hover:bg-surface-2/70 focus-visible:outline-none focus-visible:bg-surface-2/70"
+              className="flex w-full items-center gap-2.5 px-3 py-2.5 text-start text-body font-medium text-accent transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:bg-surface-hover"
             >
               <PlusIcon size={16} className="shrink-0" />
               {t("workspace.addBusiness")}
@@ -195,7 +195,7 @@ export function WorkspaceSwitcher({
               <a
                 href="/home/showroom"
                 role="menuitem"
-                className="flex w-full items-center gap-2.5 px-3 pb-2.5 text-start text-body font-medium text-accent transition-colors hover:bg-surface-2/70 focus-visible:outline-none focus-visible:bg-surface-2/70"
+                className="flex w-full items-center gap-2.5 px-3 pb-2.5 text-start text-body font-medium text-accent transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:bg-surface-hover"
               >
                 <BuildingIcon size={16} className="shrink-0" />
                 {t("workspace.connectShowroom")}

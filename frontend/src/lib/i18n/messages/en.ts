@@ -109,6 +109,7 @@ export const en = {
     account: "Account",
     language: "Language",
     theme: "Theme",
+    help: "Help & support",
     themeLight: "Light",
     themeDark: "Dark",
     organization: "Organization",

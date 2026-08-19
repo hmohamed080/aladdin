@@ -407,6 +407,15 @@ export const BellIcon = (p: IconProps) => (
   </Svg>
 );
 
+/** A question mark in a circle — the header's Help entry. */
+export const HelpIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.6 9.4a2.5 2.5 0 0 1 4.9.6c0 1.7-2.5 2.2-2.5 4" />
+    <path d="M12 17.6h.01" />
+  </Svg>
+);
+
 /** A globe — the language row in the profile menu. */
 export const GlobeIcon = (p: IconProps) => (
   <Svg {...p}>

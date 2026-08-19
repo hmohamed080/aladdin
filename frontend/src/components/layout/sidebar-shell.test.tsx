@@ -15,7 +15,7 @@ const CAPS = ["org.manage"];
 const MODULE_COUNT = allowedNavKeys(CAPS).length;
 
 function shell(mode: "expanded" | "collapsed" | "hover" = "expanded") {
-  return renderWithI18n(<SidebarShell appName="علاء الدين" allowed={CAPS} mode={mode} />);
+  return renderWithI18n(<SidebarShell allowed={CAPS} mode={mode} />);
 }
 
 beforeEach(() => {

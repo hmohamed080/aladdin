@@ -335,6 +335,10 @@ test.describe("shared shell regression (Showroom)", () => {
    * not a second one. So the test that matters is not "does the button work" but
    * "do the two controls agree" — a header that says light while the profile menu
    * says dark is the failure mode a duplicated theme state produces.
+   *
+   * It is ONE button now (`ThemeSwitch`, the control the auth and onboarding
+   * surfaces already used), so the assertions follow the press rather than a
+   * pair of segments: press once for dark, press again for light.
    */
   test("the header theme switch drives the one existing preference", async ({ page, request }) => {
     await prefs(page, "en");
@@ -342,7 +346,8 @@ test.describe("shared shell regression (Showroom)", () => {
     await page.goto("/b2b");
 
     const html = page.locator("html");
-    await page.getByTestId("theme-quick-dark").click();
+    const themeSwitch = page.getByTestId("theme-switch");
+    await themeSwitch.click();
     await expect(html).toHaveClass(/dark/);
     await expect(html).toHaveAttribute("data-theme-pref", "dark");
 
@@ -351,14 +356,15 @@ test.describe("shared shell regression (Showroom)", () => {
     await expect(page.getByTestId("theme-dark")).toHaveAttribute("aria-checked", "true");
     await page.keyboard.press("Escape");
 
-    await page.getByTestId("theme-quick-light").click();
+    await themeSwitch.click();
     await expect(html).not.toHaveClass(/dark/);
     await expect(html).toHaveAttribute("data-theme-pref", "light");
 
     // And it survives a reload — the cookie, not component state, is the store.
     await page.reload();
     await expect(html).not.toHaveClass(/dark/);
-    await expect(page.getByTestId("theme-quick-light")).toHaveAttribute("aria-checked", "true");
+    // In light, the single icon offers the theme you would GET: dark.
+    await expect(page.getByTestId("theme-switch")).toHaveAttribute("aria-label", /dark|داكن/i);
   });
 
   test("the header carries search and the account menu, and both work", async ({ page, request }) => {

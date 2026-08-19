@@ -5,7 +5,7 @@ import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import type { WorkspaceContext } from "@/server/queries/context";
 import { BranchSwitcher } from "@/components/layout/context-switchers";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
-import { AppHeader } from "@/components/layout/app-header";
+import { AppHeader, HeaderSeparator } from "@/components/layout/app-header";
 import { MobileNav } from "@/components/layout/workspace-nav";
 import { SidebarShell } from "@/components/layout/sidebar-shell";
 import { SalesRealtime } from "@/features/sales/sales-realtime";
@@ -47,41 +47,43 @@ export async function AppShell({
   const stance = commerceStance(active.orgType);
 
   return (
-    <div className="flex min-h-dvh bg-canvas">
-      {/* Persistent sidebar (desktop / tablet). Owns its own display modes. */}
-      <SidebarShell
+    // Header ABOVE, then a row of sidebar + content. The header is global chrome
+    // and spans the viewport; the sidebar navigates the region beneath it.
+    <div className="flex min-h-dvh flex-col bg-canvas">
+      <AppHeader
         appName={m.common.appName}
-        allowed={active.capabilities}
-        mode={sidebarMode}
+        capabilities={active.capabilities}
         stance={stance}
+        hasWorkspace
+        workspaceLabel={active.organizationName}
+        preferencesHref="/b2b/settings"
+        context={
+          <>
+            <WorkspaceSwitcher entries={workspace.entries} activeKey={active.organizationId} />
+            {/* The branch is a scope INSIDE the organization, so it reads as the
+                next crumb rather than as a second, unrelated chip. */}
+            <HeaderSeparator />
+            <BranchSwitcher
+              branches={active.branches}
+              activeId={active.activeBranchId}
+              orgWide={orgWide}
+            />
+          </>
+        }
+        actions={<SalesRealtime orgId={active.organizationId} branchId={active.activeBranchId} />}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <AppHeader
-          appName={m.common.appName}
-          capabilities={active.capabilities}
-          stance={stance}
-          hasWorkspace
-          workspaceLabel={active.organizationName}
-          preferencesHref="/b2b/settings"
-          context={
-            <>
-              <WorkspaceSwitcher entries={workspace.entries} activeKey={active.organizationId} />
-              <BranchSwitcher
-                branches={active.branches}
-                activeId={active.activeBranchId}
-                orgWide={orgWide}
-              />
-            </>
-          }
-          actions={<SalesRealtime orgId={active.organizationId} branchId={active.activeBranchId} />}
-        />
+      <div className="flex min-w-0 flex-1">
+        {/* Persistent sidebar (desktop / tablet). Owns its own display modes. */}
+        <SidebarShell allowed={active.capabilities} mode={sidebarMode} stance={stance} />
 
-        <main className="mx-auto w-full max-w-[1200px] flex-1 px-md py-lg pb-24 tablet:pb-xl" id="main">
-          {children}
-        </main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <main className="mx-auto w-full max-w-[1200px] flex-1 px-md py-lg pb-24 tablet:pb-xl" id="main">
+            {children}
+          </main>
 
-        <MobileNav allowed={active.capabilities} stance={stance} />
+          <MobileNav allowed={active.capabilities} stance={stance} />
+        </div>
       </div>
     </div>
   );

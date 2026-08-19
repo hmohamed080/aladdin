@@ -18,8 +18,7 @@ import {
   NAV_ICON_SIZE,
 } from "@/lib/ui/nav-geometry";
 import { Sidebar } from "@/components/layout/workspace-nav";
-import { Brand } from "@/components/layout/brand";
-import { ApertureMark, CheckIcon, PanelIcon } from "@/components/ui/icons";
+import { CheckIcon, PanelIcon } from "@/components/ui/icons";
 import type { CommerceStance } from "@/lib/workspace/supply-side";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
@@ -46,12 +45,10 @@ const ONE_YEAR = 60 * 60 * 24 * 365;
  * still owns the phone experience.
  */
 export function SidebarShell({
-  appName,
   allowed,
   mode: initialMode,
   stance = "buyer",
 }: {
-  appName: string;
   allowed: readonly string[];
   mode: SidebarMode;
   /**
@@ -130,10 +127,18 @@ export function SidebarShell({
 
   return (
     <div
-      className="sticky top-0 hidden h-dvh shrink-0 tablet:block"
-      // Above the sticky header (200) so a reveal floats over it rather than
+      className="sticky hidden shrink-0 tablet:block"
+      // It starts BENEATH the top header now, so both its sticky offset and its
+      // height come from the same `--app-header-h` the header sizes itself with;
+      // a literal 48px in either place is how the rail ends up 4px past the fold.
+      // z above the header (200) so a hover reveal floats over it rather than
       // sliding underneath, which reads as a rendering bug.
-      style={{ width: resting, zIndex: 300 }}
+      style={{
+        width: resting,
+        zIndex: 300,
+        top: "var(--app-header-h)",
+        height: "calc(100dvh - var(--app-header-h))",
+      }}
       data-sidebar-mode={mode}
       data-sidebar-open={open ? "true" : "false"}
     >
@@ -162,21 +167,15 @@ export function SidebarShell({
         )}
         style={{ width: visual }}
       >
-        <div className={cn("py-lg", narrow ? "grid place-items-center px-0" : "px-5")}>
-          {narrow ? (
-            // The wordmark has no room at 3.5rem; the mark alone still holds the
-            // brand and keeps the rail's optical top aligned with the header.
-            <span aria-label={appName} role="img">
-              <ApertureMark size={26} />
-            </span>
-          ) : (
-            <Brand name={appName} size="md" />
-          )}
-        </div>
+        {/* NO BRAND HERE ANY MORE. The mark lives in the top header, which spans
+            the viewport and is present on every authenticated surface, so the
+            product is named once and in one place. Drawing it here as well gave
+            a collapsed rail a 26px glyph standing in for the wordmark and put
+            two Aladdin marks 12px apart on the personal surface. */}
 
         {/* The grouped rail can exceed the viewport on a short screen, so it owns
             its own scroll rather than clipping the last section. */}
-        <div className={cn("min-h-0 flex-1 overflow-y-auto pb-lg", navColumnClass(narrow))}>
+        <div className={cn("min-h-0 flex-1 overflow-y-auto py-md", navColumnClass(narrow))}>
           <Sidebar allowed={allowed} narrow={narrow} stance={stance} />
         </div>
 

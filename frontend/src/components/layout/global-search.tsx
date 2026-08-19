@@ -409,10 +409,10 @@ export function GlobalSearch({
         aria-label={t("search.open")}
         aria-keyshortcuts="Control+K Meta+K"
         className={cn(
-          "group flex h-9 items-center gap-2 rounded-sm border bg-canvas/60 px-2.5 text-label text-fg-muted",
-          "transition-colors hover:border-strong hover:bg-surface-2/60 hover:text-fg-secondary",
+          "group flex h-7 items-center gap-2 rounded-sm border bg-canvas/60 px-2 text-label text-fg-muted",
+          "transition-colors hover:border-strong hover:bg-surface-hover hover:text-fg-secondary",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-          "tablet:w-64 desktop:w-80",
+          "tablet:w-56 desktop:w-72",
         )}
       >
         <SearchIcon size={16} />

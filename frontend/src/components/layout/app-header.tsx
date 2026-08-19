@@ -1,23 +1,38 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { cn } from "@/lib/ui/cn";
+import { getMessages } from "@/lib/i18n/translate";
+import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { Brand } from "@/components/layout/brand";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { ProfileMenu } from "@/components/layout/profile-menu";
-import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { ThemeSwitch } from "@/components/layout/switchers";
 import { loadAccountIdentity, initialsOf } from "@/server/queries/identity";
 import { canSearchAdmin } from "@/server/actions/search";
 import { THEME_COOKIE, resolveTheme, resolveThemePreference } from "@/lib/theme/config";
+import { HelpIcon } from "@/components/ui/icons";
 import type { CommerceStance } from "@/lib/workspace/supply-side";
 
 /**
- * THE SHARED AUTHENTICATED HEADER.
+ * THE SHARED AUTHENTICATED HEADER — now the TOP BAR of the whole shell.
  *
  * One header for every authenticated product surface — the B2B workspace, the
  * personal `/home` workspace, and the Admin console. Before this there were
  * three near-identical bars that had already drifted (different paddings,
  * different control order, three copies of the language/theme/sign-out trio),
  * and a fourth was one persona away.
+ *
+ * IT SPANS THE VIEWPORT, AND THE SIDEBAR STARTS UNDER IT
+ * The header used to be a child of the content column, sitting BESIDE the
+ * sidebar and starting at its inner edge. That made the sidebar the top-level
+ * element of the page and the header a component of one region inside it, which
+ * is backwards: the header is global chrome and the sidebar is navigation for
+ * the region below it. It also meant the brand lived in the sidebar, so a
+ * collapsed rail reduced the product's own mark to a 26px glyph, and the header
+ * had a `brand` prop just to decide who was drawing it. Now the header is a
+ * sibling ABOVE the row that holds sidebar + main, it always carries the mark,
+ * and the sidebar sticks to `--app-header-h` instead of to the top of the page.
  *
  * It is NOT applied to sign-in, sign-up, OTP or the onboarding forms. Those are
  * pre-workspace surfaces: there is no workspace to search, often no profile yet,
@@ -31,16 +46,23 @@ import type { CommerceStance } from "@/lib/workspace/supply-side";
  * live control that surface genuinely owns. The header itself has no idea which
  * persona is looking at it, which is exactly why there is no reason to clone it.
  *
- * WHAT IS ABSENT
- * There is no notification bell. The reference set shows one with a red count on
- * it, and this repository has no notification model — a bell that opens nothing,
- * or a badge showing a number nobody computed, is a lie in the chrome. When a
- * real notification surface exists it belongs in `actions`.
+ * DENSITY
+ * One 48px row (`--app-header-h`) with 28px controls, breadcrumb-style `/`
+ * separators between the mark and the context it names — the direction set by
+ * the supplied Supabase reference. Every colour, radius and focus ring is still
+ * an Aladdin token; what was borrowed is the COMPACTNESS and the hierarchy, not
+ * a palette.
+ *
+ * WHAT IS ABSENT, AND WHY
+ * There is no notification bell and no chat entry. This repository has no
+ * notification model and no messaging model — no tables, no queries, nothing in
+ * the history to restore. A bell that opens nothing, or a badge showing a number
+ * nobody computed, is a lie in the chrome. When either surface genuinely exists
+ * it belongs in `actions`, which is why that slot is here.
  *
  * RESPONSIVE
- * Below `tablet` the brand appears (the sidebar that normally carries it is
- * hidden), the search field collapses to its icon, and any `context` slot moves
- * to its own second row so the top row never wraps on a 393px screen.
+ * Below `tablet` the search field collapses to its icon and any `context` slot
+ * moves to its own second row, so the top row never wraps on a 393px screen.
  */
 export async function AppHeader({
   appName,
@@ -51,8 +73,6 @@ export async function AppHeader({
   hasWorkspace,
   workspaceLabel,
   preferencesHref,
-  brand = "sidebar",
-  width = "full",
 }: {
   appName: string;
   /** Workspace/branch switchers, an Admin badge — whatever names the context. */
@@ -67,23 +87,6 @@ export async function AppHeader({
   /** Localized name of the active work context, shown in the profile menu. */
   workspaceLabel?: string | null;
   preferencesHref?: string;
-  /**
-   * Who draws the wordmark at desktop width. `"sidebar"` (the default) is right
-   * wherever a persistent rail or aside already carries it — the B2B workspace
-   * and the Admin console — and the header then shows it only on a phone, where
-   * that rail is hidden. `"header"` is for a surface with no rail at all: the
-   * personal `/home` workspace, which would otherwise open with no Aladdin mark
-   * anywhere on the page.
-   */
-  brand?: "sidebar" | "header";
-  /**
-   * `"content"` constrains the header row to the same column the page content
-   * uses. It matters only where the page itself is a centred column with no
-   * sidebar beside it — the personal `/home` workspace — because there a
-   * full-bleed header puts the avatar and the switcher out at the window edges
-   * while everything they belong to starts 170px inboard.
-   */
-  width?: "full" | "content";
 }) {
   const [identity, canAdmin, store] = await Promise.all([
     loadAccountIdentity(),
@@ -91,41 +94,65 @@ export async function AppHeader({
     cookies(),
   ]);
   const themePreference = resolveThemePreference(store.get(THEME_COOKIE)?.value);
+  const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
+  const m = getMessages(locale);
 
   return (
-    <header className="sticky top-0 z-header border-b bg-surface/85 backdrop-blur" style={{ zIndex: 200 }}>
+    <header
+      className="sticky top-0 border-b bg-surface/85 backdrop-blur"
+      // Above the page, below the sidebar's hover reveal (300) so that reveal can
+      // float over the header rather than sliding under it.
+      style={{ zIndex: 200 }}
+    >
       <div
-        className={cn(
-          "flex min-w-0 items-center gap-sm px-md py-2 tablet:gap-md",
-          width === "content" && "mx-auto w-full max-w-[1120px]",
-        )}
+        className="flex min-w-0 items-center gap-sm px-md tablet:gap-2"
+        style={{ height: "var(--app-header-h)" }}
       >
-        <span className={cn("shrink-0", brand === "sidebar" && "tablet:hidden")}>
+        {/* The product's mark, in the product's chrome. It is here at EVERY
+            width and on every surface now — a collapsed sidebar or a phone can
+            no longer be a state in which Aladdin is unnamed. */}
+        <Link
+          href="/"
+          className="shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+        >
           <Brand name={appName} size="sm" />
-        </span>
+        </Link>
 
-        {context ? <div className="hidden min-w-0 items-center gap-sm tablet:flex">{context}</div> : null}
+        {context ? (
+          <>
+            <HeaderSeparator />
+            <div className="hidden min-w-0 items-center gap-2 tablet:flex">{context}</div>
+          </>
+        ) : null}
 
-        {/* Search sits at the START of the free space rather than centred: it is
-            the most-used control in the bar, and centring it would make its
-            position depend on how many context chips happen to be present. */}
-        <div className="ms-auto flex min-w-0 items-center gap-sm tablet:ms-0">
+        <div className="ms-auto flex shrink-0 items-center gap-1 tablet:gap-2">
           <GlobalSearch
             capabilities={capabilities}
             stance={stance}
             hasWorkspace={hasWorkspace}
             canAdmin={canAdmin}
           />
-        </div>
 
-        <div className="ms-auto flex shrink-0 items-center gap-sm">
           {actions ? <div className="hidden items-center gap-sm tablet:flex">{actions}</div> : null}
-          {/* Immediately before the avatar, and present at EVERY width. Appearance
-              is the one preference people change often enough that burying it two
-              clicks deep in the account menu was the complaint — and a phone in
-              a dark room is exactly where it is needed most, so it does not get
-              dropped at the tablet breakpoint the way `actions` does. */}
-          <ThemeToggle initial={resolveTheme(themePreference)} />
+
+          {/* Help points at the support surface that already exists and stays
+              reachable while signed in. It is a real destination with a real
+              (or honestly absent) support contact behind it — not a placeholder
+              that opens a modal we have not built. */}
+          <Link
+            href="/auth/support"
+            aria-label={m.nav.help}
+            title={m.nav.help}
+            data-testid="header-help"
+            className={headerIconClass}
+          >
+            <HelpIcon size={16} />
+          </Link>
+
+          {/* One icon, one press. See `ThemeSwitch` — this is the product's
+              existing binary switch, not a new species of control. */}
+          <ThemeSwitch current={resolveTheme(themePreference)} compact />
+
           <ProfileMenu
             displayName={identity?.displayName ?? null}
             contact={identity?.contact ?? null}
@@ -141,15 +168,41 @@ export async function AppHeader({
       {/* The context row on mobile. Kept out of the flow entirely when there is
           no context to show, so a personal account does not carry an empty bar. */}
       {context ? (
-        <div
-          className={cn(
-            "flex min-w-0 items-center gap-sm border-t px-md py-2 tablet:hidden",
-            width === "content" && "mx-auto w-full max-w-[1120px]",
-          )}
-        >
+        <div className="flex min-w-0 items-center gap-sm border-t px-md py-2 tablet:hidden">
           {context}
         </div>
       ) : null}
     </header>
   );
 }
+
+/**
+ * The breadcrumb slash between the mark and the context it introduces, and
+ * between two context chips.
+ *
+ * A rule or a chevron would both say more than is true here: the workspace is
+ * not INSIDE the brand, and the branch is not a child route of the organization.
+ * A hairline slash reads as "then", which is what the relationship actually is,
+ * and it is the same device the reference uses.
+ */
+export function HeaderSeparator({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn("hidden shrink-0 select-none text-body text-fg-muted/60 tablet:block", className)}
+    >
+      /
+    </span>
+  );
+}
+
+/**
+ * Shared geometry for the header's icon-only controls, so Help, the theme
+ * switch and anything a surface adds later cannot each pick their own box.
+ * 28px keeps four of them inside a 48px bar without crowding the avatar.
+ */
+export const headerIconClass = cn(
+  "grid h-7 w-7 shrink-0 place-items-center rounded-sm text-fg-muted transition-colors",
+  "hover:bg-surface-hover hover:text-fg",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
+);
