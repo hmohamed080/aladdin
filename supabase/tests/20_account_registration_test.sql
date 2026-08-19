@@ -9,7 +9,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(25);
+select plan(26);
 
 -- Seed identities (from supabase/seed.sql):
 --   11111111… Amina  — Org A owner (org.members.manage)
@@ -128,8 +128,11 @@ select is(
   (select status from public.invitation_lookup('does-not-exist-token-000000')),
   'invalid', 'an unknown token resolves to the invalid state');
 select is(
-  (select email_masked from public.invitation_lookup((select token from _inv))),
+  (select contact_masked from public.invitation_lookup((select token from _inv))),
   'a•••@•••.test', 'lookup never returns the raw email — only a masked form');
+select is(
+  (select channel from public.invitation_lookup((select token from _inv))),
+  'email', 'lookup reports which contact channel the invitation was addressed to');
 select is(
   (select organization_name from public.invitation_lookup((select token from _inv))),
   'Nile Finishing Supplies', 'lookup returns the organization display name');

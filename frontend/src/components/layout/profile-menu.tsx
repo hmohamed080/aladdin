@@ -7,7 +7,12 @@ import { cn } from "@/lib/ui/cn";
 import { signOut } from "@/server/actions/auth";
 import { setLocale, setTheme } from "@/server/actions/preferences";
 import { LOCALES, type Locale } from "@/lib/i18n/locales";
-import { THEME_PREFERENCES, type ThemePreference } from "@/lib/theme/config";
+import {
+  THEME_PREFERENCES,
+  applyThemePreference,
+  readThemePreference,
+  type ThemePreference,
+} from "@/lib/theme/config";
 import {
   UserIcon,
   SettingsIcon,
@@ -70,8 +75,8 @@ export function ProfileMenu({
   // The stored preference lives on <html>; after hydration that attribute is the
   // truth (the pre-paint script may have resolved `system` since SSR).
   useEffect(() => {
-    const attr = document.documentElement.getAttribute("data-theme-pref");
-    if (attr === "system" || attr === "light" || attr === "dark") setThemeState(attr);
+    const stored = readThemePreference();
+    if (stored) setThemeState(stored);
   }, []);
 
   // Outside click and Escape both close. Escape also returns focus to the
@@ -132,13 +137,10 @@ export function ProfileMenu({
 
   const chooseTheme = (next: ThemePreference) => {
     setThemeState(next);
+    // Shared with the header's quick switch — see lib/theme/config. Two controls,
+    // one cookie, one class on <html>, no second copy of the mapping between them.
+    applyThemePreference(next);
     start(async () => {
-      const root = document.documentElement;
-      root.setAttribute("data-theme-pref", next);
-      const dark =
-        next === "dark" ||
-        (next === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-      root.classList.toggle("dark", dark);
       await setTheme(next);
     });
   };

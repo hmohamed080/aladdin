@@ -11,7 +11,7 @@ import { FilterBar } from "@/components/ui/filter-bar";
 import { StatTiles } from "@/components/ui/stat-tiles";
 import { OrganizationDirectoryTable } from "@/features/directory/directory-tables";
 import { formatCompactMoney } from "@/lib/ui/format";
-import { LandmarkIcon, BadgeCheckIcon, ReceiptIcon, WalletIcon } from "@/components/ui/icons";
+import { LandmarkIcon, BadgeCheckIcon, ReceiptIcon, MoneyIcon } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +66,7 @@ export default async function InstitutionsPage({
           { label: m.institutions.stat.total, value: counts.total, Icon: LandmarkIcon, tone: "accent" },
           { label: m.institutions.stat.verified, value: counts.verified, Icon: BadgeCheckIcon, tone: "success" },
           { label: m.institutions.stat.connected, value: connected.length, Icon: ReceiptIcon, tone: "info" },
-          { label: m.institutions.stat.value, value: formatCompactMoney(exchanged, locale), Icon: WalletIcon },
+          { label: m.institutions.stat.value, value: formatCompactMoney(exchanged, locale), Icon: MoneyIcon },
         ]}
       />
 

@@ -39,6 +39,56 @@ export function resolveTheme(cookieValue: string | undefined): Theme {
 }
 
 /**
+ * ---------------------------------------------------------------------------
+ * Client helpers. ONE implementation of "make the document reflect a choice".
+ * ---------------------------------------------------------------------------
+ *
+ * There are now two controls that change the theme — the quick Light/Dark
+ * switch in the header and the full System/Light/Dark group in the profile menu
+ * — and they must not each own a copy of this. They are two doors into one
+ * preference: the cookie is the store, `<html>` is the rendering of it, and the
+ * functions below are the only place that maps between them. Neither control
+ * holds theme state of its own beyond what it reads back from here.
+ *
+ * The mirror onto `<html>` is not an optimisation. `setTheme` revalidates the
+ * layout, but React does not re-render the ROOT element's class from a server
+ * revalidation, so without this the cookie would flip and the page in front of
+ * the user would stay in the old theme until a hard reload.
+ */
+
+/** Apply a preference to the live document and report what it resolved to. */
+export function applyThemePreference(next: ThemePreference): Theme {
+  const root = document.documentElement;
+  root.setAttribute("data-theme-pref", next);
+  const dark =
+    next === "dark" ||
+    (next === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  root.classList.toggle("dark", dark);
+  return dark ? "dark" : "light";
+}
+
+/**
+ * The stored preference, read from the DOM rather than from a prop. After
+ * hydration this attribute is the truth: the pre-paint script may have resolved
+ * `system` since the server rendered, and a stale prop would show the wrong
+ * control as selected.
+ */
+export function readThemePreference(): ThemePreference | null {
+  const attr = document.documentElement.getAttribute("data-theme-pref") ?? undefined;
+  return isThemePreference(attr) ? attr : null;
+}
+
+/**
+ * What the user is ACTUALLY looking at, which is not the same question as what
+ * they chose: under `system` the preference is neither light nor dark while the
+ * screen is definitely one of them. The quick switch needs this one, because it
+ * has to show which of two states is current.
+ */
+export function readActiveTheme(): Theme {
+  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+}
+
+/**
  * The pre-paint script. Inlined in <head> so it runs BEFORE first paint — a
  * `useEffect` here would show a light flash on every navigation for every
  * dark-mode user, which is the single most visible bug a theme system can have.

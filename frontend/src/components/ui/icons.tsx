@@ -342,13 +342,6 @@ export const TrendingUpIcon = (p: IconProps) => (
   </Svg>
 );
 
-export const WalletIcon = (p: IconProps) => (
-  <Svg {...p}>
-    <path d="M3 7a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
-    <path d="M16 12h4" />
-  </Svg>
-);
-
 export const MenuIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 6h16M4 12h16M4 18h16" />
@@ -428,5 +421,46 @@ export const EnterKeyIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M20 5v6a3 3 0 0 1-3 3H5" />
     <path d="m9 10-4 4 4 4" />
+  </Svg>
+);
+
+export const MailIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2.5" y="5" width="19" height="14" rx="2" />
+    <path d="m3 7 9 6 9-6" />
+  </Svg>
+);
+
+export const PhoneIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
+    <path d="M11 18.5h2" />
+  </Svg>
+);
+
+export const CopyIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M15 6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2" />
+  </Svg>
+);
+
+/**
+ * A money VALUE, not a wallet.
+ *
+ * `WalletIcon` was being used beside order totals, quotation values and project
+ * values — the commercial figures the product genuinely holds. On its own that
+ * glyph says "wallet balance", which is a finance feature this product does not
+ * have and is not in Pilot scope, and a purse drawn next to "total order value"
+ * invites a manager to look for a balance, a top-up and a payout that do not
+ * exist. Banknotes say "an amount of money" without implying an account holding
+ * it. See the note on the Pilot's commercial-vs-financial line in
+ * docs/product/mvp-scope.md.
+ */
+export const MoneyIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2.5" y="6" width="19" height="12" rx="2" />
+    <circle cx="12" cy="12" r="2.5" />
+    <path d="M6 10v4M18 10v4" />
   </Svg>
 );

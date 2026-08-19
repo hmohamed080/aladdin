@@ -61,18 +61,37 @@ export function InvitePanel({
     : t("invite.joinOrgGeneric");
   const returnTo = `/auth/invite/${token}`;
 
+  /**
+   * An EMAIL invitation is bound to an identity: only the verified holder of
+   * that address may accept it, whoever is holding the link. A PHONE invitation
+   * cannot be bound the same way while this deployment verifies email only —
+   * there is no phone identity to compare against — so acceptance rests on the
+   * unguessable single-use token, and the same rule is enforced in the RPC (see
+   * the invitation_contact_channel migration). Mirroring the distinction here
+   * matters because otherwise a phone invitee would be told to "sign in as the
+   * invited email address", which for them names an address that does not exist.
+   */
+  const identityBound = view.channel === "email";
+  const canAccept = isSignedIn && (view.matchesCaller || !identityBound);
+
   return (
     <AuthCard title={t("invite.title")} subtitle={orgLine}>
       <div className="flex flex-col gap-md">
-        {view.emailMasked ? (
+        {view.contactMasked ? (
           <p className="text-body text-fg-secondary">
-            <span dir="ltr">{t("invite.forEmail", { email: view.emailMasked })}</span>
+            <span dir="ltr">
+              {view.channel === "phone"
+                ? t("invite.forPhone", { phone: view.contactMasked })
+                : t("invite.forEmail", { email: view.contactMasked })}
+            </span>
           </p>
         ) : null}
 
-        {isSignedIn && view.matchesCaller ? (
+        {canAccept ? (
           <>
-            <p className="text-body text-success">{t("invite.matches")}</p>
+            <p className={view.matchesCaller ? "text-body text-success" : "text-body text-fg-secondary"}>
+              {view.matchesCaller ? t("invite.matches") : t("invite.phoneLinkNote")}
+            </p>
             <form action={dispatch}>
               <input type="hidden" name="token" value={token} />
               <SubmitButton className="w-full">{t("invite.acceptCta")}</SubmitButton>

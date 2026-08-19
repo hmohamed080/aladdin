@@ -16,6 +16,40 @@
   --basalt: #0e1113;
   --basalt-2: #1b2226;
   --basalt-3: #232b30;
+
+  /* ---- Carbon ramp — the DARK-THEME ground ----
+   * Basalt is a BRAND colour: a cool, blue-black stone, right for the Aperture
+   * mark, the auth brand panel and every modal scrim. It was never a good
+   * workspace ground, and using it as one is what made dark mode unacceptable.
+   * #0e1113 is close enough to pure black that a full-height sidebar and an
+   * empty table region both read as dead space, while the jump from it up to
+   * #1b2226 is large enough that every card looked like it was floating in a
+   * hole. A dense operational workspace needs the opposite: a charcoal ground
+   * you can rest on, and elevation steps small enough that ten stacked surfaces
+   * still read as one plane.
+   *
+   * So this ramp is NEUTRAL (no blue cast), starts at charcoal rather than
+   * near-black, and steps by a few points of lightness at a time. Borders sit
+   * only just above the surface they divide, which is what removes the
+   * drawn-grid look; contrast is carried by the TEXT, where the ratios actually
+   * have to hold. Each text value is checked against both grounds it lands on:
+   *
+   *   text       on canvas 15.7:1   on surface 15.2:1
+   *   secondary  on canvas  7.7:1   on surface  7.5:1
+   *   muted      on canvas  5.2:1   on surface  4.8:1   (AA at body size)
+   *
+   * Basalt itself does not move — nothing about the brand changes here.
+   */
+  --carbon: #131415;
+  --carbon-2: #1a1c1d;
+  --carbon-3: #212425;
+  --carbon-4: #282c2d;
+  --carbon-line: #272a2b;
+  --carbon-line-strong: #343839;
+  --carbon-text: #ededec;
+  --carbon-text-secondary: #a3a8a9;
+  --carbon-text-muted: #838889;
+
   --limestone: #f4f1ea;
   --plaster: #fbf9f4;
   --sand: #eae5db;
@@ -125,23 +159,44 @@
   --scrollbar-thumb: #bab2a2;
   --scrollbar-thumb-hover: #9a917f;
   --chart-grid: var(--line-light);
+
+  /* ---- Elevation (LIGHT) ----
+   * Shadows are THEME-AWARE, which they were not before: `shadow-card` was one
+   * fixed warm near-black at 4%, tuned against Limestone, and on a dark ground
+   * it did nothing at all. Three steps, consumed as `shadow-sm` / `shadow-card`
+   * / `shadow-lg`, so a component asks for a LEVEL and the theme decides how
+   * that level is drawn. These light values are the previous ones unchanged.
+   */
+  --shadow-raised: 0 1px 2px rgba(20, 16, 10, 0.06);
+  --shadow-card: 0 1px 2px rgba(20, 16, 10, 0.04), 0 8px 24px rgba(20, 16, 10, 0.05);
+  --shadow-overlay: 0 10px 30px rgba(20, 16, 10, 0.1), 0 2px 8px rgba(20, 16, 10, 0.06);
 }
 
 .dark {
-  /* ---- Semantics · DARK theme ---- */
-  --canvas: var(--basalt);
-  --surface: var(--basalt-2);
-  --surface-2: var(--basalt-3);
+  /* ---- Semantics · DARK theme ----
+   * Four grounds, not two. `canvas` is the page, `surface` is anything raised
+   * onto it (header, sidebar, card, menu, table shell), `surface-2` is the state
+   * layer on top of that (hover, active row, selected segment). The gaps between
+   * them are small on purpose: a workspace where a card is obviously lighter than
+   * the page is a workspace of floating boxes, and by the fifth nested surface it
+   * has drifted halfway to white. Depth here comes from the BORDER plus a
+   * restrained shadow, and the surfaces only whisper.
+   */
+  --canvas: var(--carbon);
+  --surface: var(--carbon-2);
+  --surface-2: var(--carbon-3);
 
-  --fg: var(--on-dark);
-  --fg-secondary: var(--on-dark-secondary);
-  --fg-muted: var(--on-dark-muted);
+  --fg: var(--carbon-text);
+  --fg-secondary: var(--carbon-text-secondary);
+  --fg-muted: var(--carbon-text-muted);
 
-  --border: var(--line-dark);
-  --border-strong: var(--graphite);
+  /* Low-contrast by design. A dark-mode border that you can see clearly on its
+     own is a border you will see a hundred of at once. */
+  --border: var(--carbon-line);
+  --border-strong: var(--carbon-line-strong);
 
-  --primary: var(--on-dark);
-  --primary-foreground: var(--basalt);
+  --primary: var(--carbon-text);
+  --primary-foreground: var(--carbon);
 
   --accent: var(--lumen); /* bright Lumen reads fine on Basalt */
   --accent-solid: var(--lumen);
@@ -167,14 +222,26 @@
   --series-3: var(--verdigris-bright);
   --series-4: var(--bronze);
   --series-5: var(--oxide-bright);
-  --series-6: var(--on-dark-muted);
+  --series-6: var(--carbon-text-muted);
   /* ---- Scrollbars (DARK) ----
    * The whole reason this block exists: with no rule, Windows Chrome paints its
-   * NATIVE light scrollbar next to a Basalt sidebar — a white gutter down the
-   * side of a dark workspace. Track sits just above Basalt, thumb well above it.
+   * NATIVE light scrollbar beside a dark sidebar — a white gutter down the side
+   * of the workspace. Track sits a hair above the canvas so the gutter reads as
+   * a recess rather than a seam; thumb is well clear of it but still neutral.
    */
-  --scrollbar-track: #171d21;
-  --scrollbar-thumb: #3b464d;
-  --scrollbar-thumb-hover: #55636c;
-  --chart-grid: var(--graphite);
+  --scrollbar-track: #1b1e1f;
+  --scrollbar-thumb: #343a3b;
+  --scrollbar-thumb-hover: #4b5253;
+  --chart-grid: var(--carbon-4);
+
+  /* ---- Elevation (DARK) ----
+   * The light theme's shadow is a warm near-black at 4–5% — invisible on a
+   * charcoal ground, which is why dark cards had no edge at all and the whole
+   * surface stack flattened. Dark elevation is a deeper black at a HIGHER alpha
+   * but a tighter spread: enough to seat a menu above the page, not enough to
+   * smear a halo around every card in a dense table view.
+   */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.32);
+  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-overlay: 0 8px 28px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
 }

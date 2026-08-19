@@ -68,6 +68,20 @@ export function WorkspaceSwitcher({
   const activeLabel =
     active?.kind === "personal" ? t("workspace.personal") : (active?.name ?? t("workspace.title"));
 
+  /**
+   * The organization's KIND, in the words the product shows users.
+   *
+   * Two businesses in the same account can carry the same trading name in a
+   * user's head — "Nile" the importer and "Nile" the showroom — and the header is
+   * where you check which one you are about to file a quote under. The label
+   * comes from the `orgType` catalog, never from the raw enum: the internal value
+   * for a distributor is `supplier`, a word this product does not say to anyone.
+   * A missing or unrecognized type renders nothing rather than a raw key.
+   */
+  const activeType =
+    active?.kind === "business" && active.orgType ? t(`orgType.${active.orgType}`) : null;
+  const typeLabel = activeType && !activeType.startsWith("orgType.") ? activeType : null;
+
   const choose = (value: string) => {
     setOpen(false);
     start(() => selectWorkspace(value));
@@ -97,7 +111,18 @@ export function WorkspaceSwitcher({
         ) : (
           <BuildingIcon size={16} className="shrink-0 text-fg-muted" />
         )}
-        <span className="truncate">{activeLabel}</span>
+        <span className="flex min-w-0 flex-col items-start leading-tight">
+          <span className="max-w-full truncate">{activeLabel}</span>
+          {/* Desktop only. On a phone this trigger shares one row with the rest of
+              the header and a second line costs more than it tells — the name is
+              already the answer to "where am I", and the type is the tie-breaker
+              you only need when two of your businesses read alike. */}
+          {typeLabel ? (
+            <span className="hidden max-w-full truncate text-[0.6875rem] font-normal text-fg-muted desktop:block">
+              {typeLabel}
+            </span>
+          ) : null}
+        </span>
         <ChevronDownIcon size={14} className="shrink-0 text-fg-muted" />
       </button>
 

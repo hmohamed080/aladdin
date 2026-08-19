@@ -12,7 +12,7 @@ import {
   DemandIcon,
   FileTextIcon,
   ClipboardIcon,
-  WalletIcon,
+  MoneyIcon,
   PackageIcon,
   StorefrontIcon,
   TrendingUpIcon,
@@ -75,7 +75,7 @@ export function SupplyReport({
 
   return (
     <>
-      <SectionTitle icon={<WalletIcon size={18} />}>{m.supply.section.performance}</SectionTitle>
+      <SectionTitle icon={<MoneyIcon size={18} />}>{m.supply.section.performance}</SectionTitle>
 
       <StatTiles
         locale={locale}
@@ -83,7 +83,7 @@ export function SupplyReport({
           {
             label: m.supply.tile.orderValue,
             value: formatCompactMoney(supply.orderValue, locale),
-            Icon: WalletIcon,
+            Icon: MoneyIcon,
             tone: "accent",
             hint: m.supply.tile.orderValueHint,
           },

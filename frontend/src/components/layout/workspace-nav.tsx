@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ComponentType } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
+import { navIconClass, navRowClass, NAV_ICON_SIZE } from "@/lib/ui/nav-geometry";
 import {
   HomeIcon,
   UsersIcon,
@@ -166,7 +167,7 @@ function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow
         "group relative flex items-center rounded-sm text-label font-medium",
         "transition-[background-color,color,box-shadow] duration-fast ease-standard motion-reduce:transition-none",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-        narrow ? "justify-center px-0 py-0.5" : "gap-3 px-3 py-2",
+        navRowClass(Boolean(narrow)),
         !narrow && (active ? "bg-surface-2 text-fg" : "text-fg-secondary hover:bg-surface-2/60 hover:text-fg"),
       )}
     >
@@ -181,14 +182,12 @@ function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow
       />
       <span
         className={cn(
-          "shrink-0",
-          // The hover/focus target on a collapsed rail. A tile rather than a
+          // The hover/focus target on a collapsed rail is a TILE rather than a
           // colour change: at 3.5rem the glyph is small and a hue shift alone is
           // easy to miss, whereas a raised square under the pointer is
-          // unambiguous about which of nine icons is armed. Sized so the lit
-          // tiles form an even column instead of touching each other.
-          narrow &&
-            "grid h-9 w-9 place-items-center rounded-sm transition-[background-color,box-shadow] duration-fast ease-standard motion-reduce:transition-none",
+          // unambiguous about which of nine icons is armed. Its size is shared
+          // with the sidebar's mode control so both sit on one centre line.
+          navIconClass(Boolean(narrow)),
           narrow && !active && "group-hover:bg-surface-2 group-hover:shadow-sm group-focus-visible:bg-surface-2",
           // An active item already owns a tile; hovering it deepens rather than
           // re-announces, so the active/hover distinction survives the collapse.
@@ -196,7 +195,7 @@ function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow
           active ? "text-accent" : "text-fg-muted group-hover:text-fg",
         )}
       >
-        <Icon size={19} />
+        <Icon size={NAV_ICON_SIZE} />
       </span>
       {narrow ? null : <span className="truncate">{label}</span>}
     </Link>

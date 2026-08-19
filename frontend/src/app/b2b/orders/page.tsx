@@ -7,7 +7,7 @@ import { TabLinks, StatTiles } from "@/components/ui/stat-tiles";
 import { WorkPane, Panel } from "@/components/ui/workspace-layout";
 import { DonutSplit } from "@/components/ui/charts";
 import { OrderTable } from "@/features/execution/execution-lists";
-import { ClipboardIcon, ActivityIcon, CheckIcon, WalletIcon } from "@/components/ui/icons";
+import { ClipboardIcon, ActivityIcon, CheckIcon, MoneyIcon } from "@/components/ui/icons";
 import { commerceStance } from "@/lib/workspace/supply-side";
 import { formatPercent, formatCompactMoney, formatNumber } from "@/lib/ui/format";
 
@@ -92,7 +92,7 @@ export default async function OrdersPage({
             // Reports; a seven-figure EGP total at display size in a quarter-
             // width cell is how a number ends up wrapped or, worse, clipped.
             value: formatCompactMoney(totalValue, locale),
-            Icon: WalletIcon,
+            Icon: MoneyIcon,
             tone: "accent",
           },
         ]}

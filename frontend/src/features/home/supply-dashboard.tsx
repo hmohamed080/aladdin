@@ -27,7 +27,7 @@ import {
   FileTextIcon,
   ClipboardIcon,
   PackageIcon,
-  WalletIcon,
+  MoneyIcon,
   TrendingUpIcon,
   StorefrontIcon,
   ActivityIcon,
@@ -161,7 +161,7 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
       // Compact on the strip so a seven-figure EGP total cannot truncate in the
       // two-column phone grid; the exact figure lives on Reports, one click away.
       value: formatCompactMoney(supply.orderValue, locale),
-      Icon: WalletIcon,
+      Icon: MoneyIcon,
       tone: "accent",
       foot: m.supply.tile.orderValueHint,
       href: "/b2b/reports",

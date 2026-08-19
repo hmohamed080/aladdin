@@ -10,7 +10,7 @@ import { TabLinks, StatTiles } from "@/components/ui/stat-tiles";
 import { WorkPane, Panel, PanelRow } from "@/components/ui/workspace-layout";
 import { DonutSplit } from "@/components/ui/charts";
 import { QuotationTable } from "@/features/commerce/commerce-lists";
-import { InboxIcon, ClockIcon, CheckIcon, XIcon, WalletIcon, FileTextIcon } from "@/components/ui/icons";
+import { InboxIcon, ClockIcon, CheckIcon, XIcon, MoneyIcon, FileTextIcon } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -124,7 +124,7 @@ export default async function QuotationsPage({
             ? {
                 label: m.supply.acceptedValue,
                 value: formatCompactMoney(valueOf(rows, "accepted"), locale),
-                Icon: WalletIcon,
+                Icon: MoneyIcon,
                 tone: "accent",
               }
             : {
@@ -159,7 +159,7 @@ export default async function QuotationsPage({
             </Panel>
 
             {onSent ? (
-              <Panel title={m.supply.acceptedValue} Icon={WalletIcon}>
+              <Panel title={m.supply.acceptedValue} Icon={MoneyIcon}>
                 <PanelRow
                   locale={locale}
                   label={m.commerce.quotationStatus.accepted}

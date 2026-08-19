@@ -145,7 +145,17 @@ export default {
       },
       boxShadow: {
         // Raised cards on the light theme (offset + blur, real depth).
-        card: "0 1px 2px rgba(20,16,10,0.04), 0 8px 24px rgba(20,16,10,0.05)",
+        // Elevation is a LEVEL, not a colour. All three resolve through theme
+        // variables (see tokens.css) so a card asks for depth and the active
+        // theme decides how depth is drawn — a warm 4% wash on Limestone, a
+        // deeper and tighter black on Carbon. Overriding Tailwind's own `sm` and
+        // `lg` is deliberate: every menu, popover and rail in the product
+        // already reaches for those names, and leaving them as Tailwind's fixed
+        // rgb(0,0,0,0.05) is exactly how dark mode ended up with cards that had
+        // no edge and dropdowns that did not lift off the page.
+        sm: "var(--shadow-raised)",
+        card: "var(--shadow-card)",
+        lg: "var(--shadow-overlay)",
         // Lumen bloom — the aperture's focal glow and AI moments only.
         glow: "0 0 60px rgba(243,171,62,0.18)",
       },

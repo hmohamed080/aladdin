@@ -33,7 +33,7 @@ import {
   InboxIcon,
   ClipboardIcon,
   BookmarkIcon,
-  WalletIcon,
+  MoneyIcon,
   LayersIcon,
   TrendingUpIcon,
   TruckIcon,
@@ -180,7 +180,7 @@ export async function BuyerDashboard({ ctx }: { ctx: PageContext }) {
       // Compact on a tile so it fits the two-column mobile grid; the exact
       // figure is one click away on Reports, which this tile links to.
       value: formatCompactMoney(purchase.orderValue, locale),
-      Icon: WalletIcon,
+      Icon: MoneyIcon,
       hint: m.home.tileSpendHint,
       href: "/b2b/reports",
     });
@@ -233,7 +233,7 @@ export async function BuyerDashboard({ ctx }: { ctx: PageContext }) {
 
       {buys ? (
         <>
-          <SectionTitle icon={<WalletIcon size={18} />} action={seeAll("/b2b/reports", m.home.openReports)}>
+          <SectionTitle icon={<MoneyIcon size={18} />} action={seeAll("/b2b/reports", m.home.openReports)}>
             {m.home.section.purchasing}
           </SectionTitle>
 

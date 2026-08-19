@@ -1086,11 +1086,12 @@ export type Database = {
           accepted_at: string | null
           accepted_user_id: string | null
           created_at: string
-          email: string
+          email: string | null
           expires_at: string
           id: string
           invited_by: string | null
           organization_id: string
+          phone: string | null
           primary_branch_id: string | null
           status: Database["public"]["Enums"]["invitation_status"]
           token: string
@@ -1100,11 +1101,12 @@ export type Database = {
           accepted_at?: string | null
           accepted_user_id?: string | null
           created_at?: string
-          email: string
+          email?: string | null
           expires_at: string
           id?: string
           invited_by?: string | null
           organization_id: string
+          phone?: string | null
           primary_branch_id?: string | null
           status?: Database["public"]["Enums"]["invitation_status"]
           token: string
@@ -1114,7 +1116,8 @@ export type Database = {
           accepted_at?: string | null
           accepted_user_id?: string | null
           created_at?: string
-          email?: string
+          email?: string | null
+          phone?: string | null
           expires_at?: string
           id?: string
           invited_by?: string | null
@@ -3446,8 +3449,9 @@ export type Database = {
       invitation_accept: { Args: { p_token: string }; Returns: string }
       invitation_create: {
         Args: {
-          p_email: string
+          p_email?: string
           p_org_id: string
+          p_phone?: string
           p_primary_branch_id?: string
         }
         Returns: string
@@ -3455,7 +3459,8 @@ export type Database = {
       invitation_lookup: {
         Args: { p_token: string }
         Returns: {
-          email_masked: string
+          channel: string
+          contact_masked: string
           matches_caller: boolean
           organization_name: string
           status: string

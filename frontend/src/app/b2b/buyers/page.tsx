@@ -11,7 +11,7 @@ import {
   StorefrontIcon,
   ReceiptIcon,
   DemandIcon,
-  WalletIcon,
+  MoneyIcon,
   LandmarkIcon,
 } from "@/components/ui/icons";
 
@@ -91,7 +91,7 @@ export default async function CustomersNetworkPage() {
           {
             label: m.supply.customers.stat.value,
             value: formatCompactMoney(totalValue, locale),
-            Icon: WalletIcon,
+            Icon: MoneyIcon,
             href: "/b2b/reports",
           },
         ]}

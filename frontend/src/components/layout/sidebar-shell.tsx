@@ -10,6 +10,7 @@ import {
   sidebarModeLabelKey,
   type SidebarMode,
 } from "@/lib/ui/sidebar-mode";
+import { navColumnClass, navIconClass, navRowClass, NAV_ICON_SIZE } from "@/lib/ui/nav-geometry";
 import { Sidebar } from "@/components/layout/workspace-nav";
 import { Brand } from "@/components/layout/brand";
 import { ApertureMark, CheckIcon, PanelIcon } from "@/components/ui/icons";
@@ -166,11 +167,15 @@ export function SidebarShell({
 
         {/* The grouped rail can exceed the viewport on a short screen, so it owns
             its own scroll rather than clipping the last section. */}
-        <div className={cn("min-h-0 flex-1 overflow-y-auto pb-lg", narrow ? "px-2" : "px-3")}>
+        <div className={cn("min-h-0 flex-1 overflow-y-auto pb-lg", navColumnClass(narrow))}>
           <Sidebar allowed={allowed} narrow={narrow} stance={stance} />
         </div>
 
-        <div className="relative border-t p-2">
+        {/* The footer takes the SAME column inset as the nav list above it, and
+            the control inside takes the same row and icon geometry as a nav link
+            — see lib/ui/nav-geometry. Both were previously hand-set here and
+            drifted 4px inboard of the icons they sit under. */}
+        <div className={cn("relative border-t py-2", navColumnClass(narrow))}>
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
@@ -183,13 +188,26 @@ export function SidebarShell({
             aria-label={`${t("nav.sidebar.control")}: ${t(sidebarModeLabelKey(mode))}`}
             data-testid="sidebar-control"
             className={cn(
-              "flex w-full items-center rounded-sm py-2 text-label font-medium text-fg-secondary transition-colors",
-              "hover:bg-surface-2/60 hover:text-fg",
+              "group flex w-full items-center rounded-sm text-label font-medium text-fg-secondary transition-colors",
+              "hover:text-fg",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-              showModeLabel ? "gap-3 px-3" : "justify-center px-0",
+              // Keyed to `narrow`, not to whether the LABEL shows. The two differ
+              // in expand-on-hover, where the panel is wide but stays icon-only:
+              // keying the row to the label would collapse it to the rail layout
+              // mid-reveal and slide the icon sideways under the pointer.
+              navRowClass(narrow),
+              !narrow && "hover:bg-surface-2/60",
             )}
           >
-            <PanelIcon size={19} className="shrink-0 text-fg-muted" />
+            <span
+              className={cn(
+                navIconClass(narrow),
+                "text-fg-muted group-hover:text-fg",
+                narrow && "group-hover:bg-surface-2 group-hover:shadow-sm group-focus-visible:bg-surface-2",
+              )}
+            >
+              <PanelIcon size={NAV_ICON_SIZE} />
+            </span>
             {showModeLabel ? <span className="truncate">{t(sidebarModeLabelKey(mode))}</span> : null}
           </button>
 

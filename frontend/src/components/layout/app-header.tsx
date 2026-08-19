@@ -4,9 +4,10 @@ import { cn } from "@/lib/ui/cn";
 import { Brand } from "@/components/layout/brand";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { ProfileMenu } from "@/components/layout/profile-menu";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { loadAccountIdentity, initialsOf } from "@/server/queries/identity";
 import { canSearchAdmin } from "@/server/actions/search";
-import { THEME_COOKIE, resolveThemePreference } from "@/lib/theme/config";
+import { THEME_COOKIE, resolveTheme, resolveThemePreference } from "@/lib/theme/config";
 import type { CommerceStance } from "@/lib/workspace/supply-side";
 
 /**
@@ -119,6 +120,12 @@ export async function AppHeader({
 
         <div className="ms-auto flex shrink-0 items-center gap-sm">
           {actions ? <div className="hidden items-center gap-sm tablet:flex">{actions}</div> : null}
+          {/* Immediately before the avatar, and present at EVERY width. Appearance
+              is the one preference people change often enough that burying it two
+              clicks deep in the account menu was the complaint — and a phone in
+              a dark room is exactly where it is needed most, so it does not get
+              dropped at the tablet breakpoint the way `actions` does. */}
+          <ThemeToggle initial={resolveTheme(themePreference)} />
           <ProfileMenu
             displayName={identity?.displayName ?? null}
             contact={identity?.contact ?? null}

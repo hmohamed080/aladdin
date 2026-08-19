@@ -178,6 +178,104 @@ describe("CardRail", () => {
     expect(scrolls[0]?.left).toBe(CARD);
   });
 
+  /**
+   * THE REGRESSION THIS COMPONENT KEEPS HAVING.
+   *
+   * A smooth scroll takes a few hundred milliseconds, and a user clicking an
+   * arrow twice does not wait for it. Mid-animation the cards are at drifting,
+   * meaningless positions, so a second click that reasons purely from live
+   * geometry finds that "the next card from here" is the one the FIRST click is
+   * already travelling to — and commands a move that merely finishes it. Three
+   * fast clicks then advanced one card. The rail must reason from where it is
+   * HEADED, while still measuring the distance it commands from where it IS.
+   */
+  it("advances one card per click when clicks arrive faster than the scroll animates", () => {
+    rtl = false;
+    renderWithI18n(
+      <CardRail label="group">
+        <Cards />
+      </CardRail>,
+      "en",
+    );
+    const next = screen.getByLabelText(en.rail.next);
+
+    fireEvent.click(next);
+    expect(scrolls[0]?.left).toBe(CARD); // committed to card 2, at travel 200
+
+    // 120px in — the animation to card 2 is still running.
+    geometry.scrollLeft = 120;
+    fireEvent.click(next);
+
+    // Card 3 sits 280px ahead of the LIVE position (200 to finish the first
+    // move, 200 more for the second, less the 120 already travelled). A rail
+    // that ignored the in-flight commitment would ask for 80 and land back on
+    // card 2 — the same card, one click wasted.
+    expect(scrolls[1]?.left).toBe(280);
+    expect(scrollBy).toHaveBeenCalledTimes(2);
+  });
+
+  it("resumes from the settled position once a committed scroll has arrived", () => {
+    rtl = false;
+    renderWithI18n(
+      <CardRail label="group">
+        <Cards />
+      </CardRail>,
+      "en",
+    );
+    const next = screen.getByLabelText(en.rail.next);
+    fireEvent.click(next);
+
+    // The scroll completes and the rail reports it. The commitment must be
+    // released here, or every later click would keep adding a phantom card.
+    geometry.scrollLeft = CARD;
+    fireEvent.scroll(screen.getByRole("group"));
+
+    fireEvent.click(next);
+    expect(scrolls[1]?.left).toBe(CARD);
+  });
+
+  it("does not overrun the end of the rail on repeated fast clicks", () => {
+    rtl = false;
+    renderWithI18n(
+      <CardRail label="group">
+        <Cards />
+      </CardRail>,
+      "en",
+    );
+    const next = screen.getByLabelText(en.rail.next);
+    // Five cards: four steps exist, the fifth click has nowhere left to go and
+    // must be a no-op rather than a jump past the last card.
+    for (let i = 0; i < 6; i += 1) fireEvent.click(next);
+    expect(scrollBy).toHaveBeenCalledTimes(4);
+    // The last committed move lands card 5 at the start edge, and no further.
+    expect(scrolls[3]?.left).toBe(CARD * 4);
+  });
+
+  it("hands control back to the user after a manual scroll gesture", () => {
+    rtl = false;
+    renderWithI18n(
+      <CardRail label="group">
+        <Cards />
+      </CardRail>,
+      "en",
+    );
+    const rail = screen.getByRole("group");
+    fireEvent.click(screen.getByLabelText(en.rail.next));
+
+    // The user swipes past the arrow's destination. Whatever the arrow was
+    // heading for is now stale — the next click must step from where the user
+    // actually is, not from an abandoned target.
+    // Two cards past the arrow's destination — but deliberately NOT to the end
+    // of the rail, or `next` would be disabled and the click under test would
+    // never reach the component.
+    fireEvent.wheel(rail);
+    geometry.scrollLeft = CARD * 2;
+    fireEvent.scroll(rail);
+
+    fireEvent.click(screen.getByLabelText(en.rail.next));
+    expect(scrolls[1]?.left).toBe(CARD);
+  });
+
   it("steps back exactly one card", () => {
     rtl = false;
     geometry.scrollLeft = CARD * 2; // parked on card 3

@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui/workspace-layout";
 import { TabLinks, StatTiles } from "@/components/ui/stat-tiles";
 import { ProjectTable } from "@/features/execution/execution-lists";
 import { formatCompactMoney } from "@/lib/ui/format";
-import { LayersIcon, ActivityIcon, CheckIcon, AlertIcon, WalletIcon } from "@/components/ui/icons";
+import { LayersIcon, ActivityIcon, CheckIcon, AlertIcon, MoneyIcon } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +76,7 @@ export default async function ProjectsPage({
           { label: m.execution.project.stat.planned, value: countBy(rows, "planned"), Icon: LayersIcon, tone: "info" },
           { label: m.execution.project.stat.completed, value: countBy(rows, "completed"), Icon: CheckIcon, tone: "success" },
           { label: m.execution.project.stat.overdue, value: overdue(rows), Icon: AlertIcon, tone: "danger" },
-          { label: m.reports.projectValue, value: formatCompactMoney(value, locale), Icon: WalletIcon },
+          { label: m.reports.projectValue, value: formatCompactMoney(value, locale), Icon: MoneyIcon },
         ]}
         className="desktop:grid-cols-5"
       />

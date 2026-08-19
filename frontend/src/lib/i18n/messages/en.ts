@@ -454,16 +454,29 @@ export const en = {
       lastOwner: "You can't remove the last owner of the organization.",
       cannotGrant: "You can only grant capabilities you hold yourself.",
       email: "Enter a valid email address.",
+      phone: "Enter a valid phone number.",
+      contactRequired: "Enter either an email address or a phone number.",
     },
     invite: {
       title: "Invite an employee",
+      channelLabel: "How should we reach them?",
+      channel: { email: "Email", phone: "Phone" },
       email: "Work email",
+      phone: "Phone number",
+      phoneHint: "Egyptian mobile or full international number.",
       branch: "Branch",
       noBranch: "Whole organization",
-      submit: "Send invitation",
-      sent: "Invitation created.",
+      submit: "Create invitation",
+      sent: "Invitation sent by email.",
+      ready: "Invitation ready to send.",
       linkReady: "Invitation link ready",
       linkHint: "Share this link with the employee. They accept it after signing in with a matching email.",
+      // Deliberately explicit that nothing was delivered. A manager who believes
+      // a message went out stops chasing an invitee nobody ever contacted.
+      phoneShareHint:
+        "We don't send text messages yet — copy this link and send it to them on WhatsApp or however you normally reach them. It works once and expires in 14 days.",
+      copy: "Copy link",
+      copied: "Copied",
     },
     members: {
       title: "Members",
@@ -809,7 +822,10 @@ export const en = {
     joinOrg: "You've been invited to join {org} on Aladdin.",
     joinOrgGeneric: "You've been invited to join an organization on Aladdin.",
     forEmail: "This invitation was sent to {email}.",
+    forPhone: "This invitation was issued for {phone}.",
     matches: "This invitation is for your account.",
+    phoneLinkNote:
+      "This invitation was issued for a phone number and can be accepted with the account you're signed in with.",
     notMatches: "This invitation is for a different email. Sign in with the invited address to accept it.",
     acceptCta: "Accept invitation",
     signInToAccept: "Sign in to accept",
@@ -2164,7 +2180,7 @@ export const en = {
       activateHint: "Start execution — move the project from planned to active.",
       complete: "Mark project completed",
       completeHint: "Finish execution — this completes the project and its order.",
-      completedBody: "Execution is finished. No invoice or payment is created.",
+      completedBody: "Execution is finished. Nothing further is required here.",
       awaitingExecutor: "Waiting on the executing organization to advance this project.",
       empty: {
         executingTitle: "No projects yet",

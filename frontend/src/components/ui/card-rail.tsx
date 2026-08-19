@@ -46,6 +46,25 @@ export function CardRail({
   const [atEnd, setAtEnd] = useState(true);
   const [overflow, setOverflow] = useState(false);
 
+  /**
+   * The travel distance the last arrow click COMMITTED to, or null when the rail
+   * is wherever the user last left it.
+   *
+   * This is the whole fix for consecutive clicks, and it exists because a smooth
+   * scroll is not instantaneous. Measuring geometry gives you where the rail IS,
+   * and 150ms into an animation that is a moving, meaningless position: a second
+   * click would look at cards drifting past mid-flight, find that the "next card
+   * that starts after here" is the one already being scrolled to, and command a
+   * move that finishes the FIRST click instead of advancing past it. Clicking
+   * next three times quickly then advanced one card, not three — which reads as
+   * an arrow that randomly ignores you.
+   *
+   * Holding the committed destination separately means every click reasons about
+   * where the rail is HEADED, while the distance it actually commands is still
+   * measured from live geometry (which is what `scrollBy` is relative to).
+   */
+  const commit = useRef<number | null>(null);
+
   const measure = useCallback(() => {
     const el = track.current;
     if (!el) return;
@@ -57,6 +76,11 @@ export function CardRail({
     setOverflow(max > 2);
     setAtStart(travelled <= 2);
     setAtEnd(travelled >= max - 2);
+    // Arrived. Releasing the commitment here (rather than on a timer) means the
+    // rail is never left believing it is mid-flight after it has settled.
+    if (commit.current !== null && Math.abs(travelled - commit.current) <= 2) {
+      commit.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -64,12 +88,25 @@ export function CardRail({
     if (!el) return;
     measure();
     el.addEventListener("scroll", measure, { passive: true });
+    // Any scroll the USER drives — wheel, trackpad, swipe, drag, arrow keys —
+    // supersedes whatever an arrow was heading for. Without this, a click
+    // followed by a swipe would leave the next click reasoning from a
+    // destination the user has already overridden.
+    const release = () => {
+      commit.current = null;
+    };
+    for (const type of ["wheel", "touchstart", "pointerdown", "keydown"] as const) {
+      el.addEventListener(type, release, { passive: true });
+    }
     // Catches BOTH the viewport resizing and the sidebar changing mode — either
     // one changes how many cards fit, and therefore whether arrows belong.
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     if (el.firstElementChild) ro.observe(el.firstElementChild);
     return () => {
+      for (const type of ["wheel", "touchstart", "pointerdown", "keydown"] as const) {
+        el.removeEventListener(type, release);
+      }
       el.removeEventListener("scroll", measure);
       ro.disconnect();
     };
@@ -101,6 +138,23 @@ export function CardRail({
     return rtl ? t.right - c.right : c.left - t.left;
   };
 
+  /**
+   * The rail's own logical start inset. A card that is correctly snapped sits at
+   * `scroll-padding-inline-start` from the scrollport edge, NOT at zero, so its
+   * measured lead distance at rest is that padding rather than 0. Landing a card
+   * at lead 0 instead would leave it 4px past its snap position, the browser
+   * would snap it back, and the correction would compound into visible drift
+   * over a run of clicks. Read rather than hardcoded so a caller that changes
+   * the rail's padding does not silently break the arithmetic.
+   */
+  const startInset = (el: HTMLElement) => {
+    const style = getComputedStyle(el);
+    const scrollPad = parseFloat(style.scrollPaddingInlineStart);
+    if (Number.isFinite(scrollPad)) return scrollPad;
+    const pad = parseFloat(style.paddingInlineStart);
+    return Number.isFinite(pad) ? pad : 0;
+  };
+
   const step = (direction: 1 | -1) => {
     const el = track.current;
     if (!el) return;
@@ -108,27 +162,37 @@ export function CardRail({
     const cards = Array.from(el.children) as HTMLElement[];
     if (cards.length === 0) return;
 
-    // Slack has to clear the rail's own 4px inline padding: a card snapped to
-    // the start sits at distance 4, and treating that as "ahead of us" would
-    // make every click scroll by zero.
     const SLACK = 6;
-    const distances = cards.map((c) => leadDistance(el, c, rtl));
+    const inset = startInset(el);
+    const live = Math.abs(el.scrollLeft);
+    // How far ahead of the live position the rail is already headed. Zero unless
+    // a previous click is still animating.
+    const ahead = commit.current === null ? 0 : commit.current - live;
+
+    // `lead` is measured from live geometry, because that is the frame `scrollBy`
+    // works in. `fromTarget` re-bases the same numbers onto where the rail is
+    // GOING, which is the frame the choice of "which card is next" belongs in.
+    const lead = cards.map((c) => leadDistance(el, c, rtl) - inset);
+    const fromTarget = lead.map((d) => d - ahead);
 
     // Ascending by construction, so "the next one" is the first card that starts
-    // after the current position, and "the previous one" is the last card that
+    // after the committed position, and "the previous one" is the last card that
     // starts before it — never two, never the end of the rail.
-    const target =
+    const index =
       direction === 1
-        ? distances.find((d) => d > SLACK)
-        : [...distances].reverse().find((d) => d < -SLACK);
-    if (target === undefined || target === 0) return;
-
+        ? fromTarget.findIndex((d) => d > SLACK)
+        : fromTarget.findLastIndex((d) => d < -SLACK);
+    // -1 means there is no adjacent card in that direction: we are at the end of
+    // the rail, or already committed to it. Doing nothing is correct.
+    const distance = index === -1 ? undefined : lead[index];
+    if (distance === undefined) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     el.scrollBy({
       // In RTL the logical "forward" is a DECREASING scrollLeft, hence the flip.
-      left: (rtl ? -1 : 1) * target,
+      left: (rtl ? -1 : 1) * distance,
       behavior: reduce ? "auto" : "smooth",
     });
+    commit.current = live + distance;
   };
 
   const PrevIcon = dir === "rtl" ? ChevronRightIcon : ChevronLeftIcon;

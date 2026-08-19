@@ -25,7 +25,7 @@ import {
   ShoppingBagIcon,
   InboxIcon,
   ClipboardIcon,
-  WalletIcon,
+  MoneyIcon,
   TruckIcon,
   BookmarkIcon,
   TrendingUpIcon,
@@ -195,7 +195,7 @@ export default async function ReportsPage({
           summary, so the heading moves above them. A buyer's page is unchanged:
           there the same tiles ARE the summary and the heading follows. */}
       {supply ? (
-        <SectionTitle icon={<WalletIcon size={18} />}>{m.reports.section.purchasing}</SectionTitle>
+        <SectionTitle icon={<MoneyIcon size={18} />}>{m.reports.section.purchasing}</SectionTitle>
       ) : null}
 
       <StatTiles
@@ -204,7 +204,7 @@ export default async function ReportsPage({
           {
             label: m.reports.stat.spend,
             value: formatCompactMoney(purchase.orderValue, locale),
-            Icon: WalletIcon,
+            Icon: MoneyIcon,
             tone: "accent",
             hint: m.reports.stat.spendHint,
           },
@@ -231,7 +231,7 @@ export default async function ReportsPage({
 
       {/* ---------------------------------------------------------------- */}
       {supply ? null : (
-        <SectionTitle icon={<WalletIcon size={18} />}>{m.reports.section.purchasing}</SectionTitle>
+        <SectionTitle icon={<MoneyIcon size={18} />}>{m.reports.section.purchasing}</SectionTitle>
       )}
 
       <Card>
