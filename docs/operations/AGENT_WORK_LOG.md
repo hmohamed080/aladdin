@@ -2430,3 +2430,73 @@ it to open, and it was not among the three shells requested.
 Real browser: EN/light and AR/RTL/dark — both panels open with translated empty states, Escape closes,
 the panel stays inside the viewport in both directions, the Points entry shows its active state, and
 the page renders in both locales.
+
+---
+
+## Global shell closeout — Feedback, live opacity tokens, fluid content column (`349ad7f`)
+
+Final pre-UAT pass on `feature/supply-side-b2b-mvp` (PR #34). Three items only; no supply-side
+business logic, no schema, no migration, no RLS touched.
+
+### Feedback — the shell of a COMPOSER (the note above is now superseded)
+Mounted in the shared `AppHeader` beside Chat and Notifications, on the same `HeaderMenu` primitive,
+so all three behave identically (Escape, outside click, `role="dialog"`, RTL anchoring, phone clamp).
+Chat and Notifications are inboxes, so their honest shell is an empty state; Feedback has nothing to
+be empty OF, so it shows the composer it will become — heading, field, submit — with sending plainly
+marked as not open. **No counter, no history, no persistence, no claim of submission.**
+
+Two deliberate a11y choices: the textarea is `readOnly`, NOT `disabled`, because a disabled control
+leaves the tab order and takes its `aria-describedby` explanation with it — a keyboard or screen
+reader user would meet an apparently empty panel. The BUTTON is genuinely `disabled`, which is what
+a control that cannot act should be. The `/auth/support` link is included because it is the one path
+that works today; a shell that only says "not yet" is a dead end.
+
+**Next sprint attaches here:** a server action on the form plus dropping `readOnly`/`disabled`. No
+header geometry moves.
+
+### Opacity modifiers on token colours were DEAD — fixed at the root
+`bg-surface-2/60`, `bg-accent-solid/15`, `bg-danger/10` and ~40 more **emitted no CSS rule at all**.
+Tailwind cannot split `var(--surface-2)` into channels at build time, so it dropped each utility
+SILENTLY — no warning, no error, just an element with no background. Proven by compiling a probe:
+`.bg-surface-2` was emitted, `.bg-surface-2\/60` was not.
+
+Fix is one helper in `tailwind.config.ts` — every token resolves through
+`color-mix(in srgb, var(--t) calc(<alpha-value> * 100%), transparent)`, using Tailwind's own
+`<alpha-value>` substitution (`/60` → `0.6`, absent → `1`). **46 dead utilities returned with the
+alphas the code always intended: zero token edits, zero class rewrites.** `color-mix` composites
+against the ACTIVE theme's token, so one rule is correct on Limestone and Carbon alike — which a
+hardcoded rgba fallback could never be. Applied to semantic, series AND brand primitives so no
+future `/NN` can quietly evaporate.
+
+Restored: admin navigation · sidebar mode menu · profile menu (items + language/appearance
+selection) · workspace switcher · table header and row hover · cards and every soft badge tone ·
+collapsed active rail tile.
+
+**A latent inversion surfaced once the rules compiled.** In the sidebar mode menu and the workspace
+switcher, `hover:bg-*` sat alongside a conditional `selected && "bg-accent-solid/10"`. A hover
+variant always outranks a base utility in the emitted sheet, so a selected row would have washed to
+grey under the pointer — invisible before only because NEITHER rule existed. Both now branch on
+`selected` and deepen the accent (`/10` → `/20`) instead. Profile-menu items moved to the named
+`surface-hover` so all three menus agree on one hover ground.
+
+> **Rule for future work:** never write an opacity modifier and a conditional base background for the
+> same property on one element. Branch on the state instead.
+
+### Content column — fluid, not a laptop-era literal
+`<main>` carried three hardcoded caps (1200 / 1120 / 1200) in three files. On a 1874px display that
+left ~600px of dead margin around the densest content in the product. New
+`components/layout/content-column.ts` replaces all three with `contentColumnClass`: fluid between
+sidebar and viewport edge, padding opening 16 → 24 → 32px, and a 1920px cap that engages only on
+ultrawides. Measured: B2B main 1200 → **1808px**, `/home` 1120 → **1864px**, Admin fluid, with
+**0px horizontal overflow** everywhere (tables already scroll inside their own container).
+
+Forms do NOT inherit that width. `readableColumnClass` (768px) is for single-column data entry, and
+the two in-shell forms that had no measure of their own — showroom referral, org invite — now take
+it. The shell uses the display; the form stays fillable. The full-width `/home` header is unchanged.
+
+**Validation:** typecheck · `eslint .` · 315/315 unit tests green. Real browser, real Email-OTP
+sign-in (no bypass), three identities: B2B English Light + B2B Arabic Dark RTL (`rania@`), Admin
+(`admin@`), personal `/home` (`consumer@`). Feedback opens/closes and anchors inward in RTL; admin
+nav hover now paints and is clearly lighter than the active fill; selected rows keep their accent
+under hover; dark tints stay subtle. Per instruction: no full E2E, no pgTAP, no perf, no persona
+matrix. Only console error is a Grammarly extension hydration mismatch — environmental, pre-existing.
