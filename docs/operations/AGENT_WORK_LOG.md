@@ -2500,3 +2500,82 @@ sign-in (no bypass), three identities: B2B English Light + B2B Arabic Dark RTL (
 nav hover now paints and is clearly lighter than the active fill; selected rows keep their accent
 under hover; dark tints stay subtle. Per instruction: no full E2E, no pgTAP, no perf, no persona
 matrix. Only console error is a Grammarly extension hydration mismatch — environmental, pre-existing.
+
+---
+
+## Supply-side dashboard — visual fidelity against the Distributor reference
+
+**Scope:** the shared Distributor / Manufacturer / Importer dashboard only. Global shell frozen — no
+change to header, sidebar, scrollbars, CardRail, theme, search, profile menu, Chat/Notifications/
+Feedback/Points shells, `contentColumnClass`, invitations or the Tailwind colour architecture.
+
+### The problem, stated precisely
+The page was functionally right and structurally a Showroom dashboard: it used the MODULE page's
+shape — a wide list column with a fixed `18rem` context rail (`WorkPane`). Measured on a 1874px
+display: the rail held **300px of content inside a 790px row**, so ~490px × 288px of the page was
+blank from its last panel down. Nothing on the page was unavailable elsewhere, so nothing led.
+
+### What changed
+**Rows, not a column with a rail.** New `Row` + `Panel fill` in `workspace-layout.tsx`. `Row` takes
+PROPORTIONS (`lead` 1.55:1, `wide-lead` 2.5:1, `even`, `thirds`) rather than a rem aside, so the
+operational block absorbs a wide display and gives the room back on a laptop — a fixed rail can do
+neither. `fill` makes panels in a row end level. Both are opt-in; `WorkPane` is untouched and the
+rfqs / quotations / orders module pages are unchanged.
+
+**The attention queue (`features/home/supply-attention.tsx`) — the one genuinely new block.** A
+cross-stage triage list: requests nobody priced → prices nobody chased → accepted prices with no
+order → orders nobody progressed. No module owns that list, which is why it belongs here and nowhere
+else. Drawn as the reference's wide row cards (severity rail, labelled cells, per-row verb) rather
+than a table, because a table forces ONE header per column and these four record types have four
+different dates ("Required by" / "Valid until" / "Accepted on" / "Confirmed on") and four different
+jobs. Ordered by STAGE — the order a seller works — because "soonest first" across a required-by, a
+valid-until and a confirmed-on compares nothing. Three per stage, six total.
+
+`quotationsWithOrders()` (execution queries) makes "ready for order" exact: accepted quotation ids
+are asked about directly rather than inferred from a capped order page, where an old acceptance would
+read as "ready" forever. On the seed data it correctly returns **empty** — all four acceptances have
+orders.
+
+**Pipeline panel** replaces two stub cards: demand / quotations / orders statuses grouped under stage
+captions, each row carrying a proportion bar (`PanelRow share`) — share of its OWN stage, never of
+the page. Catalogue state moved to the new `Panel foot`, because as a fourth bar group it made the
+SUPPORTING panel taller than the operational queue beside it, inverting the row's whole point.
+Measured after: queue 423px / pipeline 426px, row 709 → **568px**, so head + KPIs + the entire
+attention band now fit the first viewport.
+
+**Rows 2–4.** Incoming demand and latest quotations as peers side by side; trend (lead) beside the
+funnel; top products / top customers / quotations-by-status three-up and level.
+
+### Two real defects found by measuring, not by looking
+1. **Columns did not line up.** The attribute block had no `min-w-0`, so a flex item defaulted to
+   `min-width: auto` = its content's minimum: a row carrying "EGP 628,800.00" refused to shrink to
+   its basis while a row without a money cell shrank freely. Rows landed on different vertical lines.
+   Fixed; verified identical lefts across all six rows at 1440 / 1600 / 1920 in both locales.
+2. **Arabic clipped the identifying half of every Latin name.** `text-overflow` clips at the end of
+   the element's own direction, so in the RTL workspace "Cairo Ceramics Showroom" rendered as
+   "…ics Showroom" and "Basins - New Cairo apartments" as "…sins - New Cairo apartments". Titles and
+   counterparties now CLAMP (line box) instead of truncating, so the beginning survives in either
+   script. Dates and money still truncate — a wrapped "EGP 132,000.00" reads as two numbers.
+
+The counterparty also moved from its own column into the record's second line (as every other list in
+the workspace already does via `RecordCell`): as a column it was the longest value in the row, so it
+set the floor for every other cell. The single-line row now engages at `wide` only; below that it
+uses the same stacked form the phone gets, which is readable at any container width.
+`QuotationTable` gained `compact`, which drops the counterparty column that was ALREADY the record
+cell's meta line — in a half-width panel that duplicate forced every cell to wrap over three lines.
+
+### What was NOT added
+No wallet, invoices, collections, payments, carrier tracking, maps, Reels, message or notification
+counts, AI recommendations, rewards or commissions. **No comparison-period percentages** — nothing in
+this database produces one, and the reference's "+18% from last month" badges have no honest
+equivalent here. The page is denser because real records are organised better.
+
+### Validation
+typecheck · `eslint .` · 81/81 dashboard-related unit tests (includes exact EN/AR key parity, "no
+Arabic in the English catalog", "no unintended English in the Arabic catalog"). Real browser, real
+Email-OTP sign-in, no bypass: **`rania@` (Distributor) Arabic desktop Light AND Dark** as primary,
+plus `mahmoud@` (Manufacturer) English and `fady@` (Importer) Arabic — all three inherit the same
+composition, differing only in organization identity and org-type voice. Instrumented for truncation
+and overflow at 1280 / 1440 / 1600 / 1920: **zero truncated elements, zero horizontal overflow**. One
+mobile viewport (390px) checked for breakage only — stacks correctly, `scrollWidth === clientWidth`.
+Per instruction: no full E2E, no pgTAP, no perf, no persona matrix.

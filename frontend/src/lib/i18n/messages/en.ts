@@ -1367,9 +1367,44 @@ export const en = {
       },
     },
     section: {
-      demand: "What is waiting on you",
+      attention: "What needs your attention",
+      demand: "Incoming demand, and the prices you sent",
       performance: "How the business is converting",
       fulfilment: "What you are fulfilling",
+    },
+    /* The cross-stage triage queue. Its wording never claims more than the
+       records support: a status is the record's OWN status, and a date is
+       labelled with which date it is. */
+    attention: {
+      title: "Waiting on you right now",
+      hint: "Work that has stopped at some stage of your pipeline, in the order you would work it.",
+      clear: "Nothing is waiting on you",
+      clearBody:
+        "Every request has been priced, every accepted price has an order behind it, and every order is moving.",
+      column: { status: "Status" },
+      amount: "Value",
+      date: {
+        required: "Required by",
+        validUntil: "Valid until",
+        accepted: "Accepted on",
+        confirmed: "Confirmed on",
+      },
+      cta: {
+        price: "Send a price",
+        chase: "Follow up",
+        order: "Create the order",
+        fulfil: "Progress it",
+      },
+    },
+    /* The context panel beside the queue: the same three record sets the page is
+       built from, counted by stage rather than listed. */
+    pipeline: {
+      title: "Your pipeline",
+      hint: "Every record your business is a party to, counted by stage.",
+      demand: "Requests received",
+      quotations: "Prices sent",
+      orders: "Orders",
+      catalogue: "Your catalogue",
     },
     tile: {
       awaitingResponse: "Requests to answer",

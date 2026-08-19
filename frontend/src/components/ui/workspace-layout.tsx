@@ -301,19 +301,42 @@ export function Panel({
   title,
   Icon,
   action,
+  badge,
   children,
   className,
   hint,
+  fill,
+  foot,
 }: {
   title: string;
   Icon?: ComponentType<{ size?: number }>;
   action?: ReactNode;
+  /** A count or state marker rendered beside the title, inside the header rule. */
+  badge?: ReactNode;
   children: ReactNode;
   className?: string;
   hint?: string;
+  /**
+   * Stretch to the height of the tallest panel in the row.
+   *
+   * Opt-in rather than automatic, because it is only ever right inside a GRID
+   * row — a panel in a normal flex stack that grows to fill would take the whole
+   * column. Where it is on, a short panel beside a tall one gains the difference
+   * as breathing room at its foot instead of leaving a ragged step between two
+   * cards that clearly belong to the same row.
+   */
+  fill?: boolean;
+  /** A closing line under the body, separated by a rule — a total, a caveat. */
+  foot?: ReactNode;
 }) {
   return (
-    <section className={cn("overflow-hidden rounded-md border bg-surface shadow-card", className)}>
+    <section
+      className={cn(
+        "overflow-hidden rounded-md border bg-surface shadow-card",
+        fill && "flex h-full flex-col",
+        className,
+      )}
+    >
       <div className="flex items-center justify-between gap-sm border-b bg-surface-2/40 px-md py-2.5">
         <h2 className="flex min-w-0 items-center gap-2 text-body-lg font-medium text-fg">
           {Icon ? (
@@ -322,20 +345,83 @@ export function Panel({
             </span>
           ) : null}
           <span className="truncate">{title}</span>
+          {badge ? <span className="shrink-0">{badge}</span> : null}
         </h2>
         {action ? <div className="shrink-0 text-label">{action}</div> : null}
       </div>
-      <div className="px-md py-md">
+      <div className={cn("px-md py-md", fill && "flex-1")}>
         {hint ? <p className="mb-sm text-label text-fg-muted">{hint}</p> : null}
         {children}
       </div>
+      {foot ? (
+        <div className="border-t bg-surface-2/30 px-md py-2 text-label text-fg-muted">{foot}</div>
+      ) : null}
     </section>
   );
 }
 
+/* ------------------------------------------------------------------------- */
+
 /**
- * A key/value line for the aside column. `emphasis` marks the one figure the
- * panel exists to show, so a breakdown still has a subject.
+ * A row of panels that sit SIDE BY SIDE and end level with each other.
+ *
+ * WHY THIS AND NOT `WorkPane`
+ * `WorkPane` is a wide working column with a permanently narrow context rail
+ * beside it, and it is right for a MODULE page, where one list is the subject
+ * and everything else annotates it. A dashboard is not that shape: it is a
+ * sequence of rows in which the two or three blocks are peers of different
+ * weight, and the reference builds every screen out of exactly those rows. Used
+ * on a dashboard, `WorkPane` produced the failure this replaces — an 18rem rail
+ * holding 300px of content beside an 800px column, so roughly a quarter of the
+ * page width was blank from the rail's last panel down to the row's foot.
+ *
+ * `cols` describes PROPORTION, never pixels. A fixed `22rem` aside is dead space
+ * at 2560px and a squeeze at 1280px; fractional tracks give the operational
+ * block the extra room a wide display offers and hand it back on a laptop, which
+ * is what "use the width, do not stretch the small cards" actually requires.
+ *
+ * Every variant collapses to one column below its own breakpoint, so nothing
+ * here can produce horizontal overflow.
+ */
+export type RowCols = "lead" | "wide-lead" | "even" | "thirds";
+
+const rowCols: Record<RowCols, string> = {
+  /* Operational block roughly 3:2 against its context panel. The workhorse. */
+  lead: "desktop:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]",
+  /* The same idea for a row whose lead block is a dense queue or a chart that
+     genuinely wants the room — it stays stacked until `desktop` and only opens
+     to its full 5:2 at `wide`, so a 1280px laptop does not get a 340px column. */
+  "wide-lead": "desktop:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)] wide:grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)]",
+  /* Two peers — two record lists, or a chart and its breakdown. */
+  even: "desktop:grid-cols-2",
+  /* Three summaries. Two-up on a tablet first, because three 250px cards on a
+     768px screen is not a summary, it is a set of truncated labels. */
+  thirds: "tablet:grid-cols-2 desktop:grid-cols-3",
+};
+
+export function Row({
+  cols,
+  children,
+  className,
+}: {
+  cols: RowCols;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    // `items-stretch` is the grid default and is what makes `Panel fill` work;
+    // it is named here so that a later `items-start` cannot be added by accident
+    // without someone noticing it breaks the row's level foot.
+    <div className={cn("grid items-stretch gap-md [&>*]:min-w-0", rowCols[cols], className)}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A key/value line for a summary panel: a tone dot, a label, and the figure.
+ * With `share` it also carries a proportion bar, which is what turns a list of
+ * counts into a readable breakdown.
  */
 export function PanelRow({
   label,
@@ -343,6 +429,7 @@ export function PanelRow({
   locale,
   tone,
   href,
+  share,
 }: {
   label: string;
   /** A number is formatted for `locale`; anything else renders as given. */
@@ -350,6 +437,18 @@ export function PanelRow({
   locale: Locale;
   tone?: KpiTone;
   href?: string;
+  /**
+   * This row's fraction of its group, 0–1 — draws a proportion bar under the
+   * label line.
+   *
+   * Opt-in, because it is only meaningful where the rows of a panel are PARTS OF
+   * ONE WHOLE (statuses of a stage), and actively misleading where they are not
+   * (a total beside an average). Where it is on, it also does real layout work:
+   * a bare label/value pair in a 400px column is two words separated by 300px of
+   * nothing, and the bar is what turns that gap into the comparison the reader
+   * was making anyway.
+   */
+  share?: number;
 }) {
   const dot = tone ? (
     <span
@@ -366,8 +465,8 @@ export function PanelRow({
     />
   ) : null;
 
-  const body = (
-    <>
+  const line = (
+    <span className="flex items-center justify-between gap-sm">
       <span className="flex min-w-0 items-center gap-2 text-body text-fg-secondary">
         {dot}
         <span className="truncate">{label}</span>
@@ -375,18 +474,58 @@ export function PanelRow({
       <span className="shrink-0 text-body font-medium tabular-nums text-fg">
         {typeof value === "number" ? formatNumber(value, locale) : value}
       </span>
-    </>
+    </span>
   );
+
+  const body =
+    typeof share === "number" ? (
+      <span className="flex min-w-0 flex-col gap-0.5">
+        {line}
+        {/* Track and fill, not a fill alone: without the track a row at 8% is a
+            stub floating in white space and reads as a rendering fault rather
+            than a small number. `rounded-pill` on both keeps the cap shape at
+            every width, including the near-zero one. */}
+        <span aria-hidden="true" className="block h-1 w-full rounded-pill bg-surface-2">
+          <span
+            className={cn(
+              "block h-full rounded-pill",
+              tone === "danger" && "bg-danger",
+              tone === "warning" && "bg-warning",
+              tone === "success" && "bg-success",
+              tone === "info" && "bg-info",
+              tone === "accent" && "bg-accent-solid",
+              (tone === "neutral" || !tone) && "bg-fg-muted",
+            )}
+            /* A percentage width is the one thing here that cannot be a utility
+               class: it is data. Floored at 2% so a present-but-tiny value still
+               shows an edge, and clamped at 100 so a bad share cannot overflow
+               its track. */
+            style={{ width: `${Math.min(100, Math.max(share > 0 ? 2 : 0, share * 100))}%` }}
+          />
+        </span>
+      </span>
+    ) : (
+      line
+    );
+
+  /* A row carrying a bar is two stacked lines, so it needs LESS padding than a
+     bare one to keep the same rhythm — without this the bar variant runs a third
+     taller and a summary panel built from it outgrows the operational block it
+     is meant to support. */
+  const pad = typeof share === "number" ? "py-1" : "py-1.5";
 
   return href ? (
     <Link
       href={href}
-      className="-mx-1 flex items-center justify-between gap-sm rounded-xs px-1 py-1.5 transition-colors hover:bg-surface-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+      className={cn(
+        "-mx-1 flex flex-col rounded-xs px-1 transition-colors hover:bg-surface-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
+        pad,
+      )}
     >
       {body}
     </Link>
   ) : (
-    <div className="flex items-center justify-between gap-sm py-1.5">{body}</div>
+    <div className={cn("flex flex-col", pad)}>{body}</div>
   );
 }
 

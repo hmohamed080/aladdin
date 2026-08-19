@@ -90,11 +90,24 @@ export function QuotationTable({
   perspective,
   locale,
   m,
+  compact,
 }: {
   quotations: QuotationListRow[];
   perspective: "supplier" | "requester";
   locale: Locale;
   m: Messages;
+  /**
+   * Drop the counterparty COLUMN — for a panel that is half the page wide.
+   *
+   * Nothing is lost by it, and that is the whole justification: the counterparty
+   * is already the second line of the leading record cell, so at full width the
+   * column is a helpful repeat and at half width it is a repeat that costs a
+   * sixth of the table. Squeezed into a dashboard panel the duplicate pushed
+   * every remaining cell to wrap over three lines, which turned a five-row list
+   * into a fifteen-line block and left the panel beside it looking empty by
+   * comparison. Full-width callers leave this off and are unchanged.
+   */
+  compact?: boolean;
 }) {
   const columns: Column<QuotationListRow>[] = [
     {
@@ -108,16 +121,21 @@ export function QuotationTable({
         />
       ),
     },
-    {
-      key: "counterparty",
-      header:
-        perspective === "requester"
-          ? m.commerce.quotation.column.supplier
-          : m.commerce.quotation.column.requester,
-      secondary: true,
-      desktopOnly: true,
-      cell: (q) => (perspective === "requester" ? q.supplier_name : q.requester_name) ?? "—",
-    },
+    ...(compact
+      ? []
+      : [
+          {
+            key: "counterparty",
+            header:
+              perspective === "requester"
+                ? m.commerce.quotation.column.supplier
+                : m.commerce.quotation.column.requester,
+            secondary: true,
+            desktopOnly: true,
+            cell: (q: QuotationListRow) =>
+              (perspective === "requester" ? q.supplier_name : q.requester_name) ?? "—",
+          },
+        ]),
     {
       key: "total",
       header: m.commerce.quotation.column.total,
