@@ -275,9 +275,17 @@ export function SidebarShell({
                         aria-current={selected ? "true" : undefined}
                         data-testid={`sidebar-mode-${value}`}
                         className={cn(
-                          "flex w-full items-center gap-2.5 px-3 py-2 text-start text-body text-fg transition-colors",
-                          "hover:bg-surface-2/70 focus-visible:outline-none focus-visible:bg-surface-2/70",
-                          selected && "bg-accent-solid/10",
+                          "flex w-full items-center gap-2.5 px-3 py-2 text-start text-body text-fg transition-colors focus-visible:outline-none",
+                          // Selection and hover are two DIFFERENT statements, so
+                          // they cannot share one ground. Pointing at the chosen
+                          // mode must not repaint it as merely hovered — it stays
+                          // accent and only deepens. Written as a branch rather
+                          // than as `hover:` + a conditional base, because a hover
+                          // variant always outranks a base utility in the emitted
+                          // sheet and would have washed the selection out.
+                          selected
+                            ? "bg-accent-solid/10 hover:bg-accent-solid/20 focus-visible:bg-accent-solid/20"
+                            : "hover:bg-surface-hover focus-visible:bg-surface-hover",
                         )}
                       >
                         <span className="truncate">{t(sidebarModeLabelKey(value))}</span>

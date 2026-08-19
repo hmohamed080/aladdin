@@ -9,6 +9,8 @@ import { loadPlatformRole } from "@/server/queries/platform";
 import { AppHeader } from "@/components/layout/app-header";
 import { Badge } from "@/components/ui/primitives";
 import { AdminSidebar, AdminTopNav } from "@/components/admin/admin-nav";
+import { contentColumnClass } from "@/components/layout/content-column";
+import { cn } from "@/lib/ui/cn";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +66,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           <div className="flex min-w-0 flex-1 flex-col">
             <AdminTopNav />
 
-            <main className="mx-auto w-full max-w-[1200px] flex-1 px-md py-lg" id="main">
+            <main className={cn(contentColumnClass, "py-lg")} id="main">
               {children}
             </main>
           </div>

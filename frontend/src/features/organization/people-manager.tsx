@@ -17,6 +17,7 @@ import {
 import { ROLE_PRESET_ORDER, capabilityGroups } from "@/lib/org/roles";
 import type { OrgMember, OrgInvitation } from "@/server/queries/organization";
 import { formatCount } from "@/lib/ui/format";
+import { readableColumnClass } from "@/components/layout/content-column";
 
 const INITIAL: PeopleFormState = { ok: false };
 
@@ -60,7 +61,9 @@ function InvitePanel({ orgId, orgName, branches }: { orgId: string; orgName: str
   const link = state.inviteToken ? `/auth/invite/${state.inviteToken}` : null;
 
   return (
-    <Card className="flex flex-col gap-md">
+    // Bounded to a readable measure: the workspace column is fluid now, and an
+    // invite form spread across a 1800px display reads as a spreadsheet.
+    <Card className={cn("flex flex-col gap-md", readableColumnClass)}>
       <h2 className="text-body-lg font-semibold text-fg">{t("org.invite.title")}</h2>
       <form action={action} className="flex flex-col gap-md">
         <input type="hidden" name="orgId" value={orgId} />

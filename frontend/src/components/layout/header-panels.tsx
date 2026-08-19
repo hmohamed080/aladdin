@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
 import { headerIconClass, headerPanelClass } from "@/components/layout/header-parts";
-import { BellIcon, MessageIcon } from "@/components/ui/icons";
+import Link from "next/link";
+import { BellIcon, MegaphoneIcon, MessageIcon } from "@/components/ui/icons";
 
 /**
  * CHAT AND NOTIFICATIONS — THE SHELL, AND ONLY THE SHELL.
@@ -139,6 +140,77 @@ export function NotificationsMenu() {
         title={t("notifications.empty.title")}
         body={t("notifications.empty.body")}
       />
+    </HeaderMenu>
+  );
+}
+
+/**
+ * FEEDBACK — THE SHELL OF A COMPOSER, NOT AN EMPTY INBOX.
+ *
+ * Chat and Notifications are inboxes, so their honest shell is an empty state.
+ * Feedback is a COMPOSER: there is nothing for it to be empty of, and an "empty
+ * state" here would say nothing true. What it shows instead is the real surface
+ * the next sprint will wire — heading, field, submit — with both controls inert
+ * and one plain line saying sending is not open. Attaching a backend is then a
+ * server action on the form plus dropping `readOnly`/`disabled`; no geometry in
+ * this header moves.
+ *
+ * WHY THE FIELD IS `readOnly` AND NOT `disabled`
+ * A disabled textarea is removed from the tab order, so a keyboard or screen
+ * reader user would never reach the control OR the explanation attached to it —
+ * the panel would read as empty. `readOnly` keeps it focusable and announced,
+ * `aria-describedby` ties it to the reason, and nothing typed can be submitted
+ * because there is no submit path at all. The BUTTON is genuinely disabled,
+ * because a button that cannot act is exactly what `disabled` means.
+ *
+ * The support link is here because it is the one thing that DOES work today: a
+ * shell that only says "not yet" is a dead end, and this one still hands over to
+ * a real destination.
+ */
+export function FeedbackMenu() {
+  const { t } = useI18n();
+  const noteId = useId();
+  return (
+    <HeaderMenu
+      icon={<MegaphoneIcon size={16} />}
+      label={t("nav.feedback")}
+      testId="header-feedback"
+    >
+      <div className="flex flex-col gap-2 px-md py-3">
+        <p className="text-body font-medium text-fg">{t("feedback.heading")}</p>
+
+        <textarea
+          readOnly
+          rows={3}
+          aria-describedby={noteId}
+          placeholder={t("feedback.placeholder")}
+          data-testid="feedback-input"
+          className="w-full resize-none rounded-sm border bg-surface-2 px-2.5 py-2 text-body text-fg placeholder:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface"
+        />
+
+        <p id={noteId} className="text-label text-fg-muted">
+          {t("feedback.notConnected")}
+        </p>
+
+        <button
+          type="button"
+          disabled
+          data-testid="feedback-send"
+          className="mt-0.5 w-full rounded-sm bg-accent-solid px-3 py-2 text-label font-semibold text-brand-lumen-ink disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {t("feedback.send")}
+        </button>
+
+        <p className="mt-1 border-t pt-2.5 text-label text-fg-muted">
+          {t("feedback.supportPrompt")}{" "}
+          <Link
+            href="/auth/support"
+            className="font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface"
+          >
+            {t("feedback.supportLink")}
+          </Link>
+        </p>
+      </div>
     </HeaderMenu>
   );
 }

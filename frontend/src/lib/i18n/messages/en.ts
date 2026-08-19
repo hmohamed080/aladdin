@@ -112,6 +112,7 @@ export const en = {
     help: "Help & support",
     chat: "Chat",
     notifications: "Notifications",
+    feedback: "Feedback",
     points: "Points",
     themeLight: "Light",
     themeDark: "Dark",
@@ -839,6 +840,18 @@ export const en = {
       title: "No notifications yet",
       body: "Updates on your requests, offers and orders will appear here.",
     },
+  },
+  /* The composer is the SHELL of a composer: it shows exactly the surface the
+     next sprint will wire, and states plainly that sending is not open, rather
+     than accepting text it would silently drop. */
+  feedback: {
+    title: "Feedback",
+    heading: "Tell us what to fix",
+    placeholder: "What is working, and what is getting in your way?",
+    send: "Send feedback",
+    notConnected: "Sending is not open yet — nothing typed here is saved.",
+    supportPrompt: "Need help with something now?",
+    supportLink: "Contact support",
   },
   points: {
     title: "Points",

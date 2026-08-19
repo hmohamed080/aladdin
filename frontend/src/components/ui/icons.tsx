@@ -415,6 +415,14 @@ export const MessageIcon = (p: IconProps) => (
 );
 
 /** A question mark in a circle — the header's Help entry. */
+export const MegaphoneIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m3 11 18-5.5v13L3 14z" />
+    <path d="M3 11H2.5A1.5 1.5 0 0 0 1 12.5v0A1.5 1.5 0 0 0 2.5 14H3" />
+    <path d="M7 12.6V19a1 1 0 0 0 1 1h1.5a1 1 0 0 0 1-1v-5.4" />
+  </Svg>
+);
+
 export const HelpIcon = (p: IconProps) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="9" />

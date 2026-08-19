@@ -11,6 +11,8 @@ import { SidebarShell } from "@/components/layout/sidebar-shell";
 import { SalesRealtime } from "@/features/sales/sales-realtime";
 import { SIDEBAR_MODE_COOKIE, resolveSidebarMode } from "@/lib/ui/sidebar-mode";
 import { commerceStance } from "@/lib/workspace/supply-side";
+import { contentColumnClass } from "@/components/layout/content-column";
+import { cn } from "@/lib/ui/cn";
 
 /**
  * The B2B workspace chrome: a persistent left sidebar (brand + primary nav) on
@@ -78,7 +80,7 @@ export async function AppShell({
         <SidebarShell allowed={active.capabilities} mode={sidebarMode} stance={stance} />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <main className="mx-auto w-full max-w-[1200px] flex-1 px-md py-lg pb-24 tablet:pb-xl" id="main">
+          <main className={cn(contentColumnClass, "py-lg pb-24 tablet:pb-xl")} id="main">
             {children}
           </main>
 

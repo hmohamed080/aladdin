@@ -11,7 +11,7 @@ import { loadAccountIdentity, initialsOf } from "@/server/queries/identity";
 import { canSearchAdmin } from "@/server/actions/search";
 import { THEME_COOKIE, resolveTheme, resolveThemePreference } from "@/lib/theme/config";
 import { HelpIcon } from "@/components/ui/icons";
-import { ChatMenu, NotificationsMenu } from "@/components/layout/header-panels";
+import { ChatMenu, FeedbackMenu, NotificationsMenu } from "@/components/layout/header-panels";
 import { HeaderSeparator, headerIconClass } from "@/components/layout/header-parts";
 import type { CommerceStance } from "@/lib/workspace/supply-side";
 
@@ -54,12 +54,15 @@ import type { CommerceStance } from "@/lib/workspace/supply-side";
  * an Aladdin token; what was borrowed is the COMPACTNESS and the hierarchy, not
  * a palette.
  *
- * WHAT IS ABSENT, AND WHY
- * There is no notification bell and no chat entry. This repository has no
- * notification model and no messaging model — no tables, no queries, nothing in
- * the history to restore. A bell that opens nothing, or a badge showing a number
- * nobody computed, is a lie in the chrome. When either surface genuinely exists
- * it belongs in `actions`, which is why that slot is here.
+ * WHAT IS PRESENT BUT NOT YET WIRED
+ * Chat, Notifications and Feedback are SHELLS. The repository has no messaging
+ * model, no notification model and no feedback model — no tables, no queries.
+ * They are here anyway because their PLACE in the header is a decision worth
+ * settling before the data lands, and because each opens something finished and
+ * honest: the two inboxes state that there is nothing yet, and Feedback shows the
+ * composer it will be with sending plainly marked as not open. What none of them
+ * carries is a COUNT or a badge — a number nobody computed is a lie in the
+ * chrome, and no amount of shell justifies one.
  *
  * RESPONSIVE
  * Below `tablet` the search field collapses to its icon and any `context` slot
@@ -136,13 +139,13 @@ export async function AppHeader({
 
           {actions ? <div className="hidden items-center gap-sm tablet:flex">{actions}</div> : null}
 
-          {/* Chat and Notifications: the shell only. Both open a finished empty
-              state and neither shows a count, because there is no messaging or
-              notification data in this repository yet — see `header-panels`.
-              They are here rather than in `actions` because they are not one
-              surface's controls; every authenticated surface gets both. */}
+          {/* Chat, Notifications and Feedback: the shell only — see
+              `header-panels` for what each opens and why none carries a count.
+              They sit here rather than in `actions` because they are not one
+              surface's controls; every authenticated surface gets all three. */}
           <ChatMenu />
           <NotificationsMenu />
+          <FeedbackMenu />
 
           {/* Help points at the support surface that already exists and stays
               reachable while signed in. It is a real destination with a real

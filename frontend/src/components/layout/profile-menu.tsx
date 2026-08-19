@@ -284,7 +284,7 @@ function MenuLink({
       href={href}
       role="menuitem"
       onClick={onNavigate}
-      className="flex items-center gap-2.5 px-md py-2 text-body text-fg transition-colors hover:bg-surface-2/70 focus-visible:outline-none focus-visible:bg-surface-2/70"
+      className="flex items-center gap-2.5 px-md py-2 text-body text-fg transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:bg-surface-hover"
     >
       <span className="shrink-0 text-fg-muted">
         <Icon size={17} />

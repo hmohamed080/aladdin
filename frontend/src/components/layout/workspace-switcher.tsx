@@ -148,9 +148,12 @@ export function WorkspaceSwitcher({
                     onClick={() => choose(value)}
                     aria-current={selected ? "true" : undefined}
                     className={cn(
-                      "flex w-full items-center gap-2.5 px-3 py-2 text-start transition-colors",
-                      "hover:bg-surface-hover focus-visible:outline-none focus-visible:bg-surface-hover",
-                      selected && "bg-accent-solid/10",
+                      "flex w-full items-center gap-2.5 px-3 py-2 text-start transition-colors focus-visible:outline-none",
+                      // Same rule as the sidebar mode menu: the active workspace
+                      // keeps its accent under the pointer and only deepens.
+                      selected
+                        ? "bg-accent-solid/10 hover:bg-accent-solid/20 focus-visible:bg-accent-solid/20"
+                        : "hover:bg-surface-hover focus-visible:bg-surface-hover",
                     )}
                   >
                     {entry.kind === "personal" ? (

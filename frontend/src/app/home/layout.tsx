@@ -7,6 +7,8 @@ import { getWorkspaces } from "@/server/queries/workspace";
 import { PERSONAL_CONTEXT, personalEntry } from "@/lib/workspace/model";
 import { AppHeader } from "@/components/layout/app-header";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
+import { contentColumnClass } from "@/components/layout/content-column";
+import { cn } from "@/lib/ui/cn";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +21,11 @@ export const dynamic = "force-dynamic";
  * their personal surface, and a person who has none needs somewhere to add their
  * first — which is why it is present even for a lone Personal context.
  *
- * The content column is 1120px. The previous 900px was the root of several Pilot
- * UAT findings at once — a desktop page that read as a narrow form with large empty
- * margins, and a three-up card grid with nowhere to breathe.
+ * The content column is the SHARED one (`contentColumnClass`) — fluid between the
+ * viewport edges rather than a fixed cap. The old 1120px was itself a widening of
+ * an earlier 900px, and it fixed the same Pilot UAT finding only up to a laptop:
+ * past that the page went back to reading as a narrow strip in a wide empty field.
+ * The fix is to stop hardcoding the number here at all.
  */
 export default async function HomeLayout({ children }: { children: ReactNode }) {
   const store = await cookies();
@@ -58,7 +62,7 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
           }
         />
 
-        <main className="mx-auto w-full max-w-[1120px] flex-1 px-md py-xl" id="main">
+        <main className={cn(contentColumnClass, "py-xl")} id="main">
           {children}
         </main>
       </div>
