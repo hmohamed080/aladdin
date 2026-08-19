@@ -2328,3 +2328,20 @@ green. Full E2E deliberately NOT re-run.
 
 **Environment note:** a `tailwind.config.ts` change needs a dev-server RESTART; touching
 `globals.css` is not enough, and the utility silently stays missing until then.
+
+### Follow-up: the scrollbar gutter is gone — thumb only
+Global, both axes, both themes. The track was a permanent 10px stripe down the edge of EVERY scroll
+container — the page, the sidebar, each table, dropdown and rail — and nested containers stacked
+those stripes into seams that read as borders nobody drew. `::-webkit-scrollbar`,
+`::-webkit-scrollbar-track` and `-track-piece` (Blink paints the piece above and below the thumb
+separately, and omitting it puts the gutter back in some builds) are all transparent now, and
+Firefox's `scrollbar-color` takes `transparent` as its track half. The `--scrollbar-track` tokens are
+deleted rather than left unused, so nothing invites their return.
+
+Unchanged on purpose: the 10px width (the bar still RESERVES its space, so nothing reflows when a
+container becomes scrollable), the thumb colours and their hover/active step, the pill radius and the
+2px transparent inset border, the hidden stepper arrows, and every scrolling behaviour.
+
+Verified in Chrome: injected a deliberately over-flowing box and read it in both themes — horizontal
+and vertical thumbs only, no track, no arrows, container surface showing through the gutter; plus the
+real sidebar and page bars in light. typecheck, lint, 315 unit tests green.

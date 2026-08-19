@@ -158,11 +158,12 @@
   /* Grid lines and axis rules — one step softer than a border. */
   /* ---- Scrollbars (LIGHT) ----
    * One treatment for every scroll container in the product (see globals.css).
-   * The track is one step below the canvas so a scrollable region reads as a
-   * recess; the thumb is a neutral that is clearly visible without competing
-   * with content. Never the accent — a scrollbar is chrome, not a signal.
+   * There is no track token: the gutter is TRANSPARENT everywhere, so the thumb
+   * floats over whatever surface the container already has. The thumb is a
+   * neutral that is clearly visible without competing with content, and it is
+   * legible on canvas, surface and surface-2 alike. Never the accent — a
+   * scrollbar is chrome, not a signal.
    */
-  --scrollbar-track: #e6e1d6;
   --scrollbar-thumb: #bab2a2;
   --scrollbar-thumb-hover: #9a917f;
   --chart-grid: var(--line-light);
@@ -236,10 +237,10 @@
   /* ---- Scrollbars (DARK) ----
    * The whole reason this block exists: with no rule, Windows Chrome paints its
    * NATIVE light scrollbar beside a dark sidebar — a white gutter down the side
-   * of the workspace. Track sits a hair above the canvas so the gutter reads as
-   * a recess rather than a seam; thumb is well clear of it but still neutral.
+   * of the workspace. Painting the thumb alone is enough to replace it; the
+   * gutter behind it is transparent, so nothing stripes the edge of a dark
+   * panel. The thumb stays a neutral clear of every dark ground it can land on.
    */
-  --scrollbar-track: #1b1e1f;
   --scrollbar-thumb: #343a3b;
   --scrollbar-thumb-hover: #4b5253;
   --chart-grid: var(--carbon-4);

@@ -45,6 +45,18 @@
    *   3. Firefox has no ::-webkit pseudo-elements at all; `scrollbar-width` +
    *      `scrollbar-color` are its supported equivalents and are set alongside.
    *
+   * THE TRACK IS TRANSPARENT — ONLY THE THUMB IS PAINTED.
+   * A tinted gutter is a permanent 10px stripe down the edge of every scroll
+   * container in the product: the page, the sidebar, each table, each dropdown,
+   * each rail. Nested containers stack those stripes into visible seams that
+   * read as borders nobody drew, and the recess it was meant to suggest is
+   * carried far better by the container's own border and background. So the
+   * track, the corner and the bar's own background are all transparent, on both
+   * axes and in both themes, and the thumb alone floats over whatever surface it
+   * happens to be on. The thumb COLOURS are unchanged — it was already a neutral
+   * chosen to be legible without competing, and it clears canvas, surface and
+   * surface-2 alike in both themes.
+   *
    * The bar is deliberately NOT hidden. It is the only affordance that tells a
    * user there is more content below or beside what they can see; hiding it is
    * how a dense workspace loses half its rows silently. Wheel, touch, keyboard
@@ -66,17 +78,27 @@
   @supports not selector(::-webkit-scrollbar) {
     * {
       scrollbar-width: thin;
-      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+      /* Second value is the TRACK: transparent, same as the Blink path below. */
+      scrollbar-color: var(--scrollbar-thumb) transparent;
     }
   }
 
+  /* Width is kept, background is not: the bar still RESERVES its 10px so content
+     does not reflow when a container becomes scrollable — it just paints
+     nothing behind the thumb. Both axes: `width` is the vertical bar, `height`
+     the horizontal one. */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
+    background: transparent;
   }
 
-  ::-webkit-scrollbar-track {
-    background: var(--scrollbar-track);
+  /* `-track-piece` as well as `-track`: Blink paints the piece above and below
+     the thumb separately, and leaving it out puts the gutter back in some
+     builds. */
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-track-piece {
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
@@ -102,8 +124,8 @@
     height: 0;
   }
 
-  /* Where a vertical and a horizontal bar meet, so the square is not a
-     leftover patch of native canvas. */
+  /* Where a vertical and a horizontal bar meet — already transparent, and it
+     must stay that way now that neither bar paints a ground of its own. */
   ::-webkit-scrollbar-corner {
     background: transparent;
   }
