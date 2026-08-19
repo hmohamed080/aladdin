@@ -2178,6 +2178,19 @@ re-runs its own auth migrations, then load the seeds. Also: `pnpm dev` and Playw
 share `.next`, so running both concurrently poisons the build with a `Cannot find module './NNNN.js'`
 — stop dev and `rm -rf .next` first.
 
+### A third defect, found by the new e2e assertion
+The e2e test written for "do the two theme controls agree" failed on its first run, and it was right
+to. The header switch and the profile menu each seeded local state from `<html>` once, at mount —
+fine while only one is mounted, wrong the moment both are: change the theme from the header, open the
+account menu, and the menu still showed the previous choice. Neither component owns theme state now;
+`lib/theme/use-theme` subscribes to `<html>` via `MutationObserver`, `applyThemePreference` is the
+only writer, and every reader updates in the same microtask. Also fixed while there: under `system`
+the OS could change with the app open and nothing re-applied it, so a workspace left open past sunset
+stayed light.
+
+Final e2e: `global-shell-uat` **21 passed / 0 failed** across desktop + Pixel 5 (9 skipped are the
+pointer/tablet-only rail and sidebar cases on the mobile project).
+
 ### Unfinished / next
 - `/b2b/settings` still carries the binary `ThemeSwitch` that cannot express "System" — now a THIRD
   theme control alongside the header switch and the account menu. All three share one cookie and one
