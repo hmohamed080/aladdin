@@ -91,6 +91,7 @@ export default async function OrganizationPeoplePage() {
       <JoinRequests requests={joinRequests} branches={branches} m={m} locale={locale} />
       <PeopleManager
         orgId={org.organizationId}
+        orgName={org.organizationName}
         members={members}
         invitations={invitations}
         branches={branches}

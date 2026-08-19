@@ -19,6 +19,9 @@ export default {
         surface: {
           DEFAULT: "var(--surface)",
           2: "var(--surface-2)",
+          /* The hover ground. Explicit because an opacity modifier on a `var()`
+             colour (`bg-surface-2/60`) generates no rule in this setup. */
+          hover: "var(--surface-hover)",
         },
         fg: {
           DEFAULT: "var(--fg)",

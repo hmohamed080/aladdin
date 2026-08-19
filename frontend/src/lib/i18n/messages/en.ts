@@ -474,8 +474,12 @@ export const en = {
       // Deliberately explicit that nothing was delivered. A manager who believes
       // a message went out stops chasing an invitee nobody ever contacted.
       phoneShareHint:
-        "We don't send text messages yet — copy this link and send it to them on WhatsApp or however you normally reach them. It works once and expires in 14 days.",
+        "Nothing has been sent yet. WhatsApp opens with the message ready — you still press Send there. The link works once and expires in 14 days.",
       copy: "Copy link",
+      copyLink: "Copy invitation link",
+      whatsapp: "Send via WhatsApp",
+      whatsappMessage:
+        "Hi, you've been invited to join {organizationName} on Aladdin.\nUse this link to accept your invitation:\n{inviteUrl}",
       copied: "Copied",
     },
     members: {

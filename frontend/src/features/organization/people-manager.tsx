@@ -6,6 +6,7 @@ import { cn } from "@/lib/ui/cn";
 import { Card, Badge, StatePanel } from "@/components/ui/primitives";
 import { Button, SubmitButton, Input, Select, LabeledField } from "@/components/ui/controls";
 import { UsersIcon, MailIcon, PhoneIcon, CopyIcon } from "@/components/ui/icons";
+import { whatsappShareUrl } from "@/lib/contact/whatsapp";
 import {
   inviteMemberAction,
   assignRoleAction,
@@ -52,7 +53,7 @@ function statusTone(status: string): "success" | "warning" | "neutral" | "danger
  * success message for a message that was never dispatched would leave a manager
  * waiting on an invitee nobody ever contacted.
  */
-function InvitePanel({ orgId, branches }: { orgId: string; branches: Branch[] }) {
+function InvitePanel({ orgId, orgName, branches }: { orgId: string; orgName: string; branches: Branch[] }) {
   const { t } = useI18n();
   const [state, action] = useActionState(inviteMemberAction, INITIAL);
   const [channel, setChannel] = useState<"email" | "phone">("email");
@@ -150,27 +151,62 @@ function InvitePanel({ orgId, branches }: { orgId: string; branches: Branch[] })
           {state.ok && !link ? <span className="text-label text-success">{t(state.code ?? "org.invite.sent")}</span> : null}
         </div>
       </form>
-      {link ? <InviteLink link={link} channel={state.channel ?? "email"} /> : null}
+      {link ? (
+        <InviteLink
+          link={link}
+          channel={state.channel ?? "email"}
+          phone={state.phone}
+          orgName={orgName}
+        />
+      ) : null}
     </Card>
   );
 }
 
 /**
- * The generated invitation link, with a one-press copy.
+ * The generated invitation link and the actions that get it to a human.
  *
  * On a phone invitation this is not a convenience, it is the delivery mechanism:
  * nothing was sent, and this link is the only way the invitee ever hears about
- * it. So the copy button is the primary action rather than a small affordance
- * beside a code block, and the hint says plainly which channel the manager still
- * has to use.
+ * it. So the phone channel gets TWO actions of equal weight — copy the link, or
+ * hand it to WhatsApp — and the email channel keeps exactly what it had, because
+ * its invitation really was dispatched and the link is a fallback.
  *
- * The token is rendered and copied, never logged — it is a bearer credential for
- * the phone path, and a console line or a telemetry event carrying it would hand
- * organization membership to anyone reading logs.
+ * WHAT "SEND VIA WHATSAPP" DOES
+ * It opens `wa.me` with the invitee's number and the message already typed. It
+ * does not send anything: no WhatsApp Business API, no SMS gateway, no server
+ * call — the manager presses Send inside WhatsApp, and the copy beside it says
+ * so. It is also strictly a shortcut over the copy path: if WhatsApp will not
+ * open, on a desktop without the client or with the handler blocked, the link is
+ * still selectable text with a copy button next to it, so the invitation cannot
+ * be stranded behind an app that is not installed.
+ *
+ * The token is rendered, copied and placed in the WhatsApp draft, never logged —
+ * it is a bearer credential for the phone path, and a console line or a telemetry
+ * event carrying it would hand organization membership to anyone reading logs.
+ * That includes the WhatsApp href: it is built in render and passed to the
+ * browser, and nothing prints it.
  */
-function InviteLink({ link, channel }: { link: string; channel: "email" | "phone" }) {
+function InviteLink({
+  link,
+  channel,
+  phone,
+  orgName,
+}: {
+  link: string;
+  channel: "email" | "phone";
+  phone?: string;
+  orgName: string;
+}) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
+
+  // The invitee opens this on their own device, so both actions need the ABSOLUTE
+  // URL — a copied `/auth/invite/…` is useless in a WhatsApp message. This
+  // component only ever mounts after a form submission, so `window` is present;
+  // the guard keeps it safe if that ever stops being true.
+  const inviteUrl =
+    typeof window === "undefined" ? link : new URL(link, window.location.origin).toString();
 
   const copy = async () => {
     try {
@@ -178,7 +214,7 @@ function InviteLink({ link, channel }: { link: string; channel: "email" | "phone
       // refused. A failed copy must not look like a successful one, so the
       // confirmation is only shown when the write actually resolved — the link
       // is selectable text either way, which is the fallback.
-      await navigator.clipboard.writeText(new URL(link, window.location.origin).toString());
+      await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -186,17 +222,40 @@ function InviteLink({ link, channel }: { link: string; channel: "email" | "phone
     }
   };
 
+  // Locale-aware by construction: the draft is a translated message, so an Arabic
+  // workspace hands WhatsApp Arabic text. The organization name is the real one
+  // from the workspace context, not a placeholder.
+  const whatsappHref = whatsappShareUrl({
+    phone,
+    message: t("org.invite.whatsappMessage", { organizationName: orgName, inviteUrl }),
+  });
+
   return (
     <div className="flex flex-col gap-2 rounded-md border border-dashed bg-surface-2/40 p-md">
       <p className="text-label font-medium text-success">{t("org.invite.linkReady")}</p>
+      <code dir="ltr" className="min-w-0 select-all break-all text-label text-fg-secondary">
+        {link}
+      </code>
       <div className="flex flex-wrap items-center gap-2">
-        <code dir="ltr" className="min-w-0 flex-1 select-all break-all text-label text-fg-secondary">
-          {link}
-        </code>
         <Button type="button" variant="outline" size="sm" onClick={copy} data-testid="invite-copy-link">
           <CopyIcon size={15} />
-          {copied ? t("org.invite.copied") : t("org.invite.copy")}
+          {copied ? t("org.invite.copied") : t(channel === "phone" ? "org.invite.copyLink" : "org.invite.copy")}
         </Button>
+        {channel === "phone" ? (
+          // An anchor, not a scripted `window.open`: middle-click, long-press and
+          // "open in app" all keep working, and a blocked popup cannot swallow the
+          // only delivery route. `noopener` because the target is external.
+          <a
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="invite-whatsapp"
+            className="inline-flex min-h-8 select-none items-center gap-1.5 rounded-sm border border-strong px-3 py-1 text-label font-medium text-fg transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+          >
+            <PhoneIcon size={15} />
+            {t("org.invite.whatsapp")}
+          </a>
+        ) : null}
       </div>
       <p className="text-label text-fg-muted">
         {channel === "phone" ? t("org.invite.phoneShareHint") : t("org.invite.linkHint")}
@@ -291,11 +350,14 @@ function StatusForm({ member }: { member: OrgMember }) {
 
 export function PeopleManager({
   orgId,
+  orgName,
   members,
   invitations,
   branches,
 }: {
   orgId: string;
+  /** The real business name — it goes into the invitation the invitee reads. */
+  orgName: string;
   members: OrgMember[];
   invitations: OrgInvitation[];
   branches: Branch[];
@@ -308,7 +370,7 @@ export function PeopleManager({
 
   return (
     <div className="flex flex-col gap-xl">
-      <InvitePanel orgId={orgId} branches={branches} />
+      <InvitePanel orgId={orgId} orgName={orgName} branches={branches} />
 
       <section className="flex flex-col gap-md">
         <h2 className="text-title text-fg">

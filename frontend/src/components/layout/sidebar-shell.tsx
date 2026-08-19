@@ -10,7 +10,13 @@ import {
   sidebarModeLabelKey,
   type SidebarMode,
 } from "@/lib/ui/sidebar-mode";
-import { navColumnClass, navIconClass, navRowClass, NAV_ICON_SIZE } from "@/lib/ui/nav-geometry";
+import {
+  navColumnClass,
+  navIconClass,
+  navRowClass,
+  NAV_ICON_SELF_HOVER_CLASS,
+  NAV_ICON_SIZE,
+} from "@/lib/ui/nav-geometry";
 import { Sidebar } from "@/components/layout/workspace-nav";
 import { Brand } from "@/components/layout/brand";
 import { ApertureMark, CheckIcon, PanelIcon } from "@/components/ui/icons";
@@ -190,9 +196,21 @@ export function SidebarShell({
                the painted text disappears. */
             aria-label={`${t("nav.sidebar.control")}: ${t(sidebarModeLabelKey(mode))}`}
             data-testid="sidebar-control"
+            /* THE ROW ITSELF HAS NO HOVER STATE. NOT IN ANY MODE.
+               The button stays `w-full` so the CLICK target still matches a nav
+               row, but a target and a hover surface are not the same thing here:
+               a nav row paints on hover because its whole width is label and
+               icon, whereas this row is a 36px icon followed by up to 200px of
+               nothing. Tinting that emptiness announced a control the pointer was
+               nowhere near, which is the same defect as the group-driven tile,
+               one element out. Every visible hover cue now comes from the tile
+               below — `hover:` on the span, not `group-hover:` here. Do not add
+               `hover:` anything to this element again.
+               Focus is untouched: the ring is a keyboard affordance, not hover
+               feedback, and it lands on this button because this button is what
+               takes focus. */
             className={cn(
-              "group flex w-full items-center rounded-sm text-label font-medium text-fg-secondary transition-colors",
-              "hover:text-fg",
+              "group flex w-full items-center rounded-sm text-label font-medium text-fg-secondary",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
               // Keyed to `narrow` — the PANEL's width — and never to whether the
               // control has a label, because it never has one.
@@ -207,14 +225,30 @@ export function SidebarShell({
               // column. RTL follows for free — `px` is logical, so the inset is on
               // the right in Arabic without a second rule.
               navRowClass(narrow),
-              !narrow && "hover:bg-surface-2/60",
             )}
           >
             <span
               className={cn(
-                navIconClass(narrow),
-                "text-fg-muted group-hover:text-fg",
-                narrow && "group-hover:bg-surface-2 group-hover:shadow-sm group-focus-visible:bg-surface-2",
+                navIconClass(),
+                // The same lit tile the nav icons above use, in every mode — this
+                // control sits in their column, so it must answer a pointer the
+                // way they do — but armed by the TILE, not by the row.
+                //
+                // A nav row can be row-driven because the row IS the target: its
+                // label, icon and padding all go to one href. This button has no
+                // label. It is `w-full` only so the CLICK target matches a nav
+                // row, so a row-driven tile lit from anywhere along the footer —
+                // the pointer could sit 200px away over empty space and the icon
+                // still glowed, which reads as the whole bottom of the sidebar
+                // reacting to a pointer that is nowhere near it. Scoped to the
+                // span, the paint follows the pointer actually on it, in all
+                // three modes.
+                //
+                // `group-focus-visible:` is the keyboard half and stays: a span
+                // cannot take focus, so the group it reads is the one focusable
+                // control that owns this tile — its own focus, not the footer's.
+                NAV_ICON_SELF_HOVER_CLASS,
+                "text-fg-muted hover:text-fg group-focus-visible:text-fg",
               )}
             >
               <PanelIcon size={NAV_ICON_SIZE} />

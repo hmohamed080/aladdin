@@ -107,6 +107,13 @@
   --canvas: var(--limestone);
   --surface: var(--plaster);
   --surface-2: var(--sand);
+  /* The POINTER-OVER ground: one step short of `surface-2`, so a hovered row
+     reads as "armed" and the current row (`surface-2`) still reads as stronger.
+     It is a token rather than `surface-2/60` because these semantics are
+     `var()` colours with no `<alpha-value>` channel, and Tailwind silently emits
+     NOTHING for an opacity modifier on those — `hover:bg-surface-2/60` compiled
+     to no rule at all, which is why the expanded sidebar rows had no hover. */
+  --surface-hover: #f1ede5;
 
   --fg: var(--ink);
   --fg-secondary: var(--stone);
@@ -185,6 +192,9 @@
   --canvas: var(--carbon);
   --surface: var(--carbon-2);
   --surface-2: var(--carbon-3);
+  /* Same step, same reason, on the dark ground: between `surface` and
+     `surface-2` so hover whispers and the current row still speaks. */
+  --surface-hover: #1e2122;
 
   --fg: var(--carbon-text);
   --fg-secondary: var(--carbon-text-secondary);

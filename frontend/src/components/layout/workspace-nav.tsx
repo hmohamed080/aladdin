@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ComponentType } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
-import { navIconClass, navRowClass, NAV_ICON_SIZE } from "@/lib/ui/nav-geometry";
+import { navIconClass, navRowClass, NAV_ICON_HOVER_CLASS, NAV_ICON_SIZE } from "@/lib/ui/nav-geometry";
 import {
   HomeIcon,
   UsersIcon,
@@ -168,7 +168,13 @@ function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow
         "transition-[background-color,color,box-shadow] duration-fast ease-standard motion-reduce:transition-none",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
         navRowClass(Boolean(narrow)),
-        !narrow && (active ? "bg-surface-2 text-fg" : "text-fg-secondary hover:bg-surface-2/60 hover:text-fg"),
+        // A WIDE row highlights as a row: one surface behind icon and label
+        // together, the shape the design references show. `surface-hover` is a
+        // real token because the `/60` opacity modifier this used to carry
+        // compiled to nothing (see tokens.css), so these rows have never
+        // actually painted. Active stays the full `surface-2` — plus the accent
+        // marker and accent glyph — so the current page reads clearly stronger.
+        !narrow && (active ? "bg-surface-2 text-fg" : "text-fg-secondary hover:bg-surface-hover hover:text-fg"),
       )}
     >
       {/* The active marker is the ONLY cue left once labels are gone, so it stays
@@ -182,13 +188,16 @@ function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow
       />
       <span
         className={cn(
-          // The hover/focus target on a collapsed rail is a TILE rather than a
-          // colour change: at 3.5rem the glyph is small and a hue shift alone is
-          // easy to miss, whereas a raised square under the pointer is
-          // unambiguous about which of nine icons is armed. Its size is shared
-          // with the sidebar's mode control so both sit on one centre line.
-          navIconClass(Boolean(narrow)),
-          narrow && !active && "group-hover:bg-surface-2 group-hover:shadow-sm group-focus-visible:bg-surface-2",
+          // The icon's BOX is the same 36px tile in every mode — that is geometry,
+          // and it is what keeps this glyph on the same centre line as the mode
+          // control at the foot of the panel, which needs a tile of its own.
+          navIconClass(),
+          // The tile only PAINTS on the collapsed rail, where the row is 40px of
+          // icon and the tile effectively IS the row. A wide row highlights as a
+          // ROW — see the `!narrow` hover on the link above — and lighting a tile
+          // inside an already-highlighted row would draw a second, smaller box
+          // around the icon and split one target into two.
+          narrow && !active && NAV_ICON_HOVER_CLASS,
           // An active item already owns a tile; hovering it deepens rather than
           // re-announces, so the active/hover distinction survives the collapse.
           narrow && active && "bg-accent-solid/15 group-hover:bg-accent-solid/25",

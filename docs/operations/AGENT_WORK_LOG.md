@@ -2198,3 +2198,133 @@ pointer/tablet-only rail and sidebar cases on the mobile project).
   is touched.
 - Phone invitations are bearer-token invitations until phone identity exists. The matching branch is
   already written and tested; enabling WhatsApp OTP turns it on with no migration.
+
+## Session · One icon hover state across all three sidebar modes
+**Branch** `feature/supply-side-b2b-mvp` · frontend only, no schema change
+
+The lit icon tile (`group-hover:bg-surface-2 group-hover:shadow-sm group-focus-visible:bg-surface-2`)
+existed only behind a `narrow &&` guard, so it was a COLLAPSED-only affordance. Expanded answered a
+pointer with a row tint alone, and expand-on-hover answered both ways inside one gesture — the panel
+flips 3.5rem→15rem under a cursor that never left the icon, so the icon's own cue appeared and then
+vanished mid-reveal. The brief was to reuse the existing state, not invent a second one.
+
+- `lib/ui/nav-geometry` now exports **`NAV_ICON_HOVER_CLASS`** — the one definition of that state —
+  and `navIconClass()` lost its `narrow` argument: the 36px tile is the icon's box in every mode,
+  because the hover classes have nothing to paint without it.
+- Both call sites (`workspace-nav` NavLink, `sidebar-shell` mode control) spread the same constant
+  with no mode guard. The expanded row keeps its `hover:bg-surface-2/60` tint — the tile is additive.
+- Consequence, deliberate: `navRowClass` expanded `py-2 → py-0.5` and `gap-3 → gap-1`. Height now
+  comes from the tile in BOTH states (40px), which is what stops expand-on-hover jolting the list
+  vertically as it opens; the tighter gap keeps the label's optical distance where the bare glyph put
+  it, since the tile carries ~8.5px of its own side padding. Expanded rows 35px→40px, labels 9px
+  inward. Per-mode column alignment is unchanged by construction — both call sites still ask the same
+  functions. Cross-mode, the reveal now slides icons 14px instead of 5.5px (collapsed tile centre
+  28px, expanded 42px); reducing it would need the expanded row's start inset, which
+  `sidebar-shell.test.tsx` guards at `px-3`.
+- Active items keep today's behaviour: the accent tile stays `narrow && active`, so an expanded
+  active row still reads as a tinted row, not an accent tile.
+
+**Validation:** `pnpm typecheck`, `pnpm lint`, `pnpm test` — 30 files / 307 tests green (three new
+`sidebar-shell.test.tsx` cases assert the same class string reaches a nav icon and the mode control
+in expanded, collapsed and hover, and survives a reveal). Not yet eyeballed in a real browser.
+
+### Follow-up: the bottom control's tile was armed by the wrong element
+Scoping the tile to the icon column was right; driving the CONTROL's tile from the row was not. The
+mode control is `w-full` so its CLICK target matches a nav row, but unlike a nav row it has no label,
+so `group-hover:` lit the 36px tile from anywhere along the footer — a pointer resting 200px away
+over empty space made the bottom of the sidebar glow.
+
+`lib/ui/nav-geometry` now exports the same paint under two triggers: **`NAV_ICON_HOVER_CLASS`**
+(row-driven — correct for a nav link, whose label, icon and padding all navigate to one href) and
+**`NAV_ICON_SELF_HOVER_CLASS`** (`hover:` on the tile itself). The control uses the self-scoped one in
+all three modes; its icon colour moved from `group-hover:text-fg` to `hover:text-fg` for the same
+reason. `group-focus-visible:` stays in BOTH constants on purpose: a span cannot take focus, so the
+group it reads is the single focusable control that owns the tile — that is the control's own focus,
+not an area-wide trigger, and dropping it would cost keyboard users a cue mouse users keep.
+
+The button keeps `!narrow && hover:bg-surface-2/60`, so an expanded footer row still tints on hover.
+That is the only feedback the full-width click target has left; if the target should shrink to the
+tile, the tint goes with it. **Open decision, deliberately not taken here.**
+
+**Validation:** typecheck, lint, 308 unit tests green — including a regression guard asserting the
+control's icon carries no `group-hover:` in any mode, and an assertion that the two constants differ
+only in trigger (identical declarations once the variant prefix is stripped). Tailwind emits
+`.hover\:bg-surface-2:hover` and `.hover\:shadow-sm:hover` (verified against a real
+`npx tailwindcss` compile of this config, not assumed). Still not eyeballed in a real browser.
+
+### Follow-up 2: the control's ROW lost its hover state entirely
+The open decision above was taken: `!narrow && "hover:bg-surface-2/60"` is gone, and so is the
+button's base `hover:text-fg` (dead anyway — the control paints no text) and its now-purposeless
+`transition-colors`. The button keeps `w-full`, so the CLICK target still matches a nav row; what it
+no longer does is PAINT across that width. A nav row may tint on hover because its whole width is
+label and icon; this row is a 36px tile followed by up to 200px of nothing, and tinting that emptiness
+announced a control the pointer was nowhere near — the same defect as the group-driven tile, one
+element out. All visible hover feedback now originates on the tile (`hover:` on the span). The
+`focus-visible` ring stays: it is a keyboard affordance, not hover feedback, and it lands on the
+button because the button is what takes focus.
+
+**Validation:** typecheck, lint, **309** unit tests green. New guard asserts the control's own
+className matches no `hover:`/`group-hover:` variant in expanded, collapsed or hover mode while still
+carrying `focus-visible:ring-2`; the regex was checked against the removed rule so it fails if the
+tint returns. Still not eyeballed in a real browser.
+
+## Session · UAT round 3 — full-row nav hover + WhatsApp invitation hand-off
+**Branch** `feature/supply-side-b2b-mvp` · **PR** #34 (updated, NOT merged) · frontend only
+
+### 1. Navigation items highlight as a ROW again — and a dead opacity modifier is why they did not
+A wide nav row now paints one subtle surface behind icon AND label, matching the supplied
+references; the icon tile paints only on the COLLAPSED rail, where the 40px row IS the tile. Never
+both — a tile inside an already-highlighted row draws a second box around the icon and splits one
+target in two.
+
+The row hover was not merely weak, it was ABSENT, and had been for a long time. `hover:bg-surface-2/60`
+compiles to **nothing**: the semantic colours are `var(--…)` values with no `<alpha-value>` channel,
+and Tailwind silently emits no rule for an opacity modifier on those. Verified twice — a real
+`npx tailwindcss` compile of this config produces no `/60` utility at all, and in the running app a
+CSSOM scan for `bg-surface-2\/60`, `bg-surface-2\/70` and `accent-solid\/15` returns **0 rules**. So
+the fix is a real token: `--surface-hover` (light `#f1ede5`, dark `#1e2122`) sits one step short of
+`surface-2`, mapped as `bg-surface-hover`, so hover whispers and the current row (`surface-2` + accent
+marker + accent glyph) still reads clearly stronger.
+
+**This is systemic and NOT fixed here (out of scope for this round).** Every `/xx` modifier on a
+`var()` token across the app is dead in the same way — `admin-nav`, the sidebar mode MENU
+(`hover:bg-surface-2/70`), profile menu, workspace switcher, tables, cards, and the collapsed ACTIVE
+tile's `bg-accent-solid/15`. Each is an invisible state, not a broken build, which is why it survived
+review. Fixing it properly means either more hover/active tokens or re-expressing the semantics as
+channel triples so modifiers work — a design-system change that deserves its own pass.
+
+The bottom mode control is unchanged and stays the exception: no row paint in any mode, hover only on
+its own 36px tile (`NAV_ICON_SELF_HOVER_CLASS`), icon-only in all three modes.
+
+### 2. Phone invitations: copy the link, or hand it to WhatsApp
+The phone success state now offers exactly two actions — **Copy invitation link** and **Send via
+WhatsApp** — over the honest hint ("nothing has been sent yet… you press Send there"). Email is
+untouched, including its "Copy link" label, because its invitation really was dispatched.
+
+`lib/contact/whatsapp.ts` builds a `wa.me` deep link and nothing more: no WhatsApp Business API, no
+SMS gateway, no server call, no external service. It addresses the NORMALIZED number (E.164 with the
+plus stripped — `inviteMemberAction` now echoes it back in its state) and carries a locale-aware
+template with the REAL organization name and the ABSOLUTE invite URL, URL-encoded so the link's own
+`?`/`&` and the newlines cannot become wa.me query structure. With no usable number it falls back to
+WhatsApp's contact picker rather than erroring. The WhatsApp button is strictly a shortcut over the
+copy path — the link stays selectable and copyable if WhatsApp will not open — and the token is
+rendered, copied and drafted but never logged.
+
+### Validation
+`pnpm typecheck` · `pnpm lint` · targeted units (sidebar-shell 24, whatsapp 4, i18n 20, format) — all
+green. Full E2E deliberately NOT re-run.
+
+**Real browser (Chrome, local dev), confirmed visually:**
+1. Expanded — hovering a nav item paints the whole row; active is clearly stronger. ✔
+2. Expand-on-hover — after the reveal, same full-row highlight. ✔
+3. Collapsed — icon tile lights, rail still coherent. ✔
+4. Bottom control — pointer over empty footer paints NOTHING; pointer on the tile lights the tile. ✔
+   (Verified in expanded/light; the collapsed re-check was blocked by the Next dev-overlay badge
+   sitting over that corner, and the unit tests assert the wiring in all three modes.)
+5. AR/RTL — mirrored, hover and active correct. ✔  6. Light + Dark — both. ✔
+7. Phone invitation shows exactly "نسخ رابط الدعوة" + "الإرسال عبر واتساب". ✔
+8. `wa.me/201002003040?text=…` — normalized number, real org name ("Zayed Home Showroom"), absolute
+   `/auth/invite/…` URL, 3-line Arabic template, correctly encoded. ✔
+
+**Environment note:** a `tailwind.config.ts` change needs a dev-server RESTART; touching
+`globals.css` is not enough, and the utility silently stays missing until then.

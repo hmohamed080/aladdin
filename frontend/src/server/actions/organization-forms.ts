@@ -27,6 +27,14 @@ export type PeopleFormState = {
   inviteToken?: string;
   /** Which contact the invitation was addressed to, for the success copy. */
   channel?: "email" | "phone";
+  /**
+   * The NORMALIZED number a phone invitation was issued to (E.164), echoed back
+   * so the success state can address WhatsApp at the same number the invitation
+   * is bound to rather than at the raw string someone typed. Absent on the email
+   * channel. This is the inviter's own input coming back to them — no lookup, no
+   * disclosure — and never the token.
+   */
+  phone?: string;
 };
 
 function str(fd: FormData, key: string): string | undefined {
@@ -65,6 +73,11 @@ function mapPeopleError(message: string | undefined): string {
  * or in the copy it returns, claims a message was sent — a "sent" toast for a
  * message that was never dispatched is the worst outcome available here, because
  * the manager stops chasing an invitee who was never contacted.
+ *
+ * The success state carries the normalized number back so the UI can offer a
+ * WhatsApp hand-off (`lib/contact/whatsapp`). That is still a link that OPENS
+ * WhatsApp with the message typed; the human presses Send. No messaging service
+ * is involved on this path, here or anywhere downstream of it.
  */
 export async function inviteMemberAction(
   _prev: PeopleFormState,
@@ -76,9 +89,11 @@ export async function inviteMemberAction(
   if (!orgId) return { ok: false, code: "states.genericRetry" };
 
   let target: { p_email: string } | { p_phone: string };
+  let normalizedPhone: string | undefined;
   if (channel === "phone") {
     const phone = toE164(str(fd, "phone") ?? "");
     if (!phone) return { ok: false, code: "org.error.phone" };
+    normalizedPhone = phone;
     target = { p_phone: phone };
   } else {
     const email = str(fd, "email");
@@ -103,6 +118,7 @@ export async function inviteMemberAction(
     code: channel === "phone" ? "org.invite.ready" : "org.invite.sent",
     inviteToken: typeof data === "string" ? data : undefined,
     channel,
+    phone: normalizedPhone,
   };
 }
 
