@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
 import { setTheme } from "@/server/actions/preferences";
-import { applyThemePreference, readActiveTheme, type Theme } from "@/lib/theme/config";
+import { applyThemePreference, type Theme } from "@/lib/theme/config";
+import { useThemeState } from "@/lib/theme/use-theme";
 import { SunIcon, MoonIcon } from "@/components/ui/icons";
 
 /**
@@ -41,15 +42,13 @@ import { SunIcon, MoonIcon } from "@/components/ui/icons";
  */
 export function ThemeToggle({ initial = "light" }: { initial?: Theme }) {
   const { t } = useI18n();
-  const [theme, setThemeState] = useState<Theme>(initial);
+  // Read from the document, not from local state — see lib/theme/use-theme. This
+  // control and the profile menu's must never be able to disagree.
+  const { theme } = useThemeState(initial === "dark" ? "dark" : "light", initial);
   const [, start] = useTransition();
 
-  useEffect(() => {
-    setThemeState(readActiveTheme());
-  }, []);
-
   const choose = (next: Theme) => {
-    setThemeState(applyThemePreference(next));
+    applyThemePreference(next);
     start(async () => {
       await setTheme(next);
     });

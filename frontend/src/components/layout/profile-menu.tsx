@@ -7,12 +7,8 @@ import { cn } from "@/lib/ui/cn";
 import { signOut } from "@/server/actions/auth";
 import { setLocale, setTheme } from "@/server/actions/preferences";
 import { LOCALES, type Locale } from "@/lib/i18n/locales";
-import {
-  THEME_PREFERENCES,
-  applyThemePreference,
-  readThemePreference,
-  type ThemePreference,
-} from "@/lib/theme/config";
+import { THEME_PREFERENCES, applyThemePreference, type ThemePreference } from "@/lib/theme/config";
+import { useThemeState } from "@/lib/theme/use-theme";
 import {
   UserIcon,
   SettingsIcon,
@@ -68,16 +64,14 @@ export function ProfileMenu({
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const [, start] = useTransition();
-  const [theme, setThemeState] = useState<ThemePreference>(themePreference);
+  // The stored preference lives on <html>, and this menu READS it rather than
+  // keeping a copy — the header's quick Light/Dark switch writes the same
+  // attribute, and a snapshot taken at mount would leave this group showing the
+  // previous choice after the user had already changed it there. See
+  // lib/theme/use-theme.
+  const { preference: theme } = useThemeState(themePreference, "light");
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-
-  // The stored preference lives on <html>; after hydration that attribute is the
-  // truth (the pre-paint script may have resolved `system` since SSR).
-  useEffect(() => {
-    const stored = readThemePreference();
-    if (stored) setThemeState(stored);
-  }, []);
 
   // Outside click and Escape both close. Escape also returns focus to the
   // trigger — a menu that closes and leaves focus on <body> strands a keyboard
@@ -136,9 +130,8 @@ export function ProfileMenu({
   };
 
   const chooseTheme = (next: ThemePreference) => {
-    setThemeState(next);
-    // Shared with the header's quick switch — see lib/theme/config. Two controls,
-    // one cookie, one class on <html>, no second copy of the mapping between them.
+    // No local setState: writing the document IS the update, and `useThemeState`
+    // observes it — here and in the header's switch at the same instant.
     applyThemePreference(next);
     start(async () => {
       await setTheme(next);
