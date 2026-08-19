@@ -138,9 +138,40 @@ describe("SidebarShell display modes", () => {
       expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(modeNames);
     });
 
-    it("keeps the label on a deliberately expanded sidebar", () => {
+    /**
+     * The control is icon-only in EVERY mode, expanded included.
+     *
+     * This assertion used to say the opposite — an expanded sidebar kept the
+     * mode name beside the icon. It reads harmless and it is not: what it put at
+     * the foot of an expanded panel was the permanent caption "موسّع", a control
+     * announcing a state the user can plainly see, on the one surface whose job
+     * is to stay quiet. The names belong in the menu, where they are a choice
+     * rather than a label.
+     */
+    it("stays icon-only on a deliberately expanded sidebar too", () => {
       shell("expanded");
-      expect(screen.getByTestId("sidebar-control").textContent).toBe(ar.nav.sidebar.expanded);
+      expect(screen.getByTestId("sidebar-control").textContent).toBe("");
+    });
+
+    it("renders no mode name anywhere in ANY mode while the menu is shut", () => {
+      for (const mode of ["expanded", "collapsed", "hover"] as const) {
+        const { container, unmount } = shell(mode);
+        for (const name of modeNames) expect(container.textContent).not.toContain(name);
+        unmount();
+      }
+    });
+
+    /**
+     * Icon-only must not become icon-CENTRED. An expanded panel is 15rem wide, so
+     * a control that centres its glyph lands ~120px away from the navigation icons
+     * above it — trading a 4px misalignment for a far worse one. The row keeps its
+     * start inset and simply has nothing after the icon.
+     */
+    it("keeps the expanded control's icon at the start inset, not centred", () => {
+      shell("expanded");
+      const control = screen.getByTestId("sidebar-control");
+      expect(control.className).not.toContain("justify-center");
+      expect(control.className).toContain("px-3");
     });
   });
 

@@ -188,6 +188,179 @@ test.describe("shared shell regression (Showroom)", () => {
     expect(after - before).toBeLessThan(card * 1.6);
   });
 
+  /**
+   * THE REGRESSION THIS ROUND FIXED.
+   *
+   * One card per click was already true at rest. It was NOT true when the user
+   * clicked faster than the smooth scroll animates — the second click measured
+   * cards drifting mid-flight, decided the "next" card was the one already being
+   * scrolled to, and commanded a move that merely finished the first. Three fast
+   * clicks advanced one card. The unit test models this; this one proves it in a
+   * real engine, where the smooth-scroll timing is the browser's own.
+   */
+  test("CardRail advances one card per click even when clicked mid-animation", async ({
+    page,
+    request,
+  }) => {
+    test.skip(Boolean(test.info().project.use.isMobile), "arrows are a pointer/keyboard control");
+    await prefs(page, "en");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b");
+
+    const rail = page.getByTestId("card-rail").first();
+    const track = rail.getByRole("group");
+    const next = rail.getByTestId("rail-next");
+    if ((await next.count()) === 0) {
+      await page.setViewportSize({ width: 900, height: 900 });
+      await expect(next).toBeVisible();
+    }
+
+    // Which card currently sits at the rail's logical start edge. Measured from
+    // geometry rather than from scrollLeft so the assertion reads the same in
+    // both writing directions.
+    const cardAtStart = () =>
+      track.evaluate((el) => {
+        const rtl = getComputedStyle(el).direction === "rtl";
+        const t = el.getBoundingClientRect();
+        const leads = [...el.children].map((c) => {
+          const r = c.getBoundingClientRect();
+          return rtl ? t.right - r.right : r.left - t.left;
+        });
+        let best = 0;
+        leads.forEach((d, i) => {
+          if (Math.abs(d) < Math.abs(leads[best]!)) best = i;
+        });
+        return best;
+      });
+
+    const settle = async () => {
+      let last = -1;
+      await expect
+        .poll(
+          async () => {
+            const now = await track.evaluate((el) => Math.round(Math.abs(el.scrollLeft)));
+            const stable = now === last;
+            last = now;
+            return stable;
+          },
+          { timeout: 5000 },
+        )
+        .toBe(true);
+    };
+
+    const start = await cardAtStart();
+
+    // Three clicks 90ms apart — comfortably inside a smooth scroll.
+    await next.click();
+    await page.waitForTimeout(90);
+    await next.click();
+    await page.waitForTimeout(90);
+    await next.click();
+    await settle();
+
+    expect(await cardAtStart(), "three fast clicks must advance three cards").toBe(start + 3);
+
+    // And back the same way.
+    const prev = rail.getByTestId("rail-prev");
+    await prev.click();
+    await page.waitForTimeout(90);
+    await prev.click();
+    await settle();
+    expect(await cardAtStart(), "two fast back-clicks must retreat two cards").toBe(start + 1);
+  });
+
+  /**
+   * The sidebar's bottom mode control is ICON-ONLY in every mode, and its glyph
+   * shares one column with every navigation icon above it.
+   *
+   * Both halves have been regressions. The caption returned as "Expanded" at the
+   * foot of a wide panel — a control captioning a state the user can already see.
+   * The alignment drifted 4px because the control's padding was set in a different
+   * file from the nav rows'. Asserting the CENTRES rather than the classes is what
+   * makes this survive a refactor of either file.
+   */
+  for (const [locale, dir] of [
+    ["en", "ltr"],
+    ["ar", "rtl"],
+  ] as const) {
+    test(`sidebar bottom control is icon-only and in the icon column (${dir})`, async ({
+      page,
+      request,
+    }) => {
+      test.skip(Boolean(test.info().project.use.isMobile), "the rail is tablet-and-up");
+      await prefs(page, locale);
+      await signIn(page, request, IDENTITIES.showroom);
+      await page.goto("/b2b");
+
+      for (const mode of ["expanded", "collapsed", "hover"] as const) {
+        await page.getByTestId("sidebar-control").click();
+        await page.getByTestId(`sidebar-mode-${mode}`).click();
+
+        const control = page.getByTestId("sidebar-control");
+        // Icon-only. In EVERY mode, expanded included.
+        await expect(control, `visible caption in ${mode} mode`).toHaveText("");
+        // The accessible name is what carries the meaning instead.
+        await expect(control).toHaveAttribute("aria-label", /.+/);
+
+        const geometry = await page.evaluate(() => {
+          const ctrl = document.querySelector('[data-testid="sidebar-control"]') as HTMLElement;
+          const icons = [...document.querySelectorAll("[data-sidebar-mode] a")]
+            .map((a) => a.querySelector("svg"))
+            .filter(Boolean) as SVGElement[];
+          const cx = (el: Element) => {
+            const r = el.getBoundingClientRect();
+            return Math.round((r.left + r.width / 2) * 10) / 10;
+          };
+          return {
+            control: cx(ctrl.querySelector("svg")!),
+            nav: [...new Set(icons.map(cx))],
+          };
+        });
+
+        // One column: every nav icon on the same centre, and the control on it too.
+        expect(geometry.nav, `nav icons not in one column (${mode})`).toHaveLength(1);
+        expect(
+          Math.abs(geometry.control - geometry.nav[0]!),
+          `control off the icon column in ${mode} mode`,
+        ).toBeLessThanOrEqual(0.5);
+      }
+
+      await page.getByTestId("sidebar-control").click();
+      await page.getByTestId("sidebar-mode-expanded").click();
+    });
+  }
+
+  /**
+   * The header's Light/Dark switch is a SHORTCUT into the existing preference,
+   * not a second one. So the test that matters is not "does the button work" but
+   * "do the two controls agree" — a header that says light while the profile menu
+   * says dark is the failure mode a duplicated theme state produces.
+   */
+  test("the header theme switch drives the one existing preference", async ({ page, request }) => {
+    await prefs(page, "en");
+    await signIn(page, request, IDENTITIES.showroom);
+    await page.goto("/b2b");
+
+    const html = page.locator("html");
+    await page.getByTestId("theme-quick-dark").click();
+    await expect(html).toHaveClass(/dark/);
+    await expect(html).toHaveAttribute("data-theme-pref", "dark");
+
+    // The profile menu's three-way control must reflect the header's choice.
+    await openAccountMenu(page);
+    await expect(page.getByTestId("theme-dark")).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("Escape");
+
+    await page.getByTestId("theme-quick-light").click();
+    await expect(html).not.toHaveClass(/dark/);
+    await expect(html).toHaveAttribute("data-theme-pref", "light");
+
+    // And it survives a reload — the cookie, not component state, is the store.
+    await page.reload();
+    await expect(html).not.toHaveClass(/dark/);
+    await expect(page.getByTestId("theme-quick-light")).toHaveAttribute("aria-checked", "true");
+  });
+
   test("the header carries search and the account menu, and both work", async ({ page, request }) => {
     await prefs(page, "en");
     await signIn(page, request, IDENTITIES.showroom);

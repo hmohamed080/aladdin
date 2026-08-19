@@ -102,22 +102,25 @@ export function SidebarShell({
   const hoverMode = mode === "hover";
 
   /**
-   * The mode control's own label is tied to the CHOSEN mode, not to whether the
-   * panel happens to be wide at this instant.
+   * THE MODE CONTROL IS ICON-ONLY. ALWAYS. IN EVERY MODE.
    *
-   * This is the difference that produced the UAT finding. `narrow` is momentary:
-   * in expand-on-hover the panel widens the moment the pointer crosses it, so a
-   * label gated on `narrow` appeared beside the control the instant you reached
-   * for it — and what it printed was "التوسيع عند المرور", the name of the mode
-   * you were already in. A control that announces its own state as a caption is
-   * noise on a rail whose entire premise is that it stays out of the way.
+   * There is no `showModeLabel` here any more, and there must not be one again.
+   * Earlier versions painted the mode name beside the icon whenever the panel was
+   * wide, which put a permanent caption reading "موسّع" / "Expanded" at the foot
+   * of an expanded sidebar. That caption is a control announcing its own state,
+   * which is the one thing a state does not need saying: the sidebar is visibly
+   * expanded — the user is looking at it. In expand-on-hover it was worse, since
+   * the panel widens the instant the pointer crosses it, so the label flickered
+   * in under your own cursor and printed the name of the mode you were already in.
    *
-   * Only a deliberately expanded sidebar shows the mode in text. Collapsed and
-   * expand-on-hover both keep the closed control icon-only, in every phase of the
-   * reveal. The mode NAMES still exist where they are actually needed — inside
-   * the menu the control opens, where the user is choosing between them.
+   * The mode NAMES live in the menu this control opens, which is the only moment
+   * they are load-bearing: when the user is choosing between them. Until then the
+   * icon is the whole control.
+   *
+   * Nothing is lost for assistive technology. The `aria-label` below still names
+   * both the control and the active mode, so a screen reader announces strictly
+   * more than the caption ever did. Only the PAINTED text is gone.
    */
-  const showModeLabel = mode === "expanded";
 
   return (
     <div
@@ -191,10 +194,18 @@ export function SidebarShell({
               "group flex w-full items-center rounded-sm text-label font-medium text-fg-secondary transition-colors",
               "hover:text-fg",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-              // Keyed to `narrow`, not to whether the LABEL shows. The two differ
-              // in expand-on-hover, where the panel is wide but stays icon-only:
-              // keying the row to the label would collapse it to the rail layout
-              // mid-reveal and slide the icon sideways under the pointer.
+              // Keyed to `narrow` — the PANEL's width — and never to whether the
+              // control has a label, because it never has one.
+              //
+              // This is what keeps icon-only from meaning centred. An expanded
+              // panel is 15rem wide, so a `justify-center` row would park this
+              // glyph 120px from where every navigation icon above it sits, and
+              // the fix for the misalignment would have created a worse one. An
+              // expanded row therefore keeps its `px-3` start inset and simply
+              // has nothing after the icon; the button still spans the full width
+              // so the click target matches a nav row, but the glyph stays in the
+              // column. RTL follows for free — `px` is logical, so the inset is on
+              // the right in Arabic without a second rule.
               navRowClass(narrow),
               !narrow && "hover:bg-surface-2/60",
             )}
@@ -208,7 +219,6 @@ export function SidebarShell({
             >
               <PanelIcon size={NAV_ICON_SIZE} />
             </span>
-            {showModeLabel ? <span className="truncate">{t(sidebarModeLabelKey(mode))}</span> : null}
           </button>
 
           {menuOpen ? (
