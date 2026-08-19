@@ -22,6 +22,7 @@ import {
   WrenchIcon,
   LandmarkIcon,
   BarChartIcon,
+  GaugeIcon,
   SettingsIcon,
   MenuIcon,
   XIcon,
@@ -69,6 +70,7 @@ const ITEMS: Record<NavKey, Item> = {
   followUps: { href: "/b2b/follow-ups", key: "nav.followUps", exact: false, Icon: CalendarCheckIcon },
   products: { href: "/b2b/products", key: "nav.products", exact: false, Icon: PackageIcon },
 
+  points: { href: "/b2b/points", key: "nav.points", exact: false, Icon: GaugeIcon },
   projects: { href: "/b2b/projects", key: "nav.projects", exact: false, Icon: LayersIcon },
   team: { href: "/b2b/organization", key: "nav.team", exact: false, Icon: UsersIcon },
   reports: { href: "/b2b/reports", key: "nav.reports", exact: false, Icon: BarChartIcon },

@@ -19,6 +19,9 @@ describe("allowedNavKeys", () => {
       "suppliers",
       "technicians",
       "institutions",
+      // Points is the caller's own standing, not an organization record — there
+      // is no capability that could gate it.
+      "points",
       "settings",
     ]);
   });

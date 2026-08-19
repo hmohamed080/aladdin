@@ -407,6 +407,13 @@ export const BellIcon = (p: IconProps) => (
   </Svg>
 );
 
+/** A speech bubble — the header's Chat entry. */
+export const MessageIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20 15a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2Z" />
+  </Svg>
+);
+
 /** A question mark in a circle — the header's Help entry. */
 export const HelpIcon = (p: IconProps) => (
   <Svg {...p}>

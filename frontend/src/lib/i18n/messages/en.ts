@@ -110,6 +110,9 @@ export const en = {
     language: "Language",
     theme: "Theme",
     help: "Help & support",
+    chat: "Chat",
+    notifications: "Notifications",
+    points: "Points",
     themeLight: "Light",
     themeDark: "Dark",
     organization: "Organization",
@@ -822,6 +825,30 @@ export const en = {
     unavailableBody: "A support contact hasn't been set up for this environment yet. Please reach out through your usual Aladdin contact.",
     backToSignIn: "Back to sign in",
   },
+  /* Chat, Notifications and Points are UI shells this sprint: the copy states
+     plainly that there is nothing yet rather than implying data that does not
+     exist. */
+  chat: {
+    empty: {
+      title: "No conversations yet",
+      body: "Messages with your suppliers, buyers and team will appear here.",
+    },
+  },
+  notifications: {
+    empty: {
+      title: "No notifications yet",
+      body: "Updates on your requests, offers and orders will appear here.",
+    },
+  },
+  points: {
+    title: "Points",
+    subtitle: "Your standing on Aladdin.",
+    empty: {
+      title: "Points are not running yet",
+      body: "When the programme opens, what you earn and where it counts will be shown here.",
+    },
+  },
+
   invite: {
     title: "You're invited",
     joinOrg: "You've been invited to join {org} on Aladdin.",

@@ -60,6 +60,7 @@ export type NavKey =
   | "followUps"
   | "products"
   // Business — running the organization itself
+  | "points"
   | "projects"
   | "team"
   | "reports"
@@ -107,6 +108,12 @@ export const NAV_CAPS: Record<NavKey, string[] | null> = {
   followUps: SALES,
   products: ["catalog.write", "catalog.publish"],
 
+  // Points is the caller's OWN standing on the platform, not an organization
+  // record, so no capability could gate it and none does. It is a UI shell in
+  // this sprint: the route exists and says plainly that there is nothing to show
+  // yet — see `app/b2b/points/page.tsx`.
+  points: null,
+
   projects: ["project.write", "project.read", "order.manage"],
   team: ["org.members.manage"],
   reports: [...SALES, ...COMMERCE, "catalog.read", "project.read"],
@@ -129,7 +136,7 @@ const BUYER_SECTIONS: { section: NavSection; keys: NavKey[] }[] = [
   { section: "buying", keys: ["purchaseRequests", "offers", "orders", "catalog", "saved"] },
   { section: "network", keys: ["suppliers", "technicians", "institutions"] },
   { section: "selling", keys: ["customers", "leads", "followUps", "products"] },
-  { section: "business", keys: ["projects", "team", "reports", "settings"] },
+  { section: "business", keys: ["points", "projects", "team", "reports", "settings"] },
 ];
 
 const SELLER_SECTIONS: { section: NavSection; keys: NavKey[] }[] = [
@@ -139,7 +146,7 @@ const SELLER_SECTIONS: { section: NavSection; keys: NavKey[] }[] = [
   { section: "selling", keys: ["customers", "leads", "followUps"] },
   // Still present, deliberately last: a distributor buys raw materials too.
   { section: "buying", keys: ["catalog", "saved"] },
-  { section: "business", keys: ["projects", "team", "reports", "settings"] },
+  { section: "business", keys: ["points", "projects", "team", "reports", "settings"] },
 ];
 
 export function navSectionsFor(stance: CommerceStance) {

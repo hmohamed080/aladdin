@@ -2400,3 +2400,33 @@ brand in the header, breadcrumb separators, mirrored correctly in RTL. **Admin**
 **personal /home** (dark) — same shell, rail top at 49px, one-icon theme switch showing the theme you
 would GET. Admin/home were driven headlessly against the running dev server in a throwaway context,
 so the acceptance browser session was untouched.
+
+### Follow-up: Chat, Notifications and Points as UI SHELLS (no backend, by instruction)
+Scope decision taken by the product owner mid-round: build the three entry points now, attach data
+next sprint. No migration, no table, no RPC, no realtime subscription, no local persistence, no
+hardcoded demo record was added — and none may be until the persistence sprint.
+
+- **Header** — `components/layout/header-panels.tsx` mounts `ChatMenu` and `NotificationsMenu` in the
+  SHARED `AppHeader`, so every authenticated surface gets both and no persona has its own copy. One
+  `HeaderMenu` primitive owns everything that is not content: trigger, panel, outside-click and
+  Escape to close, `aria-haspopup`/`aria-expanded`, `role="dialog"` + accessible name, RTL anchoring
+  (`end-0`), and a `max-w-[calc(100vw-1.5rem)]` clamp so a 320px panel cannot overflow a phone. Each
+  opens a FINISHED empty state — "No conversations yet" / "No notifications yet" — and **no badge or
+  count**, because every number available today would be invented.
+- **Sidebar** — `points` is a real nav key (`nav.points` · "Points" / "النقاط", `GaugeIcon`) in the
+  Business section of BOTH stances, ungated (`NAV_CAPS.points = null`): points are the caller's own
+  standing, not an organization record, so no capability could sensibly decide who may look. It is
+  also registered in the command palette, like every other module.
+- **`/b2b/points`** — page shell with the same honest empty state. No balance, no tier, no rewards,
+  no transactions, no leaderboard.
+- **Next sprint attaches here:** replace `<EmptyPanel/>` with a list and pass a real count to
+  `HeaderMenu`; fill the Points page body. Neither the trigger, the panel mechanics, the nav entry
+  nor the route moves.
+
+**Feedback** is still absent: unlike Help (`/auth/support`, a real destination), there is nothing for
+it to open, and it was not among the three shells requested.
+
+**Validation:** typecheck · lint · 315 unit tests green (the ungated-nav test now pins `points`).
+Real browser: EN/light and AR/RTL/dark — both panels open with translated empty states, Escape closes,
+the panel stays inside the viewport in both directions, the Points entry shows its active state, and
+the page renders in both locales.

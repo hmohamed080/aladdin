@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { cn } from "@/lib/ui/cn";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { Brand } from "@/components/layout/brand";
@@ -12,6 +11,8 @@ import { loadAccountIdentity, initialsOf } from "@/server/queries/identity";
 import { canSearchAdmin } from "@/server/actions/search";
 import { THEME_COOKIE, resolveTheme, resolveThemePreference } from "@/lib/theme/config";
 import { HelpIcon } from "@/components/ui/icons";
+import { ChatMenu, NotificationsMenu } from "@/components/layout/header-panels";
+import { HeaderSeparator, headerIconClass } from "@/components/layout/header-parts";
 import type { CommerceStance } from "@/lib/workspace/supply-side";
 
 /**
@@ -135,6 +136,14 @@ export async function AppHeader({
 
           {actions ? <div className="hidden items-center gap-sm tablet:flex">{actions}</div> : null}
 
+          {/* Chat and Notifications: the shell only. Both open a finished empty
+              state and neither shows a count, because there is no messaging or
+              notification data in this repository yet — see `header-panels`.
+              They are here rather than in `actions` because they are not one
+              surface's controls; every authenticated surface gets both. */}
+          <ChatMenu />
+          <NotificationsMenu />
+
           {/* Help points at the support surface that already exists and stays
               reachable while signed in. It is a real destination with a real
               (or honestly absent) support contact behind it — not a placeholder
@@ -176,33 +185,4 @@ export async function AppHeader({
   );
 }
 
-/**
- * The breadcrumb slash between the mark and the context it introduces, and
- * between two context chips.
- *
- * A rule or a chevron would both say more than is true here: the workspace is
- * not INSIDE the brand, and the branch is not a child route of the organization.
- * A hairline slash reads as "then", which is what the relationship actually is,
- * and it is the same device the reference uses.
- */
-export function HeaderSeparator({ className }: { className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn("hidden shrink-0 select-none text-body text-fg-muted/60 tablet:block", className)}
-    >
-      /
-    </span>
-  );
-}
-
-/**
- * Shared geometry for the header's icon-only controls, so Help, the theme
- * switch and anything a surface adds later cannot each pick their own box.
- * 28px keeps four of them inside a 48px bar without crowding the avatar.
- */
-export const headerIconClass = cn(
-  "grid h-7 w-7 shrink-0 place-items-center rounded-sm text-fg-muted transition-colors",
-  "hover:bg-surface-hover hover:text-fg",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-);
+export { HeaderSeparator } from "@/components/layout/header-parts";

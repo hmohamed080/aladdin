@@ -82,6 +82,7 @@ const NAV_ICONS: Record<NavKey, ComponentType<{ size?: number }>> = {
   leads: TargetIcon,
   followUps: CalendarCheckIcon,
   products: PackageIcon,
+  points: GaugeIcon,
   projects: LayersIcon,
   team: UsersIcon,
   reports: BarChartIcon,
@@ -96,6 +97,7 @@ const SELLER_NAV_ICONS: Partial<Record<NavKey, ComponentType<{ size?: number }>>
 
 const NAV_HREFS: Record<NavKey, string> = {
   home: "/b2b",
+  points: "/b2b/points",
   purchaseRequests: "/b2b/rfqs",
   offers: "/b2b/quotations",
   orders: "/b2b/orders",
