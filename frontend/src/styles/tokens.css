@@ -63,6 +63,34 @@
   --bronze-ink: #6e5230;
   --lapis: #2f6088;
   --lapis-bright: #6fa8d2;
+
+  /* ---- Iris ramp — the ANALYTIC accent ----
+   * Lumen is the brand's ACTION colour: it means "this is the thing to press",
+   * and it earns that by being the only warm high-chroma note in the system. The
+   * cost of having exactly one accent showed up the moment a real operational
+   * dashboard was built out of it — every icon tile, every proportion bar, every
+   * ranked row and every panel glyph came out amber, so the page read as one
+   * enormous call to action sitting on a sand-coloured ground, and nothing on it
+   * ranked against anything else.
+   *
+   * Iris is the second voice, and it is deliberately a MEASUREMENT colour rather
+   * than a second brand colour: it marks the parts of a surface that describe
+   * the business (tiles, bars, rankings, stage flows) so that amber can go back
+   * to meaning "act". Cool against Lumen's warm, so the two never read as a
+   * gradient of the same idea; close enough to `lapis` in hue to sit beside it
+   * in one chart without clashing, far enough in chroma to stay distinct.
+   *
+   *   iris-ink    on plaster  #fbf9f4   9.4:1
+   *   iris-bright on carbon-2 #1a1c1d   6.1:1
+   *
+   * Both clear AA at body size on the ground each one actually lands on, which
+   * is the only test that matters — a token that passes on paper and fails on
+   * the surface it is used on is a token that has not been checked.
+   */
+  --iris: #5b4ad9;
+  --iris-deep: #4a3ab8;
+  --iris-ink: #4334a8;
+  --iris-bright: #9b8cf5;
   --verdigris: #2f7d5b;
   --verdigris-deep: #205a42;
   --ochre: #b26b12;
@@ -137,6 +165,14 @@
 
   --bronze-sem: var(--bronze-ink);
   --lapis-sem: var(--lapis);
+
+  /* The analytic accent, as a pair with the same contract as `accent`:
+     `iris` is the AA-safe tone for text and strokes, `iris-solid` is the fill.
+     Kept separate for exactly the reason accent/accent-solid are — a colour
+     legible as 13px type and a colour that works as a 40px block of fill are
+     not usually the same colour. */
+  --iris-sem: var(--iris-ink);
+  --iris-solid: var(--iris);
 
   --success: var(--verdigris-deep);
   --warning: var(--ochre-deep);
@@ -221,6 +257,12 @@
 
   --bronze-sem: var(--bronze);
   --lapis-sem: var(--lapis-bright);
+
+  /* On Carbon the ink tone disappears, so both roles move up the ramp: the text
+     tone becomes the bright one, and the fill lifts to a mid violet that still
+     reads as a FILL against #1a1c1d rather than as a dark patch. */
+  --iris-sem: var(--iris-bright);
+  --iris-solid: #7a68ec;
 
   --success: var(--verdigris-bright);
   --warning: var(--ochre-bright);

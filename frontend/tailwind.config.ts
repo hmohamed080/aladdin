@@ -68,6 +68,13 @@ export default {
         },
         bronze: alpha("--bronze-sem"),
         lapis: alpha("--lapis-sem"),
+        // The analytic accent. Same DEFAULT/solid contract as `accent`: the
+        // DEFAULT is the AA-safe tone for type and strokes, `iris-solid` is the
+        // fill. See tokens.css for why a second accent exists at all.
+        iris: {
+          DEFAULT: alpha("--iris-sem"),
+          solid: alpha("--iris-solid"),
+        },
         success: alpha("--success"),
         warning: alpha("--warning"),
         danger: alpha("--danger"),
@@ -106,6 +113,10 @@ export default {
           "bronze-ink": alpha("--bronze-ink"),
           lapis: alpha("--lapis"),
           "lapis-bright": alpha("--lapis-bright"),
+          iris: alpha("--iris"),
+          "iris-deep": alpha("--iris-deep"),
+          "iris-ink": alpha("--iris-ink"),
+          "iris-bright": alpha("--iris-bright"),
           verdigris: alpha("--verdigris"),
           "verdigris-deep": alpha("--verdigris-deep"),
           ochre: alpha("--ochre"),

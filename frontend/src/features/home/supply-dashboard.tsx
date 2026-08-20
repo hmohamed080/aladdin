@@ -1,35 +1,44 @@
 import Link from "next/link";
 import type { PageContext } from "@/server/queries/page-context";
-import type { Locale } from "@/lib/i18n/locales";
 import { getMessages } from "@/lib/i18n/translate";
 import {
   recentRfqs,
   recentQuotations,
   ownProductCounts,
+  demandSignals,
   type RfqListRow,
   type QuotationListRow,
 } from "@/server/queries/commerce";
 import { listOrders, quotationsWithOrders } from "@/server/queries/execution";
-import { supplySummary, projectSummary } from "@/server/queries/reports";
-import { StatePanel } from "@/components/ui/primitives";
+import { supplySummary } from "@/server/queries/reports";
+import { resolvePeriod, periodDays, type PeriodKey } from "@/lib/workspace/period";
 import {
   PageHead,
   KpiStrip,
   Row,
   Panel,
-  PanelRow,
-  NextSteps,
-  Band,
   type Kpi,
-  type KpiTone,
-  type NextStep,
+  type KpiDelta,
 } from "@/components/ui/workspace-layout";
-import { TrendLine, RankedBars, Funnel } from "@/components/ui/charts";
-import { RfqTable, QuotationTable } from "@/features/commerce/commerce-lists";
-import { OrderTable } from "@/features/execution/execution-lists";
-import { AttentionQueue, AttentionCount, type AttentionItem } from "@/features/home/supply-attention";
-import { formatMoney } from "@/features/commerce/constants";
-import { formatMonth, formatCompactMoney, formatPercent, formatCount } from "@/lib/ui/format";
+import { RankedBars } from "@/components/ui/charts";
+import {
+  AttentionQueue,
+  AttentionCount,
+  AttentionFilter,
+  type AttentionItem,
+  type AttentionKind,
+} from "@/features/home/supply-attention";
+import {
+  OpportunityList,
+  MarketMovement,
+  WorkflowFlow,
+  NotificationsEmpty,
+  ProductVideosEmpty,
+  BlockEmpty,
+  type FlowStage,
+} from "@/features/home/supply-blocks";
+import { PeriodSelect } from "@/features/home/period-select";
+import { formatCompactMoney, formatCount } from "@/lib/ui/format";
 import { supplyVoice } from "@/lib/workspace/supply-side";
 import {
   DemandIcon,
@@ -37,7 +46,6 @@ import {
   ClipboardIcon,
   PackageIcon,
   MoneyIcon,
-  TrendingUpIcon,
   StorefrontIcon,
   ActivityIcon,
   GaugeIcon,
@@ -45,6 +53,9 @@ import {
   BarChartIcon,
   AlertIcon,
   CheckIcon,
+  TrendingUpIcon,
+  BellIcon,
+  VideoIcon,
 } from "@/components/ui/icons";
 
 /**
@@ -53,90 +64,106 @@ import {
  *
  * ONE WORKSPACE, READ FROM THE SELLING SEAT
  * This is not a second application. Every record shown lives at the same route
- * the buyer's does, and the tables are the same components with
- * `perspective="supplier"`. What differs is the QUESTION each block answers,
- * because the two seats do genuinely different work.
+ * the buyer's does, and each figure links to the module that owns it. What
+ * differs is the QUESTION each block answers, because the two seats do genuinely
+ * different work.
  *
- * THE SHAPE, AND WHY IT CHANGED TWICE
- * Version one was a single column of equally-weighted cards: correct and
- * unreadable, because nothing led. Version two fixed the weighting but kept the
- * MODULE page's shape — a wide list column with a fixed 18rem context rail
- * beside it — and on a wide display that rail held ~300px of content in a 790px
- * row, so a sixth of the page was blank from its last panel down. It read as a
- * rearranged Showroom dashboard because structurally that is what it was: the
- * same primitives, the same rhythm, different words.
+ * WHY IT IS EIGHT BLOCKS ON FOUR ROWS AND NOT A COLUMN OF TWELVE
+ * The previous version answered five questions in sequence — triage, then the
+ * record lists, then conversion, then fulfilment, then next steps — and each got
+ * a full-width band. It was correct and it was four screens long, which for a
+ * surface whose entire purpose is the morning glance is a design failure no
+ * amount of per-block polish fixes. It also duplicated: the incoming-requests
+ * table and the quotations table repeated, in full, two modules that are one
+ * click away in the sidebar, while the attention queue above them had already
+ * named the rows that actually needed work.
  *
- * The Distributor reference is built from ROWS, not from a column with a rail.
- * Each row holds two or three blocks that are peers of different weight and end
- * level with each other, and the operational block in each row is the widest
- * thing in it. That is what `Row` + `Panel fill` encode, and it is why the page
- * now uses proportional tracks (1.55fr / 2.5fr) rather than a fixed rem aside:
- * a proportion spends a wide display on the operational block and hands the room
- * back on a laptop, which a fixed rail can never do.
+ * What survives is what the dashboard alone can say. Everything that was a
+ * second copy of a module's own list is gone — the routes are untouched and
+ * every one of them is still reachable; they are simply no longer transcribed
+ * onto the home page.
  *
- * THE ORDER OF THE PAGE IS THE ORDER OF THE QUESTIONS
- *   1. What needs my attention? — the cross-stage triage queue, and the pipeline
- *      it came from. No module owns this list, which is why it is the one thing
- *      on the page that is not available anywhere else.
- *   2. What demand is coming in, and what did I price? — the two live record
- *      lists, side by side, because a seller reads them against each other.
- *   3. Am I converting? — the value trend and the demand → quotation → order
- *      funnel, then what is actually selling and who is actually buying.
- *   4. What am I fulfilling? — the orders with work behind them.
- *   5. What should I do next? — the closing action row.
+ *   ROW 1  The instrument panel, scoped to a period.
+ *   ROW 2  What needs me now · what is being asked of me.
+ *   ROW 3  What is moving · what happened · where my work is stuck.
+ *   ROW 4  My shelf: clips, best products, best customers.
+ *
+ * Rows 2–4 are proportional grids, so a wide display spends its extra pixels on
+ * the operational block in each row rather than stretching every card equally.
  *
  * WHAT IS DELIBERATELY ABSENT
  * The reference set also shows a wallet balance, carrier tracking on a map,
- * invoices and collections, chat threads, a Reels rail and an opportunity-match
- * engine. None has a model in this repository, and a dashboard that renders a
- * plausible number with nothing behind it is worse than one that renders
- * nothing. Its COMPOSITION is borrowed; its features are not.
- *
- * The reference's growth badges ("+18% from last month") are absent for the same
- * reason: nothing here produces a comparison period, and a fabricated delta is a
- * lie with a percentage sign on it.
+ * invoices and collections, a commission ledger and an AI recommendation rail.
+ * None has a model in this repository. Its COMPOSITION is borrowed; its features
+ * are not. See `supply-blocks.tsx` for the four blocks whose honest form is an
+ * empty state.
  */
-export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
+export async function SupplyDashboard({
+  ctx,
+  period: rawPeriod,
+  stage: rawStage,
+}: {
+  ctx: PageContext;
+  /** From the URL — validated here, never trusted. */
+  period?: string;
+  stage?: string;
+}) {
   const { supabase, org, locale } = ctx;
   const m = getMessages(locale);
   const voice = supplyVoice(org.orgType);
+
+  const period = resolvePeriod(rawPeriod);
+  const days = periodDays(period);
+  const stage = resolveStage(rawStage);
 
   const caps = new Set(org.capabilities);
   const superUser = caps.has("org.manage");
   const has = (...keys: string[]) => superUser || keys.some((k) => caps.has(k));
 
   // Capability gates, not org-type gates. A distributor's warehouse clerk may
-  // hold `project.read` and nothing else; they get the fulfilment panel and no
+  // hold `project.read` and nothing else; they get the fulfilment stage and no
   // pricing figures, in the same workspace.
   const sells = has("rfq.respond", "quote.submit", "catalog.publish", "order.manage");
   const managesCatalog = has("catalog.write", "catalog.publish");
   const fulfils = has("order.manage", "order.create", "project.read", "project.write");
 
   const EMPTY_LIST = { rows: [], total: 0 };
+  const EMPTY_SIGNALS = { open: [], openRequests: 0, movement: [], windowRequests: 0 };
 
-  const [supply, products, projects, incoming, sent, undecided, accepted, orders] = await Promise.all([
-    // One call covers every KPI, both charts and both rankings — they are all
-    // aggregates of the same three record sets.
-    sells ? supplySummary(supabase, org.organizationId) : null,
+  /* The demand-movement window. "All time" has no window, and a movement figure
+     over all of history is not a movement — so it borrows a year, which is the
+     longest span the selector otherwise offers. The panel's hint names the
+     window either way, so the reader is never guessing what they are looking at. */
+  const movementDays = days ?? 365;
+
+  const [supply, products, incoming, undecided, accepted, orders, signals] = await Promise.all([
+    // One call covers every KPI, both rankings and the flow — they are all
+    // aggregates of the same three record sets, and `days` buys the
+    // period-over-period comparison from those same rows at no extra cost.
+    sells ? supplySummary(supabase, org.organizationId, {}, 6, days) : null,
     managesCatalog
       ? ownProductCounts(supabase, org.organizationId)
       : Promise.resolve({ total: 0, published: 0, draft: 0 }),
-    projectSummary(supabase, org.organizationId),
-    // Requests still waiting to be priced — the work queue, newest first.
+    // Six per stage, not five: the queue shows six rows when a single stage is
+    // filtered to, and a cap below that would make the filter look broken.
     sells
-      ? recentRfqs(supabase, org.organizationId, "supplier", { statuses: ["submitted"] })
-      : Promise.resolve(EMPTY_LIST),
-    sells ? recentQuotations(supabase, org.organizationId, "supplier") : Promise.resolve(EMPTY_LIST),
-    // The two stages the summary counts but cannot name: prices out for a
-    // decision, and prices already accepted. The attention queue needs the
-    // RECORDS, not the totals, so it can link each one at its own route.
-    sells
-      ? recentQuotations(supabase, org.organizationId, "supplier", { statuses: ["submitted"] })
+      ? recentRfqs(supabase, org.organizationId, "supplier", { statuses: ["submitted"], limit: 6 })
       : Promise.resolve(EMPTY_LIST),
     sells
-      ? recentQuotations(supabase, org.organizationId, "supplier", { statuses: ["accepted"] })
+      ? recentQuotations(supabase, org.organizationId, "supplier", {
+          statuses: ["submitted"],
+          limit: 6,
+        })
+      : Promise.resolve(EMPTY_LIST),
+    sells
+      ? recentQuotations(supabase, org.organizationId, "supplier", {
+          statuses: ["accepted"],
+          limit: 6,
+        })
       : Promise.resolve(EMPTY_LIST),
     fulfils ? listOrders(supabase, org.organizationId, "supplier") : Promise.resolve([]),
+    // The two demand-reading blocks — opportunities and movement — in one call.
+    sells ? demandSignals(supabase, org.organizationId, movementDays, 5) : Promise.resolve(EMPTY_SIGNALS),
   ]);
 
   /* An accepted price with no order behind it is the most valuable stalled thing
@@ -150,70 +177,117 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
   const readyForOrder = accepted.rows.filter((q) => q.id && !ordered.has(q.id));
 
   const activeOrders = orders.filter((o) => o.status === "confirmed" || o.status === "in_progress");
-  const runningProjects = projects.executing.active ?? 0;
-  const money = (v: number | null | undefined) => formatMoney(v, locale);
+  /**
+   * COMPACT money everywhere on this page, exact money nowhere.
+   *
+   * `formatMoney` renders "EGP 45,500.00", which at English width overflowed the
+   * attention queue's value cell and truncated to "EGP 45,500…". A truncated
+   * number does not look truncated — it looks like a SMALLER NUMBER, and it is
+   * a perfectly plausible one. This workspace already treats that as a
+   * correctness bug rather than a layout nit (`KpiStrip` refuses to truncate for
+   * exactly this reason).
+   *
+   * A wider cell is not the fix: the exact figure would truncate again at seven
+   * digits, and the queue has no room to give that is not already spent on the
+   * record's own name. A dashboard is a GLANCE surface — "EGP 45.5K" is what a
+   * seller triaging six rows needs, it is the same treatment the strip directly
+   * above already uses, and the exact total is one click away on the record.
+   */
+  const money = (v: number | null | undefined) => formatCompactMoney(v, locale);
+  const p = supply?.period;
 
   /**
-   * FIVE cells, not nine.
+   * A measured movement, or nothing at all.
    *
-   * The strip is an instrument panel: it answers "what is the state of my
-   * business right now" at a glance, and a glance does not survive nine numbers.
-   * Everything that used to sit here is still on the page — catalogue state in
-   * the pipeline panel, delivery in the fulfilment band — where each has room
-   * for the detail a bare count could not carry anyway.
+   * The rule the whole strip rests on: a delta exists only where a real previous
+   * window with a NON-ZERO baseline exists. A first month of trading has no
+   * percentage — not 0%, not ∞%, not "new" dressed up as growth — and the tile
+   * silently falls back to its `foot` line. See `KpiDelta`.
+   */
+  const movement = (current: number, previous: number): KpiDelta | undefined => {
+    if (!p || previous <= 0) return undefined;
+    const pct = ((current - previous) / previous) * 100;
+    return {
+      pct,
+      // Every metric on this strip is one where MORE is better — requests
+      // received, prices sent, orders won, money. `null` at exactly zero, so an
+      // unchanged month is not painted as a success.
+      better: pct === 0 ? null : pct > 0,
+      label: period === "30d" ? m.supply.period.vsMonth : m.supply.period.vsPrevious,
+    };
+  };
+
+  /**
+   * FIVE cells, four of them period-scoped flows and one a live backlog.
+   *
+   * The mix is deliberate and is the honest reading of the period control. Four
+   * of these are things that HAPPENED inside the window — requests arrived,
+   * prices went out, orders were confirmed, money was won — so they move when
+   * the window moves and each can be compared against the window before it.
+   *
+   * "Waiting to be priced" is not that. It is a STATE, true right now, and it
+   * would be false to shrink it because the reader chose to look at 30 days
+   * rather than 90: the request from six weeks ago is still unanswered. So it
+   * carries no delta and keeps a context line instead, which is also what makes
+   * it visually distinguishable from its four neighbours at a glance.
    */
   const kpis: Kpi[] = [];
   if (supply) {
     kpis.push({
-      label: m.supply.tile.awaitingResponse,
-      value: supply.awaitingResponse,
+      label: m.supply.tile.demandIn,
+      value: p ? p.current.demand : sumOf(supply.demand),
       Icon: DemandIcon,
-      tone: supply.awaitingResponse > 0 ? "danger" : "neutral",
-      foot: m.supply.tile.awaitingResponseHint,
+      tone: "iris",
+      delta: movement(p?.current.demand ?? 0, p?.previous.demand ?? 0),
+      foot: m.supply.tile.demandInHint,
       href: "/b2b/rfqs",
     });
     kpis.push({
-      label: m.supply.tile.awaitingDecision,
-      value: supply.awaitingDecision,
+      label: m.supply.tile.quotationsOut,
+      value: p ? p.current.quotations : sumOf(supply.quotations),
       Icon: FileTextIcon,
-      tone: supply.awaitingDecision > 0 ? "warning" : "neutral",
-      foot: formatCompactMoney(supply.awaitingDecisionValue, locale),
+      tone: "iris",
+      delta: movement(p?.current.quotations ?? 0, p?.previous.quotations ?? 0),
+      foot: m.supply.tile.quotationsOutHint,
       href: "/b2b/quotations",
     });
     kpis.push({
-      label: m.supply.tile.activeOrders,
-      value: (supply.orders.confirmed ?? 0) + (supply.orders.in_progress ?? 0),
+      label: m.supply.tile.ordersWon,
+      value: p ? p.current.orders : sumOf(supply.orders),
       Icon: ClipboardIcon,
       tone: "info",
-      foot: m.supply.orders.activeHint,
+      delta: movement(p?.current.orders ?? 0, p?.previous.orders ?? 0),
+      foot: m.supply.tile.ordersWonHint,
       href: "/b2b/orders",
     });
     kpis.push({
       label: m.supply.tile.orderValue,
       // Compact on the strip so a seven-figure EGP total cannot truncate in the
       // two-column phone grid; the exact figure lives on Reports, one click away.
-      value: formatCompactMoney(supply.orderValue, locale),
+      value: formatCompactMoney(p ? p.current.orderValue : supply.orderValue, locale),
       Icon: MoneyIcon,
-      tone: "accent",
+      tone: "success",
+      delta: movement(p?.current.orderValue ?? 0, p?.previous.orderValue ?? 0),
       foot: m.supply.tile.orderValueHint,
       href: "/b2b/reports",
     });
     kpis.push({
-      label: m.supply.tile.customers,
-      value: supply.activeCustomers,
-      Icon: StorefrontIcon,
-      foot: m.supply.tile.customersHint,
-      href: "/b2b/buyers",
+      label: m.supply.tile.awaitingResponse,
+      value: supply.awaitingResponse,
+      Icon: AlertIcon,
+      tone: supply.awaitingResponse > 0 ? "danger" : "neutral",
+      foot: m.supply.tile.awaitingResponseHint,
+      href: "/b2b/rfqs",
     });
   } else if (managesCatalog) {
     // A catalogue-only seat (no pricing rights) still needs an instrument panel;
-    // it just measures a different thing.
+    // it just measures a different thing, and none of it is period-scoped.
     kpis.push(
       {
         label: m.supply.products.stat.total,
         value: products.total,
         Icon: PackageIcon,
-        tone: "accent",
+        tone: "iris",
         href: "/b2b/products",
       },
       {
@@ -234,31 +308,23 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
     );
   }
 
+  /* The status→tone map, declared above the queue because the queue reads from
+     it: one status must not be amber in the flow panel and blue in the row three
+     inches to its left. */
+  const orderTone = { confirmed: "info", in_progress: "warning", completed: "success" } as const;
+
+  const at = m.supply.attention;
+
   /**
-   * THE ATTENTION QUEUE.
+   * THE ATTENTION QUEUE, grouped by stage so the filter has something to filter.
    *
    * Ordered by STAGE — price, chase, order, fulfil — which is the order a seller
    * actually works, and the only ordering that is honest across four record
    * types: "soonest date first" would be sorting a required-by against a
    * valid-until against a confirmed-on, which compares nothing.
-   *
-   * Three per stage, six in total. The cap is what keeps this a triage list
-   * rather than a fifth copy of the queues that live below it — each stage's
-   * full list is one click away on its own module.
    */
-  /* The status→tone maps, declared ABOVE the attention queue because the queue
-     reads from them: one status must not be amber in the pipeline panel and blue
-     in the row three inches to its left. */
-  const demandStatuses = ["submitted", "quoted", "closed"] as const;
-  const demandTone = { submitted: "danger", quoted: "accent", closed: "success" } as const;
-  const orderStatuses = ["confirmed", "in_progress", "completed"] as const;
-  const orderTone = { confirmed: "info", in_progress: "warning", completed: "success" } as const;
-
-  const at = m.supply.attention;
-  const stageCap = <T,>(rows: readonly T[]) => rows.slice(0, 3);
-
-  const attention: AttentionItem[] = [
-    ...stageCap(incoming.rows).map(
+  const byStage: Record<AttentionKind, AttentionItem[]> = {
+    price: incoming.rows.map(
       (r: RfqListRow): AttentionItem => ({
         key: `price-${r.id}`,
         kind: "price",
@@ -276,7 +342,7 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
         cta: at.cta.price,
       }),
     ),
-    ...stageCap(undecided.rows).map(
+    chase: undecided.rows.map(
       (q: QuotationListRow): AttentionItem => ({
         key: `chase-${q.id}`,
         kind: "chase",
@@ -292,7 +358,7 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
         cta: at.cta.chase,
       }),
     ),
-    ...stageCap(readyForOrder).map(
+    order: readyForOrder.map(
       (q: QuotationListRow): AttentionItem => ({
         key: `order-${q.id}`,
         kind: "order",
@@ -308,14 +374,14 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
         cta: at.cta.order,
       }),
     ),
-    ...stageCap(activeOrders).map(
+    fulfil: activeOrders.map(
       (o): AttentionItem => ({
         key: `fulfil-${o.id}`,
         kind: "fulfil",
         title: o.title ?? "—",
         customer: o.requester_name ?? "—",
         status: m.execution.orderStatus[o.status ?? "confirmed"],
-        /* The same tone the pipeline panel gives this status, deliberately: two
+        /* The same tone the flow panel gives this status, deliberately: two
            blocks on one screen calling "in progress" amber in one and blue in
            the other teaches the reader that colour means nothing here. */
         tone: orderTone[o.status === "in_progress" ? "in_progress" : "confirmed"],
@@ -327,52 +393,101 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
         cta: at.cta.fulfil,
       }),
     ),
-  ].slice(0, 6);
+  };
 
+  /**
+   * Unfiltered, the queue is a TRIAGE list: three per stage, six in total, so no
+   * one stage can bury the others. Filtered, it is a short work list for that
+   * stage and shows six of it. Either way the module owning the stage is one
+   * click away and holds the complete list.
+   */
+  const attention: AttentionItem[] = stage
+    ? byStage[stage].slice(0, 6)
+    : (["price", "chase", "order", "fulfil"] as const)
+        .flatMap((k) => byStage[k].slice(0, 3))
+        .slice(0, 6);
+
+  /* The chip counts come from the queries' EXACT totals where one exists, not
+     from the fetched page — a seat with fifty unpriced requests must not see a
+     chip reading "6" beside a tile reading "50". The two derived stages have no
+     server-side count (both are computed from a fetched page: "accepted with no
+     order behind it" is a set difference, and the active orders are filtered in
+     memory), so they report what the queue can actually show. */
+  const stageCounts: { key: AttentionKind; label: string; count: number }[] = [
+    { key: "price", label: at.stage.price, count: incoming.total },
+    { key: "chase", label: at.stage.chase, count: undecided.total },
+    { key: "order", label: at.stage.order, count: readyForOrder.length },
+    { key: "fulfil", label: at.stage.fulfil, count: activeOrders.length },
+  ];
+
+  /* Parameters a stage chip must carry forward, so filtering the queue cannot
+     silently reset the period the strip above it is showing. The default period
+     carries none, which keeps the plain dashboard URL clean. */
+  const carry: Record<string, string> = period === "30d" ? {} : { period };
+
+  /**
+   * The "go to the module that owns this" link every panel carries.
+   *
+   * IRIS, NOT ACCENT, and this one token change does more to cool the page than
+   * anything else on it. There are eight of these links plus the page head's
+   * own, and in amber — the brand's ACTION colour — nine amber links scattered
+   * across a warm ground made the dashboard read as one continuous call to
+   * action with no ranking inside it. They are not actions: they are navigation
+   * to a list the reader can already see part of. Amber is now spent only where
+   * it means "press this" (the New product button) or "this is wrong" (the
+   * warning tones), which is what the colour was for in the first place.
+   */
   const seeAll = (href: string, label: string) => (
-    <Link href={href} className="text-label font-medium text-accent hover:underline">
+    <Link href={href} className="text-label font-medium text-iris hover:underline">
       {label} →
     </Link>
   );
 
-  /**
-   * Next steps — every card points at a route that exists and an action this
-   * caller may take. Assembled here rather than inside `NextSteps` precisely so
-   * the capability gate stays where the capabilities are.
-   */
-  const steps: NextStep[] = [];
-  if (sells) {
-    steps.push({
-      title: m.supply.action.answerDemand,
-      body: m.supply.action.answerDemandBody,
-      href: "/b2b/rfqs",
-      cta: m.supply.demand.title,
-      Icon: DemandIcon,
-      tone: supply && supply.awaitingResponse > 0 ? "danger" : "accent",
-    });
-  }
-  if (managesCatalog) {
-    steps.push({
-      title: m.supply.action.addProduct,
-      body: m.supply.action.addProductBody,
-      href: "/b2b/products/new",
-      cta: m.commerce.products.new,
-      Icon: PlusIcon,
-    });
-  }
-  if (sells) {
-    steps.push({
-      title: m.supply.action.customers,
-      body: m.supply.action.customersBody,
-      href: "/b2b/buyers",
-      cta: m.supply.customers.title,
-      Icon: StorefrontIcon,
-      tone: "info",
-    });
-  }
+  /** The commerce lifecycle, counted. Real stages, real counts, no new domain. */
+  const flow: FlowStage[] = supply
+    ? [
+        {
+          key: "incoming",
+          label: m.supply.flow.incoming,
+          value: supply.demand.submitted ?? 0,
+          tone: "danger",
+          href: "/b2b/rfqs",
+        },
+        {
+          key: "quoted",
+          label: m.supply.flow.quoted,
+          value: supply.quotations.submitted ?? 0,
+          tone: "warning",
+          href: "/b2b/quotations",
+        },
+        {
+          key: "accepted",
+          label: m.supply.flow.accepted,
+          value: supply.quotations.accepted ?? 0,
+          tone: "success",
+          href: "/b2b/quotations",
+        },
+        {
+          key: "ordered",
+          label: m.supply.flow.ordered,
+          value: supply.orders.confirmed ?? 0,
+          tone: "info",
+          href: "/b2b/orders",
+        },
+        {
+          key: "running",
+          label: m.supply.flow.running,
+          value: (supply.orders.in_progress ?? 0) + (supply.orders.completed ?? 0),
+          tone: "iris",
+          href: "/b2b/orders",
+        },
+      ]
+    : [];
+
+  const periodLabel = m.supply.period[period];
 
   return (
-    <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
+    <div className="flex flex-col gap-md pb-16 tablet:pb-0">
       <PageHead
         locale={locale}
         Icon={GaugeIcon}
@@ -395,291 +510,274 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
         }
       />
 
-      <KpiStrip locale={locale} items={kpis} columns={5} />
+      {/* ROW 1 — the instrument panel. The period control lives INSIDE the
+          strip's own header, because it scopes exactly these figures and nothing
+          else on the page: the queues below are live work and must not be
+          filtered by a date window. */}
+      <KpiStrip
+        locale={locale}
+        items={kpis}
+        columns={5}
+        title={m.supply.section.overview}
+        toolbar={
+          <PeriodSelect
+            value={period}
+            basePath="/b2b"
+            label={m.supply.period.label}
+            options={PERIODS.map((k) => ({ value: k, label: m.supply.period[k] }))}
+          />
+        }
+      />
 
       {supply ? (
         <>
-          {/* ROW 1 — triage, and the pipeline it was drawn from. The queue takes
-              the 2.5fr track: it is the densest and most actionable block on the
-              page, so it is the one that should absorb a wide display. */}
-          <Band title={m.supply.section.attention} Icon={AlertIcon}>
-            <Row cols="wide-lead">
-              <Panel
-                fill
-                title={at.title}
-                Icon={AlertIcon}
-                hint={at.hint}
-                badge={
-                  attention.length > 0 ? (
-                    <AttentionCount
-                      count={attention.length}
-                      locale={locale}
-                      tone={attention[0]?.tone ?? "accent"}
-                    />
-                  ) : null
+          {/* ROW 2 — what needs me, beside what is being asked of me.
+              `wide-lead` (5:2), not `lead` (3:2), and the difference is a
+              measured defect rather than a preference. The queue switches to its
+              single-line row form at the `wide` VIEWPORT breakpoint, but the
+              width that form actually needs is a CONTAINER width of ~800px. On a
+              1440px display a 3:2 track gave it ~700px, so the row form engaged
+              in a column too narrow to hold it and every date in the queue
+              truncated mid-word ("١٠ سبتم…", "تاريخ الت…"). At 5:2 the same
+              display gives it ~820px and every cell renders whole. */}
+          <Row cols="wide-lead">
+            <Panel
+              fill
+              tone="danger"
+              bodyClassName="flex flex-col"
+              title={at.title}
+              Icon={AlertIcon}
+              badge={
+                attention.length > 0 ? (
+                  <AttentionCount
+                    count={attention.length}
+                    locale={locale}
+                    tone={attention[0]?.tone ?? "accent"}
+                  />
+                ) : null
+              }
+              action={seeAll(stageHref(stage), m.common.more)}
+            >
+              {/* The filter sits ABOVE the queue, inside the panel body. It is a
+                  control over the list, and a control that appears after the
+                  thing it controls has already been read is a control nobody
+                  uses. It is in the body rather than the header because the
+                  header already carries a title, a count badge and the "more"
+                  link — a fourth element there wraps it onto two lines at
+                  laptop width. */}
+              <div className="mb-3">
+                <AttentionFilter
+                  stages={stageCounts}
+                  active={stage}
+                  basePath="/b2b"
+                  locale={locale}
+                  allLabel={at.stage.all}
+                  query={carry}
+                />
+              </div>
+
+              <AttentionQueue
+                items={attention}
+                locale={locale}
+                labels={at.column}
+                empty={
+                  /* An empty queue is a WIN, not a missing feature, and it is
+                     drawn as one — the same panel with a tick in it, rather than
+                     the apologetic "nothing here yet" an empty list usually
+                     gets. A FILTERED empty queue says something different: the
+                     stage is clear, not the whole board. */
+                  <BlockEmpty
+                    icon={<CheckIcon size={20} />}
+                    title={stage ? at.stageClear : at.clear}
+                    body={stage ? at.stageClearBody : at.clearBody}
+                  />
                 }
-                action={seeAll("/b2b/rfqs", m.supply.demand.title)}
-              >
-                <AttentionQueue
-                  items={attention}
-                  locale={locale}
-                  labels={at.column}
-                  empty={
-                    /* An empty queue is a WIN, not a missing feature, and it is
-                       drawn as one — the same panel with a tick in it, rather
-                       than the apologetic "nothing here yet" an empty list
-                       usually gets. */
-                    <StatePanel
-                      icon={<CheckIcon size={20} />}
-                      title={at.clear}
-                      body={at.clearBody}
-                    />
-                  }
-                />
-              </Panel>
+              />
+            </Panel>
 
-              <Panel
-                fill
-                title={m.supply.pipeline.title}
-                Icon={ActivityIcon}
-                hint={m.supply.pipeline.hint}
-                /* The catalogue closes the pipeline rather than opening a fourth
-                   group inside it: it is the REASON demand arrives at all, so
-                   the seller should see it here — but it is not a stage, and as
-                   a fourth bar group it made the supporting panel taller than
-                   the operational queue beside it, which inverts the whole
-                   point of the row. */
-                foot={
-                  managesCatalog ? (
-                    <Link href="/b2b/products" className="hover:text-accent hover:underline">
-                      {m.supply.pipeline.catalogue} · {m.supply.products.stat.published}{" "}
-                      <span className="font-medium tabular-nums text-fg">
-                        {formatCount(products.published, locale)}
-                      </span>{" "}
-                      · {m.supply.products.stat.draft}{" "}
-                      <span className="font-medium tabular-nums text-fg">
-                        {formatCount(products.draft, locale)}
-                      </span>
-                    </Link>
-                  ) : undefined
+            <Panel
+              fill
+              tone="iris"
+              bodyClassName="flex flex-col"
+              title={m.supply.opportunities.title}
+              Icon={TrendingUpIcon}
+              hint={m.supply.opportunities.hint}
+              action={seeAll("/b2b/rfqs", m.common.more)}
+            >
+              <OpportunityList
+                lines={signals.open}
+                locale={locale}
+                unitLabel={(u) => m.commerce.units[u]}
+                labels={{
+                  quantity: m.supply.opportunities.quantity,
+                  buyer: m.supply.opportunities.buyer,
+                  required: at.date.required,
+                  status: m.supply.opportunities.status,
+                  cta: m.supply.opportunities.cta,
+                  more: m.supply.opportunities.more,
+                }}
+                empty={
+                  <BlockEmpty
+                    icon={<TrendingUpIcon size={20} />}
+                    title={m.supply.opportunities.empty}
+                    body={m.supply.opportunities.emptyBody}
+                  />
                 }
-              >
-                <PipelineGroup
-                  locale={locale}
-                  label={m.supply.pipeline.demand}
-                  href="/b2b/rfqs"
-                  rows={demandStatuses.map((s) => ({
-                    key: s,
-                    label: m.commerce.rfqStatus[s],
-                    value: supply.demand[s] ?? 0,
-                    tone: demandTone[s],
-                  }))}
-                />
+              />
 
-                <PipelineGroup
-                  locale={locale}
-                  label={m.supply.pipeline.quotations}
-                  href="/b2b/quotations"
-                  rows={QUOTE_STATUSES.map((s) => ({
-                    key: s,
-                    label: m.commerce.quotationStatus[s],
-                    value: supply.quotations[s] ?? 0,
-                    tone: QUOTE_TONE[s],
-                  }))}
-                />
+              {/* Pinned to the foot of the panel by `mt-auto`, which is what
+                  turns the leftover height into a deliberate footer.
 
-                <PipelineGroup
-                  locale={locale}
-                  label={m.supply.pipeline.orders}
-                  href="/b2b/orders"
-                  rows={orderStatuses.map((s) => ({
-                    key: s,
-                    label: m.execution.orderStatus[s],
-                    value: supply.orders[s] ?? 0,
-                    tone: orderTone[s],
-                  }))}
-                />
+                  This panel sits beside the attention queue and will almost
+                  always be the shorter of the two, because a seller has more
+                  stalled work than they have unpriced lines. `Panel fill` levels
+                  the row, so that difference becomes blank surface at the bottom
+                  of this one. Rather than fight the levelling — a ragged row
+                  foot looks worse than a gap — the gap is spent on the one thing
+                  the block was missing: a way out to the full request list that
+                  does not require going back up to the header. */}
+              {signals.open.length > 0 ? (
+                <div className="mt-auto flex justify-center pt-3">
+                  <Link
+                    href="/b2b/rfqs"
+                    className="text-label font-medium text-iris hover:underline"
+                  >
+                    {m.supply.demand.title} →
+                  </Link>
+                </div>
+              ) : null}
+            </Panel>
+          </Row>
 
-              </Panel>
-            </Row>
-          </Band>
+          {/* ROW 3 — what is moving, what happened, and where the work sits. */}
+          <Row cols="thirds">
+            <Panel
+              fill
+              tone="iris"
+              bodyClassName="flex flex-col"
+              title={m.supply.market.title}
+              Icon={BarChartIcon}
+              hint={m.supply.market.hint.replace("{period}", periodLabel)}
+              action={seeAll("/b2b/reports", m.home.openReports)}
+            >
+              <MarketMovement
+                rows={signals.movement}
+                locale={locale}
+                labels={{ requests: m.supply.market.requests, new: m.supply.market.new }}
+                empty={
+                  <BlockEmpty
+                    icon={<BarChartIcon size={20} />}
+                    title={m.supply.market.empty}
+                    body={m.supply.market.emptyBody}
+                  />
+                }
+              />
+            </Panel>
 
-          {/* ROW 2 — the two live record lists, as peers. A seller reads "what
-              came in" against "what I sent back"; stacking them full-width put
-              a screen of scroll between two lists that answer each other. */}
-          <Band
-            title={m.supply.section.demand}
-            Icon={DemandIcon}
-            action={seeAll("/b2b/rfqs", m.supply.demand.title)}
-          >
-            <Row cols="even">
-              <Panel
-                fill
-                title={m.supply.demand.awaiting}
-                Icon={DemandIcon}
-                hint={m.supply.demand.awaitingHint}
-                action={seeAll("/b2b/rfqs", m.common.view)}
-              >
-                <RfqTable rfqs={incoming.rows} perspective="supplier" locale={locale} m={m} />
-              </Panel>
+            <Panel
+              fill
+              tone="info"
+              bodyClassName="flex flex-col"
+              title={m.supply.notifications.title}
+              Icon={BellIcon}
+              hint={m.supply.notifications.hint}
+            >
+              <NotificationsEmpty
+                title={m.supply.notifications.empty}
+                body={m.supply.notifications.emptyBody}
+              />
+            </Panel>
 
-              <Panel
-                fill
-                title={m.supply.quotations.latest}
-                Icon={FileTextIcon}
-                hint={m.supply.quotations.latestHint}
-                action={seeAll("/b2b/quotations", m.supply.quotations.title)}
-              >
-                <QuotationTable quotations={sent.rows} perspective="supplier" locale={locale} m={m} compact />
-              </Panel>
-            </Row>
-          </Band>
-
-          {/* ROW 3 + 4 — conversion. The trend leads its row because a line needs
-              width to be readable at all; the funnel beside it is the same story
-              told as a rate rather than a total. */}
-          <Band
-            title={m.supply.section.performance}
-            Icon={TrendingUpIcon}
-            action={seeAll("/b2b/reports", m.home.openReports)}
-          >
-            <Row cols="lead">
-              <Panel
-                fill
-                title={m.supply.chart.valueTrend}
-                Icon={TrendingUpIcon}
-                hint={m.supply.chart.valueTrendHint}
-              >
-                <TrendLine
-                  points={supply.trend.map((b) => ({
-                    label: formatMonth(b.month, locale),
-                    value: b.value,
-                  }))}
-                  emptyLabel={m.supply.empty.noOrders}
-                  ariaLabel={m.supply.chart.valueTrend}
-                  formatValue={(v) => formatCompactMoney(v, locale)}
-                />
-              </Panel>
-
-              <Panel
-                fill
-                title={m.supply.chart.funnel}
-                Icon={ActivityIcon}
-                hint={m.supply.chart.funnelHint}
-              >
-                <Funnel
-                  locale={locale}
-                  steps={[
-                    { label: m.supply.funnel.demand, value: sumOf(supply.demand) },
-                    { label: m.supply.funnel.quoted, value: sumOf(supply.quotations) },
-                    { label: m.supply.funnel.ordered, value: sumOf(supply.orders) },
-                  ]}
-                  emptyLabel={m.reports.noData}
-                  ofFirstLabel={(pct) =>
-                    m.reports.funnel.ofFirst.replace("{pct}", formatPercent(pct, locale))
-                  }
-                />
-              </Panel>
-            </Row>
-
-            <Row cols="thirds">
-              <Panel
-                fill
-                title={m.supply.chart.topProducts}
-                Icon={PackageIcon}
-                hint={m.supply.voice[voice].topProductsHint}
-              >
-                <RankedBars
-                  locale={locale}
-                  colored
-                  emptyLabel={m.supply.empty.noProductSales}
-                  items={supply.topProducts.slice(0, 5).map((p) => ({
-                    label: p.name,
-                    value: p.value,
-                    detail: money(p.value),
-                  }))}
-                />
-              </Panel>
-
-              <Panel
-                fill
-                title={m.supply.chart.topCustomers}
-                Icon={StorefrontIcon}
-                action={seeAll("/b2b/buyers", m.supply.customers.title)}
-              >
-                <RankedBars
-                  locale={locale}
-                  colored
-                  emptyLabel={m.supply.empty.noCustomers}
-                  items={supply.topCustomers.slice(0, 5).map((c) => ({
-                    label: c.name,
-                    value: c.value || c.orders,
-                    detail: money(c.value),
-                  }))}
-                />
-              </Panel>
-
-              <Panel
-                fill
-                title={m.supply.chart.quotationsByStatus}
-                Icon={FileTextIcon}
-                foot={
-                  <>
-                    {m.supply.acceptedValue}:{" "}
-                    <span dir="ltr" className="font-medium tabular-nums text-fg">
-                      {money(supply.acceptedValue)}
+            <Panel
+              fill
+              tone="neutral"
+              title={m.supply.pipeline.title}
+              Icon={ActivityIcon}
+              hint={m.supply.pipeline.hint}
+              foot={
+                managesCatalog ? (
+                  <Link href="/b2b/products" className="hover:text-accent hover:underline">
+                    {m.supply.pipeline.catalogue} · {m.supply.products.stat.published}{" "}
+                    <span className="font-medium tabular-nums text-fg">
+                      {formatCount(products.published, locale)}
+                    </span>{" "}
+                    · {m.supply.products.stat.draft}{" "}
+                    <span className="font-medium tabular-nums text-fg">
+                      {formatCount(products.draft, locale)}
                     </span>
-                  </>
+                  </Link>
+                ) : undefined
+              }
+            >
+              <WorkflowFlow stages={flow} locale={locale} />
+            </Panel>
+          </Row>
+
+          {/* ROW 4 — the shelf. Two rankings of what is actually selling and to
+              whom, and the clips rail that will hold product video when there is
+              a model for it. */}
+          <Row cols="thirds">
+            <Panel
+              fill
+              tone="neutral"
+              bodyClassName="flex flex-col"
+              title={m.supply.videos.title}
+              Icon={VideoIcon}
+              hint={m.supply.videos.hint}
+            >
+              <ProductVideosEmpty
+                title={m.supply.videos.empty}
+                body={m.supply.videos.emptyBody}
+                action={
+                  managesCatalog
+                    ? seeAll("/b2b/products", m.supply.products.title)
+                    : undefined
                 }
-              >
-                <RankedBars
-                  locale={locale}
-                  emptyLabel={m.reports.noData}
-                  items={QUOTE_STATUSES.map((s) => ({
-                    label: m.commerce.quotationStatus[s],
-                    value: supply.quotations[s] ?? 0,
-                  }))}
-                />
-              </Panel>
-            </Row>
-          </Band>
+              />
+            </Panel>
+
+            <Panel
+              fill
+              tone="iris"
+              title={m.supply.chart.topProducts}
+              Icon={PackageIcon}
+              hint={m.supply.voice[voice].topProductsHint}
+            >
+              <RankedBars
+                locale={locale}
+                bar="iris"
+                rank
+                emptyLabel={m.supply.empty.noProductSales}
+                items={supply.topProducts.slice(0, 5).map((pr) => ({
+                  label: pr.name,
+                  value: pr.value,
+                  detail: money(pr.value),
+                }))}
+              />
+            </Panel>
+
+            <Panel
+              fill
+              tone="iris"
+              title={m.supply.chart.topCustomers}
+              Icon={StorefrontIcon}
+              action={seeAll("/b2b/buyers", m.common.more)}
+            >
+              <RankedBars
+                locale={locale}
+                bar="iris"
+                rank
+                emptyLabel={m.supply.empty.noCustomers}
+                items={supply.topCustomers.slice(0, 5).map((c) => ({
+                  label: c.name,
+                  value: c.value || c.orders,
+                  detail: money(c.value),
+                }))}
+              />
+            </Panel>
+          </Row>
         </>
       ) : null}
-
-      {activeOrders.length > 0 || runningProjects > 0 ? (
-        <Band
-          title={m.supply.section.fulfilment}
-          Icon={ClipboardIcon}
-          action={seeAll("/b2b/orders", m.supply.orders.title)}
-        >
-          <Panel
-            title={m.supply.orders.active}
-            Icon={ClipboardIcon}
-            /* Fulfilment, NOT shipment tracking. The reference shows carriers,
-               waybill numbers and a live route on a map; this repository has no
-               shipment model and no coordinates, so what is shown is the order
-               and project state that genuinely exists. */
-            hint={m.supply.orders.activeHint}
-            action={
-              runningProjects > 0
-                ? seeAll("/b2b/projects", `${m.supply.tile.fulfilling}: ${runningProjects}`)
-                : undefined
-            }
-          >
-            {activeOrders.length === 0 ? (
-              <StatePanel
-                icon={<ClipboardIcon size={20} />}
-                title={m.supply.empty.noActiveOrders}
-                body={m.supply.empty.noActiveOrdersBody}
-              />
-            ) : (
-              <OrderTable orders={activeOrders.slice(0, 6)} perspective="supplier" locale={locale} m={m} />
-            )}
-          </Panel>
-        </Band>
-      ) : null}
-
-      <NextSteps steps={steps} label={m.home.openReports} />
 
       {/* The closing note the reference band occupies with a privacy statement.
           Here it says what the numbers above actually count, which is the honest
@@ -694,55 +792,27 @@ export async function SupplyDashboard({ ctx }: { ctx: PageContext }) {
   );
 }
 
-/**
- * One stage inside the pipeline panel.
- *
- * The panel used to be three separate cards of two or three rows each, which is
- * how a context column ends up 300px tall beside an 800px queue. Grouped under
- * quiet stage captions instead, the same figures read as ONE pipeline — which is
- * what they are — and the panel earns the height of the row it sits in.
- */
-function PipelineGroup({
-  label,
-  href,
-  locale,
-  rows,
-}: {
-  label: string;
-  /** Where every row in this group goes — one stage, one module. */
-  href: string;
-  locale: Locale;
-  rows: { key: string; label: string; value: number; tone: KpiTone }[];
-}) {
-  // Share of THIS group, not of the page: a stage's statuses are parts of that
-  // stage, and measuring "closed requests" against the order count would compare
-  // two different denominators and draw a bar that means nothing.
-  const total = rows.reduce((sum, r) => sum + r.value, 0);
-  return (
-    <div className="mb-3 last:mb-0">
-      <p className="mb-1 text-label font-medium uppercase tracking-wide text-fg-muted">{label}</p>
-      {rows.map((r) => (
-        <PanelRow
-          key={r.key}
-          locale={locale}
-          label={r.label}
-          value={r.value}
-          tone={r.tone}
-          href={href}
-          share={total > 0 ? r.value / total : 0}
-        />
-      ))}
-    </div>
-  );
+/** The periods the strip offers, in the order the selector lists them. */
+const PERIODS: PeriodKey[] = ["30d", "90d", "365d", "all"];
+
+/** The URL is user input: anything not a stage is no stage. */
+function resolveStage(raw: string | undefined): AttentionKind | null {
+  return raw === "price" || raw === "chase" || raw === "order" || raw === "fulfil" ? raw : null;
 }
 
-const QUOTE_STATUSES = ["draft", "submitted", "accepted", "rejected"] as const;
-const QUOTE_TONE = {
-  draft: "neutral",
-  submitted: "warning",
-  accepted: "success",
-  rejected: "danger",
-} as const;
+/**
+ * Where the queue's "more" link goes.
+ *
+ * A filtered queue sends the reader to the module that owns THAT stage, because
+ * that is where its full list is; unfiltered, the queue spans four modules and
+ * no single one of them is "more", so it falls back to the requests module —
+ * the first stage, and the one a seller is most often behind on.
+ */
+function stageHref(stage: AttentionKind | null): string {
+  if (stage === "chase" || stage === "order") return "/b2b/quotations";
+  if (stage === "fulfil") return "/b2b/orders";
+  return "/b2b/rfqs";
+}
 
 function sumOf(rec: Record<string, number>) {
   return Object.values(rec).reduce((a, b) => a + b, 0);

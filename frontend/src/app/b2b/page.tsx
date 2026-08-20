@@ -26,13 +26,25 @@ export const dynamic = "force-dynamic";
  * `getPageContext()` is `cache()`d per render, so resolving it here and passing it
  * down costs one identity/context resolution for the whole page.
  */
-export default async function B2BHomePage() {
-  const ctx = await getPageContext();
+export default async function B2BHomePage({
+  searchParams,
+}: {
+  // Next 15 hands search params in as a promise; the seller dashboard reads its
+  // period scope and stage filter from the URL so that both survive a reload and
+  // can be shared as a link. See `lib/workspace/period`.
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [ctx, params] = await Promise.all([getPageContext(), searchParams]);
   if (!ctx) return null;
 
   return commerceStance(ctx.org.orgType) === "seller" ? (
-    <SupplyDashboard ctx={ctx} />
+    <SupplyDashboard ctx={ctx} period={one(params.period)} stage={one(params.stage)} />
   ) : (
     <BuyerDashboard ctx={ctx} />
   );
+}
+
+/** `?period=30d&period=90d` is legal in a URL and meaningless here — take the first. */
+function one(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }

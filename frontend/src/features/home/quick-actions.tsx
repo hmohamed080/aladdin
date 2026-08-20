@@ -161,7 +161,7 @@ export function QuickActions({
             className="group flex items-start gap-3 rounded-md border bg-surface p-md shadow-card transition-colors hover:border-strong hover:bg-surface-2/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <span
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-sm bg-accent-solid/12 text-accent"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-sm bg-accent-solid/15 text-accent"
               aria-hidden="true"
             >
               <a.Icon size={18} />

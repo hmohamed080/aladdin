@@ -2579,3 +2579,127 @@ composition, differing only in organization identity and org-type voice. Instrum
 and overflow at 1280 / 1440 / 1600 / 1920: **zero truncated elements, zero horizontal overflow**. One
 mobile viewport (390px) checked for breakage only — stacks correctly, `scrollWidth === clientWidth`.
 Per instruction: no full E2E, no pgTAP, no perf, no persona matrix.
+
+## Supply dashboard — eight modules, a period scope, and the real logo
+
+Branch `feature/supply-side-b2b-mvp`, PR #34, not merged. A focused refinement pass on the
+Distributor / Manufacturer / Importer dashboard only — one shared implementation, no second surface,
+no route deleted.
+
+### The composition problem, stated honestly
+
+The previous version answered five questions in sequence and gave each a full-width band. It was
+correct and it was four screens long, which for a surface whose whole purpose is the morning glance
+is a design failure that no amount of per-block polish fixes. It also **transcribed two modules onto
+the home page**: the incoming-requests table and the quotations table repeated, in full, lists that
+are one sidebar click away — while the attention queue directly above them had already named the rows
+that needed work.
+
+The page is now **eight modules on four rows**, and every one of them says something no module page
+says: ROW 1 the period-scoped strip · ROW 2 `ينتظر تصرفك الآن` + `فرص جديدة مناسبة لك` · ROW 3
+`حركة السوق` + `أحدث الإشعارات` + `مسار عملك` · ROW 4 `فيديوهات لمنتجاتك` + `أعلى منتجاتك` +
+`أعلى عملائك`. The two duplicated tables, the value trend, the funnel, the quotations-by-status
+breakdown, the fulfilment band and the next-steps row are gone from the DASHBOARD. **No route,
+query or feature was removed.**
+
+### The comparison percentages, which used to be refused
+
+The last pass recorded "no comparison-period percentages — nothing in this database produces one".
+That was true of the QUERY, not of the data. `supplySummary` already pulls every request, quotation
+and order in order to tally them by status, and those rows carry `created_at` / `confirmed_at`. Two
+windows over rows already in hand is arithmetic; adding one column to two `select` lists was the
+entire cost. `compareDays` → `PeriodComparison`, and the strip renders `↑٤٠٪ من الشهر الماضي`.
+
+The rule that keeps it honest is in `KpiDelta`: a delta renders **only** where a real previous window
+with a **non-zero baseline** exists. First month of trading gets no percentage — not 0%, not ∞%, not
+"new" dressed up as growth — and the tile silently falls back to its context line. Orders are dated by
+`confirmed_at`, not `created_at`: confirmation is when the money became real, and dating won business
+by creation would credit a deal to the month it was drafted.
+
+Four cells are period-scoped FLOWS; the fifth (`طلبات تنتظر السعر`) is a live STATE and deliberately
+carries no delta — it would be false to shrink an unanswered six-week-old request because the reader
+chose a 30-day window. Period lives in the URL (`?period=`), so it survives a reload and is shareable.
+
+### The four blocks whose honest form is an empty state
+
+`supply-blocks.tsx`. The reference's opportunity feed is a cross-marketplace matching engine, its
+market panel a regional demand index, plus a notification stream and a Reels rail with view counts.
+This repository has **no matching engine, no market data provider, no `notifications` table and no
+video model** (`products` carries one `image_ref`). Each block is therefore rebuilt on the one dataset
+that is real — the requests buyers addressed to this org and the lines inside them — and where even
+that does not exist it renders an empty state that says so. `حركة السوق` counts **distinct requests**
+per product, never lines (a request itemising SPC twice is one business asking once), and its bars are
+a share of the BUSIEST product rather than of the window's total, because one request naming four
+products counts once for each and a "% of all demand" would exceed 100%. `مسار عملك` is explicitly
+**not a funnel** — this month's orders came from last month's quotations — so each bar is a share of
+the largest stage, never a conversion rate.
+
+### Iris — a second accent, because one was measurably not enough
+
+Lumen (amber) is the ACTION colour and earns that by being the only warm high-chroma note. Building a
+real operational dashboard out of it made every icon tile, bar, ranking and panel glyph amber, so the
+page read as one enormous call to action with no ranking inside it. `--iris` (#5b4ad9 / #9b8cf5 dark)
+is a MEASUREMENT colour, not a second brand colour. The single largest lever was the nine
+"more" links: as `text-accent` they were nine amber calls to action for what is navigation. Amber is
+now spent only on the primary button and the warning/danger tones.
+
+### Four defects found by measuring, not by looking
+
+1. **Every date in the queue truncated** (`١٠ سبتم…`, `تاريخ الت…`). The queue switches to its
+   single-line row form at the `wide` VIEWPORT breakpoint, but that form needs a CONTAINER of ~800px;
+   a 3:2 track at 1440 gave it ~700px. Row 2 is now `wide-lead` (5:2) → ~820px, every cell whole.
+2. **The RTL start-clip, again, in the new block.** `line-clamp-1` cuts at the end of the element's
+   own direction, so in the Arabic workspace "New Cairo Design Studio" rendered as `…ew Cairo Design`
+   — not a shortened name but a different one. Opportunity fields now wrap over two lines.
+3. **Empty states left ~150px voids.** `StatePanel` is a fixed-height page-level box sitting at the
+   top of a panel that stretches to match a taller neighbour. `BlockEmpty` fills and centres instead.
+4. **The iris KPI tiles looked unrendered** beside their neighbours — 12% alpha where the others had
+   15%. Raising everything to a single 18% removed EVERY tile background on the strip instead, because
+   Tailwind's opacity scale runs in steps of five and an off-scale `/NN` emits no rule at all,
+   silently. Sampling the rendered pixels found it; a grep then found **14 dead classes**, including
+   the whole `Panel` header-wash feature (`/8`), which had never rendered since the day it was
+   written — the tone prop was threaded through every panel and did nothing. All on-scale now, and
+   `styles/opacity-scale.test.ts` fails the build on any future off-scale modifier. This trap has now
+   cost this repository visible UI three separate times.
+
+### Logo
+
+`logo.png` (1254×700, gold lockup) → `frontend/public/brand/aladdin-logo.png` (384px lockup) and
+`aladdin-mark.png` (192px emblem), both trimmed to their content box and downscaled with a
+premultiplied-alpha box filter by a one-off pure-Node script (no dependency added; `zlib` is built
+in). The emblem is cut at the lamp foot: below y≈576 the wordmark's letter apexes sit INSIDE the
+emblem's x-range, so a naive alpha-bbox crop left specks. `Brand` now draws the emblem via
+`next/image` beside the **localized** name — using the whole lockup would put a Latin wordmark in the
+Arabic UI and print the name twice in the English one. The auth/onboarding `ApertureMark` panels are
+out of this pass's scope and unchanged.
+
+### Validation
+
+typecheck · `eslint .` clean. Unit: **14 new** (`demand-signals.test.ts` proves distinct-request
+counting, window splitting and the unpriced-only rule; `period.test.ts` proves the URL resolver
+rejects junk and that "all time" yields no window; `opacity-scale.test.ts` guards the trap above) plus the i18n parity/《no Arabic in EN》suite green.
+Real browser, real Email-OTP, no bypass: `rania@` Arabic Light **and** Dark, `mahmoud@` English,
+`fady@` Arabic, and one 390px phone — all eight module headings asserted present per seat, Arabic-Indic
+vs Western digits asserted per locale, `scrollWidth === clientWidth` at every stop.
+
+**The one finding that is a real defect and is NOT fixed here.** Driving the period select or a stage
+chip and waiting for the URL to change was never dependable — it failed at three different points
+across three runs. The controls are not broken: instrumented directly, a chip click does land
+`?stage=price` and the select does land `?period=90d`, each with a 200 RSC response. The problem is
+HOW LONG it takes. Both navigate to the same route with a different query, which is a full server
+render of a `force-dynamic` dashboard behind seven Supabase queries, and the URL does not move until
+that render commits. To a user this reads as "I clicked and nothing happened".
+
+Three attempted fixes were wrong and were reverted rather than left in the tree: re-firing the
+interaction (it cancels the in-flight RSC request and restarts the clock — it turned an occasional
+failure into three-out-of-three), removing `useSearchParams()` from `period-select.tsx` on a
+Suspense-deopt theory (it broke that control the same way), and a hand-rolled `QueryLink` on the
+theory that `<Link>` refuses query-only navigations (it does not). **The dashboard's render cost is
+the actual bug**, and it wants a pass of its own — the seven queries, and ~30 prefetchable links each
+pulling the whole page.
+
+The acceptance test therefore asserts the CONTRACT — that the server reads both parameters, that they
+compose, that a filtered queue really is filtered, and that every chip's `href` is exactly the URL
+being driven — rather than the latency of a synthetic click. 5/5, no retries, twice consecutively.
+
+Per instruction: no full E2E, no pgTAP, no Lighthouse, no persona matrix.

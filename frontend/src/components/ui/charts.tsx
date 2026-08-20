@@ -329,6 +329,8 @@ export function RankedBars({
   locale,
   emptyLabel,
   colored = false,
+  bar = "accent",
+  rank = false,
   className,
 }: {
   items: RankedItem[];
@@ -341,6 +343,26 @@ export function RankedBars({
   emptyLabel: string;
   /** Give each row its own series colour (use for entities, not for statuses). */
   colored?: boolean;
+  /**
+   * Which single colour the bars take when `colored` is off.
+   *
+   * `accent` is amber — the brand's ACTION colour — and it was the only option
+   * for as long as there was only one accent. On a dashboard built mostly of
+   * ranked lists that made every bar on the page a call to action, which is how
+   * a page ends up with no hierarchy at all. `iris` is the measurement colour
+   * (see tokens.css); a chart is a measurement, so a chart-heavy surface asks
+   * for it explicitly rather than having it imposed on every existing caller.
+   */
+  bar?: "accent" | "iris";
+  /**
+   * Number the rows 1..n.
+   *
+   * Only for a list whose ORDER is the point — "the five most-requested
+   * products". A ranked list already reads top-to-bottom, so the numeral adds
+   * nothing to a list that merely happens to be sorted, and on a list that can
+   * be re-sorted it actively lies.
+   */
+  rank?: boolean;
   className?: string;
 }) {
   const shown = items.filter((i) => i.value > 0);
@@ -352,14 +374,30 @@ export function RankedBars({
       {shown.map((item, i) => (
         <li key={item.label} className="min-w-0">
           <div className="flex items-baseline justify-between gap-md">
-            <span className="min-w-0 truncate text-body text-fg-secondary">{item.label}</span>
+            <span className="flex min-w-0 items-baseline gap-2">
+              {rank ? (
+                // `aria-hidden`: the position is already carried by the list
+                // itself, and a screen reader announcing "1, 1, SPC" reads the
+                // rank twice.
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 text-label font-medium tabular-nums text-fg-muted"
+                >
+                  {formatNumber(i + 1, locale)}
+                </span>
+              ) : null}
+              <span className="min-w-0 truncate text-body text-fg-secondary">{item.label}</span>
+            </span>
             <span className="shrink-0 text-label font-medium tabular-nums text-fg" dir="ltr">
               {item.detail ?? formatNumber(item.value, locale)}
             </span>
           </div>
           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-pill bg-surface-2">
             <div
-              className={cn("h-full rounded-pill", colored ? BG[seriesAt(i)] : "bg-accent-solid")}
+              className={cn(
+                "h-full rounded-pill",
+                colored ? BG[seriesAt(i)] : bar === "iris" ? "bg-iris-solid" : "bg-accent-solid",
+              )}
               style={{ width: `${Math.max((item.value / max) * 100, 4)}%` }}
             />
           </div>

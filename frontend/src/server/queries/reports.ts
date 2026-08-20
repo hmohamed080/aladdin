@@ -84,6 +84,39 @@ export type SellSummary = {
  * over their line items. Every one is RLS-scoped, so a caller sees exactly the
  * records it could open by hand.
  */
+/**
+ * The flow figures for ONE window of time. Counted, never estimated.
+ *
+ * Each field names the timestamp it is measured on, because they are not the
+ * same one: a request and a quotation are dated by when the record came into
+ * existence, an order by when it was CONFIRMED. Confirmation is the moment the
+ * money became real, and dating won business by `created_at` would credit a
+ * deal to the month it was drafted rather than the month it closed.
+ */
+export type PeriodStats = {
+  /** Requests received in the window, by `rfqs.created_at`. */
+  demand: number;
+  /** Quotations sent in the window, by `quotations.created_at`. */
+  quotations: number;
+  /** Orders confirmed in the window, by `orders.confirmed_at`. */
+  orders: number;
+  /** Value of those orders. */
+  orderValue: number;
+};
+
+/**
+ * A window and the equally-long window immediately before it.
+ *
+ * `previous` is what makes a delta legitimate, and the consumer must check it:
+ * a zero baseline has no percentage, and the UI is required to fall back rather
+ * than print ∞, 100% or "new". See `KpiDelta`.
+ */
+export type PeriodComparison = {
+  days: number;
+  current: PeriodStats;
+  previous: PeriodStats;
+};
+
 export type SupplySummary = {
   /** Requests addressed to this organization, by status. */
   demand: Record<string, number>;
@@ -106,6 +139,11 @@ export type SupplySummary = {
   topProducts: { name: string; quantity: number; value: number }[];
   /** Order value won per calendar month, oldest first. */
   trend: TrendBucket[];
+  /**
+   * Present only when a `compareDays` window was asked for. Computed from the
+   * SAME rows as everything above — no extra round trip buys this.
+   */
+  period?: PeriodComparison;
 };
 
 export type ProjectSummary = {
@@ -147,6 +185,66 @@ function monthlyTrend(
     if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + Number(r.total ?? 0));
   }
   return [...buckets.entries()].map(([month, value]) => ({ month, value }));
+}
+
+/**
+ * Split three already-fetched row sets into a window and the window before it.
+ *
+ * WHY THIS IS DONE IN MEMORY AND NOT IN THE DATABASE
+ * The honest objection to a period-over-period delta was never that the data
+ * could not support one — it was that asking for it would double the page's
+ * reads, and a comparison that costs six extra round trips on every dashboard
+ * render is a comparison that should not exist. But the dashboard ALREADY pulls
+ * every one of this organization's requests, quotations and orders in order to
+ * tally them by status. Two windows over rows that are in hand is arithmetic,
+ * and arithmetic is free. Adding `created_at` to two `select` lists is the
+ * entire cost of the feature.
+ *
+ * The boundary is exclusive at the start of the older window and inclusive at
+ * `now`, so a record can never land in both halves and none can fall between
+ * them.
+ */
+function comparePeriods(
+  days: number,
+  rfqs: { created_at: string | null }[],
+  quotes: { created_at: string | null }[],
+  orders: { confirmed_at: string | null; total: number | string | null }[],
+): PeriodComparison {
+  const now = Date.now();
+  const span = days * 86_400_000;
+  const currentFrom = now - span;
+  const previousFrom = now - span * 2;
+
+  const at = (iso: string | null) => (iso ? Date.parse(iso) : NaN);
+  const inWindow = (t: number, from: number, to: number) => !Number.isNaN(t) && t >= from && t < to;
+
+  const blank = (): PeriodStats => ({ demand: 0, quotations: 0, orders: 0, orderValue: 0 });
+  const current = blank();
+  const previous = blank();
+
+  for (const r of rfqs) {
+    const t = at(r.created_at);
+    if (inWindow(t, currentFrom, now + 1)) current.demand += 1;
+    else if (inWindow(t, previousFrom, currentFrom)) previous.demand += 1;
+  }
+  for (const q of quotes) {
+    const t = at(q.created_at);
+    if (inWindow(t, currentFrom, now + 1)) current.quotations += 1;
+    else if (inWindow(t, previousFrom, currentFrom)) previous.quotations += 1;
+  }
+  for (const o of orders) {
+    const t = at(o.confirmed_at);
+    const value = Number(o.total ?? 0);
+    if (inWindow(t, currentFrom, now + 1)) {
+      current.orders += 1;
+      current.orderValue += value;
+    } else if (inWindow(t, previousFrom, currentFrom)) {
+      previous.orders += 1;
+      previous.orderValue += value;
+    }
+  }
+
+  return { days, current, previous };
 }
 
 /**
@@ -324,13 +422,23 @@ export async function supplySummary(
   orgId: string,
   f: ReportFilters = {},
   trendMonths = 6,
+  /**
+   * Ask for a window-over-window comparison of this length, in days.
+   *
+   * Only meaningful on an UNFILTERED read: the comparison needs the row history
+   * either side of the window, and `f.from` would cut the previous window off
+   * before it could be counted. The dashboard therefore asks for the whole
+   * history and slices it here; the Reports page, which filters, does not ask
+   * for a comparison at all.
+   */
+  compareDays?: number,
 ): Promise<SupplySummary> {
   const categoryOrderIds = await orderIdsInCategory(supabase, orgId, "supplier_org_id", f.category);
 
-  let rfqQ = supabase.from("rfq_list").select("status").eq("supplier_org_id", orgId);
+  let rfqQ = supabase.from("rfq_list").select("status, created_at").eq("supplier_org_id", orgId);
   let quoteQ = supabase
     .from("quotation_list")
-    .select("status, total")
+    .select("status, total, created_at")
     .eq("supplier_org_id", orgId);
   let orderQ = supabase
     .from("order_list")
@@ -400,6 +508,7 @@ export async function supplySummary(
       orderRows.map((o) => o.id).filter((id): id is string => !!id),
     ),
     trend: monthlyTrend(orderRows, trendMonths),
+    period: compareDays ? comparePeriods(compareDays, rfqRows, quoteRows, orderRows) : undefined,
   };
 }
 

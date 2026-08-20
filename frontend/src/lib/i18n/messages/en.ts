@@ -26,6 +26,8 @@ export const en = {
     saving: "Saving…",
     unassigned: "Unassigned",
     view: "View",
+    /* "Show the rest of this list", on a panel that shows a capped slice of one. */
+    more: "More",
     open: "Open",
     close: "Close",
     actions: "Actions",
@@ -1367,10 +1369,59 @@ export const en = {
       },
     },
     section: {
+      overview: "Your business at a glance",
       attention: "What needs your attention",
       demand: "Incoming demand, and the prices you sent",
       performance: "How the business is converting",
       fulfilment: "What you are fulfilling",
+    },
+    period: {
+      label: "Period",
+      "30d": "Last 30 days",
+      "90d": "Last 90 days",
+      "365d": "Last 12 months",
+      all: "All time",
+      /* A delta is shown only where a real, non-zero previous window exists. */
+      vsMonth: "from last month",
+      vsPrevious: "from the previous period",
+    },
+    flow: {
+      incoming: "Requests in",
+      quoted: "Prices sent",
+      accepted: "Prices accepted",
+      ordered: "Orders confirmed",
+      running: "In progress & completed",
+    },
+    opportunities: {
+      title: "New opportunities",
+      hint: "Lines asked for inside requests that reached you and have not been priced.",
+      quantity: "Quantity needed",
+      buyer: "Requested by",
+      status: "Awaiting your price",
+      cta: "View details",
+      more: "+{count} more lines on this request",
+      empty: "No open opportunities right now",
+      emptyBody: "Lines asked for inside incoming requests appear here before you answer them.",
+    },
+    market: {
+      title: "Demand movement",
+      hint: "The most-requested lines in {period}, counted from the requests that reached you.",
+      requests: "requests",
+      new: "New",
+      empty: "No movement in this period",
+      emptyBody: "The most-requested lines appear here as soon as requests reach your business.",
+    },
+    notifications: {
+      title: "Latest notifications",
+      hint: "Alerts tied to your activity.",
+      empty: "No notifications yet",
+      emptyBody: "Notifications are not switched on for your account yet. They will appear here once they are.",
+    },
+    videos: {
+      title: "Videos for your products",
+      hint: "Short clips that show your products to buyers.",
+      empty: "No videos yet",
+      emptyBody: "Your catalogue currently supports one image per product. Clips will appear here once they are supported.",
     },
     /* The cross-stage triage queue. Its wording never claims more than the
        records support: a status is the record's OWN status, and a date is
@@ -1381,6 +1432,15 @@ export const en = {
       clear: "Nothing is waiting on you",
       clearBody:
         "Every request has been priced, every accepted price has an order behind it, and every order is moving.",
+      stageClear: "Nothing at this stage",
+      stageClearBody: "Pick another stage, or show everything.",
+      stage: {
+        all: "All",
+        price: "To price",
+        chase: "To follow up",
+        order: "To order",
+        fulfil: "To fulfil",
+      },
       column: { status: "Status" },
       amount: "Value",
       date: {
@@ -1407,6 +1467,12 @@ export const en = {
       catalogue: "Your catalogue",
     },
     tile: {
+      demandIn: "Requests received",
+      demandInHint: "Requests that reached your business",
+      quotationsOut: "Prices sent",
+      quotationsOutHint: "Quotations you issued",
+      ordersWon: "Orders confirmed",
+      ordersWonHint: "Confirmed in this period",
       awaitingResponse: "Requests to answer",
       awaitingResponseHint: "Nobody has priced these yet",
       awaitingDecision: "Prices out for decision",

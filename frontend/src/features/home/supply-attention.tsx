@@ -77,6 +77,7 @@ export type AttentionItem = {
 const rail: Record<KpiTone, string> = {
   neutral: "bg-fg-muted",
   accent: "bg-accent-solid",
+  iris: "bg-iris-solid",
   success: "bg-success",
   warning: "bg-warning",
   danger: "bg-danger",
@@ -86,6 +87,7 @@ const rail: Record<KpiTone, string> = {
 const chip: Record<KpiTone, string> = {
   neutral: "bg-surface-2 text-fg-secondary",
   accent: "bg-accent-solid/15 text-accent",
+  iris: "bg-iris-solid/15 text-iris",
   success: "bg-success/15 text-success",
   warning: "bg-warning/15 text-warning",
   danger: "bg-danger/15 text-danger",
@@ -146,7 +148,7 @@ export function AttentionQueue({
   const Arrow: ComponentType<{ size?: number }> = locale === "ar" ? ChevronLeftIcon : ChevronRightIcon;
 
   return (
-    <ul className="flex flex-col gap-2">
+    <ul data-testid="attention-queue" className="flex flex-col gap-2">
       {items.map((item) => (
         <li key={item.key}>
           <Link
@@ -279,6 +281,98 @@ export function AttentionQueue({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * The queue's compact stage filter — "everything / to price / to chase / to
+ * order / to fulfil".
+ *
+ * LINKS, NOT A CLIENT CONTROL
+ * Every other filter in this workspace is a `<select>` that pushes to the router;
+ * this one is a row of anchors, and the difference is what the control is FOR.
+ * A period selector has four options that scope a whole strip of figures and is
+ * used occasionally. This is a triage control used constantly, and its options
+ * carry counts that are themselves information — "3 to price, 0 to chase" is a
+ * thing the seller reads without ever clicking. Collapsing that into a closed
+ * dropdown hides the most useful part of it, and a row of five chips costs no
+ * JavaScript at all: they are server-rendered links that the browser prefetches.
+ *
+ * A stage with nothing in it is still drawn, greyed. Its absence would make the
+ * row's contents change shape between visits, and "no requests waiting to be
+ * priced" is the single most reassuring thing this panel can say.
+ */
+export function AttentionFilter({
+  stages,
+  active,
+  basePath,
+  locale,
+  allLabel,
+  query,
+}: {
+  stages: { key: AttentionKind; label: string; count: number }[];
+  /** The stage currently filtered to, or `null` for everything. */
+  active: AttentionKind | null;
+  basePath: string;
+  locale: Locale;
+  allLabel: string;
+  /**
+   * Parameters that must survive a stage change — the period, above all.
+   * Filtering the queue must not silently reset the figures in the strip above.
+   */
+  query?: Record<string, string>;
+}) {
+  const href = (stage: AttentionKind | null) => {
+    const params = new URLSearchParams(query);
+    // "Everything" is the default, so it carries no parameter and the dashboard
+    // URL stays clean until a filter is deliberately chosen.
+    if (stage) params.set("stage", stage);
+    else params.delete("stage");
+    const qs = params.toString();
+    return qs ? `${basePath}?${qs}` : basePath;
+  };
+
+  const chipFor = (isActive: boolean, empty: boolean) =>
+    cn(
+      "inline-flex shrink-0 items-center gap-1.5 rounded-pill border px-2.5 py-1 text-label transition-colors",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
+      isActive
+        ? "border-iris-solid/40 bg-iris-solid/15 font-medium text-iris"
+        : empty
+          ? "border-transparent bg-surface-2/60 text-fg-muted hover:bg-surface-hover"
+          : "border-transparent bg-surface-2 text-fg-secondary hover:bg-surface-hover hover:text-fg",
+    );
+
+  const total = stages.reduce((sum, s) => sum + s.count, 0);
+
+  return (
+    // The row scrolls rather than wraps: it sits in a panel header beside a
+    // title, and a wrapping chip row silently doubles that header's height on
+    // the one viewport where vertical space is scarcest.
+    <div className="-mx-1 flex max-w-full items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
+      {/* Ordinary `<Link>`s. Worth saying only because a lot of effort went into
+          proving they did not need to be anything cleverer: a chip changes only
+          the query string of the page it is already on, the navigation is a
+          server render of a `force-dynamic` dashboard behind seven queries, and
+          on a cold path it can take several seconds to commit. That reads as "I
+          clicked and nothing happened" — which is a LATENCY problem, not a
+          routing one, and the fix for it is to make the dashboard's render
+          cheaper rather than to hand-roll the router. */}
+      <Link href={href(null)} className={chipFor(active === null, total === 0)}>
+        {allLabel}
+        <span className="tabular-nums">{formatCount(total, locale)}</span>
+      </Link>
+      {stages.map((s) => (
+        <Link
+          key={s.key}
+          href={href(s.key)}
+          className={chipFor(active === s.key, s.count === 0)}
+        >
+          {s.label}
+          <span className="tabular-nums">{formatCount(s.count, locale)}</span>
+        </Link>
+      ))}
+    </div>
   );
 }
 

@@ -189,6 +189,177 @@ export async function productDemand(
   return out;
 }
 
+/* ---------------------------------------------------------------------------
+ * DEMAND SIGNALS — the two supply-dashboard blocks that read INSIDE requests
+ * ------------------------------------------------------------------------- */
+
+export type ProductUnit = Database["public"]["Enums"]["product_unit"];
+
+/** One product line inside a request that is still waiting to be priced. */
+export type DemandLine = {
+  rfqId: string;
+  /** The request's own title — what the buyer called the job. */
+  title: string;
+  buyer: string;
+  productName: string;
+  quantity: number;
+  unit: ProductUnit;
+  requiredDate: string | null;
+  createdAt: string | null;
+  /** Other lines on the same request, so a card can say "+2 more items". */
+  siblings: number;
+};
+
+/** How often one product is being asked for, this window against the last. */
+export type DemandMovementRow = {
+  name: string;
+  /** DISTINCT requests naming this product inside the window. */
+  requests: number;
+  /** The same count for the equally-long window immediately before it. */
+  previous: number;
+};
+
+export type DemandSignals = {
+  /** Lines from unpriced requests, newest request first. */
+  open: DemandLine[];
+  /** How many unpriced requests those lines came from. */
+  openRequests: number;
+  /** Products ranked by requests inside the window, busiest first. */
+  movement: DemandMovementRow[];
+  /** Distinct requests inside the window — the movement rows' denominator. */
+  windowRequests: number;
+};
+
+/**
+ * Everything the dashboard needs from the INSIDE of this organization's demand,
+ * in two reads.
+ *
+ * WHY ONE FUNCTION AND NOT TWO
+ * "New opportunities suited to you" and "market movement" look like different
+ * features and are the same two tables: the requests addressed to this
+ * organization, and the product lines inside them. Read separately they would be
+ * four round trips and — worse — two places that each decide what "a request for
+ * this product" means, which is exactly how two panels on one screen end up
+ * disagreeing about a number the reader can see twice.
+ *
+ * WHAT THESE ARE NOT
+ * There is no opportunity store, no matching engine, no lead score and no market
+ * feed behind any of this. The reference's opportunity cards are populated by a
+ * service that finds buyers hunting for your products across a marketplace; this
+ * repository has no such service, and inventing one that returned plausible rows
+ * would be the single most dishonest thing on the page. What IS real is that
+ * buyers address requests to this organization and those requests name products
+ * and quantities — so the block shows exactly that, and its wording says so.
+ *
+ * The movement window counts DISTINCT REQUESTS per product, never lines: a
+ * request that itemises the same product twice (two finishes, two delivery
+ * dates) is one business asking once, and counting it as two would tell a seller
+ * their demand doubled when it did not.
+ */
+export async function demandSignals(
+  supabase: DB,
+  orgId: string,
+  /** Length of the movement window, in days. The prior window is the same length. */
+  windowDays: number,
+  /** How many open lines the opportunities block can show. */
+  openLimit = 6,
+): Promise<DemandSignals> {
+  const { data: rfqs, error } = await supabase
+    .from("rfq_list")
+    .select("id, title, status, requester_name, required_date, created_at")
+    .eq("supplier_org_id", orgId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  const rows = rfqs ?? [];
+  const ids = rows.map((r) => r.id).filter((id): id is string => !!id);
+  const empty: DemandSignals = { open: [], openRequests: 0, movement: [], windowRequests: 0 };
+  if (ids.length === 0) return empty;
+
+  // Same batching rule as `productDemand`, for the same reason: the id list
+  // travels in the query string, so an organization with a long history would
+  // otherwise build a URL the gateway rejects outright.
+  const results = await Promise.all(
+    batches(ids).map((batch) =>
+      supabase
+        .from("rfq_items")
+        .select("rfq_id, product_name, quantity, unit")
+        .in("rfq_id", batch),
+    ),
+  );
+
+  type Item = { rfq_id: string; product_name: string; quantity: number; unit: ProductUnit };
+  const byRfq = new Map<string, Item[]>();
+  for (const { data, error: itemErr } of results) {
+    if (itemErr) throw itemErr;
+    for (const it of data ?? []) {
+      if (!it.rfq_id) continue;
+      const list = byRfq.get(it.rfq_id) ?? [];
+      list.push(it as Item);
+      byRfq.set(it.rfq_id, list);
+    }
+  }
+
+  /* ---- The opportunities block: lines from requests nobody has priced ---- */
+  const openRfqs = rows.filter((r) => r.status === "submitted");
+  const open: DemandLine[] = [];
+  for (const r of openRfqs) {
+    const items = byRfq.get(r.id ?? "") ?? [];
+    for (const it of items) {
+      if (open.length >= openLimit) break;
+      open.push({
+        rfqId: r.id ?? "",
+        title: r.title ?? "—",
+        buyer: r.requester_name ?? "—",
+        productName: it.product_name,
+        quantity: Number(it.quantity ?? 0),
+        unit: it.unit,
+        requiredDate: r.required_date,
+        createdAt: r.created_at,
+        siblings: items.length - 1,
+      });
+    }
+    if (open.length >= openLimit) break;
+  }
+
+  /* ---- The movement block: this window against the one before it ---- */
+  const now = Date.now();
+  const span = windowDays * 86_400_000;
+  const currentFrom = now - span;
+  const previousFrom = now - span * 2;
+
+  // Distinct-request sets per product, per window. A Set rather than a counter
+  // because a request itemising one product twice must land once.
+  const current = new Map<string, Set<string>>();
+  const previous = new Map<string, Set<string>>();
+  const windowRfqs = new Set<string>();
+
+  for (const r of rows) {
+    if (!r.id) continue;
+    const t = r.created_at ? Date.parse(r.created_at) : NaN;
+    if (Number.isNaN(t)) continue;
+    const bucket = t >= currentFrom ? current : t >= previousFrom ? previous : null;
+    if (!bucket) continue;
+    if (bucket === current) windowRfqs.add(r.id);
+    for (const it of byRfq.get(r.id) ?? []) {
+      const set = bucket.get(it.product_name) ?? new Set<string>();
+      set.add(r.id);
+      bucket.set(it.product_name, set);
+    }
+  }
+
+  const movement: DemandMovementRow[] = [...current.entries()]
+    .map(([name, set]) => ({
+      name,
+      requests: set.size,
+      previous: previous.get(name)?.size ?? 0,
+    }))
+    .sort((a, b) => b.requests - a.requests || a.name.localeCompare(b.name))
+    .slice(0, 6);
+
+  return { open, openRequests: openRfqs.length, movement, windowRequests: windowRfqs.size };
+}
+
 export async function getProduct(supabase: DB, id: string): Promise<ProductRow | null> {
   const { data, error } = await supabase.from("products").select("*").eq("id", id).maybeSingle();
   if (error) throw error;

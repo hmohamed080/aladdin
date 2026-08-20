@@ -488,3 +488,22 @@ export const MoneyIcon = (p: IconProps) => (
     <path d="M6 10v4M18 10v4" />
   </Svg>
 );
+
+/** A bare calendar — the period/date-range scope, where `CalendarCheckIcon`
+ *  would wrongly imply something about that date has been confirmed. */
+export const CalendarIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
+    <path d="M3.5 9.5h17M8 3v3M16 3v3" />
+  </Svg>
+);
+
+/** Product video / clip. Drawn as a frame with a play triangle rather than a
+ *  camera, because the subject is the RECORDING, not the device. */
+export const VideoIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2.5" y="5.5" width="14" height="13" rx="2.5" />
+    <path d="M16.5 10.5 21.5 7.5v9l-5-3z" />
+    <path d="M7.5 9.8v4.4l3.8-2.2z" />
+  </Svg>
+);

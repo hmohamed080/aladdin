@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import { cn } from "@/lib/ui/cn";
 import type { Locale } from "@/lib/i18n/locales";
-import { formatCount, formatNumber } from "@/lib/ui/format";
+import { formatCount, formatNumber, formatPercent } from "@/lib/ui/format";
 import { PlusIcon } from "@/components/ui/icons";
 
 /**
@@ -108,7 +108,39 @@ export function PageHead({
 
 /* ------------------------------------------------------------------------- */
 
-export type KpiTone = "neutral" | "accent" | "success" | "warning" | "danger" | "info";
+export type KpiTone = "neutral" | "accent" | "iris" | "success" | "warning" | "danger" | "info";
+
+/**
+ * A period-over-period movement, measured — never decorative.
+ *
+ * The reference puts "+18% ↑ from last month" under every tile, and for a long
+ * time this file refused to render one at all, on the grounds that nothing in
+ * the database produced a comparison period. That was true of the QUERY, not of
+ * the data: the rows the dashboard already reads carry `created_at` and
+ * `confirmed_at`, so a window and the window before it can be counted from the
+ * very same rows, at no extra cost (see `supplySummary`'s `compareDays`).
+ *
+ * What has not changed is the rule. A delta is rendered ONLY where a real
+ * previous window with a non-zero baseline exists. "First month of trading" has
+ * no percentage — not 0%, not ∞%, not "new" dressed up as growth — and the tile
+ * falls back to its `foot` line instead. `pct` being a number is therefore a
+ * PROMISE that a baseline existed; the caller must omit the whole object rather
+ * than pass a placeholder.
+ */
+export type KpiDelta = {
+  /** Signed change against the previous window of equal length, in percent. */
+  pct: number;
+  /**
+   * Whether this movement is GOOD, which only the caller can know: an order
+   * value rising is good, unanswered requests rising is not, and a metric with
+   * no inherent direction passes `null` and gets a neutral colour. Colour is
+   * never derived from the sign here — that is how a dashboard ends up painting
+   * "unanswered requests +40%" in success green.
+   */
+  better: boolean | null;
+  /** The comparison window in words — "vs. the previous 30 days". */
+  label: string;
+};
 
 export type Kpi = {
   label: string;
@@ -119,16 +151,34 @@ export type Kpi = {
   unit?: string;
   /** One short line at the foot of the cell: context, or where the link goes. */
   foot?: string;
+  /** Real movement against the previous window, or absent. Never fabricated. */
+  delta?: KpiDelta;
   href?: string;
 };
 
+/* 20%, one alpha for every tone — and 20 rather than 18 for a reason that has
+ * nothing to do with taste.
+ *
+ * Iris sat at 12% while its neighbours sat at 15%, and a cool violet is already
+ * the quietest hue in this set on a warm ground, so the two iris cells read as
+ * having no tile at all. Raising everything to a single, more visible alpha was
+ * the fix — but the first attempt used 18%, and 18 IS NOT ON TAILWIND'S OPACITY
+ * SCALE (it runs in steps of five). An off-scale modifier emits no rule at all,
+ * silently, so every tile on the strip lost its background entirely and the
+ * "fix" made the exact problem it was fixing strictly worse.
+ *
+ * See `opacity-scale.test.ts`, which now fails the build for any `/NN` off the
+ * scale — this same trap had already eaten every soft badge tone in the product
+ * once before, and had left the panel-header washes below dead since the day
+ * they were written. */
 const kpiChip: Record<KpiTone, string> = {
   neutral: "bg-surface-2 text-fg-secondary",
-  accent: "bg-accent-solid/15 text-accent",
-  success: "bg-success/15 text-success",
-  warning: "bg-warning/15 text-warning",
-  danger: "bg-danger/15 text-danger",
-  info: "bg-info/15 text-info",
+  accent: "bg-accent-solid/20 text-accent",
+  iris: "bg-iris-solid/20 text-iris",
+  success: "bg-success/20 text-success",
+  warning: "bg-warning/20 text-warning",
+  danger: "bg-danger/20 text-danger",
+  info: "bg-info/20 text-info",
 };
 
 /**
@@ -150,19 +200,34 @@ const kpiChip: Record<KpiTone, string> = {
  * for free, which a `border-l` version would not.
  *
  * WHAT A CELL MAY CONTAIN
- * A real count or total from the same query that fills the page, a unit, and one
- * line of context. Deliberately NOT a period-over-period delta: the reference
- * shows "+18% from last month" on every tile, and nothing in this database
- * produces a comparison period. A fabricated delta is a lie with a percentage
- * sign on it.
+ * A real count or total from the same query that fills the page, a unit, one
+ * line of context, and — where and only where a real previous window exists — a
+ * measured delta against it. See `KpiDelta` for the rule that keeps that honest.
+ *
+ * THE HEADER BAR
+ * A strip whose figures are scoped to a PERIOD has to say so, and it has to say
+ * so inside its own border. A period control floating above the strip, or
+ * parked in the page head next to the module title, reads as scoping the whole
+ * page — which it does not: the queues below are live work and are not, and must
+ * not be, filtered by a date window. Putting the control in the strip's own
+ * header binds it visually to exactly the numbers it governs.
  */
 export function KpiStrip({
   items,
   locale,
   columns,
   className,
+  title,
+  toolbar,
 }: {
   items: Kpi[];
+  /** Names what the strip measures. Rendered only alongside a header bar. */
+  title?: string;
+  /**
+   * Controls that scope THESE FIGURES and nothing else — a period selector.
+   * Anything that scopes the whole page belongs in `PageHead`.
+   */
+  toolbar?: ReactNode;
   /**
    * A `Kpi.value` may arrive as an already-formatted string (compact money, from
    * a caller that knows the shape it wants) or as a RAW NUMBER, which is the
@@ -190,24 +255,37 @@ export function KpiStrip({
   }[columns ?? (Math.min(Math.max(items.length, 2), 6) as 2 | 3 | 4 | 5 | 6)];
 
   return (
-    <div className={cn("overflow-hidden rounded-md border bg-surface shadow-card", className)}>
+    <div
+      data-testid="kpi-strip"
+      className={cn("overflow-hidden rounded-md border bg-surface shadow-card", className)}
+    >
+      {title || toolbar ? (
+        <div className="flex flex-wrap items-center justify-between gap-sm border-b bg-surface-2/30 px-md py-2.5">
+          {title ? <h2 className="min-w-0 truncate text-body-lg font-medium text-fg">{title}</h2> : <span />}
+          {toolbar ? <div className="shrink-0">{toolbar}</div> : null}
+        </div>
+      ) : null}
       <div className={cn("-mb-px -me-px grid grid-cols-2 tablet:grid-cols-3", desktop)}>
         {items.map((item) => {
           const body = (
             <>
               <div className="flex items-start justify-between gap-2">
                 <span className="min-w-0 truncate text-label text-fg-secondary">{item.label}</span>
+                {/* 2.25rem and `rounded-md`, up from a 2rem square: the tile is
+                    the cell's one piece of colour, and at 32px with a 17px glyph
+                    it read as an afterthought pinned to the corner rather than
+                    as the tile the reference draws. */}
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "grid h-8 w-8 shrink-0 place-items-center rounded-sm",
+                    "grid h-9 w-9 shrink-0 place-items-center rounded-md",
                     kpiChip[item.tone ?? "neutral"],
                   )}
                 >
-                  <item.Icon size={17} />
+                  <item.Icon size={18} />
                 </span>
               </div>
-              <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5">
+              <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
                 {/* NOT `truncate`, and this is a correctness rule rather than a
                     layout preference: truncating a number does not look
                     truncated, it looks like a SMALLER NUMBER. "EGP 289,600.00"
@@ -222,15 +300,44 @@ export function KpiStrip({
                   <span className="shrink-0 text-label text-fg-muted">{item.unit}</span>
                 ) : null}
               </div>
-              {item.foot ? (
+              {/* The delta REPLACES the foot line rather than stacking under
+                  it. Both answer "what does this number mean", and a cell
+                  carrying a measured movement AND a line of static context is a
+                  cell whose fourth row nobody reads — while the ragged heights
+                  it produces across a five-cell strip cost more than the line
+                  was worth. Where a delta exists it is the better answer. */}
+              {item.delta ? (
+                <p className="mt-2 flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-label">
+                  <span
+                    className={cn(
+                      "inline-flex shrink-0 items-center gap-0.5 font-medium tabular-nums",
+                      item.delta.better === true && "text-success",
+                      item.delta.better === false && "text-danger",
+                      item.delta.better === null && "text-fg-secondary",
+                    )}
+                  >
+                    {/* The arrow is the SIGN, drawn as a glyph so the direction
+                        survives greyscale and colour-vision deficiency — the
+                        colour beside it carries "good or bad", which is a
+                        different question and not one an arrow can answer. */}
+                    <span aria-hidden="true">{item.delta.pct >= 0 ? "↑" : "↓"}</span>
+                    {/* `formatPercent`, not a formatted number with a literal
+                        "%" after it: Arabic writes the sign as ٪ and puts it on
+                        the correct side of the digits, and hand-appending "%"
+                        is how "١٨%" — half Arabic, half Latin — gets shipped. */}
+                    {formatPercent(Math.abs(item.delta.pct), locale)}
+                  </span>
+                  <span className="min-w-0 text-fg-muted">{item.delta.label}</span>
+                </p>
+              ) : item.foot ? (
                 // Two lines, then clip. One line truncated at "Confirmed and
                 // in-progress o…" tells the reader nothing they did not already
                 // know from the label above it.
-                <p className="mt-1.5 line-clamp-2 text-label text-fg-muted">{item.foot}</p>
+                <p className="mt-2 line-clamp-2 text-label text-fg-muted">{item.foot}</p>
               ) : null}
             </>
           );
-          const shell = "flex min-w-0 flex-col border-b border-e px-md py-3.5";
+          const shell = "flex min-w-0 flex-col border-b border-e px-md py-4";
           return item.href ? (
             <Link
               key={item.label}
@@ -292,6 +399,30 @@ export function WorkPane({
 
 /* ------------------------------------------------------------------------- */
 
+/* The two halves of a toned panel header, kept as full static class strings
+   because Tailwind scans SOURCE TEXT: an interpolated `bg-${tone}/8` is a class
+   that exists in the markup and in no stylesheet, which fails silently and looks
+   exactly like a colour that "did not work". */
+const panelHeader: Record<KpiTone, string> = {
+  neutral: "bg-surface-2/40",
+  accent: "bg-accent-solid/10",
+  iris: "bg-iris-solid/10",
+  success: "bg-success/10",
+  warning: "bg-warning/10",
+  danger: "bg-danger/10",
+  info: "bg-info/10",
+};
+
+const panelGlyph: Record<KpiTone, string> = {
+  neutral: "text-fg-muted",
+  accent: "text-accent",
+  iris: "text-iris",
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-danger",
+  info: "text-info",
+};
+
 /**
  * A compact panel: header rule, title, optional trailing link, then content.
  * Tighter than `Card` on purpose — this is the unit the aside column and the
@@ -307,6 +438,8 @@ export function Panel({
   hint,
   fill,
   foot,
+  tone,
+  bodyClassName,
 }: {
   title: string;
   Icon?: ComponentType<{ size?: number }>;
@@ -316,6 +449,20 @@ export function Panel({
   children: ReactNode;
   className?: string;
   hint?: string;
+  /**
+   * Colours the header band and its glyph.
+   *
+   * Unset, the header keeps the neutral `surface-2` wash every module page
+   * already draws — this is not a restyling of the workspace. Set, it gives a
+   * dashboard row what the reference gives it: a thin band of the panel's own
+   * subject colour, so a page of eight panels reads as eight distinct
+   * instruments rather than eight identical beige cards. The wash is deliberately
+   * weak (6–8%) — it is a label, and a header that competes with its own content
+   * is a header that has stopped being one.
+   */
+  tone?: KpiTone;
+  /** Escape hatch for a body that manages its own padding (a flush list). */
+  bodyClassName?: string;
   /**
    * Stretch to the height of the tallest panel in the row.
    *
@@ -337,10 +484,15 @@ export function Panel({
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-sm border-b bg-surface-2/40 px-md py-2.5">
+      <div
+        className={cn(
+          "flex items-center justify-between gap-sm border-b px-md py-2.5",
+          tone ? panelHeader[tone] : "bg-surface-2/40",
+        )}
+      >
         <h2 className="flex min-w-0 items-center gap-2 text-body-lg font-medium text-fg">
           {Icon ? (
-            <span className="shrink-0 text-fg-muted" aria-hidden="true">
+            <span className={cn("shrink-0", tone ? panelGlyph[tone] : "text-fg-muted")} aria-hidden="true">
               <Icon size={17} />
             </span>
           ) : null}
@@ -349,7 +501,7 @@ export function Panel({
         </h2>
         {action ? <div className="shrink-0 text-label">{action}</div> : null}
       </div>
-      <div className={cn("px-md py-md", fill && "flex-1")}>
+      <div className={cn("px-md py-md", fill && "flex-1", bodyClassName)}>
         {hint ? <p className="mb-sm text-label text-fg-muted">{hint}</p> : null}
         {children}
       </div>
