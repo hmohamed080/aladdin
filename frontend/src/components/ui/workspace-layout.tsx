@@ -31,19 +31,6 @@ import { PlusIcon } from "@/components/ui/icons";
 
 /* ------------------------------------------------------------------------- */
 
-/* The icon tile's wash, one entry per tone. `/15` rather than the `/20` the KPI
-   tiles use: this tile is 44px against a 32px one, and the same alpha over a
-   third more area reads a step louder than the strip below it. */
-const headTile: Record<KpiTone, string> = {
-  neutral: "bg-surface-2 text-fg-secondary",
-  accent: "bg-accent-solid/15 text-accent",
-  iris: "bg-iris-solid/15 text-iris",
-  success: "bg-success/15 text-success",
-  warning: "bg-warning/15 text-warning",
-  danger: "bg-danger/15 text-danger",
-  info: "bg-info/15 text-info",
-};
-
 /**
  * The page head band.
  *
@@ -62,7 +49,6 @@ export function PageHead({
   locale,
   actions,
   toolbar,
-  tone = "accent",
 }: {
   title: string;
   subtitle?: string;
@@ -85,21 +71,6 @@ export function PageHead({
   actions?: ReactNode;
   /** Secondary controls that belong to the whole page (sort, export, help). */
   toolbar?: ReactNode;
-  /**
-   * Colours the icon tile. Defaults to `accent`, which is what every module
-   * page in the workspace has always drawn and keeps drawing.
-   *
-   * It is a prop rather than a constant because of what the tile IS on a
-   * DASHBOARD. On a module page the amber tile is the only tinted thing above
-   * the fold and reads as the module's badge. On the supply dashboard it sits
-   * at the top of a page whose every other tile, bar and ranking is iris, so
-   * the one amber square there stopped reading as a badge and started reading
-   * as a stray — the page's loudest colour, spent on a decoration, while amber
-   * is supposed to mean "press this" (the New product button, four inches to
-   * its left, means exactly that). A dashboard passes `iris`; nothing else has
-   * to change.
-   */
-  tone?: KpiTone;
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-md border-b pb-md">
@@ -107,10 +78,7 @@ export function PageHead({
         {Icon ? (
           <span
             aria-hidden="true"
-            className={cn(
-              "mt-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-md",
-              headTile[tone],
-            )}
+            className="mt-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-md bg-accent-solid/15 text-accent"
           >
             <Icon size={22} />
           </span>

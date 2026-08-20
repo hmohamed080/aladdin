@@ -268,11 +268,12 @@ export function AttentionQueue({
             <span
               className={cn(
                 "inline-flex shrink-0 items-center gap-1 self-start rounded-sm border px-2.5 py-1 text-label font-medium text-fg-secondary",
-                /* Iris on hover, not amber. The row's own CTA is not an amber
-                   button and must not warm up into one under the pointer: it is
-                   navigation into the record, and amber on this page is reserved
-                   for the single primary action in the page head. */
-                "transition-colors group-hover:border-iris-solid/50 group-hover:text-iris",
+                /* The product's emphasis colour on hover. The control is a
+                   bordered ghost at rest — it is navigation into the record, not
+                   a button — and only warms when the row is actually under the
+                   pointer, so a queue of six reads as six rows rather than six
+                   calls to action. */
+                "transition-colors group-hover:border-accent-solid/50 group-hover:text-accent",
                 "wide:min-w-36 wide:justify-center wide:self-auto",
               )}
             >
@@ -341,7 +342,7 @@ export function AttentionFilter({
       "inline-flex shrink-0 items-center gap-1.5 rounded-pill border px-2.5 py-1 text-label transition-colors",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
       isActive
-        ? "border-iris-solid/40 bg-iris-solid/15 font-medium text-iris"
+        ? "border-accent-solid/40 bg-accent-solid/15 font-medium text-accent"
         : empty
           ? "border-transparent bg-surface-2/60 text-fg-muted hover:bg-surface-hover"
           : "border-transparent bg-surface-2 text-fg-secondary hover:bg-surface-hover hover:text-fg",

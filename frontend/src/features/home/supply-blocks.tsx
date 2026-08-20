@@ -109,7 +109,7 @@ export function OpportunityList({
               {/* Neutral. Every card in this list carries the SAME word
                   ("awaiting your price") — it is the panel's subject restated
                   per row, not a state that varies between them, and a badge that
-                  never changes is a label. Painting all of them iris spent the
+                  never changes is a label. Painting all of them spent the
                   page's accent on the one thing in the block that carries no
                   information; the card's own CTA below is where the colour
                   belongs.
@@ -148,7 +148,7 @@ export function OpportunityList({
               ) : null}
             </div>
 
-            <span className="inline-flex items-center gap-1 text-label font-medium text-iris transition-colors group-hover:underline">
+            <span className="inline-flex items-center gap-1 text-label font-medium text-accent transition-colors group-hover:underline">
               {labels.cta}
               <span aria-hidden="true">
                 <Arrow size={13} />
@@ -261,11 +261,11 @@ export function MarketMovement({
                 </span>
               </span>
             </div>
-            {/* Lapis, not iris. This block measures the MARKET — what buyers
-                are asking the platform for — while the two rankings in row 4
-                measure THIS seller's own trade. Keeping the two on different
-                cool hues is the whole difference between "an accent" and "the
-                colour bars happen to be": iris now means "yours". */}
+            {/* Lapis. This block measures the MARKET — what buyers are asking
+                the platform for — while the two rankings in row 4 measure THIS
+                seller's own trade and carry the brand accent. Keeping the two
+                apart is the difference between a colour that means something and
+                the colour bars happen to be. */}
             <div className="mt-1 h-1.5 w-full overflow-hidden rounded-pill bg-surface-2">
               <div
                 className="h-full rounded-pill bg-info"
@@ -372,20 +372,20 @@ export function WorkflowFlow({
                 to make in one colour; the dot beside it still says which stage
                 this is.
 
-                The dots themselves are now down to three colours, set by the
-                caller: red where the stage is genuinely waiting on the reader,
-                green where it is genuinely a win, and iris for the stages in
-                between, which are just the pipeline working. See the `flow`
-                array in `supply-dashboard`. */}
+                The dots themselves are set by the caller and say only what is
+                true of each stage: red where it is genuinely waiting on the
+                reader, amber where a customer is sitting on a price, green where
+                it is genuinely a win, and blue for the live order stages. See
+                the `flow` array in `supply-dashboard`. */}
             <div className="mt-1 h-1.5 w-full overflow-hidden rounded-pill bg-surface-2">
               <div
-                /* Muted, not iris. Five accent bars stacked in one column made
-                   the pipeline the loudest analytic block on the page, and it is
+                /* Muted. Five accent bars stacked in one column made the
+                   pipeline the loudest analytic block on the page, and it is
                    the least: it restates counts the strip above already gives.
                    The DOT beside each row still carries the stage.
 
                    HALF-STRENGTH, because solid `fg-muted` overshot: a mid-grey
-                   bar at full opacity is DARKER than the iris and lapis bars in
+                   bar at full opacity is DARKER than the amber and lapis bars in
                    the rows around it, so demoting the block by draining its
                    colour had made it the heaviest thing on the screen. Quiet
                    means lower contrast, not merely less hue. */
