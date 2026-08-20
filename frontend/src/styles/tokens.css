@@ -120,11 +120,34 @@
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
   /* ---- Z-index scale (theme-independent) ---- */
-  /* Height of the authenticated top header, as a token because TWO things need
-     to agree on it: the header itself, and the sidebar that now starts BENEATH
-     it and sizes its sticky offset and its own height from it. A hard-coded
-     48px in both places is the same class of drift `lib/ui/nav-geometry` exists
-     to prevent, one axis over. */
+  /* Height of the authenticated top header, as a token because THREE things
+     need to agree on it: the header itself, the sidebar that starts BENEATH it
+     and sizes its sticky offset and its own height from it, and the Admin
+     layout's own rail. A hard-coded pixel value in any of them is the same class
+     of drift `lib/ui/nav-geometry` exists to prevent, one axis over.
+
+     68px from `tablet` up, 48 below it. The reason is the MARK, not the bar: the
+     approved Aladdin logo is an illustration — a genie, a lamp, a furnished
+     interior inside a circle — and at the 26px a 48px bar allowed it, every one
+     of those collapsed into a single gold smudge. It read as "something is
+     there" rather than as what it is.
+
+     The size is derived from the mark and not chosen for the bar: 48px of
+     artwork plus 10px of clearance above and below is 68. That clearance is the
+     floor, not a cushion — below about 8px the emblem starts to read as jammed
+     against the border, and above about 12px the 28px controls beside it begin
+     to float. Both failures are visible; the window between them is narrow.
+
+     It stops at 68 deliberately, and it does not apply on a phone at all. A
+     header is chrome: the one band on every page that is never the thing the
+     reader came for. It may take the space its contents genuinely need and not
+     one pixel more — and on a 393px screen it does not need it, because the
+     lockup there stays at its old size to leave room for seven controls beside
+     it (see `Brand`). Spending 68 of a phone's ~780 usable pixels on chrome to
+     draw a mark that did not grow would be the trade backwards.
+
+     The controls stay 28px at every width and simply gain air around them in the
+     taller bar — see `header-parts`. */
   --app-header-h: 3rem;
 
   --z-base: 0;
@@ -304,4 +327,20 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.32);
   --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-overlay: 0 8px 28px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- Header height, at tablet and above ----
+ * The one theme-independent token that has a BREAKPOINT, and it earns the
+ * exception: `--app-header-h` is consumed by three separate elements (the header
+ * itself, the sidebar's sticky offset and its height, and the Admin rail), so
+ * the alternative to changing it in one place is changing it in three and hoping
+ * they stay in step. See the token's own note for why the bar grows at all, and
+ * `Brand` for the mark that grows with it at this exact breakpoint — 768px, the
+ * `tablet` screen in tailwind.config.ts. The two must not drift apart: a 48px
+ * lockup in a 48px bar leaves no air at all, which reads as a mistake.
+ */
+@media (min-width: 768px) {
+  :root {
+    --app-header-h: 4.25rem;
+  }
 }

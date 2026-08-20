@@ -130,7 +130,9 @@ export function SidebarShell({
       className="sticky hidden shrink-0 tablet:block"
       // It starts BENEATH the top header now, so both its sticky offset and its
       // height come from the same `--app-header-h` the header sizes itself with;
-      // a literal 48px in either place is how the rail ends up 4px past the fold.
+      // a literal pixel value in either place is how the rail ends up past the
+      // fold the first time that header changes height — as it has twice now,
+      // 48 -> 60 -> 68 at tablet and up.
       // z above the header (200) so a hover reveal floats over it rather than
       // sliding underneath, which reads as a rendering bug.
       style={{

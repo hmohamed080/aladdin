@@ -48,11 +48,18 @@ import type { CommerceStance } from "@/lib/workspace/supply-side";
  * persona is looking at it, which is exactly why there is no reason to clone it.
  *
  * DENSITY
- * One 48px row (`--app-header-h`) with 28px controls, breadcrumb-style `/`
- * separators between the mark and the context it names — the direction set by
- * the supplied Supabase reference. Every colour, radius and focus ring is still
- * an Aladdin token; what was borrowed is the COMPACTNESS and the hierarchy, not
- * a palette.
+ * One row (`--app-header-h`: 68px from `tablet`, 48 below) with 28px controls,
+ * breadcrumb-style `/` separators between the mark and the context it names —
+ * the direction set by the supplied Supabase reference. Every colour, radius and
+ * focus ring is still an Aladdin token; what was borrowed is the COMPACTNESS and
+ * the hierarchy, not a palette.
+ *
+ * The row grew from 48 for the BRAND and for nothing else — see
+ * `--app-header-h`. Everything to the far side of it is unchanged and still
+ * 28px: search, the workspace and branch switchers, the three panel triggers,
+ * Help, the theme switch and the avatar all keep their boxes and simply centre
+ * in a taller band. That is the whole point of the split — one element needed
+ * room, so one element got it, and the header did not become a toolbar.
  *
  * WHAT IS PRESENT BUT NOT YET WIRED
  * Chat, Notifications and Feedback are SHELLS. The repository has no messaging
@@ -117,9 +124,18 @@ export async function AppHeader({
             no longer be a state in which Aladdin is unnamed. */}
         <Link
           href="/"
-          className="shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+          /* `flex`, and it is load-bearing rather than tidiness. An <a> is
+             inline, so the inline-flex lockup inside it sat in a LINE BOX whose
+             height carried the font's descender space — the anchor measured
+             ~46px around a 40px lockup, and centring the anchor in the row left
+             the mark three pixels high of true centre. Making the anchor a flex
+             container removes the line box, so the mark centres on the row and
+             not on a phantom text baseline. */
+          className="flex shrink-0 items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
         >
-          <Brand name={appName} size="sm" />
+          {/* `md`, the header lockup — see `Brand`. The pre-workspace screens
+              keep `sm`; this is the only surface that grew. */}
+          <Brand name={appName} size="md" />
         </Link>
 
         {context ? (

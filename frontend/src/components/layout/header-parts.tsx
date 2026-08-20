@@ -10,9 +10,17 @@ import { cn } from "@/lib/ui/cn";
  */
 
 /**
- * The header's icon-only control: 28px, so four of them fit inside a 48px bar
- * without crowding the avatar. Defined once so Help, the theme switch, Chat,
- * Notifications and anything a surface adds later cannot each pick their own box.
+ * The header's icon-only control: 28px, and it STAYS 28px now that the bar is 68
+ * rather than 48 on anything tablet-sized or wider.
+ *
+ * The reflex when a header grows is to scale everything in it, which is how a
+ * band of chrome turns into a toolbar. Nothing here got harder to hit or easier
+ * to read at 32 or 36px — a 16px glyph in a 28px box was already comfortable —
+ * so the extra twelve pixels are spent as AIR around these controls instead of
+ * on the controls themselves. The bar grew for the brand mark alone.
+ *
+ * Defined once so Help, the theme switch, Chat, Notifications and anything a
+ * surface adds later cannot each pick their own box.
  */
 export const headerIconClass = cn(
   "grid h-7 w-7 shrink-0 place-items-center rounded-sm text-fg-muted transition-colors",
