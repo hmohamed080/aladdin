@@ -268,7 +268,11 @@ export function AttentionQueue({
             <span
               className={cn(
                 "inline-flex shrink-0 items-center gap-1 self-start rounded-sm border px-2.5 py-1 text-label font-medium text-fg-secondary",
-                "transition-colors group-hover:border-accent-solid/50 group-hover:text-accent",
+                /* Iris on hover, not amber. The row's own CTA is not an amber
+                   button and must not warm up into one under the pointer: it is
+                   navigation into the record, and amber on this page is reserved
+                   for the single primary action in the page head. */
+                "transition-colors group-hover:border-iris-solid/50 group-hover:text-iris",
                 "wide:min-w-36 wide:justify-center wide:self-auto",
               )}
             >

@@ -106,7 +106,21 @@ export function OpportunityList({
                 <p className="line-clamp-2 font-medium text-fg">{line.productName}</p>
                 <p className="line-clamp-2 text-label text-fg-muted">{line.title}</p>
               </div>
-              <span className="shrink-0 rounded-pill bg-iris-solid/15 px-2 py-0.5 text-label font-medium text-iris">
+              {/* Neutral. Every card in this list carries the SAME word
+                  ("awaiting your price") — it is the panel's subject restated
+                  per row, not a state that varies between them, and a badge that
+                  never changes is a label. Painting all of them iris spent the
+                  page's accent on the one thing in the block that carries no
+                  information; the card's own CTA below is where the colour
+                  belongs.
+
+                  The wash is `fg-muted/15` rather than `surface-2`, because the
+                  CARD is already `surface-2/30`: on the dark ground the two
+                  resolved to almost the same value and the pill vanished,
+                  leaving grey text floating where a badge should be. A tint of
+                  the FOREGROUND is independent of whatever surface it lands on,
+                  so the shape survives in both themes. */}
+              <span className="shrink-0 rounded-pill bg-fg-muted/15 px-2 py-0.5 text-label font-medium text-fg-secondary">
                 {labels.status}
               </span>
             </div>
@@ -247,9 +261,14 @@ export function MarketMovement({
                 </span>
               </span>
             </div>
+            {/* Lapis, not iris. This block measures the MARKET — what buyers
+                are asking the platform for — while the two rankings in row 4
+                measure THIS seller's own trade. Keeping the two on different
+                cool hues is the whole difference between "an accent" and "the
+                colour bars happen to be": iris now means "yours". */}
             <div className="mt-1 h-1.5 w-full overflow-hidden rounded-pill bg-surface-2">
               <div
-                className="h-full rounded-pill bg-iris-solid"
+                className="h-full rounded-pill bg-info"
                 style={{ width: `${Math.max((row.requests / max) * 100, 6)}%` }}
               />
             </div>
@@ -348,14 +367,29 @@ export function WorkflowFlow({
             </div>
             {/* The BAR is one colour for every stage; only the DOT carries the
                 stage's tone. Painting both meant five hues stacked in a 380px
-                column — red, ochre, green, blue, violet — which read as a
-                rainbow rather than as a pipeline, and the ochre bar in
-                particular went muddy against the light ground. The bar's job is
-                to compare five lengths, and a comparison is easier to make in
-                one colour; the dot beside it still says which stage this is. */}
+                column, which read as a rainbow rather than as a pipeline. The
+                bar's job is to compare five lengths, and a comparison is easier
+                to make in one colour; the dot beside it still says which stage
+                this is.
+
+                The dots themselves are now down to three colours, set by the
+                caller: red where the stage is genuinely waiting on the reader,
+                green where it is genuinely a win, and iris for the stages in
+                between, which are just the pipeline working. See the `flow`
+                array in `supply-dashboard`. */}
             <div className="mt-1 h-1.5 w-full overflow-hidden rounded-pill bg-surface-2">
               <div
-                className="h-full rounded-pill bg-iris-solid"
+                /* Muted, not iris. Five accent bars stacked in one column made
+                   the pipeline the loudest analytic block on the page, and it is
+                   the least: it restates counts the strip above already gives.
+                   The DOT beside each row still carries the stage.
+
+                   HALF-STRENGTH, because solid `fg-muted` overshot: a mid-grey
+                   bar at full opacity is DARKER than the iris and lapis bars in
+                   the rows around it, so demoting the block by draining its
+                   colour had made it the heaviest thing on the screen. Quiet
+                   means lower contrast, not merely less hue. */
+                className="h-full rounded-pill bg-fg-muted/50"
                 style={{ width: `${Math.max((stage.value / max) * 100, 4)}%` }}
               />
             </div>

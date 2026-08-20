@@ -60,7 +60,9 @@ export function PeriodSelect({
         "focus-within:ring-2 focus-within:ring-focus focus-within:ring-offset-1 focus-within:ring-offset-surface",
       )}
     >
-      <span aria-hidden="true" className="shrink-0 text-iris">
+      {/* Muted. A glyph inside a form control is chrome — it says "this is a
+          date control", which the label beside it already says. */}
+      <span aria-hidden="true" className="shrink-0 text-fg-muted">
         <CalendarIcon size={15} />
       </span>
       <select

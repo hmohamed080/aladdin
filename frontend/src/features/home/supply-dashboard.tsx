@@ -246,7 +246,11 @@ export async function SupplyDashboard({
       label: m.supply.tile.quotationsOut,
       value: p ? p.current.quotations : sumOf(supply.quotations),
       Icon: FileTextIcon,
-      tone: "iris",
+      /* Neutral. Two iris tiles side by side made iris the strip's DEFAULT
+         rather than its accent, and of the pair "demand in" is the one a seller
+         opens the app for — prices going out is the consequence of it, not a
+         second headline. */
+      tone: "neutral",
       delta: movement(p?.current.quotations ?? 0, p?.previous.quotations ?? 0),
       foot: m.supply.tile.quotationsOutHint,
       href: "/b2b/quotations",
@@ -266,7 +270,14 @@ export async function SupplyDashboard({
       // two-column phone grid; the exact figure lives on Reports, one click away.
       value: formatCompactMoney(p ? p.current.orderValue : supply.orderValue, locale),
       Icon: MoneyIcon,
-      tone: "success",
+      /* `info`, not `success`. Money won is a MEASUREMENT, not a state, and the
+         cell already answers "is this good?" honestly one line below: the delta
+         is what carries success green or danger red, by comparison against the
+         previous window. Painting the tile green as well said "good" about the
+         figure itself, which no total can be — a green tile over a 40% drop is
+         the dashboard contradicting itself. Lapis keeps it in the cool family
+         with the orders tile it belongs beside. */
+      tone: "info",
       delta: movement(p?.current.orderValue ?? 0, p?.previous.orderValue ?? 0),
       foot: m.supply.tile.orderValueHint,
       href: "/b2b/reports",
@@ -301,7 +312,12 @@ export async function SupplyDashboard({
         label: m.supply.products.stat.draft,
         value: products.draft,
         Icon: FileTextIcon,
-        tone: products.draft > 0 ? "warning" : "neutral",
+        /* `info`, not `warning`. An unpublished draft is work in hand, not a
+           fault, and ochre here was the last decorative warm note in the file.
+           Blue rather than iris because this strip already leads with an iris
+           tile — the total — and a second one would make the accent the default
+           again, three cells later. */
+        tone: products.draft > 0 ? "info" : "neutral",
         foot: m.supply.tile.draftsHint,
         href: "/b2b/products?status=draft",
       },
@@ -309,9 +325,16 @@ export async function SupplyDashboard({
   }
 
   /* The status→tone map, declared above the queue because the queue reads from
-     it: one status must not be amber in the flow panel and blue in the row three
-     inches to its left. */
-  const orderTone = { confirmed: "info", in_progress: "warning", completed: "success" } as const;
+     it: one status must not be one colour in the flow panel and another in the
+     row three inches to its left.
+
+     `in_progress` is IRIS, not warning. An order being worked on is the system
+     doing exactly what it should; ochre said "something is wrong here" about the
+     healthiest row in the queue, and it said it in the same colour as the
+     quotation two rows above that genuinely is going stale. Warm colour on this
+     dashboard now means one of two things — act, or this is wrong — and an order
+     in progress is neither. */
+  const orderTone = { confirmed: "info", in_progress: "iris", completed: "success" } as const;
 
   const at = m.supply.attention;
 
@@ -457,7 +480,14 @@ export async function SupplyDashboard({
           key: "quoted",
           label: m.supply.flow.quoted,
           value: supply.quotations.submitted ?? 0,
-          tone: "warning",
+          /* Iris. The dots down this column are STAGE MARKERS, not verdicts, and
+             ochre here made the five of them read red-ochre-green-blue-violet —
+             a rainbow, and one that implied a price sitting with the customer is
+             a problem. It is not: it is the pipeline working. Red stays on
+             `incoming` because an unpriced request genuinely is waiting on the
+             reader, and green stays on `accepted` because that genuinely is a
+             win; everything between them is just progress. */
+          tone: "iris",
           href: "/b2b/quotations",
         },
         {
@@ -491,6 +521,10 @@ export async function SupplyDashboard({
       <PageHead
         locale={locale}
         Icon={GaugeIcon}
+        /* Iris, unlike every module page. See `PageHead`'s `tone`: on a page
+           built out of iris the default amber tile was the loudest thing above
+           the fold, and it was decoration. */
+        tone="iris"
         eyebrow={`${m.home.greeting} · ${org.organizationName}`}
         title={m.supply.title}
         /* The one line on the page that differs between a Distributor, a
@@ -501,7 +535,18 @@ export async function SupplyDashboard({
           managesCatalog ? (
             <Link
               href="/b2b/products/new"
-              className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-sm bg-accent-solid px-md py-1.5 text-label font-medium text-brand-basalt shadow-sm transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              /* `brand-iris`, not `iris-solid`, and the distinction is a
+                 contrast one rather than a taste one. `--iris-solid` lifts to
+                 #7a68ec on the dark ground, which carries white type at only
+                 4.18:1 — under AA for a 13px label. The brand primitive #5b4ad9
+                 does not move between themes and clears 6.1:1 against plaster in
+                 both, which is exactly how the amber button it replaces worked:
+                 `--accent-solid` is the same Lumen in light and dark, with one
+                 fixed label colour over it.
+
+                 This is the page's ONE primary action, and it is now the one
+                 place iris appears as a filled block. */
+              className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-sm bg-brand-iris px-md py-1.5 text-label font-medium text-brand-plaster shadow-sm transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
               <PlusIcon size={16} />
               {m.commerce.products.new}
@@ -552,7 +597,7 @@ export async function SupplyDashboard({
                   <AttentionCount
                     count={attention.length}
                     locale={locale}
-                    tone={attention[0]?.tone ?? "accent"}
+                    tone={attention[0]?.tone ?? "iris"}
                   />
                 ) : null
               }
@@ -649,11 +694,21 @@ export async function SupplyDashboard({
             </Panel>
           </Row>
 
-          {/* ROW 3 — what is moving, what happened, and where the work sits. */}
+          {/* ROW 3 — what is moving, what happened, and where the work sits.
+
+              NEUTRAL HEADERS FROM HERE DOWN, and this is where the page stops
+              spending colour. `Panel` offers a tinted header band, and taking it
+              up on every panel is how a dashboard ends up with eight coloured
+              cards and no ranking between them — the wash stops being a label
+              and becomes the card's background. Row 2 is where the reader WORKS,
+              so its two panels keep a wash: red for what is late, iris for where
+              the new business is. Rows 3 and 4 are reference — they are read, not
+              acted on — and they carry their subject in the title and their
+              accent in the chart, which is enough. */}
           <Row cols="thirds">
             <Panel
               fill
-              tone="iris"
+              tone="neutral"
               bodyClassName="flex flex-col"
               title={m.supply.market.title}
               Icon={BarChartIcon}
@@ -676,7 +731,7 @@ export async function SupplyDashboard({
 
             <Panel
               fill
-              tone="info"
+              tone="neutral"
               bodyClassName="flex flex-col"
               title={m.supply.notifications.title}
               Icon={BellIcon}
@@ -696,7 +751,7 @@ export async function SupplyDashboard({
               hint={m.supply.pipeline.hint}
               foot={
                 managesCatalog ? (
-                  <Link href="/b2b/products" className="hover:text-accent hover:underline">
+                  <Link href="/b2b/products" className="hover:text-iris hover:underline">
                     {m.supply.pipeline.catalogue} · {m.supply.products.stat.published}{" "}
                     <span className="font-medium tabular-nums text-fg">
                       {formatCount(products.published, locale)}
@@ -738,7 +793,7 @@ export async function SupplyDashboard({
 
             <Panel
               fill
-              tone="iris"
+              tone="neutral"
               title={m.supply.chart.topProducts}
               Icon={PackageIcon}
               hint={m.supply.voice[voice].topProductsHint}
@@ -758,7 +813,7 @@ export async function SupplyDashboard({
 
             <Panel
               fill
-              tone="iris"
+              tone="neutral"
               title={m.supply.chart.topCustomers}
               Icon={StorefrontIcon}
               action={seeAll("/b2b/buyers", m.common.more)}
