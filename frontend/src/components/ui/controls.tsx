@@ -149,22 +149,63 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   },
 );
 
-export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
-  function Select({ className, children, ...rest }, ref) {
-    return (
-      <div className="relative">
-        <select ref={ref} className={cn(fieldBase, "min-h-11 appearance-none pe-9", className)} {...rest}>
-          {children}
-        </select>
-        <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-fg-muted" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </span>
-      </div>
-    );
-  },
-);
+/**
+ * A select is a FORM FIELD by default and a piece of CHROME when it sits in a
+ * header or a toolbar, and those two want different proportions. The compact
+ * size existed already — as four geometry utilities hand-patched onto the branch
+ * switcher at the call site, which is how the next compact select would have
+ * ended up a different height from the first one.
+ *
+ * `field` matches Input and Textarea exactly, so a select in a form still lines
+ * up with the text inputs beside it.
+ */
+const selectSize = {
+  field: "min-h-11 pe-9",
+  compact: "h-7 min-h-0 py-0 px-2.5 pe-8 text-label",
+} as const;
+
+type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "size"> & {
+  /**
+   * `size` shadows the native attribute, which is why that one is omitted above.
+   * On a select, native `size` means "show N rows as a list box" — it turns the
+   * control into something that is no longer a dropdown at all, so nothing here
+   * can want it, and `size` is the name every other control in this file uses
+   * for its proportions.
+   */
+  size?: keyof typeof selectSize;
+};
+
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
+  { className, children, size = "field", ...rest },
+  ref,
+) {
+  const compact = size === "compact";
+  return (
+    <div className="relative">
+      <select
+        ref={ref}
+        className={cn(fieldBase, "appearance-none", selectSize[size], className)}
+        {...rest}
+      >
+        {children}
+      </select>
+      {/* The chevron tracks the field's own inset so it never floats at a
+          different distance from the edge than the text does. `end-*` and not
+          `right-*`: in Arabic the glyph belongs on the left. */}
+      <span
+        className={cn(
+          "pointer-events-none absolute inset-y-0 flex items-center text-fg-muted",
+          compact ? "end-2" : "end-3",
+        )}
+        aria-hidden="true"
+      >
+        <svg width={compact ? 14 : 16} height={compact ? 14 : 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </span>
+    </div>
+  );
+});
 
 /** Accessible labelled field wrapper with optional error/hint text. */
 export function LabeledField({

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
+import { menuItemClass, menuSectionLabelClass, menuSurfaceClass } from "@/components/ui/menu";
 import { signOut } from "@/server/actions/auth";
 import { setLocale, setTheme } from "@/server/actions/preferences";
 import { LOCALES, type Locale } from "@/lib/i18n/locales";
@@ -170,11 +171,10 @@ export function ProfileMenu({
           // `end-0` and not `right-0`: the panel hangs from the trailing edge of
           // the trigger, which is the left edge in Arabic. A physical property
           // here would push the menu off-screen in RTL.
-          className="absolute end-0 top-full mt-2 w-72 overflow-hidden rounded-md border border-strong bg-surface shadow-lg"
-          style={{ zIndex: 600 }}
+          className={cn(menuSurfaceClass, "absolute end-0 top-full mt-2 w-72 z-popover")}
         >
-          <div className="border-b px-md py-3">
-            <p className="text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-muted">
+          <div className="border-b px-3 py-3">
+            <p className={menuSectionLabelClass}>
               {t("account.signedInAs")}
             </p>
             {displayName ? (
@@ -210,8 +210,8 @@ export function ProfileMenu({
             </div>
           ) : null}
 
-          <div className="border-b px-md py-2.5">
-            <p className="mb-1.5 flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-muted">
+          <div className="border-b px-3 py-2.5">
+            <p className={cn(menuSectionLabelClass, "mb-1.5 flex items-center gap-1.5")}>
               <GlobeIcon size={13} />
               {t("account.language")}
             </p>
@@ -229,8 +229,8 @@ export function ProfileMenu({
             </SegmentedGroup>
           </div>
 
-          <div className="border-b px-md py-2.5">
-            <p className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-muted">
+          <div className="border-b px-3 py-2.5">
+            <p className={cn(menuSectionLabelClass, "mb-1.5")}>
               {t("account.appearance")}
             </p>
             <SegmentedGroup label={t("account.appearance")}>
@@ -256,7 +256,12 @@ export function ProfileMenu({
               type="submit"
               role="menuitem"
               data-testid="profile-sign-out"
-              className="flex w-full items-center gap-2.5 px-md py-2 text-start text-body font-medium text-danger transition-colors hover:bg-danger/10 focus-visible:outline-none focus-visible:bg-danger/10"
+              className={cn(
+                menuItemClass(false),
+                // The one row that is not neutral. It keeps the shared geometry
+                // and overrides only what makes it a destructive action.
+                "font-medium text-danger hover:bg-danger/10 focus-visible:bg-danger/10",
+              )}
             >
               <LogOutIcon size={17} />
               {t("account.signOut")}
@@ -284,10 +289,10 @@ function MenuLink({
       href={href}
       role="menuitem"
       onClick={onNavigate}
-      className="flex items-center gap-2.5 px-md py-2 text-body text-fg transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:bg-surface-hover"
+      className={menuItemClass(false)}
     >
       <span className="shrink-0 text-fg-muted">
-        <Icon size={17} />
+        <Icon size={16} />
       </span>
       {children}
     </Link>

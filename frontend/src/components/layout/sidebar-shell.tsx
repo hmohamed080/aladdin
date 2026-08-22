@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
+import { menuItemClass, menuSurfaceClass } from "@/components/ui/menu";
 import {
   SIDEBAR_MODE_COOKIE,
   SIDEBAR_MODES,
@@ -262,8 +263,7 @@ export function SidebarShell({
               data-testid="sidebar-menu"
               // Opens upward and inward. At 3.5rem it overflows the rail on
               // purpose — the panel has no `overflow-hidden` for exactly this.
-              className="absolute bottom-full start-0 mb-1 w-56 overflow-hidden rounded-md border border-strong bg-surface shadow-lg"
-              style={{ zIndex: 600 }}
+              className={cn(menuSurfaceClass, "absolute bottom-full start-0 mb-1 w-56 z-popover")}
             >
               <ul className="flex flex-col py-0.5">
                 {SIDEBAR_MODES.map((value) => {
@@ -276,19 +276,7 @@ export function SidebarShell({
                         onClick={() => choose(value)}
                         aria-current={selected ? "true" : undefined}
                         data-testid={`sidebar-mode-${value}`}
-                        className={cn(
-                          "flex w-full items-center gap-2.5 px-3 py-2 text-start text-body text-fg transition-colors focus-visible:outline-none",
-                          // Selection and hover are two DIFFERENT statements, so
-                          // they cannot share one ground. Pointing at the chosen
-                          // mode must not repaint it as merely hovered — it stays
-                          // accent and only deepens. Written as a branch rather
-                          // than as `hover:` + a conditional base, because a hover
-                          // variant always outranks a base utility in the emitted
-                          // sheet and would have washed the selection out.
-                          selected
-                            ? "bg-accent-solid/10 hover:bg-accent-solid/20 focus-visible:bg-accent-solid/20"
-                            : "hover:bg-surface-hover focus-visible:bg-surface-hover",
-                        )}
+                        className={menuItemClass(selected)}
                       >
                         <span className="truncate">{t(sidebarModeLabelKey(value))}</span>
                         {selected ? <CheckIcon size={16} className="ms-auto shrink-0 text-accent" /> : null}

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/ui/cn";
+import { menuSurfaceClass } from "@/components/ui/menu";
 
 /**
  * Geometry shared by everything that sits in the top header.
@@ -28,10 +29,15 @@ export const headerIconClass = cn(
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
 );
 
-/** A header panel: same width, ground, border and elevation for every one. */
-export const headerPanelClass = cn(
-  "absolute end-0 top-full mt-1 w-80 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-md border border-strong bg-surface shadow-lg",
-);
+/**
+ * A header panel: same width, ground, border and elevation for every one.
+ *
+ * The surface comes from `menuSurfaceClass` — this file is where the viewport
+ * cap was originally written, and the menus that lacked it now share it from
+ * one place. The z-layer deliberately stays with the caller: a header panel is
+ * a `dialog` that must sit UNDER a modal, not a menu that sits over one.
+ */
+export const headerPanelClass = cn(menuSurfaceClass, "absolute end-0 top-full mt-1 w-80");
 
 /**
  * The breadcrumb slash between the mark and the context it introduces, and

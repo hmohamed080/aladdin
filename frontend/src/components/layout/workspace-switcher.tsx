@@ -6,6 +6,7 @@ import { selectWorkspace } from "@/server/actions/context";
 import { PERSONAL_CONTEXT, type WorkspaceEntry } from "@/lib/workspace/model";
 import { BuildingIcon, ChevronDownIcon, PlusIcon, UserIcon, CheckIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/ui/cn";
+import { menuItemClass, menuSectionLabelClass, menuSurfaceClass } from "@/components/ui/menu";
 
 /**
  * The WORKSPACE switcher — it changes WHERE the user is working, never WHO they
@@ -130,10 +131,13 @@ export function WorkspaceSwitcher({
         <div
           role="menu"
           data-testid="workspace-menu"
-          className="absolute top-full mt-1 start-0 z-50 w-64 overflow-hidden rounded-md border border-strong bg-surface shadow-lg"
-          style={{ zIndex: 300 }}
+          // `z-popover`, not the drawer layer this used to sit on. It carried
+          // BOTH a dead `z-50` class and an inline `zIndex: 300`; the inline
+          // value won, which put this menu on the same layer as the sidebar
+          // hover-reveal and one layer BELOW its own sibling in the header.
+          className={cn(menuSurfaceClass, "absolute top-full mt-1 start-0 z-popover w-64")}
         >
-          <p className="px-3 pt-2.5 pb-1 text-label font-semibold uppercase tracking-wide text-fg-muted">
+          <p className={cn(menuSectionLabelClass, "px-3 pt-2.5 pb-1")}>
             {t("workspace.title")}
           </p>
           <ul className="flex flex-col py-0.5">
@@ -147,14 +151,7 @@ export function WorkspaceSwitcher({
                     role="menuitem"
                     onClick={() => choose(value)}
                     aria-current={selected ? "true" : undefined}
-                    className={cn(
-                      "flex w-full items-center gap-2.5 px-3 py-2 text-start transition-colors focus-visible:outline-none",
-                      // Same rule as the sidebar mode menu: the active workspace
-                      // keeps its accent under the pointer and only deepens.
-                      selected
-                        ? "bg-accent-solid/10 hover:bg-accent-solid/20 focus-visible:bg-accent-solid/20"
-                        : "hover:bg-surface-hover focus-visible:bg-surface-hover",
-                    )}
+                    className={menuItemClass(selected)}
                   >
                     {entry.kind === "personal" ? (
                       <UserIcon size={16} className="shrink-0 text-fg-muted" />

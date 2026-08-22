@@ -51,7 +51,8 @@ export function BranchSwitcher({
         aria-label={t("nav.branch")}
         defaultValue={activeId ?? "all"}
         disabled={pending}
-        className="h-7 min-h-0 min-w-32 max-w-44 py-0 text-label"
+        size="compact"
+        className="min-w-32 max-w-44"
         onChange={(e) => start(() => selectBranch(e.target.value))}
       >
         <option value="all">{orgWide ? t("nav.allBranches") : t("nav.allAssignedBranches")}</option>
