@@ -53,6 +53,52 @@
   --limestone: #f4f1ea;
   --plaster: #fbf9f4;
   --sand: #eae5db;
+
+  /* ---- Quartz ramp — the LIGHT-THEME ground ----
+   * The exact argument the Carbon ramp makes below, one theme over, and it was
+   * always going to need making twice.
+   *
+   * Limestone, Plaster and Sand are BRAND colours: warm stone, right for the
+   * Aperture mark, the auth brand panel and the primary button's label. They
+   * were also doing duty as the workspace ground, and a dense operational
+   * surface is where that stops working. DESIGN.md is unambiguous about the
+   * intent — "deliberately low-chroma, never cream-yellow" — but intent is not
+   * what a screen renders. Measured as the spread between a colour's highest
+   * and lowest channel, the ramp ran 10 at the canvas, 15 at the secondary
+   * fill, 18 at the hairline and 25 at the strong hairline. On a page with a
+   * handful of borders that is a warm cast you would have to look for. On the
+   * supply dashboard — a KPI strip drawn entirely in hairlines, eight framed
+   * panels, bordered rows inside each — it accumulates into a page that reads
+   * cream.
+   *
+   * Quartz is the same stone with the chroma taken out of it: still warmer than
+   * neutral, never yellow. Spread runs 4 / 2 / 6 / 5 / 6 / 7.
+   *
+   * THE HAIRLINES ARE LUMINANCE-MATCHED, which is the part worth keeping. The
+   * obvious way to de-yellow a border is to lighten it, and that quietly costs
+   * you the border: #ded8cc and #dbd8d5 differ by 0.0003 in relative luminance,
+   * so the frame carries exactly the weight it did before while losing two
+   * thirds of its chroma. Against the cleaner ground it actually reads slightly
+   * stronger than it used to (1.26 -> 1.28 on canvas, 1.35 -> 1.39 on surface).
+   * De-yellowing is not the same operation as lightening.
+   *
+   * Every light text pair improves and none regresses:
+   *   fg         on canvas  15.64 -> 15.90
+   *   secondary  on canvas   5.61 ->  5.70
+   *   muted      on canvas   4.76 ->  4.84
+   *   muted      on surface  5.10 ->  5.24
+   *   muted      on surface-2 4.27 -> 4.47   — still short of 4.5, so the
+   *                                            Muted-On-Sand Rule STAYS.
+   *
+   * The three brand primitives above do not move. Nothing about the brand
+   * changes here — only the ground the workspace is drawn on.
+   */
+  --quartz: #f4f3f0;
+  --quartz-raised: #fdfcfb;
+  --quartz-sunk: #eceae6;
+  --quartz-hover: #f3f1ee;
+  --quartz-line: #dbd8d5;
+  --quartz-line-strong: #c2bfbb;
   --ink: #17191a;
   --lumen: #f3ab3e;
   --lumen-deep: #c77f1c;
@@ -162,23 +208,25 @@
   --z-tooltip: 800;
 
   /* ---- Semantics · LIGHT theme (default) ---- */
-  --canvas: var(--limestone);
-  --surface: var(--plaster);
-  --surface-2: var(--sand);
+  /* Quartz, not Limestone — see the ramp. The brand primitives stay brand
+     primitives; the workspace stands on its own ground. */
+  --canvas: var(--quartz);
+  --surface: var(--quartz-raised);
+  --surface-2: var(--quartz-sunk);
   /* The POINTER-OVER ground: one step short of `surface-2`, so a hovered row
      reads as "armed" and the current row (`surface-2`) still reads as stronger.
      It is a token rather than `surface-2/60` because these semantics are
      `var()` colours with no `<alpha-value>` channel, and Tailwind silently emits
      NOTHING for an opacity modifier on those — `hover:bg-surface-2/60` compiled
      to no rule at all, which is why the expanded sidebar rows had no hover. */
-  --surface-hover: #f1ede5;
+  --surface-hover: var(--quartz-hover);
 
   --fg: var(--ink);
   --fg-secondary: var(--stone);
   --fg-muted: var(--stone-muted);
 
-  --border: var(--line-light);
-  --border-strong: var(--line-light-strong);
+  --border: var(--quartz-line);
+  --border-strong: var(--quartz-line-strong);
 
   --primary: var(--ink);
   --primary-foreground: var(--limestone);
@@ -230,20 +278,30 @@
    * legible on canvas, surface and surface-2 alike. Never the accent — a
    * scrollbar is chrome, not a signal.
    */
-  --scrollbar-thumb: #bab2a2;
-  --scrollbar-thumb-hover: #9a917f;
-  --chart-grid: var(--line-light);
+  /* Luminance-matched to the tan thumbs these replace (delta < 0.001), so the
+     scrollbar is exactly as findable as it was and simply stops being tan.
+     These carried the highest chroma in the entire light theme — spread 24 and
+     27 — on a control that is pure chrome. */
+  --scrollbar-thumb: #b6b2ae;
+  --scrollbar-thumb-hover: #97938e;
+  --chart-grid: var(--quartz-line);
 
   /* ---- Elevation (LIGHT) ----
    * Shadows are THEME-AWARE, which they were not before: `shadow-card` was one
    * fixed warm near-black at 4%, tuned against Limestone, and on a dark ground
    * it did nothing at all. Three steps, consumed as `shadow-sm` / `shadow-card`
    * / `shadow-lg`, so a component asks for a LEVEL and the theme decides how
-   * that level is drawn. These light values are the previous ones unchanged.
+   * that level is drawn.
+   *
+   * The tint is neutral now rather than rgba(20,16,10) — a warm near-black
+   * tuned against Limestone. At 4-6% a shadow's hue is nearly invisible on its
+   * own, but there is one under every card on the page and they were all
+   * casting warm onto the ground the rest of this change just cooled. Opacities
+   * and geometry are untouched; only the hue moved.
    */
-  --shadow-raised: 0 1px 2px rgba(20, 16, 10, 0.06);
-  --shadow-card: 0 1px 2px rgba(20, 16, 10, 0.04), 0 8px 24px rgba(20, 16, 10, 0.05);
-  --shadow-overlay: 0 10px 30px rgba(20, 16, 10, 0.1), 0 2px 8px rgba(20, 16, 10, 0.06);
+  --shadow-raised: 0 1px 2px rgba(16, 16, 18, 0.06);
+  --shadow-card: 0 1px 2px rgba(16, 16, 18, 0.04), 0 8px 24px rgba(16, 16, 18, 0.05);
+  --shadow-overlay: 0 10px 30px rgba(16, 16, 18, 0.1), 0 2px 8px rgba(16, 16, 18, 0.06);
 }
 
 .dark {

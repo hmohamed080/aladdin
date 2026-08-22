@@ -224,12 +224,11 @@ Architectural stone grounds, one warm point of light, a crafted metal, and a qui
 ### Neutral
 - **Basalt** (#0E1113): The dark canvas and Admin default; deep, warm-neutral graphite-black stone.
 - **Basalt 2** (#1B2226) / **Basalt 3** (#232B30): Raised surfaces, cards, and sidebars on dark.
-- **Limestone** (#F4F1EA): The light canvas — warm off-white plaster/limestone, deliberately low-chroma, never cream-yellow.
-- **Plaster** (#FBF9F4): Raised cards and surfaces on the light theme.
-- **Sand** (#EAE5DB): Secondary fills, tags, and chips on light.
+- **Quartz** (#F4F3F0): The light canvas — warm off-white stone, deliberately low-chroma. **Quartz Raised** (#FDFCFB): raised cards and surfaces on light. **Quartz Sunk** (#ECEAE6): secondary fills, tags, and chips on light.
+- **Limestone** (#F4F1EA) / **Plaster** (#FBF9F4) / **Sand** (#EAE5DB): brand stone, retained for the Aperture mark, the auth Brand Panel and the primary button's label — **not** the workspace ground. They previously served as both. The rule said "never cream-yellow"; measured as the spread between a colour's highest and lowest channel they ran 10 / 7 / 15, and on a border-dense operational surface that accumulated into exactly the cast the rule forbids. Quartz is the same stone with the chroma removed (spread 4 / 2 / 6) and is what the workspace stands on.
 - **Stone** (#5C6066): Secondary text on light. **Stone Muted** (#676B70): the quietest light-theme text tone that still clears AA. **Graphite** (#39444B): strong borders on dark.
 - On-dark text ramp: **On Dark** (#F2EFE9), **On Dark Secondary** (#B8BEC2), **On Dark Muted** (#828A90).
-- Hairlines: **Line Dark** (#262E33) on Basalt, **Line Light** (#DED8CC) and **Line Light Strong** (#C7BEAE) on Limestone.
+- Hairlines: **Line Dark** (#262E33) on Basalt, **Quartz Line** (#DBD8D5) and **Quartz Line Strong** (#C2BFBB) on Quartz. The light hairlines are **luminance-matched** to the Line Light (#DED8CC) / Line Light Strong (#C7BEAE) they replace — within 0.0003 — so they carry the same weight while dropping two-thirds of their chroma. De-yellowing a border is not the same operation as lightening one; lightening costs you the border.
 
 ### Status
 - **Verdigris** (#2F7D5B) success · **Ochre** (#B26B12) warning · **Oxide** (#B23A22) danger · **Lapis** (#2F6088) info. Architectural, patina-derived hues — never default web red/green/yellow. Normal-size status text uses the accessible semantic tones **Verdigris Deep** (#205A42) and **Ochre Deep** (#6E4810) on light, and the bright status tones (#58C08E / #E0A54A / #E27159) on dark.
@@ -243,11 +242,13 @@ Architectural stone grounds, one warm point of light, a crafted metal, and a qui
 
 **The Reinforced-Signal Rule.** Color never carries meaning alone; pair it with an icon, label, or shape. Required for accessibility and for AR/EN parity.
 
-**The Muted-On-Sand Rule.** `fg-muted` clears AA on the canvas/surface (4.76:1 on Limestone) but **not on the Sand fill** (4.27:1). On Sand (chips, tags, secondary fills) use `fg-secondary` or `fg` for any normal-size text — never `fg-muted`.
+**The Muted-On-Sunk Rule.** `fg-muted` clears AA on the canvas/surface (4.84:1 on Quartz) but **still not on the secondary fill** (4.47:1 on Quartz Sunk — up from 4.27:1 on Sand, and short of 4.5 by less than a thirtieth). On that fill (chips, tags, secondary fills) use `fg-secondary` or `fg` for any normal-size text — never `fg-muted`. The cleaner ground narrowed this gap; it did not close it, and a rule that is nearly unnecessary is still a rule.
 
 ### Contrast (measured 2026-08-01, WCAG 2.2 AA)
 
-All semantic text/status tokens were computed against their real backgrounds. Minimum passing ratios: **light 4.76:1** (`fg-muted` on canvas), **dark 5.40:1** (`fg-muted` on canvas); primary-action text **15.64:1**. The one sub-AA pairing (`fg-muted` on Sand, 4.27:1) is governed by the Muted-On-Sand Rule above. Full per-pair table: [`design/GOVERNANCE.md`](design/GOVERNANCE.md#accessibility). UI-component/large-text pairs all clear the 3:1 threshold.
+All semantic text/status tokens were computed against their real backgrounds. Minimum passing ratios: **light 4.84:1** (`fg-muted` on canvas), **dark 5.40:1** (`fg-muted` on canvas); primary-action text **15.90:1**. The one sub-AA pairing (`fg-muted` on Quartz Sunk, 4.47:1) is governed by the Muted-On-Sunk Rule above.
+
+The light figures were re-measured on 2026-08-20 when the workspace ground moved from Limestone to Quartz. Every light pair improved and none regressed — `fg` on canvas 15.64 → 15.90, `fg-secondary` 5.61 → 5.70, `fg-muted` 4.76 → 4.84, `fg-muted` on surface 5.10 → 5.24 — because removing chroma from a near-white raises its luminance slightly. Dark is unchanged. Full per-pair table: [`design/GOVERNANCE.md`](design/GOVERNANCE.md#accessibility). UI-component/large-text pairs all clear the 3:1 threshold.
 
 ## Typography
 
