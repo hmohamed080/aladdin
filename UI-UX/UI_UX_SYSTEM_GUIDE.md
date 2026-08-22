@@ -207,8 +207,8 @@ For **dense groups of peer cards** that would otherwise wrap into several rows a
 - Never block the whole screen for a partial update. Long/expensive work (OCR, imports, embeddings) runs in the background with progress + Realtime status, not a frozen UI.
 
 ## Accessibility
-- Target **WCAG 2.2 AA**. Contrast verified in **both** light and dark — semantic token pairs were **measured** (min light 4.76:1, min dark 5.40:1; primary-action 15.64:1). Full table: [`../design/GOVERNANCE.md`](../design/GOVERNANCE.md#accessibility).
-- **Muted-On-Sand exception:** `fg-muted` clears AA on the canvas/surface but **not on the Sand fill** (4.27:1) — on Sand use `fg-secondary`/`fg` for normal-size text.
+- Target **WCAG 2.2 AA**. Contrast verified in **both** light and dark — semantic token pairs were **measured** (min light 4.84:1, min dark 5.40:1; primary-action 15.64:1). Full table: [`../design/GOVERNANCE.md`](../design/GOVERNANCE.md#accessibility).
+- **Muted-On-Sunk exception:** `fg-muted` clears AA on the canvas/surface (4.84:1 on Quartz) but **not on the secondary fill** (4.47:1 on Quartz Sunk) — there use `fg-secondary`/`fg` for normal-size text. The Quartz ground narrowed this gap from 4.27:1; it did not close it.
 - Component-level a11y (keyboard traversal, focus trapping, SR labels, tab order, touch targets) is **verified per component at implementation**, not claimed up front — it is a `Ready` gate in the component inventory.
 - Full **keyboard** operability; visible focus states (token-based); logical tab order; focus management in modals/drawers/route changes.
 - Semantic HTML + ARIA only where semantics fall short; all interactive controls have accessible names; icons-only buttons carry labels.

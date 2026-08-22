@@ -8,6 +8,12 @@ colors:
   limestone: "#F4F1EA"
   plaster: "#FBF9F4"
   sand: "#EAE5DB"
+  quartz: "#F4F3F0"
+  quartz-raised: "#FDFCFB"
+  quartz-sunk: "#ECEAE6"
+  quartz-hover: "#F3F1EE"
+  quartz-line: "#DBD8D5"
+  quartz-line-strong: "#C2BFBB"
   ink: "#17191A"
   lumen: "#F3AB3E"
   lumen-deep: "#C77F1C"
@@ -246,9 +252,9 @@ Architectural stone grounds, one warm point of light, a crafted metal, and a qui
 
 ### Contrast (measured 2026-08-01, WCAG 2.2 AA)
 
-All semantic text/status tokens were computed against their real backgrounds. Minimum passing ratios: **light 4.84:1** (`fg-muted` on canvas), **dark 5.40:1** (`fg-muted` on canvas); primary-action text **15.90:1**. The one sub-AA pairing (`fg-muted` on Quartz Sunk, 4.47:1) is governed by the Muted-On-Sunk Rule above.
+All semantic text/status tokens were computed against their real backgrounds. Minimum passing ratios: **light 4.84:1** (`fg-muted` on canvas), **dark 5.40:1** (`fg-muted` on canvas); primary-action text **15.64:1**. The one sub-AA pairing (`fg-muted` on Quartz Sunk, 4.47:1) is governed by the Muted-On-Sunk Rule above.
 
-The light figures were re-measured on 2026-08-20 when the workspace ground moved from Limestone to Quartz. Every light pair improved and none regressed — `fg` on canvas 15.64 → 15.90, `fg-secondary` 5.61 → 5.70, `fg-muted` 4.76 → 4.84, `fg-muted` on surface 5.10 → 5.24 — because removing chroma from a near-white raises its luminance slightly. Dark is unchanged. Full per-pair table: [`design/GOVERNANCE.md`](design/GOVERNANCE.md#accessibility). UI-component/large-text pairs all clear the 3:1 threshold.
+The light figures were re-measured on 2026-08-20 when the workspace ground moved from Limestone to Quartz. Every light pair improved and none regressed — `fg` on canvas 15.64 → 15.90, `fg-secondary` 5.61 → 5.70, `fg-muted` 4.76 → 4.84, `fg-muted` on surface 5.10 → 5.24 — because removing chroma from a near-white raises its luminance slightly. Primary-action text is the exception that proves the rule: it is Limestone on Ink, and **neither token in that pair is the canvas**, so it stays at 15.64:1. Dark is unchanged. Full per-pair table: [`design/GOVERNANCE.md`](design/GOVERNANCE.md#accessibility). UI-component/large-text pairs all clear the 3:1 threshold.
 
 ## Typography
 

@@ -92,13 +92,14 @@ Target: **WCAG 2.2 AA**. Do not mark an item "complete" without evidence.
 
 | Pair | Ratio | AA-normal (4.5) | AA-large/UI (3.0) |
 |---|---|---|---|
-| Light `fg` / canvas | 15.64 | PASS | PASS |
-| Light `fg-secondary` / canvas | 5.61 | PASS | PASS |
-| Light `fg-muted` / canvas | 4.76 | PASS | PASS |
-| Light `fg-muted` / **Sand** | **4.27** | **FAIL** | PASS |
-| Light `accent` (lumen-ink) / canvas | 5.36 | PASS | PASS |
-| Light `success/warning/danger/info` / canvas | 7.15 / 7.17 / 5.29 / 5.91 | PASS | PASS |
-| Light `bronze` (bronze-ink) / Sand | 5.74 | PASS | PASS |
+| Light `fg` / canvas | 15.90 | PASS | PASS |
+| Light `fg-secondary` / canvas | 5.70 | PASS | PASS |
+| Light `fg-muted` / canvas | 4.84 | PASS | PASS |
+| Light `fg-muted` / surface | 5.24 | PASS | PASS |
+| Light `fg-muted` / **Quartz Sunk** | **4.47** | **FAIL** | PASS |
+| Light `accent` (lumen-ink) / canvas | 5.45 | PASS | PASS |
+| Light `success/warning/danger/info` / canvas | 7.27 / 7.29 / 5.37 / 6.01 | PASS | PASS |
+| Light `bronze` (bronze-ink) / Quartz Sunk | 6.00 | PASS | PASS |
 | Light primary text (limestone / ink) | 15.64 | PASS | PASS |
 | Dark `fg` / canvas | 16.51 | PASS | PASS |
 | Dark `fg-secondary` / canvas | 10.09 | PASS | PASS |
@@ -107,7 +108,9 @@ Target: **WCAG 2.2 AA**. Do not mark an item "complete" without evidence.
 | Dark `success/warning/danger/info` / canvas | 8.43 / 8.71 / 6.08 / 7.41 | PASS | PASS |
 | Dark primary text (basalt / on-dark) | 16.51 | PASS | PASS |
 
-**Governed exception:** `fg-muted` on Sand fails AA-normal (4.27:1) — see the **Muted-On-Sand Rule** in `DESIGN.md`: on Sand, use `fg-secondary`/`fg` for normal-size text.
+**Governed exception:** `fg-muted` on Quartz Sunk fails AA-normal (4.47:1) — see the **Muted-On-Sunk Rule** in `DESIGN.md`: on the secondary fill, use `fg-secondary`/`fg` for normal-size text.
+
+**Light figures re-measured 2026-08-20**, when the workspace ground moved from Limestone to Quartz. Every light pair improved and none regressed — removing chroma from a near-white raises its luminance slightly. Primary text is unchanged at 15.64: it is Limestone on Ink, and neither token in that pair is the canvas. Dark is unchanged.
 
 ### Required practices
 

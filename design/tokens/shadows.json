@@ -1,13 +1,23 @@
 {
   "name": "aladdin.shadows",
   "version": "1.0.0",
-  "description": "Elevation is primarily tonal layering; shadow is restrained. Only two shadow tokens exist by design.",
+  "description": "Elevation is primarily tonal layering; shadow is restrained. Shadows are THEME-AWARE: a component asks for a level (raised / card / overlay) and the theme decides how that level is drawn. The values below are the LIGHT theme; the dark values live in the .dark block of frontend/src/styles/tokens.css.",
   "maintenance": "Manually maintained. Edit here first, then DESIGN.md (Elevation & Depth) and frontend/tailwind.config.ts (theme.extend.boxShadow).",
   "tokens": {
-    "card": {
-      "value": "0 1px 2px rgba(20,16,10,0.04), 0 8px 24px rgba(20,16,10,0.05)",
+    "raised": {
+      "value": "0 1px 2px rgba(16,16,18,0.06)",
       "type": "box-shadow",
-      "usage": "Raised cards on the light (Limestone/Plaster) theme; real offset + blur."
+      "usage": "The quietest step, consumed as shadow-sm. Light theme."
+    },
+    "card": {
+      "value": "0 1px 2px rgba(16,16,18,0.04), 0 8px 24px rgba(16,16,18,0.05)",
+      "type": "box-shadow",
+      "usage": "Raised cards on the light (Quartz) theme; real offset + blur."
+    },
+    "overlay": {
+      "value": "0 10px 30px rgba(16,16,18,0.1), 0 2px 8px rgba(16,16,18,0.06)",
+      "type": "box-shadow",
+      "usage": "Menus, popovers and dialogs lifted off the page, consumed as shadow-lg. Light theme."
     },
     "glow": {
       "value": "0 0 60px rgba(243,171,62,0.18)",
@@ -16,6 +26,7 @@
     }
   },
   "rules": {
-    "tonal-first": "On dark, build depth with layered stone surfaces (Basalt -> Basalt 2 -> Basalt 3) and border shifts before reaching for shadow. Reserve glow for Lumen focal moments."
+    "tonal-first": "On dark, build depth with layered stone surfaces (Carbon -> Carbon 2 -> Carbon 3) and border shifts before reaching for shadow. Reserve glow for Lumen focal moments.",
+    "neutral-tint": "The light tint is a NEUTRAL near-black, rgba(16,16,18), not the warm rgba(20,16,10) tuned against Limestone. At 4-6% a single shadow's hue is nearly invisible, but there is one under every card on the page and warm ones cast warmth back onto the Quartz ground. Opacity and geometry are the design; the hue is not free."
   }
 }
