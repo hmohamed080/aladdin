@@ -49,6 +49,7 @@ export function PageHead({
   locale,
   actions,
   toolbar,
+  density = "default",
 }: {
   title: string;
   subtitle?: string;
@@ -71,9 +72,29 @@ export function PageHead({
   actions?: ReactNode;
   /** Secondary controls that belong to the whole page (sort, export, help). */
   toolbar?: ReactNode;
+  /**
+   * How much air the band carries beneath it.
+   *
+   * `default` is the reading rhythm every module page uses and does not move.
+   * `compact` is for a page whose FIRST ROW is itself an instrument — the supply
+   * dashboard opens on a KPI strip, and a full-height band above a row of live
+   * figures spends the top of the fold on saying the module's name twice (the
+   * sidebar already highlights it, and the icon tile repeats the glyph).
+   *
+   * It buys the space back from PADDING only. The eyebrow, the title size, the
+   * subtitle and the icon are untouched, because those are the hierarchy — a
+   * denser head is not a smaller one.
+   */
+  density?: "default" | "compact";
 }) {
+  const compact = density === "compact";
   return (
-    <div className="flex flex-wrap items-start justify-between gap-md border-b pb-md">
+    <div
+      className={cn(
+        "flex flex-wrap items-start justify-between border-b",
+        compact ? "gap-sm pb-sm" : "gap-md pb-md",
+      )}
+    >
       <div className="flex min-w-0 items-start gap-3">
         {Icon ? (
           <span
@@ -93,7 +114,11 @@ export function PageHead({
               </span>
             ) : null}
           </div>
-          {subtitle ? <p className="mt-0.5 text-body text-fg-secondary">{subtitle}</p> : null}
+          {subtitle ? (
+            <p className={cn("text-body text-fg-secondary", compact ? "mt-0" : "mt-0.5")}>
+              {subtitle}
+            </p>
+          ) : null}
         </div>
       </div>
       {actions || toolbar ? (

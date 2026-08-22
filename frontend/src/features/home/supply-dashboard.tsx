@@ -523,6 +523,10 @@ export async function SupplyDashboard({
     <div className="flex flex-col gap-md pb-16 tablet:pb-0">
       <PageHead
         locale={locale}
+        /* This page opens on a live instrument panel, so the band above it gives
+           back the padding a reading page wants. Hierarchy is untouched — only
+           the air below the subtitle and around the actions. */
+        density="compact"
         Icon={GaugeIcon}
         eyebrow={`${m.home.greeting} · ${org.organizationName}`}
         title={m.supply.title}
