@@ -1,6 +1,7 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
-import { PageHeader, BackLink } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
+import { BackLink } from "@/features/sales/page-parts";
 import { StatePanel } from "@/components/ui/primitives";
 import { ProductForm } from "@/features/commerce/product-form";
 
@@ -17,7 +18,7 @@ export default async function NewProductPage() {
   return (
     <div className="pb-16 tablet:pb-0">
       <BackLink href="/b2b/products">{m.commerce.products.title}</BackLink>
-      <PageHeader title={m.commerce.products.newTitle} subtitle={m.commerce.products.newSubtitle} />
+      <PageHeader locale={locale} title={m.commerce.products.newTitle} subtitle={m.commerce.products.newSubtitle} />
       {canWrite ? (
         <ProductForm orgId={org.organizationId} />
       ) : (

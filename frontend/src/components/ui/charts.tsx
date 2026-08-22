@@ -1,4 +1,6 @@
 import { cn } from "@/lib/ui/cn";
+import type { Locale } from "@/lib/i18n/locales";
+import { formatNumber } from "@/lib/ui/format";
 
 /**
  * The workspace's chart primitives.
@@ -54,6 +56,17 @@ const BG: Record<Series, string> = {
   5: "bg-series-5",
   6: "bg-series-6",
 };
+
+/**
+ * The single-colour fills a ranked bar can take. A map rather than a ternary
+ * chain because the next tone added should cost one line, not another branch.
+ */
+const BAR_BG = {
+  accent: "bg-accent-solid",
+  iris: "bg-iris-solid",
+  lapis: "bg-lapis",
+} as const;
+export type BarTone = keyof typeof BAR_BG;
 
 /** Cycle the palette so a list of any length still alternates predictably. */
 export function seriesAt(index: number): Series {
@@ -324,14 +337,51 @@ export type RankedItem = {
  */
 export function RankedBars({
   items,
+  locale,
   emptyLabel,
   colored = false,
+  bar = "accent",
+  rank = false,
   className,
 }: {
   items: RankedItem[];
+  /**
+   * A row with no `detail` prints its raw `value`, and a raw number is Latin
+   * digits in every locale. The locale is required rather than inferred so a
+   * ranked list can never disagree with the money figure in the panel above it.
+   */
+  locale: Locale;
   emptyLabel: string;
   /** Give each row its own series colour (use for entities, not for statuses). */
   colored?: boolean;
+  /**
+   * Which single colour the bars take when `colored` is off.
+   *
+   * `accent` is amber — the brand's ACTION colour — and it was the only option
+   * for as long as there was only one accent. On a dashboard built mostly of
+   * ranked lists that made every bar on the page a call to action, which is how
+   * a page ends up with no hierarchy at all. `iris` is the measurement colour
+   * (see tokens.css); a chart is a measurement, so a chart-heavy surface asks
+   * for it explicitly rather than having it imposed on every existing caller.
+   * `lapis` is the quieter blue of the same argument — the data/technology tone
+   * already used for `info` and for links — for a surface that wants the bars
+   * to recede further than Iris does.
+   *
+   * Each resolves through a SEMANTIC token, so the fill is theme-aware: `lapis`
+   * is #2F6088 on light and lifts to Lapis Bright on dark rather than sinking
+   * into the Carbon ground. The default stays `accent` — existing callers are
+   * not re-coloured by adding an option here.
+   */
+  bar?: BarTone;
+  /**
+   * Number the rows 1..n.
+   *
+   * Only for a list whose ORDER is the point — "the five most-requested
+   * products". A ranked list already reads top-to-bottom, so the numeral adds
+   * nothing to a list that merely happens to be sorted, and on a list that can
+   * be re-sorted it actively lies.
+   */
+  rank?: boolean;
   className?: string;
 }) {
   const shown = items.filter((i) => i.value > 0);
@@ -343,14 +393,30 @@ export function RankedBars({
       {shown.map((item, i) => (
         <li key={item.label} className="min-w-0">
           <div className="flex items-baseline justify-between gap-md">
-            <span className="min-w-0 truncate text-body text-fg-secondary">{item.label}</span>
+            <span className="flex min-w-0 items-baseline gap-2">
+              {rank ? (
+                // `aria-hidden`: the position is already carried by the list
+                // itself, and a screen reader announcing "1, 1, SPC" reads the
+                // rank twice.
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 text-label font-medium tabular-nums text-fg-muted"
+                >
+                  {formatNumber(i + 1, locale)}
+                </span>
+              ) : null}
+              <span className="min-w-0 truncate text-body text-fg-secondary">{item.label}</span>
+            </span>
             <span className="shrink-0 text-label font-medium tabular-nums text-fg" dir="ltr">
-              {item.detail ?? item.value}
+              {item.detail ?? formatNumber(item.value, locale)}
             </span>
           </div>
           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-pill bg-surface-2">
             <div
-              className={cn("h-full rounded-pill", colored ? BG[seriesAt(i)] : "bg-accent-solid")}
+              className={cn(
+                "h-full rounded-pill",
+                colored ? BG[seriesAt(i)] : BAR_BG[bar],
+              )}
               style={{ width: `${Math.max((item.value / max) * 100, 4)}%` }}
             />
           </div>
@@ -377,10 +443,12 @@ export type FunnelStep = { label: string; value: number };
  */
 export function Funnel({
   steps,
+  locale,
   emptyLabel,
   ofFirstLabel,
 }: {
   steps: FunnelStep[];
+  locale: Locale;
   emptyLabel: string;
   /** Renders the drop-off line, e.g. "48% of requests sent". */
   ofFirstLabel: (pct: number) => string;
@@ -397,7 +465,7 @@ export function Funnel({
             <div className="flex items-baseline justify-between gap-md">
               <span className="min-w-0 truncate text-body text-fg-secondary">{s.label}</span>
               <span className="shrink-0 text-label font-medium tabular-nums text-fg" dir="ltr">
-                {s.value}
+                {formatNumber(s.value, locale)}
               </span>
             </div>
             <div className="mt-1 h-2.5 w-full overflow-hidden rounded-pill bg-surface-2">

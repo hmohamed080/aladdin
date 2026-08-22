@@ -11,31 +11,82 @@ import {
   WrenchIcon,
   UsersIcon,
   TargetIcon,
+  DemandIcon,
+  FileTextIcon,
+  PackageIcon,
+  PlusIcon,
+  StorefrontIcon,
 } from "@/components/ui/icons";
+import type { CommerceStance } from "@/lib/workspace/supply-side";
 
 /**
  * "What do you want to do today?" — the workspace's entry ramp.
  *
  * Every tile is a real destination the caller is allowed to reach, chosen from
  * their capabilities. This exists because a dashboard full of numbers answers
- * "how are we doing" but not "what do I do now", and for a showroom the second
- * question is the one they open the app with.
+ * "how are we doing" but not "what do I do now", and that second question is the
+ * one people open the app with.
+ *
+ * The STANCE decides which ramps come first, and one shared list serves both. A
+ * showroom's first move is to browse and ask for a price; a distributor's is to
+ * answer a request and list a product. Both are still gated on capabilities —
+ * the stance only orders and selects, it never unlocks.
  */
 type Action = { href: string; label: string; body: string; Icon: ComponentType<{ size?: number }> };
 
 export function QuickActions({
   m,
   capabilities,
+  stance = "buyer",
 }: {
   m: Messages;
   capabilities: readonly string[];
+  stance?: CommerceStance;
 }) {
   const caps = new Set(capabilities);
   const has = (...keys: string[]) => caps.has("org.manage") || keys.some((k) => caps.has(k));
 
   const actions: Action[] = [];
 
-  if (has("catalog.read", "rfq.create", "order.create")) {
+  // ---- The seller's ramps, first and only on a supply-side workspace. ----
+  if (stance === "seller") {
+    if (has("rfq.respond", "quote.submit")) {
+      actions.push({
+        href: "/b2b/rfqs",
+        label: m.supply.action.answerDemand,
+        body: m.supply.action.answerDemandBody,
+        Icon: DemandIcon,
+      });
+      actions.push({
+        href: "/b2b/quotations",
+        label: m.supply.action.quotations,
+        body: m.supply.action.quotationsBody,
+        Icon: FileTextIcon,
+      });
+    }
+    if (has("catalog.write", "catalog.publish")) {
+      actions.push({
+        href: "/b2b/products/new",
+        label: m.supply.action.addProduct,
+        body: m.supply.action.addProductBody,
+        Icon: PlusIcon,
+      });
+      actions.push({
+        href: "/b2b/products",
+        label: m.supply.action.products,
+        body: m.supply.action.productsBody,
+        Icon: PackageIcon,
+      });
+    }
+    actions.push({
+      href: "/b2b/buyers",
+      label: m.supply.action.customers,
+      body: m.supply.action.customersBody,
+      Icon: StorefrontIcon,
+    });
+  }
+
+  if (stance === "buyer" && has("catalog.read", "rfq.create", "order.create")) {
     actions.push({
       href: "/b2b/catalog",
       label: m.home.action.browse,
@@ -43,7 +94,7 @@ export function QuickActions({
       Icon: SearchIcon,
     });
   }
-  if (has("rfq.create")) {
+  if (stance === "buyer" && has("rfq.create")) {
     actions.push({
       href: "/b2b/rfqs",
       label: m.home.action.requests,
@@ -51,7 +102,7 @@ export function QuickActions({
       Icon: ShoppingBagIcon,
     });
   }
-  if (has("quote.decide", "rfq.create")) {
+  if (stance === "buyer" && has("quote.decide", "rfq.create")) {
     actions.push({
       href: "/b2b/quotations",
       label: m.home.action.offers,
@@ -59,7 +110,7 @@ export function QuickActions({
       Icon: InboxIcon,
     });
   }
-  if (has("catalog.read", "rfq.create", "order.create")) {
+  if (stance === "buyer" && has("catalog.read", "rfq.create", "order.create")) {
     actions.push({
       href: "/b2b/saved",
       label: m.home.action.saved,
@@ -110,7 +161,7 @@ export function QuickActions({
             className="group flex items-start gap-3 rounded-md border bg-surface p-md shadow-card transition-colors hover:border-strong hover:bg-surface-2/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <span
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-sm bg-accent-solid/12 text-accent"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-sm bg-accent-solid/15 text-accent"
               aria-hidden="true"
             >
               <a.Icon size={18} />

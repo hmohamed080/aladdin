@@ -2,7 +2,8 @@ import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { getCustomer, branchNameMap, listOrgMembers } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
-import { PageHeader, BackLink } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
+import { BackLink } from "@/features/sales/page-parts";
 import { Card, StatePanel } from "@/components/ui/primitives";
 import { CustomerEditForm } from "@/features/sales/customer-edit-form";
 import { CustomerOwnershipForm } from "@/features/sales/customer-ownership-form";
@@ -52,7 +53,7 @@ export default async function CustomerEditPage({ params }: { params: Promise<{ i
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <div>
         <BackLink href={`/b2b/customers/${id}`}>{customer.display_name}</BackLink>
-        <PageHeader title={m.customers.editTitle} />
+        <PageHeader locale={locale} title={m.customers.editTitle} />
       </div>
       <CustomerEditForm customer={customer} branchName={branchName} assigneeName={assigneeName} />
 

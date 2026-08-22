@@ -3,6 +3,7 @@ import { getMessages } from "@/lib/i18n/translate";
 import {
   purchaseSummary,
   sellSummary,
+  supplySummary,
   savedByCategory,
   spendByCategory,
   projectSummary,
@@ -10,7 +11,9 @@ import {
   type ReportFilters,
   type ProductCategory,
 } from "@/server/queries/reports";
-import { PageHeader } from "@/features/sales/page-parts";
+import { commerceStance, supplyVoice } from "@/lib/workspace/supply-side";
+import { SupplyReport } from "@/features/reports/supply-report";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { Card, SectionTitle } from "@/components/ui/primitives";
 import { StatTiles } from "@/components/ui/stat-tiles";
 import { FilterBar } from "@/components/ui/filter-bar";
@@ -22,13 +25,14 @@ import {
   ShoppingBagIcon,
   InboxIcon,
   ClipboardIcon,
-  WalletIcon,
+  MoneyIcon,
   TruckIcon,
   BookmarkIcon,
   TrendingUpIcon,
   LayersIcon,
   UsersIcon,
   ActivityIcon,
+  BarChartIcon,
 } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
@@ -109,9 +113,16 @@ export default async function ReportsPage({
   const caps = new Set(org.capabilities);
   const runsSales = caps.has("org.manage") || ["sales.read", "sales.write", "sales.manage"].some((c) => caps.has(c));
 
-  const [purchase, sell, saved, byCategory, projects, sales] = await Promise.all([
+  // A supply-side organization gets its own analytics FIRST. The purchasing
+  // report stays below it in full — a distributor buys raw materials, and cutting
+  // that off would answer half its questions. Nothing is duplicated: the two
+  // halves read opposite ends of the same records.
+  const isSeller = commerceStance(org.orgType) === "seller";
+
+  const [purchase, sell, supply, saved, byCategory, projects, sales] = await Promise.all([
     purchaseSummary(supabase, org.organizationId, filters, trendMonths),
     sellSummary(supabase, org.organizationId, filters),
+    isSeller ? supplySummary(supabase, org.organizationId, filters, trendMonths) : Promise.resolve(null),
     savedByCategory(supabase, org.organizationId),
     spendByCategory(supabase, org.organizationId, filters),
     projectSummary(supabase, org.organizationId, filters),
@@ -123,15 +134,18 @@ export default async function ReportsPage({
   const totalOrders = sum(purchase.orders);
   const totalProjects = sum(projects.executing) + sum(projects.incoming);
   // A business that has never quoted anybody gets no sell-side section at all,
-  // rather than a card full of zeros.
-  const sells = sum(sell.quotesSent) > 0 || sell.ordersReceived > 0;
+  // rather than a card full of zeros. It is also suppressed for a supply-side
+  // organization: `SupplyReport` above already covers the same three numbers in
+  // full, and repeating them lower down as a one-card summary would let the page
+  // state the same figure twice under two different headings.
+  const sells = !supply && (sum(sell.quotesSent) > 0 || sell.ordersReceived > 0);
   const hasPipeline = runsSales && (sum(sales.leadsByStage) > 0 || sales.customers > 0 || sales.won > 0);
 
   const money = (v: number) => formatMoney(v, locale);
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
-      <PageHeader title={m.reports.title} subtitle={m.reports.subtitle} />
+      <PageHeader locale={locale} Icon={BarChartIcon} title={m.reports.title} subtitle={m.reports.subtitle} />
 
       <FilterBar
         basePath="/b2b/reports"
@@ -171,12 +185,26 @@ export default async function ReportsPage({
         ]}
       />
 
+      {/* The supply-side analytics lead for a seller, and are absent entirely for
+          a buyer — not rendered empty, not rendered with zeros. */}
+      {supply ? (
+        <SupplyReport supply={supply} voice={supplyVoice(org.orgType)} m={m} locale={locale} />
+      ) : null}
+
+      {/* For a seller the tiles below are the PURCHASING figures, not the page
+          summary, so the heading moves above them. A buyer's page is unchanged:
+          there the same tiles ARE the summary and the heading follows. */}
+      {supply ? (
+        <SectionTitle icon={<MoneyIcon size={18} />}>{m.reports.section.purchasing}</SectionTitle>
+      ) : null}
+
       <StatTiles
+        locale={locale}
         tiles={[
           {
             label: m.reports.stat.spend,
             value: formatCompactMoney(purchase.orderValue, locale),
-            Icon: WalletIcon,
+            Icon: MoneyIcon,
             tone: "accent",
             hint: m.reports.stat.spendHint,
           },
@@ -186,19 +214,25 @@ export default async function ReportsPage({
           { label: m.reports.stat.projects, value: totalProjects, Icon: LayersIcon, href: "/b2b/projects" },
           { label: m.reports.stat.saved, value: sum(saved), Icon: BookmarkIcon, href: "/b2b/saved" },
         ]}
-        /* Six across was tried and reverted once: at a laptop width it squeezed
-           the committed-spend tile until "EGP 1,103,100.00" truncated to
-           "EGP 1,103,10…", which is the one number on this page nobody may
-           misread. The rail settles that for good — a railed card holds its width
-           and scrolls instead of shrinking, so the figure stays whole at every
-           viewport, and on a wide screen where all six fit there is nothing to
-           scroll and no control is drawn. */
-        layout="rail"
-        railLabel={m.reports.title}
+        /* HISTORY, because this cell has moved twice.
+           Six tiles across a laptop width once squeezed the committed-spend
+           figure until "EGP 1,103,100.00" truncated to "EGP 1,103,10…" — the one
+           number on this page nobody may misread — and the fix at the time was a
+           rail, whose cards hold their width instead of shrinking.
+           The strip supersedes it on both counts: money on a KPI is now formatted
+           COMPACT (`formatCompactMoney`, three tiles above), and the strip's value
+           wraps rather than truncating, so a long figure can no longer be
+           silently clipped into a different number. Three across keeps every cell
+           roomy, and the page now opens the same way every other module does
+           instead of being the one screen with a carousel on it. */
+        layout="strip"
+        columns={3}
       />
 
       {/* ---------------------------------------------------------------- */}
-      <SectionTitle icon={<WalletIcon size={18} />}>{m.reports.section.purchasing}</SectionTitle>
+      {supply ? null : (
+        <SectionTitle icon={<MoneyIcon size={18} />}>{m.reports.section.purchasing}</SectionTitle>
+      )}
 
       <Card>
         <SectionTitle icon={<TrendingUpIcon size={18} />}>{m.reports.chart.spendTrend}</SectionTitle>
@@ -235,6 +269,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<TruckIcon size={18} />}>{m.reports.topSuppliers}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               colored
               emptyLabel={m.reports.noSuppliers}
               items={purchase.topDistributors.map((s) => ({
@@ -244,7 +279,7 @@ export default async function ReportsPage({
                 // How many orders, not how many line items — the bar is ranked by
                 // value, and the count is what tells a buyer whether that value is
                 // one big purchase or a standing relationship.
-                meta: orderCountLabel(s.orders, m),
+                meta: orderCountLabel(s.orders, m, locale),
               }))}
             />
           </div>
@@ -254,6 +289,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<ActivityIcon size={18} />}>{m.reports.chart.funnel}</SectionTitle>
           <div className="mt-md">
             <Funnel
+              locale={locale}
               steps={[
                 { label: m.reports.funnel.requests, value: totalRequests },
                 { label: m.reports.funnel.offers, value: totalOffers },
@@ -269,6 +305,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<ClipboardIcon size={18} />}>{m.reports.ordersByStatus}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noData}
               items={ORDER_STATUSES.map((s) => ({
                 label: m.execution.orderStatus[s],
@@ -282,6 +319,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<ShoppingBagIcon size={18} />}>{m.reports.requestsByStatus}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noData}
               items={RFQ_STATUSES.map((s) => ({
                 label: m.commerce.rfqStatus[s],
@@ -295,6 +333,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<InboxIcon size={18} />}>{m.reports.offersByStatus}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noData}
               items={QUOTE_STATUSES.map((s) => ({
                 label: m.commerce.quotationStatus[s],
@@ -320,6 +359,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<LayersIcon size={18} />}>{m.reports.projectsByStatus}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noProjects}
               items={PROJECT_STATUSES.map((s) => ({
                 label: m.execution.projectStatus[s],
@@ -339,6 +379,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<TruckIcon size={18} />}>{m.reports.projectsIncoming}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               emptyLabel={m.reports.noProjects}
               items={PROJECT_STATUSES.map((s) => ({
                 label: m.execution.projectStatus[s],
@@ -352,6 +393,7 @@ export default async function ReportsPage({
           <SectionTitle icon={<BookmarkIcon size={18} />}>{m.reports.shortlistByCategory}</SectionTitle>
           <div className="mt-md">
             <RankedBars
+              locale={locale}
               colored
               emptyLabel={m.reports.noShortlist}
               items={PRODUCT_CATEGORIES.map((c) => ({
@@ -367,6 +409,7 @@ export default async function ReportsPage({
             <SectionTitle icon={<TrendingUpIcon size={18} />}>{m.reports.sellSide}</SectionTitle>
             <div className="mt-md">
               <RankedBars
+                locale={locale}
                 emptyLabel={m.reports.noData}
                 items={QUOTE_STATUSES.map((s) => ({
                   label: m.commerce.quotationStatus[s],
@@ -395,6 +438,7 @@ export default async function ReportsPage({
               <SectionTitle icon={<TrendingUpIcon size={18} />}>{m.reports.leadsByStage}</SectionTitle>
               <div className="mt-md">
                 <RankedBars
+                  locale={locale}
                   colored
                   emptyLabel={m.reports.noData}
                   items={LEAD_STAGES.map((s) => ({
@@ -408,6 +452,7 @@ export default async function ReportsPage({
               <SectionTitle icon={<UsersIcon size={18} />}>{m.reports.activeCustomers}</SectionTitle>
               <div className="mt-md">
                 <RankedBars
+                  locale={locale}
                   emptyLabel={m.reports.noData}
                   items={[
                     { label: m.reports.activeCustomers, value: sales.customers },

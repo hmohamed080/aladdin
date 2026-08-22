@@ -109,6 +109,31 @@ export async function getOrderForQuotation(
   return data;
 }
 
+/**
+ * Which of these quotations already have an order behind them.
+ *
+ * The supply dashboard needs the COMPLEMENT of this set: an accepted quotation
+ * with no order is the seller's most valuable piece of unfinished work — the
+ * buyer has already said yes and nothing is moving. Deriving it by scanning a
+ * capped `listOrders` page would be a guess, because an accepted quotation old
+ * enough to fall off that page would read as "ready for order" forever. Asking
+ * for exactly these ids is a single indexed lookup and it cannot be wrong.
+ *
+ * Returns ids, not orders: the caller only needs to know whether one exists.
+ */
+export async function quotationsWithOrders(
+  supabase: DB,
+  quotationIds: string[],
+): Promise<Set<string>> {
+  if (quotationIds.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from("orders")
+    .select("quotation_id")
+    .in("quotation_id", quotationIds);
+  if (error) throw error;
+  return new Set((data ?? []).map((o) => o.quotation_id).filter((id): id is string => !!id));
+}
+
 // ---- Projects --------------------------------------------------------------
 export type ProjectSide = "requester" | "executing";
 

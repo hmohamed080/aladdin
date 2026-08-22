@@ -22,7 +22,7 @@ export default async function AdminOrganizationsPage() {
 
   return (
     <div className="flex flex-col gap-lg">
-      <AdminHeader title={m.admin.orgs.title} subtitle={m.admin.orgs.subtitle} count={orgs.length} />
+      <AdminHeader locale={locale} title={m.admin.orgs.title} subtitle={m.admin.orgs.subtitle} count={orgs.length} />
       {orgs.length === 0 ? (
         <StatePanel title={m.admin.orgs.empty} />
       ) : (

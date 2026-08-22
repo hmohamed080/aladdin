@@ -1,83 +1,132 @@
-"use client";
-
 import Link from "next/link";
-import { useI18n } from "@/lib/i18n/context";
-import { Card, StatePanel } from "@/components/ui/primitives";
+import type { Messages } from "@/lib/i18n/messages/en";
+import type { Locale } from "@/lib/i18n/locales";
+import { formatCount } from "@/lib/ui/format";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { StatePanel } from "@/components/ui/primitives";
 import { PackageIcon } from "@/components/ui/icons";
 import { ProductStatusBadge } from "@/features/commerce/badges";
-import type { ProductRow } from "@/server/queries/commerce";
+import { ProductMedia } from "@/features/commerce/product-media";
+import type { ProductRow, ProductDemand } from "@/server/queries/commerce";
 
 /**
- * The supplier's own product list (all statuses). Responsive: a compact table on
- * tablet+ and stacked cards on mobile. Rows link to the product detail page.
+ * The seller's own catalogue — every product, whatever its state.
+ *
+ * Built on the shared `DataTable` like every other record list in the workspace,
+ * rather than the hand-rolled table this used to be: the column rhythm, the
+ * mobile card fallback and the empty state are then the same ones a seller has
+ * already learned on Orders and Quotations.
+ *
+ * WHAT MAKES THIS A MANAGEMENT SURFACE RATHER THAN A LIST
+ * Two columns that a plain catalogue would not have:
+ *
+ *   - The IMAGE, leading. A finishing catalogue is a catalogue of surfaces; a
+ *     seller scanning for "the matte one" recognises it far faster than they read
+ *     its SKU.
+ *   - DEMAND — how many businesses have actually asked for this line. It is the
+ *     one column that turns the list into a decision: a published product with no
+ *     requests in six months is a pricing or a photography problem, and nothing
+ *     else on this page would ever say so.
+ *
+ * There is deliberately no stock level, no warehouse, no reorder point and no
+ * margin. The reference set shows all four; this repository has no inventory
+ * model, and a stock number with nothing behind it is the one thing on a supply
+ * screen that must never be invented.
+ *
+ * Server component — it takes resolved rows, so the client bundle does not grow.
  */
-export function ProductsTable({ products }: { products: ProductRow[] }) {
-  const { t } = useI18n();
+export function ProductsTable({
+  products,
+  demand,
+  m,
+  locale,
+  emptyTitle,
+  emptyBody,
+}: {
+  products: ProductRow[];
+  /** Per-product request counts, keyed by product id. Absent = not looked up. */
+  demand?: Map<string, ProductDemand>;
+  m: Messages;
+  locale: Locale;
+  emptyTitle: string;
+  emptyBody: string;
+}) {
+  // No local `Intl` instance: a table that formats its own numbers is how the
+  // two numeral systems got onto one page in the first place.
+  const number = (n: number) => formatCount(n, locale);
 
-  if (products.length === 0) {
-    return (
-      <StatePanel
-        icon={<PackageIcon size={22} />}
-        title={t("commerce.products.emptyTitle")}
-        body={t("commerce.products.emptyBody")}
-      />
-    );
-  }
+  const columns: Column<ProductRow>[] = [
+    {
+      key: "product",
+      header: m.commerce.fields.name,
+      cell: (p) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="w-12 shrink-0">
+            <ProductMedia src={p.image_ref} alt={p.name} />
+          </div>
+          <div className="min-w-0">
+            <Link
+              href={`/b2b/products/${p.id}`}
+              className="block truncate font-medium text-fg hover:text-accent"
+            >
+              {p.name}
+            </Link>
+            <span className="mt-0.5 block truncate text-label text-fg-muted">
+              {p.brand ?? m.commerce.categories[p.category]}
+              {p.sku ? ` · ${p.sku}` : ""}
+            </span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "category",
+      header: m.commerce.fields.category,
+      cell: (p) => m.commerce.categories[p.category],
+    },
+    {
+      key: "unit",
+      header: m.commerce.fields.unit,
+      desktopOnly: true,
+      secondary: true,
+      cell: (p) => m.commerce.units[p.unit],
+    },
+    ...(demand
+      ? [
+          {
+            key: "demand",
+            header: m.supply.products.column.demand,
+            numeric: true,
+            cell: (p: ProductRow) => {
+              const d = demand.get(p.id);
+              return d && d.requests > 0 ? (
+                <span className="font-medium text-fg tabular-nums">
+                  {d.requests === 1
+                    ? m.supply.products.demandRequestOne
+                    : m.supply.products.demandRequests.replace("{count}", number(d.requests))}
+                </span>
+              ) : (
+                <span className="text-fg-muted">{m.supply.products.demandNone}</span>
+              );
+            },
+          } satisfies Column<ProductRow>,
+        ]
+      : []),
+    {
+      key: "status",
+      header: m.commerce.fields.status,
+      numeric: true,
+      cell: (p) => <ProductStatusBadge status={p.status} />,
+    },
+  ];
 
   return (
-    <>
-      {/* Mobile: stacked cards */}
-      <div className="flex flex-col gap-sm tablet:hidden">
-        {products.map((p) => (
-          <Link key={p.id} href={`/b2b/products/${p.id}`} className="block">
-            <Card pad="sm" className="transition-colors hover:border-strong">
-              <div className="flex items-start justify-between gap-md">
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-fg">{p.name}</p>
-                  <p className="mt-0.5 text-label text-fg-muted">
-                    {t(`commerce.categories.${p.category}`)}
-                    {p.sku ? ` · ${p.sku}` : ""}
-                  </p>
-                </div>
-                <ProductStatusBadge status={p.status} />
-              </div>
-            </Card>
-          </Link>
-        ))}
-      </div>
-
-      {/* Tablet+: table */}
-      <Card pad="sm" className="hidden overflow-x-auto tablet:block">
-        <table className="w-full min-w-[36rem] border-collapse text-body">
-          <thead>
-            <tr className="border-b text-start text-label text-fg-muted">
-              <th className="px-2 py-2 text-start font-medium">{t("commerce.fields.name")}</th>
-              <th className="px-2 py-2 text-start font-medium">{t("commerce.fields.category")}</th>
-              <th className="px-2 py-2 text-start font-medium">{t("commerce.fields.sku")}</th>
-              <th className="px-2 py-2 text-start font-medium">{t("commerce.fields.unit")}</th>
-              <th className="px-2 py-2 text-end font-medium">{t("commerce.fields.status")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((p) => (
-              <tr key={p.id} className="border-b last:border-0 hover:bg-surface-2/50">
-                <td className="px-2 py-2.5">
-                  <Link href={`/b2b/products/${p.id}`} className="font-medium text-fg hover:text-accent">
-                    {p.name}
-                  </Link>
-                  {p.brand ? <span className="ms-2 text-label text-fg-muted">{p.brand}</span> : null}
-                </td>
-                <td className="px-2 py-2.5 text-fg-secondary">{t(`commerce.categories.${p.category}`)}</td>
-                <td className="px-2 py-2.5 text-fg-secondary" dir="ltr">{p.sku ?? "—"}</td>
-                <td className="px-2 py-2.5 text-fg-secondary">{t(`commerce.units.${p.unit}`)}</td>
-                <td className="px-2 py-2.5 text-end">
-                  <ProductStatusBadge status={p.status} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-    </>
+    <DataTable
+      columns={columns}
+      rows={products}
+      rowKey={(p) => p.id}
+      caption={m.supply.products.title}
+      empty={<StatePanel icon={<PackageIcon size={22} />} title={emptyTitle} body={emptyBody} />}
+    />
   );
 }

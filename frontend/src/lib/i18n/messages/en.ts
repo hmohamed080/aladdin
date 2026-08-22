@@ -26,6 +26,8 @@ export const en = {
     saving: "Saving…",
     unassigned: "Unassigned",
     view: "View",
+    /* "Show the rest of this list", on a panel that shows a capped slice of one. */
+    more: "More",
     open: "Open",
     close: "Close",
     actions: "Actions",
@@ -74,14 +76,24 @@ export const en = {
     home: "Home",
     section: {
       buying: "Buying",
+      // The supply-side workspace's leading group: demand in, prices out, orders
+      // fulfilled. Same modules as Buying, read from the seller's seat.
+      supply: "Supply",
+      // What "Buying" is called once it is the demoted group on a seller's rail.
+      sourcing: "Sourcing",
       network: "Network",
       selling: "Selling",
       business: "Business",
     },
     purchaseRequests: "Purchase requests",
     offers: "Incoming offers",
+    // Seller-seat names for the same three routes.
+    demand: "Incoming demand",
+    quotations: "Quotations",
+    salesOrders: "Orders",
     saved: "Saved products",
     suppliers: "Distributors",
+    buyers: "Customers & showrooms",
     technicians: "Technicians",
     institutions: "Institutions",
     team: "Team",
@@ -99,6 +111,11 @@ export const en = {
     account: "Account",
     language: "Language",
     theme: "Theme",
+    help: "Help & support",
+    chat: "Chat",
+    notifications: "Notifications",
+    feedback: "Feedback",
+    points: "Points",
     themeLight: "Light",
     themeDark: "Dark",
     organization: "Organization",
@@ -116,6 +133,84 @@ export const en = {
   rail: {
     previous: "Show previous",
     next: "Show next",
+  },
+  /**
+   * The signed-in account chrome — the profile menu in the shared header.
+   * "Account" here is the PERSON, never a business: the workspace switcher owns
+   * business context and this menu deliberately does not duplicate it.
+   */
+  account: {
+    menu: "Account menu",
+    signedInAs: "Signed in as",
+    profile: "My profile",
+    preferences: "Account preferences",
+    language: "Language",
+    appearance: "Appearance",
+    theme: { system: "System", light: "Light", dark: "Dark" },
+    workingIn: "Working in",
+    personal: "Personal account",
+    signOut: "Log out",
+  },
+  /**
+   * The global search / command palette. Two families of result, and the copy
+   * keeps them distinct: NAVIGATION goes somewhere, records ARE something.
+   */
+  search: {
+    open: "Search or run command",
+    short: "Search",
+    title: "Search",
+    placeholder: "Search products, requests, orders, businesses…",
+    placeholderPersonal: "Search your workspace…",
+    close: "Close search",
+    clear: "Clear",
+    minChars: "Keep typing to search your records.",
+    searching: "Searching…",
+    noResults: "No matches for “{q}”.",
+    noResultsHint: "Try a product name, a request title, a customer, or a business.",
+    enter: "Enter",
+    hint: { navigate: "Navigate", select: "Open", close: "Close" },
+    group: {
+      navigation: "Navigation",
+      admin: "Platform admin",
+      products: "My products",
+      catalog: "Catalog",
+      rfqs: "Requests",
+      quotations: "Quotations",
+      orders: "Orders",
+      projects: "Projects",
+      customers: "Customers",
+      leads: "Leads",
+      organizations: "Businesses",
+    },
+    /** One line per destination, in the same voice as the module it opens. */
+    desc: {
+      home: "Open your workspace dashboard.",
+      purchaseRequests: "Prices you have asked distributors for.",
+      demand: "Requests waiting for your price.",
+      offers: "Offers sent to you, and their decisions.",
+      quotations: "Prices you have sent, and their decisions.",
+      orders: "Confirmed orders and their fulfilment.",
+      catalog: "Browse published products from other businesses.",
+      saved: "Products you shortlisted.",
+      suppliers: "The distributor, manufacturer and importer directory.",
+      buyers: "The businesses that buy from you.",
+      technicians: "Installers and technicians on Aladdin.",
+      institutions: "Showrooms, contractors and design offices.",
+      customers: "Your own customer records.",
+      leads: "Opportunities moving through your pipeline.",
+      followUps: "Calls and visits you owe someone.",
+      products: "Your catalogue and the demand behind it.",
+      projects: "Execution and delivery.",
+      team: "People, capabilities and branches.",
+      reports: "Performance across the workspace.",
+      settings: "Workspace preferences.",
+      profile: "Your name, headline and contact details.",
+      adminHome: "Platform overview.",
+      adminUsers: "People registered on Aladdin.",
+      adminOrganizations: "Businesses registered on Aladdin.",
+      adminVerifications: "Verification requests awaiting review.",
+      adminAudit: "Platform activity log.",
+    },
   },
   personalHome: {
     greeting: "Welcome, {name}",
@@ -328,6 +423,14 @@ export const en = {
     title: "Team",
     subtitle: "Your salespeople and staff — who works here, what they can do, and which branch they cover.",
     noAccessBody: "You need the members-management capability to view and manage people here.",
+    /* Counted from the roster, never from a target. There is no quota model. */
+    stat: {
+      members: "People",
+      active: "Active",
+      pending: "Invitations pending",
+      pendingHint: "Sent, not yet accepted",
+      branches: "Branches",
+    },
     joinRequests: {
       title: "Requests to join",
       subtitle: "Salespeople who say they work here. Approving one gives them your sales tools.",
@@ -358,16 +461,33 @@ export const en = {
       lastOwner: "You can't remove the last owner of the organization.",
       cannotGrant: "You can only grant capabilities you hold yourself.",
       email: "Enter a valid email address.",
+      phone: "Enter a valid phone number.",
+      contactRequired: "Enter either an email address or a phone number.",
     },
     invite: {
       title: "Invite an employee",
+      channelLabel: "How should we reach them?",
+      channel: { email: "Email", phone: "Phone" },
       email: "Work email",
+      phone: "Phone number",
+      phoneHint: "Egyptian mobile or full international number.",
       branch: "Branch",
       noBranch: "Whole organization",
-      submit: "Send invitation",
-      sent: "Invitation created.",
+      submit: "Create invitation",
+      sent: "Invitation sent by email.",
+      ready: "Invitation ready to send.",
       linkReady: "Invitation link ready",
       linkHint: "Share this link with the employee. They accept it after signing in with a matching email.",
+      // Deliberately explicit that nothing was delivered. A manager who believes
+      // a message went out stops chasing an invitee nobody ever contacted.
+      phoneShareHint:
+        "Nothing has been sent yet. WhatsApp opens with the message ready — you still press Send there. The link works once and expires in 14 days.",
+      copy: "Copy link",
+      copyLink: "Copy invitation link",
+      whatsapp: "Send via WhatsApp",
+      whatsappMessage:
+        "Hi, you've been invited to join {organizationName} on Aladdin.\nUse this link to accept your invitation:\n{inviteUrl}",
+      copied: "Copied",
     },
     members: {
       title: "Members",
@@ -708,12 +828,51 @@ export const en = {
     unavailableBody: "A support contact hasn't been set up for this environment yet. Please reach out through your usual Aladdin contact.",
     backToSignIn: "Back to sign in",
   },
+  /* Chat, Notifications and Points are UI shells this sprint: the copy states
+     plainly that there is nothing yet rather than implying data that does not
+     exist. */
+  chat: {
+    empty: {
+      title: "No conversations yet",
+      body: "Messages with your suppliers, buyers and team will appear here.",
+    },
+  },
+  notifications: {
+    empty: {
+      title: "No notifications yet",
+      body: "Updates on your requests, offers and orders will appear here.",
+    },
+  },
+  /* The composer is the SHELL of a composer: it shows exactly the surface the
+     next sprint will wire, and states plainly that sending is not open, rather
+     than accepting text it would silently drop. */
+  feedback: {
+    title: "Feedback",
+    heading: "Tell us what to fix",
+    placeholder: "What is working, and what is getting in your way?",
+    send: "Send feedback",
+    notConnected: "Sending is not open yet — nothing typed here is saved.",
+    supportPrompt: "Need help with something now?",
+    supportLink: "Contact support",
+  },
+  points: {
+    title: "Points",
+    subtitle: "Your standing on Aladdin.",
+    empty: {
+      title: "Points are not running yet",
+      body: "When the programme opens, what you earn and where it counts will be shown here.",
+    },
+  },
+
   invite: {
     title: "You're invited",
     joinOrg: "You've been invited to join {org} on Aladdin.",
     joinOrgGeneric: "You've been invited to join an organization on Aladdin.",
     forEmail: "This invitation was sent to {email}.",
+    forPhone: "This invitation was issued for {phone}.",
     matches: "This invitation is for your account.",
+    phoneLinkNote:
+      "This invitation was issued for a phone number and can be accepted with the account you're signed in with.",
     notMatches: "This invitation is for a different email. Sign in with the invited address to accept it.",
     acceptCta: "Accept invitation",
     signInToAccept: "Sign in to accept",
@@ -1175,6 +1334,274 @@ export const en = {
     deliveryRunning: "Delivery in progress",
     noProjects: "No delivery work running.",
   },
+
+  /**
+   * The supply-side workspace — Distributor, Manufacturer and Importer.
+   *
+   * TERMINOLOGY RULE: the internal identifier for the Distributor concept is
+   * `supplier`, and it must NEVER appear in copy. Nothing in this block, or in
+   * any string it reaches, says "supplier".
+   *
+   * `voice` is the only place the three organization types differ. Everything
+   * else is written once and shared, because they do the same work: receive
+   * demand, price it, fulfil it.
+   */
+  supply: {
+    title: "Your supply at a glance",
+    voice: {
+      distributor: {
+        subtitle: "Demand from showrooms and businesses, and how you are converting it.",
+        topProductsHint: "The lines you distribute most, by ordered value.",
+        productsSubtitle: "The products you distribute, and how buyers find them.",
+        demandSubtitle: "Businesses asking you to price and supply.",
+      },
+      manufacturer: {
+        subtitle: "Demand for what you manufacture, and how you are converting it.",
+        topProductsHint: "The lines you make most, by ordered value.",
+        productsSubtitle: "What you manufacture, and how buyers find it.",
+        demandSubtitle: "Businesses asking you to price and produce.",
+      },
+      importer: {
+        subtitle: "Demand for what you import, and how you are converting it.",
+        topProductsHint: "The lines you import most, by ordered value.",
+        productsSubtitle: "What you import and supply, and how buyers find it.",
+        demandSubtitle: "Businesses asking you to price and supply.",
+      },
+    },
+    section: {
+      overview: "Your business at a glance",
+      attention: "What needs your attention",
+      demand: "Incoming demand, and the prices you sent",
+      performance: "How the business is converting",
+      fulfilment: "What you are fulfilling",
+    },
+    period: {
+      label: "Period",
+      "30d": "Last 30 days",
+      "90d": "Last 90 days",
+      "365d": "Last 12 months",
+      all: "All time",
+      /* A delta is shown only where a real, non-zero previous window exists. */
+      vsMonth: "from last month",
+      vsPrevious: "from the previous period",
+    },
+    flow: {
+      incoming: "Requests in",
+      quoted: "Prices sent",
+      accepted: "Prices accepted",
+      ordered: "Orders confirmed",
+      running: "In progress & completed",
+    },
+    opportunities: {
+      title: "New opportunities",
+      hint: "Lines asked for inside requests that reached you and have not been priced.",
+      quantity: "Quantity needed",
+      buyer: "Requested by",
+      status: "Awaiting your price",
+      cta: "View details",
+      more: "+{count} more lines on this request",
+      empty: "No open opportunities right now",
+      emptyBody: "Lines asked for inside incoming requests appear here before you answer them.",
+    },
+    market: {
+      title: "Demand movement",
+      hint: "The most-requested lines in {period}, counted from the requests that reached you.",
+      requests: "requests",
+      new: "New",
+      empty: "No movement in this period",
+      emptyBody: "The most-requested lines appear here as soon as requests reach your business.",
+    },
+    notifications: {
+      title: "Latest notifications",
+      hint: "Alerts tied to your activity.",
+      empty: "No notifications yet",
+      emptyBody: "Notifications are not switched on for your account yet. They will appear here once they are.",
+    },
+    videos: {
+      title: "Videos for your products",
+      hint: "Short clips that show your products to buyers.",
+      empty: "No videos yet",
+      emptyBody: "Your catalogue currently supports one image per product. Clips will appear here once they are supported.",
+    },
+    /* The cross-stage triage queue. Its wording never claims more than the
+       records support: a status is the record's OWN status, and a date is
+       labelled with which date it is. */
+    attention: {
+      title: "Waiting on you right now",
+      hint: "Work that has stopped at some stage of your pipeline, in the order you would work it.",
+      clear: "Nothing is waiting on you",
+      clearBody:
+        "Every request has been priced, every accepted price has an order behind it, and every order is moving.",
+      stageClear: "Nothing at this stage",
+      stageClearBody: "Pick another stage, or show everything.",
+      stage: {
+        all: "All",
+        price: "To price",
+        chase: "To follow up",
+        order: "To order",
+        fulfil: "To fulfil",
+      },
+      column: { status: "Status" },
+      amount: "Value",
+      date: {
+        required: "Required by",
+        validUntil: "Valid until",
+        accepted: "Accepted on",
+        confirmed: "Confirmed on",
+      },
+      cta: {
+        price: "Send a price",
+        chase: "Follow up",
+        order: "Create the order",
+        fulfil: "Progress it",
+      },
+    },
+    /* The context panel beside the queue: the same three record sets the page is
+       built from, counted by stage rather than listed. */
+    pipeline: {
+      title: "Your pipeline",
+      hint: "Every record your business is a party to, counted by stage.",
+      demand: "Requests received",
+      quotations: "Prices sent",
+      orders: "Orders",
+      catalogue: "Your catalogue",
+    },
+    tile: {
+      demandIn: "Requests received",
+      demandInHint: "Requests that reached your business",
+      quotationsOut: "Prices sent",
+      quotationsOutHint: "Quotations you issued",
+      ordersWon: "Orders confirmed",
+      ordersWonHint: "Confirmed in this period",
+      awaitingResponse: "Requests to answer",
+      awaitingResponseHint: "Nobody has priced these yet",
+      awaitingDecision: "Prices out for decision",
+      activeOrders: "Orders to fulfil",
+      orderValue: "Order value won",
+      orderValueHint: "Confirmed orders, all time",
+      completedOrders: "Orders completed",
+      customers: "Active customers",
+      customersHint: "Businesses that have ordered",
+      published: "Published products",
+      drafts: "Drafts",
+      draftsHint: "Not visible to buyers yet",
+      fulfilling: "Delivery running",
+    },
+    demand: {
+      title: "Incoming demand",
+      awaiting: "Waiting for your price",
+      awaitingHint: "Requests sent to you that nobody has answered yet.",
+      subtitle: "Requests sent to your business, and the ones you have answered.",
+      empty: "No requests are waiting on you right now.",
+      emptyBody: "Published products are how buyers find you. Keep your catalogue current.",
+    },
+    quotations: {
+      title: "Quotations",
+      latest: "Your latest quotations",
+      latestHint: "Prices you have sent, newest first.",
+      subtitle: "Prices you have sent out, and what came back.",
+    },
+    orders: {
+      title: "Orders",
+      active: "Orders in progress",
+      activeHint: "Confirmed and in-progress orders you are fulfilling.",
+      subtitle: "Orders placed with you, and the delivery work behind them.",
+    },
+    customers: {
+      title: "Customers & showrooms",
+      subtitle: "The businesses that ask you for prices and place orders with you.",
+      empty: "No customer has worked with you yet.",
+      emptyBody:
+        "A business appears here as soon as it sends you a request. Publishing products is how buyers find you.",
+      relationship: "Working relationship",
+      findMore: "Find more businesses",
+      findMoreBody: "Browse showrooms, contractors and design offices on Aladdin.",
+      column: {
+        business: "Business",
+        requests: "Requests",
+        quotations: "Quotations",
+        accepted: "Accepted",
+        orders: "Orders",
+        value: "Order value",
+        lastActivity: "Last activity",
+      },
+      stat: {
+        total: "Customers",
+        ordering: "Have ordered",
+        requesting: "Requests only",
+        value: "Order value",
+      },
+      unlisted: "Not publicly listed",
+      unlistedHint: "This business has not completed verification.",
+      scopeNote:
+        "These figures cover your own records with each business — the requests, quotations and orders you are a party to. Nothing private about the other business is shown.",
+    },
+    products: {
+      title: "Your products",
+      empty: "You have not added a product yet.",
+      emptyBody: "Buyers find you through your published products. Add your first one to get started.",
+      noMatch: "No product matches these filters.",
+      noMatchBody: "Try a different search, category or status.",
+      tab: { all: "All", published: "Published", draft: "Drafts" },
+      stat: {
+        total: "Products",
+        published: "Published",
+        draft: "Drafts",
+        requested: "Requested",
+        requestedHint: "Products with demand",
+      },
+      column: { demand: "Demand" },
+      /* One vs many, following the `directory.workedOrderOne` convention. Arabic
+         has richer plural rules than this, but "1 requests" is the error a reader
+         actually notices, and it is the one worth spending a key on until a real
+         pluralisation helper exists. */
+      demandRequests: "{count} requests",
+      demandRequestOne: "1 request",
+      demandNone: "No requests yet",
+      searchPlaceholder: "Search by name, code or brand…",
+      filterCategory: "Category",
+      filterStatus: "Status",
+      draftNotice: "Drafts are private. Publish a product to let buyers request it.",
+    },
+    chart: {
+      valueTrend: "Order value won, by month",
+      valueTrendHint: "Confirmed orders, by the month they were confirmed.",
+      funnel: "Demand to order",
+      funnelHint: "How much of the demand sent to you becomes an order.",
+      topProducts: "Your top products",
+      topCustomers: "Your top customers",
+      quotationsByStatus: "Quotations by status",
+      ordersByStatus: "Orders by status",
+      demandByStatus: "Incoming requests by status",
+      productDemand: "Most requested products",
+      productDemandHint: "By how many businesses have asked for them.",
+    },
+    funnel: { demand: "Requests received", quoted: "Quotations sent", ordered: "Orders won" },
+    acceptedValue: "Accepted quotation value",
+    awaitingDecisionValue: "Value out for decision",
+    action: {
+      answerDemand: "Answer a request",
+      answerDemandBody: "Price the requests businesses have sent you.",
+      quotations: "Your quotations",
+      quotationsBody: "Track what you have priced and what came back.",
+      addProduct: "Add a product",
+      addProductBody: "Publish a line so buyers can find and request it.",
+      products: "Manage products",
+      productsBody: "Your catalogue, its status and the demand behind it.",
+      customers: "Your customers",
+      customersBody: "The businesses that buy from you.",
+    },
+    empty: {
+      noOrders: "No confirmed orders yet.",
+      noProductSales: "No product has been ordered yet.",
+      noCustomers: "No customer has ordered yet.",
+      noActiveOrders: "Nothing in progress",
+      noActiveOrdersBody: "Orders you are fulfilling will appear here.",
+    },
+    scopeNote:
+      "Every figure here counts records your organization is a party to, and each one opens the record behind it.",
+  },
+
   customers: {
     title: "Customers",
     subtitle: "Everyone your team is working with.",
@@ -1899,7 +2326,7 @@ export const en = {
       activateHint: "Start execution — move the project from planned to active.",
       complete: "Mark project completed",
       completeHint: "Finish execution — this completes the project and its order.",
-      completedBody: "Execution is finished. No invoice or payment is created.",
+      completedBody: "Execution is finished. Nothing further is required here.",
       awaitingExecutor: "Waiting on the executing organization to advance this project.",
       empty: {
         executingTitle: "No projects yet",

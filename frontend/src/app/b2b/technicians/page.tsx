@@ -7,7 +7,7 @@ import {
   CONSULTANT_PERSONAS,
   type PersonaType,
 } from "@/server/queries/directory";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { StatTiles, TabLinks } from "@/components/ui/stat-tiles";
 import { ProfessionalDirectoryTable } from "@/features/directory/directory-tables";
@@ -70,12 +70,16 @@ export default async function TechniciansPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
+        Icon={WrenchIcon}
         title={m.technicians.title}
         subtitle={consultants ? m.technicians.consultantsSubtitle : m.technicians.subtitle}
         count={rows.length}
       />
 
       <StatTiles
+        locale={locale}
+        layout="strip"
         tiles={[
           { label: m.technicians.stat.trades, value: tradeCount, Icon: WrenchIcon, tone: "accent" },
           { label: m.technicians.stat.consultants, value: consultantCount, Icon: UsersIcon, tone: "info" },
@@ -86,6 +90,7 @@ export default async function TechniciansPage({
 
       <div>
         <TabLinks
+          locale={locale}
           basePath="/b2b/technicians"
           param="group"
           current={group}

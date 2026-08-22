@@ -37,7 +37,7 @@ export default async function B2BLayout({ children }: { children: ReactNode }) {
   return (
     <I18nProvider locale={locale} dir={dir}>
       {workspace.active ? (
-        <AppShell workspace={workspace} theme={theme}>
+        <AppShell workspace={workspace}>
           {children}
         </AppShell>
       ) : (

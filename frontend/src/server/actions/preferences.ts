@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { LOCALE_COOKIE } from "@/lib/i18n/config";
 import { isLocale } from "@/lib/i18n/locales";
-import { THEME_COOKIE } from "@/lib/theme/config";
+import { THEME_COOKIE, resolveThemePreference } from "@/lib/theme/config";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
@@ -16,9 +16,14 @@ export async function setLocale(locale: string): Promise<void> {
   revalidatePath("/", "layout");
 }
 
-/** Persist the theme (light/dark) in a cookie so SSR renders the right class. */
+/**
+ * Persist the theme PREFERENCE (system/light/dark) so SSR renders the right
+ * class. Anything unrecognised falls back to `system` rather than to a hard
+ * light — a malformed value must not silently become a choice the user did not
+ * make.
+ */
 export async function setTheme(theme: string): Promise<void> {
-  const value = theme === "dark" ? "dark" : "light";
+  const value = resolveThemePreference(theme);
   const store = await cookies();
   store.set(THEME_COOKIE, value, { path: "/", maxAge: ONE_YEAR, sameSite: "lax" });
   revalidatePath("/", "layout");

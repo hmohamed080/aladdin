@@ -46,6 +46,25 @@ export function CardRail({
   const [atEnd, setAtEnd] = useState(true);
   const [overflow, setOverflow] = useState(false);
 
+  /**
+   * The travel distance the last arrow click COMMITTED to, or null when the rail
+   * is wherever the user last left it.
+   *
+   * This is the whole fix for consecutive clicks, and it exists because a smooth
+   * scroll is not instantaneous. Measuring geometry gives you where the rail IS,
+   * and 150ms into an animation that is a moving, meaningless position: a second
+   * click would look at cards drifting past mid-flight, find that the "next card
+   * that starts after here" is the one already being scrolled to, and command a
+   * move that finishes the FIRST click instead of advancing past it. Clicking
+   * next three times quickly then advanced one card, not three — which reads as
+   * an arrow that randomly ignores you.
+   *
+   * Holding the committed destination separately means every click reasons about
+   * where the rail is HEADED, while the distance it actually commands is still
+   * measured from live geometry (which is what `scrollBy` is relative to).
+   */
+  const commit = useRef<number | null>(null);
+
   const measure = useCallback(() => {
     const el = track.current;
     if (!el) return;
@@ -57,6 +76,11 @@ export function CardRail({
     setOverflow(max > 2);
     setAtStart(travelled <= 2);
     setAtEnd(travelled >= max - 2);
+    // Arrived. Releasing the commitment here (rather than on a timer) means the
+    // rail is never left believing it is mid-flight after it has settled.
+    if (commit.current !== null && Math.abs(travelled - commit.current) <= 2) {
+      commit.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -64,32 +88,111 @@ export function CardRail({
     if (!el) return;
     measure();
     el.addEventListener("scroll", measure, { passive: true });
+    // Any scroll the USER drives — wheel, trackpad, swipe, drag, arrow keys —
+    // supersedes whatever an arrow was heading for. Without this, a click
+    // followed by a swipe would leave the next click reasoning from a
+    // destination the user has already overridden.
+    const release = () => {
+      commit.current = null;
+    };
+    for (const type of ["wheel", "touchstart", "pointerdown", "keydown"] as const) {
+      el.addEventListener(type, release, { passive: true });
+    }
     // Catches BOTH the viewport resizing and the sidebar changing mode — either
     // one changes how many cards fit, and therefore whether arrows belong.
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     if (el.firstElementChild) ro.observe(el.firstElementChild);
     return () => {
+      for (const type of ["wheel", "touchstart", "pointerdown", "keydown"] as const) {
+        el.removeEventListener(type, release);
+      }
       el.removeEventListener("scroll", measure);
       ro.disconnect();
     };
   }, [measure, children]);
 
-  /** Move by whole cards — as many as currently fit, never a raw pixel guess. */
-  const page = (direction: 1 | -1) => {
+  /**
+   * ONE CARD PER CLICK — the arrow is a "next item", not a "next page".
+   *
+   * The previous implementation multiplied a card's width by how many fit and
+   * scrolled that far, so on a wide desktop a single click on a four-up rail
+   * jumped four cards — usually straight to the end. That is a pager. What a
+   * user reaches for here is the mobile-swipe gesture: show me the next one.
+   *
+   * WHY GEOMETRY, NOT ARITHMETIC
+   * Nothing below computes a distance from a width and a gap. It measures where
+   * each card actually IS relative to the rail and scrolls to the adjacent one.
+   * That survives everything arithmetic gets wrong: a mixed-width card, a
+   * different `gap` from a caller, the 4px scroll padding, fractional layout,
+   * and a browser mid-way through a smooth scroll.
+   *
+   * RTL falls out for free. `leadDistance` measures from the rail's LOGICAL
+   * start edge — the left edge in English, the right edge in Arabic — so "the
+   * first card that begins after where we are" means the same sentence in both,
+   * and only the sign of the final `scrollBy` differs.
+   */
+  const leadDistance = (track: HTMLElement, card: HTMLElement, rtl: boolean) => {
+    const t = track.getBoundingClientRect();
+    const c = card.getBoundingClientRect();
+    return rtl ? t.right - c.right : c.left - t.left;
+  };
+
+  /**
+   * The rail's own logical start inset. A card that is correctly snapped sits at
+   * `scroll-padding-inline-start` from the scrollport edge, NOT at zero, so its
+   * measured lead distance at rest is that padding rather than 0. Landing a card
+   * at lead 0 instead would leave it 4px past its snap position, the browser
+   * would snap it back, and the correction would compound into visible drift
+   * over a run of clicks. Read rather than hardcoded so a caller that changes
+   * the rail's padding does not silently break the arithmetic.
+   */
+  const startInset = (el: HTMLElement) => {
+    const style = getComputedStyle(el);
+    const scrollPad = parseFloat(style.scrollPaddingInlineStart);
+    if (Number.isFinite(scrollPad)) return scrollPad;
+    const pad = parseFloat(style.paddingInlineStart);
+    return Number.isFinite(pad) ? pad : 0;
+  };
+
+  const step = (direction: 1 | -1) => {
     const el = track.current;
     if (!el) return;
-    const first = el.firstElementChild as HTMLElement | null;
-    const gap = parseFloat(getComputedStyle(el).columnGap || "0") || 0;
-    const step = first ? first.getBoundingClientRect().width + gap : el.clientWidth;
-    const perView = Math.max(1, Math.floor(el.clientWidth / Math.max(step, 1)));
-    const distance = step * perView;
+    const rtl = dir === "rtl";
+    const cards = Array.from(el.children) as HTMLElement[];
+    if (cards.length === 0) return;
+
+    const SLACK = 6;
+    const inset = startInset(el);
+    const live = Math.abs(el.scrollLeft);
+    // How far ahead of the live position the rail is already headed. Zero unless
+    // a previous click is still animating.
+    const ahead = commit.current === null ? 0 : commit.current - live;
+
+    // `lead` is measured from live geometry, because that is the frame `scrollBy`
+    // works in. `fromTarget` re-bases the same numbers onto where the rail is
+    // GOING, which is the frame the choice of "which card is next" belongs in.
+    const lead = cards.map((c) => leadDistance(el, c, rtl) - inset);
+    const fromTarget = lead.map((d) => d - ahead);
+
+    // Ascending by construction, so "the next one" is the first card that starts
+    // after the committed position, and "the previous one" is the last card that
+    // starts before it — never two, never the end of the rail.
+    const index =
+      direction === 1
+        ? fromTarget.findIndex((d) => d > SLACK)
+        : fromTarget.findLastIndex((d) => d < -SLACK);
+    // -1 means there is no adjacent card in that direction: we are at the end of
+    // the rail, or already committed to it. Doing nothing is correct.
+    const distance = index === -1 ? undefined : lead[index];
+    if (distance === undefined) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     el.scrollBy({
-      // In RTL the logical "next" is a DECREASING scrollLeft, hence the flip.
-      left: (dir === "rtl" ? -1 : 1) * direction * distance,
+      // In RTL the logical "forward" is a DECREASING scrollLeft, hence the flip.
+      left: (rtl ? -1 : 1) * distance,
       behavior: reduce ? "auto" : "smooth",
     });
+    commit.current = live + distance;
   };
 
   const PrevIcon = dir === "rtl" ? ChevronRightIcon : ChevronLeftIcon;
@@ -147,7 +250,7 @@ export function CardRail({
         <>
           <button
             type="button"
-            onClick={() => page(-1)}
+            onClick={() => step(-1)}
             disabled={atStart}
             aria-label={t("rail.previous")}
             data-testid="rail-prev"
@@ -157,7 +260,7 @@ export function CardRail({
           </button>
           <button
             type="button"
-            onClick={() => page(1)}
+            onClick={() => step(1)}
             disabled={atEnd}
             aria-label={t("rail.next")}
             data-testid="rail-next"

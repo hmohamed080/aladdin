@@ -4,6 +4,49 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Visual UAT fix round 1: Arabic numerals and the compact sidebar
+
+**Date:** 2026-08-18 · **Branch:** `feature/supply-side-b2b-mvp` (PR #34) · **Base:** `main`
+
+Two defects found in real-browser UAT. Both were fixed at the shared layer rather than at the surfaces where they were spotted, because each was the symptom of one missing rule.
+
+### Arabic numerals: the bug was a missing formatter, not a wrong locale
+
+The Arabic UI mixed numeral systems on the same screen — ١٢ in a panel that happened to route through `Intl`, `12` in the panel beside it. The cause was not that `ar-EG` was wrong; it was that **most numbers never reached a formatter at all**. A bare `{count}` in JSX stringifies through `Number.prototype.toString`, which is locale-blind.
+
+There were three distinct leak paths, and all three are now closed:
+
+1. **Shared primitives rendered raw numbers.** `KpiStrip`, `PageHead`/`PageHeader` (the count pill), `PanelRow`, `StatTiles`, `TabLinks`, `RankedBars`, `Funnel`, and the Admin console's `AdminHeader`/`StatTile`/`DistList` all printed `number` props directly. Each now takes a **required** `locale` and formats numeric values itself. Required, not optional-with-a-default: a default would be a silent wrong answer, and requiring it made the compiler enumerate all **88 call sites** rather than leaving the sweep to grep.
+2. **`createTranslator` coerced numeric interpolation with `String(val)`.** This was the single largest source. `t("execution.order.itemCount", { count: items.length })` localised every word of the sentence and then printed `1 عنصر`. The translator now formats a `number` for its bound locale and substitutes a `string` verbatim — which is also what keeps identifiers safe.
+3. **Duplicate formatter implementations.** `features/commerce/constants.ts` had its own `formatMoney`/`formatQuantity`, `products-table.tsx` built its own `Intl.NumberFormat`, and `supply-report.tsx` inlined a second copy of `orderCountLabel` with `String(c.orders)` — which is exactly where a Latin `2` survived into `2 طلبيات` on an otherwise fully-localized report. All now route through `lib/ui/format.ts`. **There is no `new Intl.` anywhere in `src/` outside that one file.**
+
+`lib/ui/format.ts` is the single layer. Two decisions in it are worth keeping:
+
+- **The locale tag is `ar-EG-u-nu-arab`, not `ar-EG`.** CLDR's default numbering system for Egypt has moved between `arab` and `latn` across ICU versions, and the server's Node, the browser's ICU and a CI container need not agree. Pinning the numbering system in the tag makes every runtime produce the same digits. The calendar is pinned to `gregory` for the same reason. Formatter instances are memoized per (tag, options) — a fifty-row table with four money columns would otherwise construct two hundred `Intl` objects per render.
+- **Identifiers are the explicit exception.** `formatIdentifier()` passes `ORD-1256`, SKUs, UUIDs, emails and URLs through unchanged in every locale. It is a function rather than "just don't call a formatter" so the intent is greppable and a reviewer can tell a deliberate exemption from an oversight.
+
+### The sidebar leaked its own mode name, and only during a hover
+
+The compact rail's nav items were already icon-only. The defect was the **mode control at the foot**: its label was gated on `narrow`, which is momentary. In expand-on-hover the panel widens the instant the pointer crosses it, so reaching for the control made it print `التوسيع عند المرور` — the name of the mode you were already in.
+
+The label is now gated on `mode === "expanded"` — the CHOSEN mode, not the current width. Collapsed and expand-on-hover keep the closed control icon-only through every phase of the reveal; the mode names still exist inside the menu the control opens, where the user is actually choosing between them. The accessible name gained the active mode (`"الشريط الجانبي: مصغّر"`), so a screen-reader user is told more than the sighted user sees, not less.
+
+### Validation
+
+Frontend typecheck ✓ · lint ✓ (0 errors, 0 warnings) · unit **295/295** ✓ (20 new formatter tests asserting digits rather than separators — pinning ICU's grouping marks would break the suite on a Node upgrade for no user-visible reason; 3 translator-interpolation tests; 6 sidebar tests covering the collapsed and mid-reveal control).
+
+Real-browser UAT through the real Email-OTP path:
+
+- **`rania@example.test`** (Distributor, Arabic) — dashboard, orders, order detail, reports, products, quotations, suppliers, organization, settings and catalog each scanned with a DOM probe for Latin digits in `#main`: **zero**, on every one. All three sidebar modes exercised; the hover reveal floats the panel to 240px while the spacer stays at 56px (no page reflow), shows 17–18 labels with **no duplicates**, no `role="tooltip"` and no `title` attributes.
+- **`mahmoud@example.test`** (Manufacturer, English) — zero Arabic-Indic digits; `EGP 896.8K`, `Sep 24, 2026`, counts all Western.
+- **`hana@example.test`** (Showroom) and **`admin@example.test`** (Admin console, both locales) — collapsed rail `innerText` is the empty string, aria-labels intact. The Admin console keeps its fixed labelled aside: it has no compact mode, so the icon-only contract does not apply to it.
+
+The only Latin digits found anywhere in Arabic were **product names and seeded test-account display names** (`Porcelain Floor Tile 60×60`, `Sales Refers 1787049063346`) — content, correctly left alone.
+
+**Not run, per the brief:** full E2E, pgTAP (no schema change), performance, the persona matrix. A hydration warning in the dev console is caused by a browser extension injecting `data-gr-ext-installed` onto `<body>`; it is not from this branch.
+
+---
+
 ## Session — Distributor terminology closeout
 
 **Date:** 2026-08-17 · **Branch:** `chore/distributor-terminology-closeout` · **Base:** `main` @ `474a6f0`
@@ -1842,3 +1885,821 @@ product visibility is honoured here automatically.
   planned AI/OCR/RAG/document work must not become blocking HTTP work inside these request handlers.
 - Hosted Supabase SMTP/Resend settings and the hosted Magic Link template are dashboard-only state and
   cannot be read with the repo's authenticated tooling — listed as manual owner checks.
+
+---
+
+## 2026-08-17 — Sprint 15: shared SUPPLY-SIDE B2B workspace (Distributor · Manufacturer · Importer)
+
+Branch `feature/supply-side-b2b-mvp`. Reference set: `UI-UX/references/Distributor/` (12 screens,
+now tracked, matching the existing `references/showroom/` convention). No `.pen` file touched.
+
+### The audit finding the sprint turned on
+`listRfqs`, `listQuotations`, `listOrders` and `listProjects` have **always** taken a side parameter
+(`"requester" | "supplier"`), and every commerce record names both parties. The supply side was never
+missing from the backend — it was buried as a secondary tab behind a buyer-first IA built for the
+Showroom. So this was not "build a second app"; it was "make the seat a first-class derived property".
+
+Reference → Aladdin mapping: Dashboard/Products/Quotes+Orders/Analytics/Sales reps → REORGANIZE or
+IMPLEMENT over existing modules · "New Opportunities" → the existing RFQ domain presented as incoming
+demand, **no new marketplace domain invented** · customer network → new `/b2b/buyers` · Messages,
+Reels, invoices/collections, wallet, commissions, carrier tracking, Egypt map → **DEFERRED, not faked**.
+
+### What was built
+- **`lib/workspace/supply-side.ts`** (pure, 11 unit tests) — `commerceStance(orgType)`, `supplyVoice()`.
+  `OrgContext` gained `orgType` at **zero extra reads** (the workspace entries already select it).
+  Stance is a PRESENTATION DEFAULT: it grants no authority, hides no module, never touches `users`.
+- **One shared sidebar, two orderings.** `lib/nav/modules.ts` now returns stance-ordered sections;
+  the commerce trio keeps the same hrefs/gates and swaps labels (Incoming demand / Quotations /
+  Orders). `SidebarShell`, its three display modes, RTL geometry, the mode cookie, tooltips and the
+  mobile sheet are **unchanged and shared** — no Showroom/Distributor split exists.
+- **`CardRail` reused as-is** for the dashboard KPI group and quick actions. No second carousel.
+- **Supply dashboard** (`features/home/supply-dashboard.tsx`), sibling to the extracted
+  `buyer-dashboard.tsx`; `/b2b/page.tsx` is now a thin stance selector.
+- **`supplySummary()`** — one call covering tiles, funnel, trend, top products and top customers from
+  three list-view reads plus one conditional line-item pass. Deliberately NOT `purchaseSummary` with
+  columns swapped; the seats are asymmetric (see the type's doc comment).
+- **Products** rebuilt on shared `DataTable`: KPI rail, status tabs, search + category filter, media,
+  and per-product **demand** (`productDemand`, counted per REQUEST not per line).
+- **`/b2b/buyers`** — customer network from `customerOrganizations()`. Every figure counts records the
+  caller is a party to; the only counterparty columns come from the hardened public directory.
+  Unlisted customers are MARKED, never dropped.
+- **`SupplyReport`** leads `/b2b/reports`; the purchasing report stays below in full.
+- **Team page** gained an honest roster KPI strip (zero extra reads). The reference's per-rep sales
+  TARGETS and leaderboard were refused — no quota/commission model exists, and a leaderboard built
+  from fiction would be used to manage real people.
+
+### Deliberate refusals (each has a concrete reason, not a scope preference)
+No stock/warehouse/reorder/margin on Products · no Egypt sales map (`locality_id` has no locality
+table and no coordinates) · no AI "smart insight" · no invoices/collections/wallet · no carrier
+tracking on fulfilment (order + project state only) · no growth badges anywhere (no comparison period
+exists) · supply-side report offers **no branch filter** because `requester_branch_id` is the BUYER's
+branch and filtering by it would answer the question wrongly rather than not at all.
+
+### Seed — `seed-pilot.sql` section 11
+Sections 1-10 only ever reached the supply side as the far end of chains the showroom had already
+FINISHED, so `submitted` RFQs, undecided quotations and in-progress orders were all unreachable and
+each org had exactly one customer. Section 11 adds commerce **between businesses that already exist**
+— no new orgs, people, branches or memberships — plus one published and one draft product each.
+Result per acceptance account (published/draft/awaiting/undecided/active orders/completed/customers/projects):
+Distributor 3/1/**3**/1/2/2/**3**/1 · Manufacturer 3/1/2/2/1/1/2/1 · Importer 3/1/2/2/1/1/2/1.
+
+Acceptance accounts: `rania@example.test` (Suez Paints, Distributor) · `mahmoud@example.test`
+(Alexandria Glass, Manufacturer) · `fady@example.test` (Cairo Sanitary Ware, Importer).
+
+### Validation (feature-first, as scoped)
+typecheck ✅ · lint ✅ · vitest **254/254** ✅ · clean `supabase db reset` + pgTAP **747/747** ✅
+(seed change disturbed no fixture) · new `e2e/supply-side-mvp.spec.ts`: **31 desktop + 30 mobile** ✅
+across all three org types, EN + AR, asserting real data, no console errors, no horizontal overflow,
+all three sidebar modes with cookie persistence, the shared CardRail by test id, and that `Supplier`
+never reaches user-facing copy · showroom regression `showroom-mvp` + `showroom-interaction`
+**26/26** ✅ — the buyer seat is untouched.
+
+Not run, per scope: full repository E2E, final cross-account integration gate, performance gate.
+
+### One assertion corrected during validation, worth recording
+The first spec demanded the purchasing trend CHART on a supply-side report. It failed for all three —
+correctly: none of them has bought anything, so `TrendLine` renders its honest "no committed spend"
+panel. The assertion was wrong, not the code, and was changed to assert the purchasing SECTION plus
+that empty state. Demanding the chart would have been demanding the page draw data that does not exist.
+
+### Unfinished / next
+- Cross-account integration gate (Showroom publishes → RFQ → quote → accept → order → supply-side
+  progresses → Showroom observes) is now manually testable end to end but was **not** run, per scope.
+- `sellSummary()` is now redundant with `supplySummary()` on the seller path; it still backs the
+  buyer-seat report's small sell-side card. Collapse the two when the buyer report is next revisited.
+
+---
+
+## 2026-08-18 — Pre-UAT shell + supply-side visual pass (`feature/supply-side-b2b-mvp`, PR #34)
+
+One correction pass over the authenticated shell and the seller surfaces, on the same branch and the
+same PR. **No migration, no schema change, no seed change, no RLS change.**
+
+### Global shell
+- **One shared `AppHeader`** replaces three drifting header bars (B2B · personal `/home` · Admin).
+  Everything surface-specific arrives as a SLOT (`context`, `actions`), so there is no persona clone.
+  It is deliberately NOT applied to sign-in / sign-up / OTP / onboarding — those keep their own
+  minimal chrome and the standalone language/theme switches. **No notification bell**: no
+  notification model exists, and a bell that opens nothing is a lie in the chrome.
+- **Global search / command palette** (`Ctrl/Cmd+K`, click, Escape, ↑/↓, Enter). Two result families:
+  navigation results are LOCAL (from the same `allowedNavSections` the sidebar draws from, so they
+  are instant), record results are server-side, debounced 250 ms, request-id guarded, RLS-scoped,
+  pinned to the active organization, and **capability-gated per entity group**. The gate is a pure
+  module — `lib/search/scope.ts` — unit-tested against `lib/nav/modules` so search can never become a
+  back door into a module the sidebar hides. Platform-admin destinations are gated by a
+  SERVER-resolved role, never a client flag. A personal account issues no record query at all.
+  Bounded: 6 rows per group, minimum 2-character query, `sanitizeSearchTerm` on every term.
+- **Profile/account menu**: signed-in identity (display name + the ONE verified contact — the auth
+  model verifies email OR WhatsApp, so an email row is not assumed), work context as read-only
+  CONTEXT (not a second workspace switcher), profile + preferences links, AR/EN language,
+  System/Light/Dark appearance, log out. Theme preference gained `system` with a blocking pre-paint
+  script in `<head>` and a `ThemeSync` listener; one theme system, not two. Language and sign-out
+  moved OUT of the header row into this menu on every authenticated surface.
+- **Collapsed sidebar**: the floating hover caption is gone; hover/focus now lights the icon's own
+  tile. `aria-label`, active state and every capability-derived module are unchanged. The caption was
+  painting over page content and, in expand-on-hover mode, racing the reveal to show the same word twice.
+- **CardRail**: one arrow click = exactly ONE card, measured from real adjacent-child geometry rather
+  than `cardWidth × cardsPerView` (which on a wide desktop jumped to the end). RTL falls out of the
+  same measurement; six unit tests cover both directions and a mid-rail position.
+- **Scrollbars, globally**: stepper arrows removed, dark-mode track/thumb tokenised, Firefox served
+  via `scrollbar-width`/`scrollbar-color`. **The trap:** Blink IGNORES every `::-webkit-scrollbar-*`
+  rule the moment `scrollbar-width` or `scrollbar-color` matches the element — setting both, the
+  obvious "belt and braces" version, silently disables the arrow removal. The standard properties are
+  therefore fenced behind `@supports not selector(::-webkit-scrollbar)`.
+
+### Supply-side visual fidelity (reference: `UI-UX/references/Distributor`, structure only)
+New shared, server-safe `components/ui/workspace-layout.tsx`: `PageHead` (banded head + module
+glyph), `KpiStrip` (ONE bordered instrument with hairline seams), `WorkPane` (wide working column +
+narrow context column), `Panel`/`PanelRow`, `NextSteps`, `Band`. `PageHeader` is now a thin adapter
+over `PageHead` and moved out of the `"use client"` module so pages can pass a glyph; `StatTiles`
+gained `layout="strip"`. The supply dashboard was rebuilt to the reference SHAPE — banded head, five
+KPIs (not nine railed tiles), a demand queue with a status/catalogue context column, a performance
+band, and a real next-steps row. RFQs/quotations/orders gained a real status donut beside their
+tables. Reports (both the buyer strip and `SupplyReport`) moved from the rail to the strip.
+
+**Still deliberately absent, each because no model backs it:** wallet · invoices/collections · Reels ·
+chat/messages · carrier tracking · maps · quotas · warehouse/ERP · growth badges (no comparison
+period exists in the database).
+
+### Two real defects found and fixed during validation
+1. **The language switch never re-rendered the page.** `revalidatePath` clears the server cache but
+   does not pull a fresh RSC payload for the ROOT layout, which owns `<html lang>`/`<html dir>` — so
+   the cookie flipped, `dir` flipped imperatively, and every string stayed in the old language: an
+   RTL shell full of English. Both language controls now reload the document. This was pre-existing
+   (it is behind the long-standing `sales.spec` language-switch failure), not introduced here.
+2. **`truncate` on a KPI value is a correctness bug, not a layout one.** `EGP 289,600.00` clipped
+   mid-string renders as a perfectly plausible smaller number. The strip's value now wraps, and
+   money on a KPI is formatted compact at the caller.
+
+### Validation
+typecheck ✅ · lint ✅ (0/0) · vitest **266/266** ✅ (new: `lib/search/scope`, rewritten `card-rail`,
+extended `sidebar-shell`) · new `e2e/global-shell-uat.spec.ts` **16 passed** across desktop + Pixel 5
+(Distributor AR, Manufacturer EN, Importer AR, collapsed-rail hover, one-card rail, header search +
+account menu, locale switch, personal `/home` palette exposing no business records, Admin gating,
+non-staff never offered Admin, mobile) · regression `supply-side-mvp` + `showroom-mvp` +
+`showroom-interaction` **122 passed** after four assertions were updated to the intended new
+behaviour (no collapsed tooltip, KPI strip instead of the dashboard rail, language control now in the
+account menu, Reports money-figure check rewritten to assert the FIGURE rather than the container).
+Real-browser review as `rania@example.test` in Arabic, light and dark.
+
+Not run, per scope: full repository E2E, Lighthouse/performance, pgTAP (no schema or RLS change).
+
+### Unfinished / next
+- `/b2b/settings` still carries the binary `ThemeSwitch`, which cannot express "System". Harmless
+  (same cookie, same action, and it now reads the live theme) but worth reconciling with the account
+  menu's three-way control next time settings is touched.
+- The reference's per-product media/thumbnails are placeholders; no image pipeline exists yet.
+
+---
+
+## Session · Visual UAT round 2 — global shell + Pilot scope
+**Branch** `feature/supply-side-b2b-mvp` · **PR** #34 (updated, NOT merged)
+
+Seven product-wide findings from UAT round 2. Discovery was deliberately scoped to the shared
+components named in the brief — no second repository audit.
+
+### Dark mode rebuilt on a neutral ground (the largest change)
+The dark theme was painted on **Basalt**, which is a BRAND colour — a cool blue-black stone that is
+right for the Aperture mark, the auth panel and every modal scrim, and wrong as a workspace ground.
+At `#0e1113` it is close enough to pure black that a full-height sidebar and an empty table region
+both read as dead space, while the jump up to `#1b2226` was large enough that every card looked like
+it was floating in a hole.
+
+A new **Carbon** primitive ramp is now the dark ground: neutral (no blue cast), starting at charcoal
+rather than near-black, stepping a few points of lightness at a time. Borders sit only just above the
+surface they divide — that is what removes the drawn-grid look — and contrast is carried by the TEXT,
+where the ratios actually have to hold (`15.7 / 7.7 / 4.8 : 1` on both canvas and surface). Basalt is
+untouched; the brand does not move.
+
+**Shadows are now theme-aware tokens** (`--shadow-raised` / `--shadow-card` / `--shadow-overlay`,
+mapped onto Tailwind's `sm` / `card` / `lg`). The old `shadow-card` was one fixed warm near-black at
+4%, tuned against Limestone and invisible on a charcoal ground — which is the real reason dark cards
+had no edge and dropdowns did not lift off the page. Overriding Tailwind's own `sm`/`lg` is
+deliberate: every menu, popover and rail in the product already reaches for those names.
+
+Light mode is unchanged (verified: `body` still resolves to `#f4f1ea`).
+
+### CardRail — the defect was consecutive clicks, not the step size
+One card per click was already correct **at rest** (a previous session replaced the pager arithmetic
+with geometry). What was still broken was clicking faster than the smooth scroll animates: 150ms in,
+the cards are at drifting intermediate positions, so a second click concluded that "the next card
+from here" was the one the first click was already travelling to, and commanded a move that merely
+finished it. **Three fast clicks advanced one card.**
+
+The rail now holds the travel distance it COMMITTED to and reasons about which card is next from
+where it is *headed*, while still measuring the distance it commands from live geometry (which is the
+frame `scrollBy` works in). The commitment is released on arrival and on any user-driven scroll
+(wheel / touch / pointer / keys), so an arrow can never fight a swipe. The rail's own scroll-padding
+is now read rather than assumed, so a card lands on its snap position instead of 4px past it and
+drifting further with every click.
+
+### Invitations by EMAIL or PHONE (schema + RPC change)
+The people a showroom or distributor needs in their workspace — a branch salesperson, a fitter, a
+driver — are on WhatsApp and frequently have no work email. `organization_invitations` now carries a
+`phone` column, `email` is nullable, and **exactly one** is set per row (`ck_invitation_contact`), so
+acceptance always has one rule to check.
+
+**Nothing claims a message was sent that was not.** Email invitations reuse the existing email path.
+There is no SMS/WhatsApp sender configured here, so a phone invitation is created, tokenized, and the
+link handed back with a one-press copy and copy that says plainly: *"we don't send text messages yet
+— copy this link and send it on WhatsApp or however you normally reach them."* No new paid provider
+was introduced, and tokens are never logged.
+
+**The acceptance rule, stated honestly.** An email invitation stays bound to its verified address. A
+phone invitation binds to a confirmed phone WHEN THE ACCEPTOR HAS ONE — which starts protecting these
+invitations the day WhatsApp OTP is enabled, with no further migration — and otherwise rests on the
+unguessable single-use token, with a verified contact of some kind still required. That second branch
+is a bearer credential and is documented as one in the migration header and pinned by a pgTAP
+assertion, so weakening or tightening it later is a conscious decision rather than a silent drift.
+
+**A regression introduced and caught in validation:** the first version of `invitation_create` put
+`p_phone` third, which silently rebound every existing POSITIONAL caller — a branch uuid arriving
+where a phone was expected. `20_account_registration_test.sql` went from green to 10 failures. The
+parameter now goes LAST, and the migration also drops the intermediate 4-arg signature so a database
+that ran the earlier version does not keep both overloads and fail every named-argument call as
+ambiguous.
+
+### Finance / accounting in Pilot: there was none to remove
+Audited and confirmed: **no** invoice, collection, payment, receivable, wallet, payout, commission,
+settlement or accounting module exists in this repository — no route, no nav entry, no table, no
+i18n block. The Arabic strings quoted in the brief appear nowhere in the codebase; they are in the
+Distributor REFERENCE screenshots, which were never built.
+
+Two real vocabulary problems did exist and are fixed:
+- `WalletIcon` was the glyph beside **order value**, **quotation total** and **project value** — the
+  commercial figures the brief explicitly says to KEEP. A purse next to "total order value" invites a
+  manager to look for a balance, a top-up and a payout that do not exist. Replaced everywhere with a
+  neutral `MoneyIcon` (banknotes), and `WalletIcon` deleted so it cannot drift back into a value slot.
+- One string named a finance artefact even while denying it ("No invoice or payment is created") —
+  reworded in both catalogs.
+
+### Header, theme switch, sidebar
+- A direct **Light/Dark** switch now sits in the shared header, immediately before the avatar, at
+  every width. It is a pair of segments rather than one toggle because a lone moon icon cannot say
+  whether it means "you are in dark" or "press for dark", and either reading is common enough that
+  half the audience would read the current theme backwards. It owns **no state**: both it and the
+  profile menu now write through one `applyThemePreference` helper and one cookie, and the menu keeps
+  the full System/Light/Dark preference.
+- The B2B header's workspace switcher now shows the organization's **user-facing type** under its
+  name (*Distributor*, *Showroom / Dealer*, …) from the `orgType` catalog. Never the internal
+  `supplier` identifier; an unrecognized type renders nothing rather than a raw key.
+- **Sidebar bottom control.** Two defects. It sat 4px inboard of the navigation icons because its
+  padding was set in `sidebar-shell` while the nav rows' was set in `workspace-nav`; both now derive
+  from one `lib/ui/nav-geometry` module, so they cannot disagree by construction and Arabic is the
+  mirror of English with no direction-specific rule. And per the round-2 follow-up it is now
+  **icon-only in every mode, expanded included** — a control captioning a state the user can see is
+  noise. The mode names live in the menu it opens; the `aria-label` still names the control AND the
+  active mode.
+  The trap worth remembering: icon-only must not become icon-CENTRED. An expanded panel is 15rem
+  wide, so `justify-center` would have moved the glyph ~120px out of the column — trading a 4px
+  misalignment for a far worse one. The row keeps its start inset and simply has nothing after the
+  icon.
+
+### Validation
+typecheck OK · lint OK (0/0) · vitest **301/301** (4 new CardRail regressions incl. mid-animation
+consecutive clicks, boundary, and manual-scroll release; 2 new sidebar assertions incl. the inverted
+icon-only contract) · pgTAP `20_account_registration` and new `30_invitation_contact_channel`
+**16/16**, both re-run on a **from-scratch database** (all migrations replayed in order + all three
+seeds).
+
+Real-browser acceptance (Chrome, local dev): Distributor `rania@example.test` AR+EN, dark and light —
+header theme switch, org type in the header, invitation Email/Phone with a real phone invitation
+created end-to-end (`+201002003040` stored normalized, no email, pending) and shown masked as
+`+20•••40`; Showroom `hazem@example.test` — CardRail proven one-card-per-click **and** one-card-per-
+click when clicked 90ms apart mid-animation, in BOTH directions, with the boundary arrow disabling
+correctly and no page overflow; sidebar icon column measured at **33.5px for the control and all 17
+nav icons** in LTR and **1444.5px** in RTL, in expanded, collapsed, and mid-hover-reveal.
+
+**Environment notes for the next session:** `supabase db reset` fails on this machine — the CLI times
+out reaching `127.0.0.1:54322` even though the container is healthy, and on one run it dropped the
+database and left the `auth` schema a stub. Recovery: apply migrations via
+`docker exec -i supabase_db_aladdin psql`, then `docker restart supabase_auth_aladdin` so GoTrue
+re-runs its own auth migrations, then load the seeds. Also: `pnpm dev` and Playwright's `next build`
+share `.next`, so running both concurrently poisons the build with a `Cannot find module './NNNN.js'`
+— stop dev and `rm -rf .next` first.
+
+### A third defect, found by the new e2e assertion
+The e2e test written for "do the two theme controls agree" failed on its first run, and it was right
+to. The header switch and the profile menu each seeded local state from `<html>` once, at mount —
+fine while only one is mounted, wrong the moment both are: change the theme from the header, open the
+account menu, and the menu still showed the previous choice. Neither component owns theme state now;
+`lib/theme/use-theme` subscribes to `<html>` via `MutationObserver`, `applyThemePreference` is the
+only writer, and every reader updates in the same microtask. Also fixed while there: under `system`
+the OS could change with the app open and nothing re-applied it, so a workspace left open past sunset
+stayed light.
+
+Final e2e: `global-shell-uat` **21 passed / 0 failed** across desktop + Pixel 5 (9 skipped are the
+pointer/tablet-only rail and sidebar cases on the mobile project).
+
+### Unfinished / next
+- `/b2b/settings` still carries the binary `ThemeSwitch` that cannot express "System" — now a THIRD
+  theme control alongside the header switch and the account menu. All three share one cookie and one
+  helper, so it is correct, but it should be reconciled to the three-way control next time settings
+  is touched.
+- Phone invitations are bearer-token invitations until phone identity exists. The matching branch is
+  already written and tested; enabling WhatsApp OTP turns it on with no migration.
+
+## Session · One icon hover state across all three sidebar modes
+**Branch** `feature/supply-side-b2b-mvp` · frontend only, no schema change
+
+The lit icon tile (`group-hover:bg-surface-2 group-hover:shadow-sm group-focus-visible:bg-surface-2`)
+existed only behind a `narrow &&` guard, so it was a COLLAPSED-only affordance. Expanded answered a
+pointer with a row tint alone, and expand-on-hover answered both ways inside one gesture — the panel
+flips 3.5rem→15rem under a cursor that never left the icon, so the icon's own cue appeared and then
+vanished mid-reveal. The brief was to reuse the existing state, not invent a second one.
+
+- `lib/ui/nav-geometry` now exports **`NAV_ICON_HOVER_CLASS`** — the one definition of that state —
+  and `navIconClass()` lost its `narrow` argument: the 36px tile is the icon's box in every mode,
+  because the hover classes have nothing to paint without it.
+- Both call sites (`workspace-nav` NavLink, `sidebar-shell` mode control) spread the same constant
+  with no mode guard. The expanded row keeps its `hover:bg-surface-2/60` tint — the tile is additive.
+- Consequence, deliberate: `navRowClass` expanded `py-2 → py-0.5` and `gap-3 → gap-1`. Height now
+  comes from the tile in BOTH states (40px), which is what stops expand-on-hover jolting the list
+  vertically as it opens; the tighter gap keeps the label's optical distance where the bare glyph put
+  it, since the tile carries ~8.5px of its own side padding. Expanded rows 35px→40px, labels 9px
+  inward. Per-mode column alignment is unchanged by construction — both call sites still ask the same
+  functions. Cross-mode, the reveal now slides icons 14px instead of 5.5px (collapsed tile centre
+  28px, expanded 42px); reducing it would need the expanded row's start inset, which
+  `sidebar-shell.test.tsx` guards at `px-3`.
+- Active items keep today's behaviour: the accent tile stays `narrow && active`, so an expanded
+  active row still reads as a tinted row, not an accent tile.
+
+**Validation:** `pnpm typecheck`, `pnpm lint`, `pnpm test` — 30 files / 307 tests green (three new
+`sidebar-shell.test.tsx` cases assert the same class string reaches a nav icon and the mode control
+in expanded, collapsed and hover, and survives a reveal). Not yet eyeballed in a real browser.
+
+### Follow-up: the bottom control's tile was armed by the wrong element
+Scoping the tile to the icon column was right; driving the CONTROL's tile from the row was not. The
+mode control is `w-full` so its CLICK target matches a nav row, but unlike a nav row it has no label,
+so `group-hover:` lit the 36px tile from anywhere along the footer — a pointer resting 200px away
+over empty space made the bottom of the sidebar glow.
+
+`lib/ui/nav-geometry` now exports the same paint under two triggers: **`NAV_ICON_HOVER_CLASS`**
+(row-driven — correct for a nav link, whose label, icon and padding all navigate to one href) and
+**`NAV_ICON_SELF_HOVER_CLASS`** (`hover:` on the tile itself). The control uses the self-scoped one in
+all three modes; its icon colour moved from `group-hover:text-fg` to `hover:text-fg` for the same
+reason. `group-focus-visible:` stays in BOTH constants on purpose: a span cannot take focus, so the
+group it reads is the single focusable control that owns the tile — that is the control's own focus,
+not an area-wide trigger, and dropping it would cost keyboard users a cue mouse users keep.
+
+The button keeps `!narrow && hover:bg-surface-2/60`, so an expanded footer row still tints on hover.
+That is the only feedback the full-width click target has left; if the target should shrink to the
+tile, the tint goes with it. **Open decision, deliberately not taken here.**
+
+**Validation:** typecheck, lint, 308 unit tests green — including a regression guard asserting the
+control's icon carries no `group-hover:` in any mode, and an assertion that the two constants differ
+only in trigger (identical declarations once the variant prefix is stripped). Tailwind emits
+`.hover\:bg-surface-2:hover` and `.hover\:shadow-sm:hover` (verified against a real
+`npx tailwindcss` compile of this config, not assumed). Still not eyeballed in a real browser.
+
+### Follow-up 2: the control's ROW lost its hover state entirely
+The open decision above was taken: `!narrow && "hover:bg-surface-2/60"` is gone, and so is the
+button's base `hover:text-fg` (dead anyway — the control paints no text) and its now-purposeless
+`transition-colors`. The button keeps `w-full`, so the CLICK target still matches a nav row; what it
+no longer does is PAINT across that width. A nav row may tint on hover because its whole width is
+label and icon; this row is a 36px tile followed by up to 200px of nothing, and tinting that emptiness
+announced a control the pointer was nowhere near — the same defect as the group-driven tile, one
+element out. All visible hover feedback now originates on the tile (`hover:` on the span). The
+`focus-visible` ring stays: it is a keyboard affordance, not hover feedback, and it lands on the
+button because the button is what takes focus.
+
+**Validation:** typecheck, lint, **309** unit tests green. New guard asserts the control's own
+className matches no `hover:`/`group-hover:` variant in expanded, collapsed or hover mode while still
+carrying `focus-visible:ring-2`; the regex was checked against the removed rule so it fails if the
+tint returns. Still not eyeballed in a real browser.
+
+## Session · UAT round 3 — full-row nav hover + WhatsApp invitation hand-off
+**Branch** `feature/supply-side-b2b-mvp` · **PR** #34 (updated, NOT merged) · frontend only
+
+### 1. Navigation items highlight as a ROW again — and a dead opacity modifier is why they did not
+A wide nav row now paints one subtle surface behind icon AND label, matching the supplied
+references; the icon tile paints only on the COLLAPSED rail, where the 40px row IS the tile. Never
+both — a tile inside an already-highlighted row draws a second box around the icon and splits one
+target in two.
+
+The row hover was not merely weak, it was ABSENT, and had been for a long time. `hover:bg-surface-2/60`
+compiles to **nothing**: the semantic colours are `var(--…)` values with no `<alpha-value>` channel,
+and Tailwind silently emits no rule for an opacity modifier on those. Verified twice — a real
+`npx tailwindcss` compile of this config produces no `/60` utility at all, and in the running app a
+CSSOM scan for `bg-surface-2\/60`, `bg-surface-2\/70` and `accent-solid\/15` returns **0 rules**. So
+the fix is a real token: `--surface-hover` (light `#f1ede5`, dark `#1e2122`) sits one step short of
+`surface-2`, mapped as `bg-surface-hover`, so hover whispers and the current row (`surface-2` + accent
+marker + accent glyph) still reads clearly stronger.
+
+**This is systemic and NOT fixed here (out of scope for this round).** Every `/xx` modifier on a
+`var()` token across the app is dead in the same way — `admin-nav`, the sidebar mode MENU
+(`hover:bg-surface-2/70`), profile menu, workspace switcher, tables, cards, and the collapsed ACTIVE
+tile's `bg-accent-solid/15`. Each is an invisible state, not a broken build, which is why it survived
+review. Fixing it properly means either more hover/active tokens or re-expressing the semantics as
+channel triples so modifiers work — a design-system change that deserves its own pass.
+
+The bottom mode control is unchanged and stays the exception: no row paint in any mode, hover only on
+its own 36px tile (`NAV_ICON_SELF_HOVER_CLASS`), icon-only in all three modes.
+
+### 2. Phone invitations: copy the link, or hand it to WhatsApp
+The phone success state now offers exactly two actions — **Copy invitation link** and **Send via
+WhatsApp** — over the honest hint ("nothing has been sent yet… you press Send there"). Email is
+untouched, including its "Copy link" label, because its invitation really was dispatched.
+
+`lib/contact/whatsapp.ts` builds a `wa.me` deep link and nothing more: no WhatsApp Business API, no
+SMS gateway, no server call, no external service. It addresses the NORMALIZED number (E.164 with the
+plus stripped — `inviteMemberAction` now echoes it back in its state) and carries a locale-aware
+template with the REAL organization name and the ABSOLUTE invite URL, URL-encoded so the link's own
+`?`/`&` and the newlines cannot become wa.me query structure. With no usable number it falls back to
+WhatsApp's contact picker rather than erroring. The WhatsApp button is strictly a shortcut over the
+copy path — the link stays selectable and copyable if WhatsApp will not open — and the token is
+rendered, copied and drafted but never logged.
+
+### Validation
+`pnpm typecheck` · `pnpm lint` · targeted units (sidebar-shell 24, whatsapp 4, i18n 20, format) — all
+green. Full E2E deliberately NOT re-run.
+
+**Real browser (Chrome, local dev), confirmed visually:**
+1. Expanded — hovering a nav item paints the whole row; active is clearly stronger. ✔
+2. Expand-on-hover — after the reveal, same full-row highlight. ✔
+3. Collapsed — icon tile lights, rail still coherent. ✔
+4. Bottom control — pointer over empty footer paints NOTHING; pointer on the tile lights the tile. ✔
+   (Verified in expanded/light; the collapsed re-check was blocked by the Next dev-overlay badge
+   sitting over that corner, and the unit tests assert the wiring in all three modes.)
+5. AR/RTL — mirrored, hover and active correct. ✔  6. Light + Dark — both. ✔
+7. Phone invitation shows exactly "نسخ رابط الدعوة" + "الإرسال عبر واتساب". ✔
+8. `wa.me/201002003040?text=…` — normalized number, real org name ("Zayed Home Showroom"), absolute
+   `/auth/invite/…` URL, 3-line Arabic template, correctly encoded. ✔
+
+**Environment note:** a `tailwind.config.ts` change needs a dev-server RESTART; touching
+`globals.css` is not enough, and the utility silently stays missing until then.
+
+### Follow-up: the scrollbar gutter is gone — thumb only
+Global, both axes, both themes. The track was a permanent 10px stripe down the edge of EVERY scroll
+container — the page, the sidebar, each table, dropdown and rail — and nested containers stacked
+those stripes into seams that read as borders nobody drew. `::-webkit-scrollbar`,
+`::-webkit-scrollbar-track` and `-track-piece` (Blink paints the piece above and below the thumb
+separately, and omitting it puts the gutter back in some builds) are all transparent now, and
+Firefox's `scrollbar-color` takes `transparent` as its track half. The `--scrollbar-track` tokens are
+deleted rather than left unused, so nothing invites their return.
+
+Unchanged on purpose: the 10px width (the bar still RESERVES its space, so nothing reflows when a
+container becomes scrollable), the thumb colours and their hover/active step, the pill radius and the
+2px transparent inset border, the hidden stepper arrows, and every scrolling behaviour.
+
+Verified in Chrome: injected a deliberately over-flowing box and read it in both themes — horizontal
+and vertical thumbs only, no track, no arrows, container surface showing through the gutter; plus the
+real sidebar and page bars in light. typecheck, lint, 315 unit tests green.
+
+## Session · One shell: full-width top header, sidebar beneath it
+**Branch** `feature/supply-side-b2b-mvp` · **PR** #34 (updated, NOT merged) · frontend only
+
+### The hierarchy was inverted, and the brand paid for it
+The header used to be a child of the CONTENT column, so the sidebar was the page's top-level element
+and the header a component of one region inside it. That is backwards — the header is global chrome,
+the sidebar navigates the region below it — and it had consequences: the brand lived in the sidebar,
+so a collapsed rail reduced the product's mark to a 26px glyph and a `brand` prop existed purely to
+decide which component was drawing it.
+
+Now, on **all three** authenticated surfaces (B2B workspace, personal `/home`, Admin console):
+header → then a row of sidebar/rail + main. The header spans the viewport, always carries the mark
+(a link to `/`), and `--app-header-h` (3rem) is a token because two things must agree on it — the
+header's own height and the sticky offset/height of the rail beneath it.
+
+### Supabase-direction density, Aladdin tokens
+One 48px row; 28px controls; breadcrumb `/` separators (`HeaderSeparator`) between the mark, the
+workspace and the branch — the branch is a scope INSIDE the organization, so it reads as the next
+crumb, not a second unrelated chip. The workspace trigger lost its border and its second line (the
+org type moved into `title`, still reachable, no longer costing a two-line control); the branch
+control is a 28px select or a plain label; search is 28px and narrower. Their hover states now
+actually paint, via `surface-hover` — every one of them was carrying a dead `/60` modifier.
+
+### The theme control is one icon again
+`ThemeSwitch` — the control the auth, onboarding, business-creation and settings surfaces already
+used — is what the header carries, with a `compact` variant for the 48px row. The two-segment pill
+(`theme-toggle.tsx`) is deleted. ThemeSwitch was rewired to `useThemeState` + `applyThemePreference`
+first: its old local-state-at-mount is exactly the defect fixed in 742f599, and promoting it into the
+header unfixed would have brought the disagreeing-controls bug back with it. e2e updated to press one
+button twice rather than two segments.
+
+### NOT built, because there is nothing real behind them
+- **Chat** — no messaging model. No table, no query, no component, nothing in git history.
+- **Notifications** — same. `src/features/notifications/` is an empty scaffold (a README only).
+- **System Points** — no points model anywhere: not in `supabase/migrations` (33 tables, none), not
+  in the frontend, not in history. The only "points" in the codebase are chart data points.
+The brief itself said to use real data only and invent no counters, so each of these would have to be
+a control that opens nothing. `actions` (header) and the nav module list (sidebar) are the slots they
+belong in the moment the data exists. **Help** WAS added: it points at `/auth/support`, which exists,
+stays reachable while signed in, and shows a real support contact or an honest unavailable state.
+**Feedback** was not: there is no feedback destination to point at.
+
+### Trade-off taken deliberately
+`/home`'s header row was constrained to the 1120px content column (a fix from an earlier round, so the
+avatar did not sit at the window edge while content started inboard). "Spans the full viewport width"
+overrides that: one shell, one geometry, on every surface.
+
+### Validation
+typecheck · lint · 315 unit tests — green. Full E2E not run.
+Real browser: **B2B** (light EN, dark AR/RTL) — header 49px full-bleed, sidebar top exactly 49px,
+brand in the header, breadcrumb separators, mirrored correctly in RTL. **Admin** (light) and
+**personal /home** (dark) — same shell, rail top at 49px, one-icon theme switch showing the theme you
+would GET. Admin/home were driven headlessly against the running dev server in a throwaway context,
+so the acceptance browser session was untouched.
+
+### Follow-up: Chat, Notifications and Points as UI SHELLS (no backend, by instruction)
+Scope decision taken by the product owner mid-round: build the three entry points now, attach data
+next sprint. No migration, no table, no RPC, no realtime subscription, no local persistence, no
+hardcoded demo record was added — and none may be until the persistence sprint.
+
+- **Header** — `components/layout/header-panels.tsx` mounts `ChatMenu` and `NotificationsMenu` in the
+  SHARED `AppHeader`, so every authenticated surface gets both and no persona has its own copy. One
+  `HeaderMenu` primitive owns everything that is not content: trigger, panel, outside-click and
+  Escape to close, `aria-haspopup`/`aria-expanded`, `role="dialog"` + accessible name, RTL anchoring
+  (`end-0`), and a `max-w-[calc(100vw-1.5rem)]` clamp so a 320px panel cannot overflow a phone. Each
+  opens a FINISHED empty state — "No conversations yet" / "No notifications yet" — and **no badge or
+  count**, because every number available today would be invented.
+- **Sidebar** — `points` is a real nav key (`nav.points` · "Points" / "النقاط", `GaugeIcon`) in the
+  Business section of BOTH stances, ungated (`NAV_CAPS.points = null`): points are the caller's own
+  standing, not an organization record, so no capability could sensibly decide who may look. It is
+  also registered in the command palette, like every other module.
+- **`/b2b/points`** — page shell with the same honest empty state. No balance, no tier, no rewards,
+  no transactions, no leaderboard.
+- **Next sprint attaches here:** replace `<EmptyPanel/>` with a list and pass a real count to
+  `HeaderMenu`; fill the Points page body. Neither the trigger, the panel mechanics, the nav entry
+  nor the route moves.
+
+**Feedback** is still absent: unlike Help (`/auth/support`, a real destination), there is nothing for
+it to open, and it was not among the three shells requested.
+
+**Validation:** typecheck · lint · 315 unit tests green (the ungated-nav test now pins `points`).
+Real browser: EN/light and AR/RTL/dark — both panels open with translated empty states, Escape closes,
+the panel stays inside the viewport in both directions, the Points entry shows its active state, and
+the page renders in both locales.
+
+---
+
+## Global shell closeout — Feedback, live opacity tokens, fluid content column (`349ad7f`)
+
+Final pre-UAT pass on `feature/supply-side-b2b-mvp` (PR #34). Three items only; no supply-side
+business logic, no schema, no migration, no RLS touched.
+
+### Feedback — the shell of a COMPOSER (the note above is now superseded)
+Mounted in the shared `AppHeader` beside Chat and Notifications, on the same `HeaderMenu` primitive,
+so all three behave identically (Escape, outside click, `role="dialog"`, RTL anchoring, phone clamp).
+Chat and Notifications are inboxes, so their honest shell is an empty state; Feedback has nothing to
+be empty OF, so it shows the composer it will become — heading, field, submit — with sending plainly
+marked as not open. **No counter, no history, no persistence, no claim of submission.**
+
+Two deliberate a11y choices: the textarea is `readOnly`, NOT `disabled`, because a disabled control
+leaves the tab order and takes its `aria-describedby` explanation with it — a keyboard or screen
+reader user would meet an apparently empty panel. The BUTTON is genuinely `disabled`, which is what
+a control that cannot act should be. The `/auth/support` link is included because it is the one path
+that works today; a shell that only says "not yet" is a dead end.
+
+**Next sprint attaches here:** a server action on the form plus dropping `readOnly`/`disabled`. No
+header geometry moves.
+
+### Opacity modifiers on token colours were DEAD — fixed at the root
+`bg-surface-2/60`, `bg-accent-solid/15`, `bg-danger/10` and ~40 more **emitted no CSS rule at all**.
+Tailwind cannot split `var(--surface-2)` into channels at build time, so it dropped each utility
+SILENTLY — no warning, no error, just an element with no background. Proven by compiling a probe:
+`.bg-surface-2` was emitted, `.bg-surface-2\/60` was not.
+
+Fix is one helper in `tailwind.config.ts` — every token resolves through
+`color-mix(in srgb, var(--t) calc(<alpha-value> * 100%), transparent)`, using Tailwind's own
+`<alpha-value>` substitution (`/60` → `0.6`, absent → `1`). **46 dead utilities returned with the
+alphas the code always intended: zero token edits, zero class rewrites.** `color-mix` composites
+against the ACTIVE theme's token, so one rule is correct on Limestone and Carbon alike — which a
+hardcoded rgba fallback could never be. Applied to semantic, series AND brand primitives so no
+future `/NN` can quietly evaporate.
+
+Restored: admin navigation · sidebar mode menu · profile menu (items + language/appearance
+selection) · workspace switcher · table header and row hover · cards and every soft badge tone ·
+collapsed active rail tile.
+
+**A latent inversion surfaced once the rules compiled.** In the sidebar mode menu and the workspace
+switcher, `hover:bg-*` sat alongside a conditional `selected && "bg-accent-solid/10"`. A hover
+variant always outranks a base utility in the emitted sheet, so a selected row would have washed to
+grey under the pointer — invisible before only because NEITHER rule existed. Both now branch on
+`selected` and deepen the accent (`/10` → `/20`) instead. Profile-menu items moved to the named
+`surface-hover` so all three menus agree on one hover ground.
+
+> **Rule for future work:** never write an opacity modifier and a conditional base background for the
+> same property on one element. Branch on the state instead.
+
+### Content column — fluid, not a laptop-era literal
+`<main>` carried three hardcoded caps (1200 / 1120 / 1200) in three files. On a 1874px display that
+left ~600px of dead margin around the densest content in the product. New
+`components/layout/content-column.ts` replaces all three with `contentColumnClass`: fluid between
+sidebar and viewport edge, padding opening 16 → 24 → 32px, and a 1920px cap that engages only on
+ultrawides. Measured: B2B main 1200 → **1808px**, `/home` 1120 → **1864px**, Admin fluid, with
+**0px horizontal overflow** everywhere (tables already scroll inside their own container).
+
+Forms do NOT inherit that width. `readableColumnClass` (768px) is for single-column data entry, and
+the two in-shell forms that had no measure of their own — showroom referral, org invite — now take
+it. The shell uses the display; the form stays fillable. The full-width `/home` header is unchanged.
+
+**Validation:** typecheck · `eslint .` · 315/315 unit tests green. Real browser, real Email-OTP
+sign-in (no bypass), three identities: B2B English Light + B2B Arabic Dark RTL (`rania@`), Admin
+(`admin@`), personal `/home` (`consumer@`). Feedback opens/closes and anchors inward in RTL; admin
+nav hover now paints and is clearly lighter than the active fill; selected rows keep their accent
+under hover; dark tints stay subtle. Per instruction: no full E2E, no pgTAP, no perf, no persona
+matrix. Only console error is a Grammarly extension hydration mismatch — environmental, pre-existing.
+
+---
+
+## Supply-side dashboard — visual fidelity against the Distributor reference
+
+**Scope:** the shared Distributor / Manufacturer / Importer dashboard only. Global shell frozen — no
+change to header, sidebar, scrollbars, CardRail, theme, search, profile menu, Chat/Notifications/
+Feedback/Points shells, `contentColumnClass`, invitations or the Tailwind colour architecture.
+
+### The problem, stated precisely
+The page was functionally right and structurally a Showroom dashboard: it used the MODULE page's
+shape — a wide list column with a fixed `18rem` context rail (`WorkPane`). Measured on a 1874px
+display: the rail held **300px of content inside a 790px row**, so ~490px × 288px of the page was
+blank from its last panel down. Nothing on the page was unavailable elsewhere, so nothing led.
+
+### What changed
+**Rows, not a column with a rail.** New `Row` + `Panel fill` in `workspace-layout.tsx`. `Row` takes
+PROPORTIONS (`lead` 1.55:1, `wide-lead` 2.5:1, `even`, `thirds`) rather than a rem aside, so the
+operational block absorbs a wide display and gives the room back on a laptop — a fixed rail can do
+neither. `fill` makes panels in a row end level. Both are opt-in; `WorkPane` is untouched and the
+rfqs / quotations / orders module pages are unchanged.
+
+**The attention queue (`features/home/supply-attention.tsx`) — the one genuinely new block.** A
+cross-stage triage list: requests nobody priced → prices nobody chased → accepted prices with no
+order → orders nobody progressed. No module owns that list, which is why it belongs here and nowhere
+else. Drawn as the reference's wide row cards (severity rail, labelled cells, per-row verb) rather
+than a table, because a table forces ONE header per column and these four record types have four
+different dates ("Required by" / "Valid until" / "Accepted on" / "Confirmed on") and four different
+jobs. Ordered by STAGE — the order a seller works — because "soonest first" across a required-by, a
+valid-until and a confirmed-on compares nothing. Three per stage, six total.
+
+`quotationsWithOrders()` (execution queries) makes "ready for order" exact: accepted quotation ids
+are asked about directly rather than inferred from a capped order page, where an old acceptance would
+read as "ready" forever. On the seed data it correctly returns **empty** — all four acceptances have
+orders.
+
+**Pipeline panel** replaces two stub cards: demand / quotations / orders statuses grouped under stage
+captions, each row carrying a proportion bar (`PanelRow share`) — share of its OWN stage, never of
+the page. Catalogue state moved to the new `Panel foot`, because as a fourth bar group it made the
+SUPPORTING panel taller than the operational queue beside it, inverting the row's whole point.
+Measured after: queue 423px / pipeline 426px, row 709 → **568px**, so head + KPIs + the entire
+attention band now fit the first viewport.
+
+**Rows 2–4.** Incoming demand and latest quotations as peers side by side; trend (lead) beside the
+funnel; top products / top customers / quotations-by-status three-up and level.
+
+### Two real defects found by measuring, not by looking
+1. **Columns did not line up.** The attribute block had no `min-w-0`, so a flex item defaulted to
+   `min-width: auto` = its content's minimum: a row carrying "EGP 628,800.00" refused to shrink to
+   its basis while a row without a money cell shrank freely. Rows landed on different vertical lines.
+   Fixed; verified identical lefts across all six rows at 1440 / 1600 / 1920 in both locales.
+2. **Arabic clipped the identifying half of every Latin name.** `text-overflow` clips at the end of
+   the element's own direction, so in the RTL workspace "Cairo Ceramics Showroom" rendered as
+   "…ics Showroom" and "Basins - New Cairo apartments" as "…sins - New Cairo apartments". Titles and
+   counterparties now CLAMP (line box) instead of truncating, so the beginning survives in either
+   script. Dates and money still truncate — a wrapped "EGP 132,000.00" reads as two numbers.
+
+The counterparty also moved from its own column into the record's second line (as every other list in
+the workspace already does via `RecordCell`): as a column it was the longest value in the row, so it
+set the floor for every other cell. The single-line row now engages at `wide` only; below that it
+uses the same stacked form the phone gets, which is readable at any container width.
+`QuotationTable` gained `compact`, which drops the counterparty column that was ALREADY the record
+cell's meta line — in a half-width panel that duplicate forced every cell to wrap over three lines.
+
+### What was NOT added
+No wallet, invoices, collections, payments, carrier tracking, maps, Reels, message or notification
+counts, AI recommendations, rewards or commissions. **No comparison-period percentages** — nothing in
+this database produces one, and the reference's "+18% from last month" badges have no honest
+equivalent here. The page is denser because real records are organised better.
+
+### Validation
+typecheck · `eslint .` · 81/81 dashboard-related unit tests (includes exact EN/AR key parity, "no
+Arabic in the English catalog", "no unintended English in the Arabic catalog"). Real browser, real
+Email-OTP sign-in, no bypass: **`rania@` (Distributor) Arabic desktop Light AND Dark** as primary,
+plus `mahmoud@` (Manufacturer) English and `fady@` (Importer) Arabic — all three inherit the same
+composition, differing only in organization identity and org-type voice. Instrumented for truncation
+and overflow at 1280 / 1440 / 1600 / 1920: **zero truncated elements, zero horizontal overflow**. One
+mobile viewport (390px) checked for breakage only — stacks correctly, `scrollWidth === clientWidth`.
+Per instruction: no full E2E, no pgTAP, no perf, no persona matrix.
+
+## Supply dashboard — eight modules, a period scope, and the real logo
+
+Branch `feature/supply-side-b2b-mvp`, PR #34, not merged. A focused refinement pass on the
+Distributor / Manufacturer / Importer dashboard only — one shared implementation, no second surface,
+no route deleted.
+
+### The composition problem, stated honestly
+
+The previous version answered five questions in sequence and gave each a full-width band. It was
+correct and it was four screens long, which for a surface whose whole purpose is the morning glance
+is a design failure that no amount of per-block polish fixes. It also **transcribed two modules onto
+the home page**: the incoming-requests table and the quotations table repeated, in full, lists that
+are one sidebar click away — while the attention queue directly above them had already named the rows
+that needed work.
+
+The page is now **eight modules on four rows**, and every one of them says something no module page
+says: ROW 1 the period-scoped strip · ROW 2 `ينتظر تصرفك الآن` + `فرص جديدة مناسبة لك` · ROW 3
+`حركة السوق` + `أحدث الإشعارات` + `مسار عملك` · ROW 4 `فيديوهات لمنتجاتك` + `أعلى منتجاتك` +
+`أعلى عملائك`. The two duplicated tables, the value trend, the funnel, the quotations-by-status
+breakdown, the fulfilment band and the next-steps row are gone from the DASHBOARD. **No route,
+query or feature was removed.**
+
+### The comparison percentages, which used to be refused
+
+The last pass recorded "no comparison-period percentages — nothing in this database produces one".
+That was true of the QUERY, not of the data. `supplySummary` already pulls every request, quotation
+and order in order to tally them by status, and those rows carry `created_at` / `confirmed_at`. Two
+windows over rows already in hand is arithmetic; adding one column to two `select` lists was the
+entire cost. `compareDays` → `PeriodComparison`, and the strip renders `↑٤٠٪ من الشهر الماضي`.
+
+The rule that keeps it honest is in `KpiDelta`: a delta renders **only** where a real previous window
+with a **non-zero baseline** exists. First month of trading gets no percentage — not 0%, not ∞%, not
+"new" dressed up as growth — and the tile silently falls back to its context line. Orders are dated by
+`confirmed_at`, not `created_at`: confirmation is when the money became real, and dating won business
+by creation would credit a deal to the month it was drafted.
+
+Four cells are period-scoped FLOWS; the fifth (`طلبات تنتظر السعر`) is a live STATE and deliberately
+carries no delta — it would be false to shrink an unanswered six-week-old request because the reader
+chose a 30-day window. Period lives in the URL (`?period=`), so it survives a reload and is shareable.
+
+### The four blocks whose honest form is an empty state
+
+`supply-blocks.tsx`. The reference's opportunity feed is a cross-marketplace matching engine, its
+market panel a regional demand index, plus a notification stream and a Reels rail with view counts.
+This repository has **no matching engine, no market data provider, no `notifications` table and no
+video model** (`products` carries one `image_ref`). Each block is therefore rebuilt on the one dataset
+that is real — the requests buyers addressed to this org and the lines inside them — and where even
+that does not exist it renders an empty state that says so. `حركة السوق` counts **distinct requests**
+per product, never lines (a request itemising SPC twice is one business asking once), and its bars are
+a share of the BUSIEST product rather than of the window's total, because one request naming four
+products counts once for each and a "% of all demand" would exceed 100%. `مسار عملك` is explicitly
+**not a funnel** — this month's orders came from last month's quotations — so each bar is a share of
+the largest stage, never a conversion rate.
+
+### Iris — a second accent, because one was measurably not enough
+
+Lumen (amber) is the ACTION colour and earns that by being the only warm high-chroma note. Building a
+real operational dashboard out of it made every icon tile, bar, ranking and panel glyph amber, so the
+page read as one enormous call to action with no ranking inside it. `--iris` (#5b4ad9 / #9b8cf5 dark)
+is a MEASUREMENT colour, not a second brand colour. The single largest lever was the nine
+"more" links: as `text-accent` they were nine amber calls to action for what is navigation. Amber is
+now spent only on the primary button and the warning/danger tones.
+
+### Four defects found by measuring, not by looking
+
+1. **Every date in the queue truncated** (`١٠ سبتم…`, `تاريخ الت…`). The queue switches to its
+   single-line row form at the `wide` VIEWPORT breakpoint, but that form needs a CONTAINER of ~800px;
+   a 3:2 track at 1440 gave it ~700px. Row 2 is now `wide-lead` (5:2) → ~820px, every cell whole.
+2. **The RTL start-clip, again, in the new block.** `line-clamp-1` cuts at the end of the element's
+   own direction, so in the Arabic workspace "New Cairo Design Studio" rendered as `…ew Cairo Design`
+   — not a shortened name but a different one. Opportunity fields now wrap over two lines.
+3. **Empty states left ~150px voids.** `StatePanel` is a fixed-height page-level box sitting at the
+   top of a panel that stretches to match a taller neighbour. `BlockEmpty` fills and centres instead.
+4. **The iris KPI tiles looked unrendered** beside their neighbours — 12% alpha where the others had
+   15%. Raising everything to a single 18% removed EVERY tile background on the strip instead, because
+   Tailwind's opacity scale runs in steps of five and an off-scale `/NN` emits no rule at all,
+   silently. Sampling the rendered pixels found it; a grep then found **14 dead classes**, including
+   the whole `Panel` header-wash feature (`/8`), which had never rendered since the day it was
+   written — the tone prop was threaded through every panel and did nothing. All on-scale now, and
+   `styles/opacity-scale.test.ts` fails the build on any future off-scale modifier. This trap has now
+   cost this repository visible UI three separate times.
+
+### Logo
+
+`logo.png` (1254×700, gold lockup) → `frontend/public/brand/aladdin-logo.png` (384px lockup) and
+`aladdin-mark.png` (192px emblem), both trimmed to their content box and downscaled with a
+premultiplied-alpha box filter by a one-off pure-Node script (no dependency added; `zlib` is built
+in). The emblem is cut at the lamp foot: below y≈576 the wordmark's letter apexes sit INSIDE the
+emblem's x-range, so a naive alpha-bbox crop left specks. `Brand` now draws the emblem via
+`next/image` beside the **localized** name — using the whole lockup would put a Latin wordmark in the
+Arabic UI and print the name twice in the English one. The auth/onboarding `ApertureMark` panels are
+out of this pass's scope and unchanged.
+
+### Validation
+
+typecheck · `eslint .` clean. Unit: **14 new** (`demand-signals.test.ts` proves distinct-request
+counting, window splitting and the unpriced-only rule; `period.test.ts` proves the URL resolver
+rejects junk and that "all time" yields no window; `opacity-scale.test.ts` guards the trap above) plus the i18n parity/《no Arabic in EN》suite green.
+Real browser, real Email-OTP, no bypass: `rania@` Arabic Light **and** Dark, `mahmoud@` English,
+`fady@` Arabic, and one 390px phone — all eight module headings asserted present per seat, Arabic-Indic
+vs Western digits asserted per locale, `scrollWidth === clientWidth` at every stop.
+
+**The one finding that is a real defect and is NOT fixed here.** Driving the period select or a stage
+chip and waiting for the URL to change was never dependable — it failed at three different points
+across three runs. The controls are not broken: instrumented directly, a chip click does land
+`?stage=price` and the select does land `?period=90d`, each with a 200 RSC response. The problem is
+HOW LONG it takes. Both navigate to the same route with a different query, which is a full server
+render of a `force-dynamic` dashboard behind seven Supabase queries, and the URL does not move until
+that render commits. To a user this reads as "I clicked and nothing happened".
+
+Three attempted fixes were wrong and were reverted rather than left in the tree: re-firing the
+interaction (it cancels the in-flight RSC request and restarts the clock — it turned an occasional
+failure into three-out-of-three), removing `useSearchParams()` from `period-select.tsx` on a
+Suspense-deopt theory (it broke that control the same way), and a hand-rolled `QueryLink` on the
+theory that `<Link>` refuses query-only navigations (it does not). **The dashboard's render cost is
+the actual bug**, and it wants a pass of its own — the seven queries, and ~30 prefetchable links each
+pulling the whole page.
+
+The acceptance test therefore asserts the CONTRACT — that the server reads both parameters, that they
+compose, that a filtered queue really is filtered, and that every chip's `href` is exactly the URL
+being driven — rather than the latency of a synthetic click. 5/5, no retries, twice consecutively.
+
+Per instruction: no full E2E, no pgTAP, no Lighthouse, no persona matrix.

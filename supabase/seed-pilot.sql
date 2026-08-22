@@ -809,3 +809,206 @@ values
    'Fifth Settlement villa - marble package', 'Fifth Settlement, New Cairo', 'Marble stairs and reception counters, cut and delivered to schedule.',
    (now() + interval '5 days')::date, (now() + interval '45 days')::date, 'planned', 1, null, null, now() - interval '12 days', '70000001-0000-4000-8000-000000000001');
 
+
+-- ===========================================================================
+-- 11. SUPPLY-SIDE ACCEPTANCE WORLD (Sprint 15)
+-- ===========================================================================
+-- Sections 1-10 built the world from the SHOWROOM's seat. Everything a
+-- supply-side organization needs already existed as the far end of those same
+-- records — but only the far end of a chain the showroom had already finished.
+-- Reading Suez Paints' workspace, every request was closed, every quotation
+-- decided, every order delivered. The supply side's three most important states
+-- were therefore unreachable:
+--
+--   * a request SUBMITTED and not yet priced   — the work queue, and the only
+--     number on the dashboard with a clock running on it;
+--   * a quotation SENT and not yet decided     — value at stake;
+--   * an order IN PROGRESS                     — something to fulfil today.
+--
+-- and each org had exactly ONE customer, so "top customers" was a bar chart with
+-- one bar and the customer network was a list of one.
+--
+-- This section fixes that with the smallest addition that makes all three
+-- workspaces demonstrable: no new organizations, no new people, no new branches
+-- and no new memberships — only commerce between businesses that ALREADY exist,
+-- plus one published and one draft product each so the catalogue module has both
+-- of its states.
+--
+-- The three acceptance accounts, in manual-priority order:
+--   1. Distributor   Rania Gamal   rania@example.test    Suez Paints & Coatings
+--   2. Manufacturer  Mahmoud Ezzat mahmoud@example.test  Alexandria Glass & Aluminium
+--   3. Importer      Fady Riad     fady@example.test     Cairo Sanitary Ware Trading
+--
+-- The Distributor deliberately gets the deepest queue: it is the primary
+-- acceptance account and the one whose screens are reviewed first.
+--
+-- Dates are relative (now() - interval ...) exactly as above, so the trend line,
+-- the funnel and the "waiting on you" states stay true whenever the seed is run.
+-- Every quotation total equals the sum of its own items — the RPCs derive totals,
+-- and a seeded row must never disagree with its own lines.
+-- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
+-- 11.1 One more published line and one DRAFT for each supply-side catalogue
+-- ---------------------------------------------------------------------------
+-- The draft is not filler: products.status is draft | published, and nothing in
+-- sections 1-10 seeds a draft at all, so the Drafts tab, the "not visible to
+-- buyers yet" tile and the publish action had no data to act on.
+insert into public.products (id, organization_id, name, sku, category, brand, short_description, unit, image_ref, status, published_at, created_by)
+values
+  -- Alexandria Glass & Aluminium (manufacturer)
+  ('d7000014-0000-4000-8000-000000000014', '91000001-1111-4111-8111-000000000001',
+   'Glass Balustrade System', 'GLS-BAL', 'construction', 'AlexGlass',
+   'Frameless glass balustrade with base channel, for stairs and terraces.', 'linear_meter',
+   '/demo/products/glass-panel.svg', 'published', now() - interval '40 days', '71000001-0000-4000-8000-000000000001'),
+  ('d7000015-0000-4000-8000-000000000015', '91000001-1111-4111-8111-000000000001',
+   'Acoustic Double Glazing', 'GLS-ACS', 'construction', 'AlexGlass',
+   'Laminated acoustic double-glazed unit for street-facing facades.', 'square_meter',
+   '/demo/products/glass-panel.svg', 'draft', null, '71000001-0000-4000-8000-000000000001'),
+
+  -- Suez Paints & Coatings (Distributor)
+  ('d7000016-0000-4000-8000-000000000016', '91000002-1111-4111-8111-000000000002',
+   'Epoxy Floor Coating', 'PNT-EPX', 'finishing', 'SuezCoat',
+   'Two-part epoxy floor coating for workshops and service areas.', 'liter',
+   '/demo/products/wall-paint.svg', 'published', now() - interval '52 days', '71000002-0000-4000-8000-000000000002'),
+  ('d7000017-0000-4000-8000-000000000017', '91000002-1111-4111-8111-000000000002',
+   'Anti-Rust Metal Primer', 'PNT-ARP', 'finishing', 'SuezCoat',
+   'Zinc-phosphate primer for structural steel and joinery.', 'liter',
+   '/demo/products/wall-paint.svg', 'draft', null, '71000002-0000-4000-8000-000000000002'),
+
+  -- Cairo Sanitary Ware Trading (importer)
+  ('d7000018-0000-4000-8000-000000000018', '91000003-1111-4111-8111-000000000003',
+   'Imported Shower Mixer', 'SAN-MIX', 'supply', 'CairoSanitary',
+   'Thermostatic shower mixer, chrome finish, imported.', 'piece',
+   '/demo/products/sanitary-basin.svg', 'published', now() - interval '35 days', '71000003-0000-4000-8000-000000000003'),
+  ('d7000019-0000-4000-8000-000000000019', '91000003-1111-4111-8111-000000000003',
+   'Wall-Hung WC Pan', 'SAN-WHP', 'supply', 'CairoSanitary',
+   'Rimless wall-hung pan with soft-close seat.', 'piece',
+   '/demo/products/sanitary-basin.svg', 'draft', null, '71000003-0000-4000-8000-000000000003');
+
+-- ---------------------------------------------------------------------------
+-- 11.2 Requests waiting to be priced, from businesses that already exist
+-- ---------------------------------------------------------------------------
+-- Status submitted, with no quotation behind it. These are what the supply-side
+-- dashboard's leading tile counts and what its work queue lists.
+insert into public.rfqs (id, requester_org_id, requester_branch_id, supplier_org_id, title, note, required_date, status, version, submitted_at, closed_at, created_at, created_by)
+values
+  -- To Alexandria Glass & Aluminium (manufacturer)
+  ('e1000001-0000-4000-8000-000000000001', '9a000000-aaaa-4aaa-8aaa-000000000005', 'b0000005-0000-4000-8000-000000000005', '91000001-1111-4111-8111-000000000001',
+   'Glass partitions - New Cairo tower', 'Office floors 3 to 7. Tempered, polished edges.', (now() + interval '38 days')::date, 'submitted', 1, now() - interval '1 day', null, now() - interval '1 day', '70000006-0000-4000-8000-000000000006'),
+  ('e1000002-0000-4000-8000-000000000002', '91000004-1111-4111-8111-000000000004', 'b1000004-0000-4000-8000-000000000004', '91000001-1111-4111-8111-000000000001',
+   'Balustrade - villa staircase', 'Frameless, satin base channel.', (now() + interval '26 days')::date, 'submitted', 1, now() - interval '3 hours', null, now() - interval '3 hours', '71000004-0000-4000-8000-000000000004'),
+
+  -- To Suez Paints & Coatings (Distributor - the deepest queue)
+  ('e1000011-0000-4000-8000-000000000011', '91000005-1111-4111-8111-000000000005', 'b1000005-0000-4000-8000-000000000005', '91000002-1111-4111-8111-000000000002',
+   'Emulsion - showroom repaint', 'Matte white, display walls and ceiling.', (now() + interval '15 days')::date, 'submitted', 1, now() - interval '4 hours', null, now() - interval '4 hours', '71000005-0000-4000-8000-000000000005'),
+  ('e1000012-0000-4000-8000-000000000012', '9a000000-aaaa-4aaa-8aaa-000000000005', 'b0000005-0000-4000-8000-000000000005', '91000002-1111-4111-8111-000000000002',
+   'Epoxy floor - workshop bays', 'Two coats over primed screed.', (now() + interval '22 days')::date, 'submitted', 1, now() - interval '1 day', null, now() - interval '1 day', '70000006-0000-4000-8000-000000000006'),
+  ('e1000013-0000-4000-8000-000000000013', '91000004-1111-4111-8111-000000000004', 'b1000004-0000-4000-8000-000000000004', '91000002-1111-4111-8111-000000000002',
+   'Weather coat - villa facade', 'Elastomeric, off-white.', (now() + interval '31 days')::date, 'submitted', 1, now() - interval '2 days', null, now() - interval '2 days', '71000004-0000-4000-8000-000000000004'),
+
+  -- To Cairo Sanitary Ware Trading (importer)
+  ('e1000021-0000-4000-8000-000000000021', '91000004-1111-4111-8111-000000000004', 'b1000004-0000-4000-8000-000000000004', '91000003-1111-4111-8111-000000000003',
+   'Sanitary package - Maadi villa', 'Basins for six bathrooms.', (now() + interval '19 days')::date, 'submitted', 1, now() - interval '6 hours', null, now() - interval '6 hours', '71000004-0000-4000-8000-000000000004'),
+  ('e1000022-0000-4000-8000-000000000022', '9a000000-aaaa-4aaa-8aaa-000000000005', 'b0000005-0000-4000-8000-000000000005', '91000003-1111-4111-8111-000000000003',
+   'Shower mixers - hotel fit-out', 'One hundred and fifty rooms, staged delivery.', (now() + interval '45 days')::date, 'submitted', 1, now() - interval '2 days', null, now() - interval '2 days', '70000006-0000-4000-8000-000000000006');
+
+-- ---------------------------------------------------------------------------
+-- 11.3 Priced, waiting on the CUSTOMER's decision
+-- ---------------------------------------------------------------------------
+insert into public.rfqs (id, requester_org_id, requester_branch_id, supplier_org_id, title, note, required_date, status, version, submitted_at, closed_at, created_at, created_by)
+values
+  ('e1000003-0000-4000-8000-000000000003', '91000005-1111-4111-8111-000000000005', 'b1000005-0000-4000-8000-000000000005', '91000001-1111-4111-8111-000000000001',
+   'Window profiles - showroom facade', 'Thermal break, anodised silver.', (now() + interval '33 days')::date, 'quoted', 2, now() - interval '6 days', null, now() - interval '7 days', '71000005-0000-4000-8000-000000000005'),
+  ('e1000015-0000-4000-8000-000000000015', '9a000000-aaaa-4aaa-8aaa-000000000005', 'b0000005-0000-4000-8000-000000000005', '91000002-1111-4111-8111-000000000002',
+   'Primer and emulsion - Nasr City block', 'Twelve apartments, handover finish.', (now() + interval '28 days')::date, 'quoted', 2, now() - interval '5 days', null, now() - interval '6 days', '70000006-0000-4000-8000-000000000006'),
+  ('e1000023-0000-4000-8000-000000000023', '91000005-1111-4111-8111-000000000005', 'b1000005-0000-4000-8000-000000000005', '91000003-1111-4111-8111-000000000003',
+   'Concealed cisterns - display units', 'For the bathroom display corner.', (now() + interval '20 days')::date, 'quoted', 2, now() - interval '4 days', null, now() - interval '5 days', '71000005-0000-4000-8000-000000000005');
+
+-- ---------------------------------------------------------------------------
+-- 11.4 Won and being fulfilled, plus one older completed chain for the trend
+-- ---------------------------------------------------------------------------
+insert into public.rfqs (id, requester_org_id, requester_branch_id, supplier_org_id, title, note, required_date, status, version, submitted_at, closed_at, created_at, created_by)
+values
+  ('e1000004-0000-4000-8000-000000000004', '9a000000-aaaa-4aaa-8aaa-000000000005', 'b0000005-0000-4000-8000-000000000005', '91000001-1111-4111-8111-000000000001',
+   'Glazing package - Fifth Settlement', 'Survey before fabrication.', (now() + interval '24 days')::date, 'closed', 3, now() - interval '34 days', now() - interval '28 days', now() - interval '35 days', '70000006-0000-4000-8000-000000000006'),
+  ('e1000016-0000-4000-8000-000000000016', '91000004-1111-4111-8111-000000000004', 'b1000004-0000-4000-8000-000000000004', '91000002-1111-4111-8111-000000000002',
+   'Interior paint - Maadi apartments', 'Eight apartments, two coats.', (now() + interval '12 days')::date, 'closed', 3, now() - interval '30 days', now() - interval '24 days', now() - interval '31 days', '71000004-0000-4000-8000-000000000004'),
+  ('e1000017-0000-4000-8000-000000000017', '91000005-1111-4111-8111-000000000005', 'b1000005-0000-4000-8000-000000000005', '91000002-1111-4111-8111-000000000002',
+   'Exterior coat - Zayed branch', 'Facade refresh before opening.', (now() - interval '70 days')::date, 'closed', 3, now() - interval '98 days', now() - interval '92 days', now() - interval '99 days', '71000005-0000-4000-8000-000000000005'),
+  ('e1000024-0000-4000-8000-000000000024', '9a000000-aaaa-4aaa-8aaa-000000000005', 'b0000005-0000-4000-8000-000000000005', '91000003-1111-4111-8111-000000000003',
+   'Basins - New Cairo tower', 'Two hundred units, staged by floor.', (now() + interval '29 days')::date, 'closed', 3, now() - interval '26 days', now() - interval '20 days', now() - interval '27 days', '70000006-0000-4000-8000-000000000006');
+
+insert into public.rfq_items (id, rfq_id, product_id, product_name, unit, quantity, note)
+values
+  ('e2000001-0000-4000-8000-000000000001', 'e1000001-0000-4000-8000-000000000001', 'd7000002-0000-4000-8000-000000000002', 'Tempered Glass Partition 10mm', 'square_meter', 320, 'Floors 3-7'),
+  ('e2000002-0000-4000-8000-000000000002', 'e1000002-0000-4000-8000-000000000002', 'd7000014-0000-4000-8000-000000000014', 'Glass Balustrade System', 'linear_meter', 85, null),
+  ('e2000003-0000-4000-8000-000000000003', 'e1000003-0000-4000-8000-000000000003', 'd7000003-0000-4000-8000-000000000003', 'Aluminium Window Profile', 'linear_meter', 260, 'Anodised silver'),
+  ('e2000004-0000-4000-8000-000000000004', 'e1000004-0000-4000-8000-000000000004', 'd7000002-0000-4000-8000-000000000002', 'Tempered Glass Partition 10mm', 'square_meter', 480, null),
+
+  ('e2000011-0000-4000-8000-000000000011', 'e1000011-0000-4000-8000-000000000011', 'd7000004-0000-4000-8000-000000000004', 'Interior Emulsion - Matte White', 'liter', 450, null),
+  ('e2000012-0000-4000-8000-000000000012', 'e1000012-0000-4000-8000-000000000012', 'd7000016-0000-4000-8000-000000000016', 'Epoxy Floor Coating', 'liter', 900, 'Two coats'),
+  ('e2000013-0000-4000-8000-000000000013', 'e1000013-0000-4000-8000-000000000013', 'd7000005-0000-4000-8000-000000000005', 'Exterior Weather Coat', 'liter', 260, 'Off-white'),
+  ('e2000015-0000-4000-8000-000000000015', 'e1000015-0000-4000-8000-000000000015', 'd7000004-0000-4000-8000-000000000004', 'Interior Emulsion - Matte White', 'liter', 600, null),
+  ('e2000016-0000-4000-8000-000000000016', 'e1000016-0000-4000-8000-000000000016', 'd7000004-0000-4000-8000-000000000004', 'Interior Emulsion - Matte White', 'liter', 1200, 'Eight apartments'),
+  ('e2000017-0000-4000-8000-000000000017', 'e1000017-0000-4000-8000-000000000017', 'd7000005-0000-4000-8000-000000000005', 'Exterior Weather Coat', 'liter', 400, null),
+
+  ('e2000021-0000-4000-8000-000000000021', 'e1000021-0000-4000-8000-000000000021', 'd7000006-0000-4000-8000-000000000006', 'Ceramic Wash Basin', 'piece', 24, 'Six bathrooms'),
+  ('e2000022-0000-4000-8000-000000000022', 'e1000022-0000-4000-8000-000000000022', 'd7000018-0000-4000-8000-000000000018', 'Imported Shower Mixer', 'piece', 150, 'Staged delivery'),
+  ('e2000023-0000-4000-8000-000000000023', 'e1000023-0000-4000-8000-000000000023', 'd7000007-0000-4000-8000-000000000007', 'Concealed Cistern Set', 'set', 30, null),
+  ('e2000024-0000-4000-8000-000000000024', 'e1000024-0000-4000-8000-000000000024', 'd7000006-0000-4000-8000-000000000006', 'Ceramic Wash Basin', 'piece', 200, 'Staged by floor');
+
+-- Quotations SENT by the supply side. Totals equal the sum of their own lines.
+insert into public.quotations (id, rfq_id, supplier_org_id, requester_org_id, note, validity_date, subtotal, total, status, version, submitted_at, decided_at, decided_by, created_at, created_by)
+values
+  -- Out for decision (no decided_at, no decided_by).
+  ('e3000003-0000-4000-8000-000000000003', 'e1000003-0000-4000-8000-000000000003', '91000001-1111-4111-8111-000000000001', '91000005-1111-4111-8111-000000000005', 'Anodised silver, four week lead.', (now() + interval '18 days')::date, 45500, 45500, 'submitted', 1, now() - interval '3 days', null, null, now() - interval '4 days', '71000001-0000-4000-8000-000000000001'),
+  ('e3000015-0000-4000-8000-000000000015', 'e1000015-0000-4000-8000-000000000015', '91000002-1111-4111-8111-000000000002', '9a000000-aaaa-4aaa-8aaa-000000000005', 'Price holds for the full quantity.', (now() + interval '14 days')::date, 52800, 52800, 'submitted', 1, now() - interval '2 days', null, null, now() - interval '3 days', '71000002-0000-4000-8000-000000000002'),
+  ('e3000023-0000-4000-8000-000000000023', 'e1000023-0000-4000-8000-000000000023', '91000003-1111-4111-8111-000000000003', '91000005-1111-4111-8111-000000000005', 'Ex-stock, collection from Obour.', (now() + interval '10 days')::date, 37500, 37500, 'submitted', 1, now() - interval '2 days', null, null, now() - interval '3 days', '71000003-0000-4000-8000-000000000003'),
+  -- Accepted, and now orders.
+  ('e3000004-0000-4000-8000-000000000004', 'e1000004-0000-4000-8000-000000000004', '91000001-1111-4111-8111-000000000001', '9a000000-aaaa-4aaa-8aaa-000000000005', 'Site survey included.', (now() - interval '26 days')::date, 628800, 628800, 'accepted', 1, now() - interval '31 days', now() - interval '28 days', '70000006-0000-4000-8000-000000000006', now() - interval '32 days', '71000001-0000-4000-8000-000000000001'),
+  ('e3000016-0000-4000-8000-000000000016', 'e1000016-0000-4000-8000-000000000016', '91000002-1111-4111-8111-000000000002', '91000004-1111-4111-8111-000000000004', 'Delivery to site in two drops.', (now() - interval '22 days')::date, 103200, 103200, 'accepted', 1, now() - interval '27 days', now() - interval '24 days', '71000004-0000-4000-8000-000000000004', now() - interval '28 days', '71000002-0000-4000-8000-000000000002'),
+  ('e3000017-0000-4000-8000-000000000017', 'e1000017-0000-4000-8000-000000000017', '91000002-1111-4111-8111-000000000002', '91000005-1111-4111-8111-000000000005', 'Colour matched on site.', (now() - interval '90 days')::date, 71200, 71200, 'accepted', 1, now() - interval '95 days', now() - interval '92 days', '71000005-0000-4000-8000-000000000005', now() - interval '96 days', '71000002-0000-4000-8000-000000000002'),
+  ('e3000024-0000-4000-8000-000000000024', 'e1000024-0000-4000-8000-000000000024', '91000003-1111-4111-8111-000000000003', '9a000000-aaaa-4aaa-8aaa-000000000005', 'Stock held against the schedule.', (now() - interval '18 days')::date, 256000, 256000, 'accepted', 1, now() - interval '23 days', now() - interval '20 days', '70000006-0000-4000-8000-000000000006', now() - interval '24 days', '71000003-0000-4000-8000-000000000003');
+
+insert into public.quotation_items (quotation_id, rfq_item_id, product_name, unit, quantity, unit_price)
+values
+  ('e3000003-0000-4000-8000-000000000003', 'e2000003-0000-4000-8000-000000000003', 'Aluminium Window Profile', 'linear_meter', 260, 175),
+  ('e3000004-0000-4000-8000-000000000004', 'e2000004-0000-4000-8000-000000000004', 'Tempered Glass Partition 10mm', 'square_meter', 480, 1310),
+  ('e3000015-0000-4000-8000-000000000015', 'e2000015-0000-4000-8000-000000000015', 'Interior Emulsion - Matte White', 'liter', 600, 88),
+  ('e3000016-0000-4000-8000-000000000016', 'e2000016-0000-4000-8000-000000000016', 'Interior Emulsion - Matte White', 'liter', 1200, 86),
+  ('e3000017-0000-4000-8000-000000000017', 'e2000017-0000-4000-8000-000000000017', 'Exterior Weather Coat', 'liter', 400, 178),
+  ('e3000023-0000-4000-8000-000000000023', 'e2000023-0000-4000-8000-000000000023', 'Concealed Cistern Set', 'set', 30, 1250),
+  ('e3000024-0000-4000-8000-000000000024', 'e2000024-0000-4000-8000-000000000024', 'Ceramic Wash Basin', 'piece', 200, 1280);
+
+-- Orders the supply side must FULFIL. Three in progress and one completed, so
+-- "orders to fulfil" and "orders completed" are both non-zero for the Distributor.
+insert into public.orders (id, quotation_id, rfq_id, requester_org_id, supplier_org_id, requester_branch_id, title, note, subtotal, total, status, version, confirmed_at, started_at, completed_at, created_at, created_by)
+values
+  ('e5000004-0000-4000-8000-000000000004', 'e3000004-0000-4000-8000-000000000004', 'e1000004-0000-4000-8000-000000000004', '9a000000-aaaa-4aaa-8aaa-000000000005', '91000001-1111-4111-8111-000000000001', 'b0000005-0000-4000-8000-000000000005', 'Glazing package - Fifth Settlement', 'Site survey included.', 628800, 628800, 'in_progress', 2, now() - interval '28 days', now() - interval '25 days', null, now() - interval '28 days', '70000006-0000-4000-8000-000000000006'),
+  ('e5000016-0000-4000-8000-000000000016', 'e3000016-0000-4000-8000-000000000016', 'e1000016-0000-4000-8000-000000000016', '91000004-1111-4111-8111-000000000004', '91000002-1111-4111-8111-000000000002', 'b1000004-0000-4000-8000-000000000004', 'Interior paint - Maadi apartments', 'Delivery to site in two drops.', 103200, 103200, 'in_progress', 2, now() - interval '24 days', now() - interval '21 days', null, now() - interval '24 days', '71000004-0000-4000-8000-000000000004'),
+  ('e5000017-0000-4000-8000-000000000017', 'e3000017-0000-4000-8000-000000000017', 'e1000017-0000-4000-8000-000000000017', '91000005-1111-4111-8111-000000000005', '91000002-1111-4111-8111-000000000002', 'b1000005-0000-4000-8000-000000000005', 'Exterior coat - Zayed branch', 'Colour matched on site.', 71200, 71200, 'completed', 3, now() - interval '92 days', now() - interval '89 days', now() - interval '74 days', now() - interval '92 days', '71000005-0000-4000-8000-000000000005'),
+  ('e5000024-0000-4000-8000-000000000024', 'e3000024-0000-4000-8000-000000000024', 'e1000024-0000-4000-8000-000000000024', '9a000000-aaaa-4aaa-8aaa-000000000005', '91000003-1111-4111-8111-000000000003', 'b0000005-0000-4000-8000-000000000005', 'Basins - New Cairo tower', 'Stock held against the schedule.', 256000, 256000, 'in_progress', 2, now() - interval '20 days', now() - interval '16 days', null, now() - interval '20 days', '70000006-0000-4000-8000-000000000006');
+
+insert into public.order_items (order_id, product_name, unit, quantity, unit_price)
+values
+  ('e5000004-0000-4000-8000-000000000004', 'Tempered Glass Partition 10mm', 'square_meter', 480, 1310),
+  ('e5000016-0000-4000-8000-000000000016', 'Interior Emulsion - Matte White', 'liter', 1200, 86),
+  ('e5000017-0000-4000-8000-000000000017', 'Exterior Weather Coat', 'liter', 400, 178),
+  ('e5000024-0000-4000-8000-000000000024', 'Ceramic Wash Basin', 'piece', 200, 1280);
+
+-- Delivery work the supply side EXECUTES. This is what the fulfilment panel and
+-- the Projects module show for a Distributor, Manufacturer or Importer — real
+-- order and project state, and deliberately not carrier tracking, which has no
+-- model here.
+insert into public.projects (id, order_id, requester_org_id, executing_org_id, branch_id, title, location, description, start_date, target_date, status, version, activated_at, completed_at, created_at, created_by)
+values
+  ('e7000004-0000-4000-8000-000000000004', 'e5000004-0000-4000-8000-000000000004', '9a000000-aaaa-4aaa-8aaa-000000000005', '91000001-1111-4111-8111-000000000001', 'b0000005-0000-4000-8000-000000000005',
+   'Glazing installation - Fifth Settlement tower', 'Fifth Settlement, New Cairo', 'Survey, fabrication and installation of tempered glass partitions across five office floors.',
+   (now() - interval '25 days')::date, (now() + interval '20 days')::date, 'active', 2, now() - interval '25 days', null, now() - interval '28 days', '71000001-0000-4000-8000-000000000001'),
+  ('e7000016-0000-4000-8000-000000000016', 'e5000016-0000-4000-8000-000000000016', '91000004-1111-4111-8111-000000000004', '91000002-1111-4111-8111-000000000002', 'b1000004-0000-4000-8000-000000000004',
+   'Paint supply - Maadi apartments', 'Maadi, Cairo', 'Staged supply of interior emulsion for an eight-apartment handover.',
+   (now() - interval '21 days')::date, (now() + interval '8 days')::date, 'active', 2, now() - interval '21 days', null, now() - interval '24 days', '71000002-0000-4000-8000-000000000002'),
+  ('e7000024-0000-4000-8000-000000000024', 'e5000024-0000-4000-8000-000000000024', '9a000000-aaaa-4aaa-8aaa-000000000005', '91000003-1111-4111-8111-000000000003', 'b0000005-0000-4000-8000-000000000005',
+   'Sanitary supply - New Cairo tower', 'New Cairo, Cairo', 'Staged delivery of imported basins, floor by floor.',
+   (now() - interval '16 days')::date, (now() + interval '14 days')::date, 'active', 2, now() - interval '16 days', null, now() - interval '20 days', '71000003-0000-4000-8000-000000000003');

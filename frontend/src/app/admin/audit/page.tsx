@@ -17,7 +17,7 @@ export default async function AdminAuditPage() {
 
   return (
     <div className="flex flex-col gap-lg">
-      <AdminHeader title={m.admin.audit.title} subtitle={m.admin.audit.subtitle} count={entries.length} />
+      <AdminHeader locale={locale} title={m.admin.audit.title} subtitle={m.admin.audit.subtitle} count={entries.length} />
       <AuditFeed entries={entries} locale={locale} />
     </div>
   );

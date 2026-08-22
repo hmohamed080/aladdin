@@ -34,20 +34,25 @@ export function BranchSwitcher({
   if (branches.length === 0) return null;
   if (branches.length === 1) {
     return (
-      <span className="flex items-center gap-1 text-label text-fg-secondary">
-        <span className="text-fg-muted">{t("nav.branch")}:</span>
-        {branches[0]!.name}
+      // Header density: the label reads as the next crumb after the workspace,
+      // so it carries the branch NAME and drops the "Branch:" prefix into the
+      // accessible name — the row is 48px and a literal field label in it is
+      // the kind of chrome-in-the-chrome the reference does without.
+      <span className="flex h-7 min-w-0 items-center px-1 text-label text-fg-secondary">
+        <span className="sr-only">{t("nav.branch")}: </span>
+        <span className="truncate">{branches[0]!.name}</span>
       </span>
     );
   }
   return (
-    <label className="flex items-center gap-2">
+    <label className="flex min-w-0 items-center gap-2">
       <span className="sr-only">{t("nav.branch")}</span>
       <Select
         aria-label={t("nav.branch")}
         defaultValue={activeId ?? "all"}
         disabled={pending}
-        className="min-w-40"
+        size="compact"
+        className="min-w-32 max-w-44"
         onChange={(e) => start(() => selectBranch(e.target.value))}
       >
         <option value="all">{orgWide ? t("nav.allBranches") : t("nav.allAssignedBranches")}</option>

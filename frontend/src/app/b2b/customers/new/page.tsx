@@ -2,7 +2,8 @@ import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listOrgMembers } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
-import { PageHeader, BackLink } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
+import { BackLink } from "@/features/sales/page-parts";
 import { StatePanel } from "@/components/ui/primitives";
 import { CustomerForm } from "@/features/sales/customer-form";
 
@@ -28,7 +29,7 @@ export default async function NewCustomerPage() {
   return (
     <div className="pb-16 tablet:pb-0">
       <BackLink href="/b2b/customers">{m.customers.title}</BackLink>
-      <PageHeader title={m.customers.createTitle} />
+      <PageHeader locale={locale} title={m.customers.createTitle} />
       <CustomerForm
         orgId={org.organizationId}
         branches={org.branches}

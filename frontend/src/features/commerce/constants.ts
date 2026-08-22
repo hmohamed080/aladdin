@@ -1,5 +1,4 @@
 import type { Database } from "@/types/database.types";
-import type { Locale } from "@/lib/i18n/locales";
 
 /**
  * Shared commerce constants and formatters. Enum value lists mirror the DB enums
@@ -34,23 +33,14 @@ export const PRODUCT_UNITS: ProductUnit[] = [
   "pack",
 ];
 
-/** Locale-aware EGP money formatting (Egyptian pound). */
-export function formatMoney(value: number | string | null, locale: Locale): string {
-  if (value === null) return "—";
-  const n = typeof value === "string" ? Number(value) : value;
-  if (!Number.isFinite(n)) return "—";
-  return new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-EG", {
-    style: "currency",
-    currency: "EGP",
-    maximumFractionDigits: 2,
-  }).format(n);
-}
-
-/** Plain quantity formatting (trims trailing zeros for whole numbers). */
-export function formatQuantity(value: number | string, locale: Locale): string {
-  const n = typeof value === "string" ? Number(value) : value;
-  if (!Number.isFinite(n)) return String(value);
-  return new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-EG", {
-    maximumFractionDigits: 2,
-  }).format(n);
-}
+/**
+ * Money and quantity are NOT redefined here.
+ *
+ * They used to be, with their own `Intl` calls and their own locale tag, which
+ * is precisely how the Arabic UI ended up with two numeral systems on one page:
+ * a quantity formatted by this file and a total formatted by `lib/ui/format`
+ * could disagree about the numbering system. There is now ONE formatting layer
+ * and this module re-exports from it, so the hundred-odd existing imports keep
+ * working and no caller can pick the wrong copy.
+ */
+export { formatMoney, formatQuantity } from "@/lib/ui/format";

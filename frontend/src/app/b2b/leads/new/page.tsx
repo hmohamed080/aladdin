@@ -2,7 +2,8 @@ import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listOrgMembers } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
-import { PageHeader, BackLink } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
+import { BackLink } from "@/features/sales/page-parts";
 import { StatePanel } from "@/components/ui/primitives";
 import { LeadForm } from "@/features/sales/lead-form";
 
@@ -44,7 +45,7 @@ export default async function NewLeadPage({
   return (
     <div className="pb-16 tablet:pb-0">
       <BackLink href="/b2b/leads">{m.leads.title}</BackLink>
-      <PageHeader title={m.leads.createTitle} />
+      <PageHeader locale={locale} title={m.leads.createTitle} />
       <LeadForm
         orgId={org.organizationId}
         branches={org.branches}

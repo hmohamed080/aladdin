@@ -3,15 +3,14 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/context";
-import { THEME_COOKIE } from "@/lib/theme/config";
 import { getMessages } from "@/lib/i18n/translate";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadPlatformRole } from "@/server/queries/platform";
-import { Brand } from "@/components/layout/brand";
-import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
-import { SignOutButton } from "@/components/layout/account-menu";
+import { AppHeader } from "@/components/layout/app-header";
 import { Badge } from "@/components/ui/primitives";
 import { AdminSidebar, AdminTopNav } from "@/components/admin/admin-nav";
+import { contentColumnClass } from "@/components/layout/content-column";
+import { cn } from "@/lib/ui/cn";
 
 export const dynamic = "force-dynamic";
 
@@ -30,45 +29,47 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const dir = directionFor(locale);
-  const theme = store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light";
   const m = getMessages(locale);
 
   return (
     <I18nProvider locale={locale} dir={dir}>
-      <div className="flex min-h-dvh bg-canvas">
-        <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-e bg-surface px-3 py-lg tablet:flex">
-          <div className="flex items-center gap-2 px-2 pb-lg">
-            <Brand name={m.common.appName} size="md" />
-          </div>
-          <p className="px-3 pb-2 text-label font-semibold uppercase tracking-wide text-fg-muted">
-            {m.admin.title}
-          </p>
-          <AdminSidebar />
-          <div className="mt-auto px-3 pt-lg">
-            <Badge tone="accent">{m.admin.roleLabel[role]}</Badge>
-          </div>
-        </aside>
+      {/* Same shell shape as the workspace: full-width header, then a row of
+          rail + content. The console differs in WHAT it navigates, never in how
+          the shell is assembled. */}
+      <div className="flex min-h-dvh flex-col bg-canvas">
+        <AppHeader
+          appName={m.common.appName}
+          /* The console has no organization behind it, so the palette offers
+             Admin destinations (server-gated on platform role) and nothing
+             else. Admin record search is deliberately not wired here: the
+             console's own lists are the searchable surface, and a second path
+             into platform-wide data is a second place to get the gate wrong. */
+          hasWorkspace={false}
+          workspaceLabel={m.admin.title}
+          context={<Badge tone="accent">{m.admin.roleLabel[role]}</Badge>}
+        />
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-header border-b bg-surface/85 backdrop-blur" style={{ zIndex: 200 }}>
-            <div className="flex flex-wrap items-center gap-md px-md py-2">
-              <span className="flex items-center gap-2 tablet:hidden">
-                <Brand name={m.common.appName} size="sm" />
-                <Badge tone="accent">{m.admin.title}</Badge>
-              </span>
-              <div className="ms-auto flex items-center gap-sm">
-                <LanguageSwitch />
-                <ThemeSwitch current={theme} />
-                <SignOutButton />
-              </div>
+        <div className="flex min-w-0 flex-1">
+          <aside
+            className="sticky hidden w-56 shrink-0 flex-col border-e bg-surface px-3 py-md tablet:flex"
+            style={{ top: "var(--app-header-h)", height: "calc(100dvh - var(--app-header-h))" }}
+          >
+            <p className="px-3 pb-2 text-label font-semibold uppercase tracking-wide text-fg-muted">
+              {m.admin.title}
+            </p>
+            <AdminSidebar />
+            <div className="mt-auto px-3 pt-lg">
+              <Badge tone="accent">{m.admin.roleLabel[role]}</Badge>
             </div>
-          </header>
+          </aside>
 
-          <AdminTopNav />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <AdminTopNav />
 
-          <main className="mx-auto w-full max-w-[1200px] flex-1 px-md py-lg" id="main">
-            {children}
-          </main>
+            <main className={cn(contentColumnClass, "py-lg")} id="main">
+              {children}
+            </main>
+          </div>
         </div>
       </div>
     </I18nProvider>

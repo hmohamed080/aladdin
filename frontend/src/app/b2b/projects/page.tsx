@@ -1,11 +1,11 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listProjects, type ProjectListRow } from "@/server/queries/execution";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { TabLinks, StatTiles } from "@/components/ui/stat-tiles";
 import { ProjectTable } from "@/features/execution/execution-lists";
 import { formatCompactMoney } from "@/lib/ui/format";
-import { LayersIcon, ActivityIcon, CheckIcon, AlertIcon, WalletIcon } from "@/components/ui/icons";
+import { LayersIcon, ActivityIcon, CheckIcon, AlertIcon, MoneyIcon } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -61,18 +61,22 @@ export default async function ProjectsPage({
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
+        Icon={LayersIcon}
         title={m.execution.project.title}
         subtitle={m.execution.project.subtitle}
         count={rows.length}
       />
 
       <StatTiles
+        locale={locale}
+        layout="strip"
         tiles={[
           { label: m.execution.project.stat.active, value: countBy(rows, "active"), Icon: ActivityIcon, tone: "accent" },
           { label: m.execution.project.stat.planned, value: countBy(rows, "planned"), Icon: LayersIcon, tone: "info" },
           { label: m.execution.project.stat.completed, value: countBy(rows, "completed"), Icon: CheckIcon, tone: "success" },
           { label: m.execution.project.stat.overdue, value: overdue(rows), Icon: AlertIcon, tone: "danger" },
-          { label: m.reports.projectValue, value: formatCompactMoney(value, locale), Icon: WalletIcon },
+          { label: m.reports.projectValue, value: formatCompactMoney(value, locale), Icon: MoneyIcon },
         ]}
         className="desktop:grid-cols-5"
       />
@@ -80,6 +84,7 @@ export default async function ProjectsPage({
       <div>
         {showIncoming ? (
           <TabLinks
+            locale={locale}
             basePath="/b2b/projects"
             param="view"
             current={view === "executing" ? "" : "incoming"}

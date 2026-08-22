@@ -6,6 +6,7 @@ import type { ReferralDraft } from "@/server/queries/affiliation";
 import { GOVERNORATES, CITIES_BY_GOVERNORATE, type Governorate } from "@/lib/onboarding/persona-fields";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import { HomeHeader } from "@/features/home/parts";
+import { readableColumnClass } from "@/components/layout/content-column";
 
 /**
  * Refer a showroom that is not on Aladdin yet.
@@ -72,7 +73,10 @@ export function ShowroomReferralForm({
 
       <StatePanel title={t("showroom.refer.noticeTitle")} body={t("showroom.refer.noticeBody")} />
 
-      <Card>
+      {/* A single-column form keeps its measure even though the shell around it is
+          now fluid — see `readableColumnClass`. Fields stretched to the full width
+          of a wide display are harder to fill, not easier. */}
+      <Card className={readableColumnClass}>
         <form action={submitShowroomReferral} className="flex flex-col gap-md">
           {referral ? <input type="hidden" name="referralId" value={referral.id} /> : null}
 

@@ -17,6 +17,7 @@ function ctx(caps: string[], canManageSales = false): OrgContext {
   return {
     organizationId: "org",
     organizationName: "Org",
+    orgType: "showroom_dealer",
     membershipId: "mem",
     capabilities: caps,
     canManageSales,

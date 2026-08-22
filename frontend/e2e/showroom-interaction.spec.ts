@@ -97,12 +97,17 @@ test.describe("Workspace sidebar display modes", () => {
     await expect(catalog).toBeVisible();
     await expect(catalog).toHaveAttribute("aria-current", "page");
 
-    // ...and come back visually on hover, as a tooltip. Located by CSS, not by
-    // role: the tooltip is `aria-hidden` on purpose (the link is already NAMED
-    // with the same string, so exposing both would make it stutter), and
-    // `getByRole` only sees the accessibility tree.
+    // Hovering must NOT bring the word back as a floating caption.
+    //
+    // It used to. Two problems, and neither was cosmetic: the caption rendered
+    // outside the rail, over page content, so running the pointer down the icons
+    // flashed a box in and out over the workspace; and in expand-on-hover mode
+    // the rail was already opening to show that exact word, so the same label
+    // appeared twice in two places. The hover cue is now the icon's own tile.
+    // The accessible name above is what carries the label.
     await catalog.hover();
-    await expect(sidebar(page).locator('[role="tooltip"]')).toHaveText("Browse products");
+    await expect(sidebar(page).locator('[role="tooltip"]')).toHaveCount(0);
+    await expect(catalog).toHaveText("");
   });
 
   test("expand-on-hover overlays the page instead of reflowing it", async ({ page, request }) => {
@@ -298,12 +303,25 @@ test.describe("Horizontal card rails", () => {
     await expectNoPageOverflow(page);
   });
 
-  test("Reports keeps its money figures whole inside the rail", async ({ page, request }) => {
+  test("Reports keeps its money figures whole", async ({ page, request }) => {
     await prefs(page, "en");
     await signIn(page, request, IDENTITIES.showroom);
     await page.goto("/b2b/reports");
 
-    await expect(page.getByRole("group", { name: "Reports & analytics" })).toBeVisible();
+    // The rail this used to assert has been replaced by the shared KPI strip,
+    // but the DEFECT it was written for is the one that matters and is still
+    // guarded here: a committed-spend figure clipped mid-string does not look
+    // clipped, it looks like a smaller number. Two things now prevent it — the
+    // value is formatted compact, and the strip wraps instead of truncating —
+    // so the check is that the rendered figure is COMPLETE, not that a
+    // particular container is on the page.
+    const value = page
+      .locator("main")
+      .getByText(/^EGP\s?[\d.,]+[KM]?$/)
+      .first();
+    await expect(value).toBeVisible();
+    const clipped = await value.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+    expect(clipped, "the money figure is clipped by its cell").toBe(false);
     await expectNoPageOverflow(page);
   });
 });

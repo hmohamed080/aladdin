@@ -3,7 +3,8 @@ import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { getFollowUp, listOrgMembers } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
-import { PageHeader, BackLink } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
+import { BackLink } from "@/features/sales/page-parts";
 import { StatePanel, SectionTitle } from "@/components/ui/primitives";
 import { FollowUpEditForm } from "@/features/sales/follow-up-edit-form";
 import { ReassignFollowUpForm } from "@/features/sales/reassign-follow-up-form";
@@ -42,7 +43,7 @@ export default async function FollowUpEditPage({ params }: { params: Promise<{ i
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <div>
         <BackLink href="/b2b/follow-ups">{m.followUps.title}</BackLink>
-        <PageHeader title={m.followUps.editTitle} />
+        <PageHeader locale={locale} title={m.followUps.editTitle} />
       </div>
       {followUp.status === "open" ? (
         <>

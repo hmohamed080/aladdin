@@ -377,7 +377,13 @@ test.describe("showroom workspace", () => {
     await signIn(page, request, IDENTITIES.showroom);
     await page.goto("/b2b");
 
-    await page.getByRole("button", { name: "Language", exact: true }).first().click();
+    // The language control moved OUT of the header row and INTO the account
+    // menu, alongside appearance — the header now carries search, context and
+    // the avatar, and the loose language/theme/sign-out trio that used to sit
+    // beside them is gone from every authenticated surface. Same cookie, same
+    // action, one place to find it.
+    await page.getByTestId("profile-menu-trigger").click();
+    await page.getByTestId("locale-ar").click();
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.locator("html")).toHaveAttribute("lang", "ar");
   });

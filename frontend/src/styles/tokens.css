@@ -16,9 +16,89 @@
   --basalt: #0e1113;
   --basalt-2: #1b2226;
   --basalt-3: #232b30;
+
+  /* ---- Carbon ramp — the DARK-THEME ground ----
+   * Basalt is a BRAND colour: a cool, blue-black stone, right for the Aperture
+   * mark, the auth brand panel and every modal scrim. It was never a good
+   * workspace ground, and using it as one is what made dark mode unacceptable.
+   * #0e1113 is close enough to pure black that a full-height sidebar and an
+   * empty table region both read as dead space, while the jump from it up to
+   * #1b2226 is large enough that every card looked like it was floating in a
+   * hole. A dense operational workspace needs the opposite: a charcoal ground
+   * you can rest on, and elevation steps small enough that ten stacked surfaces
+   * still read as one plane.
+   *
+   * So this ramp is NEUTRAL (no blue cast), starts at charcoal rather than
+   * near-black, and steps by a few points of lightness at a time. Borders sit
+   * only just above the surface they divide, which is what removes the
+   * drawn-grid look; contrast is carried by the TEXT, where the ratios actually
+   * have to hold. Each text value is checked against both grounds it lands on:
+   *
+   *   text       on canvas 15.7:1   on surface 15.2:1
+   *   secondary  on canvas  7.7:1   on surface  7.5:1
+   *   muted      on canvas  5.2:1   on surface  4.8:1   (AA at body size)
+   *
+   * Basalt itself does not move — nothing about the brand changes here.
+   */
+  --carbon: #131415;
+  --carbon-2: #1a1c1d;
+  --carbon-3: #212425;
+  --carbon-4: #282c2d;
+  --carbon-line: #272a2b;
+  --carbon-line-strong: #343839;
+  --carbon-text: #ededec;
+  --carbon-text-secondary: #a3a8a9;
+  --carbon-text-muted: #838889;
+
   --limestone: #f4f1ea;
   --plaster: #fbf9f4;
   --sand: #eae5db;
+
+  /* ---- Quartz ramp — the LIGHT-THEME ground ----
+   * The exact argument the Carbon ramp makes below, one theme over, and it was
+   * always going to need making twice.
+   *
+   * Limestone, Plaster and Sand are BRAND colours: warm stone, right for the
+   * Aperture mark, the auth brand panel and the primary button's label. They
+   * were also doing duty as the workspace ground, and a dense operational
+   * surface is where that stops working. DESIGN.md is unambiguous about the
+   * intent — "deliberately low-chroma, never cream-yellow" — but intent is not
+   * what a screen renders. Measured as the spread between a colour's highest
+   * and lowest channel, the ramp ran 10 at the canvas, 15 at the secondary
+   * fill, 18 at the hairline and 25 at the strong hairline. On a page with a
+   * handful of borders that is a warm cast you would have to look for. On the
+   * supply dashboard — a KPI strip drawn entirely in hairlines, eight framed
+   * panels, bordered rows inside each — it accumulates into a page that reads
+   * cream.
+   *
+   * Quartz is the same stone with the chroma taken out of it: still warmer than
+   * neutral, never yellow. Spread runs 4 / 2 / 6 / 5 / 6 / 7.
+   *
+   * THE HAIRLINES ARE LUMINANCE-MATCHED, which is the part worth keeping. The
+   * obvious way to de-yellow a border is to lighten it, and that quietly costs
+   * you the border: #ded8cc and #dbd8d5 differ by 0.0003 in relative luminance,
+   * so the frame carries exactly the weight it did before while losing two
+   * thirds of its chroma. Against the cleaner ground it actually reads slightly
+   * stronger than it used to (1.26 -> 1.28 on canvas, 1.35 -> 1.39 on surface).
+   * De-yellowing is not the same operation as lightening.
+   *
+   * Every light text pair improves and none regresses:
+   *   fg         on canvas  15.64 -> 15.90
+   *   secondary  on canvas   5.61 ->  5.70
+   *   muted      on canvas   4.76 ->  4.84
+   *   muted      on surface  5.10 ->  5.24
+   *   muted      on surface-2 4.27 -> 4.47   — still short of 4.5, so the
+   *                                            Muted-On-Sand Rule STAYS.
+   *
+   * The three brand primitives above do not move. Nothing about the brand
+   * changes here — only the ground the workspace is drawn on.
+   */
+  --quartz: #f4f3f0;
+  --quartz-raised: #fdfcfb;
+  --quartz-sunk: #eceae6;
+  --quartz-hover: #f3f1ee;
+  --quartz-line: #dbd8d5;
+  --quartz-line-strong: #c2bfbb;
   --ink: #17191a;
   --lumen: #f3ab3e;
   --lumen-deep: #c77f1c;
@@ -29,6 +109,34 @@
   --bronze-ink: #6e5230;
   --lapis: #2f6088;
   --lapis-bright: #6fa8d2;
+
+  /* ---- Iris ramp — the ANALYTIC accent ----
+   * Lumen is the brand's ACTION colour: it means "this is the thing to press",
+   * and it earns that by being the only warm high-chroma note in the system. The
+   * cost of having exactly one accent showed up the moment a real operational
+   * dashboard was built out of it — every icon tile, every proportion bar, every
+   * ranked row and every panel glyph came out amber, so the page read as one
+   * enormous call to action sitting on a sand-coloured ground, and nothing on it
+   * ranked against anything else.
+   *
+   * Iris is the second voice, and it is deliberately a MEASUREMENT colour rather
+   * than a second brand colour: it marks the parts of a surface that describe
+   * the business (tiles, bars, rankings, stage flows) so that amber can go back
+   * to meaning "act". Cool against Lumen's warm, so the two never read as a
+   * gradient of the same idea; close enough to `lapis` in hue to sit beside it
+   * in one chart without clashing, far enough in chroma to stay distinct.
+   *
+   *   iris-ink    on plaster  #fbf9f4   9.4:1
+   *   iris-bright on carbon-2 #1a1c1d   6.1:1
+   *
+   * Both clear AA at body size on the ground each one actually lands on, which
+   * is the only test that matters — a token that passes on paper and fails on
+   * the surface it is used on is a token that has not been checked.
+   */
+  --iris: #5b4ad9;
+  --iris-deep: #4a3ab8;
+  --iris-ink: #4334a8;
+  --iris-bright: #9b8cf5;
   --verdigris: #2f7d5b;
   --verdigris-deep: #205a42;
   --ochre: #b26b12;
@@ -58,6 +166,36 @@
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
   /* ---- Z-index scale (theme-independent) ---- */
+  /* Height of the authenticated top header, as a token because THREE things
+     need to agree on it: the header itself, the sidebar that starts BENEATH it
+     and sizes its sticky offset and its own height from it, and the Admin
+     layout's own rail. A hard-coded pixel value in any of them is the same class
+     of drift `lib/ui/nav-geometry` exists to prevent, one axis over.
+
+     68px from `tablet` up, 48 below it. The reason is the MARK, not the bar: the
+     approved Aladdin logo is an illustration — a genie, a lamp, a furnished
+     interior inside a circle — and at the 26px a 48px bar allowed it, every one
+     of those collapsed into a single gold smudge. It read as "something is
+     there" rather than as what it is.
+
+     The size is derived from the mark and not chosen for the bar: 48px of
+     artwork plus 10px of clearance above and below is 68. That clearance is the
+     floor, not a cushion — below about 8px the emblem starts to read as jammed
+     against the border, and above about 12px the 28px controls beside it begin
+     to float. Both failures are visible; the window between them is narrow.
+
+     It stops at 68 deliberately, and it does not apply on a phone at all. A
+     header is chrome: the one band on every page that is never the thing the
+     reader came for. It may take the space its contents genuinely need and not
+     one pixel more — and on a 393px screen it does not need it, because the
+     lockup there stays at its old size to leave room for seven controls beside
+     it (see `Brand`). Spending 68 of a phone's ~780 usable pixels on chrome to
+     draw a mark that did not grow would be the trade backwards.
+
+     The controls stay 28px at every width and simply gain air around them in the
+     taller bar — see `header-parts`. */
+  --app-header-h: 3rem;
+
   --z-base: 0;
   --z-raised: 10;
   --z-sticky: 100;
@@ -70,16 +208,25 @@
   --z-tooltip: 800;
 
   /* ---- Semantics · LIGHT theme (default) ---- */
-  --canvas: var(--limestone);
-  --surface: var(--plaster);
-  --surface-2: var(--sand);
+  /* Quartz, not Limestone — see the ramp. The brand primitives stay brand
+     primitives; the workspace stands on its own ground. */
+  --canvas: var(--quartz);
+  --surface: var(--quartz-raised);
+  --surface-2: var(--quartz-sunk);
+  /* The POINTER-OVER ground: one step short of `surface-2`, so a hovered row
+     reads as "armed" and the current row (`surface-2`) still reads as stronger.
+     It is a token rather than `surface-2/60` because these semantics are
+     `var()` colours with no `<alpha-value>` channel, and Tailwind silently emits
+     NOTHING for an opacity modifier on those — `hover:bg-surface-2/60` compiled
+     to no rule at all, which is why the expanded sidebar rows had no hover. */
+  --surface-hover: var(--quartz-hover);
 
   --fg: var(--ink);
   --fg-secondary: var(--stone);
   --fg-muted: var(--stone-muted);
 
-  --border: var(--line-light);
-  --border-strong: var(--line-light-strong);
+  --border: var(--quartz-line);
+  --border-strong: var(--quartz-line-strong);
 
   --primary: var(--ink);
   --primary-foreground: var(--limestone);
@@ -89,6 +236,14 @@
 
   --bronze-sem: var(--bronze-ink);
   --lapis-sem: var(--lapis);
+
+  /* The analytic accent, as a pair with the same contract as `accent`:
+     `iris` is the AA-safe tone for text and strokes, `iris-solid` is the fill.
+     Kept separate for exactly the reason accent/accent-solid are — a colour
+     legible as 13px type and a colour that works as a 40px block of fill are
+     not usually the same colour. */
+  --iris-sem: var(--iris-ink);
+  --iris-solid: var(--iris);
 
   --success: var(--verdigris-deep);
   --warning: var(--ochre-deep);
@@ -115,30 +270,80 @@
   --series-5: var(--oxide);
   --series-6: var(--stone);
   /* Grid lines and axis rules — one step softer than a border. */
-  --chart-grid: var(--line-light);
+  /* ---- Scrollbars (LIGHT) ----
+   * One treatment for every scroll container in the product (see globals.css).
+   * There is no track token: the gutter is TRANSPARENT everywhere, so the thumb
+   * floats over whatever surface the container already has. The thumb is a
+   * neutral that is clearly visible without competing with content, and it is
+   * legible on canvas, surface and surface-2 alike. Never the accent — a
+   * scrollbar is chrome, not a signal.
+   */
+  /* Luminance-matched to the tan thumbs these replace (delta < 0.001), so the
+     scrollbar is exactly as findable as it was and simply stops being tan.
+     These carried the highest chroma in the entire light theme — spread 24 and
+     27 — on a control that is pure chrome. */
+  --scrollbar-thumb: #b6b2ae;
+  --scrollbar-thumb-hover: #97938e;
+  --chart-grid: var(--quartz-line);
+
+  /* ---- Elevation (LIGHT) ----
+   * Shadows are THEME-AWARE, which they were not before: `shadow-card` was one
+   * fixed warm near-black at 4%, tuned against Limestone, and on a dark ground
+   * it did nothing at all. Three steps, consumed as `shadow-sm` / `shadow-card`
+   * / `shadow-lg`, so a component asks for a LEVEL and the theme decides how
+   * that level is drawn.
+   *
+   * The tint is neutral now rather than rgba(20,16,10) — a warm near-black
+   * tuned against Limestone. At 4-6% a shadow's hue is nearly invisible on its
+   * own, but there is one under every card on the page and they were all
+   * casting warm onto the ground the rest of this change just cooled. Opacities
+   * and geometry are untouched; only the hue moved.
+   */
+  --shadow-raised: 0 1px 2px rgba(16, 16, 18, 0.06);
+  --shadow-card: 0 1px 2px rgba(16, 16, 18, 0.04), 0 8px 24px rgba(16, 16, 18, 0.05);
+  --shadow-overlay: 0 10px 30px rgba(16, 16, 18, 0.1), 0 2px 8px rgba(16, 16, 18, 0.06);
 }
 
 .dark {
-  /* ---- Semantics · DARK theme ---- */
-  --canvas: var(--basalt);
-  --surface: var(--basalt-2);
-  --surface-2: var(--basalt-3);
+  /* ---- Semantics · DARK theme ----
+   * Four grounds, not two. `canvas` is the page, `surface` is anything raised
+   * onto it (header, sidebar, card, menu, table shell), `surface-2` is the state
+   * layer on top of that (hover, active row, selected segment). The gaps between
+   * them are small on purpose: a workspace where a card is obviously lighter than
+   * the page is a workspace of floating boxes, and by the fifth nested surface it
+   * has drifted halfway to white. Depth here comes from the BORDER plus a
+   * restrained shadow, and the surfaces only whisper.
+   */
+  --canvas: var(--carbon);
+  --surface: var(--carbon-2);
+  --surface-2: var(--carbon-3);
+  /* Same step, same reason, on the dark ground: between `surface` and
+     `surface-2` so hover whispers and the current row still speaks. */
+  --surface-hover: #1e2122;
 
-  --fg: var(--on-dark);
-  --fg-secondary: var(--on-dark-secondary);
-  --fg-muted: var(--on-dark-muted);
+  --fg: var(--carbon-text);
+  --fg-secondary: var(--carbon-text-secondary);
+  --fg-muted: var(--carbon-text-muted);
 
-  --border: var(--line-dark);
-  --border-strong: var(--graphite);
+  /* Low-contrast by design. A dark-mode border that you can see clearly on its
+     own is a border you will see a hundred of at once. */
+  --border: var(--carbon-line);
+  --border-strong: var(--carbon-line-strong);
 
-  --primary: var(--on-dark);
-  --primary-foreground: var(--basalt);
+  --primary: var(--carbon-text);
+  --primary-foreground: var(--carbon);
 
   --accent: var(--lumen); /* bright Lumen reads fine on Basalt */
   --accent-solid: var(--lumen);
 
   --bronze-sem: var(--bronze);
   --lapis-sem: var(--lapis-bright);
+
+  /* On Carbon the ink tone disappears, so both roles move up the ramp: the text
+     tone becomes the bright one, and the fill lifts to a mid violet that still
+     reads as a FILL against #1a1c1d rather than as a dark patch. */
+  --iris-sem: var(--iris-bright);
+  --iris-solid: #7a68ec;
 
   --success: var(--verdigris-bright);
   --warning: var(--ochre-bright);
@@ -158,6 +363,42 @@
   --series-3: var(--verdigris-bright);
   --series-4: var(--bronze);
   --series-5: var(--oxide-bright);
-  --series-6: var(--on-dark-muted);
-  --chart-grid: var(--graphite);
+  --series-6: var(--carbon-text-muted);
+  /* ---- Scrollbars (DARK) ----
+   * The whole reason this block exists: with no rule, Windows Chrome paints its
+   * NATIVE light scrollbar beside a dark sidebar — a white gutter down the side
+   * of the workspace. Painting the thumb alone is enough to replace it; the
+   * gutter behind it is transparent, so nothing stripes the edge of a dark
+   * panel. The thumb stays a neutral clear of every dark ground it can land on.
+   */
+  --scrollbar-thumb: #343a3b;
+  --scrollbar-thumb-hover: #4b5253;
+  --chart-grid: var(--carbon-4);
+
+  /* ---- Elevation (DARK) ----
+   * The light theme's shadow is a warm near-black at 4–5% — invisible on a
+   * charcoal ground, which is why dark cards had no edge at all and the whole
+   * surface stack flattened. Dark elevation is a deeper black at a HIGHER alpha
+   * but a tighter spread: enough to seat a menu above the page, not enough to
+   * smear a halo around every card in a dense table view.
+   */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.32);
+  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-overlay: 0 8px 28px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- Header height, at tablet and above ----
+ * The one theme-independent token that has a BREAKPOINT, and it earns the
+ * exception: `--app-header-h` is consumed by three separate elements (the header
+ * itself, the sidebar's sticky offset and its height, and the Admin rail), so
+ * the alternative to changing it in one place is changing it in three and hoping
+ * they stay in step. See the token's own note for why the bar grows at all, and
+ * `Brand` for the mark that grows with it at this exact breakpoint — 768px, the
+ * `tablet` screen in tailwind.config.ts. The two must not drift apart: a 48px
+ * lockup in a 48px bar leaves no air at all, which reads as a mistake.
+ */
+@media (min-width: 768px) {
+  :root {
+    --app-header-h: 4.25rem;
+  }
 }

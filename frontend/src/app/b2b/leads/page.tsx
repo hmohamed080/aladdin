@@ -2,7 +2,7 @@ import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import { listLeads, customerNameMap, memberNameMap } from "@/server/queries/sales";
 import { canWrite } from "@/server/queries/context";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { StatePanel } from "@/components/ui/primitives";
 import { TargetIcon } from "@/components/ui/icons";
 import { LeadsView } from "@/features/sales/leads-view";
@@ -45,6 +45,8 @@ export default async function LeadsPage({
   return (
     <div className="pb-16 tablet:pb-0">
       <PageHeader
+        locale={locale}
+        Icon={TargetIcon}
         title={m.leads.title}
         subtitle={m.leads.subtitle}
         count={leads.length}

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ComponentType } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
+import { navIconClass, navRowClass, NAV_ICON_HOVER_CLASS, NAV_ICON_SIZE } from "@/lib/ui/nav-geometry";
 import {
   HomeIcon,
   UsersIcon,
@@ -21,12 +22,17 @@ import {
   WrenchIcon,
   LandmarkIcon,
   BarChartIcon,
+  GaugeIcon,
   SettingsIcon,
   MenuIcon,
   XIcon,
+  StorefrontIcon,
+  DemandIcon,
+  FileTextIcon,
 } from "@/components/ui/icons";
 import type { NavKey, NavSection } from "@/lib/nav/modules";
-import { allowedNavSections } from "@/lib/nav/modules";
+import { allowedNavSections, navLabelKey } from "@/lib/nav/modules";
+import type { CommerceStance } from "@/lib/workspace/supply-side";
 
 /**
  * Primary workspace navigation — the implemented modules (no dead links). A
@@ -55,6 +61,7 @@ const ITEMS: Record<NavKey, Item> = {
   saved: { href: "/b2b/saved", key: "nav.saved", exact: false, Icon: BookmarkIcon },
 
   suppliers: { href: "/b2b/suppliers", key: "nav.suppliers", exact: false, Icon: TruckIcon },
+  buyers: { href: "/b2b/buyers", key: "nav.buyers", exact: false, Icon: StorefrontIcon },
   technicians: { href: "/b2b/technicians", key: "nav.technicians", exact: false, Icon: WrenchIcon },
   institutions: { href: "/b2b/institutions", key: "nav.institutions", exact: false, Icon: LandmarkIcon },
 
@@ -63,11 +70,34 @@ const ITEMS: Record<NavKey, Item> = {
   followUps: { href: "/b2b/follow-ups", key: "nav.followUps", exact: false, Icon: CalendarCheckIcon },
   products: { href: "/b2b/products", key: "nav.products", exact: false, Icon: PackageIcon },
 
+  points: { href: "/b2b/points", key: "nav.points", exact: false, Icon: GaugeIcon },
   projects: { href: "/b2b/projects", key: "nav.projects", exact: false, Icon: LayersIcon },
   team: { href: "/b2b/organization", key: "nav.team", exact: false, Icon: UsersIcon },
   reports: { href: "/b2b/reports", key: "nav.reports", exact: false, Icon: BarChartIcon },
   settings: { href: "/b2b/settings", key: "nav.settings", exact: false, Icon: SettingsIcon },
 };
+
+/**
+ * Presentation overrides for the seller seat.
+ *
+ * The route and the gate are unchanged — see `lib/nav/modules` for why the same
+ * three modules carry two names. Only the two glyphs whose METAPHOR reverses are
+ * swapped: a shopping bag means "what I am going out to buy", which is exactly
+ * backwards for a distributor reading requests that arrived; and an inbox means
+ * "prices that came to me", which is backwards for prices it sent out. On a
+ * collapsed rail the glyph IS the label, so a wrong metaphor is a wrong label.
+ */
+const SELLER_ICONS: Partial<Record<NavKey, ComponentType<{ size?: number }>>> = {
+  purchaseRequests: DemandIcon,
+  offers: FileTextIcon,
+};
+
+function itemFor(key: NavKey, stance: CommerceStance): Item {
+  const base = ITEMS[key];
+  if (stance !== "seller") return base;
+  const Icon = SELLER_ICONS[key] ?? base.Icon;
+  return { ...base, key: navLabelKey(key, stance, base.key), Icon };
+}
 
 /**
  * Two modules answer to `/b2b/rfqs` and `/b2b/quotations` respectively but no
@@ -81,6 +111,7 @@ function useActive() {
 
 const sectionLabel: Record<NavSection, string | null> = {
   overview: null, // Home stands alone above the first heading.
+  supply: "nav.section.supply",
   buying: "nav.section.buying",
   network: "nav.section.network",
   selling: "nav.section.selling",
@@ -88,58 +119,64 @@ const sectionLabel: Record<NavSection, string | null> = {
 };
 
 /**
+ * A seller's demoted Buying group is not the buyer's leading one, and calling
+ * both "Buying" would put the word twice on one rail (once over the commerce
+ * trio's supply counterpart, once over browse/shortlist). Under the seller
+ * layout it is what it actually is: sourcing.
+ */
+function sectionLabelKey(section: NavSection, stance: CommerceStance): string | null {
+  if (stance === "seller" && section === "buying") return "nav.section.sourcing";
+  return sectionLabel[section];
+}
+
+/**
  * One navigation row.
  *
  * `narrow` is the icon-rail presentation, not a different link: the same href,
- * the same active rule, the same capability gate. Only the label moves — out of
- * the row and into a tooltip — so a collapsed rail can never expose a different
- * set of modules than an expanded one.
+ * the same active rule, the same capability gate. Only the label is dropped, so
+ * a collapsed rail can never expose a different set of modules than an expanded
+ * one.
  *
- * Accessibility in the narrow state: the localized label becomes the link's
- * `aria-label`, so assistive tech reads exactly what the expanded rail shows.
- * The tooltip is therefore purely visual (`aria-hidden`) — describing the link
- * with the same string it is already named with would just stutter.
+ * WHY THERE IS NO VISIBLE TOOLTIP ANY MORE
+ * The collapsed rail used to grow a floating label beside whichever icon the
+ * pointer touched. Two problems, and neither was cosmetic: the label appeared
+ * OUTSIDE the rail, over page content, so a glance down the icons flickered a
+ * box in and out over the workspace; and in "expand on hover" mode the rail was
+ * already opening to show that exact word, so the tooltip raced the reveal and
+ * the same label rendered twice in two places. What a user needs from a hover on
+ * an icon rail is to know WHICH target they are on — that is a surface cue, not
+ * a caption. So the hover now lights the icon's own tile.
+ *
+ * Nothing is lost for assistive technology: the localized label is still the
+ * link's `aria-label` in the narrow state, so a screen reader announces exactly
+ * what the expanded rail shows. The change is purely to what is PAINTED.
+ *
+ * Keyboard parity is deliberate — `focus-visible` gets the same lit tile plus a
+ * focus ring, because a keyboard user moving down a rail of unlabelled icons has
+ * strictly more need of "you are here" than a mouse user does.
  */
 function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow?: boolean }) {
-  const { t, dir } = useI18n();
+  const { t } = useI18n();
   const { href, key, Icon } = item;
   const label = t(key);
-  const [tip, setTip] = useState<{ top: number; inlineStart: number } | null>(null);
-
-  /**
-   * The tooltip is `position: fixed`, and that is not a stylistic choice.
-   * The rail scrolls vertically, and a box with `overflow-y: auto` also clips
-   * horizontally — an absolutely-positioned tooltip at `start-full` would be
-   * sliced off at the rail's edge. Fixed positioning leaves the clipping context
-   * entirely, so the coordinates have to be measured rather than declared.
-   */
-  const place = (el: HTMLElement | null) => {
-    if (!el || !narrow) return;
-    const r = el.getBoundingClientRect();
-    setTip({
-      top: r.top + r.height / 2,
-      // Always inward, toward the content: past the trailing edge in LTR, past
-      // the leading edge in RTL. `inlineStart` is fed to the matching physical
-      // property below.
-      inlineStart: dir === "rtl" ? window.innerWidth - r.left : r.right,
-    });
-  };
-  const hide = () => setTip(null);
 
   return (
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
       aria-label={narrow ? label : undefined}
-      onMouseEnter={(e) => place(e.currentTarget)}
-      onMouseLeave={hide}
-      onFocus={(e) => place(e.currentTarget)}
-      onBlur={hide}
       className={cn(
-        "group relative flex items-center rounded-sm py-2 text-label font-medium transition-colors duration-fast",
+        "group relative flex items-center rounded-sm text-label font-medium",
+        "transition-[background-color,color,box-shadow] duration-fast ease-standard motion-reduce:transition-none",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-        narrow ? "justify-center px-0" : "gap-3 px-3",
-        active ? "bg-surface-2 text-fg" : "text-fg-secondary hover:bg-surface-2/60 hover:text-fg",
+        navRowClass(Boolean(narrow)),
+        // A WIDE row highlights as a row: one surface behind icon and label
+        // together, the shape the design references show. `surface-hover` is a
+        // real token because the `/60` opacity modifier this used to carry
+        // compiled to nothing (see tokens.css), so these rows have never
+        // actually painted. Active stays the full `surface-2` — plus the accent
+        // marker and accent glyph — so the current page reads clearly stronger.
+        !narrow && (active ? "bg-surface-2 text-fg" : "text-fg-secondary hover:bg-surface-hover hover:text-fg"),
       )}
     >
       {/* The active marker is the ONLY cue left once labels are gone, so it stays
@@ -151,32 +188,27 @@ function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow
           active ? "opacity-100" : "opacity-0",
         )}
       />
-      <span className={cn("shrink-0", active ? "text-accent" : "text-fg-muted group-hover:text-fg-secondary")}>
-        <Icon size={19} />
+      <span
+        className={cn(
+          // The icon's BOX is the same 36px tile in every mode — that is geometry,
+          // and it is what keeps this glyph on the same centre line as the mode
+          // control at the foot of the panel, which needs a tile of its own.
+          navIconClass(),
+          // The tile only PAINTS on the collapsed rail, where the row is 40px of
+          // icon and the tile effectively IS the row. A wide row highlights as a
+          // ROW — see the `!narrow` hover on the link above — and lighting a tile
+          // inside an already-highlighted row would draw a second, smaller box
+          // around the icon and split one target into two.
+          narrow && !active && NAV_ICON_HOVER_CLASS,
+          // An active item already owns a tile; hovering it deepens rather than
+          // re-announces, so the active/hover distinction survives the collapse.
+          narrow && active && "bg-accent-solid/15 group-hover:bg-accent-solid/25",
+          active ? "text-accent" : "text-fg-muted group-hover:text-fg",
+        )}
+      >
+        <Icon size={NAV_ICON_SIZE} />
       </span>
-      {narrow ? (
-        tip ? (
-          <span
-            role="tooltip"
-            aria-hidden="true"
-            className={cn(
-              "pointer-events-none fixed -translate-y-1/2 whitespace-nowrap",
-              "rounded-sm border border-strong bg-surface px-2 py-1 text-label text-fg shadow-lg",
-            )}
-            style={{
-              zIndex: 800,
-              top: tip.top,
-              ...(dir === "rtl"
-                ? { right: tip.inlineStart + 8 }
-                : { left: tip.inlineStart + 8 }),
-            }}
-          >
-            {label}
-          </span>
-        ) : null
-      ) : (
-        <span className="truncate">{label}</span>
-      )}
+      {narrow ? null : <span className="truncate">{label}</span>}
     </Link>
   );
 }
@@ -190,15 +222,23 @@ function NavLink({ item, active, narrow }: { item: Item; active: boolean; narrow
  * have no room at 3.5rem, so the grouping is carried by a rule instead of a
  * word; the groups themselves are unchanged and in the same order.
  */
-export function Sidebar({ allowed, narrow = false }: { allowed: readonly string[]; narrow?: boolean }) {
+export function Sidebar({
+  allowed,
+  narrow = false,
+  stance = "buyer",
+}: {
+  allowed: readonly string[];
+  narrow?: boolean;
+  stance?: CommerceStance;
+}) {
   const { t } = useI18n();
   const isActive = useActive();
-  const sections = allowedNavSections(allowed);
+  const sections = allowedNavSections(allowed, stance);
 
   return (
     <nav aria-label={t("nav.workspace")} className="flex flex-col gap-1">
       {sections.map(({ section, keys }, i) => {
-        const labelKey = sectionLabel[section];
+        const labelKey = sectionLabelKey(section, stance);
         return (
           <div
             key={section}
@@ -216,7 +256,7 @@ export function Sidebar({ allowed, narrow = false }: { allowed: readonly string[
             ) : null}
             <div className="flex flex-col gap-0.5">
               {keys.map((k) => {
-                const item = ITEMS[k];
+                const item = itemFor(k, stance);
                 return (
                   <NavLink key={k} item={item} active={isActive(item.href, item.exact)} narrow={narrow} />
                 );
@@ -240,13 +280,23 @@ export function Sidebar({ allowed, narrow = false }: { allowed: readonly string[
  * The sheet renders the SAME sections as the desktop rail, so both surfaces
  * expose exactly the same set of modules.
  */
-export function MobileNav({ allowed }: { allowed: readonly string[] }) {
+export function MobileNav({
+  allowed,
+  stance = "buyer",
+}: {
+  allowed: readonly string[];
+  stance?: CommerceStance;
+}) {
   const { t } = useI18n();
   const isActive = useActive();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const sections = allowedNavSections(allowed);
+  // The stance reorders the sections, so the four modules that earn a bottom-bar
+  // slot follow the stance too: a distributor's phone opens on incoming demand,
+  // not on purchase requests. The PATTERN — four plus a "More" sheet holding the
+  // same sections as the desktop rail — is unchanged.
+  const sections = allowedNavSections(allowed, stance);
   const flat = sections.flatMap((s) => s.keys);
   const primary = flat.slice(0, 4);
   const overflow = flat.slice(4);
@@ -282,7 +332,7 @@ export function MobileNav({ allowed }: { allowed: readonly string[] }) {
               {sections.map(({ section, keys }) => {
                 const shown = keys.filter((k) => overflow.includes(k));
                 if (shown.length === 0) return null;
-                const labelKey = sectionLabel[section];
+                const labelKey = sectionLabelKey(section, stance);
                 return (
                   <div key={section} className="mt-md first:mt-0">
                     {labelKey ? (
@@ -292,7 +342,7 @@ export function MobileNav({ allowed }: { allowed: readonly string[] }) {
                     ) : null}
                     <div className="flex flex-col gap-0.5">
                       {shown.map((k) => {
-                        const item = ITEMS[k];
+                        const item = itemFor(k, stance);
                         return <NavLink key={k} item={item} active={isActive(item.href, item.exact)} />;
                       })}
                     </div>
@@ -314,7 +364,7 @@ export function MobileNav({ allowed }: { allowed: readonly string[] }) {
           style={{ gridTemplateColumns: `repeat(${Math.max(columns, 1)}, minmax(0, 1fr))` }}
         >
           {primary.map((k) => {
-            const { href, key, exact, Icon } = ITEMS[k];
+            const { href, key, exact, Icon } = itemFor(k, stance);
             const active = isActive(href, exact);
             return (
               <li key={k}>

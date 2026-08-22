@@ -28,6 +28,18 @@ export type SalesCapability = "sales.read" | "sales.write" | "sales.assign" | "s
 export type OrgContext = {
   organizationId: string;
   organizationName: string;
+  /**
+   * `organizations.org_type` — the business CLASSIFICATION, which belongs to the
+   * organization and never to the person working in it. Carried here so a surface
+   * can derive its commerce stance (see lib/workspace/supply-side) without a
+   * second read: the workspace entries this context is built from already select
+   * the column. Null when the organization has not been classified.
+   *
+   * It confers NO authority. Capabilities and RLS decide what may be done; this
+   * only decides which perspective a shared surface leads with and what it is
+   * called.
+   */
+  orgType: string | null;
   /** The caller's own active membership id in this org (for self-assignment). */
   membershipId: string;
   /** membership_capabilities for the caller in this org (+ org.manage). */
@@ -125,7 +137,8 @@ export const loadWorkspaceContext = cache(async function loadWorkspaceContext(
   // The switcher's entries and this shell's active org come from the SAME derived
   // source, so what the caller sees and what the page renders can never disagree.
   const [{ entries }, store] = await Promise.all([workspacesPromise, cookies()]);
-  const orgs = businessEntries(entries).map((b) => ({ id: b.organizationId, name: b.name }));
+  const businesses = businessEntries(entries);
+  const orgs = businesses.map((b) => ({ id: b.organizationId, name: b.name }));
 
   // B2B surfaces are business by definition: a Personal selection falls through to
   // a valid organization here rather than bouncing a caller off a link they
@@ -134,7 +147,10 @@ export const loadWorkspaceContext = cache(async function loadWorkspaceContext(
   if (!activeOrgId) {
     return { organizations: orgs, active: null, entries };
   }
-  const activeOrg = orgs.find((o) => o.id === activeOrgId)!;
+  // The full entry, not the trimmed {id,name} pair — it already carries the
+  // classification, so reading org_type costs nothing extra here.
+  const activeEntry = businesses.find((b) => b.organizationId === activeOrgId)!;
+  const activeOrg = { id: activeEntry.organizationId, name: activeEntry.name };
 
   const { data: memberships, error: mErr } = await supabase
     .from("memberships")
@@ -197,6 +213,7 @@ export const loadWorkspaceContext = cache(async function loadWorkspaceContext(
     active: {
       organizationId: activeOrg.id,
       organizationName: activeOrg.name,
+      orgType: activeEntry.orgType,
       membershipId: membership.id,
       capabilities,
       canManageSales,

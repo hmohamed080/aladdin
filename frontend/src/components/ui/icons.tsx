@@ -284,6 +284,30 @@ export const LandmarkIcon = (p: IconProps) => (
   </Svg>
 );
 
+/**
+ * A shop front with an awning — the customer/showroom network, i.e. the
+ * businesses a supply-side organization sells INTO. Deliberately distinct from
+ * `TruckIcon` (the distributors it buys from) and `BuildingIcon` (institutions):
+ * on a collapsed rail the glyph is the only label there is, so the three
+ * directories must not read as the same mark.
+ */
+export const StorefrontIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 9V20a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9" />
+    <path d="M3 9h18l-1.4-4.3A1 1 0 0 0 18.65 4H5.35a1 1 0 0 0-.95.7L3 9Z" />
+    <path d="M9.5 21v-5.5h5V21" />
+  </Svg>
+);
+
+/** Demand coming toward you — the incoming-RFQ / opportunity module. */
+export const DemandIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 12h9" />
+  </Svg>
+);
+
 export const BarChartIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 21h18" />
@@ -315,13 +339,6 @@ export const TrendingUpIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="m3 17 6-6 4 4 8-8" />
     <path d="M15 7h6v6" />
-  </Svg>
-);
-
-export const WalletIcon = (p: IconProps) => (
-  <Svg {...p}>
-    <path d="M3 7a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
-    <path d="M16 12h4" />
   </Svg>
 );
 
@@ -360,5 +377,133 @@ export const ChevronLeftIcon = (p: IconProps) => (
 export const ChevronRightIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="m9 5 7 7-7 7" />
+  </Svg>
+);
+
+/** The ⌘/command glyph — the palette's leading mark, matching the reference. */
+export const CommandIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M15 6a3 3 0 1 1 3 3h-3V6Z" />
+    <path d="M9 6a3 3 0 1 0-3 3h3V6Z" />
+    <path d="M15 18a3 3 0 1 0 3-3h-3v3Z" />
+    <path d="M9 18a3 3 0 1 1-3-3h3v3Z" />
+    <path d="M9 9h6v6H9z" />
+  </Svg>
+);
+
+/** A display — the "System" appearance option in the profile menu. */
+export const MonitorIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2.5" y="4" width="19" height="12.5" rx="2" />
+    <path d="M8.5 21h7M12 16.5V21" />
+  </Svg>
+);
+
+/** A bell — notifications. Only rendered where a real surface exists. */
+export const BellIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M18 8.5a6 6 0 1 0-12 0c0 5-2 6.5-2 6.5h16s-2-1.5-2-6.5" />
+    <path d="M13.7 19a2 2 0 0 1-3.4 0" />
+  </Svg>
+);
+
+/** A speech bubble — the header's Chat entry. */
+export const MessageIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20 15a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2Z" />
+  </Svg>
+);
+
+/** A question mark in a circle — the header's Help entry. */
+export const MegaphoneIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m3 11 18-5.5v13L3 14z" />
+    <path d="M3 11H2.5A1.5 1.5 0 0 0 1 12.5v0A1.5 1.5 0 0 0 2.5 14H3" />
+    <path d="M7 12.6V19a1 1 0 0 0 1 1h1.5a1 1 0 0 0 1-1v-5.4" />
+  </Svg>
+);
+
+export const HelpIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.6 9.4a2.5 2.5 0 0 1 4.9.6c0 1.7-2.5 2.2-2.5 4" />
+    <path d="M12 17.6h.01" />
+  </Svg>
+);
+
+/** A globe — the language row in the profile menu. */
+export const GlobeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18" />
+    <path d="M12 3c2.5 2.7 3.8 5.7 3.8 9S14.5 18.3 12 21c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z" />
+  </Svg>
+);
+
+/** A corner arrow — the "press Enter to open" affordance on a search result. */
+export const EnterKeyIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20 5v6a3 3 0 0 1-3 3H5" />
+    <path d="m9 10-4 4 4 4" />
+  </Svg>
+);
+
+export const MailIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2.5" y="5" width="19" height="14" rx="2" />
+    <path d="m3 7 9 6 9-6" />
+  </Svg>
+);
+
+export const PhoneIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
+    <path d="M11 18.5h2" />
+  </Svg>
+);
+
+export const CopyIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M15 6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2" />
+  </Svg>
+);
+
+/**
+ * A money VALUE, not a wallet.
+ *
+ * `WalletIcon` was being used beside order totals, quotation values and project
+ * values — the commercial figures the product genuinely holds. On its own that
+ * glyph says "wallet balance", which is a finance feature this product does not
+ * have and is not in Pilot scope, and a purse drawn next to "total order value"
+ * invites a manager to look for a balance, a top-up and a payout that do not
+ * exist. Banknotes say "an amount of money" without implying an account holding
+ * it. See the note on the Pilot's commercial-vs-financial line in
+ * docs/product/mvp-scope.md.
+ */
+export const MoneyIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2.5" y="6" width="19" height="12" rx="2" />
+    <circle cx="12" cy="12" r="2.5" />
+    <path d="M6 10v4M18 10v4" />
+  </Svg>
+);
+
+/** A bare calendar — the period/date-range scope, where `CalendarCheckIcon`
+ *  would wrongly imply something about that date has been confirmed. */
+export const CalendarIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
+    <path d="M3.5 9.5h17M8 3v3M16 3v3" />
+  </Svg>
+);
+
+/** Product video / clip. Drawn as a frame with a play triangle rather than a
+ *  camera, because the subject is the RECORDING, not the device. */
+export const VideoIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2.5" y="5.5" width="14" height="13" rx="2.5" />
+    <path d="M16.5 10.5 21.5 7.5v9l-5-3z" />
+    <path d="M7.5 9.8v4.4l3.8-2.2z" />
   </Svg>
 );

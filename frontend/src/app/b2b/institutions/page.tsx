@@ -6,12 +6,12 @@ import {
   sharedWorkCounts,
   INSTITUTION_ORG_TYPES,
 } from "@/server/queries/directory";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { StatTiles } from "@/components/ui/stat-tiles";
 import { OrganizationDirectoryTable } from "@/features/directory/directory-tables";
 import { formatCompactMoney } from "@/lib/ui/format";
-import { LandmarkIcon, BadgeCheckIcon, ReceiptIcon, WalletIcon } from "@/components/ui/icons";
+import { LandmarkIcon, BadgeCheckIcon, ReceiptIcon, MoneyIcon } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -57,14 +57,16 @@ export default async function InstitutionsPage({
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
-      <PageHeader title={m.institutions.title} subtitle={m.institutions.subtitle} count={rows.length} />
+      <PageHeader locale={locale} Icon={LandmarkIcon} title={m.institutions.title} subtitle={m.institutions.subtitle} count={rows.length} />
 
       <StatTiles
+        locale={locale}
+        layout="strip"
         tiles={[
           { label: m.institutions.stat.total, value: counts.total, Icon: LandmarkIcon, tone: "accent" },
           { label: m.institutions.stat.verified, value: counts.verified, Icon: BadgeCheckIcon, tone: "success" },
           { label: m.institutions.stat.connected, value: connected.length, Icon: ReceiptIcon, tone: "info" },
-          { label: m.institutions.stat.value, value: formatCompactMoney(exchanged, locale), Icon: WalletIcon },
+          { label: m.institutions.stat.value, value: formatCompactMoney(exchanged, locale), Icon: MoneyIcon },
         ]}
       />
 
@@ -84,6 +86,7 @@ export default async function InstitutionsPage({
           ]}
         />
         <OrganizationDirectoryTable
+          locale={locale}
           rows={rows}
           m={m}
           sharedWork={worked}

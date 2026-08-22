@@ -177,7 +177,7 @@ function ResendButton({ cooldown }: { cooldown: number }) {
   const waiting = cooldown > 0;
   return (
     <Button type="submit" variant="ghost" size="sm" disabled={waiting}>
-      {waiting ? t("auth.resendIn", { seconds: String(cooldown) }) : t("auth.resend")}
+      {waiting ? t("auth.resendIn", { seconds: cooldown }) : t("auth.resend")}
     </Button>
   );
 }

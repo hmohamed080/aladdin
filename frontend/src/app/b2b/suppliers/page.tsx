@@ -7,7 +7,7 @@ import {
   sharedWorkCounts,
   SUPPLIER_ORG_TYPES,
 } from "@/server/queries/directory";
-import { PageHeader } from "@/features/sales/page-parts";
+import { PageHeader } from "@/components/ui/workspace-layout";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { StatTiles } from "@/components/ui/stat-tiles";
 import { OrganizationDirectoryTable } from "@/features/directory/directory-tables";
@@ -63,9 +63,11 @@ export default async function DistributorsPage({
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
-      <PageHeader title={m.suppliers.title} subtitle={m.suppliers.subtitle} count={rows.length} />
+      <PageHeader locale={locale} Icon={TruckIcon} title={m.suppliers.title} subtitle={m.suppliers.subtitle} count={rows.length} />
 
       <StatTiles
+        locale={locale}
+        layout="strip"
         tiles={[
           { label: m.suppliers.stat.total, value: counts.total, Icon: TruckIcon, tone: "accent" },
           { label: m.suppliers.stat.verified, value: counts.verified, Icon: BadgeCheckIcon, tone: "success" },
@@ -90,6 +92,7 @@ export default async function DistributorsPage({
           ]}
         />
         <OrganizationDirectoryTable
+          locale={locale}
           rows={rows}
           m={m}
           facets={facets}

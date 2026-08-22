@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { Messages } from "@/lib/i18n/messages/en";
+import type { Locale } from "@/lib/i18n/locales";
+import { formatCount } from "@/lib/ui/format";
 import { DataTable, RecordCell, Monogram, type Column } from "@/components/ui/data-table";
 import { Badge, StatePanel } from "@/components/ui/primitives";
 import { BadgeCheckIcon, BuildingIcon, UserIcon } from "@/components/ui/icons";
@@ -21,9 +23,18 @@ import type { OrgDirectoryRow, ProfileDirectoryRow, OrgFacet, SharedWork } from 
  * distributor actually publishes, and whether you have already worked together.
  */
 
-/** "1 order" / "4 orders" — shared so the two surfaces that show it agree. */
-export function orderCountLabel(count: number, m: Messages): string {
-  return count === 1 ? m.directory.workedOrderOne : m.directory.workedOrders.replace("{count}", String(count));
+/**
+ * "1 order" / "4 orders" — shared so the two surfaces that show it agree.
+ *
+ * The count goes through the shared formatter rather than `String()`: this label
+ * sits in a badge beside money and dates that are already localised, and a Latin
+ * "4" next to an Arabic "٤" on the same row is the exact defect this pass exists
+ * to remove.
+ */
+export function orderCountLabel(count: number, m: Messages, locale: Locale): string {
+  return count === 1
+    ? m.directory.workedOrderOne
+    : m.directory.workedOrders.replace("{count}", formatCount(count, locale));
 }
 
 function VerifiedBadge({ verified, m }: { verified: boolean | null; m: Messages }) {
@@ -60,6 +71,7 @@ function CategoryChips({ facet, m }: { facet: OrgFacet | undefined; m: Messages 
 export function OrganizationDirectoryTable({
   rows,
   m,
+  locale,
   emptyTitle,
   emptyBody,
   facets,
@@ -67,6 +79,7 @@ export function OrganizationDirectoryTable({
 }: {
   rows: OrgDirectoryRow[];
   m: Messages;
+  locale: Locale;
   emptyTitle: string;
   emptyBody: string;
   /** What each business publishes. Passed by the Distributors module. */
@@ -107,7 +120,7 @@ export function OrganizationDirectoryTable({
       desktopOnly: true,
       cell: (r) => {
         const n = (r.id && facets.get(r.id)?.products) || 0;
-        return n > 0 ? m.directory.productCount.replace("{count}", String(n)) : "—";
+        return n > 0 ? m.directory.productCount.replace("{count}", formatCount(n, locale)) : "—";
       },
     });
   }
@@ -119,7 +132,7 @@ export function OrganizationDirectoryTable({
       cell: (r) => {
         const w = r.id ? sharedWork.get(r.id) : undefined;
         return w ? (
-          <Badge tone="info">{orderCountLabel(w.orders, m)}</Badge>
+          <Badge tone="info">{orderCountLabel(w.orders, m, locale)}</Badge>
         ) : (
           <span className="text-fg-muted">{m.directory.noSharedWork}</span>
         );
@@ -158,6 +171,11 @@ export function OrganizationDirectoryTable({
   );
 }
 
+/**
+ * No `locale` prop here on purpose: this table renders names, trades, bios and
+ * language badges and not one number, so taking a locale it never uses would be
+ * a prop that lies about what the component does.
+ */
 export function ProfessionalDirectoryTable({
   rows,
   m,

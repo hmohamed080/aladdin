@@ -4,7 +4,7 @@ import { StatePanel } from "@/components/ui/primitives";
 import { PackageIcon, ActivityIcon } from "@/components/ui/icons";
 import { OrderStatusBadge, ProjectStatusBadge } from "@/features/execution/badges";
 import { DataTable, RecordCell, type Column } from "@/components/ui/data-table";
-import { formatDate } from "@/lib/ui/format";
+import { formatDate, formatCount } from "@/lib/ui/format";
 import { formatMoney } from "@/features/commerce/constants";
 import type { OrderListRow, ProjectListRow } from "@/server/queries/execution";
 
@@ -35,7 +35,7 @@ export function OrderTable({
       cell: (o) => (
         <RecordCell
           title={o.title ?? "—"}
-          meta={m.execution.order.itemCountShort.replace("{count}", String(o.item_count ?? 0))}
+          meta={m.execution.order.itemCountShort.replace("{count}", formatCount(o.item_count ?? 0, locale))}
           href={`/b2b/orders/${o.id}`}
         />
       ),

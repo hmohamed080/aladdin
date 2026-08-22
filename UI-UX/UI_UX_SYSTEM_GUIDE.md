@@ -82,14 +82,40 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 - Charts are **inline SVG rendered on the server** (`components/ui/charts.tsx`) — no charting library, no client component, no runtime dependency. The four shapes the product needs (trend, proportion, ranked comparison, funnel) are a path, a dashed circle, a flex row and a list.
 - Every chart is `role="img"` with an `aria-label`, and carries an `sr-only` list of its **actual values** — a screen reader gets the data, not a description of a picture.
 - **Direction:** value/time axes stay LTR in both locales (an Arabic dashboard still reads a Jan→Jun trend left to right, and digits are LTR anyway). Ranked bars, legends and funnels are text lists — they follow document direction and grow from the inline start.
-- **Numerals:** anything shown beside formatted money must use the same numeral system (`formatPercent`, `formatCompactMoney`). Mixing Arabic-Indic money with a Latin `57%` in one row is a defect.
+- **Numerals:** see *Numerals and formatting* below. Mixing Arabic-Indic money with a Latin `57%` in one row is a defect, and so is a chart value or axis bound that skipped the shared formatter.
 - **Empty is a first-class state**: a chart with nothing behind it renders a sentence, never an empty axis pretending to be a measurement. No targets, forecasts or growth percentages unless the database actually produces them.
+
+## Numerals and Formatting
+
+**Every user-facing number goes through the one shared formatter layer (`lib/ui/format.ts`).** Not "supply-side numbers" or "report numbers" — all of them: KPI counts, money, quantities, percentages, dates, times, relative time, pagination, badge counts, table cells, chart values and axis labels, dashboard statistics.
+
+- **Arabic renders Arabic-Indic digits** (٠١٢٣٤٥٦٧٨٩); English renders Western digits. This is not decoration — a screen that shows ١٢ in one panel and `12` in the next reads as two products stitched together.
+- **The locale tag names the numbering system explicitly** (`ar-EG-u-nu-arab`). `ar-EG` alone lets each runtime's ICU choose, and the server, the browser and CI need not agree. Format with `Intl`; never substitute digits by hand — hand substitution also mangles the grouping separator, the decimal mark, currency placement and the bidi marks `Intl` emits.
+- **A bare `{value}` in JSX is the bug.** A `number` interpolated into JSX or into a message template stringifies through `Number.prototype.toString`, which is locale-blind. Shared primitives that render numeric props take a **required** `locale` so the compiler — not a later grep — proves the coverage.
+- **Technical identifiers are the exception and stay Latin in every locale**: order/RFQ references (`ORD-1256`), SKUs, UUIDs, VAT numbers, emails, URLs, API strings. They are looked up, dictated down a phone and compared character for character; reshaping their digits produces a reference that does not match the record it names. Mark the intent with `formatIdentifier()` and render them `dir="ltr"` inside RTL text.
+- **Content is not a number.** A product name (`Porcelain Floor Tile 60×60`) or a supplied description keeps whatever digits its author wrote.
+- **No second copy.** There is exactly one `Intl` construction site in the codebase. A feature that formats its own numbers is how two numeral systems end up on one page.
+
 
 ## Dark Mode Rules
 - The **only** theme axis is `mode: light/dark`. Platform/device/language are naming lanes, **not** theme axes — never fork a component per language for theming.
 - Dark is a **first-class, designed** theme (not an inverted filter): surfaces use layered elevation, borders shift to `$border-strong` equivalents, and contrast is re-verified against WCAG AA in dark.
 - **Admin surfaces are intentionally dark** by default — keep that deliberate, don't "fix" it to light.
 - Implement via a `dark` class on `<html>` (Tailwind `darkMode: "class"`); tokens resolve per theme.
+- **The dark GROUND is the Carbon ramp, never Basalt.** Basalt is a brand colour — the Aperture mark,
+  the auth brand panel, modal scrims. It is not a workspace ground: at `#0e1113` a full-height sidebar
+  and an empty table region both read as dead space, and the jump from it to the card surface made
+  every panel look like it was floating in a hole. Carbon is neutral (no blue cast), starts at
+  charcoal rather than near-black, and steps a few points of lightness at a time:
+  `--carbon` canvas → `--carbon-2` surface → `--carbon-3` state layer, with `--carbon-line` borders
+  sitting only just above the surface they divide. **Contrast is carried by the TEXT**
+  (15.7 / 7.7 / 4.8 : 1 on both canvas and surface), not by making surfaces lighter — a dark theme
+  whose cards are obviously lighter than the page has drifted halfway to white by the fifth nesting.
+- **Elevation is a LEVEL, not a colour.** `shadow-sm` / `shadow-card` / `shadow-lg` all resolve
+  through `--shadow-raised` / `--shadow-card` / `--shadow-overlay`, which each theme defines for
+  itself: a warm 4% wash on Limestone, a deeper and tighter black on Carbon. Never hardcode a shadow
+  in a component — a single fixed shadow tuned for light is invisible on a dark ground, which is
+  exactly how dark cards ended up with no edge and dropdowns that did not lift off the page.
 
 ## Navigation System
 - **Surface-appropriate navigation:** B2C = discovery-style top navigation + prominent search; B2B/Admin = **workspace shell with a sidebar**.
@@ -108,8 +134,15 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 The desktop sidebar offers **Expanded · Collapsed · Expand on hover**, chosen from a compact control in the sidebar footer. These are **presentations of one navigation**, never different navigations: the capability-derived item set, the grouping and order, the active-route rule and the RTL mirroring are identical in all three. A mode that hid a module the user has the capability for would be a defect, not a density option.
 
 - **Expanded** — icons + labels + section headings at full width.
-- **Collapsed** — a narrow icon rail. Section headings have no room, so grouping is carried by a divider instead of a word. Every item keeps its localized label as its **accessible name**, plus a visual tooltip on hover *and* keyboard focus.
+- **Collapsed** — a narrow icon rail, and **icon-only means no painted text of any kind**. Section headings have no room, so grouping is carried by a divider instead of a word. Every item keeps its localized label as its **accessible name** and nothing more: no visible caption, no floating tooltip, no `title` attribute, no duplicated route name.
 - **Expand on hover** — rests collapsed and reveals on pointer entry or keyboard focus. The reveal **overlays inward over the content**; it must not resize the document, because widening a layout element on hover reflows the whole page on every pointer pass and is the usual source of hover flicker.
+
+**The compact rail paints no text — including its own control.** Hover and keyboard focus light the **icon tile itself** (a subtle surface, a soft shadow, a short transition, and a focus-visible ring), and the active item stays visually stronger than any hover. Two rules follow, and both are things this rail got wrong before:
+
+- **No floating caption beside an icon.** A caption over page content flickers a box in and out as the eye runs down the rail, and in expand-on-hover it races the reveal — printing the same label twice, in two places, at once.
+- **The sidebar-mode control is icon-only whenever the chosen mode is not Expanded.** Its label must be gated on the **chosen mode**, never on the panel's current width: width is momentary, so a width-gated label appears the instant a pointer approaches in expand-on-hover and announces the mode the user is already in. The mode names belong **inside the menu the control opens**, where the user is choosing between them — not on the closed control.
+
+Nothing is lost for assistive technology: the accessible name carries the localized label, and the control's accessible name also names the **active mode**, so a screen-reader user is told more than the sighted user sees, not less. Only the painted text is removed.
 
 **Direction.** The reveal always grows *inward toward the content* — rightward in English, leftward in Arabic — and the control's glyph stays direction-neutral rather than implying a side.
 
@@ -174,8 +207,8 @@ For **dense groups of peer cards** that would otherwise wrap into several rows a
 - Never block the whole screen for a partial update. Long/expensive work (OCR, imports, embeddings) runs in the background with progress + Realtime status, not a frozen UI.
 
 ## Accessibility
-- Target **WCAG 2.2 AA**. Contrast verified in **both** light and dark — semantic token pairs were **measured** (min light 4.76:1, min dark 5.40:1; primary-action 15.64:1). Full table: [`../design/GOVERNANCE.md`](../design/GOVERNANCE.md#accessibility).
-- **Muted-On-Sand exception:** `fg-muted` clears AA on the canvas/surface but **not on the Sand fill** (4.27:1) — on Sand use `fg-secondary`/`fg` for normal-size text.
+- Target **WCAG 2.2 AA**. Contrast verified in **both** light and dark — semantic token pairs were **measured** (min light 4.84:1, min dark 5.40:1; primary-action 15.64:1). Full table: [`../design/GOVERNANCE.md`](../design/GOVERNANCE.md#accessibility).
+- **Muted-On-Sunk exception:** `fg-muted` clears AA on the canvas/surface (4.84:1 on Quartz) but **not on the secondary fill** (4.47:1 on Quartz Sunk) — there use `fg-secondary`/`fg` for normal-size text. The Quartz ground narrowed this gap from 4.27:1; it did not close it.
 - Component-level a11y (keyboard traversal, focus trapping, SR labels, tab order, touch targets) is **verified per component at implementation**, not claimed up front — it is a `Ready` gate in the component inventory.
 - Full **keyboard** operability; visible focus states (token-based); logical tab order; focus management in modals/drawers/route changes.
 - Semantic HTML + ARIA only where semantics fall short; all interactive controls have accessible names; icons-only buttons carry labels.
@@ -225,6 +258,10 @@ For **dense groups of peer cards** that would otherwise wrap into several rows a
 
 ## Change History
 Newest first.
+
+### 2026-08-18 — Numerals-and-formatting rule; the compact rail paints no text
+- **What:** Added *Numerals and Formatting* as a first-class section: every user-facing number goes through the one shared formatter layer, Arabic renders Arabic-Indic digits with the numbering system **named in the locale tag** (`ar-EG-u-nu-arab`), and technical identifiers (order refs, SKUs, UUIDs, emails, URLs) are the explicit exception that stays Latin in every locale. Rewrote the **Collapsed** and **Expand on hover** rules: icon-only now means *no painted text of any kind* — no caption, no tooltip, no `title`, and the sidebar-mode control itself is icon-only whenever the chosen mode is not Expanded. The chart *Numerals* bullet now points at the new section instead of restating half of it.
+- **Why:** Both rules were written down only after real-browser UAT found them violated, and both violations came from a gap the old text left open. The numeral rule previously existed only as "anything beside money must match money", which said nothing about the ninety-odd places that rendered a bare count — so an Arabic dashboard showed ١٢ and `12` on one screen. The collapsed rule previously *required* a visual tooltip, which is what produced a caption racing the hover reveal and the same label painted twice; and it gated the mode control's label on the panel's momentary width rather than the chosen mode, so the rail announced the mode you were already in the instant you reached for it. Tokens, themes, spacing, typography and accent behavior are unchanged.
 
 ### 2026-08-16 — Workspace sidebar display modes + horizontal card rails
 - **What:** Added two interaction rules to *Sidebar Behavior*. The desktop workspace sidebar now documents exactly three display modes (**Expanded · Collapsed · Expand on hover**) as presentations of ONE capability-derived navigation, with the hover reveal required to **overlay inward** rather than reflow the document, direction-neutral control iconography, and a **per-browser cookie** (not `localStorage`, not the database) because the preference decides a width. Added **Horizontal card rails** as an approved pattern for dense peer-card groups, including the explicit RTL `scrollLeft` normalization rule and the list of surfaces that must **never** become rails (data tables, main report charts, forms, large operational lists).

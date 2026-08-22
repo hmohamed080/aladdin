@@ -213,3 +213,151 @@ export async function sharedWorkCounts(supabase: DB, orgId: string): Promise<Map
   }
   return out;
 }
+
+/**
+ * The organizations a supply-side business actually SELLS TO, with the shape of
+ * each relationship.
+ *
+ * WHY THIS IS NOT A DIRECTORY QUERY
+ * Everything else in this file reads a public projection: "who exists on Aladdin".
+ * This reads the caller's OWN commerce records and groups them by counterparty:
+ * "who works with me, and how much". Those are different questions, and the
+ * second one cannot be answered from a directory at all.
+ *
+ * WHAT MAKES IT SAFE
+ * Every row counted here is a record the caller is a PARTY TO — it sent the
+ * quotation, it is fulfilling the order. The figures are therefore facts about
+ * the caller's own business ("we have done 4 orders worth X with them"), not
+ * disclosures about the customer's ("they spend Y in total"), and they would read
+ * zero for any other viewer. Nothing private about the counterparty is exposed:
+ * the only columns taken from the customer's side are its NAME, which is already
+ * on every record the caller can open, and whatever the hardened public directory
+ * chooses to publish.
+ *
+ * A customer that is not verified simply has no public row, so it keeps the name
+ * from the commerce records and reports `listed: false`. It is deliberately NOT
+ * dropped — a real trading relationship must not disappear from the seller's own
+ * customer list because the other business has not finished verification.
+ *
+ * There is no invented CRM here: no contact person, no credit terms, no
+ * segments, no scores. Every field is either a count of records or a published
+ * public column.
+ */
+export type CustomerOrganization = {
+  organizationId: string;
+  name: string;
+  /** Present only when the business is verified and publicly listed. */
+  orgType: OrgType | null;
+  /** Whether the business appears in the public directory (i.e. is verified). */
+  listed: boolean;
+  slug: string | null;
+  requests: number;
+  quotations: number;
+  accepted: number;
+  orders: number;
+  orderValue: number;
+  /** Most recent record of any kind, for "last activity". */
+  lastActivity: string | null;
+};
+
+export async function customerOrganizations(
+  supabase: DB,
+  orgId: string,
+): Promise<CustomerOrganization[]> {
+  // Three reads of the caller's own supply-side records. Each selects only the
+  // counterparty, the state and the timestamp — never the record set.
+  const [rfqs, quotes, orders] = await Promise.all([
+    supabase
+      .from("rfq_list")
+      .select("requester_org_id, requester_name, created_at")
+      .eq("supplier_org_id", orgId),
+    supabase
+      .from("quotation_list")
+      .select("requester_org_id, requester_name, status, created_at")
+      .eq("supplier_org_id", orgId),
+    supabase
+      .from("order_list")
+      .select("requester_org_id, requester_name, total, confirmed_at")
+      .eq("supplier_org_id", orgId),
+  ]);
+  if (rfqs.error) throw rfqs.error;
+  if (quotes.error) throw quotes.error;
+  if (orders.error) throw orders.error;
+
+  const byOrg = new Map<string, CustomerOrganization>();
+  const touch = (id: string | null, name: string | null, at: string | null) => {
+    if (!id) return null;
+    let row = byOrg.get(id);
+    if (!row) {
+      row = {
+        organizationId: id,
+        name: name ?? "—",
+        orgType: null,
+        listed: false,
+        slug: null,
+        requests: 0,
+        quotations: 0,
+        accepted: 0,
+        orders: 0,
+        orderValue: 0,
+        lastActivity: null,
+      };
+      byOrg.set(id, row);
+    }
+    if (at && (!row.lastActivity || at > row.lastActivity)) row.lastActivity = at;
+    return row;
+  };
+
+  for (const r of rfqs.data ?? []) {
+    const row = touch(r.requester_org_id, r.requester_name, r.created_at);
+    if (row) row.requests += 1;
+  }
+  for (const q of quotes.data ?? []) {
+    const row = touch(q.requester_org_id, q.requester_name, q.created_at);
+    if (!row) continue;
+    row.quotations += 1;
+    if (q.status === "accepted") row.accepted += 1;
+  }
+  for (const o of orders.data ?? []) {
+    const row = touch(o.requester_org_id, o.requester_name, o.confirmed_at);
+    if (!row) continue;
+    row.orders += 1;
+    row.orderValue += Number(o.total ?? 0);
+  }
+
+  // One enrichment pass, bounded by the customers the caller actually has. The
+  // public projection is the ONLY source for classification and verification —
+  // this never touches the base `organizations` table.
+  const ids = [...byOrg.keys()];
+  if (ids.length > 0) {
+    const { data, error } = await supabase
+      .from("organization_public_directory")
+      .select("id, name, org_type, slug")
+      .in("id", ids);
+    if (error) throw error;
+    for (const pub of data ?? []) {
+      if (!pub.id) continue;
+      const row = byOrg.get(pub.id);
+      if (!row) continue;
+      row.listed = true;
+      row.orgType = pub.org_type;
+      row.slug = pub.slug;
+      // The published name wins where one exists: it is the business's own
+      // canonical public name, and a commerce record only ever holds a copy.
+      if (pub.name) row.name = pub.name;
+    }
+  }
+
+  // Strongest relationship first — value won, then orders, then how recently they
+  // were in touch. A customer that has only ever sent requests still appears; it
+  // is exactly the one a seller should be chasing.
+  return [...byOrg.values()].sort(
+    (a, b) =>
+      b.orderValue - a.orderValue ||
+      b.orders - a.orders ||
+      (b.lastActivity ?? "").localeCompare(a.lastActivity ?? ""),
+  );
+}
+
+/** The org types that BUY from the supply side — the "find new customers" set. */
+export const BUYER_ORG_TYPES: OrgType[] = ["showroom_dealer", "contractor_company", "design_office"];

@@ -17,7 +17,7 @@ export function ProfessionalReview({ answers }: { answers: ProfessionalAnswers }
   const [pending, start] = useTransition();
 
   const specValue = answers.concreteType
-    ? [t(`onboarding.professional.concreteType.${answers.concreteType}`), answers.yearsExperience != null ? t("onboarding.professional.review.years", { n: String(answers.yearsExperience) }) : null]
+    ? [t(`onboarding.professional.concreteType.${answers.concreteType}`), answers.yearsExperience != null ? t("onboarding.professional.review.years", { n: answers.yearsExperience }) : null]
         .filter(Boolean)
         .join(" · ")
     : t("onboarding.consumer.notSet");

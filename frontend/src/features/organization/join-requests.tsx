@@ -4,6 +4,8 @@ import { UsersIcon } from "@/components/ui/icons";
 import { approveJoinRequest, rejectJoinRequest } from "@/server/actions/affiliation";
 import type { JoinRequestRow } from "@/server/queries/affiliation";
 import type { Messages } from "@/lib/i18n/messages/en";
+import type { Locale } from "@/lib/i18n/locales";
+import { formatCount } from "@/lib/ui/format";
 
 /**
  * Affiliation requests, on the organization's EXISTING people surface.
@@ -21,10 +23,12 @@ export function JoinRequests({
   requests,
   branches,
   m,
+  locale,
 }: {
   requests: JoinRequestRow[];
   branches: { id: string; name: string }[];
   m: Messages;
+  locale: Locale;
 }) {
   const pending = requests.filter((r) => r.status === "pending");
   const decided = requests.filter((r) => r.status !== "pending");
@@ -124,7 +128,7 @@ export function JoinRequests({
       {decided.length > 0 ? (
         <details className="rounded-md border bg-surface p-md">
           <summary className="cursor-pointer text-body font-medium text-fg">
-            {m.org.joinRequests.history} ({decided.length})
+            {m.org.joinRequests.history} ({formatCount(decided.length, locale)})
           </summary>
           <ul className="mt-md flex flex-col gap-sm">
             {decided.map((r) => (

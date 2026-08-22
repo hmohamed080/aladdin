@@ -30,7 +30,10 @@ export type OrgMember = {
 
 export type OrgInvitation = {
   id: string;
-  emailMasked: string;
+  /** Which contact this invitation was addressed to — exactly one, never both. */
+  channel: "email" | "phone";
+  /** Masked for display. The roster shows who was invited, not their address. */
+  contactMasked: string;
   status: string;
   token: string;
   primaryBranchId: string | null;
@@ -43,6 +46,16 @@ function maskEmail(email: string): string {
   if (!domain || !local) return "•••";
   const head = local.slice(0, 2);
   return `${head}${"•".repeat(Math.max(local.length - 2, 1))}@${domain}`;
+}
+
+/**
+ * Country code and last two digits, e.g. +201002003040 -> `+20•••40`. The same
+ * shape `app.mask_phone` produces on the invitee's own entry screen, so a
+ * manager and an invitee are looking at the same rendering of one number.
+ */
+function maskPhone(phone: string): string {
+  if (phone.length < 6) return "•••";
+  return `${phone.slice(0, 3)}•••${phone.slice(-2)}`;
 }
 
 export async function listOrgMembers(supabase: Client, orgId: string): Promise<OrgMember[]> {
@@ -66,13 +79,16 @@ export async function listOrgMembers(supabase: Client, orgId: string): Promise<O
 export async function listOrgInvitations(supabase: Client, orgId: string): Promise<OrgInvitation[]> {
   const { data, error } = await supabase
     .from("organization_invitations")
-    .select("id, email, status, token, primary_branch_id, expires_at, accepted_at")
+    .select("id, email, phone, status, token, primary_branch_id, expires_at, accepted_at")
     .eq("organization_id", orgId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map((r) => ({
     id: r.id,
-    emailMasked: maskEmail(r.email),
+    // `ck_invitation_contact` guarantees exactly one is set, so the email branch
+    // is the only test needed and there is no third "neither" case to render.
+    channel: r.email ? ("email" as const) : ("phone" as const),
+    contactMasked: r.email ? maskEmail(r.email) : maskPhone(r.phone ?? ""),
     status: r.status,
     token: r.token,
     primaryBranchId: r.primary_branch_id,
