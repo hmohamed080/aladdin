@@ -53,6 +53,21 @@ async function assertNoOverflow(page: Page, label: string) {
   expect(overflow, `${label} horizontal overflow (px)`).toBeLessThanOrEqual(1);
 }
 
+/**
+ * The period control reflects the period in force.
+ *
+ * Asserted as the trigger's RENDERED TEXT, not as a form value. The control was
+ * a native `<select>` when this spec was written and `toHaveValue` was correct
+ * then; it is now a `role="menu"` chip whose current choice is the label drawn
+ * on the trigger, and a DOM `value` property no longer exists to read. Querying
+ * it by ROLE AND ACCESSIBLE NAME keeps the half of the old assertion that still
+ * matters — that the control is reachable as a named button — so a refactor that
+ * dropped the label would still fail here rather than pass quietly.
+ */
+async function expectPeriod(page: Page, label: RegExp) {
+  await expect(page.getByRole("button", { name: /period/i })).toHaveText(label);
+}
+
 /** The eight modules the dashboard is required to compose, by their headings. */
 const MODULES = {
   ar: [
@@ -206,12 +221,12 @@ test.describe("supply dashboard — shared implementation, three seats", () => {
 
     // The default period carries no parameter, so a plain dashboard link is clean.
     expect(new URL(page.url()).searchParams.get("period")).toBeNull();
-    await expect(page.getByLabel(/period/i)).toHaveValue("30d");
+    await expectPeriod(page, /Last 30 days/);
 
     // Every chip must carry the CURRENT period forward, or filtering the queue
     // would silently snap the figures above it back to 30 days.
     await page.goto("/b2b?period=90d", { waitUntil: "networkidle" });
-    await expect(page.getByLabel(/period/i)).toHaveValue("90d");
+    await expectPeriod(page, /Last 90 days/);
     for (const [name, stage] of [
       [/to price/i, "price"],
       [/to follow up/i, "chase"],
@@ -229,7 +244,7 @@ test.describe("supply dashboard — shared implementation, three seats", () => {
     // one stage. Every row in a price-filtered queue offers the price verb, and
     // none offers a later stage's verb.
     await page.goto("/b2b?period=90d&stage=price", { waitUntil: "networkidle" });
-    await expect(page.getByLabel(/period/i)).toHaveValue("90d");
+    await expectPeriod(page, /Last 90 days/);
 
     const queue = page.getByTestId("attention-queue");
     await expect(queue.getByRole("link", { name: /send a price/i }).first()).toBeVisible();
