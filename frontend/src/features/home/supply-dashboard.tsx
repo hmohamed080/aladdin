@@ -793,6 +793,7 @@ export async function SupplyDashboard({
               <RankedBars
                 locale={locale}
                 rank
+                bar="lapis"
                 emptyLabel={m.supply.empty.noProductSales}
                 items={supply.topProducts.slice(0, 5).map((pr) => ({
                   label: pr.name,
@@ -812,6 +813,7 @@ export async function SupplyDashboard({
               <RankedBars
                 locale={locale}
                 rank
+                bar="lapis"
                 emptyLabel={m.supply.empty.noCustomers}
                 items={supply.topCustomers.slice(0, 5).map((c) => ({
                   label: c.name,

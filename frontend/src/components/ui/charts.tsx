@@ -57,6 +57,17 @@ const BG: Record<Series, string> = {
   6: "bg-series-6",
 };
 
+/**
+ * The single-colour fills a ranked bar can take. A map rather than a ternary
+ * chain because the next tone added should cost one line, not another branch.
+ */
+const BAR_BG = {
+  accent: "bg-accent-solid",
+  iris: "bg-iris-solid",
+  lapis: "bg-lapis",
+} as const;
+export type BarTone = keyof typeof BAR_BG;
+
 /** Cycle the palette so a list of any length still alternates predictably. */
 export function seriesAt(index: number): Series {
   return ((index % 6) + 1) as Series;
@@ -352,8 +363,16 @@ export function RankedBars({
    * a page ends up with no hierarchy at all. `iris` is the measurement colour
    * (see tokens.css); a chart is a measurement, so a chart-heavy surface asks
    * for it explicitly rather than having it imposed on every existing caller.
+   * `lapis` is the quieter blue of the same argument — the data/technology tone
+   * already used for `info` and for links — for a surface that wants the bars
+   * to recede further than Iris does.
+   *
+   * Each resolves through a SEMANTIC token, so the fill is theme-aware: `lapis`
+   * is #2F6088 on light and lifts to Lapis Bright on dark rather than sinking
+   * into the Carbon ground. The default stays `accent` — existing callers are
+   * not re-coloured by adding an option here.
    */
-  bar?: "accent" | "iris";
+  bar?: BarTone;
   /**
    * Number the rows 1..n.
    *
@@ -396,7 +415,7 @@ export function RankedBars({
             <div
               className={cn(
                 "h-full rounded-pill",
-                colored ? BG[seriesAt(i)] : bar === "iris" ? "bg-iris-solid" : "bg-accent-solid",
+                colored ? BG[seriesAt(i)] : BAR_BG[bar],
               )}
               style={{ width: `${Math.max((item.value / max) * 100, 4)}%` }}
             />
