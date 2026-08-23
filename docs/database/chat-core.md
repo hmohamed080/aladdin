@@ -1,6 +1,6 @@
 # Transactional Chat Core — Database Specification
 
-**Status:** Proposed specification · 2026-08-23 · awaiting approval · **no migration written**
+**Status:** **Approved and implemented** · 2026-08-23 · migrations `20260823090001_chat_core.sql` (tables, RLS, RPCs), `20260823090002_chat_message_notifications.sql` (`message.sent` emission), `20260823090003_message_sent_no_owner_fallback.sql` (recipient-authority correction)
 
 ## 1. Purpose
 
@@ -686,8 +686,10 @@ public.send_message(p_conversation_id uuid, p_body text) returns uuid
 7. Returns the new message id. **No audit event per message** — a forensic row
    per chat line would swamp `audit_log`, whose actions are lifecycle
    transitions; the messages table is itself the immutable record.
-8. Notification emission is **not wired in this increment** — see
-   [§13](#13-notifications-integration-seam).
+8. Notification emission: **one `app.notify_org(...)` to the opposite party**,
+   in this same transaction — see [§13](#13-notifications-integration-seam).
+   Added by `20260823090002_chat_message_notifications.sql`; every other step
+   above is unchanged from the original definition.
 
 Deliberately **no `p_expected_version`**: optimistic concurrency guards *edits*,
 and there are none. Two people sending at once is a correct outcome, not a
@@ -905,45 +907,81 @@ See [Q4](#20-open-questions--blockers).
 
 ## 13. Notifications integration seam
 
-**Nothing in this section is implemented by this increment.** No migration, no
-CHECK-constraint change, no call site.
+**Implemented and approved for the Pilot** (`20260823090002_chat_message_notifications.sql`).
+This section described a proposal until Q6 was decided; it now records the
+contract as built.
 
 ### 13.1 The event
 
-| Proposed | Value |
+| Contract | Value |
 |---|---|
 | `event_type` | `message.sent` |
-| `subject_type` / `subject_id` | the **conversation's** subject (`'rfq'`, `'quotation'` or `'order'` + its id) — so the notice and the deep link agree, and `ix_notifications_subject` supports dedupe |
+| Emission point | `public.send_message(...)`, in the **same transaction** as the message insert |
+| `subject_type` / `subject_id` | the **conversation's** subject (`'rfq'`, `'quotation'` or `'order'` + its id) — so the notice and the deep link agree |
 | `deep_link` | `/b2b/rfqs/{id}`, `/b2b/quotations/{id}`, `/b2b/orders/{id}` — the existing record routes, valid under `ck_notifications_deep_link` |
-| Recipient org | **the opposite party only** — the one of `requester_org_id` / `supplier_org_id` the sender does not belong to |
+| Recipient org | **the opposite party only** — the one of `requester_org_id` / `supplier_org_id` the sender does not belong to, resolved from the conversation row `send_message` has already authorized and locked |
 | Capability | `conversation.participate` |
-| `title_key` / `body_key` | `notifications.message.sent.title` / `.body`, params `{"sender_org_name": app.org_display_name(...)}` |
+| Owner fallback | **disabled for this event** (`p_allow_owner_fallback => false`). An `org.manage` owner without the capability is refused by `conversations_select_party`, so telling them a thread exists would disclose its record and counterparty past the boundary Chat enforces. Where the counterparty has no holder, nobody is notified and the message still persists. |
+| Self-notification | suppressed centrally by `app.notify`; the sending organization is additionally never targeted |
+| Dedupe / grouping / digest | **none in the Pilot** — one persisted message is one persisted notification event |
+| `title_key` / `body_key` | `notifications.message.sent.title` / `notifications.message.sent.body` |
+| `params` | `{"counterparty_name": app.org_display_name(<sender org>)}` — business context only |
+| Message body | **never** copied, excerpted, previewed or otherwise persisted into the notification row |
+| Realtime | still deferred — no publication change |
 
-Emission would be a single `app.notify_org(...)` inside `send_message`,
-immediately beside the existing pattern — **no new call site, no new fan-out
-mechanism**. `app.notify` already suppresses self-notification, so the sender is
-covered twice over.
+Emission is a single `app.notify_org(...)` inside `send_message`, immediately
+beside the existing pattern — **no new call site, no new fan-out mechanism, no
+new helper**. `app.notify` already suppresses self-notification, so the sender is
+covered twice over: once because the recipient organization is the opposite
+party, and once because the actor is filtered out centrally.
 
-### 13.2 Two things that must be decided before it is wired
+The recipient organization is **not** re-derived by a second membership guess. It
+is whichever party column the sender's already-resolved acting organization is
+not, taken from the same locked conversation row — so the notification cannot
+address a party the message itself was not authorized against.
 
-1. **`ck_notifications_event_type_known` must gain `'message.sent'`** in a
-   migration. It is **not** added now.
-2. **Volume.** Every event currently in the allow-list is a *lifecycle
-   transition* — a handful per transaction. Chat is conversational; a brisk
-   exchange could write dozens of notification rows per hour per recipient and
-   make the badge useless. A dedupe rule is needed before wiring — the natural
-   one being *notify only when the recipient has no unread notice for this
-   conversation's subject already*, which `ix_notifications_subject` supports
-   directly. This is [Q6](#20-open-questions--blockers), and it is the reason
-   this seam is documented rather than built.
+### 13.2 Q6 (volume) — decided: no dedupe in the Pilot
 
-### 13.3 What must not change
+Every event previously in the allow-list is a *lifecycle transition* — a handful
+per transaction. Chat is conversational, so a brisk exchange writes one
+notification row per message per recipient. The Pilot accepts that:
 
-Notifications Core is implemented and approved. This specification proposes **no
-modification** to `public.notifications`, `app.notify`, `app.notify_org`,
-`mark_notification_read`, `mark_all_notifications_read`, their RLS, or their
-tests. The only future change is one allow-list value and one call inside a
-Chat-owned function.
+- **every successfully persisted message is an independently persisted event.**
+  A dedupe rule that suppresses a notice because an earlier one is still unread
+  makes the inbox lie about how much correspondence is waiting, and the failure
+  it prevents (a noisy badge) is more recoverable than the one it causes (a
+  message nobody was told about);
+- Pilot volumes are small enough to measure before optimising, and the natural
+  rule — *at most one unread `message.sent` per recipient per subject*, which
+  `ix_notifications_subject` supports directly — remains available as a purely
+  additive change if real usage shows the badge becoming useless;
+- grouping, digests and notification preferences are all still out of scope.
+
+**Revisit when** observed `message.sent` volume per recipient per day makes the
+unread count uninformative — not before, and not on speculation.
+
+### 13.3 What did not change
+
+`public.notifications` keeps its columns, RLS and indexes; `app.notify` is
+untouched; `mark_notification_read` and `mark_all_notifications_read` are
+unchanged, as are their tests and the Notifications UI. Chat's own schema, RLS
+policies, capability model and error codes are unchanged, and `send_message`
+keeps its signature, authorization, derivations, validation, immutability,
+read-state bump, error codes, definer settings and grants.
+
+Three things changed. Two were predicted: **one allow-list value**
+(`ck_notifications_event_type_known` gains `'message.sent'`) and **one call
+inside a Chat-owned function** (`send_message`).
+
+The third was not, and is a correction: **`app.notify_org` gained
+`p_allow_owner_fallback boolean default true`**
+(`20260823090003_message_sent_no_owner_fallback.sql`). The first wiring inherited
+the approved `org.manage` owner fallback, which is safe for every event whose
+record an owner can already read — and unsafe for this one, because Chat access
+requires `conversation.participate` and an owner without it cannot open the
+thread. The default preserves the fallback for all thirteen existing call sites
+without touching any of them; only `send_message` opts out. See
+[`notifications-core.md`](notifications-core.md) for the general rule.
 
 ## 14. Realtime-deferred seam
 
@@ -1040,7 +1078,7 @@ before merge. Per the recorded validation protocol, pgTAP runs against a **clean
 | T-27 | `app.conversation_parties` executed by `authenticated` | permission denied — INV-11 |
 | T-28 | Message rows survive the sender's membership being revoked | still readable, still attributed |
 | T-29 | Existing suites `23`, `24`, `31`, `32` re-run unchanged | all pass — INV-15 |
-| T-30 | `notifications` has **no** `message.sent` row after `send_message` | proves the seam is documented, not wired |
+| T-30 | `send_message` writes exactly one `message.sent` notice to the **opposite** party, carrying the conversation's own subject and no message body | the seam, as wired — covered by `34_chat_message_notifications_test.sql` |
 
 ## 17. Bilingual / product presentation boundary
 
@@ -1109,8 +1147,9 @@ conversations ([Q1](#20-open-questions--blockers)).
 **No blockers.** Every table, capability, helper, route and convention this
 specification depends on already exists. Implementation can begin on approval.
 
-Six product decisions are **raised, not decided** — each is recorded here rather
-than invented, and none prevents the core from shipping:
+Six product decisions were **raised, not decided** — each is recorded here rather
+than invented, and none prevented the core from shipping. **Q6 has since been
+decided** (see its row); the remaining five stand open:
 
 | # | Question | Recommendation |
 |---|---|---|
@@ -1119,7 +1158,7 @@ than invented, and none prevents the core from shipping:
 | **Q3** | Should sending be frozen once the subject reaches a terminal state (`cancelled`, `rejected`, `completed`)? | **No, for the Pilot** — post-completion questions are real. Needs a product answer; additive as a `22023` guard in `send_message`. |
 | **Q4** | Retention, deletion, and erasure of message bodies. | **Unresolved — deliberately.** Business correspondence may be evidentiary; this is a legal question and needs its own specification ([§12.5](#125-retention-moderation-deletion)). |
 | **Q5** | B2C consumer chat — a consumer may hold **zero** organizations, so no second party can be derived. | **Out of scope.** The two-party model does not describe it; a consumer chat model would need its own authority design. |
-| **Q6** | Notification volume for `message.sent` — dozens of rows per hour would make the badge useless. | Decide a dedupe rule (recommended: **at most one unread `message.sent` notice per recipient per subject**) **before** wiring ([§13.2](#132-two-things-that-must-be-decided-before-it-is-wired)). |
+| **Q6** | ~~Notification volume for `message.sent`~~ — **DECIDED 2026-08-23.** | **No dedupe, grouping or digest in the Pilot**: one persisted message emits one independent notification event. Wired in `20260823090002_chat_message_notifications.sql`; the dedupe rule stays available as an additive change if measured volume makes the badge uninformative ([§13.2](#132-q6-volume--decided-no-dedupe-in-the-pilot)). |
 
 One documentation reconciliation is also outstanding:
 `docs/technical/08_api_contracts.md` §10 still describes

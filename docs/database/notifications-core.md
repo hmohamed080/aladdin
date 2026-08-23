@@ -195,7 +195,8 @@ app.notify_org(
   p_deep_link       text,
   p_title_key       text,
   p_body_key        text default null,
-  p_params          jsonb default '{}'::jsonb
+  p_params          jsonb default '{}'::jsonb,
+  p_allow_owner_fallback boolean default true
 ) returns integer
 ```
 
@@ -206,6 +207,27 @@ every employee of the company. Recipient resolution reuses the same
 `memberships` + `membership_capabilities` join that `app.has_capability` already
 uses. Where a capability yields no holder, the organization owner receives it, so
 a notice is never silently dropped.
+
+**`p_allow_owner_fallback` turns that last sentence off, per call.** The default
+is `true`, so every event above keeps the fallback unchanged. It is passed
+`false` only by `send_message`, and the reason generalises: the fallback is safe
+exactly when an owner could already read the record the notice is about. For
+every commerce and verification event that holds — an owner can open the rfq,
+quotation, order or verification, so the fallback only widens *who is told* about
+something they were already entitled to see. It does **not** hold for
+`message.sent`: Chat access is `active membership + conversation.participate` and
+nothing else, so an owner holding only `org.manage` is refused by
+`conversations_select_party`, and telling them a conversation exists would
+disclose its record and its counterparty past the boundary Chat enforces. **When
+the counterparty organization has no capability holder, nobody is notified and
+the message still persists** — a dropped notice is strictly safer than a
+disclosed one, and the conversation is still there the moment somebody is granted
+the capability.
+
+The flag is a **call-site** decision, not a check on `p_event_type` inside the
+helper: whether an owner may be told is a property of the emitting event's
+authorization model, and hard-coding one event name into a generic mechanism
+would quietly mislead the next event with the same shape.
 
 ### Public — `public.mark_notification_read(p_id uuid)`
 
@@ -252,6 +274,7 @@ existing `app.record_audit_event` call and inside the same transaction.
 | `verification.approved` | `review_approve` | `verifications.organization_id` | `org.manage` | `/b2b/organization` |
 | `verification.rejected` | `review_reject` | `verifications.organization_id` | `org.manage` | `/b2b/organization` |
 | `verification.changes_requested` | `review_request_changes` | `verifications.organization_id` | `org.manage` | `/b2b/organization` |
+| `message.sent` | `send_message` | counterparty of the sender's org | `conversation.participate` | the conversation's own subject route — `/b2b/rfqs/{id}`, `/b2b/quotations/{id}` or `/b2b/orders/{id}` |
 
 Notes on the mapping:
 
@@ -268,6 +291,27 @@ Notes on the mapping:
 - **Verification notices address the organization** via `org.manage`, because
   `verifications` may carry either `organization_id` or `user_id`; the
   personal-verification case is deferred with the rest of the B2C surface.
+- **`message.sent` is the one event whose subject type is not fixed by its
+  emitting RPC.** A conversation is a property of a transaction
+  ([`chat-core.md`](chat-core.md) §4), so the notice inherits the conversation's
+  own `subject_type` / `subject_id` — `rfq`, `quotation` or `order` — and its
+  deep link is that record's existing route. There is deliberately **no `/chat`
+  route to link to**, and none is invented: the recipient lands on the real
+  transaction record, where the existing Chat entry point is.
+- **`message.sent` is the one event with the owner fallback disabled**
+  (`p_allow_owner_fallback => false`). Its recipients are exactly the active
+  members of the opposite organization holding `conversation.participate` — the
+  people who can actually open the thread. Every other event keeps the fallback.
+- **`message.sent` carries no message content.** Its params are business context
+  only (`counterparty_name`); the authored body is never copied into a
+  notification row, never excerpted, and never previewed. A notification says
+  *that* correspondence happened, and the thread itself stays behind the Chat
+  authorization path rather than being partially mirrored into an inbox with
+  different visibility rules.
+- **`message.sent` is not deduped or grouped in the Pilot.** Every successfully
+  persisted message emits one independent notification event. This was raised as
+  Q6 in `chat-core.md` and is now decided; see §13.2 there for the decision and
+  the conditions under which it should be revisited.
 - Every capability named above is already in use in the schema. Every target
   route already exists. Nothing in this table needs to be created first.
 

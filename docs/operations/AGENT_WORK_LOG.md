@@ -4,6 +4,145 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — message.sent: telling the counterparty, without telling anyone who cannot look
+
+**Date:** 2026-08-23 · **Branch:** `feature/engagement-notifications-points-core` · **Base:** `main` @ `34b06d4`
+
+Chat became usable earlier the same day (`315296a`). This entry covers the one
+seam that was deliberately left unwired then: a persisted Chat message now emits
+a `message.sent` notification to the **opposite transaction party**, and to
+nobody else.
+
+### The event, and why its subject is not fixed
+
+`message.sent` is the sixteenth value in `ck_notifications_event_type_known` and
+the first whose `subject_type` varies per row. Every other event is emitted by an
+RPC that owns exactly one kind of record; a conversation is a *property of a
+transaction* (§4), so the notice inherits the conversation's own subject —
+`rfq`, `quotation` or `order` — and deep-links to that record's existing route.
+
+There is deliberately **no `/chat` route**, and none was invented for the notice
+to point at. The recipient lands on the real transaction record and opens Chat
+from the entry point already there, which keeps one navigation architecture
+instead of two.
+
+Emission is one `app.notify_org(...)` inside `send_message`, beside the existing
+writes and **in the same transaction**. That coupling is the point, and the test
+for it is not "both rows exist afterwards" — two separate transactions would
+produce that too. It takes a savepoint, sends, asserts both the message and its
+notification are present, rolls back, and asserts **both** are gone. Only shared
+transaction scope produces that pair of outcomes; a background or deferred notify
+would survive the rollback.
+
+### No dedupe, decided rather than deferred
+
+Q6 in `chat-core.md` had blocked this seam on notification volume, recommending
+*at most one unread notice per recipient per subject*. Decided the other way for
+the Pilot: **every persisted message is an independent notification event.** A
+dedupe rule that suppresses a notice because an earlier one is still unread makes
+the inbox lie about how much correspondence is waiting, and the failure it
+prevents — a noisy badge — is more recoverable than the one it causes, which is a
+message nobody was told about. The rule stays available as a purely additive
+change, and `ix_notifications_subject` still supports it directly.
+
+### The message body is not in the notification, and there is nowhere to put it
+
+Params are `{"counterparty_name": …}` and nothing else. Notifications and Chat
+have **different visibility rules**, so a preview would mirror private
+correspondence past the narrower one. Asserted at both layers: pgTAP proves no
+`body` / `message` / `excerpt` / `preview` key and no body text ever reaches a
+row, and a frontend test feeds a row with a smuggled body and proves the rendered
+sentence is byte-identical to the clean one — because the catalog sentence has
+exactly one placeholder and it is not for content.
+
+The copy stays generic about the record ("about this transaction") rather than
+naming *this request* / *this order*. One event serves three subject types, so a
+subject noun would have to arrive as a param — which would mean the database
+persisting an English word into a row an Arabic reader may open, the exact leak
+the keys-not-sentences rule exists to prevent. The deep link carries the
+specificity.
+
+### The defect this increment introduced, and then fixed
+
+The first wiring inherited `app.notify_org`'s approved **`org.manage` owner
+fallback**, which fires when the capability yields no holder so that a notice is
+never silently dropped. That is right for all fifteen existing events and wrong
+for this one, and the reason generalises cleanly:
+
+> The owner fallback is safe **exactly when an owner could already read the
+> record the notice is about.**
+
+For commerce and verification they can — an owner can open the rfq, quotation,
+order or verification, so the fallback only widens *who is told* about something
+they were already entitled to see. Chat is the first event whose subject sits
+behind a capability an owner may not hold: access is `active membership +
+conversation.participate`, so `conversations_select_party` refuses an owner
+holding only `org.manage`. In a counterparty organization with no capability
+holder, the fallback would have told that owner a conversation exists, on which
+record, and with which counterparty — every fact except the body — about a thread
+the database would refuse to show them. **The notification would have become a
+wider read path than the feature it describes.**
+
+`20260823090003` gives `app.notify_org` a `p_allow_owner_fallback boolean default
+true`; `send_message` passes `false`. The default preserves the fallback for all
+thirteen existing call sites without touching one of them. Two notes on the shape:
+
+- **DROP + CREATE, not CREATE OR REPLACE.** A ten-argument overload beside the
+  nine-argument original makes every existing nine-argument call ambiguous
+  (*"function is not unique"*). Dropping is safe because plpgsql resolves callees
+  by name at execution time, so the thirteen callers rebind and pick up the
+  default — but the drop takes the `revoke` with it, and internal-only status has
+  to be re-established explicitly.
+- **The flag is a call-site decision, not `p_event_type <> 'message.sent'` inside
+  the helper.** Whether an owner may be told is a property of the emitting
+  event's authorization model; hard-coding one event name into a generic
+  mechanism would quietly mislead the next event with the same shape.
+
+**When nobody qualifies, nobody is told, and the message still persists.** Silence
+is the correct outcome: a dropped notice is strictly safer than a disclosed one,
+and the counterparty sees the conversation the moment somebody there is granted
+the capability, because Chat reads are live rather than replayed from an inbox.
+
+### Two tests that were passing and wrong
+
+Worth recording, because both are the same mistake in different clothes: a test
+that agrees with itself proves nothing.
+
+1. The new suite's recipient-authority assertions were verified **against a
+   deliberately reverted `notify_org`** with the fallback forced back on. Two
+   failed and the "fallback still works for other events" assertion still passed
+   — which is what proves they discriminate the two cases rather than merely
+   observing a green database.
+2. One assertion checked a **live-capability property across historical rows**,
+   and the suite itself falsifies it by revoking a capability mid-run. A
+   capability revoked *after* a legitimate notice does not make that notice
+   retroactively wrong. It is now asserted as a delta.
+
+`33_chat_core_test.sql` also had two assertions that were correct for the
+previous increment and are now false — it proved emission was *absent* and that
+`message.sent` was *not* in the allow-list. Both were inverted rather than
+deleted: the seam is exactly what they were watching.
+
+### Validation
+
+Clean `supabase db reset`, then the four directly affected suites: new
+`34_chat_message_notifications_test.sql` **46/46**, `33_chat_core_test` 106/106,
+`31_notifications_core_test` 38/38, `32_notifications_event_emission_test` 50/50
+— **240 assertions, no failures**. Verified live afterwards that exactly one
+`app.notify_org` exists (no ambiguous overload), that it grants EXECUTE to
+neither `authenticated` nor `service_role`, and that `send_message` kept its
+grant and its exact signature including parameter names — PostgREST calls it by
+named argument, so a rename would break every caller as surely as a retype.
+
+Frontend: 61 targeted notification/i18n tests, typecheck and `eslint .` all
+clean. The recipient-authority fix is entirely database-side and changed no
+frontend file.
+
+Per instruction: no full Playwright, no E2E, no Lighthouse, no persona matrix,
+and no Realtime or Points.
+
+---
+
 ## Session — Transactional Chat: the application half, and a seam where two correct layers did not meet
 
 **Date:** 2026-08-23 · **Branch:** `feature/engagement-notifications-points-core` · **Base:** `main` @ `34b06d4`

@@ -964,6 +964,22 @@ export const en = {
         body: "The review team asked for changes before your business can be verified.",
       },
     },
+    /* Transactional Chat. The body says THAT correspondence happened and who
+       from — never WHAT was said. The authored message is deliberately absent
+       from the notification's params, so there is nothing here to render it
+       with even by accident (chat-core.md §13.1).
+
+       It stays generic about the record rather than naming "this request" /
+       "this order", because one event type serves all three subjects and the
+       subject word would have to arrive as a param — which would mean the
+       database persisting an English noun into a row an Arabic reader may open.
+       The deep link already carries the specificity. */
+    message: {
+      sent: {
+        title: "New message",
+        body: "{counterparty_name} sent a new message about this transaction.",
+      },
+    },
   },
   /* The composer is the SHELL of a composer: it shows exactly the surface the
      next sprint will wire, and states plainly that sending is not open, rather

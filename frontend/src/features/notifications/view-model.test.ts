@@ -78,7 +78,7 @@ describe("the persisted key contract is honoured exactly", () => {
 });
 
 describe("every approved event type has real bilingual copy", () => {
-  it("covers all fifteen, in both locales, with no key leaking through", () => {
+  it("covers all sixteen, in both locales, with no key leaking through", () => {
     const missing: string[] = [];
     for (const event of KNOWN_NOTIFICATION_EVENTS) {
       const titleKey = `notifications.${event}.title`;
@@ -125,6 +125,7 @@ describe("every approved event type has real bilingual copy", () => {
       "verification.approved": {},
       "verification.rejected": {},
       "verification.changes_requested": {},
+      "message.sent": { counterparty_name: "A" },
     };
 
     const unfilled: string[] = [];
@@ -206,5 +207,93 @@ describe("a malformed row degrades visibly instead of vanishing or throwing", ()
     // Every persisted row is accounted for, so the unread badge — which counts
     // rows in the database — can never exceed what the panel shows.
     expect(views.map((v) => v.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+/**
+ * message.sent — the Chat -> Notifications integration, seen from the READER.
+ *
+ * The event is deliberately ordinary here: it arrives through the same
+ * persisted-key pipeline as every commerce event, and this file asserts that it
+ * needs no special component, no special branch, and above all that the pipeline
+ * has NOTHING to render the authored message with.
+ */
+describe("message.sent renders through the generic pipeline", () => {
+  const SENDER = "Suez Paints & Coatings";
+
+  /** Exactly the row `send_message` writes for an order-anchored conversation. */
+  function messageRow(over: Partial<NotificationSource> = {}): NotificationSource {
+    return row({
+      event_type: "message.sent",
+      deep_link: "/b2b/orders/da000007-0000-4000-8000-000000000007",
+      title_key: "notifications.message.sent.title",
+      body_key: "notifications.message.sent.body",
+      params: { counterparty_name: SENDER },
+      ...over,
+    });
+  }
+
+  it("resolves English copy from the stored keys and params", () => {
+    const view = toNotificationView(messageRow(), enT, "en", NOW);
+    expect(view.title).toBe(en.notifications.message.sent.title);
+    expect(view.body).toBe(`${SENDER} sent a new message about this transaction.`);
+    expect(view.href).toBe("/b2b/orders/da000007-0000-4000-8000-000000000007");
+  });
+
+  it("resolves Arabic copy from the same stored keys and params", () => {
+    const view = toNotificationView(messageRow(), arT, "ar", NOW);
+    expect(view.title).toBe(ar.notifications.message.sent.title);
+    expect(view.body).toContain(SENDER);
+    // The Arabic sentence, not the English one, and not a bare key.
+    expect(view.body).toContain("رسالة جديدة");
+    expect(view.body).not.toContain("sent a new message");
+  });
+
+  it("is a KNOWN event, so it never degrades to the neutral fallback", () => {
+    const view = toNotificationView(messageRow(), enT, "en", NOW);
+    expect(view.degraded).toBe(false);
+    expect(view.title).not.toBe(enT(NOTIFICATION_FALLBACK_TITLE_KEY));
+    expect(KNOWN_NOTIFICATION_EVENTS).toContain("message.sent");
+  });
+
+  it("keeps exact EN/AR key parity for the pair", () => {
+    for (const suffix of ["title", "body"] as const) {
+      const key = `notifications.message.sent.${suffix}`;
+      expect(enT(key), `EN missing ${key}`).not.toBe(key);
+      expect(arT(key), `AR missing ${key}`).not.toBe(key);
+    }
+    expect(Object.keys(en.notifications.message.sent).sort()).toEqual(
+      Object.keys(ar.notifications.message.sent).sort(),
+    );
+  });
+
+  /**
+   * THE PRIVACY ASSERTION. The authored body is never persisted into the
+   * notification row, so even a row that smuggles one in has no placeholder to
+   * put it in — the rendered sentence must stay the same either way. This is the
+   * property that keeps private correspondence behind the Chat authorization
+   * path instead of half-mirrored into an inbox with different visibility rules.
+   */
+  it("cannot render the authored Chat message, even if a row carries one", () => {
+    const SECRET = "Our floor price is 42,000 EGP — do not share.";
+    const clean = toNotificationView(messageRow(), enT, "en", NOW);
+    const smuggled = toNotificationView(
+      messageRow({ params: { counterparty_name: SENDER, body: SECRET, message: SECRET } }),
+      enT,
+      "en",
+      NOW,
+    );
+
+    expect(smuggled.body).toBe(clean.body);
+    expect(smuggled.title).toBe(clean.title);
+    expect(`${smuggled.title} ${smuggled.body}`).not.toContain(SECRET);
+    expect(`${smuggled.title} ${smuggled.body}`).not.toContain("42,000");
+  });
+
+  it("neither catalog's sentence has a slot for message content", () => {
+    for (const t of [enT, arT]) {
+      const placeholders = t("notifications.message.sent.body").match(/\{[^}]+\}/g) ?? [];
+      expect(placeholders).toEqual(["{counterparty_name}"]);
+    }
   });
 });

@@ -20,7 +20,7 @@
 --   • messages are append-only to product clients.
 --
 -- NOT covered here, because this increment deliberately does not build them:
--- Chat UI, Realtime, notification emission (asserted ABSENT below), Points,
+-- Chat UI, Realtime, Points,
 -- attachments, reactions, editing, deletion, typing, presence, consumer DMs.
 --
 -- Fixtures come from the shared seed, plus one extra organization built here:
@@ -751,13 +751,17 @@ select is(
 -- ===========================================================================
 reset role;
 set local request.jwt.claims = '';
-select is(
-  (select count(*)::int from public.notifications where event_type like 'message%'),
-  0, 'send_message emitted NO notification — the Notifications seam is documented, not wired');
+-- Emission was ABSENT in the Chat Core increment and is now WIRED
+-- (20260823090002, chat-core.md §13). These two assertions are inverted rather
+-- than deleted: the seam is exactly what they were watching, and its contract is
+-- proved in depth by 34_chat_message_notifications_test.sql.
+select cmp_ok(
+  (select count(*)::int from public.notifications where event_type = 'message.sent'),
+  '>', 0, 'send_message now emits message.sent — the Notifications seam is wired');
 select ok(
-  (select pg_get_constraintdef(oid) not like '%message.sent%'
+  (select pg_get_constraintdef(oid) like '%message.sent%'
    from pg_constraint where conname='ck_notifications_event_type_known'),
-  'message.sent was NOT added to the notifications allow-list in this increment');
+  'message.sent is in the notifications allow-list');
 select is(
   (select count(*)::int from pg_publication_tables
    where pubname='supabase_realtime' and schemaname='public'
