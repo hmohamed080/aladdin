@@ -843,6 +843,66 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          body_key: string | null
+          created_at: string
+          deep_link: string
+          event_type: string
+          id: string
+          organization_id: string | null
+          params: Json
+          read_at: string | null
+          recipient_user_id: string
+          subject_id: string | null
+          subject_type: string
+          title_key: string
+        }
+        Insert: {
+          body_key?: string | null
+          created_at?: string
+          deep_link: string
+          event_type: string
+          id?: string
+          organization_id?: string | null
+          params?: Json
+          read_at?: string | null
+          recipient_user_id: string
+          subject_id?: string | null
+          subject_type: string
+          title_key: string
+        }
+        Update: {
+          body_key?: string | null
+          created_at?: string
+          deep_link?: string
+          event_type?: string
+          id?: string
+          organization_id?: string | null
+          params?: Json
+          read_at?: string | null
+          recipient_user_id?: string
+          subject_id?: string | null
+          subject_type?: string
+          title_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_recipient_user_id_fkey"
+            columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_progress: {
         Row: {
           account_type_completed_at: string | null
@@ -3466,6 +3526,11 @@ export type Database = {
           status: string
         }[]
       }
+      mark_all_notifications_read: {
+        Args: { p_org_id?: string }
+        Returns: number
+      }
+      mark_notification_read: { Args: { p_id: string }; Returns: undefined }
       membership_activate: {
         Args: { p_membership_id: string }
         Returns: undefined

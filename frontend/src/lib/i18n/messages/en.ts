@@ -842,6 +842,96 @@ export const en = {
       title: "No notifications yet",
       body: "Updates on your requests, offers and orders will appear here.",
     },
+    /* Panel chrome. `unreadCount` names the badge for a screen reader, because
+       the badge itself is a bare numeral and a numeral alone does not say what
+       it counts. `unread` is the sr-only marker on a row, so unread/read is
+       legible without relying on the dot's colour. */
+    markAllRead: "Mark all as read",
+    markedAllRead: "All notifications marked as read",
+    unread: "Unread",
+    unreadCount: "{count} unread",
+    /* The one neutral stand-in, used when an event ships ahead of its copy. It
+       is a real translated string in both catalogs — the row stays visible and
+       still opens its record, so the unread badge never counts something the
+       reader cannot see. */
+    fallback: {
+      title: "Activity update",
+    },
+    /* Event copy. Every title/body pair below is addressed by the persisted
+       `title_key` / `body_key`, and the recipient is ALWAYS the counterparty —
+       never the side that acted — so each sentence is written from the reader's
+       side of the transaction. Placeholders match the `params` the emitting RPC
+       writes, exactly. */
+    rfq: {
+      submitted: {
+        title: "New request for quotation",
+        body: "{requester_name} asked you to price {item_count} lines.",
+      },
+      cancelled: {
+        title: "A request was cancelled",
+        body: "{requester_name} cancelled their request for quotation.",
+      },
+    },
+    quotation: {
+      submitted: {
+        title: "New quotation received",
+        body: "{supplier_name} sent you a quotation for {total}.",
+      },
+      accepted: {
+        title: "Your quotation was accepted",
+        body: "{requester_name} accepted your quotation of {total}.",
+      },
+      rejected: {
+        title: "Your quotation was not accepted",
+        body: "{requester_name} decided not to proceed with your quotation.",
+      },
+    },
+    order: {
+      created: {
+        title: "New order received",
+        body: "{requester_name} placed an order worth {total}.",
+      },
+      started: {
+        title: "Your order has started",
+        body: "{supplier_name} began work on your order.",
+      },
+      completed: {
+        title: "Your order is complete",
+        body: "{executing_name} finished the work on your order.",
+      },
+      cancelled: {
+        title: "An order was cancelled",
+        body: "{actor_name} cancelled the order.",
+      },
+    },
+    project: {
+      created: {
+        title: "A project was opened for your order",
+        body: "{executing_name} opened a project to carry out your order.",
+      },
+      activated: {
+        title: "Your project is under way",
+        body: "{executing_name} moved the project into execution.",
+      },
+      completed: {
+        title: "Your project is complete",
+        body: "{executing_name} marked the project as finished.",
+      },
+    },
+    verification: {
+      approved: {
+        title: "Your business is verified",
+        body: "Your verification request was approved.",
+      },
+      rejected: {
+        title: "Verification was declined",
+        body: "Your verification request was not approved. Open your organization page for the reason.",
+      },
+      changes_requested: {
+        title: "Verification needs changes",
+        body: "The review team asked for changes before your business can be verified.",
+      },
+    },
   },
   /* The composer is the SHELL of a composer: it shows exactly the surface the
      next sprint will wire, and states plainly that sending is not open, rather
@@ -1415,7 +1505,7 @@ export const en = {
       title: "Latest notifications",
       hint: "Alerts tied to your activity.",
       empty: "No notifications yet",
-      emptyBody: "Notifications are not switched on for your account yet. They will appear here once they are.",
+      emptyBody: "Alerts tied to your requests, offers and orders appear here as they happen.",
     },
     videos: {
       title: "Videos for your products",

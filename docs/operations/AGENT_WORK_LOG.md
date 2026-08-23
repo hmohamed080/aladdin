@@ -4,6 +4,72 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Notifications Core: the read/UI half, and a shared panel that did not fit a phone
+
+**Date:** 2026-08-23 · **Branch:** `feature/engagement-notifications-points-core` · **Base:** `main` @ `34b06d4`
+
+The database half of Notifications Core landed in three earlier commits on this branch (`8fe74df` spec, `7a6a154` table + RLS, `619c8f3` event wiring). This entry covers the **read and UI half** — the queries, the mutations, the view model, the one list, and the two surfaces that render it — plus one shared-shell defect that only became visible once the panel had real content in it.
+
+### The read path adds no ownership check of its own, deliberately
+
+`public.notifications` carries exactly one RLS policy, `recipient_user_id = auth.uid()`, and no org-wide read path. So `server/queries/notifications.ts` runs on the caller-scoped client and adds **nothing**: there is no ownership filter to add that RLS has not already decided, and a duplicated check in TypeScript would only be a second place to get it wrong.
+
+`organization_id` appears in the query layer as an **optional UX argument**, never as authority. It scopes the list to the active work context; passing an org you do not belong to cannot widen an RLS-bounded result, only narrow it to zero rows. That is why the specification forbids the column from ever reaching a `USING` clause, and why the header passes it and a personal surface does not.
+
+Two reads, split on purpose. `countUnread` uses `head: true` — Postgres counts and returns the number in a header, transferring no rows. This runs on **every authenticated page render** to decide whether the bell carries a badge, so fetching twenty rows to learn one integer would have been the most-repeated waste in the shell. `listNotifications` is capped at 20 by construction: both surfaces are RECENT lists, not archives, and a cap means a runaway inbox degrades into a shorter list rather than a slower page.
+
+### Rows store i18n keys, and the badge counts the database
+
+Two decisions that look like detail and are not:
+
+- **A row stores `title_key` / `body_key` / `params`, never a rendered sentence.** Arabic is an MVP release language and a reader's locale can change *after* a row is written; storing "Nile Ceramics sent you a quotation" would freeze one language into a permanent record. `view-model.ts` builds the sentence at render time and never composes one of its own. It runs on the **server**, in the reader's locale, before the panel is ever opened — so the client receives finished strings and the i18n catalog stays out of the browser bundle for a panel most page views never open.
+- **A row the UI has no copy for still renders**, under a neutral translated fallback title, still carrying its deep link. Dropping it would make the header lie: `countUnread` counts rows in the *database*, so a dropped unread row leaves a badge reading "2" over a panel showing one item. Missing copy is a translation gap, not a reason to withhold someone's mail.
+
+The badge follows the same rule. `effectiveUnread` is the **server total minus what has been read since**, never a count of what happens to be on screen — a reader with thirty unread who opens one notice sees 29, not 19. Marking read fires the RPC and then `router.refresh()`, which re-renders the current route *and its layouts*, so the badge (which lives in the layout) updates with the list and without a browser reload. No `revalidatePath`: one broad enough to catch the header would expire the entire B2B subtree for a change that affects one number.
+
+### One list, two densities, and no button inside a link
+
+`notification-list.tsx` is **the** notification list. The header panel and the supply-dashboard block differ in DENSITY and in nothing else — same row, same unread cue, same deep link, same read-state behaviour. A dashboard block with its own row design would be a second thing to keep in step every time the shape of a notification changes.
+
+A row is a link, and the **whole row** is the link — not a link with a "mark read" button inside it. Nesting a button in an anchor is invalid HTML that browsers resolve inconsistently and screen readers announce as two overlapping targets. Marking read is a side effect of opening the notice, which is also the honest model: you have read it because you went and looked. The unread cue is a dot **and** a visually-hidden word, because colour alone cannot carry the distinction (WCAG 1.4.1) and a screen reader gets no signal from a coloured span.
+
+### The shared header panel did not fit a 393px phone, and the width cap could not have caught it
+
+Found in real-browser smoke, not by reading: at 393px the Notifications panel ran off the far edge of the screen and **clipped the start of every row** — in Arabic, the first word of every sentence.
+
+`headerPanelClass` is `absolute end-0 top-full mt-1 w-80`, which anchors the panel to its TRIGGER. That is the right relationship — a panel that detaches from the control that opened it reads as a different surface — but the trigger is not at the edge of the screen. Notifications sits fifth in a cluster of seven, roughly 130px in from the header's inline-end edge. A desktop header has room for the 320px panel to hang inward from there; a phone does not.
+
+**`menuSurfaceClass` already carries `max-w-[calc(100vw-1.5rem)]`, and that cap is exactly why this survived the pass that introduced it.** A max-width can only rescue a surface that is too WIDE. This one was the approved width and in the wrong PLACE, and no max-width moves a box.
+
+The fix is positioning only, in two files. The panel `<div>` moved out of `HeaderMenu` into a `HeaderPanelSurface` component — same markup, same classes, same z-layer — that corrects its own horizontal offset in `useLayoutEffect`: measure the natural box, and if either physical edge falls outside a 12px viewport gutter, `translateX` it back in by exactly that much. Three properties keep this a small fix rather than a positioning system:
+
+- **It is PHYSICAL, so there is no direction branch.** `getBoundingClientRect` and `translateX` are both left-to-right whatever `dir` says, so RTL and LTR overflow — exact mirror images, off opposite edges — collapse into one subtraction. A logical fix would have needed two cases and could only ever have been half tested.
+- **It is a no-op where it is not needed.** On a desktop header nothing falls outside the gutter, `dx` is 0, no transform is written, and the approved desktop geometry is not merely preserved but untouched.
+- **It has no breakpoint**, so it cannot drift the next time the control cluster gains or loses an icon — which is the change that would silently re-break a `tablet:` override.
+
+Rendered only while open, which is what lets it use `useLayoutEffect` with no isomorphic shim: `open` is false through SSR, so the measurement never runs on the server. All three panels (Notifications, Chat, Feedback) come from the one shell and are fixed together.
+
+The accepted mobile result is that the panel **docks to the screen gutter** below the header rather than sitting directly beneath its bell. A caret or a full-bleed phone sheet was considered and explicitly declined — that is a design change, not a positioning fix.
+
+### Validation
+
+Frontend typecheck ✓ · `eslint .` ✓ (0 errors, 0 warnings) · unit **375/375** across 37 files, of which **35 are new here** (21 panel/list tests covering the optimistic decrement, the "mark all" snapshot expiry and the degraded row; 14 view-model tests covering key resolution, money interpolation, the protocol-relative `//evil.example` deep link and the fallback title).
+
+Real browser, real Email-OTP through Mailpit, no auth bypass, against a production `next build` + `next start` — `rania@example.test` (Distributor):
+
+- **The badge decrement, at 393px.** 23 unread seeded against the 20-row list cap — the only arrangement in which "the badge counts server rows" and "the badge counts visible rows" give different answers. Badge read 23 on arrival, panel showed 20 rows, opening one notice left **exactly one** row with `read_at` set in the database, and the badge read 22 after the navigation *and* again after a cold reload. 23 → 22, server-side, not an optimistic illusion.
+- **The panel clamp, at 393px in both directions.** Notifications with 23 real rows in Arabic and English, plus a Chat and Feedback smoke in each: both physical edges inside `documentElement.clientWidth`, zero document overflow, every row measured individually (a legal panel box around still-spilling rows would pass a box-only check and look exactly as broken), and the panel still exactly 320px wide. At 1440 the assertion is the **absence** of an inline transform on all three panels, so "desktop anchoring preserved" is checked rather than intended.
+
+**Not run, per the brief:** full E2E, pgTAP (no schema change in this increment), Lighthouse, the persona matrix.
+
+### Unfinished / deliberately out of scope
+
+- **The two verification specs are not in the suite.** Both drive a notification fixture through an env var pointing at a scratchpad SQL file, so committing them would break a plain `pnpm e2e`. The badge-decrement spec is worth keeping as a permanent regression guard, but that needs the notification fixture to move into `supabase/demo-seed.sql` first. Not done here.
+- Realtime subscriptions, Chat, Points, notification preferences, digests, grouping, pagination and outbound delivery remain out of scope for this increment — see "Out of scope" in `docs/database/notifications-core.md`.
+- **Local Supabase note for the next session:** `supabase_inbucket_aladdin` (Mailpit) was not running at the start of this session and had to be started for the OTP path. It was removed again afterwards, so the container set is back to db · pg_meta · rest · auth · kong. Run `supabase start` before any E2E that signs in.
+
+---
+
 ## Session — Visual UAT fix round 1: Arabic numerals and the compact sidebar
 
 **Date:** 2026-08-18 · **Branch:** `feature/supply-side-b2b-mvp` (PR #34) · **Base:** `main`
