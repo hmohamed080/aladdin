@@ -1,6 +1,6 @@
 # Notifications Core — Database Specification
 
-**Status:** Approved specification · 2026-08-22 · awaiting implementation
+**Status:** **Approved and implemented** · 2026-08-22 · migrations `20260822090001_notifications_core.sql` (table, RLS, `app.notify*`), `20260822090002_notifications_event_wiring.sql` (15 emissions across 13 RPCs), `20260823090002` / `20260823090003` (`message.sent`, and its owner-fallback scoping)
 
 ## Purpose
 
@@ -56,7 +56,9 @@ create table public.notifications (
     'quotation.submitted', 'quotation.accepted', 'quotation.rejected',
     'order.created', 'order.started', 'order.completed', 'order.cancelled',
     'project.created', 'project.activated', 'project.completed',
-    'verification.approved', 'verification.rejected', 'verification.changes_requested'
+    'verification.approved', 'verification.rejected', 'verification.changes_requested',
+    -- Added 2026-08-23 by 20260823090002; see the mapping table below.
+    'message.sent'
   )),
   constraint ck_notifications_subject_type check (char_length(subject_type) between 1 and 64),
   constraint ck_notifications_deep_link check (deep_link ~ '^/[A-Za-z0-9/_-]*$'),
@@ -368,14 +370,24 @@ A pgTAP suite in `supabase/tests/` is mandatory before merge and must cover:
   values carrying `?` or `#`.
 - **Emission** — each RPC in the mapping table writes exactly the expected rows,
   to exactly the expected recipients.
+- **Owner-fallback scoping** — an event passing `p_allow_owner_fallback => false`
+  notifies nobody when the capability has no holder, while an event in the same
+  organization state that keeps the default still reaches the `org.manage` owner.
+  (`message.sent` is the only such event today;
+  `34_chat_message_notifications_test.sql` covers both halves.)
 
 ## Out of scope
 
 Explicitly **not** part of Notifications Core, and not to be added without a
 further approved specification:
 
-- **Chat / messaging.** No conversation, thread, or message model. The header's
-  `ChatMenu` shell stays a shell.
+- **Chat / messaging.** Notifications Core introduced no conversation, thread or
+  message model, and did not change the `ChatMenu` shell.
+  **Superseded 2026-08-23:** that model now exists
+  ([`chat-core.md`](chat-core.md)), `ChatMenu` is a real list with a real unread
+  count, and this document's mapping table above carries `message.sent`. What
+  remains out of scope here is unchanged: Notifications owns no chat model of its
+  own, and stores no message content.
 - **Points / gamification.** No balance, ledger, tier, reward, or leaderboard
   model. The `/b2b/points` route stays a shell.
 - **Outbound delivery** — e-mail, WhatsApp, or push. This table is an in-app inbox

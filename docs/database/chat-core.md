@@ -688,8 +688,10 @@ public.send_message(p_conversation_id uuid, p_body text) returns uuid
    transitions; the messages table is itself the immutable record.
 8. Notification emission: **one `app.notify_org(...)` to the opposite party**,
    in this same transaction — see [§13](#13-notifications-integration-seam).
-   Added by `20260823090002_chat_message_notifications.sql`; every other step
-   above is unchanged from the original definition.
+   Added by `20260823090002_chat_message_notifications.sql` and amended by
+   `20260823090003_message_sent_no_owner_fallback.sql`, which disables the
+   `org.manage` owner fallback for this event — so the live definition of this
+   function is 090003's. Every other step above is unchanged from the original.
 
 Deliberately **no `p_expected_version`**: optimistic concurrency guards *edits*,
 and there are none. Two people sending at once is a correct outcome, not a
@@ -979,8 +981,11 @@ The third was not, and is a correction: **`app.notify_org` gained
 the approved `org.manage` owner fallback, which is safe for every event whose
 record an owner can already read — and unsafe for this one, because Chat access
 requires `conversation.participate` and an owner without it cannot open the
-thread. The default preserves the fallback for all thirteen existing call sites
-without touching any of them; only `send_message` opts out. See
+thread. The default preserves the fallback for every pre-existing emission —
+fifteen `app.notify_org` call sites across the thirteen functions
+`20260822090002_notifications_event_wiring.sql` replaced — without touching any
+of them; only `send_message` opts out. (The migration header says "thirteen call
+sites", conflating functions with calls: several functions emit two events.) See
 [`notifications-core.md`](notifications-core.md) for the general rule.
 
 ## 14. Realtime-deferred seam
@@ -1079,6 +1084,7 @@ before merge. Per the recorded validation protocol, pgTAP runs against a **clean
 | T-28 | Message rows survive the sender's membership being revoked | still readable, still attributed |
 | T-29 | Existing suites `23`, `24`, `31`, `32` re-run unchanged | all pass — INV-15 |
 | T-30 | `send_message` writes exactly one `message.sent` notice to the **opposite** party, carrying the conversation's own subject and no message body | the seam, as wired — covered by `34_chat_message_notifications_test.sql` |
+| T-31 | With the counterparty holding **no** `conversation.participate` holder but an active `org.manage` owner, `send_message` notifies **nobody** — while a non-Chat event in the same state still reaches that owner | the recipient-authority rule: the owner fallback is off for `message.sent` and unchanged for every other event ([§13.1](#131-the-event)) — `34_chat_message_notifications_test.sql` |
 
 ## 17. Bilingual / product presentation boundary
 
@@ -1158,7 +1164,7 @@ decided** (see its row); the remaining five stand open:
 | **Q3** | Should sending be frozen once the subject reaches a terminal state (`cancelled`, `rejected`, `completed`)? | **No, for the Pilot** — post-completion questions are real. Needs a product answer; additive as a `22023` guard in `send_message`. |
 | **Q4** | Retention, deletion, and erasure of message bodies. | **Unresolved — deliberately.** Business correspondence may be evidentiary; this is a legal question and needs its own specification ([§12.5](#125-retention-moderation-deletion)). |
 | **Q5** | B2C consumer chat — a consumer may hold **zero** organizations, so no second party can be derived. | **Out of scope.** The two-party model does not describe it; a consumer chat model would need its own authority design. |
-| **Q6** | ~~Notification volume for `message.sent`~~ — **DECIDED 2026-08-23.** | **No dedupe, grouping or digest in the Pilot**: one persisted message emits one independent notification event. Wired in `20260823090002_chat_message_notifications.sql`; the dedupe rule stays available as an additive change if measured volume makes the badge uninformative ([§13.2](#132-q6-volume--decided-no-dedupe-in-the-pilot)). |
+| **Q6** | ~~Notification volume for `message.sent`~~ — **DECIDED 2026-08-23.** | **No dedupe, grouping or digest in the Pilot**: one persisted message emits one independent notification event. Wired in `20260823090002_chat_message_notifications.sql` (recipient authority corrected in `20260823090003`); the dedupe rule stays available as an additive change if measured volume makes the badge uninformative ([§13.2](#132-q6-volume--decided-no-dedupe-in-the-pilot)). |
 
 One documentation reconciliation is also outstanding:
 `docs/technical/08_api_contracts.md` §10 still describes
@@ -1181,8 +1187,10 @@ approved.
    `ck_audit_action_known` with `'conversation.opened'`, and `comment on` for
    every table and function. **One migration — the schema and the only write
    paths that may touch it must never land apart.**
-3. **pgTAP `33_chat_core_test.sql`** — the full T-01…T-30 matrix, run against a
+3. **pgTAP `33_chat_core_test.sql`** — the T-01…T-29 matrix, run against a
    clean `supabase db reset`, with suites 23/24/31/32 confirmed still green.
+   (T-30 and T-31 concern the Notifications seam and live in
+   `34_chat_message_notifications_test.sql`, added with step 7.)
 4. **Read surfaces** — thread and conversation list as RLS-scoped `SELECT`s;
    `ChatMenu` gains a real unread **conversation** count and real rows. It stops
    being a shell here and not before, and only once a real number exists to show.
@@ -1192,9 +1200,10 @@ approved.
    built ([§3.6](#36-pre-existing-product-documentation-and-where-this-spec-departs-from-it)),
    and record the increment in `docs/operations/AGENT_WORK_LOG.md` and
    `docs/operations/RUNTIME_STATE.md`.
-7. **Then, and only as separate increments:** resolve Q6 and wire
-   `message.sent` notifications; add `public.messages` to the Realtime
-   publication.
+7. **Then, and only as separate increments:** ~~resolve Q6 and wire
+   `message.sent` notifications~~ — **done 2026-08-23**, see
+   [§13](#13-notifications-integration-seam); add `public.messages` to the
+   Realtime publication — **still deferred**.
 
 ## References
 
