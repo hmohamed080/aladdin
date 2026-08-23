@@ -146,14 +146,103 @@ Webhooks are **idempotent** (dedupe by provider message id), verify signatures, 
 ---
 
 ## 10. Conversations (`conversations`) & notifications
+
+> **Reconciled 2026-08-23 with what shipped.** This section previously sketched
+> `startConversation({… participantUserIds[]})`, `sendMessage({… attachments[]})`
+> and Realtime delivery. All three were **deliberately dropped**; the authority is
+> [`docs/database/chat-core.md`](../database/chat-core.md) and
+> [`docs/database/notifications-core.md`](../database/notifications-core.md), and
+> the schema source of truth is `supabase/migrations` (ADR-0002). See the
+> [departures](#101-what-changed-from-the-original-sketch-and-why) below.
+
+### Transactional Chat
+
+**A conversation is not a room — it is a property of a transaction.** It exists
+only when anchored to a commercial record that already names exactly two
+organizations, and it is reachable only from that record.
+
 | Action / Query | Auth | Input | Output |
 |---|---|---|---|
-| `startConversation` | context participant | `{subjectType, subjectId, participantUserIds[]}` | conversation |
-| `sendMessage` | `conversation.participate` | `{conversationId, body, attachments[]?}` | message (Realtime) |
-| Q `listMessages` | participant | `{conversationId, page}` | paginated (Realtime) |
-| Q `listNotifications` | user | `{status?, page}` | paginated (Realtime) |
-| `markNotificationRead` | user | `{id|all}` | ok |
-| `updateNotificationPreferences` | user | `{inApp, email, whatsapp, typeOverrides}` | prefs |
+| `openConversationAction` → `open_conversation` | `conversation.participate` in a **party** org | `{subjectType: 'rfq'\|'quotation'\|'order', subjectId}` | `conversationId` (idempotent get-or-create) |
+| `sendMessageAction` → `send_message` | same | `{conversationId, body}` — plain text, 1–4000 chars | `messageId` |
+| `markConversationReadAction` → `mark_conversation_read` | same | `{conversationId}` | ok (monotonic, idempotent) |
+| Q `listConversations` | RLS | `{limit?}` — bounded, recent-first | conversations + caller's own read position |
+| Q `getConversation` | RLS | `{id}` | conversation, or `null` |
+| Q `listMessages` | RLS | `{conversationId, limit?}` | bounded newest page, rendered chronologically |
+| Q `countUnreadConversations` | RLS | — | integer |
+
+**Contract rules that differ from the rest of this document, and are load-bearing:**
+
+- **No organization id is ever an input**, in any action or query. Both parties
+  are derived inside the RPC from the authoritative subject row. There is no
+  parameter for one and no prop for one.
+- **`participantUserIds[]` does not exist.** Access is *derived*, never stored:
+  active membership **+** `conversation.participate` **+** membership in one of
+  the transaction's two organizations. A colleague holding the capability reads
+  the whole thread — transactional correspondence is company records, not
+  personal mail. There is no way to start a conversation with a *person*.
+- **Sender identity is derived, not supplied.** `sender_user_id` comes from
+  `auth.uid()`; `sender_organization_id` is resolved by capability lookup against
+  the conversation's own two party columns. That resolution *is* the
+  anti-spoofing mechanism.
+- **Reads take no RPC.** Listing, reading a thread and counting unread are plain
+  RLS-scoped `SELECT`s.
+- **Messages are immutable plain text.** No edit, delete, reply, reaction,
+  forward, attachment, media, voice, or markup — and no translation: a body
+  renders exactly as authored.
+- **Unread is per *conversation*, not per message** — `conversations.last_message_at`
+  against the caller's own `conversation_read_state.last_read_at`. There are no
+  read receipts.
+- **Errors** map from Postgres, not from a Zod layer: `42501` → `FORBIDDEN`,
+  `22023` → `VALIDATION_ERROR` (invalid subject type, draft subject, empty,
+  whitespace-only or over-4000-character body). A `42501` renders as **one
+  neutral message** that never discloses whether the conversation exists.
+
+**Surfaces.** There is deliberately **no `/chat` or `/messages` route**. The
+thread renders inside the existing header Chat panel, and each of the RFQ,
+quotation and order detail pages carries one entry point that calls
+`open_conversation`. `project` is **not** a subject type — a project uses its
+parent order's conversation.
+
+### Notifications
+
+Recipient-scoped in-app inbox. Rows store **i18n keys and params, never rendered
+text**, so a reader's locale can change after the row is written.
+
+| Action / Query | Auth | Input | Output |
+|---|---|---|---|
+| `markNotificationRead` → `mark_notification_read` | recipient only | `{id}` | ok (idempotent) |
+| `markAllNotificationsRead` → `mark_all_notifications_read` | recipient only | `{orgId?}` | ok |
+| Q `listNotifications` | RLS (`recipient_user_id = auth.uid()`) | `{orgId?, limit?}` | bounded, recent-first |
+| Q `countUnread` | RLS | `{orgId?}` | integer |
+
+- **`organization_id` is context, never authority.** It scopes the list to the
+  active work context and must never appear in a `USING` clause: an inbox is
+  personal even when its subject is corporate.
+- **Writes are internal only.** `app.notify` / `app.notify_org` are
+  `security definer` and executable by no client role; `app.notify` suppresses
+  self-notification centrally.
+- **`updateNotificationPreferences` does not exist.** No per-event mute, digest,
+  channel selection or quiet hours model is specified or implemented.
+
+**`message.sent`** is emitted by `send_message`, in the same transaction as the
+message insert, to the **opposite** party organization via `app.notify_org` with
+capability `conversation.participate`. It deep-links to the underlying record
+(`/b2b/rfqs/{id}`, `/b2b/quotations/{id}`, `/b2b/orders/{id}`), carries business
+context only (`counterparty_name`) and **never the message body**, and is the one
+event with the `org.manage` owner fallback **disabled** — nobody is told about a
+thread they could not open. No dedupe, grouping or digest in the Pilot.
+
+### 10.1 What changed from the original sketch, and why
+
+| Sketched | Shipped | Why |
+|---|---|---|
+| `participantUserIds[]` | derived from membership + capability + the transaction's two orgs | a participant list is a second, divergenceable copy of an authorization decision the schema already makes |
+| `attachments[]` | plain text only | no storage, scanning, retention or quota model exists; adding a column would imply one |
+| Realtime message/notification delivery | persisted reads + `router.refresh()` | deferred deliberately; no table joined the `supabase_realtime` publication |
+| `startConversation` | `open_conversation` | it is honestly get-**or**-create, and calling it twice is not an error |
+| `{id\|all}` on mark-read | two distinct RPCs | a union-typed input hides two different authorization shapes |
+| `updateNotificationPreferences` | — | no preferences model is approved |
 
 ---
 
