@@ -4,6 +4,114 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Transactional Chat: the application half, and a seam where two correct layers did not meet
+
+**Date:** 2026-08-23 · **Branch:** `feature/engagement-notifications-points-core` · **Base:** `main` @ `34b06d4`
+
+The Chat Core database foundation landed earlier the same day (`b2854b2` specification, `5953233`
+tables + RLS + the three RPCs). This entry covers the **application and UI half** — the read layer, the
+mutation layer, the view model, the conversation list, the thread, and the three transactional entry
+points that reach them.
+
+### The thread lives in the header panel, because inventing a route was not this increment's decision
+
+`docs/database/chat-core.md` §3.5 records that **there is no `/chat` route** anywhere under
+`frontend/src/app`, and the specification establishes no canonical thread destination. So none was
+invented. A conversation opens **inside the existing header Chat panel**: the list is the panel body,
+and selecting a row replaces that body with the thread. The panel's geometry, width, anchoring,
+viewport clamp, Escape and outside-click behaviour are untouched — the change is exactly what
+`header-panels.tsx` predicted it would be when Notifications went through the same transition: a body
+swapped in behind the same heading, and a badge passed in. This placement is now approved for the Pilot.
+
+The seam from a record page to the panel is a `window` CustomEvent (`aladdin:chat-open`). The panel
+lives in the shared LAYOUT, which never sees `searchParams`, and which conversation is open is
+ephemeral UI state rather than a preference worth persisting. The event carries only a conversation id
+the server action just returned **for this caller**, so it grants nothing and can open nothing RLS
+would refuse.
+
+### The frontend re-implements no part of the authorization decision
+
+Access is already settled by the database: an active membership holding `conversation.participate` in
+one of the transaction's two organizations. So `server/queries/chat.ts` runs on the caller-scoped
+client and adds **no ownership predicate of its own**, and — unlike Notifications, which takes an
+optional `organization_id` as UX scope — **no organization id is an argument anywhere in the module**.
+A notification row carries one org column; a conversation carries TWO parties and neither is "the" org
+of the thread, so filtering on either here would re-implement half the database's party test in a
+second, divergenceable place. The active-workspace org enters only at the VIEW MODEL, where it decides
+which of two already-visible names to call the counterparty.
+
+The same rule governs the write path. All three mutations forward the caller's JWT to the approved
+`security definer` RPCs and pass **nothing else**: `open_conversation` derives both parties from the
+authoritative subject row, and `send_message` resolves sender user and sender organization from
+`auth.uid()` plus the conversation's own columns. Neither identity is a parameter, and there is no prop
+for one in either direction. A `42501` — suspended membership, withdrawn capability, changed context —
+collapses to **one neutral translated string** that names nothing about whether the conversation
+exists, because §7.6 makes "does not exist" and "exists but not yours" deliberately indistinguishable
+and the error text must not undo that.
+
+### Unread counts conversations, and never touches `public.messages`
+
+The badge is `last_message_at` vs the caller's own `last_read_at`, exactly as §11 specifies — no
+per-message receipts, and none may be added. Read state rides along as an RLS-gated embed, so a
+conversation the caller can no longer reach drops out of the count on its own and the badge can never
+count a thread the panel cannot open. Marking read fires only when a thread is **genuinely opened**
+(opening the panel marks nothing), then `router.refresh()` re-renders the route and its layouts so the
+badge reconciles without a browser reload.
+
+### The defect: two correct layers, one key, two spellings of it
+
+Found by looking at a screenshot, not by a failing test. Every conversation row rendered as bare
+"Order" with no counterparty and no record title, and every counterparty message was attributed to
+`· 05:18 PM` — a separator, a time, and no name.
+
+`resolveConversationDisplayContext` keys its map by **subject id** (it queries the commerce `_list`
+projections, which know nothing about conversations). `toConversationViews` looked that map up by
+**conversation id**. Both halves had passing unit tests, because each test agreed with its own half's
+idea of the key. Unit tests verify components; only a test that spans the boundary verifies that two
+correct components fit together — and there was no such test, so the feature rendered every label blank
+while the suite stayed green.
+
+Both sides now build the key through one exported `conversationSubjectKey(subjectType, subjectId)`,
+qualified by type because a bare subject id is ambiguous across three source tables. A new test drives
+the real resolver into the real view model with a conversation id deliberately unequal to the subject
+id, so the key can only be wrong in one place at a time again. The longer subject line this fix
+restored then wrapped the thread's back control onto two lines; `shrink-0 whitespace-nowrap` makes the
+subject truncate instead.
+
+### Deliberately not built
+
+No Realtime, no subscriptions, no presence, no typing — Chat works through persisted reads, sends and
+router refresh, and the realtime publication is untouched. No `message.sent` notification wiring: that
+is a separate increment after Chat is accepted, and the notifications CHECK constraint, event wiring
+and UI are unchanged. No project Chat subject — `projects` is 1:1 with `orders` and names the same two
+organizations, so a project page uses its parent order's conversation (§4.3); the entry-point
+component's type cannot even express `project`. No avatars, presence dots, message previews, tabs,
+search, filters or archive controls, and no bulk mark-all-read.
+
+### Validation
+
+typecheck · `eslint .` both clean, zero warnings. **116 unit tests** green across the chat query,
+action, view-model, panel and entry-point suites plus the directly affected notifications and i18n
+parity suites — covering ordering and bounds, chronological messages, the unread model in all three
+of its cases, that the actions call only the approved RPCs and never supply sender or organization
+identity, the composer's whitespace and 4000-character boundaries with the database still final
+authority, the pending-send gate, the zero-conversation empty state, unread carried without colour
+alone, badge correctness and reconciliation, AR and EN copy, and the cross-layer seam above.
+
+Real browser, real Email-OTP through Mailpit, production build, no auth bypass: **25 checks** across
+both parties of one real persisted order conversation — send, persistence after a full reload,
+mark-read with the badge reconciling without a reload, English LTR and Arabic RTL, light and dark, and
+a 393px phone where the panel stays inside the viewport in both the list and the thread. The honest
+ZERO state was verified as a user whose organization is party to no conversation, and the empty
+thread on an RFQ that genuinely had none — both reached the way a real user reaches them, rather than
+by deleting persisted rows to manufacture the state. Review harnesses and screenshots were temporary
+and are not committed.
+
+Per instruction: no full Playwright suite, no E2E matrix, no pgTAP re-run, no Lighthouse, no persona
+matrix.
+
+---
+
 ## Session — Notifications Core: the read/UI half, and a shared panel that did not fit a phone
 
 **Date:** 2026-08-23 · **Branch:** `feature/engagement-notifications-points-core` · **Base:** `main` @ `34b06d4`

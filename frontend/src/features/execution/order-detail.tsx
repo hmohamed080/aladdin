@@ -14,6 +14,7 @@ import { Card, SectionTitle, Field, InlineError } from "@/components/ui/primitiv
 import { Input, Textarea, LabeledField, SubmitButton, Button } from "@/components/ui/controls";
 import { PackageIcon, ActivityIcon, CheckIcon, ClockIcon } from "@/components/ui/icons";
 import { OrderStatusBadge } from "@/features/execution/badges";
+import { OpenConversationButton } from "@/features/chat/open-conversation-button";
 import { formatDateTime } from "@/lib/ui/format";
 import { formatMoney, formatQuantity } from "@/features/commerce/constants";
 import type { OrderRow, OrderItemRow, ProjectRow } from "@/server/queries/execution";
@@ -62,11 +63,18 @@ export function OrderDetail({
               {t("execution.order.viewQuotation")}
             </Link>
           </div>
-          <div className="text-end">
-            <p className="text-label text-fg-muted">{t("execution.order.total")}</p>
-            <p className="text-title font-semibold tabular-nums text-fg" dir="ltr">
-              {formatMoney(order.total, locale)}
-            </p>
+          {/* One chat entry, beside the total. An order is visible to both
+              parties from the moment it exists (chat-core.md §10), so this
+              renders unconditionally — the database still decides who may open
+              it, and says so neutrally if they may not. */}
+          <div className="flex items-start gap-md">
+            <div className="text-end">
+              <p className="text-label text-fg-muted">{t("execution.order.total")}</p>
+              <p className="text-title font-semibold tabular-nums text-fg" dir="ltr">
+                {formatMoney(order.total, locale)}
+              </p>
+            </div>
+            <OpenConversationButton subjectType="order" subjectId={order.id} />
           </div>
         </div>
         <dl className="mt-md grid grid-cols-2 gap-md tablet:grid-cols-4">

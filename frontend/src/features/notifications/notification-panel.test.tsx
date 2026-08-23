@@ -26,6 +26,16 @@ vi.mock("@/server/actions/notifications", () => ({
     markAllNotificationsReadAction(orgId),
 }));
 
+/* `header-panels` now mounts Chat beside Notifications; its server-side action
+   module must never resolve here either. */
+vi.mock("@/server/actions/chat", () => ({
+  CHAT_ACCESS_DENIED: "chat.error.access",
+  openConversationAction: vi.fn(async () => ({ ok: true })),
+  sendMessageAction: vi.fn(async () => ({ ok: true })),
+  markConversationReadAction: vi.fn(async () => ({ ok: true })),
+  loadConversationThreadAction: vi.fn(async () => ({ ok: true, messages: [] })),
+}));
+
 const ORG = "org-1";
 
 function source(over: Partial<NotificationSource> = {}): NotificationSource {

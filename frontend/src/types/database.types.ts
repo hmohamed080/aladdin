@@ -331,6 +331,97 @@ export type Database = {
           },
         ]
       }
+      conversation_read_state: {
+        Row: {
+          conversation_id: string
+          id: string
+          last_read_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          last_read_at: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          last_read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_read_state_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_read_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          last_message_at: string | null
+          requester_org_id: string
+          subject_id: string
+          subject_type: string
+          supplier_org_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          last_message_at?: string | null
+          requester_org_id: string
+          subject_id: string
+          subject_type: string
+          supplier_org_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          last_message_at?: string | null
+          requester_org_id?: string
+          subject_id?: string
+          subject_type?: string
+          supplier_org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_requester_org_id_fkey"
+            columns: ["requester_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_supplier_org_id_fkey"
+            columns: ["supplier_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           archived_at: string | null
@@ -843,6 +934,55 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          sender_organization_id: string
+          sender_user_id: string
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          sender_organization_id: string
+          sender_user_id: string
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          sender_organization_id?: string
+          sender_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_organization_id_fkey"
+            columns: ["sender_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_user_id_fkey"
+            columns: ["sender_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body_key: string | null
@@ -1177,11 +1317,11 @@ export type Database = {
           accepted_user_id?: string | null
           created_at?: string
           email?: string | null
-          phone?: string | null
           expires_at?: string
           id?: string
           invited_by?: string | null
           organization_id?: string
+          phone?: string | null
           primary_branch_id?: string | null
           status?: Database["public"]["Enums"]["invitation_status"]
           token?: string
@@ -3530,6 +3670,10 @@ export type Database = {
         Args: { p_org_id?: string }
         Returns: number
       }
+      mark_conversation_read: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
       mark_notification_read: { Args: { p_id: string }; Returns: undefined }
       membership_activate: {
         Args: { p_membership_id: string }
@@ -3612,6 +3756,10 @@ export type Database = {
           p_track: Database["public"]["Enums"]["onboarding_track"]
         }
         Returns: undefined
+      }
+      open_conversation: {
+        Args: { p_subject_id: string; p_subject_type: string }
+        Returns: string
       }
       org_join_request_approve: {
         Args: { p_branch_id?: string; p_request_id: string }
@@ -3697,6 +3845,10 @@ export type Database = {
           p_product_id: string
         }
         Returns: undefined
+      }
+      send_message: {
+        Args: { p_body: string; p_conversation_id: string }
+        Returns: string
       }
       set_customer_ownership: {
         Args: {

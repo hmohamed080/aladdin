@@ -834,8 +834,40 @@ export const en = {
   chat: {
     empty: {
       title: "No conversations yet",
-      body: "Messages with your suppliers, buyers and team will appear here.",
+      body: "Conversations on your requests, offers and orders will appear here.",
     },
+    /* Badge and row markers follow the language Notifications established:
+       a real count only, and unread carried by a dot AND a word so colour is
+       never the sole signal. */
+    unreadCount: "{count} unread",
+    unread: "Unread",
+    /* Transaction labels. A conversation is a property of a commercial record,
+       so every row names its record type first. */
+    subject: {
+      rfq: "Request for quotation",
+      quotation: "Quotation",
+      order: "Order",
+    },
+    thread: {
+      back: "All conversations",
+      empty: {
+        title: "No messages yet",
+        body: "Messages between the two organizations on this record will appear here.",
+      },
+      you: "You",
+    },
+    composer: {
+      label: "Your message",
+      placeholder: "Write a message…",
+      send: "Send",
+      sending: "Sending…",
+      tooLong: "A message cannot exceed {count} characters.",
+    },
+    error: {
+      access: "You no longer have access to this conversation.",
+    },
+    openFromRecord: "Open conversation",
+    openFromRecordSending: "Opening…",
   },
   notifications: {
     empty: {

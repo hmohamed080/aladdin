@@ -11,33 +11,26 @@ import {
   useNotificationReadState,
 } from "@/features/notifications/notification-list";
 import type { NotificationView } from "@/features/notifications/view-model";
+import { ConversationList } from "@/features/chat/conversation-list";
+import { ChatThread } from "@/features/chat/chat-thread";
+import { onPanelChatRequest } from "@/features/chat/open-chat-event";
+import type { ConversationView } from "@/features/chat/view-model";
 import { formatCount } from "@/lib/ui/format";
 
 /**
- * CHAT AND NOTIFICATIONS — ONE SHELL, NOW HALF FILLED.
+ * CHAT AND NOTIFICATIONS — ONE SHELL, NOW FULLY FILLED.
  *
  * `HeaderMenu` owns the trigger, the panel, and every interaction that has
  * nothing to do with content: outside-click and Escape to close, focus handling,
  * `aria-haspopup`/`aria-expanded`, RTL anchoring, mobile width clamping. Chat and
  * Notifications are then just a title, an icon and a BODY.
  *
- * That prediction held. NOTIFICATIONS now has a table behind it
- * (`docs/database/notifications-core.md`), so its body is a real list and its
- * trigger carries a real count — and the change was exactly the two things this
- * note said it would be: `<EmptyPanel …/>` swapped for a list, and a `badge`
- * passed in. No geometry moved.
- *
- * CHAT IS STILL A SHELL, and the original rules still bind it:
- *
- *   - no unread COUNT, and no badge that could imply one. A number is a claim,
- *     and every number `ChatMenu` could render today would be invented;
- *   - no rows, no sample conversations, no "3 new" — the panel says plainly that
- *     there is nothing yet, which is the truth and reads as a finished empty
- *     state rather than a broken list;
- *   - no local storage, no polling, no realtime subscription, no query.
- *
- * There is no messaging model in the repository and Chat is explicitly out of
- * scope for Notifications Core, so it stays as built.
+ * That prediction held twice. NOTIFICATIONS gained its table
+ * (`docs/database/notifications-core.md`) and then CHAT gained its own
+ * (`docs/database/chat-core.md`): both bodies are real lists backed by RLS-scoped
+ * reads, both triggers carry a count somebody computed, and each change was
+ * exactly the two things this note said it would be — a body swapped in behind
+ * the same heading, and a badge passed in. No geometry moved either time.
  *
  * They are shared components, mounted once in the shared `AppHeader`, so every
  * authenticated surface gets the same two controls. There is no persona-specific
@@ -156,6 +149,7 @@ function HeaderMenu({
   label,
   testId,
   badge,
+  openSignal,
   children,
 }: {
   icon: ReactNode;
@@ -173,6 +167,13 @@ function HeaderMenu({
    * "Notifications" beside an unexplained 3.
    */
   badge?: { display: string; srLabel: string };
+  /**
+   * Bump to OPEN the panel from outside — how a record page's chat entry point
+   * hands its freshly-opened conversation to the already-mounted control.
+   * Closing stays owned by the interactions below; nothing external can close
+   * a panel the reader may be reading.
+   */
+  openSignal?: number;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -193,6 +194,10 @@ function HeaderMenu({
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (openSignal) setOpen(true);
+  }, [openSignal]);
 
   return (
     <div ref={root} className="relative">
@@ -255,15 +260,121 @@ function EmptyPanel({ icon, title, body }: { icon: ReactNode; title: string; bod
   );
 }
 
-export function ChatMenu() {
-  const { t } = useI18n();
+/**
+ * CHAT — TRANSACTIONAL COMPANY CORRESPONDENCE, IN THE SHELL ABOVE.
+ *
+ * The prediction held a second time. `docs/database/chat-core.md` is approved
+ * and its tables live, so Chat now does what Notifications did: the BODY is
+ * real (a bounded recent list, and each conversation's thread inside this same
+ * panel), and the badge is a number somebody counted. The original rules still
+ * bind, with the one change their own wording anticipated:
+ *
+ *   - the unread count is computed from the approved model —
+ *     `last_message_at` vs the caller's own `last_read_at` — never invented,
+ *     never a count of rows on screen;
+ *   - zero conversations keeps the honest empty state below, unchanged;
+ *   - no local storage, no polling, no realtime subscription.
+ *
+ * A thread opens INSIDE this panel — there is no `/chat` route in the approved
+ * architecture, and inventing one is not this increment's decision. The panel's
+ * geometry, anchoring, clamp and dismissal behaviour are untouched; only the
+ * body behind the same heading changes.
+ *
+ * Badge reconciliation follows Notifications exactly: marking read fires the RPC
+ * and then `router.refresh()` re-renders this route plus its layouts, while the
+ * locally-cleared ids keep the count honest during the round trip. A stale id
+ * can only ever agree with the refreshed server data, so nothing needs to clean
+ * up after itself.
+ */
+export function ChatMenu({
+  items = [],
+  unreadCount = 0,
+  activeOrgId = null,
+  activeOrgName = null,
+  currentUserId = null,
+}: {
+  items?: readonly ConversationView[];
+  /** Server-computed count of conversations holding something unread. */
+  unreadCount?: number;
+  /** The viewer's active work context — counterparty attribution ONLY. */
+  activeOrgId?: string | null;
+  /** Its display name, for attributing colleagues' messages on our side. */
+  activeOrgName?: string | null;
+  /** The signed-in person, for the "You" attribution. */
+  currentUserId?: string | null;
+}) {
+  const { t, locale } = useI18n();
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [clearedIds, setClearedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [openSignal, setOpenSignal] = useState(0);
+
+  useEffect(
+    () =>
+      onPanelChatRequest((conversationId) => {
+        setThreadId(conversationId);
+        setOpenSignal((v) => v + 1);
+      }),
+    [],
+  );
+
+  const markOpened = (conversationId: string) => {
+    setClearedIds((prev) => new Set(prev).add(conversationId));
+  };
+
+  /* Server total minus conversations cleared since it was computed — the same
+     "badge counts the database" arithmetic as the bell. */
+  const pendingCleared = items.filter((c) => c.unread && clearedIds.has(c.id)).length;
+  const effectiveUnread = Math.max(0, unreadCount - pendingCleared);
+
+  const thread = threadId ? items.find((c) => c.id === threadId) : undefined;
+
   return (
-    <HeaderMenu icon={<MessageIcon size={16} />} label={t("nav.chat")} testId="header-chat">
-      <EmptyPanel
-        icon={<MessageIcon size={18} />}
-        title={t("chat.empty.title")}
-        body={t("chat.empty.body")}
-      />
+    <HeaderMenu
+      icon={<MessageIcon size={16} />}
+      label={t("nav.chat")}
+      testId="header-chat"
+      openSignal={openSignal}
+      badge={
+        effectiveUnread > 0
+          ? {
+              display: formatCount(effectiveUnread, locale),
+              srLabel: t("chat.unreadCount", { count: effectiveUnread }),
+            }
+          : undefined
+      }
+    >
+      {thread ? (
+        <ChatThread
+          key={thread.id}
+          conversationId={thread.id}
+          sides={{
+            requesterOrgId: thread.requesterOrgId,
+            supplierOrgId: thread.supplierOrgId,
+          }}
+          header={{
+            subjectLabelKey: thread.subjectLabelKey,
+            subjectTitle: thread.subjectTitle,
+            counterpartyName: thread.counterpartyName,
+          }}
+          viewer={{
+            userId: currentUserId,
+            activeOrgId,
+            activeOrgName,
+          }}
+          onBack={() => setThreadId(null)}
+          onOpened={markOpened}
+        />
+      ) : items.length === 0 ? (
+        <EmptyPanel
+          icon={<MessageIcon size={18} />}
+          title={t("chat.empty.title")}
+          body={t("chat.empty.body")}
+        />
+      ) : (
+        <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
+          <ConversationList items={items} onOpen={setThreadId} />
+        </div>
+      )}
     </HeaderMenu>
   );
 }
