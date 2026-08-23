@@ -58,6 +58,7 @@ export async function AppShell({
         stance={stance}
         hasWorkspace
         workspaceLabel={active.organizationName}
+        orgId={active.organizationId}
         preferencesHref="/b2b/settings"
         context={
           <>

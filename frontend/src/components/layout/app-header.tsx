@@ -12,6 +12,19 @@ import { canSearchAdmin } from "@/server/actions/search";
 import { THEME_COOKIE, resolveTheme, resolveThemePreference } from "@/lib/theme/config";
 import { HelpIcon } from "@/components/ui/icons";
 import { ChatMenu, FeedbackMenu, NotificationsMenu } from "@/components/layout/header-panels";
+import { getServerSupabase } from "@/lib/supabase/server";
+import {
+  countUnread,
+  listNotifications,
+} from "@/server/queries/notifications";
+import {
+  countUnreadConversations,
+  listConversations,
+  resolveConversationDisplayContext,
+} from "@/server/queries/chat";
+import { toNotificationViews } from "@/features/notifications/view-model";
+import { toConversationViews } from "@/features/chat/view-model";
+import { createTranslator } from "@/lib/i18n/translate";
 import { HeaderSeparator, headerIconClass } from "@/components/layout/header-parts";
 import type { CommerceStance } from "@/lib/workspace/supply-side";
 
@@ -61,15 +74,16 @@ import type { CommerceStance } from "@/lib/workspace/supply-side";
  * in a taller band. That is the whole point of the split — one element needed
  * room, so one element got it, and the header did not become a toolbar.
  *
- * WHAT IS PRESENT BUT NOT YET WIRED
- * Chat, Notifications and Feedback are SHELLS. The repository has no messaging
- * model, no notification model and no feedback model — no tables, no queries.
- * They are here anyway because their PLACE in the header is a decision worth
- * settling before the data lands, and because each opens something finished and
- * honest: the two inboxes state that there is nothing yet, and Feedback shows the
- * composer it will be with sending plainly marked as not open. What none of them
- * carries is a COUNT or a badge — a number nobody computed is a lie in the
- * chrome, and no amount of shell justifies one.
+ * WHAT IS WIRED, AND WHAT IS STILL A SHELL
+ * NOTIFICATIONS and CHAT are both real: each reads its own table through the
+ * caller's own client, so RLS decides what the panel may contain, and each
+ * trigger carries a counted badge. The rule the shells were built under has not
+ * been relaxed — a badge is allowed precisely BECAUSE somebody counted it.
+ *
+ * Feedback is still a SHELL. There is no feedback model — no table, no queries —
+ * and it carries no count, because a number nobody computed is a lie in the
+ * chrome. It still opens something finished and honest: the composer it will be,
+ * with sending plainly marked as not open.
  *
  * RESPONSIVE
  * Below `tablet` the search field collapses to its icon and any `context` slot
@@ -84,6 +98,7 @@ export async function AppHeader({
   hasWorkspace,
   workspaceLabel,
   preferencesHref,
+  orgId,
 }: {
   appName: string;
   /** Workspace/branch switchers, an Admin badge — whatever names the context. */
@@ -98,15 +113,55 @@ export async function AppHeader({
   /** Localized name of the active work context, shown in the profile menu. */
   workspaceLabel?: string | null;
   preferencesHref?: string;
+  /**
+   * The active organization, for scoping the notification list to the work
+   * context the reader is actually in. UX ONLY — `notifications` is governed by
+   * a recipient-only RLS policy, so this can narrow what is shown and can never
+   * widen it. A personal surface passes nothing and gets the whole inbox.
+   */
+  orgId?: string | null;
 }) {
-  const [identity, canAdmin, store] = await Promise.all([
-    loadAccountIdentity(),
-    canSearchAdmin(),
-    cookies(),
-  ]);
+  const supabase = await getServerSupabase();
+  const [identity, canAdmin, store, notificationRows, unreadCount, conversationRows, chatUnread] =
+    await Promise.all([
+      loadAccountIdentity(),
+      canSearchAdmin(),
+      cookies(),
+      listNotifications(supabase, { orgId }),
+      // Counted rather than derived from the list: the badge must be right even
+      // when there are more unread notices than the list's cap. `head: true`, so
+      // this costs a count and no rows.
+      countUnread(supabase, { orgId }),
+      listConversations(supabase),
+      // The same arithmetic as the bell's count: conversations whose activity
+      // postdates this reader's position — computed from the approved columns,
+      // never from the bounded list below.
+      countUnreadConversations(supabase),
+    ]);
   const themePreference = resolveThemePreference(store.get(THEME_COOKIE)?.value);
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const m = getMessages(locale);
+
+  /* Rendered on the SERVER, in the reader's locale, before the panel is ever
+     opened. The client component receives finished sentences and never sees a
+     `title_key` — which is what keeps the i18n catalog out of the browser bundle
+     for a panel most page views never open. */
+  const translator = createTranslator(locale);
+  const notifications = toNotificationViews(notificationRows, translator, locale);
+
+  /* Conversation rows carry ids; names and titles are resolved through the
+     commerce `_list` projections (the same path every commerce list uses) and
+     only when there is something to resolve. */
+  const chatContexts = conversationRows.length
+    ? await resolveConversationDisplayContext(supabase, conversationRows)
+    : new Map();
+  const conversations = toConversationViews(
+    conversationRows,
+    chatContexts,
+    translator,
+    locale,
+    orgId,
+  );
 
   return (
     <header
@@ -155,12 +210,23 @@ export async function AppHeader({
 
           {actions ? <div className="hidden items-center gap-sm tablet:flex">{actions}</div> : null}
 
-          {/* Chat, Notifications and Feedback: the shell only — see
-              `header-panels` for what each opens and why none carries a count.
-              They sit here rather than in `actions` because they are not one
-              surface's controls; every authenticated surface gets all three. */}
-          <ChatMenu />
-          <NotificationsMenu />
+          {/* Chat, Notifications and Feedback: one shell each. Chat and
+              Notifications read real, RLS-scoped data; Feedback is still the
+              composer shell it honestly is. They sit here rather than in
+              `actions` because they are not one surface's controls; every
+              authenticated surface gets all three. */}
+          <ChatMenu
+            items={conversations}
+            unreadCount={chatUnread}
+            activeOrgId={orgId}
+            activeOrgName={workspaceLabel}
+            currentUserId={identity?.userId ?? null}
+          />
+          <NotificationsMenu
+            items={notifications}
+            unreadCount={unreadCount}
+            orgId={orgId}
+          />
           <FeedbackMenu />
 
           {/* Help points at the support surface that already exists and stays

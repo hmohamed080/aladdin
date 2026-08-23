@@ -4,6 +4,319 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — message.sent: telling the counterparty, without telling anyone who cannot look
+
+**Date:** 2026-08-23 · **Branch:** `feature/engagement-notifications-points-core` · **Base:** `main` @ `34b06d4`
+
+Chat became usable earlier the same day (`315296a`). This entry covers the one
+seam that was deliberately left unwired then: a persisted Chat message now emits
+a `message.sent` notification to the **opposite transaction party**, and to
+nobody else.
+
+### The event, and why its subject is not fixed
+
+`message.sent` is the sixteenth value in `ck_notifications_event_type_known` and
+the first whose `subject_type` varies per row. Every other event is emitted by an
+RPC that owns exactly one kind of record; a conversation is a *property of a
+transaction* (§4), so the notice inherits the conversation's own subject —
+`rfq`, `quotation` or `order` — and deep-links to that record's existing route.
+
+There is deliberately **no `/chat` route**, and none was invented for the notice
+to point at. The recipient lands on the real transaction record and opens Chat
+from the entry point already there, which keeps one navigation architecture
+instead of two.
+
+Emission is one `app.notify_org(...)` inside `send_message`, beside the existing
+writes and **in the same transaction**. That coupling is the point, and the test
+for it is not "both rows exist afterwards" — two separate transactions would
+produce that too. It takes a savepoint, sends, asserts both the message and its
+notification are present, rolls back, and asserts **both** are gone. Only shared
+transaction scope produces that pair of outcomes; a background or deferred notify
+would survive the rollback.
+
+### No dedupe, decided rather than deferred
+
+Q6 in `chat-core.md` had blocked this seam on notification volume, recommending
+*at most one unread notice per recipient per subject*. Decided the other way for
+the Pilot: **every persisted message is an independent notification event.** A
+dedupe rule that suppresses a notice because an earlier one is still unread makes
+the inbox lie about how much correspondence is waiting, and the failure it
+prevents — a noisy badge — is more recoverable than the one it causes, which is a
+message nobody was told about. The rule stays available as a purely additive
+change, and `ix_notifications_subject` still supports it directly.
+
+### The message body is not in the notification, and there is nowhere to put it
+
+Params are `{"counterparty_name": …}` and nothing else. Notifications and Chat
+have **different visibility rules**, so a preview would mirror private
+correspondence past the narrower one. Asserted at both layers: pgTAP proves no
+`body` / `message` / `excerpt` / `preview` key and no body text ever reaches a
+row, and a frontend test feeds a row with a smuggled body and proves the rendered
+sentence is byte-identical to the clean one — because the catalog sentence has
+exactly one placeholder and it is not for content.
+
+The copy stays generic about the record ("about this transaction") rather than
+naming *this request* / *this order*. One event serves three subject types, so a
+subject noun would have to arrive as a param — which would mean the database
+persisting an English word into a row an Arabic reader may open, the exact leak
+the keys-not-sentences rule exists to prevent. The deep link carries the
+specificity.
+
+### The defect this increment introduced, and then fixed
+
+The first wiring inherited `app.notify_org`'s approved **`org.manage` owner
+fallback**, which fires when the capability yields no holder so that a notice is
+never silently dropped. That is right for all fifteen existing events and wrong
+for this one, and the reason generalises cleanly:
+
+> The owner fallback is safe **exactly when an owner could already read the
+> record the notice is about.**
+
+For commerce and verification they can — an owner can open the rfq, quotation,
+order or verification, so the fallback only widens *who is told* about something
+they were already entitled to see. Chat is the first event whose subject sits
+behind a capability an owner may not hold: access is `active membership +
+conversation.participate`, so `conversations_select_party` refuses an owner
+holding only `org.manage`. In a counterparty organization with no capability
+holder, the fallback would have told that owner a conversation exists, on which
+record, and with which counterparty — every fact except the body — about a thread
+the database would refuse to show them. **The notification would have become a
+wider read path than the feature it describes.**
+
+`20260823090003` gives `app.notify_org` a `p_allow_owner_fallback boolean default
+true`; `send_message` passes `false`. The default preserves the fallback for all
+thirteen existing call sites without touching one of them. Two notes on the shape:
+
+- **DROP + CREATE, not CREATE OR REPLACE.** A ten-argument overload beside the
+  nine-argument original makes every existing nine-argument call ambiguous
+  (*"function is not unique"*). Dropping is safe because plpgsql resolves callees
+  by name at execution time, so the thirteen callers rebind and pick up the
+  default — but the drop takes the `revoke` with it, and internal-only status has
+  to be re-established explicitly.
+- **The flag is a call-site decision, not `p_event_type <> 'message.sent'` inside
+  the helper.** Whether an owner may be told is a property of the emitting
+  event's authorization model; hard-coding one event name into a generic
+  mechanism would quietly mislead the next event with the same shape.
+
+**When nobody qualifies, nobody is told, and the message still persists.** Silence
+is the correct outcome: a dropped notice is strictly safer than a disclosed one,
+and the counterparty sees the conversation the moment somebody there is granted
+the capability, because Chat reads are live rather than replayed from an inbox.
+
+### Two tests that were passing and wrong
+
+Worth recording, because both are the same mistake in different clothes: a test
+that agrees with itself proves nothing.
+
+1. The new suite's recipient-authority assertions were verified **against a
+   deliberately reverted `notify_org`** with the fallback forced back on. Two
+   failed and the "fallback still works for other events" assertion still passed
+   — which is what proves they discriminate the two cases rather than merely
+   observing a green database.
+2. One assertion checked a **live-capability property across historical rows**,
+   and the suite itself falsifies it by revoking a capability mid-run. A
+   capability revoked *after* a legitimate notice does not make that notice
+   retroactively wrong. It is now asserted as a delta.
+
+`33_chat_core_test.sql` also had two assertions that were correct for the
+previous increment and are now false — it proved emission was *absent* and that
+`message.sent` was *not* in the allow-list. Both were inverted rather than
+deleted: the seam is exactly what they were watching.
+
+### Validation
+
+Clean `supabase db reset`, then the four directly affected suites: new
+`34_chat_message_notifications_test.sql` **46/46**, `33_chat_core_test` 106/106,
+`31_notifications_core_test` 38/38, `32_notifications_event_emission_test` 50/50
+— **240 assertions, no failures**. Verified live afterwards that exactly one
+`app.notify_org` exists (no ambiguous overload), that it grants EXECUTE to
+neither `authenticated` nor `service_role`, and that `send_message` kept its
+grant and its exact signature including parameter names — PostgREST calls it by
+named argument, so a rename would break every caller as surely as a retype.
+
+Frontend: 61 targeted notification/i18n tests, typecheck and `eslint .` all
+clean. The recipient-authority fix is entirely database-side and changed no
+frontend file.
+
+Per instruction: no full Playwright, no E2E, no Lighthouse, no persona matrix,
+and no Realtime or Points.
+
+---
+
+## Session — Transactional Chat: the application half, and a seam where two correct layers did not meet
+
+**Date:** 2026-08-23 · **Branch:** `feature/engagement-notifications-points-core` · **Base:** `main` @ `34b06d4`
+
+The Chat Core database foundation landed earlier the same day (`b2854b2` specification, `5953233`
+tables + RLS + the three RPCs). This entry covers the **application and UI half** — the read layer, the
+mutation layer, the view model, the conversation list, the thread, and the three transactional entry
+points that reach them.
+
+### The thread lives in the header panel, because inventing a route was not this increment's decision
+
+`docs/database/chat-core.md` §3.5 records that **there is no `/chat` route** anywhere under
+`frontend/src/app`, and the specification establishes no canonical thread destination. So none was
+invented. A conversation opens **inside the existing header Chat panel**: the list is the panel body,
+and selecting a row replaces that body with the thread. The panel's geometry, width, anchoring,
+viewport clamp, Escape and outside-click behaviour are untouched — the change is exactly what
+`header-panels.tsx` predicted it would be when Notifications went through the same transition: a body
+swapped in behind the same heading, and a badge passed in. This placement is now approved for the Pilot.
+
+The seam from a record page to the panel is a `window` CustomEvent (`aladdin:chat-open`). The panel
+lives in the shared LAYOUT, which never sees `searchParams`, and which conversation is open is
+ephemeral UI state rather than a preference worth persisting. The event carries only a conversation id
+the server action just returned **for this caller**, so it grants nothing and can open nothing RLS
+would refuse.
+
+### The frontend re-implements no part of the authorization decision
+
+Access is already settled by the database: an active membership holding `conversation.participate` in
+one of the transaction's two organizations. So `server/queries/chat.ts` runs on the caller-scoped
+client and adds **no ownership predicate of its own**, and — unlike Notifications, which takes an
+optional `organization_id` as UX scope — **no organization id is an argument anywhere in the module**.
+A notification row carries one org column; a conversation carries TWO parties and neither is "the" org
+of the thread, so filtering on either here would re-implement half the database's party test in a
+second, divergenceable place. The active-workspace org enters only at the VIEW MODEL, where it decides
+which of two already-visible names to call the counterparty.
+
+The same rule governs the write path. All three mutations forward the caller's JWT to the approved
+`security definer` RPCs and pass **nothing else**: `open_conversation` derives both parties from the
+authoritative subject row, and `send_message` resolves sender user and sender organization from
+`auth.uid()` plus the conversation's own columns. Neither identity is a parameter, and there is no prop
+for one in either direction. A `42501` — suspended membership, withdrawn capability, changed context —
+collapses to **one neutral translated string** that names nothing about whether the conversation
+exists, because §7.6 makes "does not exist" and "exists but not yours" deliberately indistinguishable
+and the error text must not undo that.
+
+### Unread counts conversations, and never touches `public.messages`
+
+The badge is `last_message_at` vs the caller's own `last_read_at`, exactly as §11 specifies — no
+per-message receipts, and none may be added. Read state rides along as an RLS-gated embed, so a
+conversation the caller can no longer reach drops out of the count on its own and the badge can never
+count a thread the panel cannot open. Marking read fires only when a thread is **genuinely opened**
+(opening the panel marks nothing), then `router.refresh()` re-renders the route and its layouts so the
+badge reconciles without a browser reload.
+
+### The defect: two correct layers, one key, two spellings of it
+
+Found by looking at a screenshot, not by a failing test. Every conversation row rendered as bare
+"Order" with no counterparty and no record title, and every counterparty message was attributed to
+`· 05:18 PM` — a separator, a time, and no name.
+
+`resolveConversationDisplayContext` keys its map by **subject id** (it queries the commerce `_list`
+projections, which know nothing about conversations). `toConversationViews` looked that map up by
+**conversation id**. Both halves had passing unit tests, because each test agreed with its own half's
+idea of the key. Unit tests verify components; only a test that spans the boundary verifies that two
+correct components fit together — and there was no such test, so the feature rendered every label blank
+while the suite stayed green.
+
+Both sides now build the key through one exported `conversationSubjectKey(subjectType, subjectId)`,
+qualified by type because a bare subject id is ambiguous across three source tables. A new test drives
+the real resolver into the real view model with a conversation id deliberately unequal to the subject
+id, so the key can only be wrong in one place at a time again. The longer subject line this fix
+restored then wrapped the thread's back control onto two lines; `shrink-0 whitespace-nowrap` makes the
+subject truncate instead.
+
+### Deliberately not built
+
+No Realtime, no subscriptions, no presence, no typing — Chat works through persisted reads, sends and
+router refresh, and the realtime publication is untouched. No `message.sent` notification wiring: that
+is a separate increment after Chat is accepted, and the notifications CHECK constraint, event wiring
+and UI are unchanged. No project Chat subject — `projects` is 1:1 with `orders` and names the same two
+organizations, so a project page uses its parent order's conversation (§4.3); the entry-point
+component's type cannot even express `project`. No avatars, presence dots, message previews, tabs,
+search, filters or archive controls, and no bulk mark-all-read.
+
+### Validation
+
+typecheck · `eslint .` both clean, zero warnings. **116 unit tests** green across the chat query,
+action, view-model, panel and entry-point suites plus the directly affected notifications and i18n
+parity suites — covering ordering and bounds, chronological messages, the unread model in all three
+of its cases, that the actions call only the approved RPCs and never supply sender or organization
+identity, the composer's whitespace and 4000-character boundaries with the database still final
+authority, the pending-send gate, the zero-conversation empty state, unread carried without colour
+alone, badge correctness and reconciliation, AR and EN copy, and the cross-layer seam above.
+
+Real browser, real Email-OTP through Mailpit, production build, no auth bypass: **25 checks** across
+both parties of one real persisted order conversation — send, persistence after a full reload,
+mark-read with the badge reconciling without a reload, English LTR and Arabic RTL, light and dark, and
+a 393px phone where the panel stays inside the viewport in both the list and the thread. The honest
+ZERO state was verified as a user whose organization is party to no conversation, and the empty
+thread on an RFQ that genuinely had none — both reached the way a real user reaches them, rather than
+by deleting persisted rows to manufacture the state. Review harnesses and screenshots were temporary
+and are not committed.
+
+Per instruction: no full Playwright suite, no E2E matrix, no pgTAP re-run, no Lighthouse, no persona
+matrix.
+
+---
+
+## Session — Notifications Core: the read/UI half, and a shared panel that did not fit a phone
+
+**Date:** 2026-08-23 · **Branch:** `feature/engagement-notifications-points-core` · **Base:** `main` @ `34b06d4`
+
+The database half of Notifications Core landed in three earlier commits on this branch (`8fe74df` spec, `7a6a154` table + RLS, `619c8f3` event wiring). This entry covers the **read and UI half** — the queries, the mutations, the view model, the one list, and the two surfaces that render it — plus one shared-shell defect that only became visible once the panel had real content in it.
+
+### The read path adds no ownership check of its own, deliberately
+
+`public.notifications` carries exactly one RLS policy, `recipient_user_id = auth.uid()`, and no org-wide read path. So `server/queries/notifications.ts` runs on the caller-scoped client and adds **nothing**: there is no ownership filter to add that RLS has not already decided, and a duplicated check in TypeScript would only be a second place to get it wrong.
+
+`organization_id` appears in the query layer as an **optional UX argument**, never as authority. It scopes the list to the active work context; passing an org you do not belong to cannot widen an RLS-bounded result, only narrow it to zero rows. That is why the specification forbids the column from ever reaching a `USING` clause, and why the header passes it and a personal surface does not.
+
+Two reads, split on purpose. `countUnread` uses `head: true` — Postgres counts and returns the number in a header, transferring no rows. This runs on **every authenticated page render** to decide whether the bell carries a badge, so fetching twenty rows to learn one integer would have been the most-repeated waste in the shell. `listNotifications` is capped at 20 by construction: both surfaces are RECENT lists, not archives, and a cap means a runaway inbox degrades into a shorter list rather than a slower page.
+
+### Rows store i18n keys, and the badge counts the database
+
+Two decisions that look like detail and are not:
+
+- **A row stores `title_key` / `body_key` / `params`, never a rendered sentence.** Arabic is an MVP release language and a reader's locale can change *after* a row is written; storing "Nile Ceramics sent you a quotation" would freeze one language into a permanent record. `view-model.ts` builds the sentence at render time and never composes one of its own. It runs on the **server**, in the reader's locale, before the panel is ever opened — so the client receives finished strings and the i18n catalog stays out of the browser bundle for a panel most page views never open.
+- **A row the UI has no copy for still renders**, under a neutral translated fallback title, still carrying its deep link. Dropping it would make the header lie: `countUnread` counts rows in the *database*, so a dropped unread row leaves a badge reading "2" over a panel showing one item. Missing copy is a translation gap, not a reason to withhold someone's mail.
+
+The badge follows the same rule. `effectiveUnread` is the **server total minus what has been read since**, never a count of what happens to be on screen — a reader with thirty unread who opens one notice sees 29, not 19. Marking read fires the RPC and then `router.refresh()`, which re-renders the current route *and its layouts*, so the badge (which lives in the layout) updates with the list and without a browser reload. No `revalidatePath`: one broad enough to catch the header would expire the entire B2B subtree for a change that affects one number.
+
+### One list, two densities, and no button inside a link
+
+`notification-list.tsx` is **the** notification list. The header panel and the supply-dashboard block differ in DENSITY and in nothing else — same row, same unread cue, same deep link, same read-state behaviour. A dashboard block with its own row design would be a second thing to keep in step every time the shape of a notification changes.
+
+A row is a link, and the **whole row** is the link — not a link with a "mark read" button inside it. Nesting a button in an anchor is invalid HTML that browsers resolve inconsistently and screen readers announce as two overlapping targets. Marking read is a side effect of opening the notice, which is also the honest model: you have read it because you went and looked. The unread cue is a dot **and** a visually-hidden word, because colour alone cannot carry the distinction (WCAG 1.4.1) and a screen reader gets no signal from a coloured span.
+
+### The shared header panel did not fit a 393px phone, and the width cap could not have caught it
+
+Found in real-browser smoke, not by reading: at 393px the Notifications panel ran off the far edge of the screen and **clipped the start of every row** — in Arabic, the first word of every sentence.
+
+`headerPanelClass` is `absolute end-0 top-full mt-1 w-80`, which anchors the panel to its TRIGGER. That is the right relationship — a panel that detaches from the control that opened it reads as a different surface — but the trigger is not at the edge of the screen. Notifications sits fifth in a cluster of seven, roughly 130px in from the header's inline-end edge. A desktop header has room for the 320px panel to hang inward from there; a phone does not.
+
+**`menuSurfaceClass` already carries `max-w-[calc(100vw-1.5rem)]`, and that cap is exactly why this survived the pass that introduced it.** A max-width can only rescue a surface that is too WIDE. This one was the approved width and in the wrong PLACE, and no max-width moves a box.
+
+The fix is positioning only, in two files. The panel `<div>` moved out of `HeaderMenu` into a `HeaderPanelSurface` component — same markup, same classes, same z-layer — that corrects its own horizontal offset in `useLayoutEffect`: measure the natural box, and if either physical edge falls outside a 12px viewport gutter, `translateX` it back in by exactly that much. Three properties keep this a small fix rather than a positioning system:
+
+- **It is PHYSICAL, so there is no direction branch.** `getBoundingClientRect` and `translateX` are both left-to-right whatever `dir` says, so RTL and LTR overflow — exact mirror images, off opposite edges — collapse into one subtraction. A logical fix would have needed two cases and could only ever have been half tested.
+- **It is a no-op where it is not needed.** On a desktop header nothing falls outside the gutter, `dx` is 0, no transform is written, and the approved desktop geometry is not merely preserved but untouched.
+- **It has no breakpoint**, so it cannot drift the next time the control cluster gains or loses an icon — which is the change that would silently re-break a `tablet:` override.
+
+Rendered only while open, which is what lets it use `useLayoutEffect` with no isomorphic shim: `open` is false through SSR, so the measurement never runs on the server. All three panels (Notifications, Chat, Feedback) come from the one shell and are fixed together.
+
+The accepted mobile result is that the panel **docks to the screen gutter** below the header rather than sitting directly beneath its bell. A caret or a full-bleed phone sheet was considered and explicitly declined — that is a design change, not a positioning fix.
+
+### Validation
+
+Frontend typecheck ✓ · `eslint .` ✓ (0 errors, 0 warnings) · unit **375/375** across 37 files, of which **35 are new here** (21 panel/list tests covering the optimistic decrement, the "mark all" snapshot expiry and the degraded row; 14 view-model tests covering key resolution, money interpolation, the protocol-relative `//evil.example` deep link and the fallback title).
+
+Real browser, real Email-OTP through Mailpit, no auth bypass, against a production `next build` + `next start` — `rania@example.test` (Distributor):
+
+- **The badge decrement, at 393px.** 23 unread seeded against the 20-row list cap — the only arrangement in which "the badge counts server rows" and "the badge counts visible rows" give different answers. Badge read 23 on arrival, panel showed 20 rows, opening one notice left **exactly one** row with `read_at` set in the database, and the badge read 22 after the navigation *and* again after a cold reload. 23 → 22, server-side, not an optimistic illusion.
+- **The panel clamp, at 393px in both directions.** Notifications with 23 real rows in Arabic and English, plus a Chat and Feedback smoke in each: both physical edges inside `documentElement.clientWidth`, zero document overflow, every row measured individually (a legal panel box around still-spilling rows would pass a box-only check and look exactly as broken), and the panel still exactly 320px wide. At 1440 the assertion is the **absence** of an inline transform on all three panels, so "desktop anchoring preserved" is checked rather than intended.
+
+**Not run, per the brief:** full E2E, pgTAP (no schema change in this increment), Lighthouse, the persona matrix.
+
+### Unfinished / deliberately out of scope
+
+- **The two verification specs are not in the suite.** Both drive a notification fixture through an env var pointing at a scratchpad SQL file, so committing them would break a plain `pnpm e2e`. The badge-decrement spec is worth keeping as a permanent regression guard, but that needs the notification fixture to move into `supabase/demo-seed.sql` first. Not done here.
+- Realtime subscriptions, Chat, Points, notification preferences, digests, grouping, pagination and outbound delivery remain out of scope for this increment — see "Out of scope" in `docs/database/notifications-core.md`.
+- **Local Supabase note for the next session:** `supabase_inbucket_aladdin` (Mailpit) was not running at the start of this session and had to be started for the OTP path. It was removed again afterwards, so the container set is back to db · pg_meta · rest · auth · kong. Run `supabase start` before any E2E that signs in.
+
+---
+
 ## Session — Visual UAT fix round 1: Arabic numerals and the compact sidebar
 
 **Date:** 2026-08-18 · **Branch:** `feature/supply-side-b2b-mvp` (PR #34) · **Base:** `main`

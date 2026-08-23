@@ -16,6 +16,7 @@ import { Card, SectionTitle, Field, InlineError, InlineSuccess } from "@/compone
 import { Input, Select, LabeledField, SubmitButton, Button } from "@/components/ui/controls";
 import { PackageIcon, FileTextIcon } from "@/components/ui/icons";
 import { RfqStatusBadge } from "@/features/commerce/badges";
+import { OpenConversationButton } from "@/features/chat/open-conversation-button";
 import { formatDate, formatDateTime } from "@/lib/ui/format";
 import { formatQuantity } from "@/features/commerce/constants";
 import type { RfqRow, RfqItemRow } from "@/server/queries/commerce";
@@ -66,6 +67,13 @@ export function RfqDetail({
               {t("commerce.rfq.toSupplier", { supplier: supplierName })}
             </p>
           </div>
+          {/* One chat entry per screen, for either party — the conversation is a
+              property of THIS request, and the database decides who may open it.
+              Hidden on drafts: a draft is private to its owning side, so there
+              is nothing legitimate to open yet (chat-core.md §10.1). */}
+          {rfq.status !== "draft" ? (
+            <OpenConversationButton subjectType="rfq" subjectId={rfq.id} />
+          ) : null}
         </div>
         <dl className="mt-md grid grid-cols-2 gap-md tablet:grid-cols-4">
           <Field label={t("commerce.rfq.requester")}>{requesterName}</Field>

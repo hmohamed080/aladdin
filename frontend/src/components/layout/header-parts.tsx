@@ -36,6 +36,12 @@ export const headerIconClass = cn(
  * cap was originally written, and the menus that lacked it now share it from
  * one place. The z-layer deliberately stays with the caller: a header panel is
  * a `dialog` that must sit UNDER a modal, not a menu that sits over one.
+ *
+ * `end-0` anchors the panel to its TRIGGER, which on a phone is far enough in
+ * from the screen edge that 320px does not fit beside it. The horizontal
+ * position is therefore clamped into the viewport at open time by
+ * `HeaderPanelSurface` (`header-panels.tsx`) — the width here is the approved
+ * one and stays; only the offset moves, and only when it has to.
  */
 export const headerPanelClass = cn(menuSurfaceClass, "absolute end-0 top-full mt-1 w-80");
 

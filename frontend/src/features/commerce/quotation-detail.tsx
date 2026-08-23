@@ -15,6 +15,7 @@ import { Card, SectionTitle, Field, InlineError, InlineSuccess } from "@/compone
 import { Input, Textarea, LabeledField, SubmitButton, Button } from "@/components/ui/controls";
 import { ReceiptIcon, CheckIcon, XIcon } from "@/components/ui/icons";
 import { QuotationStatusBadge, ReadyForOrderBadge } from "@/features/commerce/badges";
+import { OpenConversationButton } from "@/features/chat/open-conversation-button";
 import { formatDate, formatDateTime } from "@/lib/ui/format";
 import { formatMoney, formatQuantity } from "@/features/commerce/constants";
 import type { QuotationRow, QuotationItemRow } from "@/server/queries/commerce";
@@ -71,6 +72,12 @@ export function QuotationDetail({
               {t("commerce.quotation.viewRfq")}
             </Link>
           </div>
+          {/* One chat entry per screen, for either party. Hidden on drafts — a
+              draft quotation is private to the supplier pricing it
+              (chat-core.md §10.1). */}
+          {quotation.status !== "draft" ? (
+            <OpenConversationButton subjectType="quotation" subjectId={quotation.id} />
+          ) : null}
         </div>
         <dl className="mt-md grid grid-cols-2 gap-md tablet:grid-cols-4">
           <Field label={t("commerce.rfq.supplier")}>{supplierName}</Field>

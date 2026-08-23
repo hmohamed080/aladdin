@@ -38,6 +38,10 @@ import {
   type FlowStage,
 } from "@/features/home/supply-blocks";
 import { PeriodSelect } from "@/features/home/period-select";
+import { listNotifications } from "@/server/queries/notifications";
+import { toNotificationViews } from "@/features/notifications/view-model";
+import { NotificationList } from "@/features/notifications/notification-list";
+import { createTranslator } from "@/lib/i18n/translate";
 import { formatCompactMoney, formatCount } from "@/lib/ui/format";
 import { supplyVoice } from "@/lib/workspace/supply-side";
 import {
@@ -136,35 +140,44 @@ export async function SupplyDashboard({
      window either way, so the reader is never guessing what they are looking at. */
   const movementDays = days ?? 365;
 
-  const [supply, products, incoming, undecided, accepted, orders, signals] = await Promise.all([
-    // One call covers every KPI, both rankings and the flow — they are all
-    // aggregates of the same three record sets, and `days` buys the
-    // period-over-period comparison from those same rows at no extra cost.
-    sells ? supplySummary(supabase, org.organizationId, {}, 6, days) : null,
-    managesCatalog
-      ? ownProductCounts(supabase, org.organizationId)
-      : Promise.resolve({ total: 0, published: 0, draft: 0 }),
-    // Six per stage, not five: the queue shows six rows when a single stage is
-    // filtered to, and a cap below that would make the filter look broken.
-    sells
-      ? recentRfqs(supabase, org.organizationId, "supplier", { statuses: ["submitted"], limit: 6 })
-      : Promise.resolve(EMPTY_LIST),
-    sells
-      ? recentQuotations(supabase, org.organizationId, "supplier", {
-          statuses: ["submitted"],
-          limit: 6,
-        })
-      : Promise.resolve(EMPTY_LIST),
-    sells
-      ? recentQuotations(supabase, org.organizationId, "supplier", {
-          statuses: ["accepted"],
-          limit: 6,
-        })
-      : Promise.resolve(EMPTY_LIST),
-    fulfils ? listOrders(supabase, org.organizationId, "supplier") : Promise.resolve([]),
-    // The two demand-reading blocks — opportunities and movement — in one call.
-    sells ? demandSignals(supabase, org.organizationId, movementDays, 5) : Promise.resolve(EMPTY_SIGNALS),
-  ]);
+  const [supply, products, incoming, undecided, accepted, orders, signals, notificationRows] =
+    await Promise.all([
+      // One call covers every KPI, both rankings and the flow — they are all
+      // aggregates of the same three record sets, and `days` buys the
+      // period-over-period comparison from those same rows at no extra cost.
+      sells ? supplySummary(supabase, org.organizationId, {}, 6, days) : null,
+      managesCatalog
+        ? ownProductCounts(supabase, org.organizationId)
+        : Promise.resolve({ total: 0, published: 0, draft: 0 }),
+      // Six per stage, not five: the queue shows six rows when a single stage is
+      // filtered to, and a cap below that would make the filter look broken.
+      sells
+        ? recentRfqs(supabase, org.organizationId, "supplier", { statuses: ["submitted"], limit: 6 })
+        : Promise.resolve(EMPTY_LIST),
+      sells
+        ? recentQuotations(supabase, org.organizationId, "supplier", {
+            statuses: ["submitted"],
+            limit: 6,
+          })
+        : Promise.resolve(EMPTY_LIST),
+      sells
+        ? recentQuotations(supabase, org.organizationId, "supplier", {
+            statuses: ["accepted"],
+            limit: 6,
+          })
+        : Promise.resolve(EMPTY_LIST),
+      fulfils ? listOrders(supabase, org.organizationId, "supplier") : Promise.resolve([]),
+      // The two demand-reading blocks — opportunities and movement — in one call.
+      sells ? demandSignals(supabase, org.organizationId, movementDays, 5) : Promise.resolve(EMPTY_SIGNALS),
+      /* The SAME persisted source the header panel reads, scoped to the same
+         workspace — five rows, because this is a block in a three-across row and
+         not an inbox. Ungated by capability on purpose: `notifications` is
+         recipient-scoped by RLS, so what arrives is already only this reader's
+         own mail. */
+      listNotifications(supabase, { orgId: org.organizationId, limit: 5 }),
+    ]);
+
+  const notifications = toNotificationViews(notificationRows, createTranslator(locale), locale);
 
   /* An accepted price with no order behind it is the most valuable stalled thing
      a seller owns: the buyer has already said yes. Asked as an exact lookup on
@@ -733,10 +746,24 @@ export async function SupplyDashboard({
               Icon={BellIcon}
               hint={m.supply.notifications.hint}
             >
-              <NotificationsEmpty
-                title={m.supply.notifications.empty}
-                body={m.supply.notifications.emptyBody}
-              />
+              {/* Zero stays the honest empty state that was built for it; the
+                  list simply takes its place once there is one. Same rows, same
+                  view model and same read-state behaviour as the header panel —
+                  denser, and without "mark all", which belongs to the inbox
+                  rather than to a dashboard summary of it. */}
+              {notifications.length === 0 ? (
+                <NotificationsEmpty
+                  title={m.supply.notifications.empty}
+                  body={m.supply.notifications.emptyBody}
+                />
+              ) : (
+                <NotificationList
+                  items={notifications}
+                  orgId={org.organizationId}
+                  dense
+                  showMarkAll={false}
+                />
+              )}
             </Panel>
 
             <Panel

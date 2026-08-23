@@ -834,13 +834,151 @@ export const en = {
   chat: {
     empty: {
       title: "No conversations yet",
-      body: "Messages with your suppliers, buyers and team will appear here.",
+      body: "Conversations on your requests, offers and orders will appear here.",
     },
+    /* Badge and row markers follow the language Notifications established:
+       a real count only, and unread carried by a dot AND a word so colour is
+       never the sole signal. */
+    unreadCount: "{count} unread",
+    unread: "Unread",
+    /* Transaction labels. A conversation is a property of a commercial record,
+       so every row names its record type first. */
+    subject: {
+      rfq: "Request for quotation",
+      quotation: "Quotation",
+      order: "Order",
+    },
+    thread: {
+      back: "All conversations",
+      empty: {
+        title: "No messages yet",
+        body: "Messages between the two organizations on this record will appear here.",
+      },
+      you: "You",
+    },
+    composer: {
+      label: "Your message",
+      placeholder: "Write a message…",
+      send: "Send",
+      sending: "Sending…",
+      tooLong: "A message cannot exceed {count} characters.",
+    },
+    error: {
+      access: "You no longer have access to this conversation.",
+    },
+    openFromRecord: "Open conversation",
+    openFromRecordSending: "Opening…",
   },
   notifications: {
     empty: {
       title: "No notifications yet",
       body: "Updates on your requests, offers and orders will appear here.",
+    },
+    /* Panel chrome. `unreadCount` names the badge for a screen reader, because
+       the badge itself is a bare numeral and a numeral alone does not say what
+       it counts. `unread` is the sr-only marker on a row, so unread/read is
+       legible without relying on the dot's colour. */
+    markAllRead: "Mark all as read",
+    markedAllRead: "All notifications marked as read",
+    unread: "Unread",
+    unreadCount: "{count} unread",
+    /* The one neutral stand-in, used when an event ships ahead of its copy. It
+       is a real translated string in both catalogs — the row stays visible and
+       still opens its record, so the unread badge never counts something the
+       reader cannot see. */
+    fallback: {
+      title: "Activity update",
+    },
+    /* Event copy. Every title/body pair below is addressed by the persisted
+       `title_key` / `body_key`, and the recipient is ALWAYS the counterparty —
+       never the side that acted — so each sentence is written from the reader's
+       side of the transaction. Placeholders match the `params` the emitting RPC
+       writes, exactly. */
+    rfq: {
+      submitted: {
+        title: "New request for quotation",
+        body: "{requester_name} asked you to price {item_count} lines.",
+      },
+      cancelled: {
+        title: "A request was cancelled",
+        body: "{requester_name} cancelled their request for quotation.",
+      },
+    },
+    quotation: {
+      submitted: {
+        title: "New quotation received",
+        body: "{supplier_name} sent you a quotation for {total}.",
+      },
+      accepted: {
+        title: "Your quotation was accepted",
+        body: "{requester_name} accepted your quotation of {total}.",
+      },
+      rejected: {
+        title: "Your quotation was not accepted",
+        body: "{requester_name} decided not to proceed with your quotation.",
+      },
+    },
+    order: {
+      created: {
+        title: "New order received",
+        body: "{requester_name} placed an order worth {total}.",
+      },
+      started: {
+        title: "Your order has started",
+        body: "{supplier_name} began work on your order.",
+      },
+      completed: {
+        title: "Your order is complete",
+        body: "{executing_name} finished the work on your order.",
+      },
+      cancelled: {
+        title: "An order was cancelled",
+        body: "{actor_name} cancelled the order.",
+      },
+    },
+    project: {
+      created: {
+        title: "A project was opened for your order",
+        body: "{executing_name} opened a project to carry out your order.",
+      },
+      activated: {
+        title: "Your project is under way",
+        body: "{executing_name} moved the project into execution.",
+      },
+      completed: {
+        title: "Your project is complete",
+        body: "{executing_name} marked the project as finished.",
+      },
+    },
+    verification: {
+      approved: {
+        title: "Your business is verified",
+        body: "Your verification request was approved.",
+      },
+      rejected: {
+        title: "Verification was declined",
+        body: "Your verification request was not approved. Open your organization page for the reason.",
+      },
+      changes_requested: {
+        title: "Verification needs changes",
+        body: "The review team asked for changes before your business can be verified.",
+      },
+    },
+    /* Transactional Chat. The body says THAT correspondence happened and who
+       from — never WHAT was said. The authored message is deliberately absent
+       from the notification's params, so there is nothing here to render it
+       with even by accident (chat-core.md §13.1).
+
+       It stays generic about the record rather than naming "this request" /
+       "this order", because one event type serves all three subjects and the
+       subject word would have to arrive as a param — which would mean the
+       database persisting an English noun into a row an Arabic reader may open.
+       The deep link already carries the specificity. */
+    message: {
+      sent: {
+        title: "New message",
+        body: "{counterparty_name} sent a new message about this transaction.",
+      },
     },
   },
   /* The composer is the SHELL of a composer: it shows exactly the surface the
@@ -1415,7 +1553,7 @@ export const en = {
       title: "Latest notifications",
       hint: "Alerts tied to your activity.",
       empty: "No notifications yet",
-      emptyBody: "Notifications are not switched on for your account yet. They will appear here once they are.",
+      emptyBody: "Alerts tied to your requests, offers and orders appear here as they happen.",
     },
     videos: {
       title: "Videos for your products",
