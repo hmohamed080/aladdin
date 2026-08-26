@@ -38,7 +38,13 @@ export default async function B2BHomePage({
   if (!ctx) return null;
 
   return commerceStance(ctx.org.orgType) === "seller" ? (
-    <SupplyDashboard ctx={ctx} period={one(params.period)} stage={one(params.stage)} />
+    <SupplyDashboard
+      ctx={ctx}
+      period={one(params.period)}
+      stage={one(params.stage)}
+      sort={one(params.sort)}
+      demandWindow={one(params.demandWindow)}
+    />
   ) : (
     <BuyerDashboard ctx={ctx} />
   );

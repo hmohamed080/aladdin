@@ -31,6 +31,7 @@ export const ar: Messages = {
     more: "المزيد",
     open: "فتح",
     close: "إغلاق",
+    refresh: "تحديث",
     actions: "إجراءات",
     saveChanges: "حفظ التغييرات",
     confirm: "تأكيد",
@@ -1517,18 +1518,27 @@ export const ar: Messages = {
       new: "جديد",
       empty: "لا توجد حركة في هذه الفترة",
       emptyBody: "تظهر هنا الأصناف الأكثر طلبا فور وصول طلبات إلى نشاطك.",
+      viewAll: "عرض تقرير الطلب على المواد",
     },
     notifications: {
       title: "أحدث الإشعارات",
       hint: "التنبيهات المرتبطة بنشاطك.",
       empty: "لا توجد إشعارات بعد",
       emptyBody: "تظهر هنا التنبيهات المرتبطة بطلباتك وعروضك وأوامرك فور حدوثها.",
+      viewAll: "عرض كل النشاط",
     },
     videos: {
       title: "فيديوهات لمنتجاتك",
       hint: "مقاطع قصيرة تعرض منتجاتك على المشترين.",
       empty: "لا توجد فيديوهات بعد",
       emptyBody: "لا يدعم كتالوجك حاليا سوى صورة واحدة لكل منتج. ستظهر المقاطع هنا فور إتاحتها.",
+    },
+    reels: {
+      title: "فيديوهات المنتجات (Reels)",
+      viewAll: "عرض الكل",
+      addNew: "إضافة فيديو جديد",
+      views: "مشاهدة",
+      likes: "إعجاب",
     },
     attention: {
       title: "ينتظر تصرفك الآن",
@@ -1544,6 +1554,10 @@ export const ar: Messages = {
         order: "لإنشاء طلبية",
         fulfil: "للتنفيذ",
       },
+      typeFilter: "كل الأنواع",
+      dueDateLabel: "تاريخ الاستحقاق",
+      dueDateSorted: "الأقرب استحقاقا أولا",
+      viewAll: "عرض كل الطلبات المفتوحة",
       column: { status: "الحالة" },
       amount: "القيمة",
       date: {
@@ -1566,6 +1580,7 @@ export const ar: Messages = {
       quotations: "أسعار مرسلة",
       orders: "طلبيات",
       catalogue: "كتالوجك",
+      viewAll: "عرض كل الطلبيات",
     },
     tile: {
       demandIn: "طلبات واردة",
@@ -1595,6 +1610,8 @@ export const ar: Messages = {
       subtitle: "الطلبات المرسلة إلى نشاطك، وما قمت بالرد عليه.",
       empty: "لا توجد طلبات تنتظر ردك الآن.",
       emptyBody: "المنتجات المنشورة هي ما يقود المشترين إليك. حافظ على تحديث كتالوجك.",
+      today: "اليوم",
+      viewAll: "عرض كل الطلبات الواردة",
     },
     quotations: {
       title: "عروض الأسعار",
@@ -1694,7 +1711,6 @@ export const ar: Messages = {
       noActiveOrders: "لا يوجد شيء قيد التنفيذ",
       noActiveOrdersBody: "ستظهر هنا الطلبيات التي تقوم بتنفيذها.",
     },
-    scopeNote: "كل رقم هنا يحسب سجلات نشاطك طرف فيها، ويمكنك فتح السجل الذي وراءه.",
   },
 
   customers: {

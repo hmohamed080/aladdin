@@ -1,0 +1,18 @@
+# The design-fidelity capture directory.
+#
+# NOTHING in here is source. The PNGs are evidence for a human eye, regenerated
+# by `node design-lab/pass.mjs` in about a minute, and they are large. They are
+# left untracked deliberately.
+#
+# `.session.json` is the reason this file exists rather than a line in the
+# repo-root ignore: it is a COOKIE JAR. The captures need a signed-in workspace,
+# so `design-lab/session.mjs` walks the real passwordless flow once and caches
+# the resulting session cookies here. They belong to a seeded synthetic identity
+# on a local Supabase and are worthless anywhere else — but a live session token
+# is still a live session token, and `git add -A` in this directory must not be
+# the only thing standing between it and a public history.
+*
+
+# ...except this rule, which has to travel with the directory to be worth
+# anything. Without it the `*` above hides the protection itself.
+!.gitignore

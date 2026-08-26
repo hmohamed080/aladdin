@@ -5,6 +5,24 @@ colors:
   basalt: "#0E1113"
   basalt-2: "#1B2226"
   basalt-3: "#232B30"
+  navy: "#001537"
+  navy-lit: "#012045"
+  navy-deep: "#000E26"
+  navy-edge: "#153860"
+  navy-text: "#F2F5FA"
+  navy-text-secondary: "#A8B8CE"
+  navy-text-muted: "#7E90AB"
+  # The B2B workspace FRAME: three grounds in a fixed order — frame darkest
+  # (the gutter beside the sidebar and the margin around the cards), workspace
+  # above it (the surface the page is composed on), panels above that
+  # (unchanged `surface`). That order is what makes the header card and the body
+  # read as floating rather than as two regions of one flat page. Cool, because
+  # a warm grey beside the saturated navy reads as two pasted images.
+  # NB the name: a `body` colour token would collide with the `body` TYPE step
+  # and make `text-body` mean two things.
+  frame: "#DDE4F0"
+  frame-2: "#ECEEF4"
+  workspace: "#EFF1F6"
   limestone: "#F4F1EA"
   plaster: "#FBF9F4"
   sand: "#EAE5DB"
@@ -84,6 +102,15 @@ typography:
     fontWeight: 500
     lineHeight: 1.2
     letterSpacing: "0.02em"
+  # The METADATA step, below label. Dates, counts, comparison lines and the
+  # secondary line of a dense row. Regular weight: it earns its place by size
+  # and colour, and a bolder small step would just be a second label.
+  caption:
+    fontFamily: "Readex Pro, system-ui, sans-serif"
+    fontSize: "0.75rem"
+    fontWeight: 400
+    lineHeight: 1.35
+    letterSpacing: "0.01em"
   mono:
     fontFamily: "JetBrains Mono, ui-monospace, monospace"
     fontSize: "0.8125rem"

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { PageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
 import {
@@ -6,43 +5,65 @@ import {
   recentQuotations,
   ownProductCounts,
   demandSignals,
+  listOwnProducts,
   type RfqListRow,
   type QuotationListRow,
 } from "@/server/queries/commerce";
 import { listOrders, quotationsWithOrders } from "@/server/queries/execution";
 import { supplySummary } from "@/server/queries/reports";
 import { resolvePeriod, periodDays, type PeriodKey } from "@/lib/workspace/period";
+import { type Kpi, type KpiDelta } from "@/components/ui/workspace-layout";
+import { RankedBars, DonutSplit } from "@/components/ui/charts";
 import {
-  PageHead,
-  KpiStrip,
-  Row,
-  Panel,
-  type Kpi,
-  type KpiDelta,
-} from "@/components/ui/workspace-layout";
-import { RankedBars } from "@/components/ui/charts";
-import {
-  AttentionQueue,
-  AttentionCount,
   AttentionFilter,
   type AttentionItem,
   type AttentionKind,
 } from "@/features/home/supply-attention";
 import {
-  OpportunityList,
-  MarketMovement,
-  WorkflowFlow,
   NotificationsEmpty,
-  ProductVideosEmpty,
   BlockEmpty,
   type FlowStage,
 } from "@/features/home/supply-blocks";
 import { PeriodSelect } from "@/features/home/period-select";
+import { ViewActivityAction } from "@/features/home/notifications-footer-link";
+import { StageSelect } from "@/features/home/stage-select";
+import { BoardMenu } from "@/features/home/board-menu";
+import {
+  Board,
+  BoardCount,
+  BoardOut,
+  DashboardHead,
+  PrimaryAction,
+  SecondaryAction,
+  MetricStrip,
+  AttentionBoard,
+  IncomingRail,
+  MovingBoard,
+  ActivityBoard,
+  PipelineTrack,
+  HeaderToggle,
+  ReelsBoard,
+  type Metric,
+  type MetricTone,
+  type AttentionRow,
+  type IncomingRow,
+  type MovingRow,
+  type ActivityRow,
+  type PipelineStage,
+  type ReelItem,
+} from "@/features/home/supply-boards";
 import { listNotifications } from "@/server/queries/notifications";
 import { toNotificationViews } from "@/features/notifications/view-model";
-import { NotificationList } from "@/features/notifications/notification-list";
 import { createTranslator } from "@/lib/i18n/translate";
-import { formatCompactMoney, formatCount } from "@/lib/ui/format";
+import {
+  formatCompactMoney,
+  formatCount,
+  formatDate,
+  formatDateShort,
+  formatPercent,
+  formatQuantity,
+  formatRelativeTime,
+} from "@/lib/ui/format";
 import { supplyVoice } from "@/lib/workspace/supply-side";
 import {
   DemandIcon,
@@ -52,14 +73,13 @@ import {
   MoneyIcon,
   StorefrontIcon,
   ActivityIcon,
-  GaugeIcon,
   PlusIcon,
   BarChartIcon,
   AlertIcon,
   CheckIcon,
   TrendingUpIcon,
   BellIcon,
-  VideoIcon,
+  CalendarIcon,
 } from "@/components/ui/icons";
 
 /**
@@ -106,19 +126,31 @@ export async function SupplyDashboard({
   ctx,
   period: rawPeriod,
   stage: rawStage,
+  sort: rawSort,
+  demandWindow: rawDemandWindow,
 }: {
   ctx: PageContext;
   /** From the URL — validated here, never trusted. */
   period?: string;
   stage?: string;
+  /** DESIGN-LAB PROTOTYPE — the attention board's "Due date" header toggle. */
+  sort?: string;
+  /** DESIGN-LAB PROTOTYPE — the incoming-demand board's "Today" header toggle. */
+  demandWindow?: string;
 }) {
-  const { supabase, org, locale } = ctx;
+  const { supabase, org, locale, designLabAtmosphere } = ctx;
   const m = getMessages(locale);
   const voice = supplyVoice(org.orgType);
 
   const period = resolvePeriod(rawPeriod);
   const days = periodDays(period);
   const stage = resolveStage(rawStage);
+  /* Both header toggles below are gated to the design-lab account: the
+     controls that set these params only render for fady, so no other
+     account's dashboard can produce a URL that reaches this branch — but
+     gating the READ too means a hand-typed query string cannot do it either. */
+  const sortDue = designLabAtmosphere && rawSort === "due";
+  const demandToday = designLabAtmosphere && rawDemandWindow === "today";
 
   const caps = new Set(org.capabilities);
   const superUser = caps.has("org.manage");
@@ -140,7 +172,7 @@ export async function SupplyDashboard({
      window either way, so the reader is never guessing what they are looking at. */
   const movementDays = days ?? 365;
 
-  const [supply, products, incoming, undecided, accepted, orders, signals, notificationRows] =
+  const [supply, products, incoming, undecided, accepted, orders, signals, notificationRows, reelProducts] =
     await Promise.all([
       // One call covers every KPI, both rankings and the flow — they are all
       // aggregates of the same three record sets, and `days` buys the
@@ -175,6 +207,12 @@ export async function SupplyDashboard({
          recipient-scoped by RLS, so what arrives is already only this reader's
          own mail. */
       listNotifications(supabase, { orgId: org.organizationId, limit: 5 }),
+      /* DESIGN-LAB PROTOTYPE — see `app/b2b/layout.tsx`. The Reels module's
+         real product photos, for fady@example.test only; every other
+         account pays nothing extra for a query it never renders. */
+      designLabAtmosphere && managesCatalog
+        ? listOwnProducts(supabase, org.organizationId, { status: "published" })
+        : Promise.resolve([]),
     ]);
 
   const notifications = toNotificationViews(notificationRows, createTranslator(locale), locale);
@@ -445,6 +483,17 @@ export async function SupplyDashboard({
         .flatMap((k) => byStage[k].slice(0, 3))
         .slice(0, 6);
 
+  /* DESIGN-LAB "Due date" header toggle — resorts the SAME six rows already
+     selected above by their own date, soonest first. Not a new query: every
+     row already carries the one date that matters for its stage: */
+  if (sortDue) {
+    attention.sort((a, b) => {
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+  }
+
   /* The chip counts come from the queries' EXACT totals where one exists, not
      from the fetched page — a seat with fifty unpriced requests must not see a
      chip reading "6" beside a tile reading "50". The two derived stages have no
@@ -458,29 +507,18 @@ export async function SupplyDashboard({
     { key: "fulfil", label: at.stage.fulfil, count: activeOrders.length },
   ];
 
-  /* Parameters a stage chip must carry forward, so filtering the queue cannot
-     silently reset the period the strip above it is showing. The default period
-     carries none, which keeps the plain dashboard URL clean. */
-  const carry: Record<string, string> = period === "30d" ? {} : { period };
-
-  /**
-   * The "go to the module that owns this" link every panel carries.
-   *
-   * `text-accent`, which is the EMPHASIS-LINK convention across the whole
-   * product — auth, directory, commerce and the buyer dashboard's own `seeAll`
-   * all draw it this way. A dashboard that invents its own link colour teaches
-   * the reader that a link here is a different kind of thing from a link one
-   * route over, which it is not.
-   *
-   * What keeps eight of them from shouting is not their hue but the company
-   * they keep: the panels behind them are neutral, so a link is the only marked
-   * thing in each header rather than one warm note among several.
-   */
-  const seeAll = (href: string, label: string) => (
-    <Link href={href} className="text-label font-medium text-accent hover:underline">
-      {label} →
-    </Link>
-  );
+  /* Parameters a header control must carry forward, so changing ONE of them
+     cannot silently reset another — a stage chip changing the period, or the
+     "Due date" toggle dropping a stage filter. Each control's own href
+     builder still sets/deletes its OWN param on top of this; the point is
+     that every OTHER param already reflects the current URL. Defaults carry
+     nothing, which is what keeps the plain dashboard URL clean. */
+  const carry: Record<string, string> = {
+    ...(period !== "30d" ? { period } : {}),
+    ...(stage ? { stage } : {}),
+    ...(sortDue ? { sort: "due" } : {}),
+    ...(demandToday ? { demandWindow: "today" } : {}),
+  };
 
   /** The commerce lifecycle, counted. Real stages, real counts, no new domain. */
   const flow: FlowStage[] = supply
@@ -530,96 +568,299 @@ export async function SupplyDashboard({
       ]
     : [];
 
-  const periodLabel = m.supply.period[period];
+  /* ------------------------------------------------------------------
+     FROM FIGURES TO BOARDS
+
+     Everything below this line is PRESENTATION. Not one query moves, not one
+     capability gate changes, and no figure is recomputed — the strip, the queue
+     and the flow are the same values assembled above, re-shaped for the boards
+     that draw them. That separation is the whole reason the visual rebuild
+     could be this large without touching a contract.
+     ------------------------------------------------------------------ */
+
+  /* KpiTone carries two tones the metric chips have no use for. `warning` folds
+     into `accent` (both are the warm chip) and anything unrecognised falls to
+     neutral, so a new tone upstream degrades to a grey chip rather than to no
+     chip at all. */
+  const chipTone = (t: Kpi["tone"]): MetricTone =>
+    t === "warning" || t === "accent"
+      ? "accent"
+      : t === "success" || t === "danger" || t === "info" || t === "iris"
+        ? t
+        : "neutral";
+
+  const metrics: Metric[] = kpis.map((k, idx) => ({
+    key: `${idx}-${k.label}`,
+    label: k.label,
+    /* Counts arrive as numbers and money arrives pre-formatted, because money
+       had to be compacted where it was computed. Both end as strings here so
+       the board layer never has to know which is which. */
+    value: typeof k.value === "number" ? formatCount(k.value, locale) : String(k.value),
+    Icon: k.Icon,
+    tone: chipTone(k.tone),
+    delta: k.delta
+      ? {
+          /* The sign is carried by the arrow and the colour, so the number is
+             printed unsigned — "▼ 8%" rather than "▼ -8%", which reads as a
+             double negative. */
+          text: formatPercent(Math.abs(k.delta.pct), locale),
+          better: k.delta.better,
+          label: k.delta.label,
+        }
+      : undefined,
+    foot: k.foot,
+    /* The one metric that is a live backlog rather than a period flow marks
+       itself when it is non-zero — see the `kpis` block above. */
+    footTone: k.tone === "danger" ? "warning" : "muted",
+    href: k.href,
+  }));
+
+  /* The material images and the buyer's actual lines, indexed by request.
+
+     Both come from `signals.open`, which is ALREADY FETCHED for the incoming
+     rail — this is a regrouping of rows in hand, not a second read. Only
+     unpriced requests are covered, so only `price` rows can carry a photo;
+     every other stage falls through to ProductMedia's own "no image" panel,
+     which is the honest outcome rather than a placeholder standing in for one. */
+  const imageByRfq = new Map<string, string>();
+  const linesByRfq = new Map<string, { name: string; quantity: string; imageRef: string | null }[]>();
+  for (const line of signals.open) {
+    if (line.imageRef && !imageByRfq.has(line.rfqId)) imageByRfq.set(line.rfqId, line.imageRef);
+    const bucket = linesByRfq.get(line.rfqId) ?? [];
+    bucket.push({
+      name: line.productName,
+      quantity: `${formatQuantity(line.quantity, locale)} ${m.commerce.units[line.unit]}`,
+      imageRef: line.imageRef,
+    });
+    linesByRfq.set(line.rfqId, bucket);
+  }
+
+  /* The record id, recovered from the queue key.
+
+     The key is built directly above as `${kind}-${id}`, and no kind contains a
+     hyphen, so the first hyphen is the boundary. Reading it back here rather
+     than widening `AttentionItem` keeps the id out of a view model that has no
+     other use for it — the queue navigates by `href`, not by id. */
+  const recordId = (key: string) => key.slice(key.indexOf("-") + 1);
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const attentionRows: AttentionRow[] = attention.map((a) => {
+    const id = recordId(a.key);
+    /* Overdue is only meaningful where the date is a DEADLINE. A required-by
+       date and a validity date are both promises about the future, so a past one
+       is a fault; an accepted-on or confirmed-on date is a record of the past and
+       is supposed to have happened already. Painting the latter red would mark
+       every healthy order in the queue. */
+    const deadline = a.kind === "price" || a.kind === "chase";
+    return {
+      key: a.key,
+      stage: at.stage[a.kind],
+      tone: chipTone(a.tone),
+      title: a.title,
+      customer: a.customer,
+      imageRef: imageByRfq.get(id) ?? null,
+      dateLabel: a.dateLabel,
+      /* The row's column gets day-and-month; the expanded region, which has
+         the width, keeps the full date. Same instant, two readings. */
+      date: formatDateShort(a.date, locale),
+      dateLong: formatDate(a.date, locale),
+      overdue: deadline && !!a.date && new Date(a.date) < startOfToday,
+      /* Money where the stage has money, the line count where it does not.
+         Only the money gets a caption: "Value / EGP 132K" needs one, and
+         "1 items" is already its own caption. */
+      figureLabel: a.amount ? a.amountLabel : undefined,
+      figure: a.amount ?? a.meta,
+      status: a.status,
+      href: a.href,
+      cta: a.cta,
+      lines: linesByRfq.get(id),
+    };
+  });
+
+  /* DESIGN-LAB "Today" header toggle — filters the SAME already-fetched rows
+     by a field they already carry (`createdAt`, used two lines below for the
+     relative-time caption regardless), rather than a second, day-scoped query. */
+  const incomingSource = demandToday
+    ? signals.open.filter((line) => !!line.createdAt && new Date(line.createdAt) >= startOfToday)
+    : signals.open;
+
+  const incomingRows: IncomingRow[] = incomingSource.slice(0, 5).map((line, idx) => ({
+    key: `${line.rfqId}-${idx}`,
+    productName: line.productName,
+    buyer: line.buyer,
+    /* When it arrived. The reference prints a record number and a relative
+       time here; these records have no human-readable number, and the request's
+       own title — the only other candidate — is both long enough to truncate in
+       this column and largely a restatement of the product name one line above. */
+    meta: formatRelativeTime(line.createdAt, locale),
+    imageRef: line.imageRef,
+    href: `/b2b/rfqs/${line.rfqId}`,
+    open: true,
+  }));
+
+  /* Bars are scaled against the BUSIEST row, so `peak` is the denominator. */
+  const peak = Math.max(1, ...signals.movement.map((r) => r.requests));
+  const movingRows: MovingRow[] = signals.movement.slice(0, 5).map((r) => ({
+    name: r.name,
+    requests: formatCount(r.requests, locale),
+    share: r.requests / peak,
+    /* No previous window, or an empty one, means there is no movement to
+       report — not 0% and not "new" dressed up as growth. The cell prints an
+       em dash and the row still ranks. */
+    change:
+      r.previous > 0
+        ? formatPercent(Math.abs(((r.requests - r.previous) / r.previous) * 100), locale)
+        : null,
+    changeBetter: r.previous > 0 ? r.requests >= r.previous : null,
+  }));
+
+  /* DESIGN-LAB Reels module — real products, real photos. Skips anything
+     with no `image_ref`: the whole point of standing a photo in for a video
+     frame is that it IS a real frame, not a grey placeholder pretending to
+     be one. */
+  const reelItems: ReelItem[] = reelProducts
+    .filter((p) => p.image_ref)
+    .slice(0, 6)
+    .map((p) => ({ id: p.id, title: p.name, imageRef: p.image_ref, href: `/b2b/products/${p.id}` }));
+
+  const activityRows: ActivityRow[] = notifications.slice(0, 5).map((n) => ({
+    key: n.id,
+    title: n.title,
+    timeAgo: n.timeAgo,
+    timestamp: n.timestamp,
+    href: n.href,
+    unread: n.unread,
+  }));
+
+  const pipelineStages: PipelineStage[] = flow.map((f) => ({
+    key: f.key,
+    label: f.label,
+    value: formatCount(f.value, locale),
+    Icon:
+      f.key === "incoming"
+        ? DemandIcon
+        : f.key === "quoted"
+          ? FileTextIcon
+          : f.key === "accepted"
+            ? CheckIcon
+            : f.key === "ordered"
+              ? ClipboardIcon
+              : ActivityIcon,
+    href: f.href,
+  }));
+
+  /* Active orders by state — the same three counts the flow above is built
+     from, split rather than summed, so the pipeline board answers "how many"
+     and "in what condition" in one place. */
+  const orderSlices = supply
+    ? [
+        { label: m.execution.orderStatus.confirmed, value: supply.orders.confirmed ?? 0 },
+        { label: m.execution.orderStatus.in_progress, value: supply.orders.in_progress ?? 0 },
+        { label: m.execution.orderStatus.completed, value: supply.orders.completed ?? 0 },
+      ]
+    : [];
 
   return (
-    <div className="flex flex-col gap-md pb-16 tablet:pb-0">
-      <PageHead
-        locale={locale}
-        /* This page opens on a live instrument panel, so the band above it gives
-           back the padding a reading page wants. Hierarchy is untouched — only
-           the air below the subtitle and around the actions. */
-        density="compact"
-        Icon={GaugeIcon}
-        eyebrow={`${m.home.greeting} · ${org.organizationName}`}
+    <div className="flex flex-col gap-3 pb-16 tablet:pb-0">
+      <DashboardHead
         title={m.supply.title}
         /* The one line on the page that differs between a Distributor, a
            Manufacturer and an Importer. Everything below is identical. */
         subtitle={m.supply.voice[voice].subtitle}
-        toolbar={seeAll("/b2b/reports", m.home.openReports)}
         actions={
-          managesCatalog ? (
-            <Link
-              href="/b2b/products/new"
-              /* Lumen, the brand ACTION colour, on the page's one primary
-                 action — which is what that colour is for and the only thing it
-                 is for. Every decorative amber on this dashboard has been spent
-                 elsewhere; this one stays. */
-              className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-sm bg-accent-solid px-md py-1.5 text-label font-medium text-brand-basalt shadow-sm transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-            >
-              <PlusIcon size={16} />
-              {m.commerce.products.new}
-            </Link>
-          ) : undefined
+          <>
+            {/* The period control sits WITH the actions rather than inside the
+                metric panel, because the metric panel no longer has a header to
+                put it in — it is one continuous region now, and a control
+                floating inside it would read as belonging to whichever cell it
+                happened to land beside. Here it is plainly a page-level scope,
+                which is what it is.
+
+                DESIGN-LAB PROTOTYPE GATE — see `app/b2b/layout.tsx`. Pulled out
+                of this row for fady@example.test on direct request (it was
+                circled as visually competing with "+ New product"); every
+                other account keeps it exactly where it always was. The period
+                still resolves from the URL the same way — nothing about what
+                the dashboard queries or computes changed, only where this one
+                control is drawn. */}
+            {designLabAtmosphere ? null : (
+              <PeriodSelect
+                value={period}
+                basePath="/b2b"
+                label={m.supply.period.label}
+                options={PERIODS.map((k) => ({ value: k, label: m.supply.period[k] }))}
+              />
+            )}
+            {managesCatalog ? (
+              <PrimaryAction href="/b2b/products/new">
+                <PlusIcon size={16} />
+                {m.commerce.products.new}
+              </PrimaryAction>
+            ) : null}
+            <SecondaryAction href="/b2b/reports">
+              <BarChartIcon size={16} />
+              {m.home.openReports}
+            </SecondaryAction>
+          </>
         }
       />
 
-      {/* ROW 1 — the instrument panel. The period control lives INSIDE the
-          strip's own header, because it scopes exactly these figures and nothing
-          else on the page: the queues below are live work and must not be
-          filtered by a date window. */}
-      <KpiStrip
-        locale={locale}
-        items={kpis}
-        columns={5}
-        title={m.supply.section.overview}
-        toolbar={
-          <PeriodSelect
-            value={period}
-            basePath="/b2b"
-            label={m.supply.period.label}
-            options={PERIODS.map((k) => ({ value: k, label: m.supply.period[k] }))}
-          />
-        }
-      />
+      <MetricStrip items={metrics} />
 
       {supply ? (
         <>
-          {/* ROW 2 — what needs me, beside what is being asked of me.
-              `wide-lead` (5:2), not `lead` (3:2), and the difference is a
-              measured defect rather than a preference. The queue switches to its
-              single-line row form at the `wide` VIEWPORT breakpoint, but the
-              width that form actually needs is a CONTAINER width of ~800px. On a
-              1440px display a 3:2 track gave it ~700px, so the row form engaged
-              in a column too narrow to hold it and every date in the queue
-              truncated mid-word ("١٠ سبتم…", "تاريخ الت…"). At 5:2 the same
-              display gives it ~820px and every cell renders whole. */}
-          <Row cols="wide-lead">
-            <Panel
-              fill
-              tone="danger"
-              bodyClassName="flex flex-col"
-              title={at.title}
+          {/* ROW 1 — what needs me, beside what is arriving.
+
+              The ratio is the reference's: the attention board takes roughly
+              five parts to the rail's three. It is not a preference — the board
+              carries a date, a figure and a status per row and stops being
+              readable under about 640px, while the rail carries three lines of
+              text and is comfortable at 380. Splitting the difference evenly
+              would break the one that matters. */}
+          <div className="grid min-w-0 gap-3 wide:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)]">
+            <Board
+              title={m.supply.section.attention}
               Icon={AlertIcon}
               badge={
-                attention.length > 0 ? (
-                  <AttentionCount
-                    count={attention.length}
-                    locale={locale}
-                    tone={attention[0]?.tone ?? "accent"}
-                  />
+                attention.length > 0 ? <BoardCount>{formatCount(attention.length, locale)}</BoardCount> : null
+              }
+              controls={
+                designLabAtmosphere ? (
+                  <>
+                    <StageSelect
+                      value={stage}
+                      basePath="/b2b"
+                      label={at.stage.all}
+                      allLabel={at.typeFilter}
+                      options={stageCounts.map((s) => ({ key: s.key, label: s.label }))}
+                      query={carry}
+                    />
+                    <HeaderToggle
+                      Icon={CalendarIcon}
+                      label={sortDue ? at.dueDateSorted : at.dueDateLabel}
+                      active={sortDue}
+                      href={toggleHref("/b2b", carry, "sort", sortDue, "due")}
+                    />
+                    <BoardMenu
+                      label={m.supply.section.attention}
+                      refreshLabel={m.common.refresh}
+                      viewAllLabel={at.viewAll}
+                      viewAllHref={stageHref(stage)}
+                    />
+                  </>
                 ) : null
               }
-              action={seeAll(stageHref(stage), m.common.more)}
+              footer={<BoardOut href={stageHref(stage)} label={m.supply.attention.viewAll} />}
             >
-              {/* The filter sits ABOVE the queue, inside the panel body. It is a
-                  control over the list, and a control that appears after the
-                  thing it controls has already been read is a control nobody
-                  uses. It is in the body rather than the header because the
-                  header already carries a title, a count badge and the "more"
-                  link — a fourth element there wraps it onto two lines at
-                  laptop width. */}
-              <div className="mb-3">
+              {/* The filter sits inside the board, directly under its header. It
+                  is a control over the list, and a control that appears after
+                  the list it controls has already been read is a control nobody
+                  uses. It is not in the header because the header already holds
+                  a title and a count, and five stage chips beside them wrap onto
+                  a second line at board width. */}
+              <div className="px-4 pb-2.5 tablet:px-5">
                 <AttentionFilter
                   stages={stageCounts}
                   active={stage}
@@ -630,13 +871,15 @@ export async function SupplyDashboard({
                 />
               </div>
 
-              <AttentionQueue
-                items={attention}
-                locale={locale}
-                labels={at.column}
+              <AttentionBoard
+                rows={attentionRows}
+                labels={{
+                  requirements: m.supply.opportunities.quantity,
+                  buyer: m.supply.opportunities.buyer,
+                }}
                 empty={
                   /* An empty queue is a WIN, not a missing feature, and it is
-                     drawn as one — the same panel with a tick in it, rather than
+                     drawn as one — the same board with a tick in it, rather than
                      the apologetic "nothing here yet" an empty list usually
                      gets. A FILTERED empty queue says something different: the
                      stage is clear, not the whole board. */
@@ -647,29 +890,33 @@ export async function SupplyDashboard({
                   />
                 }
               />
-            </Panel>
+            </Board>
 
-            <Panel
-              fill
-              tone="info"
-              bodyClassName="flex flex-col"
-              title={m.supply.opportunities.title}
-              Icon={TrendingUpIcon}
-              hint={m.supply.opportunities.hint}
-              action={seeAll("/b2b/rfqs", m.common.more)}
+            <Board
+              title={m.supply.demand.title}
+              Icon={DemandIcon}
+              controls={
+                designLabAtmosphere ? (
+                  <>
+                    <HeaderToggle
+                      Icon={CalendarIcon}
+                      label={m.supply.demand.today}
+                      active={demandToday}
+                      href={toggleHref("/b2b", carry, "demandWindow", demandToday, "today")}
+                    />
+                    <BoardMenu
+                      label={m.supply.demand.title}
+                      refreshLabel={m.common.refresh}
+                      viewAllLabel={m.supply.demand.viewAll}
+                      viewAllHref="/b2b/rfqs"
+                    />
+                  </>
+                ) : null
+              }
+              footer={<BoardOut href="/b2b/rfqs" label={m.supply.demand.viewAll} />}
             >
-              <OpportunityList
-                lines={signals.open}
-                locale={locale}
-                unitLabel={(u) => m.commerce.units[u]}
-                labels={{
-                  quantity: m.supply.opportunities.quantity,
-                  buyer: m.supply.opportunities.buyer,
-                  required: at.date.required,
-                  status: m.supply.opportunities.status,
-                  cta: m.supply.opportunities.cta,
-                  more: m.supply.opportunities.more,
-                }}
+              <IncomingRail
+                rows={incomingRows}
                 empty={
                   <BlockEmpty
                     icon={<TrendingUpIcon size={20} />}
@@ -678,56 +925,21 @@ export async function SupplyDashboard({
                   />
                 }
               />
+            </Board>
+          </div>
 
-              {/* Pinned to the foot of the panel by `mt-auto`, which is what
-                  turns the leftover height into a deliberate footer.
-
-                  This panel sits beside the attention queue and will almost
-                  always be the shorter of the two, because a seller has more
-                  stalled work than they have unpriced lines. `Panel fill` levels
-                  the row, so that difference becomes blank surface at the bottom
-                  of this one. Rather than fight the levelling — a ragged row
-                  foot looks worse than a gap — the gap is spent on the one thing
-                  the block was missing: a way out to the full request list that
-                  does not require going back up to the header. */}
-              {signals.open.length > 0 ? (
-                <div className="mt-auto flex justify-center pt-3">
-                  <Link
-                    href="/b2b/rfqs"
-                    className="text-label font-medium text-accent hover:underline"
-                  >
-                    {m.supply.demand.title} →
-                  </Link>
-                </div>
-              ) : null}
-            </Panel>
-          </Row>
-
-          {/* ROW 3 — what is moving, what happened, and where the work sits.
-
-              NEUTRAL HEADERS FROM HERE DOWN, and this is where the page stops
-              spending colour. `Panel` offers a tinted header band, and taking it
-              up on every panel is how a dashboard ends up with eight coloured
-              cards and no ranking between them — the wash stops being a label
-              and becomes the card's background. Row 2 is where the reader WORKS,
-              so its two panels keep a wash: red for what is late, blue for where
-              the new business is. Rows 3 and 4 are reference — they are read, not
-              acted on — and they carry their subject in the title and their
-              accent in the chart, which is enough. */}
-          <Row cols="thirds">
-            <Panel
-              fill
-              tone="neutral"
-              bodyClassName="flex flex-col"
+          {/* ROW 2 — the reference modules. Read, not acted on, and drawn that
+              way: a third of the width each, no accent beyond the header mark,
+              and every one of them a way out to the module that owns it. */}
+          <div className="grid min-w-0 gap-3 desktop:grid-cols-3">
+            <Board
               title={m.supply.market.title}
               Icon={BarChartIcon}
-              hint={m.supply.market.hint.replace("{period}", periodLabel)}
-              action={seeAll("/b2b/reports", m.home.openReports)}
+              footer={<BoardOut href="/b2b/reports" label={m.supply.market.viewAll} />}
             >
-              <MarketMovement
-                rows={signals.movement}
-                locale={locale}
-                labels={{ requests: m.supply.market.requests, new: m.supply.market.new }}
+              <MovingBoard
+                rows={movingRows}
+                labels={{ requests: m.supply.market.requests }}
                 empty={
                   <BlockEmpty
                     icon={<BarChartIcon size={20} />}
@@ -736,136 +948,108 @@ export async function SupplyDashboard({
                   />
                 }
               />
-            </Panel>
+            </Board>
 
-            <Panel
-              fill
-              tone="neutral"
-              bodyClassName="flex flex-col"
+            <Board
               title={m.supply.notifications.title}
               Icon={BellIcon}
-              hint={m.supply.notifications.hint}
+              footer={<ViewActivityAction label={m.supply.notifications.viewAll} />}
             >
-              {/* Zero stays the honest empty state that was built for it; the
-                  list simply takes its place once there is one. Same rows, same
-                  view model and same read-state behaviour as the header panel —
-                  denser, and without "mark all", which belongs to the inbox
-                  rather than to a dashboard summary of it. */}
-              {notifications.length === 0 ? (
-                <NotificationsEmpty
-                  title={m.supply.notifications.empty}
-                  body={m.supply.notifications.emptyBody}
-                />
-              ) : (
-                <NotificationList
-                  items={notifications}
-                  orgId={org.organizationId}
-                  dense
-                  showMarkAll={false}
-                />
-              )}
-            </Panel>
-
-            <Panel
-              fill
-              tone="neutral"
-              title={m.supply.pipeline.title}
-              Icon={ActivityIcon}
-              hint={m.supply.pipeline.hint}
-              foot={
-                managesCatalog ? (
-                  <Link href="/b2b/products" className="hover:text-accent hover:underline">
-                    {m.supply.pipeline.catalogue} · {m.supply.products.stat.published}{" "}
-                    <span className="font-medium tabular-nums text-fg">
-                      {formatCount(products.published, locale)}
-                    </span>{" "}
-                    · {m.supply.products.stat.draft}{" "}
-                    <span className="font-medium tabular-nums text-fg">
-                      {formatCount(products.draft, locale)}
-                    </span>
-                  </Link>
-                ) : undefined
-              }
-            >
-              <WorkflowFlow stages={flow} locale={locale} />
-            </Panel>
-          </Row>
-
-          {/* ROW 4 — the shelf. Two rankings of what is actually selling and to
-              whom, and the clips rail that will hold product video when there is
-              a model for it. */}
-          <Row cols="thirds">
-            <Panel
-              fill
-              tone="neutral"
-              bodyClassName="flex flex-col"
-              title={m.supply.videos.title}
-              Icon={VideoIcon}
-              hint={m.supply.videos.hint}
-            >
-              <ProductVideosEmpty
-                title={m.supply.videos.empty}
-                body={m.supply.videos.emptyBody}
-                action={
-                  managesCatalog
-                    ? seeAll("/b2b/products", m.supply.products.title)
-                    : undefined
+              <ActivityBoard
+                rows={activityRows}
+                empty={
+                  <NotificationsEmpty
+                    title={m.supply.notifications.empty}
+                    body={m.supply.notifications.emptyBody}
+                  />
                 }
               />
-            </Panel>
+            </Board>
 
-            <Panel
-              fill
-              tone="neutral"
-              title={m.supply.chart.topProducts}
-              Icon={PackageIcon}
-              hint={m.supply.voice[voice].topProductsHint}
+            <Board
+              title={m.supply.pipeline.title}
+              Icon={ActivityIcon}
+              footer={<BoardOut href="/b2b/orders" label={m.supply.pipeline.viewAll} />}
             >
-              <RankedBars
-                locale={locale}
-                rank
-                bar="lapis"
-                emptyLabel={m.supply.empty.noProductSales}
-                items={supply.topProducts.slice(0, 5).map((pr) => ({
-                  label: pr.name,
-                  value: pr.value,
-                  detail: money(pr.value),
-                }))}
-              />
-            </Panel>
+              <PipelineTrack stages={pipelineStages} />
+              <div className="border-t border-workspace-line px-4 pt-3 tablet:px-5">
+                <DonutSplit
+                  slices={orderSlices}
+                  emptyLabel={m.supply.empty.noProductSales}
+                  ariaLabel={m.supply.pipeline.orders}
+                  centerLabel={m.supply.pipeline.orders}
+                  formatValue={(v) => formatCount(v, locale)}
+                  formatShare={(pct) => formatPercent(pct, locale)}
+                />
+              </div>
+            </Board>
+          </div>
 
-            <Panel
-              fill
-              tone="neutral"
+          {/* ROW 3 — the shelf. Two rankings of what is actually selling and to
+              whom. They stay because they answer a question the boards above do
+              not: those count WORK, these count VALUE. */}
+          <div className="grid min-w-0 gap-3 desktop:grid-cols-2">
+            <Board title={m.supply.chart.topProducts} Icon={PackageIcon}>
+              <div className="px-4 pb-4 tablet:px-5">
+                <RankedBars
+                  locale={locale}
+                  rank
+                  bar="lapis"
+                  emptyLabel={m.supply.empty.noProductSales}
+                  items={supply.topProducts.slice(0, 5).map((pr) => ({
+                    label: pr.name,
+                    value: pr.value,
+                    detail: money(pr.value),
+                  }))}
+                />
+              </div>
+            </Board>
+
+            <Board
               title={m.supply.chart.topCustomers}
               Icon={StorefrontIcon}
-              action={seeAll("/b2b/buyers", m.common.more)}
+              footer={<BoardOut href="/b2b/buyers" label={m.common.more} />}
             >
-              <RankedBars
-                locale={locale}
-                rank
-                bar="lapis"
-                emptyLabel={m.supply.empty.noCustomers}
-                items={supply.topCustomers.slice(0, 5).map((c) => ({
-                  label: c.name,
-                  value: c.value || c.orders,
-                  detail: money(c.value),
-                }))}
-              />
-            </Panel>
-          </Row>
+              <div className="px-4 pb-4 tablet:px-5">
+                <RankedBars
+                  locale={locale}
+                  rank
+                  bar="lapis"
+                  emptyLabel={m.supply.empty.noCustomers}
+                  items={supply.topCustomers.slice(0, 5).map((c) => ({
+                    label: c.name,
+                    value: c.value || c.orders,
+                    detail: money(c.value),
+                  }))}
+                />
+              </div>
+            </Board>
+          </div>
+
+          {/* ROW 4 — DESIGN-LAB ONLY. The Reels module from the approved
+              reference, scoped to fady@example.test — see `ReelsBoard`'s own
+              doc for why product photos stand in for video frames here. */}
+          {designLabAtmosphere ? (
+            <ReelsBoard
+              title={m.supply.reels.title}
+              viewAllLabel={m.supply.reels.viewAll}
+              viewAllHref="/b2b/products"
+              addLabel={m.supply.reels.addNew}
+              addHref="/b2b/products/new"
+              items={reelItems}
+              viewsLabel={m.supply.reels.views}
+              likesLabel={m.supply.reels.likes}
+              empty={
+                <BlockEmpty
+                  icon={<TrendingUpIcon size={20} />}
+                  title={m.supply.videos.empty}
+                  body={m.supply.videos.emptyBody}
+                />
+              }
+            />
+          ) : null}
         </>
       ) : null}
-
-      {/* The closing note the reference band occupies with a privacy statement.
-          Here it says what the numbers above actually count, which is the honest
-          version of the same reassurance. */}
-      <p className="flex items-start gap-2 rounded-md border border-dashed bg-surface/60 px-md py-3 text-label text-fg-muted">
-        <span aria-hidden="true" className="mt-0.5 shrink-0 text-fg-muted">
-          <BarChartIcon size={15} />
-        </span>
-        {m.supply.scopeNote}
-      </p>
     </div>
   );
 }
@@ -894,4 +1078,19 @@ function stageHref(stage: AttentionKind | null): string {
 
 function sumOf(rec: Record<string, number>) {
   return Object.values(rec).reduce((a, b) => a + b, 0);
+}
+
+/**
+ * A header toggle's own link: `carry` plus `key=value` when turning ON,
+ * `carry` with `key` removed when turning OFF — the same "everything else
+ * survives" contract `AttentionFilter`'s and `PeriodSelect`'s own href
+ * builders keep, generalised because two independent header toggles
+ * (`sort`, `demandWindow`) now need it rather than one.
+ */
+function toggleHref(basePath: string, carry: Record<string, string>, key: string, active: boolean, value: string) {
+  const params = new URLSearchParams(carry);
+  if (active) params.delete(key);
+  else params.set(key, value);
+  const qs = params.toString();
+  return qs ? `${basePath}?${qs}` : basePath;
 }

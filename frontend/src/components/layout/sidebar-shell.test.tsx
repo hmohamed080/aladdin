@@ -15,7 +15,19 @@ const CAPS = ["org.manage"];
 const MODULE_COUNT = allowedNavKeys(CAPS).length;
 
 function shell(mode: "expanded" | "collapsed" | "hover" = "expanded") {
-  return renderWithI18n(<SidebarShell allowed={CAPS} mode={mode} />);
+  return renderWithI18n(
+    <SidebarShell
+      allowed={CAPS}
+      mode={mode}
+      /* The shell now draws the lockup and the workspace card itself, so these
+         three are required rather than optional. They are fixtures, not
+         assertions — nothing below reads them; they exist so the component can
+         render the panel it actually renders in the product. */
+      appName="Aladdin"
+      orgName="Cairo Sanitary Ware Trading"
+      branchName="Obour City warehouse"
+    />,
+  );
 }
 
 beforeEach(() => {
@@ -193,14 +205,17 @@ describe("SidebarShell display modes", () => {
    * has its own cases below.
    */
   describe("nav row hover vs icon tile", () => {
-    // The first span in a nav row is the active marker; the icon is the second.
-    const iconOf = (row: HTMLElement) => row.querySelectorAll("span")[1] ?? row.querySelector("span");
+    // Queried by its own hook, not by position: the active marker that used to
+    // sit before it is now rail-only, so "the second span" is not the icon in
+    // every mode.
+    const iconOf = (row: HTMLElement) => row.querySelector("[data-nav-icon]") as HTMLElement;
 
     it("highlights a wide nav item as a whole row, with no tile inside it", () => {
       shell("expanded");
       // A module that is NOT the current route — an active item paints regardless.
       const row = screen.getByRole("link", { name: ar.nav.reports });
-      expect(row.className).toContain("hover:bg-surface-hover");
+      // A SHELL token, not a content one — these rows sit on navy now.
+      expect(row.className).toContain("hover:bg-shell-2");
       // The icon must not light separately inside that highlight.
       expect((iconOf(row) as HTMLElement).className).not.toMatch(/group-hover:bg-/);
     });
@@ -222,19 +237,103 @@ describe("SidebarShell display modes", () => {
       // Revealed, it is a wide row and must behave like one — one surface, not two.
       fireEvent.mouseEnter(spacer.firstElementChild as HTMLElement);
       const revealed = screen.getByRole("link", { name: ar.nav.reports });
-      expect(revealed.className).toContain("hover:bg-surface-hover");
+      expect(revealed.className).toContain("hover:bg-shell-2");
       expect((iconOf(revealed) as HTMLElement).className).not.toMatch(/group-hover:bg-/);
     });
 
     it("keeps the current page stronger than an ordinary hover", () => {
       shell("expanded");
-      // Active is the full surface; hover is the same surface at 60%. Plus the
-      // accent marker and accent glyph, which a hovered row never gets.
+      /* The invariant is unchanged — the current page must read stronger than a
+         hovered one — but WHERE it is expressed moved. The active row no longer
+         paints a background of its own: the carve does, as one element behind
+         the whole list that survives navigation (see nav-carve.tsx). So the row
+         is asserted to be CLEAN of both, the carve is asserted to exist, and the
+         active glyph is asserted to take the carve's ink rather than the shell's.
+         A background back on this row would mean two stacked active surfaces. */
       const active = screen.getByRole("link", { name: ar.nav.catalog });
       expect(active).toHaveAttribute("aria-current", "page");
-      expect(active.className).toContain("bg-surface-2");
+      expect(active).toHaveAttribute("data-nav-active", "true");
       expect(active.className).not.toMatch(/hover:bg-/);
-      expect((iconOf(active) as HTMLElement).className).toContain("text-accent");
+      expect(active.className).not.toMatch(/bg-/);
+      expect(screen.getByTestId("nav-carve")).toBeInTheDocument();
+      expect(iconOf(active).className).toContain("text-shell-active-fg");
+    });
+
+    /**
+     * ONE CARVE, EVERY MODE — AND THIS TEST IS THE INVERSE OF THE ONE IT
+     * REPLACED.
+     *
+     * The old rule was that only the docked expanded panel carved: a rail had no
+     * room, and a hover reveal would appear to merge into a page 15rem away and
+     * behind it. That produced three different active mechanics — a carved band,
+     * an accent tile with a marker bar, and a translucent accent wash — so the
+     * sidebar stopped being one object the moment it changed width, which is
+     * exactly what a reviewer sees first.
+     *
+     * The rule now is that there is ONE surface and it MORPHS. So the assertion
+     * is not "present here, absent there" but "present everywhere, in a
+     * different shape": `--carve-p` is the shape parameter (0 = the icon's own
+     * tile, 1 = the band flush with the trailing edge), and it is the single
+     * value the reveal animates. Asserting on it rather than on rendered
+     * geometry is deliberate — jsdom has no layout, so every measured number
+     * here is 0 and a test that read one would be asserting on the absence of a
+     * layout engine.
+     */
+    const carve = () => screen.getByTestId("nav-carve") as HTMLElement;
+    /** The animated shape parameter, as motion has actually written it. */
+    const carveP = () => carve().style.getPropertyValue("--carve-p");
+    /** The same fact as a plain attribute — see below for why both exist. */
+    const carveNarrow = () => carve().getAttribute("data-carve-narrow");
+
+    it("carves in every display mode, as a tile on the rail and a band when open", () => {
+      const expanded = shell("expanded");
+      expect(carveP()).toBe("1");
+      expect(carveNarrow()).toBeNull();
+      expanded.unmount();
+
+      const collapsed = shell("collapsed");
+      // Still one carve — at tile scale, with the fillets off because there is
+      // no trailing edge for them to close around at 3.5rem.
+      expect(carveP()).toBe("0");
+      expect(carveNarrow()).toBe("true");
+      collapsed.unmount();
+
+      const { container } = shell("hover");
+      expect(carveNarrow()).toBe("true");
+      // Revealed, it is the SAME element in the band shape — not a second
+      // treatment swapped in for a floating panel.
+      //
+      // ASSERTED ON THE ATTRIBUTE, NOT ON `--carve-p`, and the difference is
+      // about what jsdom can honestly report. `--carve-p` is written by motion:
+      // on MOUNT it lands immediately (`initial={false}` makes the first render
+      // a position rather than a movement), which is why the two cases above can
+      // read it — but a mid-session change is an ANIMATION, and jsdom drives no
+      // frames, so the property still holds its old value one tick after the
+      // pointer arrives. Reading it here would assert that motion has finished
+      // animating in an environment where motion cannot start. The attribute is
+      // ordinary React state and flips synchronously, so it is the honest
+      // witness that the SHAPE changed; the shot at design-lab-shots/pass is
+      // what shows it arriving smoothly.
+      fireEvent.mouseEnter(
+        (container.querySelector("[data-sidebar-mode]") as HTMLElement).firstElementChild as HTMLElement,
+      );
+      expect(carveNarrow()).toBeNull();
+    });
+
+    /* The rail's active item used to paint its own accent-tinted tile, which was
+       its stand-in for a carve back when it had none. It has one now — sitting
+       in exactly that spot — so a tint here would be a second surface inside the
+       first. Same invariant the expanded row has always been held to, extended
+       to the width that used to be exempt. */
+    it("paints no second active surface on the rail, where the carve now sits", () => {
+      shell("collapsed");
+      const active = screen.getByRole("link", { name: ar.nav.catalog });
+      const icon = active.querySelector("[data-nav-icon]") as HTMLElement;
+      expect(active).toHaveAttribute("data-nav-active", "true");
+      expect(icon.className).not.toMatch(/bg-accent/);
+      // And it takes the carve's ink, because that is the ground it stands on —
+      // the same foreground the expanded band gives it.
+      expect(icon.className).toContain("text-shell-active-fg");
     });
 
     /**
@@ -248,7 +347,14 @@ describe("SidebarShell display modes", () => {
       for (const mode of ["expanded", "collapsed", "hover"] as const) {
         const { unmount } = shell(mode);
         const icon = screen.getByTestId("sidebar-control").querySelector("span") as HTMLElement;
-        expect(icon.className).toContain(NAV_ICON_SELF_HOVER_CLASS);
+        /* Same self-scoped CONTRACT as NAV_ICON_SELF_HOVER_CLASS — the pointer
+           must be over the 36px tile, never anywhere along the label-less
+           full-width row — but painted in shell tokens, because that constant's
+           `bg-surface-2` is a Quartz-tuned content colour and is invisible on
+           navy. The `group-hover:` assertion below is the one that actually
+           guards the defect, and it is unchanged. */
+        expect(icon.className).toContain("hover:bg-shell-2");
+        expect(icon.className).toContain("group-focus-visible:bg-shell-2");
         expect(icon.className).not.toMatch(/group-hover:/);
         unmount();
       }

@@ -507,3 +507,23 @@ export const VideoIcon = (p: IconProps) => (
     <path d="M7.5 9.8v4.4l3.8-2.2z" />
   </Svg>
 );
+
+/** A standalone play control — a circle with a centred triangle, for a card's
+ *  own play affordance (as opposed to `VideoIcon`, which names the MEDIUM). */
+export const PlayIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9.25" />
+    <path d="M10.2 8.6v6.8l5.6-3.4z" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
+/** Three dots, for an overflow menu's own trigger — filled, not stroked: at
+ *  the sizes this renders, a 1.75px stroke on a ~2px dot draws a ring with no
+ *  visible centre. */
+export const MoreHorizontalIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    <circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />
+  </Svg>
+);

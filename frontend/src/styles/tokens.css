@@ -17,6 +17,48 @@
   --basalt-2: #1b2226;
   --basalt-3: #232b30;
 
+  /* ---- Navy ramp — the SHELL ground ----
+   * The workspace CHROME (sidebar, and the ambient wash the body borrows from
+   * it) stands on its own ground, separate from both the Quartz body and the
+   * Carbon dark ramp. It exists because neither could do this job: Quartz is the
+   * page the shell has to be distinguishable FROM, and Basalt — the brand's
+   * blue-black — was already tried as a full-height workspace ground and
+   * rejected for reading as dead space (see the Carbon note above).
+   *
+   * This ramp is the opposite of that rejection: it is deeply SATURATED rather
+   * than near-black, so a tall sidebar reads as a deliberate material with a
+   * hue, not as an absence of light. Values are sampled from the approved
+   * concept (UI-UX/references/styleUpdate/dashboard.png).
+   *
+   * It is chrome-only. No content surface, no card, and no page ground may use
+   * it — those stay on Quartz and Carbon, whose contrast ratios are the ones
+   * already proven against body text.
+   *
+   *   on-shell text  19.1:1   secondary  12.2:1   muted  5.3:1   (all AA+)
+   */
+  --navy: #001537;
+  --navy-lit: #012045;
+  --navy-deep: #000e26;
+  --navy-edge: #153860;
+  /* THE NAVY AT PAGE LIGHTNESS — the one member of this family that is not a
+     surface. It exists because of a colour-mixing fact that cost a whole pass:
+     tinting a light ground TOWARD `--navy` does not make it blue. Navy is
+     (0,21,55); mixing it into Quartz at 15% pulls red down by 36 and blue down
+     by 27, so the ground goes GREY, gaining barely 9 points of blue-minus-red.
+     The approved concept's workspace frame measures 25 points of blue-minus-red
+     at the sidebar edge (#d0d9e9), and no percentage of a near-black navy
+     reaches that without also going dark.
+     So this is the same HUE (217°) carried up to page lightness, and it is what
+     every frame and wash gradient actually mixes. At 20-26% over the Quartz
+     ground it lands on the concept's sampled values while costing about ten
+     points of lightness — the "navy at 8-15% visual strength" the brief asks
+     for, expressed as the pigment that can actually produce it.
+     NEVER paint a surface with this. It is a tint source only. */
+  --navy-air: #5986cf;
+  --navy-text: #f2f5fa;
+  --navy-text-secondary: #ccd6e4;
+  --navy-text-muted: #7e90ab;
+
   /* ---- Carbon ramp — the DARK-THEME ground ----
    * Basalt is a BRAND colour: a cool, blue-black stone, right for the Aperture
    * mark, the auth brand panel and every modal scrim. It was never a good
@@ -302,6 +344,191 @@
   --shadow-raised: 0 1px 2px rgba(16, 16, 18, 0.06);
   --shadow-card: 0 1px 2px rgba(16, 16, 18, 0.04), 0 8px 24px rgba(16, 16, 18, 0.05);
   --shadow-overlay: 0 10px 30px rgba(16, 16, 18, 0.1), 0 2px 8px rgba(16, 16, 18, 0.06);
+
+  /* ---- Form fields · LIGHT ----
+   * A COMMAND FIELD IS NOT A BLOCK OF PROSE, and this family exists because it
+   * was being painted as though it were.
+   *
+   * The global foreground ramp is COOL — `--fg-secondary` is #5c6066, ten points
+   * bluer than it is red — while every light ground in the product is WARM:
+   * Quartz #f4f3f0, `--surface` #fdfcfb, `--border` #dbd8d5. On a body of text
+   * that mismatch is invisible; on a 40px control whose entire visual content is
+   * one line of placeholder inside one warm rounded rectangle, it is the whole
+   * impression the control makes. The search field read as a blue-grey object
+   * imported from another design system, and it read that way because a cool
+   * grey was the only ink on it.
+   *
+   * These are the same neutrals derived the other way: Ink mixed INTO Quartz, so
+   * every step down the ramp keeps the ground's temperature.
+   *
+   *   --field-placeholder  Ink at 58% into Quartz. 4.5:1 on `--surface`, so the
+   *                        prompt is real type rather than a suggestion of it.
+   *   --field-hint         Ink at 45%. The shortcut badge, which must read as
+   *                        quieter than the prompt beside it — it is an
+   *                        accelerator, not an instruction, and it is already
+   *                        carried properly by `aria-keyshortcuts`.
+   *   --field-line         A step lighter than `--border`: the field is sunk
+   *                        into a card, so its edge is a change of surface, not
+   *                        a division between two regions.
+   *   --field-focus        Lumen at 38%. The brand accent at LOW intensity, in
+   *                        place of the hard two-pixel ring the control used to
+   *                        take from `--focus`. `--focus` itself is unchanged
+   *                        and still correct for everything that is not sitting
+   *                        inside a floating header card.
+   */
+  --field: var(--quartz);
+  --field-line: #e5e2de;
+  --field-fg: var(--ink);
+  --field-placeholder: #747574;
+  --field-hint: #919190;
+  --field-focus: rgba(243, 171, 62, 0.38);
+
+  /* ---- Shell · LIGHT ----
+   * The chrome semantics. `shell` is the sidebar ground; `shell-2` is anything
+   * raised onto it (the organization card at its foot); `shell-line` is the
+   * hairline that divides them. Foregrounds are tinted FROM the navy rather than
+   * grey, because a neutral grey on a saturated ground reads as dirty.
+   *
+   * `shell-active` is the carved navigation surface, and it is deliberately the
+   * page's own ground rather than a lighter navy: the whole effect depends on
+   * that surface reading as the BODY arriving into the sidebar, not as a
+   * highlight painted on top of it.
+   */
+  --shell: var(--navy);
+  --shell-lit: var(--navy-lit);
+  --shell-deep: var(--navy-deep);
+  --shell-2: rgba(255, 255, 255, 0.06);
+  --shell-line: rgba(255, 255, 255, 0.1);
+  --shell-fg: var(--navy-text);
+  --shell-fg-secondary: var(--navy-text-secondary);
+  --shell-fg-muted: var(--navy-text-muted);
+  /* The carved surface, and it is NO LONGER `var(--frame)`. It cannot be: the
+     frame is now a gradient plane whose far-corner resting value is a warm
+     cream, and a warm cream carve on a navy panel reads as a stain. What the
+     carve has to match is the BODY at the seam — the body under its own corner
+     wash, which is where the carve physically arrives. The concept measures
+     that surface at #eef2f6, sampled straight off the active row, and it is
+     deliberately a step LIGHTER than the frame blue immediately beside it
+     (#cdd8e8) so the carve reads as the page and the gutter reads as the frame
+     the page floats on. Literal rather than derived, because it is a sampled
+     value with no expression that produces it more honestly. */
+  --shell-active: #eef2f6;
+  --shell-active-fg: var(--navy);
+  /* The brand hairline that traces the shell's trailing edge and the arabesque
+     flow lines behind the navigation. Lumen at low alpha — the same gold the
+     mark and the primary action use, spent here as a line rather than a fill. */
+  --shell-gold: rgba(243, 171, 62, 0.55);
+  --shell-gold-soft: rgba(243, 171, 62, 0.14);
+  /* The tonal pools in `ShellAtmosphere`. A SEMANTIC name because the component
+     was reaching for `--navy-edge` directly — a raw palette entry — which meant
+     the shell's material could not be re-grounded without editing a component. */
+  --shell-pool: var(--navy-edge);
+
+  /* HOW MUCH OF THE BODY IS ACTUALLY THERE, AT THE TOP AND FURTHER DOWN.
+     The body used to paint an opaque fill plus a separately-tuned periwinkle
+     pool inside it, and the two were tuned independently — which is exactly why
+     the gutter beside the page heading measured #dde2ea and the heading zone
+     itself measured #dee7f6. Two blues, one seam, and nothing that could keep
+     them in agreement, because nothing made them the same colour.
+
+     They are the same colour now by construction: the body's TOP IS PARTLY
+     TRANSPARENT and what shows through it is the frame plane itself. There is
+     no second blue to tune, so there is no second blue to drift. `--body-veil`
+     is how present the surface is at its top edge, `--body-veil-mid` how present
+     it is a screen down, and by `--body-solid` it is simply the surface.
+
+     This is not glass. There is no blur, no saturation trick and no backdrop
+     filter anywhere near it — a backdrop-filter on an element this large is a
+     full-page composite on every scroll frame, and it would frost the sidebar's
+     gold flow lines through the gutter besides. It is one linear-gradient in the
+     alpha channel, which costs nothing and reads as a light surface with the
+     room's colour still in it. */
+  --body-veil: 20%;
+  --body-veil-mid: 74%;
+  --body-solid: 420px;
+
+  /* ---- Workspace FRAME · LIGHT ----
+   * Three grounds, not one, and the whole shell composition depends on them
+   * being distinguishable:
+   *
+   *   `frame`      the ground the chrome floats ON — the gutter between the
+   *                sidebar and the header card, and the margin around both. It
+   *                is the DARKEST of the three, which is what makes the header
+   *                and the body read as raised rather than as two regions of
+   *                one flat page.
+   *   `workspace`  the surface the dashboard is composed on. Lighter than the
+   *                frame and darker than a panel, so a white card sitting on it
+   *                has something to be lighter THAN. This is the lightly tinted
+   *                premium workspace; panels themselves stay `surface`.
+   *   `surface`    unchanged. Panels are still near-white, and still the same
+   *                near-white every other route uses.
+   *
+   * IT IS CALLED `workspace` AND NOT `body`, WHICH IS THE OBVIOUS NAME.
+   * `body` is already a step in the TYPE scale, and Tailwind derives utilities
+   * from every scale independently: a `body` colour makes `text-body` mean both
+   * "0.875rem" and "this colour", emits two rules with the same selector, and
+   * lets source order decide. It does not warn. The failure it produced was
+   * exactly as quiet as that description suggests — `tablet:text-body` on the
+   * command field painted 13px type in the WORKSPACE GROUND colour, which on a
+   * white header is invisible, and 185 other uses of `text-body` across the
+   * product were one stylesheet-ordering change away from the same thing. Never
+   * name a colour after a type step.
+   *
+   * All three are COOL, and that is the one departure from Quartz. It is not a
+   * preference: the shell's navy is a saturated blue-black, and a warm grey page
+   * beside it reads as two unrelated images pasted together rather than as one
+   * room. Values sampled from the approved concept rather than estimated — see
+   * `design-lab/sample-ref.mjs`, which prints the actual bytes.
+   *
+   * SCOPE. These are the WORKSPACE FRAME's grounds and `AppShell` is their only
+   * consumer. `--canvas` is deliberately untouched, so every surface outside the
+   * B2B shell keeps exactly the ground it already had.
+   */
+  /* THE FRAME IS A GRADIENT PLANE, NOT A FILL. `--frame` is only its far-corner
+     resting value — the Quartz/Limestone ground with no tint left in it, which
+     is what the concept shows down the RIGHT gutter (#f5f2ed) where the sidebar
+     is furthest away. The blue lives in `--frame-tint`, pooled at the sidebar
+     edge and the top, and the warmth in `--frame-warm` at the opposite corner.
+     `.workspace-frame` in globals.css composes the three.
+     Sampled: left gutter #d0d9e9 at the top, #eaeef4 mid, #dadfe8 at the foot;
+     right gutter #fdf3e3 at the top warming to #f5f2ed. So the plane runs COOL
+     at the sidebar and WARM away from it, which is precisely what makes it read
+     as the navy's own light spilling onto the page. */
+  /* THE RESTING VALUE IS COOL NOW, AND THAT IS THE CORRECTION.
+     It was #f5f3ef — a warm cream — on the reasoning that the blue was a pool
+     and the cream was what the page returned to. Measured, that reasoning
+     produced a frame which was blue in a 400px band beside the sidebar and warm
+     cream EVERYWHERE ELSE: #f5f1eb above the header card, #eeebe4 in the strip
+     between the header and the body, #f2f0ec down the far edge. Three of the
+     four places the frame is visible at all were reading as an off-white gap
+     separating the chrome from the shell rather than as the plane connecting
+     them — which is precisely the "white gap breaking them apart" the brief
+     names.
+
+     So the plane's resting value carries the cool, and the pool only deepens it.
+     The warmth is still here and still real, but it is now an ACCENT at the far
+     corner rather than the ground everything else is an exception to. */
+  --frame: #e9ecf2;
+  --frame-tint: rgba(89, 134, 207, 0.15);
+  --frame-tint-soft: rgba(89, 134, 207, 0.1);
+  --frame-warm: rgba(247, 198, 116, 0.13);
+  --frame-2: #eceef4;
+
+  /* THE BODY IS NEAR-WHITE AND THAT IS THE CORRECTION. It was #eff1f6 — a cool
+     grey only 18 steps off the old frame, so the two planes had no order and the
+     body read as a region of the page rather than as a surface floating on it.
+     The concept measures #fbfdfe / #fdfdfd across the body's open ground: a
+     light surface, with all of its colour coming from the corner wash above and
+     none from the fill. Panels stay `--surface`, one step lighter again. */
+  --workspace: #fbfcfe;
+  --workspace-line: rgba(0, 21, 55, 0.06);
+  /* The body's edge treatment. It floats, so it casts: a wide ambient drop plus
+     a tight contact shadow, both tinted navy rather than black — a neutral
+     shadow on a blue frame reads as dirt. */
+  --workspace-shadow:
+    0 1px 2px rgba(0, 21, 55, 0.05),
+    0 12px 32px -12px rgba(0, 21, 55, 0.16),
+    0 2px 8px -4px rgba(0, 21, 55, 0.08);
 }
 
 .dark {
@@ -385,6 +612,101 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.32);
   --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-overlay: 0 8px 28px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+
+  /* ---- Shell · DARK ----
+   * The navy does NOT carry over unchanged. In light theme the sidebar is the
+   * darkest thing on screen and the contrast with the page is what separates
+   * chrome from content; on the Carbon ground the SAME navy would be lighter
+   * and far more saturated than the workspace it frames, so the sidebar would
+   * become the brightest, loudest element on a dark page — the tail wagging the
+   * dog. So the ramp drops below Carbon and keeps only enough chroma to stay
+   * recognisably the same material.
+   *
+   * `shell-active` follows the same rule it does in light: the carved surface is
+   * the page's own ground, so the notch still reads as the body arriving.
+   */
+  /* Lifted from #0a1220. The dark sidebar has to be a distinguishable PLANE,
+     and the carve has to be a visible notch in it — both are contrast against
+     the frame beside it, and at #0a1220 against a #08090b frame there were two
+     units of difference doing the work of a design. The panel stays the second
+     darkest thing on the page; it just stops being the same thing as its own
+     gutter. */
+  --shell: #101826;
+  --shell-lit: #162031;
+  --shell-deep: #0a1220;
+  --shell-2: rgba(255, 255, 255, 0.05);
+  --shell-line: rgba(255, 255, 255, 0.08);
+  --shell-fg: var(--carbon-text);
+  --shell-fg-secondary: #9aa6ba;
+  --shell-fg-muted: #78849a;
+  /* Same reasoning as light: the carve is the BODY at the seam, so it tracks
+     `--workspace` rather than the frame beneath it. In dark that is Carbon
+     lifted just enough to be a notch rather than a hole. */
+  --shell-active: #1b2028;
+  --shell-active-fg: var(--carbon-text);
+  --shell-gold: rgba(243, 171, 62, 0.4);
+  --shell-gold-soft: rgba(243, 171, 62, 0.1);
+  --shell-pool: #1d2a3d;
+
+  /* ---- Form fields · DARK ----
+   * The same relationship re-derived, not re-tinted: the field is a step SUNK
+   * into the raised surface it sits on rather than a step lighter, because on a
+   * near-black ground "recessed" is the only direction depth has left. The two
+   * inks are Carbon's own text ramp brought down to the same two roles, and the
+   * focus wash is Lumen again — brighter, because 38% of a warm gold over
+   * near-black is nothing at all.
+   */
+  --field: #16181c;
+  --field-line: rgba(255, 255, 255, 0.09);
+  --field-fg: var(--carbon-text);
+  --field-placeholder: #8d9199;
+  --field-hint: #6f747c;
+  --field-focus: rgba(243, 171, 62, 0.5);
+
+  /* The body's veil, re-derived for a dark ground rather than re-tinted.
+     In light the frame is a step DARKER than the body, so a translucent top
+     reads as the shell's colour settling onto the page. In dark the frame is a
+     step darker still — near-black against Carbon — so the same mechanic reads
+     as the page's top edge sinking, which is the same statement about depth
+     made in the direction this theme has available.
+
+     It is held back hard. A dark surface shows a 25% dilution as plainly as a
+     light one shows a 60% dilution, and the page heading has to stay the most
+     legible thing in that band. */
+  --body-veil: 62%;
+  --body-veil-mid: 90%;
+  --body-solid: 340px;
+
+  /* ---- Workspace FRAME · DARK ----
+   * The SAME three-ground relationship, re-derived rather than re-tinted. What
+   * has to survive into dark is the ORDER — frame darkest, body above it,
+   * panels above that — because that order is what makes the header and body
+   * read as floating, and the composition is meant to be recognisably the same
+   * page in either theme.
+   *
+   * What does not survive is the hue budget. A cool cast that reads as air on a
+   * white page reads as BLUE on a near-black one, so the chroma is spent almost
+   * entirely and these are near-neutral. The body lands on `carbon`, the ground
+   * this theme has already proven its body text against, so no contrast ratio on
+   * the page is newly asserted by any of this.
+   */
+  --frame: #05070a;
+  /* The same two pools, re-aimed. On a near-black frame a 26% blue would be a
+     glow, not a tint, so the cool side is spent almost entirely and the warm
+     side is barely present — what has to survive into dark is the DIRECTION of
+     the gradient (cool at the sidebar, warm away from it), not its strength. */
+  --frame-tint: rgba(89, 134, 207, 0.07);
+  --frame-tint-soft: rgba(89, 134, 207, 0.03);
+  --frame-warm: rgba(247, 198, 116, 0.035);
+  --frame-2: #0a0d11;
+  --workspace: var(--carbon);
+  --workspace-line: rgba(255, 255, 255, 0.05);
+  /* Dark surfaces do not cast believable shadows onto darker ones, so the body
+     floats on a light hairline instead — the same job done by the one cue that
+     still works at this end of the scale. */
+  --workspace-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 16px 40px -16px rgba(0, 0, 0, 0.7);
 }
 
 /* ---- Header height, at tablet and above ----
@@ -401,4 +723,102 @@
   :root {
     --app-header-h: 4.25rem;
   }
+}
+
+/* ==================================================================
+ * SHELL PALETTE · OPTION B — "ALADDIN INK"
+ *
+ * A PROPOSAL, NOT A DECISION. Nothing selects this yet. It is switched on by
+ * `data-shell-palette="ink"` on the document element, which is set by nothing in
+ * the app and by one line in `design-lab/palette-compare.mjs`, so both options
+ * can be photographed side by side before either is adopted. If it is chosen,
+ * these values move into `:root` and this block goes; if it is not, the block
+ * goes. It is deliberately not wired to a cookie or a setting — a shell palette
+ * is not a user preference, and shipping the switch would make it one.
+ *
+ * WHAT IT CHANGES, AND WHY THE DERIVATION MATTERS
+ * Option A's shell is `--navy` #001537: hue 217°, saturation 100%, a fully
+ * saturated blue that is not in the Aladdin palette and does not derive from
+ * anything in it. It was sampled off a rendered concept, which is a legitimate
+ * way to match an image and no way at all to own a colour — nothing in the
+ * system can say what it is a shade OF.
+ *
+ * This one is built from two colours that are already the brand's:
+ *
+ *   --basalt  #0e1113   the near-black
+ *   --lapis   #2f6088   the cool blue
+ *
+ * MOSTLY BASALT, WITH ENOUGH LAPIS TO BE BLUE ON PURPOSE:
+ *
+ *   shell        Basalt 78% + Lapis 22%  #15222d   hue 206°, sat 37%
+ *   shell-lit    Basalt 68% + Lapis 32%  #192a38   the head of the ramp
+ *   shell-deep   Basalt 88% + Lapis 12%  #121a21   the foot
+ *   shell-pool   Basalt 45% + Lapis 55%  #203c53   the tonal pools
+ *
+ * The audible difference from A is SATURATION, not hue: 37% against 100%. That
+ * is the whole distinction between an ink and an enterprise navy, and it is the
+ * reason Lumen Gold reads as an accent on this ground rather than as a second
+ * primary competing with it.
+ *
+ * THE FRAME IS DERIVED, NOT PAINTED AT LOW OPACITY.
+ * `--ink-air` #5f96c0 is Lapis lifted into air (lapis-bright 75% + lapis 25%),
+ * and the frame is that mixed into a Quartz-family ground — which is what the
+ * brief asks for and is a different operation from tinting a page toward a
+ * near-black. Tinting toward #15222d only ever produces grey; you cannot reach
+ * a light blue by adding a dark one.
+ *
+ *   frame        #e5ebed                  the resting plane, cool +8
+ *   frame + tint #e5ebed + ink-air @ 22%  ≈ #d7e1e7 at the sidebar's head
+ *
+ * CONTRAST, MEASURED ON THE INK BASE #15222d:
+ *   shell-fg           #eff4f8   14.6:1
+ *   shell-fg-secondary #c3d0dc   10.3:1
+ *   shell-fg-muted     #7b8b9b    4.6:1   (section headings)
+ *   accent-solid       #f3ab3e    8.2:1   (Lumen, unchanged)
+ * ================================================================== */
+:root[data-shell-palette="ink"] {
+  /* The ink ramp itself. */
+  --ink-shell: #15222d;
+  --ink-shell-lit: #192a38;
+  --ink-shell-deep: #121a21;
+  --ink-shell-pool: #203c53;
+  /* Lapis lifted into air — the only member of this family light enough to
+     tint a near-white ground toward blue rather than toward grey. */
+  --ink-air: #5f96c0;
+
+  --shell: var(--ink-shell);
+  --shell-lit: var(--ink-shell-lit);
+  --shell-deep: var(--ink-shell-deep);
+  --shell-pool: var(--ink-shell-pool);
+  --shell-fg: #eff4f8;
+  --shell-fg-secondary: #c3d0dc;
+  --shell-fg-muted: #7b8b9b;
+  /* The carve is still the BODY arriving, so it tracks the body — which in this
+     option is a warm Quartz rather than a cool white. */
+  --shell-active: #f3f2ef;
+  --shell-active-fg: var(--ink-shell);
+
+  /* The frame: a high-lightness, low-chroma derivative of the same family,
+     mixed into a Quartz/Limestone ground rather than painted as navy at low
+     opacity. The RESTING value carries the cool, exactly as it does in option A. It was
+     #eef0ef — near-neutral — which measured cool +1 above the header card and
+     +1 in the strip between the two cards, so three of the four apertures the
+     frame is visible through read as off-white and the plane stopped connecting
+     the shell to the chrome. Same defect A had before this pass, same fix. */
+  --frame: #e5ebed;
+  --frame-tint: rgba(95, 150, 192, 0.22);
+  --frame-tint-soft: rgba(95, 150, 192, 0.15);
+  --frame-warm: rgba(247, 198, 116, 0.15);
+  --frame-2: #e6eaeb;
+
+  /* A WARM workspace, which is the other half of the brief's direction:
+     dark Aladdin ink shell → soft airy blue-grey frame → light premium body.
+     One step under `--surface` so a panel still has something to be lighter
+     than. */
+  --workspace: #fdfcfa;
+  --workspace-line: rgba(21, 34, 45, 0.08);
+  --workspace-shadow:
+    0 1px 2px rgba(21, 34, 45, 0.05),
+    0 12px 32px -12px rgba(21, 34, 45, 0.18),
+    0 2px 8px -4px rgba(21, 34, 45, 0.1);
 }

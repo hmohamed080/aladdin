@@ -13,6 +13,8 @@ export type PageContext = {
   supabase: SupabaseClient<Database>;
   org: OrgContext;
   locale: Locale;
+  /** DESIGN-LAB PROTOTYPE GATE — see `app/b2b/layout.tsx`. One account only. */
+  designLabAtmosphere: boolean;
 };
 
 /**
@@ -27,8 +29,13 @@ export type PageContext = {
  */
 export const getPageContext = cache(async function getPageContext(): Promise<PageContext | null> {
   const supabase = await getServerSupabase();
-  const [workspace, store] = await Promise.all([loadWorkspaceContext(supabase), cookies()]);
+  const [workspace, store, userResult] = await Promise.all([
+    loadWorkspaceContext(supabase),
+    cookies(),
+    supabase.auth.getUser(),
+  ]);
   if (!workspace.active) return null;
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
-  return { supabase, org: workspace.active, locale };
+  const designLabAtmosphere = userResult.data.user?.email === "fady@example.test";
+  return { supabase, org: workspace.active, locale, designLabAtmosphere };
 });

@@ -180,7 +180,23 @@ export function GlobalSearch({
   stance = "buyer",
   hasWorkspace,
   canAdmin = false,
+  size = "compact",
 }: {
+  /**
+   * How much of the header this control is entitled to.
+   *
+   * `compact` is the trigger as it has always been: one control among eight in a
+   * row, sized so a 393px phone still fits. `lead` is the floating header card,
+   * where search is the FIRST thing in the shell and the only control on its
+   * side — it takes the height of a real field and as much width as the card can
+   * spare, because at 28px tall and 224px wide it read as an afterthought
+   * tucked beside the notification bell rather than as the way into the product.
+   *
+   * Only the trigger changes. The palette it opens is one overlay with one
+   * layout, and a search that looked different depending on which header opened
+   * it would be two searches.
+   */
+  size?: "compact" | "lead";
   /** Membership capabilities — the same list the sidebar renders from. */
   capabilities: readonly string[];
   stance?: CommerceStance;
@@ -401,9 +417,28 @@ export function GlobalSearch({
 
   return (
     <>
-      {/* The header trigger. Styled as a field rather than a button because that
-          is what it becomes; on narrow screens it collapses to the icon alone so
-          the header still fits a 393px phone. */}
+      {/* THE HEADER TRIGGER, ON THE FIELD FAMILY RATHER THAN THE PROSE RAMP.
+          Styled as a field because that is what it becomes; on narrow screens it
+          collapses to the icon alone so the header still fits a 393px phone.
+
+          Every colour here moved, and none of it moved for taste. The control
+          used to take `text-fg-secondary` — #5c6066, a COOL grey — and paint it
+          on a warm Quartz ground inside a warm near-white card. Nothing about
+          that is wrong on a paragraph, and it is the entire appearance of a
+          control whose visible content is one line of placeholder: the field
+          read as a blue-grey component borrowed from a different design system,
+          sitting in an Aladdin header. `field-*` is the same neutral ramp
+          derived by mixing Ink into Quartz instead, so the ink keeps the
+          ground's temperature. See tokens.css.
+
+          THE FOCUS RING IS THE OTHER HALF. It was `ring-2 ring-focus` — a hard
+          two-pixel band of #855a15 — which is a perfectly good affordance on a
+          form page and far too loud for a control floating in the header card
+          on every route. `field-focus` is Lumen at 38%: the same brand accent,
+          spent as a soft halo, with the border stepping up to `accent` so the
+          field's own edge carries the state rather than a ring drawn around it.
+          `ring-offset` is gone with it — an offset ring needs a known ground to
+          offset against, and this control sits on two different ones. */}
       <button
         type="button"
         onClick={openPalette}
@@ -411,15 +446,27 @@ export function GlobalSearch({
         aria-label={t("search.open")}
         aria-keyshortcuts="Control+K Meta+K"
         className={cn(
-          "group flex h-7 items-center gap-2 rounded-sm border bg-canvas/60 px-2 text-label text-fg-muted",
-          "transition-colors hover:border-strong hover:bg-surface-hover hover:text-fg-secondary",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-          "tablet:w-56 desktop:w-72",
+          "group flex items-center gap-2 border border-field-line bg-field text-field-placeholder",
+          "transition-[background-color,border-color,box-shadow,color] duration-fast ease-standard motion-reduce:transition-none",
+          "hover:border-border hover:bg-surface-hover hover:text-field-fg",
+          "focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-field-focus",
+          // Below `tablet` both sizes are the same icon-only button, because
+          // there is one row and eight controls in it either way.
+          "h-7 rounded-sm px-2 text-label",
+          size === "lead"
+            ? "tablet:h-10 tablet:w-full tablet:rounded-lg tablet:px-3.5 tablet:text-body"
+            : "tablet:w-56 desktop:w-72",
         )}
       >
-        <SearchIcon size={16} />
+        {/* One step quieter than the prompt beside it — the glyph is an emblem
+            for the field, and matching the type's weight makes it compete with
+            the words it is introducing. */}
+        <SearchIcon size={size === "lead" ? 18 : 16} className="shrink-0 text-field-hint" />
         <span className="hidden truncate tablet:inline">{t("search.open")}</span>
-        <kbd className="ms-auto hidden shrink-0 rounded-xs border px-1.5 py-0.5 font-sans text-[0.6875rem] text-fg-muted tablet:inline">
+        {/* The accelerator, and the quietest thing in the control. It is a hint,
+            not an instruction: `aria-keyshortcuts` above is what actually
+            carries the shortcut, so nothing is lost by letting this recede. */}
+        <kbd className="ms-auto hidden shrink-0 rounded-xs border border-field-line bg-surface px-1.5 py-0.5 font-sans text-[0.6875rem] text-field-hint tablet:inline">
           Ctrl K
         </kbd>
       </button>
@@ -461,7 +508,11 @@ export function GlobalSearch({
                 data-testid="global-search-input"
                 placeholder={hasWorkspace ? t("search.placeholder") : t("search.placeholderPersonal")}
                 aria-label={t("search.title")}
-                className="min-w-0 flex-1 bg-transparent text-body-lg text-fg outline-none placeholder:text-fg-muted"
+                /* The palette's own field. Same warm-derived placeholder as the
+                   trigger that opened it — the two are one control in two
+                   states, and a cool prompt here after a warm one there is the
+                   seam the user notices. */
+                className="min-w-0 flex-1 bg-transparent text-body-lg text-field-fg outline-none placeholder:text-field-placeholder"
               />
               <button
                 type="button"

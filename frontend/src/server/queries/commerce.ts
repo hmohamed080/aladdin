@@ -208,6 +208,16 @@ export type DemandLine = {
   createdAt: string | null;
   /** Other lines on the same request, so a card can say "+2 more items". */
   siblings: number;
+  /**
+   * The catalogue image for the requested product, when the line is linked to a
+   * catalogue entry and the reader is allowed to see it.
+   *
+   * Null is an ordinary outcome, not a failure: `rfq_items.product_id` is
+   * nullable (a buyer can ask for something nobody has listed), the product may
+   * carry no `image_ref`, and RLS may withhold another organization's catalogue
+   * row. Every caller therefore has to render without it.
+   */
+  imageRef: string | null;
 };
 
 /** How often one product is being asked for, this window against the last. */
@@ -283,12 +293,32 @@ export async function demandSignals(
     batches(ids).map((batch) =>
       supabase
         .from("rfq_items")
-        .select("rfq_id, product_name, quantity, unit")
+        /* `products(image_ref)` is an embedded read across the existing
+           `rfq_items.product_id` foreign key — no new column, no new table and
+           no RPC. It resolves to null wherever the line is unlinked or the
+           catalogue row is not readable by this caller, which the type and
+           every caller already treat as normal. */
+        .select("rfq_id, product_name, quantity, unit, products(image_ref)")
         .in("rfq_id", batch),
     ),
   );
 
-  type Item = { rfq_id: string; product_name: string; quantity: number; unit: ProductUnit };
+  type Item = {
+    rfq_id: string;
+    product_name: string;
+    quantity: number;
+    unit: ProductUnit;
+    /* PostgREST returns an embedded to-one as an object, but the generated types
+       widen it to an array for some relationships — normalised at the one place
+       it is read rather than at every call site. */
+    products?: { image_ref: string | null } | Array<{ image_ref: string | null }> | null;
+  };
+
+  const imageOf = (it: Item): string | null => {
+    const rel = it.products;
+    if (!rel) return null;
+    return (Array.isArray(rel) ? rel[0]?.image_ref : rel.image_ref) ?? null;
+  };
   const byRfq = new Map<string, Item[]>();
   for (const { data, error: itemErr } of results) {
     if (itemErr) throw itemErr;
@@ -317,6 +347,7 @@ export async function demandSignals(
         requiredDate: r.required_date,
         createdAt: r.created_at,
         siblings: items.length - 1,
+        imageRef: imageOf(it),
       });
     }
     if (open.length >= openLimit) break;
