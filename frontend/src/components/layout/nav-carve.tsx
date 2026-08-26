@@ -327,9 +327,19 @@ export function ActiveCarve({
       {/* The surface. Rounded on the LEADING side always; the TRAILING side is
           driven by `--carve-end-r`, which is the tile's own pill radius on the
           rail and zero once the band reaches the edge and the fillets take the
-          joint over. */}
+          joint over.
+
+          NO CAST SHADOW, AND THAT IS NOT AN OMISSION. This carried a fixed
+          `shadow-[0_2px_10px_rgba(0,10,30,0.28)]` — a dark shadow tuned for a
+          near-white pill sitting proud of the material, back when
+          `--shell-active` was the page's own light ground. It is not that any
+          more: the active surface is a translucent wash of the shell itself
+          (see tokens.css), and a dark shadow under a dark wash is not a depth
+          cue, it is a faint smudge. The row reads as lifted through its own
+          lighter tone instead, which is what keeps it in the rail's colour
+          family rather than pasted on top of it. */}
       <span
-        className="absolute inset-0 bg-shell-active shadow-[0_2px_10px_rgba(0,10,30,0.28)]"
+        className="absolute inset-0 bg-shell-active"
         style={{
           borderStartStartRadius: "var(--carve-start-r)",
           borderEndStartRadius: "var(--carve-start-r)",

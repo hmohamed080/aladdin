@@ -1018,7 +1018,24 @@ export function PipelineTrack({ stages }: { stages: PipelineStage[] }) {
 }
 
 /* ------------------------------------------------------------------ *
- * Product videos (Reels) — DESIGN-LAB PROTOTYPE, see `app/b2b/layout.tsx`
+ * Product videos (Reels) — A SUPPLIER-SIDE MODULE WITH DEMO PRESENTATION DATA
+ *
+ * WHO SEES IT. Rendered only where `catalog.write`/`catalog.publish` says the
+ * workspace publishes products (see `supply-dashboard.tsx`). It is a seller's
+ * module and does not propagate to buyer, consumer or admin surfaces — the
+ * DESIGN LANGUAGE globalized, this module's CONTENT deliberately did not.
+ *
+ * WHAT IS REAL AND WHAT IS NOT, STATED PLAINLY.
+ *   REAL      the products, their names, their photos, and the links out.
+ *   NOT REAL  views, likes, and durations. There is no video record and no
+ *             engagement model in this schema — nothing stores these. They are
+ *             DEMO PRESENTATION DATA derived from each product's own id (see
+ *             `decorativeFigure`), and they must not be read, exported, charted
+ *             or reported on as metrics.
+ *
+ * Building a media/engagement backend to make them real is a product decision
+ * with its own schema, storage and RLS consequences; the globalization pass that
+ * promoted this module's visual language deliberately did not make it.
  * ------------------------------------------------------------------ */
 
 export type ReelItem = {
@@ -1030,11 +1047,15 @@ export type ReelItem = {
 };
 
 /**
- * A stable, PLAINLY DECORATIVE figure derived from the record's own id — not
- * a random number (which would reshuffle every render/reload and look like a
- * flaky metric) and not a real count (there is no video/view/like model
- * behind this prototype; see the module doc). Same id, same figure, every
- * time, which is what keeps it from reading as live data it is not.
+ * A stable, PLAINLY DECORATIVE figure derived from the record's own id — not a
+ * random number (which would reshuffle every render/reload and look like a flaky
+ * metric) and not a real count (there is no video/view/like model behind this
+ * module; see the module doc). Same id, same figure, every time, which is what
+ * keeps it from reading as live data it is not.
+ *
+ * DO NOT promote these into anything that behaves like a metric — a sort, a
+ * filter, a report, an export or a chart. The moment a figure is ordered by, it
+ * stops being decoration and starts making a claim.
  */
 function decorativeFigure(id: string, min: number, max: number): number {
   let h = 0;
@@ -1055,11 +1076,10 @@ function formatDuration(totalSeconds: number): string {
  *
  * WHY A PHOTO CAN STAND IN FOR A FRAME
  * There is no video record in this schema (see the module's own empty state,
- * `m.supply.videos`) — this board is an explicitly scoped, fady-only
- * PRESENTATION of what the module will look like once one exists, built from
- * the one real asset every product already has. The play control and
- * duration badge are honest about what they are: an affordance and a length,
- * not a claim that a clip exists behind them.
+ * `m.supply.videos`) — this board is a PRESENTATION of what the module will look
+ * like once one exists, built from the one real asset every product already has.
+ * The play control and duration badge are honest about what they are: an
+ * affordance and a length, not a claim that a clip exists behind them.
  */
 function ReelCard({
   item,

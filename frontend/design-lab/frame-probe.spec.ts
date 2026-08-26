@@ -31,7 +31,7 @@ test("shell planes — geometry and computed styles", async ({ page, request }) 
         const header = document.querySelector<HTMLElement>("header")!;
         const L: string[] = [];
         L.push(`dir = ${document.documentElement.dir}`);
-        for (const v of ["--frame-pool-x", "--frame-warm-x", "--wash-angle", "--workspace", "--frame"])
+        for (const v of ["--frame-pool-x", "--workspace", "--workspace-mesh", "--workspace-mesh-lit"])
           L.push(`${v.padEnd(16)} = ${cs.getPropertyValue(v).trim()}`);
         const rect = (n: string, e: HTMLElement) => {
           const r = e.getBoundingClientRect();

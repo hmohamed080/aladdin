@@ -5,9 +5,9 @@
 | | |
 |---|---|
 | **Status** | Living document (canonical project memory) |
-| **Version** | Living (canonical) · rev 2026-08-01 |
+| **Version** | Living (canonical) · rev 2026-08-26 |
 | **Owner** | Design System / UX |
-| **Last updated** | 2026-08-01 |
+| **Last updated** | 2026-08-26 |
 | **Scope** | The design system and UX rules that govern **both** design work in `design.pen` **and** its frontend implementation. |
 | **Authority** | Authoritative for UI/UX policy. `UI-UX/design.pen` is the **visual source of truth** for screens/components; root [`DESIGN.md`](../DESIGN.md) is the approved brand-token and design-rule record; frontend semantic CSS variables and Tailwind mappings mirror those approved values. Operational rules for handling `.pen` files live in [`AGENTS.md`](./AGENTS.md). |
 | **Update triggers** | Any change to approved tokens, component rules, accessibility target, navigation/account model, or the anti-patterns list. UI/UX changes are recorded here and in `docs/operations/AGENT_WORK_LOG.md`. |
@@ -131,11 +131,38 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 - Mirrors to the **trailing edge in RTL**.
 
 ### Desktop display modes (three, and only three)
-The desktop sidebar offers **Expanded · Collapsed · Expand on hover**, chosen from a compact control in the sidebar footer. These are **presentations of one navigation**, never different navigations: the capability-derived item set, the grouping and order, the active-route rule and the RTL mirroring are identical in all three. A mode that hid a module the user has the capability for would be a defect, not a density option.
+The desktop sidebar offers **Expanded · Collapsed · Expand on hover**. These are **presentations of one navigation**, never different navigations: the capability-derived item set, the grouping and order, the active-route rule and the RTL mirroring are identical in all three. A mode that hid a module the user has the capability for would be a defect, not a density option.
 
-- **Expanded** — icons + labels + section headings at full width.
-- **Collapsed** — a narrow icon rail, and **icon-only means no painted text of any kind**. Section headings have no room, so grouping is carried by a divider instead of a word. Every item keeps its localized label as its **accessible name** and nothing more: no visible caption, no floating tooltip, no `title` attribute, no duplicated route name.
-- **Expand on hover** — rests collapsed and reveals on pointer entry or keyboard focus. The reveal **overlays inward over the content**; it must not resize the document, because widening a layout element on hover reflows the whole page on every pointer pass and is the usual source of hover flicker.
+- **Expanded** — icons + labels + group headings at full width. The brand lockup leads the top row and the mode control trails it.
+- **Collapsed** — a narrow icon rail, and **icon-only means no painted text of any kind**. The mode control *replaces* the lockup and centres; it does not sit beside a shrunken copy of it. Every item keeps its localized label as its **accessible name** and nothing more: no visible caption, no floating tooltip, no `title` attribute, no duplicated route name.
+- **Expand on hover** — rests collapsed and reveals on pointer entry or keyboard focus.
+
+**The control lives at the TOP of the sidebar, and it answers two gestures.** A **click** is a binary Expanded ↔ Collapsed toggle — the one choice a reader makes most often. A **hover or keyboard focus** opens a menu naming all three modes, which is the rarer, deliberate choice. Collapsing both into one menu-behind-a-click makes the common case cost two clicks: open the menu, then pick the state you are already looking at. The menu is **portaled above all content**, because the control travels between the centre of a rail and the trailing edge of an expanded panel and a menu clipped by its own scroll container is a bug waiting on a narrow screen.
+
+**The reveal PUSHES the workspace; it does not overlay it.** *(This reverses the earlier rule, deliberately — see Change History 2026-08-26.)* The sidebar widening **is** the application's own width changing, so the spacer that reserves its width animates on the same spring the panel does and the two stay in lockstep. The old rule forbade this because a hover-widened layout element reflows the page on every pointer pass; what makes it safe here is that both boxes are driven by **one** spring off **one** value, so there is no second element racing to catch up, and the width the server renders comes from the mode cookie so the first paint is never wrong.
+
+### Sidebar hierarchy — quick access, then groups
+The rail is **not** a flat list, and it is **not** entirely grouped. Both were tried:
+
+- **Quick access** — the handful of modules a caller opens every day sit at the top with no heading and no collapse. Burying daily-use routes one hover-delay behind a heading to keep the rail tidy optimizes the wrong thing.
+- **Secondary groups** — everything else lives under a collapsible heading (Network, Selling, Sourcing, Business). Groups start **closed**, except whichever one holds the current route. A rail that greets the reader with every group open buries the five items that matter under nine that do not.
+
+**Collapsed groups keep their identity.** On the rail a closed group draws **one representative icon**, not its flattened children — a group the reader left closed must not spill four icons the moment the sidebar narrows, which would expose exactly the state the expanded rail had just hidden. Clicking that icon reveals the group's own child icons vertically beneath it, and **only one collapsed group may be open at a time**, or the rail grows without bound.
+
+**A closed group is `inert`, not merely clipped.** Hiding rows with a zero-height track and `overflow: hidden` hides them *visually and nothing else*: the links stay in the tab order and in the accessibility tree, so a keyboard user walks through a dozen links they cannot see and a screen reader reads out a navigation the sighted user deliberately collapsed. Use `inert` on the collapsed subtree — it removes both at once without killing the height transition the collapse is built on.
+
+### Active route
+- A **rounded, calm band, inset on both sides.** Not a one-sided surface that touches the material's edge on one side and floats free on the other — that reads as cut off.
+- The active surface is a **wash of the sidebar's own material** (a little white mixed into its lit tone), never the page's ground. A near-white pill on a saturated rail reads as an object pasted on top of it rather than a row lifted out of it — and it needs no cast shadow, because a dark shadow under a light-on-dark wash is a smudge, not a depth cue.
+- The active label takes the rail's own **full-strength foreground**, not an inverted ink tuned for a light pill.
+- **If the active route is inside a group:** the group opens automatically, the active *child* carries the stronger selected background, and the parent group gets only a subtle "open" indication. The two cues are different things — a group can be open with no active route inside it, and active without being open — so they must never be drawn with the same treatment or they will fight for the single travelling carve.
+
+### Fixed bottom actions
+- **Settings** and **Upgrade your plan**, pinned below the scrolling list as a sibling so they can never scroll under it. Both the top row and this block are `shrink-0`; the nav list between them is the only flex item allowed to grow *or* shrink, and it owns the overflow.
+- **Exactly one Settings entry** in the whole rail. It is filtered out of the capability-derived list precisely so the fixed one is the only one — a Settings that appears both inside a group and at the foot is two answers to one question.
+- **Upgrade is one unified button surface.** One fill on the row itself — never a tinted icon tile stacked on an identically tinted row, because two translucent fills of the same colour compound and the icon reads as a darker box nested in a lighter one.
+- **No divider above this block.** A rule plus a fill there reads as a second component stitched onto the foot of the sidebar rather than the same sidebar continuing.
+- Collapsed, both rows are icon-only and therefore **must** carry an `aria-label` — without one the link has no accessible name at all.
 
 **The compact rail paints no text — including its own control.** Hover and keyboard focus light the **icon tile itself** (a subtle surface, a soft shadow, a short transition, and a focus-visible ring), and the active item stays visually stronger than any hover. Two rules follow, and both are things this rail got wrong before:
 
@@ -159,6 +186,47 @@ For **dense groups of peer cards** that would otherwise wrap into several rows a
 - CSS scroll snapping, smooth scrolling (respecting reduced motion), native trackpad/wheel and touch swipe. Controls are real buttons; an overflowing rail is keyboard-reachable.
 - **RTL is normalized explicitly.** `scrollLeft` does not follow writing direction — in RTL it rests at 0 and travels negative — so position is read as a distance (`Math.abs`) and every scroll flips its sign from the active direction. Never assume left means previous.
 - **Do not** convert data tables, main report charts, forms, or large operational lists into rails. Those are scanned and compared down the page; hiding half of one behind a swipe is a regression.
+
+## Workspace Shell & Surface Language
+The canonical B2B composition. Approved 2026-08-26; it supersedes the earlier three-plane "frame" shell entirely (see Change History).
+
+### Two materials and a field
+- **The sidebar carries the saturated dark colour; the workspace is light.** Not the other way round. A large expanse of low-luminance colour was tried as the workspace ground twice and read as heavy both times — "atmospheric" is not a synonym for "dark".
+- **The workspace is an ATMOSPHERE, not a fill:** a soft cool-mineral base with three restrained pools — a seam pool at the sidebar's own corner, a quieter mineral pool lower down, and one warm Lumen note. It is fixed to the **viewport**, never sized off the document, so it does not drift or re-tile as a long dashboard scrolls.
+- **The seam pool is the sidebar's own hue, diluted by the room.** That single fact is the whole mechanism behind the sidebar reading as integrated with the environment rather than pasted beside it. Mix pools toward the mesh's own light tone, never toward white — mixing toward white produces a spotlight, and a room is not a spotlight.
+- **Nothing between the field and the cards is a panel.** The shell root and the page body paint no fill, no border and no shadow; their transparency is what makes the atmosphere visible in every gutter. Any visible edge drawn around the whole dashboard reads as *"the dashboard sits inside a container"* — the one claim this composition must not make.
+- The `<body>` ground must match the atmosphere's base, so overscroll at either end of a long page and any route too short to fill the viewport reveal **more of the same field**, never a mismatched flash.
+
+### Surface hierarchy — and do not wrap everything in a card
+Workspace background → page heading and content → operational surfaces (cards/boards) → contextual surfaces (menus, popovers) where genuinely needed. Content that is simply *on the page* stays on the page.
+
+- **Cards are the only surfaces.** They carry the reader's attention precisely because the field behind them does not.
+- **Elevation is a level, not a look.** Light: a tight contact shadow plus a soft diffuse one, tinted toward the shell's colour family rather than neutral grey — a neutral shadow on a blue field reads as dirt. Dark: a cast shadow barely registers on a dark ground, so the lift comes from a **highlight edge plus a stronger border** instead. Same grammar, roles swapped for what actually reads.
+- **Board headers** carry a title, an optional count, and a control cluster (scope select · state toggle · overflow menu). **Board footers** carry one "view all" action out to the full list.
+- **Filters and chips are flat and borderless** — a bordered filter competes with the page's primary action. Hierarchy: one solid primary, one outlined secondary, everything else a quiet chip.
+- **Avoid:** nested cards everywhere, excessive pills, arbitrary icon boxes, stacked shadows, and generic SaaS gradients.
+
+### The header
+- **Sticky, with breathing room while stuck.** It stays in view as the workspace scrolls under it, and it sticks at the shell's gutter unit — never `top: 0`, which flattens a floating rounded card into a bar wedged into the viewport corner.
+- **Translucent chrome the atmosphere shows through**, not a second opaque page layer. Equal leading/trailing margins; the leading side is supplied by the sidebar's own gutter, so the trailing padding must **match that gutter exactly** or the card sits closer to the sidebar than to the viewport edge.
+- **Muted tokens inside it need a contrast nudge.** They are tuned against an opaque surface; composited over a translucent, lighter header they measure under their 4.5:1 target. Nudge toward the `-secondary` neighbour, not to full foreground — subordinate chrome must not become as loud as the context beside it.
+- **Never style it with a bare `header` selector.** Boards render their own semantic `<header>`; a bare selector froze every card's title row to the viewport while its card scrolled underneath. Use an explicit component attribute, and put the **variant in its value** — the same header component also renders on shells that have no atmosphere behind them and must keep their opaque bar.
+
+### Search
+Visual promotion only — behaviour is unchanged.
+- **Light:** a near-opaque Quartz surface, calm border, readable input text, muted placeholder, subtle shortcut badge. Not heavily translucent: stacked on the header's own translucency it reads as a grey smear rather than a surface.
+- **Dark:** a **lifted** charcoal-mineral surface with a real border — visibly distinct from both the header and the page. Never near-black.
+
+### Radius, spacing and motion
+- **Radius scale:** nav row < button < card. A row and a button that share a radius stop announcing which is which.
+- **Gutters are the composition, not spacing preferences** — they are the only apertures through which the field is visible. The sidebar owns the gutter between itself and the cards, because the active-route carve crosses it.
+- **Motion only where it communicates state:** sidebar width change, group expand/collapse, active-route travel, hover reveal, popover appearance. Everything honours `prefers-reduced-motion` — under it the carve **jumps** between positions rather than tweening.
+
+### What is global, and what is not
+The **design language** is global. The **navigation content and the modules are not.**
+- Role, organization type, capabilities, permissions and route visibility continue to decide what a rail contains and what a dashboard renders. Never achieve visual consistency by flattening role differences.
+- Supplier-only modules (incoming demand, quotations to answer, product videos) must not appear on buyer, consumer or admin surfaces.
+- Surfaces with a fundamentally different shell — the personal `/home` surface and the Admin console — keep that shell. Apply the canonical language to their own components where it fits; do not force B2B modules into them.
 
 ## Dashboard UX
 - Dashboards/cockpits are **action surfaces, not vanity walls.** Every tile answers "what should I do next?" and links to a real workflow (Sales cockpit → Opportunity/Need/Match/Follow-up/Quote/Pipeline/Task).
@@ -253,11 +321,20 @@ For **dense groups of peer cards** that would otherwise wrap into several rows a
 - **Merging roles** because they look similar — roles stay separate (End Consumer, Installer, Engineer, Interior Designer, Showroom, Supplier, Manufacturer, Importer, Wholesaler, Sales, Contractor, Trainer, Trainee, Admin).
 - **Diverging from the approved Aperture identity** or scattering its raw logo/font/hex values through components instead of semantic tokens.
 - **The rejected flat direction** ("Basic/Contact Information" old look) instead of the premium OTP direction.
+- **The superseded three-plane "frame" shell** — a flat pale frame colour behind the chrome, a bordered/shadowed body panel wrapping the whole dashboard, and a near-black navy sidebar. It is not an alternative to the current direction; it is the thing the current direction replaced.
+- **Identity-gated presentation** — branching any visual system on *who is signed in* (`user.email === …`) rather than on capability, org type or route. A design system is a property of the product, not of an account.
+- **Anti-AI / visual-quality constraints:** generic SaaS gradients, glassmorphism-for-its-own-sake, an icon in a tinted box beside every label, a pill around every noun, a shadow on every element, and decorative illustration standing in for information. Every surface, tint and elevation must be answerable with what it distinguishes.
 - **Color-only signaling**, single-theme tokens, non-mirrored RTL, dead-end dashboard tiles, hover-only actions on touch, native `alert/confirm` dialogs, unbounded tables, and full-screen blocking spinners for partial updates.
 - **UI implying access it can't grant** — authorization is enforced server-side (RLS); never show data or actions a user isn't entitled to.
 
 ## Change History
 Newest first.
+
+### 2026-08-26 — The approved visual direction becomes the canonical design system
+- **What:** Promoted the reviewed-and-approved workspace visual system out of a one-account prototype gate and into the shared design system. New **Workspace Shell & Surface Language** section (two materials and a field, surface hierarchy, header, search, radius/spacing/motion, and what is global vs role-specific). Rewrote **Desktop display modes**: the mode control moves to the **top** of the sidebar and answers a click (binary toggle) and a hover/focus (mode menu) differently; the hover reveal now **pushes** the workspace instead of overlaying it. Added **Sidebar hierarchy** (quick access + collapsible groups, one open collapsed group at a time, `inert` when closed), **Active route**, and **Fixed bottom actions** (one Settings, unified Upgrade, no divider). Added the superseded frame shell, identity-gated presentation, and the anti-AI constraints to *Anti-Patterns*.
+- **Why:** The direction was approved in the running application, so the gate it was reviewed behind (`user.email === "fady@example.test"`) had to go — a design system that depends on who is signed in is not a design system. Two of the rules here **reverse** earlier ones and both reversals are deliberate. The hover reveal was forbidden from resizing the document because a hover-widened layout element reflows the page on every pointer pass; what makes pushing safe is that the panel and the spacer that reserves its width are driven by **one** spring off **one** value, with the server-rendered width coming from the mode cookie. And the mode control moved out of the footer because a click there opened a three-item menu to change a state the user could already see, making the common case cost two clicks.
+- **Also corrected while promoting, because production is a higher bar than a prototype:** collapsed nav groups were clipped but still focusable and still announced (now `inert`); the collapsed Settings/Upgrade rows had **no accessible name at all**; the Upgrade label was an inline `locale === "ar" ? …` ternary the AR/EN parity check could not see; and the Arabic Reels title carried an untranslated "(Reels)". The shell-palette A/B proposal is **settled and removed** — neither candidate won; the adopted shell is a third value chosen against a light workspace.
+- **Known gap, deliberately not closed here:** the dashboard period selector was pulled from the page heading row on review (it competed with the primary action). The period still resolves from the URL and every comparison still computes from it, but there is currently **no UI to change it**. That needs a placement decision, not a re-add of the rejected control.
 
 ### 2026-08-18 — Numerals-and-formatting rule; the compact rail paints no text
 - **What:** Added *Numerals and Formatting* as a first-class section: every user-facing number goes through the one shared formatter layer, Arabic renders Arabic-Indic digits with the numbering system **named in the locale tag** (`ar-EG-u-nu-arab`), and technical identifiers (order refs, SKUs, UUIDs, emails, URLs) are the explicit exception that stays Latin in every locale. Rewrote the **Collapsed** and **Expand on hover** rules: icon-only now means *no painted text of any kind* — no caption, no tooltip, no `title`, and the sidebar-mode control itself is icon-only whenever the chosen mode is not Expanded. The chart *Numerals* bullet now points at the new section instead of restating half of it.

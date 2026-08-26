@@ -34,23 +34,10 @@ export default async function B2BLayout({ children }: { children: ReactNode }) {
 
   if (!workspace.active && personalEntry(workspace.entries)) redirect("/home");
 
-  /* DESIGN-LAB PROTOTYPE GATE — TEMPORARY, ONE ACCOUNT ONLY.
-     A visual-refresh pass reviewed live rather than as static shots. Gated on
-     the signed-in email so every other account renders byte-identical chrome;
-     nothing here changes data, capabilities, or business behavior. This is a
-     working-tree prototype, not a shipped preference — remove once the
-     direction is approved instead of promoting the flag. */
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const designLabAtmosphere = user?.email === "fady@example.test";
-
   return (
     <I18nProvider locale={locale} dir={dir}>
       {workspace.active ? (
-        <AppShell workspace={workspace} designLabAtmosphere={designLabAtmosphere}>
-          {children}
-        </AppShell>
+        <AppShell workspace={workspace}>{children}</AppShell>
       ) : (
         <NoOrgNotice theme={theme} />
       )}

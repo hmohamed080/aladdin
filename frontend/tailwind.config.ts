@@ -46,16 +46,21 @@ export default {
       colors: {
         // ---- Semantic (theme-aware) ----
         canvas: alpha("--canvas"),
-        /* ---- Workspace frame ----
-           The three grounds the B2B shell is built from: the frame the chrome
-           floats on, the workspace surface the page is composed on, and the
-           hairline that closes it. Chrome-and-shell only — see tokens.css.
-           NOTE the name: a `body` colour would collide with the `body` TYPE
-           step and make `text-body` mean two things. See tokens.css. */
-        frame: {
-          DEFAULT: alpha("--frame"),
-          2: alpha("--frame-2"),
-        },
+        /* ---- Workspace ----
+           The ground the B2B page is composed ON, and the hairline that closes
+           it. Chrome-and-shell only — see tokens.css.
+
+           THERE IS NO `frame` COLOUR ANY MORE. It used to be here (`frame`,
+           `frame-2`) as the plane the chrome floated on, and nothing paints that
+           plane now: `.workspace-frame` is a transparent layout box and the
+           field behind it is the atmosphere (`.workspace-atmosphere` in
+           globals.css), which is a gradient rather than a colour and therefore
+           has no business being a Tailwind colour utility. A `bg-frame` left
+           here would be a class that compiles, renders a flat fill, and quietly
+           undoes the composition wherever someone reached for it.
+
+           NOTE the name `workspace`: a `body` colour would collide with the
+           `body` TYPE step and make `text-body` mean two things. */
         workspace: alpha("--workspace"),
         "workspace-line": alpha("--workspace-line"),
         /* ---- Shell (workspace chrome) ----

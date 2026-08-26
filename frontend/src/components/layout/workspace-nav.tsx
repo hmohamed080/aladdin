@@ -382,7 +382,6 @@ export function Sidebar({
   narrow = false,
   stance = "buyer",
   carved = false,
-  collapsibleSections = false,
 }: {
   allowed: readonly string[];
   narrow?: boolean;
@@ -404,27 +403,19 @@ export function Sidebar({
    * no trailing edge and nothing to be carved out of.
    */
   carved?: boolean;
-  /**
-   * DESIGN-LAB PROTOTYPE GATE — see `app/b2b/layout.tsx`. One account only.
-   * Makes each labelled section a collapsible group (Bitrix24's own IA
-   * pattern) instead of a static heading. Off by default so every other
-   * account's rail is unaffected.
-   */
-  collapsibleSections?: boolean;
 }) {
   const { t } = useI18n();
   const reduced = useReducedMotion();
   const isActive = useActive();
-  /* SETTINGS IS NEVER IN THIS LIST FOR THE DESIGN-LAB RAIL.
-     It used to appear twice — once here, grouped under Business, and again as
-     the fixed bottom action `SidebarShell` always renders. `collapsibleSections`
-     is the design-lab gate already, so filtering here cannot touch any other
-     account's rail: everywhere else `collapsibleSections` is false and this
-     `.map` is a no-op. */
+  /* SETTINGS IS NEVER IN THIS LIST. It would otherwise appear twice — once
+     here, grouped under Business, and again as the fixed bottom action
+     `SidebarShell` always renders. One Settings entry, and the fixed one wins:
+     it is in the same place on every screen regardless of which groups are
+     open. */
   const sections = allowedNavSections(allowed, stance)
     .map(({ section, keys }) => ({
       section,
-      keys: collapsibleSections ? keys.filter((k) => k !== "settings") : keys,
+      keys: keys.filter((k) => k !== "settings"),
     }))
     .filter((s) => s.keys.length > 0);
   /* State, not a ref: the carve measures against this node from a LAYOUT effect,
@@ -470,7 +461,7 @@ export function Sidebar({
   return (
     <div ref={setList} className="relative">
       {carved ? (
-        <ActiveCarve container={list} narrow={narrow} roundedBand={collapsibleSections} />
+        <ActiveCarve container={list} narrow={narrow} roundedBand />
       ) : null}
       <nav
         aria-label={t("nav.workspace")}
@@ -494,8 +485,7 @@ export function Sidebar({
         // A manually-closed section still OPENS for the page the reader is
         // actually on — collapsing the group under your own feet and losing
         // the carve inside it would be a worse defect than the feature is
-        // worth. `collapsibleSections` off (every other account) always
-        // resolves to `open`, so nothing here can change their rail.
+        // worth.
         const containsActive = keys.some((k) => {
           const item = itemFor(k, stance);
           return isActive(item.href, item.exact);
@@ -507,15 +497,14 @@ export function Sidebar({
            just to keep the rail visually tidy would be optimizing the wrong
            thing; Bitrix24 doesn't group its own daily-use row either. Every
            later section (Network, Selling, Sourcing, Business) still gets
-           the heading + collapse treatment below. Off (`i` is irrelevant)
-           for every other account, where `collapsibleSections` is false. */
-        const quickAccess = collapsibleSections && i < 2;
+           the heading + collapse treatment below. */
+        const quickAccess = i < 2;
         /** Whether this section is one of the collapsible groups (Network,
          *  Selling, Sourcing, Business) as opposed to quick access — true
          *  regardless of `narrow`, unlike `collapsible` below, because the
          *  RAIL needs to know "this is a group" even where it draws no
          *  collapse control for one. */
-        const isSecondaryGroup = collapsibleSections && Boolean(labelKey) && !quickAccess;
+        const isSecondaryGroup = Boolean(labelKey) && !quickAccess;
         const collapsible = isSecondaryGroup && !narrow;
         const open = !collapsible || containsActive || !closed.has(section);
         const heading = labelKey && !narrow && !quickAccess ? labelKey : null;
@@ -599,11 +588,22 @@ export function Sidebar({
                    Motion, layered on top rather than replacing it — a grid
                    track alone is a wipe, and the reference's groups arrive
                    with a little more give than that. Both run on the same
-                   `open`, so they land together. Only reached when
-                   `collapsibleSections` is on (fady only) — every other
-                   account still gets the plain `<div>` below, unchanged. */
+                   `open`, so they land together. The plain `<div>` below is
+                   what quick-access sections and the narrow rail render
+                   instead — neither has a collapse control to animate. */
                 <motion.div
                   className="flex flex-col gap-0.5 overflow-hidden"
+                  /* `inert` WHILE CLOSED, AND IT IS NOT DECORATION.
+                     A `0fr` grid track plus `overflow: hidden` hides these rows
+                     VISUALLY and does nothing else: the links stay in the
+                     accessibility tree and in the tab order, so a keyboard user
+                     tabbing down a rail with four closed groups walks through
+                     ~12 links they cannot see, and a screen reader reads out a
+                     navigation the sighted user has deliberately collapsed.
+                     `inert` removes the whole subtree from both at once, which
+                     `hidden`/`display:none` could also do but only by killing
+                     the height transition this collapse is built on. */
+                  inert={!open}
                   initial={false}
                   animate={{ opacity: open ? 1 : 0, y: open ? 0 : -4 }}
                   transition={{ duration: reduced ? 0 : 0.18, ease: "easeOut" }}
@@ -695,6 +695,11 @@ export function Sidebar({
                   >
                     <motion.div
                       className="flex flex-col items-center gap-0.5 overflow-hidden"
+                      /* Same reasoning as the expanded groups above: clipped is
+                         not hidden. On the RAIL this matters more, not less —
+                         only one group may be revealed at a time, so everything
+                         in the other three is off-screen by design. */
+                      inert={!revealed}
                       initial={false}
                       animate={{
                         opacity: revealed ? 1 : 0,

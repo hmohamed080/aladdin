@@ -1,7 +1,7 @@
 {
   "$schema": "../tokens/README.md#format",
   "name": "aladdin.colors",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Canonical Aladdin color tokens for 'The Aperture'. Primitives are fixed hex; semantic tokens are theme-aware and reference primitives via {primitives.<name>}. This file is the source of truth; DESIGN.md frontmatter, frontend/src/styles/tokens.css, and the Tailwind theme mirror it.",
   "maintenance": "Manually maintained. On any color change, edit this file first, then propagate to DESIGN.md frontmatter and frontend/src/styles/tokens.css (see tokens/README.md).",
   "primitives": {
@@ -43,7 +43,26 @@
     "line-light-strong": { "value": "#C7BEAE", "description": "BRAND strong hairline, retained as a primitive. Superseded by quartz-line-strong." },
     "on-dark": { "value": "#F2EFE9", "description": "Primary text on dark; also dark-theme primary action fill." },
     "on-dark-secondary": { "value": "#B8BEC2", "description": "Secondary text on dark." },
-    "on-dark-muted": { "value": "#828A90", "description": "Muted text on dark." }
+    "on-dark-muted": { "value": "#828A90", "description": "Muted text on dark." },
+
+    "shell": { "value": "#24384D", "description": "THE WORKSPACE SHELL — the sidebar's own material. An architectural blue, deliberately NOT the enterprise navy #001537 it replaced (hue 217 at 100% saturation, sampled off a rendered concept, derived from nothing in this palette). Chrome only: never a content surface, never a card, never a page ground." },
+    "shell-lit": { "value": "#32506A", "description": "Head of the shell ramp. The active navigation row is a wash of THIS (white 14%), not of the page's ground — a near-white pill on a saturated rail reads as pasted on rather than carved out." },
+    "shell-deep": { "value": "#182636", "description": "Foot of the shell ramp." },
+    "shell-pool": { "value": "#345070", "description": "The tonal pools painted inside the shell." },
+    "shell-dark": { "value": "#0B131C", "description": "The shell in dark theme. Only MODERATELY darker than the dark workspace — light theme keeps a large gap between the two materials, dark theme deliberately does not, or the page becomes one undifferentiated near-black stack." },
+    "shell-dark-lit": { "value": "#131F2A", "description": "Head of the dark shell ramp." },
+    "shell-dark-deep": { "value": "#070D13", "description": "Foot of the dark shell ramp." },
+    "shell-dark-pool": { "value": "#16222E", "description": "Tonal pools inside the dark shell." },
+    "shell-text": { "value": "#F2F5FA", "description": "Primary text ON the shell. Tinted from the shell's hue rather than grey — a neutral grey on a saturated ground reads as dirty." },
+    "shell-text-secondary": { "value": "#CCD6E4", "description": "Secondary text on the shell." },
+    "shell-text-muted": { "value": "#7E90AB", "description": "Group headings and quietest chrome on the shell." },
+
+    "mineral": { "value": "#E6EBF2", "description": "THE WORKSPACE ATMOSPHERE base (light) — the cool-mineral field the whole B2B page is composed on. Light on purpose: the SIDEBAR carries the ink, and a large expanse of low-luminance colour was twice rejected as a workspace ground for reading as heavy." },
+    "mineral-lit": { "value": "#EEF2F8", "description": "The tone the atmosphere's pools are mixed TOWARD. Never mix toward white — that produces a spotlight, and a room is not a spotlight." },
+    "mineral-dark": { "value": "#111A24", "description": "Atmosphere base in dark theme. A soft charcoal-ink, deliberately neither pure black nor the app's own near-black carbon." },
+    "mineral-dark-lit": { "value": "#1B2836", "description": "Pool mix target in dark theme." },
+    "navy-air": { "value": "#5986CF", "description": "A TINT SOURCE, never a surface. Tinting a light ground toward a near-black blue yields grey, not blue: navy (0,21,55) mixed into a light ground at 15% gains barely 9 points of blue-minus-red. This is the same hue carried up to PAGE lightness, and it is what the atmosphere's seam pool — the sidebar's own hue diluted by the room — is actually mixed from." },
+    "navy-edge": { "value": "#153860", "description": "The second, quieter atmosphere pool's hue. Tint source only." }
   },
   "semantic": {
     "light": {
@@ -66,7 +85,23 @@
       "warning": { "value": "{primitives.ochre-deep}", "contrastOnCanvas": "7.29:1" },
       "danger": { "value": "{primitives.oxide}", "contrastOnCanvas": "5.37:1" },
       "info": { "value": "{primitives.lapis}" },
-      "focus": { "value": "{primitives.lumen-ink}" }
+      "focus": { "value": "{primitives.lumen-ink}" },
+
+      "shell": { "value": "{primitives.shell}", "note": "Chrome family. Separate from surface/canvas ON PURPOSE: these are the only tokens allowed on chrome, and surface/canvas the only ones allowed on content, so the two can never be confused at a call site." },
+      "shell-lit": { "value": "{primitives.shell-lit}" },
+      "shell-deep": { "value": "{primitives.shell-deep}" },
+      "shell-pool": { "value": "{primitives.shell-pool}" },
+      "shell-fg": { "value": "{primitives.shell-text}", "contrastOnShell": "12.1:1" },
+      "shell-fg-secondary": { "value": "{primitives.shell-text-secondary}", "contrastOnShell": "8.6:1" },
+      "shell-fg-muted": { "value": "{primitives.shell-text-muted}", "contrastOnShell": "3.5:1", "note": "Group HEADINGS only — uppercase 11px, which is not body text. Never use for a readable label." },
+      "shell-active": { "value": "color-mix(white 14%, {primitives.shell-lit})", "note": "The carved active row. A wash of the shell's OWN lit tone, never the page ground, and it carries no cast shadow — a dark shadow under a light-on-dark wash is a smudge, not a depth cue." },
+      "shell-active-fg": { "value": "{primitives.shell-text}", "note": "The rail's full-strength foreground, NOT an inverted ink: an ink tuned for a near-white pill is close to invisible on a translucent wash of the shell." },
+      "workspace-mesh": { "value": "{primitives.mineral}" },
+      "workspace-mesh-lit": { "value": "{primitives.mineral-lit}" },
+      "workspace-pool-cool": { "value": "{primitives.navy-air}", "note": "The SEAM pool — the sidebar's own hue. This one token is the mechanism behind the sidebar reading as integrated with the environment rather than pasted beside it." },
+      "workspace-pool-cool-2": { "value": "{primitives.navy-edge}" },
+      "workspace-pool-warm": { "value": "{primitives.lumen}", "note": "The one warm note in a cool field. Restrained — the brand's accent, not a second temperature competing with it." },
+      "workspace": { "value": "#FBFCFE", "note": "The operational ground the cards are drawn on. Panels stay `surface`." }
     },
     "dark": {
       "canvas": { "value": "{primitives.basalt}" },
@@ -87,7 +122,25 @@
       "warning": { "value": "{primitives.ochre-bright}", "contrastOnCanvas": "8.71:1" },
       "danger": { "value": "{primitives.oxide-bright}", "contrastOnCanvas": "6.08:1" },
       "info": { "value": "{primitives.lapis-bright}" },
-      "focus": { "value": "{primitives.lumen}" }
+      "focus": { "value": "{primitives.lumen}" },
+
+      "shell": { "value": "{primitives.shell-dark}" },
+      "shell-lit": { "value": "{primitives.shell-dark-lit}" },
+      "shell-deep": { "value": "{primitives.shell-dark-deep}" },
+      "shell-pool": { "value": "{primitives.shell-dark-pool}" },
+      "shell-fg": { "value": "#EDEDEC", "note": "The dark theme's own primary text. Literal rather than a {primitives.*} reference because the Carbon ramp it belongs to is not in this file yet — see knownDrift." },
+      "shell-active": { "value": "color-mix(white 14%, {primitives.shell-dark-lit})", "note": "SAME percentage as light, and that is correct rather than lazy: the token it mixes FROM already carries the theme, so re-deriving the percentage on top double-counts it. Measured at 9% and the active row visibly flattened against the rail." },
+      "shell-active-fg": { "value": "#EDEDEC", "note": "Same literal, same reason." },
+      "workspace-mesh": { "value": "{primitives.mineral-dark}" },
+      "workspace-mesh-lit": { "value": "{primitives.mineral-dark-lit}" },
+      "workspace-pool-cool": { "value": "{primitives.navy-air}", "note": "Hues are theme-independent; only the mesh they mix INTO changes, so the same percentages land as a tint rather than a glow." },
+      "workspace-pool-cool-2": { "value": "{primitives.navy-edge}" },
+      "workspace-pool-warm": { "value": "{primitives.lumen}" },
+      "workspace": { "value": "#131415", "note": "The Carbon ground. Literal for the same reason — see knownDrift." }
     }
+  },
+  "knownDrift": {
+    "note": "PRE-EXISTING, NOT INTRODUCED BY THE SHELL PASS. This file still names Basalt as the dark canvas/surface ramp; the implementation (frontend/src/styles/tokens.css) moved the dark GROUND to a neutral Carbon ramp some passes ago — Basalt was retained as a brand colour only. The Carbon primitives, the dark elevation shadows and the scrollbar tokens are therefore absent here. The shell/workspace family added on 2026-08-26 IS current. Reconciling the dark ramp is its own task; do not treat the Basalt entries above as authoritative for the dark workspace.",
+    "authority": "frontend/src/styles/tokens.css is currently ahead of this file for the dark theme."
   }
 }

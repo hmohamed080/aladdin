@@ -20,7 +20,7 @@ const PORT = Number(process.env.SHOT_PORT ?? 3000);
 
 export default defineConfig({
   testDir: ".",
-  testMatch: /(shots|probe|reduced-motion).spec.ts$/,
+  testMatch: /(shots|matrix|probe|reduced-motion).spec.ts$/,
   fullyParallel: false,
   workers: 1,
   retries: 0,

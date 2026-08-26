@@ -11,7 +11,7 @@ import {
 } from "@/server/queries/commerce";
 import { listOrders, quotationsWithOrders } from "@/server/queries/execution";
 import { supplySummary } from "@/server/queries/reports";
-import { resolvePeriod, periodDays, type PeriodKey } from "@/lib/workspace/period";
+import { resolvePeriod, periodDays } from "@/lib/workspace/period";
 import { type Kpi, type KpiDelta } from "@/components/ui/workspace-layout";
 import { RankedBars, DonutSplit } from "@/components/ui/charts";
 import {
@@ -24,7 +24,6 @@ import {
   BlockEmpty,
   type FlowStage,
 } from "@/features/home/supply-blocks";
-import { PeriodSelect } from "@/features/home/period-select";
 import { ViewActivityAction } from "@/features/home/notifications-footer-link";
 import { StageSelect } from "@/features/home/stage-select";
 import { BoardMenu } from "@/features/home/board-menu";
@@ -133,24 +132,27 @@ export async function SupplyDashboard({
   /** From the URL — validated here, never trusted. */
   period?: string;
   stage?: string;
-  /** DESIGN-LAB PROTOTYPE — the attention board's "Due date" header toggle. */
+  /** The attention board's "Due date" header toggle. */
   sort?: string;
-  /** DESIGN-LAB PROTOTYPE — the incoming-demand board's "Today" header toggle. */
+  /** The incoming-demand board's "Today" header toggle. */
   demandWindow?: string;
 }) {
-  const { supabase, org, locale, designLabAtmosphere } = ctx;
+  const { supabase, org, locale } = ctx;
   const m = getMessages(locale);
   const voice = supplyVoice(org.orgType);
 
   const period = resolvePeriod(rawPeriod);
   const days = periodDays(period);
   const stage = resolveStage(rawStage);
-  /* Both header toggles below are gated to the design-lab account: the
-     controls that set these params only render for fady, so no other
-     account's dashboard can produce a URL that reaches this branch — but
-     gating the READ too means a hand-typed query string cannot do it either. */
-  const sortDue = designLabAtmosphere && rawSort === "due";
-  const demandToday = designLabAtmosphere && rawDemandWindow === "today";
+  /* Both header toggles are ordinary view state now. They used to be gated on
+     one account's email, which is not a permission — it was scaffolding holding
+     a prototype control off everyone else's dashboard. Sorting a queue by due
+     date and narrowing a demand list to today read NOTHING the caller cannot
+     already see on this page, and both resolve to a boolean that only reorders
+     or filters rows RLS already returned. There is nothing here for a
+     hand-typed query string to reach. */
+  const sortDue = rawSort === "due";
+  const demandToday = rawDemandWindow === "today";
 
   const caps = new Set(org.capabilities);
   const superUser = caps.has("org.manage");
@@ -207,10 +209,13 @@ export async function SupplyDashboard({
          recipient-scoped by RLS, so what arrives is already only this reader's
          own mail. */
       listNotifications(supabase, { orgId: org.organizationId, limit: 5 }),
-      /* DESIGN-LAB PROTOTYPE — see `app/b2b/layout.tsx`. The Reels module's
-         real product photos, for fady@example.test only; every other
-         account pays nothing extra for a query it never renders. */
-      designLabAtmosphere && managesCatalog
+      /* The Reels module's product photos. Gated on the CAPABILITY that decides
+         whether this workspace has a catalogue to show reels of — the same gate
+         the module itself renders behind — so a workspace that cannot publish
+         products pays nothing for a query it would never draw. This used to be
+         `designLabAtmosphere && managesCatalog`: the identity half is gone, the
+         capability half is the part that was always doing real work. */
+      managesCatalog
         ? listOwnProducts(supabase, org.organizationId, { status: "published" })
         : Promise.resolve([]),
     ]);
@@ -771,28 +776,18 @@ export async function SupplyDashboard({
         subtitle={m.supply.voice[voice].subtitle}
         actions={
           <>
-            {/* The period control sits WITH the actions rather than inside the
-                metric panel, because the metric panel no longer has a header to
-                put it in — it is one continuous region now, and a control
-                floating inside it would read as belonging to whichever cell it
-                happened to land beside. Here it is plainly a page-level scope,
-                which is what it is.
+            {/* NO PERIOD CONTROL IN THIS ROW, BY REVIEW DECISION. It used to sit
+                here with the actions, and was pulled on direct request: against
+                the approved composition it read as competing with "+ New
+                product" for the same corner of the page.
 
-                DESIGN-LAB PROTOTYPE GATE — see `app/b2b/layout.tsx`. Pulled out
-                of this row for fady@example.test on direct request (it was
-                circled as visually competing with "+ New product"); every
-                other account keeps it exactly where it always was. The period
-                still resolves from the URL the same way — nothing about what
-                the dashboard queries or computes changed, only where this one
-                control is drawn. */}
-            {designLabAtmosphere ? null : (
-              <PeriodSelect
-                value={period}
-                basePath="/b2b"
-                label={m.supply.period.label}
-                options={PERIODS.map((k) => ({ value: k, label: m.supply.period[k] }))}
-              />
-            )}
+                WHAT DID NOT CHANGE: the period still resolves from the URL
+                exactly as before (`?period=`), every KPI still computes its
+                period-over-period comparison from it, and each card still names
+                its own window in its hint. What is missing is only the UI for
+                CHANGING it — a gap worth closing deliberately (most likely
+                inside the metric panel's own affordances) rather than by
+                re-adding a control the review already rejected from this row. */}
             {managesCatalog ? (
               <PrimaryAction href="/b2b/products/new">
                 <PlusIcon size={16} />
@@ -826,31 +821,35 @@ export async function SupplyDashboard({
               badge={
                 attention.length > 0 ? <BoardCount>{formatCount(attention.length, locale)}</BoardCount> : null
               }
+              /* THE BOARD-HEADER CONTROL GRAMMAR, now unconditional. These three
+                 — a scope select, a state toggle, an overflow menu — are the
+                 approved pattern for a board that has more rows than it shows.
+                 They were behind the prototype gate; nothing about them was ever
+                 account-specific, and every route they produce is the same
+                 RLS-scoped query with a different sort or filter. */
               controls={
-                designLabAtmosphere ? (
-                  <>
-                    <StageSelect
-                      value={stage}
-                      basePath="/b2b"
-                      label={at.stage.all}
-                      allLabel={at.typeFilter}
-                      options={stageCounts.map((s) => ({ key: s.key, label: s.label }))}
-                      query={carry}
-                    />
-                    <HeaderToggle
-                      Icon={CalendarIcon}
-                      label={sortDue ? at.dueDateSorted : at.dueDateLabel}
-                      active={sortDue}
-                      href={toggleHref("/b2b", carry, "sort", sortDue, "due")}
-                    />
-                    <BoardMenu
-                      label={m.supply.section.attention}
-                      refreshLabel={m.common.refresh}
-                      viewAllLabel={at.viewAll}
-                      viewAllHref={stageHref(stage)}
-                    />
-                  </>
-                ) : null
+                <>
+                  <StageSelect
+                    value={stage}
+                    basePath="/b2b"
+                    label={at.stage.all}
+                    allLabel={at.typeFilter}
+                    options={stageCounts.map((s) => ({ key: s.key, label: s.label }))}
+                    query={carry}
+                  />
+                  <HeaderToggle
+                    Icon={CalendarIcon}
+                    label={sortDue ? at.dueDateSorted : at.dueDateLabel}
+                    active={sortDue}
+                    href={toggleHref("/b2b", carry, "sort", sortDue, "due")}
+                  />
+                  <BoardMenu
+                    label={m.supply.section.attention}
+                    refreshLabel={m.common.refresh}
+                    viewAllLabel={at.viewAll}
+                    viewAllHref={stageHref(stage)}
+                  />
+                </>
               }
               footer={<BoardOut href={stageHref(stage)} label={m.supply.attention.viewAll} />}
             >
@@ -896,22 +895,20 @@ export async function SupplyDashboard({
               title={m.supply.demand.title}
               Icon={DemandIcon}
               controls={
-                designLabAtmosphere ? (
-                  <>
-                    <HeaderToggle
-                      Icon={CalendarIcon}
-                      label={m.supply.demand.today}
-                      active={demandToday}
-                      href={toggleHref("/b2b", carry, "demandWindow", demandToday, "today")}
-                    />
-                    <BoardMenu
-                      label={m.supply.demand.title}
-                      refreshLabel={m.common.refresh}
-                      viewAllLabel={m.supply.demand.viewAll}
-                      viewAllHref="/b2b/rfqs"
-                    />
-                  </>
-                ) : null
+                <>
+                  <HeaderToggle
+                    Icon={CalendarIcon}
+                    label={m.supply.demand.today}
+                    active={demandToday}
+                    href={toggleHref("/b2b", carry, "demandWindow", demandToday, "today")}
+                  />
+                  <BoardMenu
+                    label={m.supply.demand.title}
+                    refreshLabel={m.common.refresh}
+                    viewAllLabel={m.supply.demand.viewAll}
+                    viewAllHref="/b2b/rfqs"
+                  />
+                </>
               }
               footer={<BoardOut href="/b2b/rfqs" label={m.supply.demand.viewAll} />}
             >
@@ -1026,10 +1023,19 @@ export async function SupplyDashboard({
             </Board>
           </div>
 
-          {/* ROW 4 — DESIGN-LAB ONLY. The Reels module from the approved
-              reference, scoped to fady@example.test — see `ReelsBoard`'s own
-              doc for why product photos stand in for video frames here. */}
-          {designLabAtmosphere ? (
+          {/* ROW 4 — PRODUCT VIDEOS. A SUPPLIER-SIDE MODULE, AND IT STAYS ONE.
+              Gated on `managesCatalog` — the capability that means "this
+              workspace publishes products" — rather than on an account's
+              identity. A buyer-side organization reaching this dashboard has no
+              catalogue to draw reels of and never renders this row; the query
+              behind it is gated on the same capability, so it also never runs.
+
+              The engagement figures on each tile are PRESENTATION DATA, not
+              persisted metrics — see `ReelsBoard`'s own doc, and section 12 of
+              the globalization brief. Nothing in the schema stores views, likes
+              or durations, and this pass deliberately did not invent a media
+              backend to make them real. */}
+          {managesCatalog ? (
             <ReelsBoard
               title={m.supply.reels.title}
               viewAllLabel={m.supply.reels.viewAll}
@@ -1054,8 +1060,6 @@ export async function SupplyDashboard({
   );
 }
 
-/** The periods the strip offers, in the order the selector lists them. */
-const PERIODS: PeriodKey[] = ["30d", "90d", "365d", "all"];
 
 /** The URL is user input: anything not a stage is no stage. */
 function resolveStage(raw: string | undefined): AttentionKind | null {

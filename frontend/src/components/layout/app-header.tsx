@@ -217,13 +217,24 @@ export async function AppHeader({
 
   return (
     <header
-      /* Identifies THIS header uniquely, for CSS that must reach only the
-         shell's own bar and not any other `<header>` a page happens to
-         render further down (a dashboard board, an article, ...). Purely a
-         hook — it draws nothing and no rule currently reads it outside the
-         design-lab prototype, but it exists so a selector never again has to
-         assume "header" means "this one" for an entire subtree. */
-      data-app-header=""
+      /* Identifies THIS header uniquely, AND WHICH VARIANT IT IS, for CSS that
+         must reach only the shell's own bar — never another `<header>` a page
+         happens to render further down (a dashboard board, an article, ...),
+         and never a different shell's bar.
+
+         Both halves are load-bearing and both were learned the expensive way:
+           — WITHOUT the attribute, a bare `header` selector caught every
+             dashboard board's own title row, freezing each card's header to the
+             viewport while the card scrolled under it.
+           — WITHOUT the VALUE, promoting the card's translucent material would
+             reach the Personal home and the Admin console too. Those two render
+             the `bar` variant on `bg-canvas` with no workspace atmosphere behind
+             them, so a translucent bar there composites over nothing and reads
+             as a washed-out strip.
+
+         See the canonical chrome rules in globals.css, which key entirely off
+         `header[data-app-header="card"]`. */
+      data-app-header={card ? "card" : "bar"}
       /* A DISTINCT SHELL SURFACE, not a translucent strip over the page.
          It used to be `bg-surface/85 backdrop-blur`, which let the workspace
          scroll through it as a smear. That was survivable against flat white;

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { IDENTITIES, signIn } from "./helpers/auth";
+import { setSidebarMode } from "./helpers/sidebar";
 
 /**
  * Sprint 14 refinement — workspace sidebar modes and horizontal card rails.
@@ -23,11 +24,11 @@ async function prefs(page: Page, locale: "en" | "ar") {
 const sidebar = (page: Page) => page.locator("[data-sidebar-mode]");
 const control = (page: Page) => page.getByTestId("sidebar-control");
 
-async function setMode(page: Page, mode: "expanded" | "collapsed" | "hover") {
-  await control(page).click();
-  await page.getByTestId(`sidebar-mode-${mode}`).click();
-  await expect(sidebar(page)).toHaveAttribute("data-sidebar-mode", mode);
-}
+/* Delegates to the shared helper. A click on the control is a binary toggle and
+   no longer opens the menu — see `helpers/sidebar.ts`. Kept as a local alias so
+   the call sites below read the same as they always did. */
+const setMode = (page: Page, mode: "expanded" | "collapsed" | "hover") =>
+  setSidebarMode(page, mode);
 
 /** Width of the element that actually RESERVES layout space in the shell. */
 async function restingWidth(page: Page): Promise<number> {

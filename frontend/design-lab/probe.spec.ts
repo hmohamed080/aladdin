@@ -28,7 +28,7 @@ test("shell probe", async ({ page, request }) => {
 
   const out = await page.evaluate(() => {
     const cs = getComputedStyle(document.documentElement);
-    const vars = ["--frame", "--body", "--shell", "--shell-active", "--shell-gutter-w"];
+    const vars = ["--workspace-mesh", "--workspace", "--shell", "--shell-active", "--shell-gutter-w"];
 
     const rules: string[] = [];
     for (const sheet of Array.from(document.styleSheets)) {

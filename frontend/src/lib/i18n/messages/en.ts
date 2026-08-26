@@ -130,6 +130,10 @@ export const en = {
       collapsed: "Collapsed",
       hover: "Expand on hover",
     },
+    /* The one commercial call-to-action on the rail. The label only — which
+       plan, and what upgrading costs, are PRODUCT decisions this pass does not
+       make. */
+    upgrade: "Upgrade your plan",
   },
   rail: {
     previous: "Show previous",
@@ -1564,10 +1568,13 @@ export const en = {
       empty: "No videos yet",
       emptyBody: "Your catalogue currently supports one image per product. Clips will appear here once they are supported.",
     },
-    /* DESIGN-LAB PROTOTYPE — see `app/b2b/layout.tsx`. A presentational "Reels"
-       module for fady@example.test only: real product names and photos, no
-       video records behind it (none exist in this schema yet — see `videos`
-       above, which is the honest empty state for every other account). */
+    /* A SUPPLIER-SIDE module, rendered where `catalog.write`/`catalog.publish`
+       says the workspace publishes products. Real product names and photos; no
+       video records behind it, because none exist in this schema yet — see
+       `videos` above, which is the honest empty state when there is nothing to
+       show. The views/likes figures the module paints are demo presentation
+       data derived from each product's id, never persisted metrics; see
+       `features/home/supply-boards.tsx`. */
     reels: {
       title: "Product videos (Reels)",
       viewAll: "View all",

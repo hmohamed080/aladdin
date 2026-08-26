@@ -126,6 +126,7 @@ export const ar: Messages = {
       collapsed: "مصغّر",
       hover: "التوسيع عند المرور",
     },
+    upgrade: "ترقية خطتك",
   },
   rail: {
     previous: "عرض السابق",
@@ -1534,7 +1535,13 @@ export const ar: Messages = {
       emptyBody: "لا يدعم كتالوجك حاليا سوى صورة واحدة لكل منتج. ستظهر المقاطع هنا فور إتاحتها.",
     },
     reels: {
-      title: "فيديوهات المنتجات (Reels)",
+      /* NO "(Reels)" GLOSS HERE, unlike the English title. The Latin word was
+         carried over from the English string and reads as untranslated UI on an
+         Arabic screen — which is exactly what the catalogue's own parity test
+         flags. The Arabic name stands on its own without it; "Reels" is a
+         borrowed platform word, not an Aladdin brand term that must survive
+         translation. */
+      title: "فيديوهات المنتجات",
       viewAll: "عرض الكل",
       addNew: "إضافة فيديو جديد",
       views: "مشاهدة",

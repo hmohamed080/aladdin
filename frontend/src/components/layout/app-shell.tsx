@@ -17,12 +17,23 @@ import { cn } from "@/lib/ui/cn";
 /**
  * The B2B workspace chrome.
  *
- * THREE PLANES, AND THE ORDER IS THE WHOLE DESIGN
- * A full-height navy sidebar standing on the far side; a light header card and a
- * light body surface FLOATING on a slightly darker frame; and white panels
- * raised again on top of the body. Each plane is a step lighter than the one
- * behind it, which is what lets the header read as a separate object rather than
- * as the top edge of the page.
+ * TWO MATERIALS AND A FIELD, AND THE RELATIONSHIP IS THE WHOLE DESIGN
+ * A full-height sidebar in saturated architectural blue standing on the far
+ * side; a light, cool-mineral ATMOSPHERE filling everything else; and the cards
+ * — header, boards, panels — as the only surfaces raised onto it.
+ *
+ * The sidebar carries the ink and the workspace is light, not the other way
+ * round: a large expanse of low-luminance colour was tried twice and read as
+ * heavy both times. What ties the two together is the atmosphere's own seam
+ * pool, which is the SIDEBAR'S hue diluted by the room — so the join reads as
+ * one designed transition rather than as a dark rectangle and a light rectangle
+ * touching.
+ *
+ * NOTHING BETWEEN THEM IS A PANEL. This element and the body below it paint no
+ * fill, no border and no shadow (see globals.css); their transparency is what
+ * makes the atmosphere visible in every gutter. Any visible edge drawn around
+ * the whole dashboard reads as "the dashboard sits inside a container", which is
+ * the one claim this composition must not make.
  *
  * WHAT CHANGED, AND WHY IT HAD TO
  * The header used to span the viewport with the sidebar tucked underneath it,
@@ -36,12 +47,12 @@ import { cn } from "@/lib/ui/cn";
  * column beside it.
  *
  * THE GUTTER IS THE SIDEBAR'S, NOT THE CONTENT COLUMN'S
- * The strip of frame between the navy and the header card is owned by
- * `SidebarShell` (see its `--shell-gutter-w`). It has to be, because the carve
- * crosses it: the active module's light surface starts inside the navigation
- * column, passes through the sidebar's trailing edge and ends flush with the
- * cards. A gutter that belonged to this element instead would clip it at the
- * navy edge and the carve would become a pill again.
+ * The strip between the shell and the header card is owned by `SidebarShell`
+ * (see its `--shell-gutter-w`). It has to be, because the carve crosses it: the
+ * active module's surface starts inside the navigation column, passes through
+ * the sidebar's trailing edge and ends flush with the cards. A gutter that
+ * belonged to this element instead would clip it at the shell's edge and the
+ * carve would become a pill again.
  *
  * BELOW `tablet` NONE OF THIS APPLIES. The sidebar is not rendered, the cards
  * lose their margins and the header goes back to being a plain bar, because 390
@@ -54,12 +65,9 @@ import { cn } from "@/lib/ui/cn";
 export async function AppShell({
   workspace,
   children,
-  designLabAtmosphere = false,
 }: {
   workspace: WorkspaceContext;
   children: ReactNode;
-  /** DESIGN-LAB PROTOTYPE GATE — see `app/b2b/layout.tsx`. One account only. */
-  designLabAtmosphere?: boolean;
 }) {
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
@@ -77,28 +85,22 @@ export async function AppShell({
   return (
     // `items-stretch` rather than the default: the sidebar sizes itself and the
     // column beside it takes the rest, and both must reach the full height even
-    // when the page is shorter than the viewport — otherwise the navy stops
+    // when the page is shorter than the viewport — otherwise the shell stops
     // partway down on an empty route.
-    // `workspace-frame` rather than `bg-frame`: the frame is a four-layer
-    // gradient plane, not a fill — cool where the navy is, warm where it is not.
-    // See globals.css. It is painted HERE, on the outermost box, because that is
-    // the only element that is behind the sidebar's gutter, the header card and
-    // the body card at once — which is the definition of the plane they float on.
-    <div
-      className="workspace-frame flex min-h-dvh items-stretch"
-      data-design-lab={designLabAtmosphere ? "atmosphere" : undefined}
-    >
-      {/* THE DESIGN-LAB ATMOSPHERE MESH — fady@example.test only.
-          A fixed, viewport-anchored layer (not sized off the document, so it
-          never drifts as the body scrolls) painted BEHIND everything on this
-          plane. It only exists so `.workspace-frame`'s own flat fill can be
-          switched to `transparent` under the same gate — see globals.css —
-          letting this show through the sidebar's gutter, the gap around the
-          header card, and the translucent body. Inert and unannounced, same as
-          `ShellAtmosphere`. */}
-      {designLabAtmosphere ? (
-        <div aria-hidden="true" className="design-lab-mesh pointer-events-none fixed inset-0 -z-10" />
-      ) : null}
+    // `workspace-frame` is the outermost box — the only element behind the
+    // sidebar's gutter, the header card and the body at once, which is the
+    // definition of the plane they float on. It PAINTS NOTHING now (see
+    // globals.css): its transparency is what makes the atmosphere below visible
+    // in every aperture, and its `isolation: isolate` is what stops `<body>`'s
+    // own fill covering that atmosphere up.
+    <div className="workspace-frame flex min-h-dvh items-stretch">
+      {/* THE WORKSPACE ATMOSPHERE — the field this whole application is composed
+          on. A fixed, VIEWPORT-anchored layer (not sized off the document, so it
+          never drifts or re-tiles as a long dashboard scrolls) painted behind
+          everything on this plane: it shows through the sidebar's gutter, the
+          gaps around the header card, and every space the page's own content
+          does not cover. Inert and unannounced, same as `ShellAtmosphere`. */}
+      <div aria-hidden="true" className="workspace-atmosphere pointer-events-none fixed inset-0 -z-10" />
 
       {/* Persistent sidebar (desktop / tablet). Owns its own display modes, its
           own gutter, and now the brand lockup. */}
@@ -107,13 +109,15 @@ export async function AppShell({
         mode={sidebarMode}
         stance={stance}
         appName={m.common.appName}
-        orgName={active.organizationName}
-        branchName={active.branches.find((b) => b.id === active.activeBranchId)?.name ?? null}
-        designLabAtmosphere={designLabAtmosphere}
-        /* No verification chip. The reference draws one, but `OrgContext` carries
-           no verification state and inventing a backend read for a badge is the
-           wrong trade — a chip that says "Verified" without asking anything is
-           worse than no chip. */
+        /* NO ORG/BRANCH CARD, so no `orgName`/`branchName`. The fixed
+           Settings/Upgrade block took that space at the foot of the rail, and
+           the header's own workspace switcher already carries both facts on the
+           same screen — the card was stating one fact twice.
+
+           No verification chip either. The reference draws one, but `OrgContext`
+           carries no verification state and inventing a backend read for a badge
+           is the wrong trade — a chip that says "Verified" without asking
+           anything is worse than no chip. */
       />
 
       <div
@@ -127,7 +131,7 @@ export async function AppShell({
           // card, 13px between the header and the body, 16px down the far edge.
           // `pt-4`/`gap-3`/`pe-4` are those, to the nearest step. The START side
           // is zero because the sidebar's own gutter already supplies it —
-          // doubling them puts the header card 80px off the navy.
+          // doubling them puts the header card 80px off the shell.
           //
           // THERE IS NO BOTTOM MARGIN, AND THAT IS THE POINT.
           // It used to be `py-4`, which closed the body 16px above the viewport
@@ -138,30 +142,26 @@ export async function AppShell({
           // nothing is meant to. The body is the workspace, so it runs off the
           // bottom of the page and simply does not end.
           "tablet:ps-0",
-          // DESIGN-LAB ONLY: the shared shell's apertures (16/13/16px) were
-          // sized to show a bare tint of `--frame` — enough for a flat colour,
-          // not enough for a mesh with real form to read as a mesh rather than
-          // a hairline. Widened so the pools behind the header and down the
-          // trailing edge are actually LEGIBLE, and so the body reads as an
-          // object with real air around it rather than a page that happens to
-          // have rounded top corners. This is normal padding on the scrolling
-          // column, not a fixed footer or an inner scroll area — the mesh
-          // behind it is what makes the gap read as "background", and it is
-          // always there, at any scroll position, because it is a fixed
-          // layer, not part of the document. Written as one or the other
-          // (never both) so the atmosphere's wider apertures cannot collide
-          // with the shared shell's own utility classes for the same
-          // properties.
-          // The END padding now MATCHES `--shell-gutter-w` (0.875rem) exactly
-          // — the same aperture the sidebar's own gutter spends on the START
-          // side, which `ps-0` above deliberately leaves this column to
-          // supply nothing of. Before this it was `pe-8` (2rem) against an
-          // effective start margin of 0.875rem: measurably asymmetric, not
-          // an eyeballing error — the header card sat closer to the sidebar
-          // than to the viewport's own trailing edge.
-          designLabAtmosphere
-            ? "tablet:gap-6 tablet:pt-8 tablet:pe-3.5 tablet:pb-10"
-            : "tablet:gap-3 tablet:pt-4 tablet:pe-4",
+          // THE APERTURES. The earlier shell's were 16/13/16px, sized to show a
+          // bare tint of a FLAT frame colour — enough for a fill, not enough for
+          // an atmosphere with real form to read as anything but a hairline.
+          // Widened so the pools behind the header and down the trailing edge
+          // are actually LEGIBLE, and so the body reads as an object with real
+          // air around it rather than a page that happens to have rounded top
+          // corners. This is normal padding on the scrolling column — not a
+          // fixed footer, not an inner scroll area — and what makes the gap read
+          // as "background" is the atmosphere behind it, which is present at any
+          // scroll position because it is a fixed layer rather than part of the
+          // document.
+          //
+          // THE END PADDING MATCHES `--shell-gutter-w` (0.875rem) EXACTLY — the
+          // same aperture the sidebar's own gutter spends on the START side,
+          // which `ps-0` above deliberately leaves this column to supply nothing
+          // of. It was `pe-8` (2rem) against an effective start margin of
+          // 0.875rem: measurably asymmetric, not an eyeballing error — the
+          // header card sat closer to the sidebar than to the viewport's own
+          // trailing edge.
+          "tablet:gap-6 tablet:pt-8 tablet:pe-3.5 tablet:pb-10",
         )}
       >
         <AppHeader
@@ -192,49 +192,29 @@ export async function AppShell({
           actions={<SalesRealtime orgId={active.organizationId} branchId={active.activeBranchId} />}
         />
 
-        {/* The BODY plane — ONE CONTINUOUS WORKSPACE SURFACE. It opens below the
-            header, it reaches the bottom of the viewport when the content is
-            shorter than the screen, it grows with the content when it is
-            longer, and in neither case does it close: `flex-1` claims the
-            height, and the absence of a bottom margin, a bottom border and a
-            bottom radius is what stops it drawing an edge across the page.
+        {/* The BODY — A LAYOUT BOX, NOT A PANEL, AND THAT IS THE DECISION.
+            An earlier round gave this element its own visible panel (rounded
+            top, bordered, a translucent fill, an elevation shadow) and it was
+            reviewed and rejected: one giant surface wrapping the dashboard was
+            the single biggest mismatch against the approved reference, where
+            content sits DIRECTLY on the workspace and the cards are the only
+            surfaces. Any visible edge around the whole dashboard reads as "the
+            dashboard sits inside a container", which is precisely the claim the
+            composition is trying not to make.
 
-            `workspace-body` is its fill, and the fill is a RAMP IN ALPHA — see
-            globals.css. The surface is barely present at its top edge, so the
-            frame plane behind it is what shows through around the page heading,
-            and it is fully opaque a screen down, where the panels need a flat
-            ground. This is why the heading zone and the gutter beside it are the
-            same colour: they are the same plane.
+            So it carries no radius, no border, no shadow and no fill (the
+            no-paint is stated explicitly in globals.css). What the reader sees
+            here is the atmosphere, unmodified, in every gap the page's own
+            content does not cover.
 
-            The radius and border are TOP-ONLY for the same reason the margin is.
-            A rounded bottom corner is a statement that the surface has ended,
-            and it has not. */}
+            It still opens below the header, reaches the bottom of the viewport
+            when the content is shorter than the screen, grows with the content
+            when it is longer, and in neither case CLOSES: `flex-1` claims the
+            height, and the absence of a bottom margin is what stops it drawing
+            an edge across the page. */}
         <main
           className={cn(
             "workspace-body relative flex min-w-0 flex-1 flex-col",
-            // DESIGN-LAB ONLY: round 3 gave this element its own visible
-            // panel (rounded, bordered, a glass fill) — reviewed and
-            // rejected: "one giant navy/glass body wrapping the dashboard"
-            // was the single biggest mismatch against the Bitrix24 reference,
-            // where content sits DIRECTLY on the workspace background and the
-            // cards themselves are the only surfaces. So under the gate this
-            // element now carries NO panel chrome at all — no radius, no
-            // border, no shadow, no fill (see globals.css) — it is purely a
-            // layout box. The mesh painted behind `.workspace-frame` is what
-            // the reader sees here, in every gap the page's own content
-            // doesn't cover.
-            designLabAtmosphere
-              ? null
-              : "tablet:rounded-t-3xl tablet:border-x tablet:border-t tablet:border-workspace-line",
-            // `shadow-[shadow:var(...)]` — the type hint is REQUIRED and its
-            // absence is silent. Tailwind cannot infer whether a bare
-            // `shadow-[var(--x)]` is a box-shadow or a shadow COLOUR, and when it
-            // guesses colour it emits a rule that sets `--tw-shadow-color` and
-            // leaves `box-shadow: none`. That is exactly what happened here: the
-            // class was present in the markup, the token resolved correctly, and
-            // the computed style still read `none`. (Design-lab skips this
-            // entirely — a panel shadow implies a panel.)
-            !designLabAtmosphere && "tablet:shadow-[shadow:var(--workspace-shadow)]",
             // The bottom padding is the LAST PANEL's clearance, not the body's
             // own margin — the surface continues past it either way. On mobile
             // it also has to clear the fixed bottom navigation.

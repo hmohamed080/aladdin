@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { IDENTITIES, signIn } from "./helpers/auth";
+import { setSidebarMode } from "./helpers/sidebar";
 
 /**
  * Sprint 15 — the shared SUPPLY-SIDE B2B workspace.
@@ -317,8 +318,7 @@ test.describe("shared B2B chrome on a supply-side workspace", () => {
 
     // Collapse, then confirm the choice SURVIVES a full document load — the mode
     // is a cookie read on the server so the first paint is already correct.
-    await page.getByTestId("sidebar-control").click();
-    await page.getByTestId("sidebar-mode-collapsed").click();
+    await setSidebarMode(page, "collapsed");
     await expect(shell).toHaveAttribute("data-sidebar-mode", "collapsed");
     await page.reload();
     await expect(page.locator("[data-sidebar-mode]")).toHaveAttribute(
@@ -331,8 +331,7 @@ test.describe("shared B2B chrome on a supply-side workspace", () => {
     await expect(nav.getByRole("link", { name: "Incoming demand", exact: true })).toBeVisible();
 
     // Hover mode reveals without reflowing the document.
-    await page.getByTestId("sidebar-control").click();
-    await page.getByTestId("sidebar-mode-hover").click();
+    await setSidebarMode(page, "hover");
     await expect(shell).toHaveAttribute("data-sidebar-mode", "hover");
     await expect(shell).toHaveAttribute("data-sidebar-open", "false");
     await nav.hover();
@@ -341,8 +340,7 @@ test.describe("shared B2B chrome on a supply-side workspace", () => {
 
     // Leave the workspace as we found it, so the mode does not leak into the
     // next test in this serial suite.
-    await page.getByTestId("sidebar-control").click();
-    await page.getByTestId("sidebar-mode-expanded").click();
+    await setSidebarMode(page, "expanded");
   });
 
   test("the dashboard KPI group is the shared strip, and the shared rail still exists", async ({

@@ -25,17 +25,16 @@ const ONE_YEAR = 60 * 60 * 24 * 365;
 const MENU_HOVER_DELAY_MS = 350;
 
 /**
- * DESIGN-LAB ONLY: the top display-mode control.
+ * The top display-mode control.
  *
  * TWO SEPARATE GESTURES, ONE ELEMENT — a click and a hover mean different
- * things here, which the shared shell's version does not attempt: there a
- * click opens the same 3-option menu every time. Bitrix24 (and most rails
- * that put this control up top) split it: a click is the ONE choice you make
- * most often — flip between expanded and collapsed — and a hover is for the
+ * things here, which the earlier shell's version did not attempt: there a click
+ * opened the same 3-option menu every time. The approved reference (and most
+ * rails that put this control up top) splits it: a CLICK is the one choice you
+ * make most often — flip between expanded and collapsed — and a HOVER is for the
  * rarer, deliberate choice of a specific mode, "Expand on hover" included.
- * Collapsing that into one menu-behind-a-click means the common case now
- * costs two clicks (open the menu, then pick the state you're already
- * looking at).
+ * Collapsing both into one menu-behind-a-click makes the common case cost two
+ * clicks: open the menu, then pick the state you are already looking at.
  *
  * A real component rather than a closure returning JSX (the shared shell's
  * `modeControl` helper) BECAUSE it owns hover-timer state: a plain function
@@ -296,30 +295,25 @@ export function SidebarShell({
   mode: initialMode,
   stance = "buyer",
   appName,
-  orgName,
-  branchName,
-  designLabAtmosphere = false,
 }: {
   allowed: readonly string[];
   mode: SidebarMode;
   /**
    * The product name, for the lockup at the head of the panel.
    *
-   * The brand lives HERE now and not in the header. It moved because the header
+   * The brand lives HERE and not in the header. It moved because the header
    * stopped spanning the viewport: a lockup inside a card that begins 280px in
    * is no longer introducing the application, it is decorating one of two cards.
    * At the top of the full-height sidebar it is the first thing on the screen
    * again, which is the job it was always doing.
+   *
+   * `orgName` / `branchName` USED TO BE HERE and deliberately are not any more.
+   * They fed a workspace card at the foot of the panel, which the fixed
+   * Settings/Upgrade block replaced: the same organization and branch are
+   * already on screen in the header's own workspace switcher, so the card was
+   * stating one fact twice rather than a second fact worth the space.
    */
   appName: string;
-  /** The active organization, for the card at the foot of the panel. */
-  orgName: string;
-  /**
-   * The active branch, or null when the caller's scope is org-wide. Null is a
-   * real state and is drawn as absence — the card simply carries one line — not
-   * as an em dash standing in for a place.
-   */
-  branchName: string | null;
   /**
    * Which seat this workspace leads from. It reaches only as far as `Sidebar`,
    * which uses it to order and label the modules. Every display mode, the hover
@@ -328,10 +322,8 @@ export function SidebarShell({
    * Distributor one.
    */
   stance?: CommerceStance;
-  /** DESIGN-LAB PROTOTYPE GATE — see `app/b2b/layout.tsx`. One account only. */
-  designLabAtmosphere?: boolean;
 }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const reduced = useReducedMotion();
   const [mode, setMode] = useState<SidebarMode>(initialMode);
   const [revealed, setRevealed] = useState(false);
@@ -342,7 +334,13 @@ export function SidebarShell({
   // panel out from under an open menu would close it mid-choice.
   const open = mode === "expanded" || ((revealed || menuOpen) && mode === "hover");
   const narrow = !open;
-  const resting = mode === "expanded" ? SIDEBAR_WIDTH.expanded : SIDEBAR_WIDTH.rail;
+  /* ONE WIDTH, NOT TWO. There used to be a second `resting` value here — the
+     width the SPACER held regardless of a hover reveal, which is what let the
+     panel float over the page instead of pushing it. Now that the spacer tracks
+     the panel (see below), `resting` and `visual` only ever differed mid-reveal,
+     and keeping both invited them to drift. First paint is still correct without
+     it: `open` is false for a fresh `hover` mode, so the server-rendered width is
+     the rail, exactly as the mode cookie asks. */
   const visual = open ? SIDEBAR_WIDTH.expanded : SIDEBAR_WIDTH.rail;
 
   const choose = (next: SidebarMode) => {
@@ -397,42 +395,44 @@ export function SidebarShell({
    * more than the caption ever did. Only the PAINTED text is gone.
    */
 
-  /* DESIGN-LAB PUSH BEHAVIOUR — see the prop's own note.
-     The shared shell's spacer is a PLAIN, unanimated box: its width is the
-     JS `resting` value, so it only ever changes on a mode switch, and a hover
-     reveal (which changes `visual` without touching `resting`) leaves it
-     untouched on purpose — the panel then overlays the page rather than
-     resizing it, which is deliberate there (see the file header).
-     Fady's prototype asks for the opposite: the sidebar is the application's
-     own width changing, not a drawer floating over it, so the SPACER has to
-     carry the same animated value the panel does. Doing that only costs
+  /* THE SIDEBAR PUSHES THE PAGE; IT DOES NOT FLOAT OVER IT.
+     The earlier shell's spacer was a PLAIN, unanimated box: its width was the JS
+     `resting` value, so it only changed on a mode switch, and a hover reveal
+     (which changes `visual` without touching `resting`) left it untouched — the
+     panel then overlaid the page rather than resizing it.
+
+     The approved direction is the opposite: the sidebar widening IS the
+     application's own width changing, not a drawer sliding over it. So the
+     SPACER carries the same animated value the panel does. That costs only
      handing it the identical `animate`/`transition` pair — the panel's own
-     animation is untouched and the two stay in lockstep because they are
-     driven by the same spring off the same `visual`, not because one waits
-     on the other. */
+     animation is untouched, and the two stay in lockstep because they are driven
+     by the same spring off the same `visual`, not because one waits on the
+     other.
+
+     The width the server renders is still the mode cookie's (read in
+     `AppShell`), so first paint is correct before this spring ever runs. */
   // `animate`/`transition` take Motion's own types, not `CSSProperties` — the
   // panel below gets away with an inline object literal because JSX gives it
-  // contextual typing; pulled into a variable (so the spacer can share the
-  // exact same value) that inference is lost, so both are typed loosely here
-  // rather than fighting Motion's generics for a value this narrow.
+  // contextual typing; pulled into a variable (so the spacer can share the exact
+  // same value) that inference is lost, so both are typed loosely here rather
+  // than fighting Motion's generics for a value this narrow.
   const springTransition = reduced
     ? { duration: 0 }
     : ({ type: "spring", stiffness: 520, damping: 42, mass: 1 } as const);
-  const spacerAnimate: Record<string, string> | undefined = designLabAtmosphere
-    ? { "--shell-nav-w": visual }
-    : undefined;
-  const spacerTransition = designLabAtmosphere ? springTransition : undefined;
-  const spacerStyle: CSSProperties = designLabAtmosphere
-    ? {
-        width: "calc(var(--shell-nav-w) + var(--shell-gutter-w))",
-        ["--shell-nav-w" as string]: visual,
-        zIndex: 300,
-        top: 0,
-        height: "100dvh",
-      }
-    : { width: `calc(${resting} + var(--shell-gutter-w))`, zIndex: 300, top: 0, height: "100dvh" };
+  const spacerAnimate: Record<string, string> = { "--shell-nav-w": visual };
+  const spacerStyle: CSSProperties = {
+    width: "calc(var(--shell-nav-w) + var(--shell-gutter-w))",
+    ["--shell-nav-w" as string]: visual,
+    zIndex: 300,
+    top: 0,
+    height: "100dvh",
+  };
 
-  const upgradeLabel = locale === "ar" ? "ترقية خطتك" : "Upgrade your plan";
+  /* THROUGH THE MESSAGE CATALOGUE, NOT A TERNARY ON `locale`. While this was a
+     one-account prototype an inline `locale === "ar" ? ... : ...` was a
+     shortcut with a known expiry; shipped, it is a string the AR/EN parity check
+     cannot see and the next locale silently falls back to English on. */
+  const upgradeLabel = t("nav.upgrade");
   const modeControlLabel = `${t("nav.sidebar.control")}: ${t(sidebarModeLabelKey(mode))}`;
 
   return (
@@ -452,12 +452,12 @@ export function SidebarShell({
       // sliding underneath, which reads as a rendering bug.
       initial={false}
       animate={spacerAnimate}
-      transition={spacerTransition}
+      transition={springTransition}
       style={spacerStyle}
       data-shell-sidebar=""
       data-sidebar-mode={mode}
       data-sidebar-open={open ? "true" : "false"}
-      data-sidebar-push={designLabAtmosphere ? "true" : undefined}
+      data-sidebar-push="true"
     >
       <motion.div
         ref={panel}
@@ -547,68 +547,55 @@ export function SidebarShell({
           <ShellAtmosphere />
         </div>
 
-        {/* THE LOCKUP.
-            SHARED SHELL: the mark never leaves — it used to be suppressed
-            entirely at rail width, on the reasoning that 56px cannot hold a
-            wordmark. It cannot, but a wordmark is not the brand, and dropping
-            the emblem with it meant the product had no identity on screen at
-            all on a collapsed rail. Only the WORDMARK is conditional; the
-            mark is the same element in the same place in both states.
-
-            DESIGN-LAB: the brief asks for the OPPOSITE at rail width — the
-            control REPLACES the mark rather than sitting beside a shrunken
-            version of it, so collapsed mode opens on one centred control, not
-            a logo with a second small icon stacked under it. `AnimatePresence`
-            crossfades the swap (mark ⇄ control) rather than a hard cut, which
-            would otherwise read as a flash on every collapse/expand — the
-            width itself is already animating on the same spring, so the
-            content inside gets the same treatment. */}
+        {/* THE TOP CONTROL ROW — the lockup and the display-mode control.
+            EXPANDED: the mark leads at the row's leading edge and the control
+            trails at its far side, spread by `justify-between` rather than a
+            gap so it lands in the same corner the reference does. This ordering
+            was reverted back from a control-first row: adjacent-and-leading read
+            as tidier in isolation, but put a utility toggle where the reader's
+            eye lands FIRST on every load, ahead of the product's own name.
+            COLLAPSED: the control REPLACES the mark rather than sitting beside a
+            shrunken version of it, so the rail opens on one centred control
+            instead of a logo with a second small icon stacked under it.
+            `AnimatePresence` crossfades the swap rather than hard-cutting it,
+            which would read as a flash on every collapse/expand — the width is
+            already animating on the same spring, so the content inside gets the
+            same treatment. */}
         <div
           className={cn(
             "relative z-10 flex h-16 shrink-0 items-center",
-            narrow ? "justify-center px-2" : "px-5",
-            designLabAtmosphere && !narrow && "justify-between",
+            narrow ? "justify-center px-2" : "justify-between px-5",
           )}
           style={{ width: "var(--shell-nav-w)" }}
         >
-          {designLabAtmosphere ? (
-            <>
-              {/* THE MARK LEADS, THE CONTROL TRAILS — reverted back from a
-                  control-first row: adjacent-and-left read as tidier in
-                  isolation, but put the toggle where a reader's eye lands
-                  FIRST on every load, ahead of the product's own name. The
-                  brand belongs at the leading edge; the control is a utility
-                  and sits at the row's far side, spread there by
-                  `justify-between` rather than a gap, so it lands in the
-                  same corner the reference does. The mark fades OUT going
-                  narrow and back IN going wide — mount/unmount, not a shared
-                  element, since it has nowhere to travel to (the control
-                  holds its own end of the row throughout). */}
-              <AnimatePresence initial={false}>
-                {!narrow ? (
-                  <motion.div
-                    key="brand"
-                    layout
-                    initial={reduced ? false : { opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={reduced ? undefined : { opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    <Brand name={appName} size="sm" tone="shell" wordmark />
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
-              {/* The control never unmounts; `layout` alone gives it a smooth
-                  FLIP between centred (narrow, alone) and trailing-edge
-                  (wide, beside the mark) as the row's own `justify-content`
-                  swaps. */}
-              <motion.div layout={!reduced}>
-                <SidebarModeControl mode={mode} menuAlign="down" onPick={choose} ariaLabel={modeControlLabel} />
+          {/* The mark fades OUT going narrow and back IN going wide —
+              mount/unmount rather than a shared element, since it has nowhere to
+              travel to (the control holds its own end of the row throughout). */}
+          <AnimatePresence initial={false}>
+            {!narrow ? (
+              <motion.div
+                key="brand"
+                layout
+                initial={reduced ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={reduced ? undefined : { opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <Brand name={appName} size="sm" tone="shell" wordmark />
               </motion.div>
-            </>
-          ) : (
-            <Brand name={appName} size="sm" tone="shell" wordmark={!narrow} />
-          )}
+            ) : null}
+          </AnimatePresence>
+          {/* The control never unmounts; `layout` alone gives it a smooth FLIP
+              between centred (narrow, alone) and trailing-edge (wide, beside the
+              mark) as the row's own `justify-content` swaps. */}
+          <motion.div layout={!reduced}>
+            <SidebarModeControl
+              mode={mode}
+              menuAlign="down"
+              onPick={choose}
+              ariaLabel={modeControlLabel}
+            />
+          </motion.div>
         </div>
 
         {/* The grouped rail can exceed the viewport on a short screen, so it owns
@@ -635,12 +622,11 @@ export function SidebarShell({
                reads `narrow` and changes shape; it does not need protecting from
                a width. */
             carved
-            collapsibleSections={designLabAtmosphere}
           />
         </div>
 
-        {designLabAtmosphere ? (
-          /* DESIGN-LAB BOTTOM ACTIONS — structurally fixed, not just visually.
+        {
+          /* THE BOTTOM ACTIONS — structurally fixed, not just visually.
              TOP (brand/control) and this BOTTOM block are both `shrink-0`;
              the nav list between them is the only flex item allowed to grow
              OR shrink (`min-h-0 flex-1 shrink grow`, both stated explicitly
@@ -670,8 +656,17 @@ export function SidebarShell({
             className={cn("relative z-10 shrink-0 py-2", navColumnClass(narrow))}
             style={{ width: "var(--shell-nav-w)" }}
           >
+            {/* `aria-label` ON THE NARROW RAIL, and it is required rather than
+                tidy. Collapsed, this row renders an icon and NOTHING ELSE, so
+                without it the link has no accessible name at all — a screen
+                reader announces "link" and stops, and both bottom rows point at
+                the same href, so the two are indistinguishable. Every nav row
+                above already does this (see `NavLink`); these two were the pair
+                that did not. Only when narrow: with the label painted, a
+                duplicate `aria-label` would just talk over it. */}
             <Link
               href="/b2b/settings"
+              aria-label={narrow ? t("nav.settings") : undefined}
               className={cn(
                 "flex items-center rounded-sm text-label font-medium text-shell-fg-secondary",
                 "hover:bg-shell-2 hover:text-shell-fg",
@@ -702,6 +697,7 @@ export function SidebarShell({
                 icon alone. */}
             <Link
               href="/b2b/settings"
+              aria-label={narrow ? upgradeLabel : undefined}
               className={cn(
                 "flex items-center rounded-md text-label font-medium text-accent-solid",
                 "bg-shell-gold-soft hover:bg-shell-gold/30",
@@ -715,145 +711,7 @@ export function SidebarShell({
               {narrow ? null : <span className="truncate">{upgradeLabel}</span>}
             </Link>
           </div>
-        ) : (
-          <>
-            {/* THE WORKSPACE CARD. Which organization this is, and which of its
-                branches the reader is scoped to — the two facts that decide what
-                every number on the page counts. It sits at the foot of the panel
-                because it is REFERENCE, not navigation: read once on arrival and then
-                ignored, which is the one thing the bottom of a rail is good for.
-
-                Raised onto the navy with `shell-2` rather than outlined, so it reads
-                as a card resting ON the material instead of a hole cut into it.
-                Suppressed on the rail, which has width for neither line. */}
-            {narrow ? null : (
-              <div className="relative z-10 px-4 pb-3" style={{ width: "var(--shell-nav-w)" }}>
-                <div className="rounded-md border border-shell-line bg-shell-2 px-3 py-2.5">
-                  <p className="truncate text-label font-semibold text-shell-fg">{orgName}</p>
-                  {branchName ? (
-                    <p className="mt-0.5 truncate text-caption text-shell-fg-muted">{branchName}</p>
-                  ) : null}
-                </div>
-              </div>
-            )}
-
-            {/* The footer takes the SAME column inset as the nav list above it, and
-                the control inside takes the same row and icon geometry as a nav link
-                — see lib/ui/nav-geometry. Both were previously hand-set here and
-                drifted 4px inboard of the icons they sit under. */}
-            <div
-              className={cn("relative z-10 border-t border-shell-line py-2", navColumnClass(narrow))}
-              style={{ width: "var(--shell-nav-w)" }}
-            >
-              <button
-                type="button"
-                onClick={() => setMenuOpen((v) => !v)}
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-                /* The accessible name carries what the icon cannot: what this control
-                   is AND which mode is currently active. That is the whole reason the
-                   visible caption can go — nothing is lost for a screen reader, only
-                   the painted text disappears. */
-                aria-label={`${t("nav.sidebar.control")}: ${t(sidebarModeLabelKey(mode))}`}
-                data-testid="sidebar-control"
-                /* THE ROW ITSELF HAS NO HOVER STATE. NOT IN ANY MODE.
-                   The button stays `w-full` so the CLICK target still matches a nav
-                   row, but a target and a hover surface are not the same thing here:
-                   a nav row paints on hover because its whole width is label and
-                   icon, whereas this row is a 36px icon followed by up to 200px of
-                   nothing. Tinting that emptiness announced a control the pointer was
-                   nowhere near, which is the same defect as the group-driven tile,
-                   one element out. Every visible hover cue now comes from the tile
-                   below — `hover:` on the span, not `group-hover:` here. Do not add
-                   `hover:` anything to this element again.
-                   Focus is untouched: the ring is a keyboard affordance, not hover
-                   feedback, and it lands on this button because this button is what
-                   takes focus. */
-                className={cn(
-                  "group flex w-full items-center rounded-sm text-label font-medium text-shell-fg-secondary",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-shell",
-                  // Keyed to `narrow` — the PANEL's width — and never to whether the
-                  // control has a label, because it never has one.
-                  //
-                  // This is what keeps icon-only from meaning centred. An expanded
-                  // panel is 15rem wide, so a `justify-center` row would park this
-                  // glyph 120px from where every navigation icon above it sits, and
-                  // the fix for the misalignment would have created a worse one. An
-                  // expanded row therefore keeps its `px-3` start inset and simply
-                  // has nothing after the icon; the button still spans the full width
-                  // so the click target matches a nav row, but the glyph stays in the
-                  // column. RTL follows for free — `px` is logical, so the inset is on
-                  // the right in Arabic without a second rule.
-                  navRowClass(narrow),
-                )}
-              >
-                <span
-                  className={cn(
-                    navIconClass(),
-                    // The same lit tile the nav icons above use, in every mode — this
-                    // control sits in their column, so it must answer a pointer the
-                    // way they do — but armed by the TILE, not by the row.
-                    //
-                    // A nav row can be row-driven because the row IS the target: its
-                    // label, icon and padding all go to one href. This button has no
-                    // label. It is `w-full` only so the CLICK target matches a nav
-                    // row, so a row-driven tile lit from anywhere along the footer —
-                    // the pointer could sit 200px away over empty space and the icon
-                    // still glowed, which reads as the whole bottom of the sidebar
-                    // reacting to a pointer that is nowhere near it. Scoped to the
-                    // span, the paint follows the pointer actually on it, in all
-                    // three modes.
-                    //
-                    // `group-focus-visible:` is the keyboard half and stays: a span
-                    // cannot take focus, so the group it reads is the one focusable
-                    // control that owns this tile — its own focus, not the footer's.
-                    // Not NAV_ICON_SELF_HOVER_CLASS: that constant paints
-                    // `bg-surface-2`, a CONTENT token tuned against Quartz, which on
-                    // this navy ground is both nearly invisible and semantically
-                    // wrong. Same appearance contract, same self-scoped trigger (the
-                    // pointer must be over the 36px tile, not anywhere along a
-                    // label-less full-width row) — shell ground instead.
-                    "hover:bg-shell-2 group-focus-visible:bg-shell-2",
-                    "text-shell-fg-muted hover:text-shell-fg group-focus-visible:text-shell-fg",
-                  )}
-                >
-                  <PanelIcon size={NAV_ICON_SIZE} />
-                </span>
-              </button>
-
-              {menuOpen ? (
-                <div
-                  role="menu"
-                  data-testid="sidebar-menu"
-                  // Opens upward and inward. At 3.5rem it overflows the rail on
-                  // purpose — the panel has no `overflow-hidden` for exactly this.
-                  className={cn(menuSurfaceClass, "absolute bottom-full start-0 mb-1 w-56 z-popover")}
-                >
-                  <ul className="flex flex-col py-0.5">
-                    {SIDEBAR_MODES.map((value) => {
-                      const selected = value === mode;
-                      return (
-                        <li key={value}>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => choose(value)}
-                            aria-current={selected ? "true" : undefined}
-                            data-testid={`sidebar-mode-${value}`}
-                            className={menuItemClass(selected)}
-                          >
-                            <span className="truncate">{t(sidebarModeLabelKey(value))}</span>
-                            {selected ? <CheckIcon size={16} className="ms-auto shrink-0 text-accent" /> : null}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-          </>
-        )}
+        }
       </motion.div>
     </motion.div>
   );

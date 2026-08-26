@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { IDENTITIES, signIn } from "./helpers/auth";
+import { setSidebarMode } from "./helpers/sidebar";
 
 /**
  * PRE-UAT ACCEPTANCE for the shared authenticated shell and the supply-side
@@ -132,8 +133,7 @@ test.describe("shared shell regression (Showroom)", () => {
     await prefs(page, "en");
     await signIn(page, request, IDENTITIES.showroom);
 
-    await page.getByTestId("sidebar-control").click();
-    await page.getByTestId("sidebar-mode-collapsed").click();
+    await setSidebarMode(page, "collapsed");
 
     const link = page.getByRole("link", { name: "Reports", exact: true });
     await expect(link).toBeVisible();
@@ -145,8 +145,7 @@ test.describe("shared shell regression (Showroom)", () => {
     await expect(page.getByRole("tooltip")).toHaveCount(0);
 
     // Restore, so the mode cookie does not leak into the next test's expectations.
-    await page.getByTestId("sidebar-control").click();
-    await page.getByTestId("sidebar-mode-expanded").click();
+    await setSidebarMode(page, "expanded");
   });
 
   test("CardRail advances exactly one card per arrow click", async ({ page, request }) => {
@@ -270,14 +269,25 @@ test.describe("shared shell regression (Showroom)", () => {
   });
 
   /**
-   * The sidebar's bottom mode control is ICON-ONLY in every mode, and its glyph
-   * shares one column with every navigation icon above it.
+   * The sidebar's mode control is ICON-ONLY in every mode, expanded included.
    *
-   * Both halves have been regressions. The caption returned as "Expanded" at the
-   * foot of a wide panel — a control captioning a state the user can already see.
-   * The alignment drifted 4px because the control's padding was set in a different
-   * file from the nav rows'. Asserting the CENTRES rather than the classes is what
-   * makes this survive a refactor of either file.
+   * THE COLUMN HALF OF THIS TEST IS GONE, AND DELIBERATELY. It used to also
+   * assert that the control's glyph shared one centre-line with every navigation
+   * icon above it, which was right while the control lived in the sidebar's
+   * FOOTER, inside the navigation's own column — a centred glyph there would have
+   * landed ~120px off the icons in a 15rem panel.
+   *
+   * The control has moved to the TOP row. Expanded it sits at that row's trailing
+   * edge beside the wordmark; collapsed it is the row's only occupant and
+   * centres. Neither position is the nav column, so the old assertion now
+   * describes a layout the approved design does not have.
+   *
+   * What survives is the half that was always the real regression: the caption.
+   * It came back once as "Expanded" at the foot of a wide panel — a control
+   * captioning a state the user is looking at. That is asserted in every mode,
+   * plus the accessible name that carries the meaning instead, plus the fact
+   * that the control is the same 36px tile the nav icons are (a size, not a
+   * position — that part does survive a move).
    */
   for (const [locale, dir] of [
     ["en", "ltr"],
@@ -293,13 +303,14 @@ test.describe("shared shell regression (Showroom)", () => {
       await page.goto("/b2b");
 
       for (const mode of ["expanded", "collapsed", "hover"] as const) {
-        await page.getByTestId("sidebar-control").click();
-        await page.getByTestId(`sidebar-mode-${mode}`).click();
+        await setSidebarMode(page, mode);
 
         const control = page.getByTestId("sidebar-control");
         // Icon-only. In EVERY mode, expanded included.
         await expect(control, `visible caption in ${mode} mode`).toHaveText("");
-        // The accessible name is what carries the meaning instead.
+        // The accessible name is what carries the meaning instead, and it names
+        // the ACTIVE MODE — so a screen-reader user is told strictly more than
+        // the sighted user sees, which is the whole trade the caption paid for.
         await expect(control).toHaveAttribute("aria-label", /.+/);
 
         const geometry = await page.evaluate(() => {
@@ -311,22 +322,25 @@ test.describe("shared shell regression (Showroom)", () => {
             const r = el.getBoundingClientRect();
             return Math.round((r.left + r.width / 2) * 10) / 10;
           };
+          const box = ctrl.getBoundingClientRect();
           return {
-            control: cx(ctrl.querySelector("svg")!),
-            nav: [...new Set(icons.map(cx))],
+            controlSize: [Math.round(box.width), Math.round(box.height)],
+            navColumns: [...new Set(icons.map(cx))].length,
           };
         });
 
-        // One column: every nav icon on the same centre, and the control on it too.
-        expect(geometry.nav, `nav icons not in one column (${mode})`).toHaveLength(1);
-        expect(
-          Math.abs(geometry.control - geometry.nav[0]!),
-          `control off the icon column in ${mode} mode`,
-        ).toBeLessThanOrEqual(0.5);
+        /* The nav icons still share ONE column — that rule is about the list and
+           is unaffected by where the control went. It is asserted here because
+           this is the only place in the suite that measures it. */
+        expect(geometry.navColumns, `nav icons not in one column (${mode})`).toBe(1);
+        /* And the control is still the shared 36px tile, which is what makes it
+           read as part of the same system after moving out of the nav column. */
+        expect(geometry.controlSize, `control is not the shared tile in ${mode} mode`).toEqual([
+          36, 36,
+        ]);
       }
 
-      await page.getByTestId("sidebar-control").click();
-      await page.getByTestId("sidebar-mode-expanded").click();
+      await setSidebarMode(page, "expanded");
     });
   }
 
