@@ -143,3 +143,414 @@
     }
   }
 }
+
+/* ------------------------------------------------------------------
+ * THE CARVED ACTIVE-NAVIGATION FILLETS
+ *
+ * Two quarter-circle joints that close the navy shell back around the active
+ * module's light surface — see components/layout/nav-carve.tsx for what the
+ * carve is and why it is one moving element.
+ *
+ * The shape is a radial-gradient rather than a border-radius because the corner
+ * is CONCAVE. `border-radius` can only round a corner inward, into its own box;
+ * here the light has to bulge OUT of the sidebar and the navy has to curve away
+ * from it, which is the complement of a rounded corner and not expressible as
+ * one. A gradient with a hard stop paints exactly that complement: transparent
+ * inside the arc (the shell shows through, atmosphere and all), light outside
+ * it. The half-pixel between the two stops is anti-aliasing — a single hard stop
+ * renders a visibly stepped arc at this radius.
+ *
+ * `--carve-x` is the only thing that differs between writing directions, and it
+ * is the arc's CENTRE. In English the fillet box sits at the panel's right edge
+ * and the arc is centred on its left; in Arabic the whole shell mirrors, so the
+ * box is at the left edge and the centre moves to its right. Everything else —
+ * placement, radius, both stops — is direction-agnostic, which is why this is
+ * one property flip and not a mirrored ruleset.
+ * ------------------------------------------------------------------ */
+:root {
+  /* The fillet radius, tuned to the gutter it resolves into. It was 18px, sized
+     for the 40px gutter below — against the much tighter frame that gutter is
+     now, the joint reads oversized. */
+  --carve-r: 11px;
+  --carve-x: 0%;
+
+  /* THE SIDEBAR'S GUTTER: the strip of workspace between the shell plate and the
+     header/body cards. It is declared here rather than in `sidebar-shell`
+     because two very different consumers need the same number — the component
+     sizes itself and its plate with it, and the fillet rule below has to place
+     itself at the SHELL's trailing edge, which is that many pixels inboard of
+     the carve's own end. A literal in either place drifts from the other the
+     first time the gutter is retuned.
+
+     CUT FROM 2.5rem, AND THE REASON IS THE COMPOSITION CHANGING UNDER IT. The
+     40px was sized for the earlier concept, where a wide frame margin was itself
+     part of the design. Now that the sidebar reads as visually continuous with
+     the workspace atmosphere at the seam, that much empty strip just reads as
+     wasted width. Not zero, because the carve's fillets and the workspace's own
+     corner still need SOME frame to resolve into. */
+  --shell-gutter-w: 0.875rem;
+}
+
+[dir="rtl"] {
+  --carve-x: 100%;
+}
+
+@layer components {
+  .nav-carve-fillet {
+    position: absolute;
+    /* FLUSH WITH THE CARVE'S OWN TRAILING EDGE, which is the same thing as the
+       shell's edge — the band stops there instead of crossing the gutter.
+       This was `var(--shell-gutter-w)`, correct while the band overshot the
+       panel by exactly that much and wrong the moment it stopped: the two
+       offsets stack, which would park the joints 40px INSIDE the panel,
+       filleting a corner that is not there and leaving the real one square. */
+    inset-inline-end: 0;
+    width: var(--carve-r);
+    height: var(--carve-r);
+    /* Driven by the carve itself, which is the only element that knows whether
+       the band currently reaches an edge. On the rail it does not — the tile
+       stands clear of the trailing edge — so a joint drawn there would be two
+       light stubs sitting in open material with nothing to join. Animated
+       rather than switched so it fades out across the collapse instead of
+       vanishing one frame into it. */
+    opacity: var(--carve-fillet-o, 1);
+  }
+
+  .nav-carve-fillet--top {
+    bottom: 100%;
+    background: radial-gradient(
+      circle at var(--carve-x) 0,
+      transparent 0 var(--carve-r),
+      var(--shell-active) calc(var(--carve-r) + 0.5px)
+    );
+  }
+
+  .nav-carve-fillet--bottom {
+    top: 100%;
+    background: radial-gradient(
+      circle at var(--carve-x) 100%,
+      transparent 0 var(--carve-r),
+      var(--shell-active) calc(var(--carve-r) + 0.5px)
+    );
+  }
+}
+
+/* ------------------------------------------------------------------
+ * THE WORKSPACE PLANE — ONE FIELD, SEEN THROUGH EVERYTHING
+ *
+ * ONE PLANE, AND EARLIER PASSES KEPT MAKING IT TWO. First there was a frame
+ * painted on the shell root PLUS a separately-tuned "wash" painted inside the
+ * body to stand in for it; the seam gave it away, a grey-blue butted against a
+ * periwinkle, because the two were tuned by different rules against different
+ * grounds and nothing could hold them together. Then the frame itself became a
+ * flat fill with three gradient pools over it — better, but still a plane that
+ * had to be re-derived every time the composition moved.
+ *
+ * There is one field now and nothing reproduces it:
+ *
+ *   `.workspace-atmosphere`  the field itself. Fixed to the VIEWPORT, painted
+ *                            behind everything, and the only thing that paints
+ *                            a ground at all.
+ *   `.workspace-frame`       a layout box that paints NOTHING. Its transparency
+ *                            is what makes the atmosphere visible in the
+ *                            sidebar's gutter and every margin around the cards.
+ *   `.workspace-body`        likewise nothing. Content sits DIRECTLY on the
+ *                            field; the cards are the only surfaces.
+ *
+ * So the colour behind the page heading is not a reproduction of the gutter's
+ * colour — it is the same pixels.
+ *
+ * NOT GLASS. No backdrop-filter, no blur, no saturation anywhere in this file.
+ * A backdrop-filter here would cost a full-page composite on every scroll frame
+ * and would frost the shell's gold flow lines where they pass behind the gutter.
+ *
+ * DIRECTION. `radial-gradient(... at X% ...)` takes PHYSICAL positions with no
+ * logical equivalent, so Arabic would pool the cool light down the side of the
+ * page the sidebar is NOT on. `--frame-pool-x` is the sidebar's own corner and
+ * flips with `[dir]` — one variable instead of a mirrored ruleset.
+ *
+ * (`--wash-angle` and `--frame-warm-x` were the other two of what used to be
+ * three direction variables. They belonged to the flat frame's linear edge-band
+ * and its warm far corner, neither of which the atmosphere has.)
+ * ------------------------------------------------------------------ */
+:root {
+  --frame-pool-x: 0%;
+}
+
+[dir="rtl"] {
+  --frame-pool-x: 100%;
+}
+
+@layer components {
+  /* THE FRAME IS NOW A LAYOUT BOX THAT PAINTS NOTHING, and that is the whole
+     shape of the change. It used to carry a flat `--frame` fill plus a
+     three-pool gradient — the "pale flat page" the approved direction exists to
+     replace. What paints the field now is `.workspace-atmosphere` below: a
+     fixed, viewport-anchored mesh BEHIND this element, which this element's own
+     transparency is what makes visible. Every gutter — above the header, between
+     header and body, down the sidebar's trailing edge, below the body — shows
+     the mesh with nothing painted over it. */
+  .workspace-frame {
+    background-color: transparent;
+    background-image: none;
+    /* `isolation: isolate` gives this box its OWN stacking context, so the fixed
+       mesh below is layered against ITS siblings (the sidebar, the header/body
+       column) rather than against the whole document. Without it the mesh's
+       negative z-index resolves against the ROOT stacking context, where
+       `<body>`'s own opaque `bg-canvas` fill sits in front of any
+       negative-z-index content and hides the mesh completely — confirmed live:
+       the mesh painted correctly (right gradients, full-viewport, right colours)
+       and every pixel of it was covered by body's own background paint until
+       this was added. (Authored here rather than as Tailwind's `isolate`
+       utility: that utility was not being emitted by this build, and plain CSS
+       sidesteps the question entirely.) */
+    isolation: isolate;
+  }
+
+  /* THE WORKSPACE ATMOSPHERE — the field the whole application is composed on.
+     Fixed to the VIEWPORT, not the document, so it never drifts or re-tiles as a
+     long dashboard scrolls. Light, because a large expanse of dark colour read
+     as heavy through two full rounds of review no matter how it was tuned:
+     comfort on a screen someone looks at for hours comes from a light field with
+     gentle movement in it. The sidebar keeps all the saturated ink; this only
+     borrows its HUE, faintly, at the seam. Grounds come from
+     `--workspace-mesh*` / `--workspace-pool-*`, which is where light and dark
+     diverge — the STRUCTURE below is theme-independent. */
+  .workspace-atmosphere {
+    background-color: var(--workspace-mesh);
+    /* LAYER ORDER IS LOAD-BEARING. CSS paints the FIRST-listed background-image
+       closest to the viewer — this cost a full round once already, when an
+       opaque layer was listed first and silently hid three radial pools beneath
+       it for an entire pass. Every partly-transparent pool goes first; a fully
+       opaque layer (there is none — the base colour above carries that job)
+       would have to go last. */
+    background-image:
+      /* THE SEAM POOL — picks up the sidebar's own hue at the corner where the
+         two materials meet, mixed toward the mesh's own light tone rather than
+         toward white, so it reads as "the ink's colour, diluted by the room"
+         instead of a bright spotlight. This is the entire mechanism behind
+         "the sidebar is integrated with the environment": the workspace's
+         lightest, most saturated blue is exactly the sidebar's hue. */
+      radial-gradient(
+        70vw 66vh at var(--frame-pool-x) 0%,
+        color-mix(in srgb, var(--workspace-pool-cool) 38%, var(--workspace-mesh-lit)) 0%,
+        color-mix(in srgb, var(--workspace-pool-cool) 16%, var(--workspace-mesh-lit)) 34%,
+        transparent 72%
+      ),
+      /* a second, quieter mineral pool lower in the page, for gentle depth
+         without introducing a second hue. */
+      radial-gradient(
+        50vw 56vh at 68% 64%,
+        color-mix(in srgb, var(--workspace-pool-cool-2) 18%, transparent) 0%,
+        transparent 68%
+      ),
+      /* THE ONE WARM NOTE. Lumen, kept restrained — the brand's own accent
+         inside a cool field, not a second temperature competing with it. */
+      radial-gradient(
+        36vw 36vh at 86% 92%,
+        color-mix(in srgb, var(--workspace-pool-warm) 20%, transparent) 0%,
+        transparent 56%
+      );
+  }
+
+  /* THE BODY IS NOT A PANEL, ON PURPOSE. It used to carry a fill, a border, an
+     inset highlight and its own elevation shadow — a real surface, just a
+     translucent one. That was the mistake: ANY visible edge around the whole
+     dashboard reads as "the dashboard sits inside a container", and the approved
+     direction puts content DIRECTLY on the workspace with the cards as the only
+     surfaces. So this element contributes nothing visually and is a layout box
+     only — what the reader sees here is the atmosphere, unmodified, in every gap
+     the page's own content does not cover.
+
+     Declared as an explicit no-paint rather than simply deleted, because
+     `AppShell` still needs a stable class to hang the body's layout on and a
+     future surface decision has an obvious place to land. */
+  .workspace-body {
+    background: none;
+    border-color: transparent;
+    box-shadow: none;
+  }
+}
+
+/* CONTINUITY GUARANTEE, AND IT HAS TO BE UNLAYERED TO BEAT `bg-canvas`.
+   `.workspace-atmosphere` is `position: fixed`, so it always covers the current
+   viewport — but the browser's OWN canvas paint (from `<body>`'s `bg-canvas` in
+   `app/layout.tsx`) is what elastic overscroll at the very top or bottom of a
+   long page reveals for an instant, and on a route short enough that the shell
+   does not fill the viewport, is what would show past `.workspace-frame`'s box.
+   Matching it to the mesh's own base means EITHER case reveals more of the same
+   field, never a mismatched flash — "the workspace background is continuous for
+   the entire scrollable page" has to hold at the edges too, not just mid-scroll. */
+body:has(.workspace-frame) {
+  background-color: var(--workspace-mesh);
+}
+
+/* ============================================================================
+ * THE CANONICAL WORKSPACE CHROME
+ *
+ * These rules were the approved visual direction's override block, scoped under
+ * `[data-design-lab="atmosphere"]` and gated on one seeded account's email. The
+ * direction is approved, so the gate is gone and these are simply how the
+ * workspace chrome looks. Grounds and hues live in tokens.css; what is left here
+ * is the part that is STRUCTURAL — material, elevation, stickiness — and cannot
+ * be expressed as a token value alone.
+ *
+ * WHY UNLAYERED. Several rules here have to beat Tailwind utilities already on
+ * the same elements (`bg-surface`, `bg-field`, `border-field-line`). Rules inside
+ * `@layer components`/`utilities` LOSE TIES to Tailwind's own `@layer utilities`
+ * regardless of selector specificity — cascade layers settle disputes by layer
+ * order first and specificity only within a layer. Declaring these outside any
+ * layer puts them in the implicit final layer, which beats every layered rule
+ * unconditionally.
+ *
+ * WHY `header[data-app-header="card"]` AND NOT BARE `header`. Twice over:
+ *   1. The dashboard's own `Board` component renders a semantic `<header>` for
+ *      its title row. A bare `header` selector caught every card on the page, so
+ *      each board's header froze to the viewport as its card scrolled and the
+ *      card's own content scrolled UNDER it. `data-app-header` (set once, by
+ *      `AppHeader` itself) makes "this is the shell's bar" a fact the selector
+ *      checks rather than an assumption about how many `<header>` tags exist.
+ *   2. `AppHeader` renders on THREE shells — the B2B workspace (`card`), the
+ *      Personal home and the Admin console (both `bar`). Only the card floats on
+ *      a workspace atmosphere; the other two sit on `bg-canvas` and must keep
+ *      their opaque bar. The variant is in the attribute's VALUE, so promoting
+ *      this material cannot leak onto a shell that has no mesh behind it.
+ * ============================================================================ */
+
+/* THE HEADER — the one surface between "background" and "cards" that stays a
+   distinct material, because it is chrome (search, switchers, the profile menu),
+   not content. Deliberately lighter-touch than an opaque bar: it reads as
+   translucent chrome the atmosphere shows through, not as a second opaque page
+   layer stacked under the real one. */
+header[data-app-header="card"] {
+  background-color: color-mix(in srgb, var(--workspace) 70%, transparent) !important;
+  border-color: color-mix(in srgb, white 45%, var(--workspace-line)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 10px 24px -16px rgba(20, 32, 54, 0.16);
+  /* STICKY, AND WITH BREATHING ROOM WHILE STUCK. The header stays in view while
+     the dashboard scrolls under it. `top: 0` pinned the card flush to the
+     viewport edge the instant the page scrolled, flattening the floating rounded
+     card into a bar wedged into the corner — the exact thing this variant exists
+     not to be. `--shell-gutter-w` rather than a second magic number: it is
+     already the apertures' shared unit on this shell, so the sticky gap reads as
+     the same rhythm as the gap above the header at rest. */
+  position: sticky !important;
+  top: var(--shell-gutter-w) !important;
+}
+
+.dark header[data-app-header="card"] {
+  background-color: color-mix(in srgb, var(--workspace) 68%, transparent) !important;
+  border-color: color-mix(in srgb, white 8%, var(--workspace-line)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 28px -16px rgba(0, 0, 0, 0.4);
+}
+
+/* HEADER CONTRAST. The muted/hint tokens used inside the header (utility icons,
+   the switcher's glyphs, the search field's placeholder and shortcut badge) are
+   tuned against an OPAQUE `--surface`; composited over this translucent, lighter
+   header they measure under their own 4.5:1 target. Nudged toward their
+   `-secondary` neighbour rather than to full `--fg`, which would make
+   subordinate chrome as loud as the primary context beside it.
+
+   The "/" crumb separator is excluded (via its own `select-none`, which nothing
+   else in the header carries) and deliberately left quieter than the tokens
+   beside it — a separator that reads as clearly as the words it separates stops
+   reading as a separator. */
+header[data-app-header="card"] [class*="text-fg-muted"]:not([class*="select-none"]) {
+  color: color-mix(in srgb, var(--fg-muted) 55%, var(--fg-secondary)) !important;
+}
+
+/* THE SEARCH FIELD — pulled into the header's own material instead of the
+   cooler, opaque `bg-field` ramp, so it reads as belonging to the card rather
+   than pasted onto it. Targeted by the trigger's existing `data-testid`, so
+   `GlobalSearch` needs no shell-specific prop and keeps working identically on
+   the bar shells.
+   LIGHT: near-opaque Quartz. At 72% — stacked on the header's own 70% over the
+   mesh — it read as a grey smear rather than a clean surface.
+   DARK: a LIFTED charcoal-mineral, visibly distinct from both the header and the
+   page behind it, with a real border. Without its own rule it fell through to
+   the light formula against a dark `--workspace` and landed on almost exactly
+   the near-black the brief rules out. */
+header[data-app-header="card"] [data-testid="global-search-trigger"] {
+  background-color: color-mix(in srgb, var(--workspace) 92%, transparent) !important;
+  border-color: color-mix(in srgb, white 55%, var(--border)) !important;
+  color: var(--field-fg) !important;
+}
+
+header[data-app-header="card"] [data-testid="global-search-trigger"]:hover {
+  background-color: var(--workspace) !important;
+}
+
+.dark header[data-app-header="card"] [data-testid="global-search-trigger"] {
+  background-color: color-mix(in srgb, white 10%, var(--workspace)) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+.dark header[data-app-header="card"] [data-testid="global-search-trigger"]:hover {
+  background-color: color-mix(in srgb, white 15%, var(--workspace)) !important;
+}
+
+header[data-app-header="card"] [data-testid="global-search-trigger"] [class*="text-field-placeholder"] {
+  color: color-mix(in srgb, var(--field-placeholder) 55%, var(--field-fg)) !important;
+}
+
+header[data-app-header="card"] [data-testid="global-search-trigger"] [class*="text-field-hint"] {
+  color: color-mix(in srgb, var(--field-hint) 45%, var(--field-fg)) !important;
+}
+
+/* THE OPERATIONAL CARDS — the deliberate counterweight to the atmosphere behind
+   them. The ordinary elevation grammar (a tight contact shadow plus a soft
+   diffuse one), tuned a shade cooler than pure grey so it belongs to the shell's
+   colour family rather than reading as dirt on a blue field.
+
+   Scoped to surfaces inside the BODY specifically. The header's own dropdowns
+   (workspace and branch switchers) keep their ordinary elevation, since they are
+   menus, not operational cards — and scoping to `.workspace-body` also keeps
+   this off the Personal and Admin shells, which have no such element. */
+.workspace-body .bg-surface {
+  border-color: color-mix(in srgb, var(--workspace-pool-cool) 10%, var(--workspace-line)) !important;
+  box-shadow:
+    0 1px 2px rgba(20, 32, 54, 0.05),
+    0 10px 24px -16px rgba(20, 32, 54, 0.14) !important;
+}
+
+/* Dark theme: a cast shadow barely registers against an already-dark ground, so
+   the lift comes from a highlight edge and a visibly stronger border instead —
+   the same elevation grammar light mode uses (edge + shadow), with the roles
+   that actually read swapped for a dark ground. */
+.dark .workspace-body .bg-surface {
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 10px 24px -16px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* FILTER CHIPS — flat and borderless rather than bordered buttons competing with
+   the page's primary action. The hierarchy is deliberate: one solid primary, one
+   outlined secondary, and everything else a quiet chip. */
+.workspace-body [data-testid="period-select"],
+.workspace-body [data-testid="stage-select"] {
+  border-color: transparent !important;
+  background-color: color-mix(in srgb, var(--workspace) 55%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.workspace-body [data-testid="period-select"]:hover,
+.workspace-body [data-testid="stage-select"]:hover {
+  background-color: color-mix(in srgb, var(--workspace) 74%, transparent) !important;
+}
+
+/* THE PAGE HEADING — a step up from the old shell's scale, now that it carries
+   the top of the page on its own rather than sharing a card with a KPI strip.
+   Tighter tracking at this size keeps a two-word English title (and a longer
+   Arabic one) from reading loose against the field behind it. */
+.workspace-body h1 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.workspace-body h1 + p {
+  color: color-mix(in srgb, var(--fg-secondary) 88%, var(--workspace-pool-cool));
+}

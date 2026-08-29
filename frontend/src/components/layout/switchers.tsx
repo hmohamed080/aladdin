@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
 import { setLocale, setTheme } from "@/server/actions/preferences";
@@ -71,7 +71,32 @@ export function ThemeSwitch({
   compact?: boolean;
 }) {
   const { t } = useI18n();
-  const [pending, start] = useTransition();
+  /**
+   * `useState`, NOT `useTransition`, AND THE DIFFERENCE IS THE WHOLE BUG.
+   *
+   * This used to be `const [pending, start] = useTransition()`, with the write
+   * inside `start(...)`. That reads as the idiomatic way to call a server action
+   * — and it is, for an action whose RESULT the page has to re-render around.
+   * This one is not that. Two facts make it actively wrong here:
+   *
+   *   A transition stays pending until the re-render the action caused has
+   *   COMMITTED, not until the action returns. Writing a cookie in a Server
+   *   Action makes Next send fresh flight data for the current route, so on the
+   *   B2B shell the toggle stayed disabled for as long as `/b2b` took to rebuild
+   *   — workspace context, the header's identity/notification/chat fan-out and
+   *   the dashboard's queries. Measured, it did not re-enable within 30 seconds,
+   *   so one press killed the control for the rest of the session.
+   *
+   *   None of that re-render does anything for the theme anyway. The theme is a
+   *   class on the ROOT <html> element, which React does not re-render from a
+   *   server revalidation — `applyThemePreference` below is what actually
+   *   changes what the user sees, and it has already run by then.
+   *
+   * So the control is busy for exactly as long as the WRITE is in flight, which
+   * is the thing worth guarding against a double press, and not one millisecond
+   * of the tree rebuild that follows it.
+   */
+  const [busy, setBusy] = useState(false);
   const { theme } = useThemeState(current, current);
   const next = theme === "dark" ? "light" : "dark";
 
@@ -80,10 +105,18 @@ export function ThemeSwitch({
   // is a description or a promise.
   const label = `${t("nav.theme")}: ${next === "dark" ? t("nav.themeDark") : t("nav.themeLight")}`;
   const toggle = () => {
+    // The document is updated FIRST and unconditionally: the preference is
+    // already true on screen before persistence is even attempted.
     applyThemePreference(next);
-    start(async () => {
-      await setTheme(next);
-    });
+    setBusy(true);
+    /* `.finally`, so the control comes back on BOTH paths. A rejected write must
+       not strand it: the theme the user asked for is already applied above, and
+       the only thing a failed write costs is that it will not survive a reload.
+       Failing to remember a display preference is not worth breaking the control
+       that sets it. */
+    void setTheme(next)
+      .catch(() => {})
+      .finally(() => setBusy(false));
   };
   const Icon = theme === "dark" ? SunIcon : MoonIcon;
 
@@ -94,7 +127,7 @@ export function ThemeSwitch({
         aria-label={label}
         title={label}
         data-testid="theme-switch"
-        disabled={pending}
+        disabled={busy}
         onClick={toggle}
         suppressHydrationWarning
         className={cn(
@@ -114,7 +147,7 @@ export function ThemeSwitch({
       size="sm"
       aria-label={label}
       data-testid="theme-switch"
-      disabled={pending}
+      disabled={busy}
       onClick={toggle}
       suppressHydrationWarning
     >

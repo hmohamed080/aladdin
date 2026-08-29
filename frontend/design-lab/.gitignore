@@ -1,0 +1,8 @@
+# Scratch pages the capture tools write and re-write on every run.
+#
+# `crop-ref`, `zoom`, `sample-shot` and `inline-shots` each need a real HTML
+# file on disk rather than `page.setContent`: setContent leaves the document on
+# the about:blank origin, which cannot load `file:` subresources, so the image
+# silently never arrives and every crop comes back a flat rectangle. These are
+# that file. The TOOLS are source and are tracked; their scratch is not.
+.*.html

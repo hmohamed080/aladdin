@@ -30,6 +30,7 @@ export const en = {
     more: "More",
     open: "Open",
     close: "Close",
+    refresh: "Refresh",
     actions: "Actions",
     saveChanges: "Save changes",
     confirm: "Confirm",
@@ -129,6 +130,10 @@ export const en = {
       collapsed: "Collapsed",
       hover: "Expand on hover",
     },
+    /* The one commercial call-to-action on the rail. The label only — which
+       plan, and what upgrading costs, are PRODUCT decisions this pass does not
+       make. */
+    upgrade: "Upgrade your plan",
   },
   rail: {
     previous: "Show previous",
@@ -1548,18 +1553,34 @@ export const en = {
       new: "New",
       empty: "No movement in this period",
       emptyBody: "The most-requested lines appear here as soon as requests reach your business.",
+      viewAll: "View material demand report",
     },
     notifications: {
       title: "Latest notifications",
       hint: "Alerts tied to your activity.",
       empty: "No notifications yet",
       emptyBody: "Alerts tied to your requests, offers and orders appear here as they happen.",
+      viewAll: "View all activity",
     },
     videos: {
       title: "Videos for your products",
       hint: "Short clips that show your products to buyers.",
       empty: "No videos yet",
       emptyBody: "Your catalogue currently supports one image per product. Clips will appear here once they are supported.",
+    },
+    /* A SUPPLIER-SIDE module, rendered where `catalog.write`/`catalog.publish`
+       says the workspace publishes products. Real product names and photos; no
+       video records behind it, because none exist in this schema yet — see
+       `videos` above, which is the honest empty state when there is nothing to
+       show. The views/likes figures the module paints are demo presentation
+       data derived from each product's id, never persisted metrics; see
+       `features/home/supply-boards.tsx`. */
+    reels: {
+      title: "Product videos (Reels)",
+      viewAll: "View all",
+      addNew: "Add new video",
+      views: "views",
+      likes: "likes",
     },
     /* The cross-stage triage queue. Its wording never claims more than the
        records support: a status is the record's OWN status, and a date is
@@ -1579,6 +1600,13 @@ export const en = {
         order: "To order",
         fulfil: "To fulfil",
       },
+      /* The header's compact controls, alongside the stage chips below them —
+         both read the same `stage` state; the chips stay for their counts,
+         these mirror the choice in the compact shape the board header wants. */
+      typeFilter: "All types",
+      dueDateLabel: "Due date",
+      dueDateSorted: "Soonest due first",
+      viewAll: "View all open demand",
       column: { status: "Status" },
       amount: "Value",
       date: {
@@ -1603,6 +1631,7 @@ export const en = {
       quotations: "Prices sent",
       orders: "Orders",
       catalogue: "Your catalogue",
+      viewAll: "View all orders",
     },
     tile: {
       demandIn: "Requests received",
@@ -1632,6 +1661,8 @@ export const en = {
       subtitle: "Requests sent to your business, and the ones you have answered.",
       empty: "No requests are waiting on you right now.",
       emptyBody: "Published products are how buyers find you. Keep your catalogue current.",
+      today: "Today",
+      viewAll: "View all incoming demand",
     },
     quotations: {
       title: "Quotations",
@@ -1736,8 +1767,6 @@ export const en = {
       noActiveOrders: "Nothing in progress",
       noActiveOrdersBody: "Orders you are fulfilling will appear here.",
     },
-    scopeNote:
-      "Every figure here counts records your organization is a party to, and each one opens the record behind it.",
   },
 
   customers: {

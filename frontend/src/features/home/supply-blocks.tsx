@@ -4,6 +4,7 @@ import { cn } from "@/lib/ui/cn";
 import type { Locale } from "@/lib/i18n/locales";
 import type { KpiTone } from "@/components/ui/workspace-layout";
 import type { DemandLine, DemandMovementRow } from "@/server/queries/commerce";
+import { ProductMedia } from "@/features/commerce/product-media";
 import { formatCount, formatDate, formatPercent, formatQuantity } from "@/lib/ui/format";
 import { BellIcon, ChevronLeftIcon, ChevronRightIcon, VideoIcon } from "@/components/ui/icons";
 
@@ -98,13 +99,45 @@ export function OpportunityList({
             )}
           >
             <div className="flex min-w-0 items-start justify-between gap-2">
-              <div className="min-w-0">
+              {/* The material itself, at 56px.
+
+                  This is a finishing catalogue: a seller recognises "Galala
+                  marble, polished" by looking at it far faster than by reading
+                  it, and a column of identical text rows is the slowest possible
+                  way to scan for something you stock. It reuses the catalogue's
+                  own `ProductMedia` — same 4:3 ratio, same lazy loading, same
+                  neutral fallback — inside a fixed-width box rather than being
+                  reimplemented at thumbnail size.
+
+                  It is genuinely optional. The image arrives over the existing
+                  `rfq_items.product_id` foreign key, which is nullable and
+                  RLS-filtered, so `imageRef` is null for any line that is not
+                  linked to a catalogue entry the reader may see; ProductMedia
+                  then draws its marked placeholder and the row still reads. No
+                  information lives in the picture — quantity, buyer and date are
+                  all still text beside it. */}
+              <div className="w-14 shrink-0">
+                <ProductMedia src={line.imageRef} alt={line.productName} />
+              </div>
+              <div className="min-w-0 flex-1">
                 {/* The PRODUCT leads, not the request title. A seller decides
                     whether an opportunity is theirs by what is being asked for;
                     the request's own name ("Villa 12 finishing") tells them
                     nothing about whether they stock it. */}
                 <p className="line-clamp-2 font-medium text-fg">{line.productName}</p>
                 <p className="line-clamp-2 text-label text-fg-muted">{line.title}</p>
+                {/* BELOW the name, not beside it.
+
+                    This block lives in the narrow right-hand rail, so the header
+                    row has roughly 300px to divide. A `shrink-0` pill beside the
+                    title took ~120px of that and left the product — the one thing
+                    a seller scans this list for — truncating to "Ceram…". Since
+                    the pill's text is identical on every card it can never be the
+                    reason a row is read, so it yields the line and the name gets
+                    the full width. */}
+                <span className="mt-1.5 inline-block rounded-pill bg-fg-muted/15 px-2 py-0.5 text-label font-medium text-fg-secondary">
+                  {labels.status}
+                </span>
               </div>
               {/* Neutral. Every card in this list carries the SAME word
                   ("awaiting your price") — it is the panel's subject restated
@@ -120,9 +153,6 @@ export function OpportunityList({
                   leaving grey text floating where a badge should be. A tint of
                   the FOREGROUND is independent of whatever surface it lands on,
                   so the shape survives in both themes. */}
-              <span className="shrink-0 rounded-pill bg-fg-muted/15 px-2 py-0.5 text-label font-medium text-fg-secondary">
-                {labels.status}
-              </span>
             </div>
 
             <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-1">

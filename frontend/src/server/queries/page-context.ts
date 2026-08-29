@@ -27,6 +27,13 @@ export type PageContext = {
  */
 export const getPageContext = cache(async function getPageContext(): Promise<PageContext | null> {
   const supabase = await getServerSupabase();
+  /* The identity read that used to sit here alongside these two is GONE, not
+     merely unused: it existed only to compare the caller's email against one
+     seeded account and switch the visual system on for it. The visual system is
+     the design system now, so no page needs to know who is looking at it in
+     order to decide how to look — and `getUser()` is a round trip this loader no
+     longer has to spend. What a page renders still depends on the caller, but
+     through capabilities and org type, which `workspace.active` already carries. */
   const [workspace, store] = await Promise.all([loadWorkspaceContext(supabase), cookies()]);
   if (!workspace.active) return null;
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);

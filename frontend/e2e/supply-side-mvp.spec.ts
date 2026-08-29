@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { IDENTITIES, signIn } from "./helpers/auth";
+import { setSidebarMode } from "./helpers/sidebar";
 
 /**
  * Sprint 15 — the shared SUPPLY-SIDE B2B workspace.
@@ -71,10 +72,44 @@ const ROUTES = [
   "/b2b/settings",
 ] as const;
 
+/* Each account carries the two things that actually prove the dashboard is
+   showing THIS organization's records rather than a shell:
+
+     `voice`      the one line on the page that differs between a Distributor, a
+                  Manufacturer and an Importer — derived from the org's own
+                  `org_type`, so it cannot be right by accident.
+     `signature`  a product that exists only in this organization's seeded
+                  catalogue, so seeing it means the page reached that org's rows.
+
+   `org` (the organization's NAME) is still here because the header's workspace
+   switcher carries it — but it is deliberately no longer asserted inside
+   <main>. The supply dashboard has never rendered the org's own name in the
+   page body: it opens on "Your supply at a glance" and states the org's SEAT in
+   the subtitle instead. The old assertion looked for a UI element that does not
+   exist and never did, so it failed identically on the pre-globalization
+   checkpoint. */
 const ACCOUNTS = [
-  { name: "Distributor", email: IDENTITIES.distributor, org: "Suez Paints & Coatings" },
-  { name: "Manufacturer", email: IDENTITIES.manufacturer, org: "Alexandria Glass & Aluminium" },
-  { name: "Importer", email: IDENTITIES.importer, org: "Cairo Sanitary Ware Trading" },
+  {
+    name: "Distributor",
+    email: IDENTITIES.distributor,
+    org: "Suez Paints & Coatings",
+    voice: "Demand from showrooms and businesses",
+    signature: "Interior Emulsion - Matte White",
+  },
+  {
+    name: "Manufacturer",
+    email: IDENTITIES.manufacturer,
+    org: "Alexandria Glass & Aluminium",
+    voice: "Demand for what you manufacture",
+    signature: "Tempered Glass Partition 10mm",
+  },
+  {
+    name: "Importer",
+    email: IDENTITIES.importer,
+    org: "Cairo Sanitary Ware Trading",
+    voice: "Demand for what you import",
+    signature: "Ceramic Wash Basin",
+  },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -143,17 +178,40 @@ for (const account of ACCOUNTS) {
       await page.goto("/b2b");
 
       await expect(page.locator("main h1")).toHaveText("Your supply at a glance");
-      // The organization's own name, from its own context — not a fixture label.
-      await expect(page.locator("main")).toContainText(account.org);
+
+      /* THIS ORGANIZATION'S DASHBOARD, not a shell and not another org's.
+         Two independent facts, because either alone is weak: the SEAT (a line
+         derived from the org's own classification, so a Manufacturer's page
+         cannot read as an Importer's) and a PRODUCT that exists only in this
+         org's seeded catalogue (so the page reached that org's rows). */
+      await expect(page.locator("main")).toContainText(account.voice);
+      await expect(page.locator("main")).toContainText(account.signature);
+
+      /* And the header names the organization the workspace is scoped to.
+         `.first()` because the header DECLARES the context block once and PLACES
+         it twice (see `AppHeader`) — the bar and card layouts each get a copy,
+         and only one is visible at a given width. Either copy names the same
+         organization, so the first is the right one to read. */
+      await expect(page.getByTestId("workspace-switcher").first()).toContainText(account.org);
 
       // The leading tile: requests nobody has priced. The seed guarantees a
       // non-zero queue for all three, so this asserts live data, not a shell.
       await expect(visibleText(page, "Requests to answer")).toBeVisible();
       await expect(page.locator("main")).toContainText("EGP");
 
-      // Each chart is an accessible image with its own name, so this asserts the
-      // chart EXISTS rather than that some <svg> is on the page.
-      await expect(page.getByRole("img", { name: "Order value won, by month" })).toBeVisible();
+      /* Each chart is an accessible image with its own name, so this asserts the
+         chart EXISTS rather than that some <svg> is on the page.
+
+         THE NAME CHANGED BECAUSE THE OLD ONE WAS NEVER ON THIS PAGE. This asked
+         for "Order value won, by month" (`supply.chart.valueTrend`), which is
+         drawn by `features/reports/supply-report.tsx` — the REPORTS page. The
+         dashboard's own chart is the pipeline board's `DonutSplit`, named after
+         `supply.pipeline.orders`. Same class of staleness as the organization-
+         name assertion above, and pre-existing for the same reason: it was
+         simply never reached, because that assertion failed first. */
+      await expect(
+        page.locator("main").getByRole("img", { name: "Orders", exact: true }),
+      ).toBeVisible();
       await expect(visibleText(page, "Your top products")).toBeVisible();
       await expect(visibleText(page, "Your top customers")).toBeVisible();
     });
@@ -277,24 +335,40 @@ test.describe("shared B2B chrome on a supply-side workspace", () => {
     await page.goto("/b2b");
 
     const nav = page.getByRole("navigation", { name: "Workspace" }).first();
-    // Supply leads; Sourcing is the demoted buying group; the rest are the same
-    // sections a showroom sees.
-    for (const heading of ["Supply", "Network", "Selling", "Sourcing", "Business"]) {
-      await expect(nav.getByRole("heading", { name: heading, exact: true })).toBeVisible();
-    }
 
-    for (const label of [
-      "Incoming demand",
-      "Quotations",
-      "Orders",
-      "My products",
-      "Customers & showrooms",
-      "Distributors",
-      "Reports",
-      "Settings",
-    ]) {
+    /* THE APPROVED IA IS QUICK ACCESS + COLLAPSIBLE GROUPS, and this assertion
+       was written against the older flat rail where every section was a static
+       <h2> and every module was on screen at once.
+
+       What the rail does now:
+         - the seller's daily modules (Supply) are UNGROUPED and always visible,
+           with no heading at all — a caption over the five rows a user opens
+           every day is a label nobody reads;
+         - Network / Selling / Sourcing / Business are collapsible GROUPS, so
+           their toggles are <button>s (not headings) and their children are
+           `inert` until opened. */
+    for (const label of ["Incoming demand", "Quotations", "Orders", "My products"]) {
       await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
+
+    for (const group of ["Network", "Selling", "Sourcing", "Business"]) {
+      await expect(nav.getByRole("button", { name: group, exact: true })).toBeVisible();
+    }
+
+    // Opening a group reveals its own children — the modules are filed, not lost.
+    await nav.getByRole("button", { name: "Network", exact: true }).click();
+    await expect(
+      nav.getByRole("link", { name: "Customers & showrooms", exact: true }),
+    ).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Distributors", exact: true })).toBeVisible();
+
+    /* SETTINGS IS NOT IN THE NAV LIST, AND EXACTLY ONCE ON THE RAIL. It is the
+       fixed bottom action beneath the scrolling list — a sibling of <nav>, not a
+       child — so it keeps the same position no matter which groups are open. It
+       used to appear here too, under Business, which put it on screen twice. */
+    await expect(nav.getByRole("link", { name: "Settings", exact: true })).toHaveCount(0);
+    const rail = page.locator("[data-sidebar-mode]");
+    await expect(rail.getByRole("link", { name: "Settings", exact: true })).toHaveCount(1);
 
     // Same hrefs as the showroom's — one module set, two orderings.
     await expect(nav.getByRole("link", { name: "Incoming demand", exact: true })).toHaveAttribute(
@@ -317,8 +391,7 @@ test.describe("shared B2B chrome on a supply-side workspace", () => {
 
     // Collapse, then confirm the choice SURVIVES a full document load — the mode
     // is a cookie read on the server so the first paint is already correct.
-    await page.getByTestId("sidebar-control").click();
-    await page.getByTestId("sidebar-mode-collapsed").click();
+    await setSidebarMode(page, "collapsed");
     await expect(shell).toHaveAttribute("data-sidebar-mode", "collapsed");
     await page.reload();
     await expect(page.locator("[data-sidebar-mode]")).toHaveAttribute(
@@ -331,8 +404,7 @@ test.describe("shared B2B chrome on a supply-side workspace", () => {
     await expect(nav.getByRole("link", { name: "Incoming demand", exact: true })).toBeVisible();
 
     // Hover mode reveals without reflowing the document.
-    await page.getByTestId("sidebar-control").click();
-    await page.getByTestId("sidebar-mode-hover").click();
+    await setSidebarMode(page, "hover");
     await expect(shell).toHaveAttribute("data-sidebar-mode", "hover");
     await expect(shell).toHaveAttribute("data-sidebar-open", "false");
     await nav.hover();
@@ -341,8 +413,7 @@ test.describe("shared B2B chrome on a supply-side workspace", () => {
 
     // Leave the workspace as we found it, so the mode does not leak into the
     // next test in this serial suite.
-    await page.getByTestId("sidebar-control").click();
-    await page.getByTestId("sidebar-mode-expanded").click();
+    await setSidebarMode(page, "expanded");
   });
 
   test("the dashboard KPI group is the shared strip, and the shared rail still exists", async ({

@@ -4,6 +4,126 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — The approved visual direction stops being one account's prototype
+
+**Date:** 2026-08-26 · **Branch:** `feature/supplier-dashboard-visual-refresh` · **Base:** `main` @ `f975c38` · **Checkpoint:** `d70ba3b`
+
+The workspace visual system had been reviewed live, in the running application, behind a
+gate: `user.email === "fady@example.test"`. It was approved. This session turns it into the
+Aladdin design system — a productionization pass, not another visual exploration. No part of
+the approved direction was redesigned.
+
+### The shape of the thing being promoted
+
+The gate was one boolean and one attribute, which is what made it removable. `designLabAtmosphere`
+was computed in two places (`app/b2b/layout.tsx`, `server/queries/page-context.ts`) and threaded as a
+prop through `AppShell` → `SidebarShell` → `Sidebar`, plus the supply dashboard. `AppShell` stamped
+`data-design-lab="atmosphere"` on the shell root, and ~400 lines of unlayered CSS in `globals.css`
+hung off that attribute.
+
+Almost all of that CSS was **override-shaped** — it either re-declared a token or put `!important`
+on a Tailwind utility. That is what decided the promotion strategy: the token re-declarations moved
+into `tokens.css` and became *the* values rather than overrides, at which point most of the
+`!important` rules had nothing left to fight and simply disappeared. What survived into
+`globals.css` is only the genuinely structural part — material, elevation, stickiness — which no
+token value can express.
+
+### The trap this pass turned on, and it is worth remembering
+
+`[data-design-lab="atmosphere"]` is an attribute selector with specificity (0,1,0) — **identical to
+`.dark`** — declared later in the cascade. So every token the prototype's *light* block declared also
+won **in dark mode**. Reading that block as "the light values" and re-deriving dark equivalents is
+therefore wrong by construction, and it is exactly the mistake made here first: `--shell-active`
+(white 14%), `--shell-gold` (0.5) and `--shell-gold-soft` (0.12) were "deliberately re-derived" for
+dark at 9% / 0.4 / 0.1. The pixel diff caught it — the dark fold moved where light was byte-identical.
+Restoring the three values brought dark back to `0.0000%` moved. **The percentages are theme-
+independent because the tokens they mix FROM already carry the theme**; re-deriving on top of an
+already-re-derived base double-counts it.
+
+### One real bug fixed while promoting, and it had been invisible
+
+The prototype's continuity rule read
+`body:has([data-design-lab]) { background-color: var(--dlab-mesh-base, var(--frame)); }`.
+`--dlab-mesh-base` was declared on a **descendant** of `<body>`, and custom properties inherit
+downward only — so on `<body>` it was undefined and the `var(--frame)` fallback always won. In light
+theme `--frame` (#e9ecf2) and the mesh base (#e6ebf2) are three units apart and nobody could see it.
+In dark, `--frame` was #05070a against a #111a24 mesh, so every part of a long page below the first
+viewport painted near-black instead of the field. The canonical rule keys off a token defined on
+`:root`, which is what the prototype's own comment said it intended all along.
+
+### Role-awareness is not what got globalized
+
+The design LANGUAGE is global; navigation content and modules are not. Supplier-only modules stay
+behind the capability that means "this workspace publishes products" (`catalog.write` /
+`catalog.publish`) rather than behind an identity — which is what `designLabAtmosphere &&
+managesCatalog` had been hiding: the second half was always the one doing real work.
+
+Verified across the account matrix (`design-lab/matrix.spec.ts`, six identities, EN/AR, light/dark,
+desktop + phone). The buyer-side showroom workspace renders the approved shell with **buyer** content
+and no supplier modules. The personal `/home` surface and the Admin console are pixel-identical to
+before — they are different shells with no atmosphere and no sidebar, and forcing B2B chrome into
+them was explicitly not the task.
+
+### Accessibility defects found in the approved prototype and fixed
+
+Production is a higher bar than a review build, and two of these would have shipped:
+
+- **Collapsed nav groups were clipped, not hidden.** A `0fr` grid track plus `overflow: hidden`
+  removes rows visually and leaves them in the tab order and the accessibility tree — a keyboard user
+  walked through ~12 invisible links on a rail with four closed groups. Now `inert`, which removes
+  both without killing the height transition the collapse is built on.
+- **The collapsed Settings and Upgrade rows had no accessible name at all** — icon-only, no
+  `aria-label`, and both pointing at the same href, so a screen reader announced two identical
+  unnamed links.
+- The Upgrade label was an inline `locale === "ar" ? … : …` ternary, invisible to the AR/EN parity
+  test; now `nav.upgrade` in both catalogues.
+- The Arabic Reels title carried an untranslated `(Reels)`; the parity suite flagged it the moment
+  the module stopped being gated.
+
+### Removed, and why each was safe
+
+The shell-palette A/B proposal (`data-shell-palette="ink"`) is **settled** — neither candidate won,
+the adopted shell is a third value, and the block plus its comparison script are gone. The frame
+family (`--frame`, `--frame-2`, `--frame-tint`, `--frame-tint-soft`, `--frame-warm`), the body alpha
+ramp (`--body-veil*`, `--body-solid`), two of the three direction variables, the three dead navy
+*surface* entries and the `frame` Tailwind colour group were all removed because nothing paints that
+plane any more. `--navy-air` and `--navy-edge` survive as what they always were: tint sources, never
+surfaces. Five one-off variant-exploration scripts (`fady-*-shell.mjs` and friends) went; the capture
+harness stayed and gained `matrix.spec.ts`, `regress.mjs` and `where.mjs`.
+
+### Validation
+
+typecheck clean · `eslint .` clean (one pre-existing `exhaustive-deps` warning, untouched) ·
+**448/448 unit** green, including a rewritten `sidebar-shell.test.tsx` — seven of its assertions
+encoded the OLD footer control's contract (a click that opened a menu, a `px-3` full-width row, a
+tile armed through an inner span) and were rewritten to the canonical control rather than patched
+green.
+
+**Visual regression, measured rather than eyeballed** (`design-lab/regress.mjs`, decoding both PNGs
+in a browser canvas — no new image dependency): the approved reference is **0.0000% moved, max
+channel Δ 0** at the fold in EN-light, AR-light and EN-dark. The two remaining deltas are both
+deliberate and named: the Arabic full page moves 0.0144% (the `(Reels)` removal) and the dark full
+page 17.4% at Δ≤26 (the `<body>` ground bug above, below the first viewport).
+
+Reduced motion asserted, not photographed: the carve records exactly two positions under
+`prefers-reduced-motion` and tweens without it. **Note for the next run** — the reduced-motion spec
+reports a vacuous single-position pass when the dev server is cold, because the 900ms sample window
+closes while Next is still compiling the route. It is a harness limit, not a defect; run it twice.
+
+### What is NOT closed
+
+The dashboard **period selector** was pulled from the page heading row on review (it competed with
+"+ New product"). The period still resolves from `?period=` and every comparison still computes from
+it, but there is now **no UI to change it** for any account. That wants a placement decision, not a
+re-add of the rejected control.
+
+`design/tokens/colors.json` gained the shell/workspace family and a `knownDrift` block. The drift is
+**pre-existing and older than this session**: that file still names Basalt as the dark canvas ramp,
+while the implementation moved the dark ground to Carbon several passes ago. Reconciling it is its
+own task.
+
+---
+
 ## Session — message.sent: telling the counterparty, without telling anyone who cannot look
 
 **Date:** 2026-08-23 · **Branch:** `feature/engagement-notifications-points-core` · **Base:** `main` @ `34b06d4`

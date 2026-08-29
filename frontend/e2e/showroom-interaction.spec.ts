@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { IDENTITIES, signIn } from "./helpers/auth";
+import { setSidebarMode } from "./helpers/sidebar";
 
 /**
  * Sprint 14 refinement — workspace sidebar modes and horizontal card rails.
@@ -23,18 +24,18 @@ async function prefs(page: Page, locale: "en" | "ar") {
 const sidebar = (page: Page) => page.locator("[data-sidebar-mode]");
 const control = (page: Page) => page.getByTestId("sidebar-control");
 
-async function setMode(page: Page, mode: "expanded" | "collapsed" | "hover") {
-  await control(page).click();
-  await page.getByTestId(`sidebar-mode-${mode}`).click();
-  await expect(sidebar(page)).toHaveAttribute("data-sidebar-mode", mode);
-}
+/* Delegates to the shared helper. A click on the control is a binary toggle and
+   no longer opens the menu — see `helpers/sidebar.ts`. Kept as a local alias so
+   the call sites below read the same as they always did. */
+const setMode = (page: Page, mode: "expanded" | "collapsed" | "hover") =>
+  setSidebarMode(page, mode);
 
 /** Width of the element that actually RESERVES layout space in the shell. */
 async function restingWidth(page: Page): Promise<number> {
   return (await sidebar(page).boundingBox())!.width;
 }
 
-/** Width of the visible panel — differs from the above only during a hover reveal. */
+/** Width of the visible panel. The sidebar PUSHES, so this tracks the spacer. */
 async function panelWidth(page: Page): Promise<number> {
   return (await sidebar(page).locator("> div").first().boundingBox())!.width;
 }
@@ -59,11 +60,32 @@ test.describe("Workspace sidebar display modes", () => {
     await signIn(page, request, IDENTITIES.showroom);
     await page.goto("/b2b");
 
+    /* REACHABILITY IS A SET OF ROUTES, NOT A COUNT OF ANCHORS.
+       This used to compare `links.count()` across the three modes, which was a
+       fair proxy while every mode drew the same flat list. The approved rail
+       breaks that proxy honestly: a COLLAPSED secondary group draws one extra
+       representative icon standing for the group itself, so the rail has three
+       MORE anchors than the expanded panel while offering exactly the same
+       modules. A count comparison reads that as a regression; it is the design.
+
+       So the property asserted is the one that actually matters — every route
+       reachable when expanded is still reachable in the other two modes. */
+    const hrefsIn = async () =>
+      new Set(
+        (await sidebar(page).getByRole("link").evaluateAll((els) =>
+          els.map((e) => (e as HTMLAnchorElement).getAttribute("href")),
+        )).filter(Boolean) as string[],
+      );
+
     const links = sidebar(page).getByRole("link");
     const expanded = await links.count();
     expect(expanded).toBeGreaterThan(10); // A showroom owner reaches the full IA.
+    const expandedHrefs = await hrefsIn();
 
-    await control(page).click();
+    /* FOCUS, NOT CLICK. A click on this control is a binary Expanded ↔
+       Collapsed toggle; the three-mode menu is the rarer, deliberate choice and
+       opens on hover or keyboard focus. See `helpers/sidebar.ts`. */
+    await control(page).focus();
     await expect(page.getByRole("menuitem")).toHaveText([
       "Expanded",
       "Collapsed",
@@ -74,9 +96,13 @@ test.describe("Workspace sidebar display modes", () => {
     // Collapsing is a change of PRESENTATION. Losing a route here would mean a
     // user could not reach a module they have the capability for.
     await setMode(page, "collapsed");
-    await expect(links).toHaveCount(expanded);
+    for (const href of expandedHrefs) {
+      expect([...(await hrefsIn())], `"${href}" unreachable on the collapsed rail`).toContain(href);
+    }
     await setMode(page, "hover");
-    await expect(links).toHaveCount(expanded);
+    for (const href of expandedHrefs) {
+      expect([...(await hrefsIn())], `"${href}" unreachable in expand-on-hover`).toContain(href);
+    }
   });
 
   test("collapsed is a narrow rail that still names its items and marks the active route", async ({
@@ -110,7 +136,10 @@ test.describe("Workspace sidebar display modes", () => {
     await expect(catalog).toHaveText("");
   });
 
-  test("expand-on-hover overlays the page instead of reflowing it", async ({ page, request }) => {
+  test("expand-on-hover pushes the workspace rather than floating over it", async ({
+    page,
+    request,
+  }) => {
     await prefs(page, "en");
     await signIn(page, request, IDENTITIES.showroom);
     await page.goto("/b2b");
@@ -127,11 +156,21 @@ test.describe("Workspace sidebar display modes", () => {
     await expect(sidebar(page)).toHaveAttribute("data-sidebar-open", "true");
     await expect.poll(() => panelWidth(page)).toBeGreaterThan(restingBefore * 2);
 
-    // The whole point: the panel grew, the document did not move.
-    expect(await restingWidth(page)).toBe(restingBefore);
-    const mainAfter = (await page.locator("#main").boundingBox())!;
-    expect(mainAfter.x).toBe(mainBefore.x);
-    expect(mainAfter.width).toBe(mainBefore.width);
+    /* THE APPROVED BEHAVIOUR IS A PUSH, AND THIS ASSERTION IS THE INVERSE OF
+       WHAT IT USED TO BE. The reveal used to float the panel OVER the page: the
+       spacer held its resting width and `#main` never moved. The approved
+       direction makes the sidebar widening the application's own width changing,
+       so the spacer animates with the panel and the workspace gives up the room.
+
+       Polled rather than read once — the spacer animates on a spring, so the
+       instant after `data-sidebar-open` flips it is still mid-travel. */
+    await expect.poll(() => restingWidth(page)).toBeGreaterThan(restingBefore * 2);
+    await expect
+      .poll(async () => (await page.locator("#main").boundingBox())!.width)
+      .toBeLessThan(mainBefore.width);
+
+    // The document must not gain a sideways scrollbar while doing it.
+    await expectNoPageOverflow(page);
 
     await page.locator("#main").hover();
     await expect(sidebar(page)).toHaveAttribute("data-sidebar-open", "false");

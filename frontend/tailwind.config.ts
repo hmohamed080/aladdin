@@ -46,6 +46,56 @@ export default {
       colors: {
         // ---- Semantic (theme-aware) ----
         canvas: alpha("--canvas"),
+        /* ---- Workspace ----
+           The ground the B2B page is composed ON, and the hairline that closes
+           it. Chrome-and-shell only — see tokens.css.
+
+           THERE IS NO `frame` COLOUR ANY MORE. It used to be here (`frame`,
+           `frame-2`) as the plane the chrome floated on, and nothing paints that
+           plane now: `.workspace-frame` is a transparent layout box and the
+           field behind it is the atmosphere (`.workspace-atmosphere` in
+           globals.css), which is a gradient rather than a colour and therefore
+           has no business being a Tailwind colour utility. A `bg-frame` left
+           here would be a class that compiles, renders a flat fill, and quietly
+           undoes the composition wherever someone reached for it.
+
+           NOTE the name `workspace`: a `body` colour would collide with the
+           `body` TYPE step and make `text-body` mean two things. */
+        workspace: alpha("--workspace"),
+        "workspace-line": alpha("--workspace-line"),
+        /* ---- Shell (workspace chrome) ----
+           The navy sidebar and everything painted on it. Deliberately a
+           SEPARATE family from `surface`: these are the only tokens allowed on
+           chrome, and `surface`/`canvas` remain the only ones allowed on
+           content, so the two can never be confused at a call site. */
+        shell: {
+          DEFAULT: alpha("--shell"),
+          lit: alpha("--shell-lit"),
+          deep: alpha("--shell-deep"),
+          2: alpha("--shell-2"),
+          line: alpha("--shell-line"),
+          fg: alpha("--shell-fg"),
+          "fg-secondary": alpha("--shell-fg-secondary"),
+          "fg-muted": alpha("--shell-fg-muted"),
+          active: alpha("--shell-active"),
+          "active-fg": alpha("--shell-active-fg"),
+          gold: alpha("--shell-gold"),
+          "gold-soft": alpha("--shell-gold-soft"),
+        },
+        /* ---- Form fields ----
+           A field's own neutrals, warm-derived so the control matches the ground
+           it is sunk into. See tokens.css for why the global `fg` ramp could not
+           serve: it is cool, every light surface in the product is warm, and on
+           a control that is one line of placeholder in a rounded rectangle that
+           mismatch IS the control's appearance. */
+        field: {
+          DEFAULT: alpha("--field"),
+          line: alpha("--field-line"),
+          fg: alpha("--field-fg"),
+          placeholder: alpha("--field-placeholder"),
+          hint: alpha("--field-hint"),
+          focus: alpha("--field-focus"),
+        },
         surface: {
           DEFAULT: alpha("--surface"),
           2: alpha("--surface-2"),
@@ -166,6 +216,26 @@ export default {
         label: [
           "0.8125rem",
           { lineHeight: "1.2", letterSpacing: "0.02em", fontWeight: "500" },
+        ],
+        /* The METADATA step, below `label`.
+         *
+         * The scale stopped at 13px, which left every secondary line on a dense
+         * surface — a row's date caption, a metric's comparison line, a section
+         * heading in the rail — sharing a size with the primary label beside it.
+         * On a page with three or four such lines that is survivable; on the
+         * dashboard's boards, where a row carries a name AND a buyer AND a date
+         * label AND a status, it is why the columns had no ranking and why every
+         * one of them truncated.
+         *
+         * 12px, and not smaller: this carries real content (dates, counts, buyer
+         * names), not decoration, so it stays inside the range that survives a
+         * 1.5x browser zoom and a mid-range phone. Regular weight rather than
+         * medium, because it earns its place by SIZE and colour, and a bolder
+         * small step would just be a second label.
+         */
+        caption: [
+          "0.75rem",
+          { lineHeight: "1.35", letterSpacing: "0.01em", fontWeight: "400" },
         ],
         mono: [
           "0.8125rem",

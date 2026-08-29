@@ -191,6 +191,28 @@ export function formatDate(iso: string | null | undefined, locale: Locale): stri
   return dateFormat(locale, { day: "2-digit", month: "short", year: "numeric" }).format(d);
 }
 
+/**
+ * Day and month, no year — the OPERATIONAL date.
+ *
+ * `formatDate` renders "12 Sep 2026", which is the right answer on a record
+ * page and the wrong one in a dashboard column: it is ~78px of 13px type, and a
+ * queue row that has to carry a name, a buyer, a quantity and a status cannot
+ * spend that on a year the reader already knows. Truncating it is worse than
+ * shortening it — "Sep 12, 2…" is not a shorter date, it is a date that has to
+ * be reconstructed.
+ *
+ * The year is dropped rather than abbreviated because these are near-term
+ * working dates (a required-by, a validity, a promised dispatch) where the year
+ * is never the ambiguous part, and the full date is one click away on the record
+ * every one of these rows links to. Do NOT use this where a date can be years
+ * old or years out — an audit trail, a contract term, a birth date.
+ */
+export function formatDateShort(iso: string | null | undefined, locale: Locale): string {
+  const d = parse(iso);
+  if (!d) return EMPTY;
+  return dateFormat(locale, { day: "2-digit", month: "short" }).format(d);
+}
+
 export function formatDateTime(iso: string | null | undefined, locale: Locale): string {
   const d = parse(iso);
   if (!d) return EMPTY;

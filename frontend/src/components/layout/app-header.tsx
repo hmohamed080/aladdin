@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cn } from "@/lib/ui/cn";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { getMessages } from "@/lib/i18n/translate";
@@ -99,8 +100,29 @@ export async function AppHeader({
   workspaceLabel,
   preferencesHref,
   orgId,
+  variant = "bar",
 }: {
   appName: string;
+  /**
+   * Which shell is rendering this header.
+   *
+   * `bar` is the original and the default: a full-width band across the top of
+   * the viewport, with the brand at its head. It is what `/home` and `/admin`
+   * still are.
+   *
+   * `card` is the B2B workspace, where the header is one of two objects
+   * floating beside a full-height sidebar. Three things follow from that and all
+   * three are consequences of the same fact rather than independent style
+   * choices: it is rounded and detached instead of edged and stuck; it does NOT
+   * draw the brand, because the sidebar beside it already does; and search moves
+   * to the head of the card, because with the lockup gone that position is free
+   * and search is the thing that deserves it.
+   *
+   * The DIFFERENCE IS ONLY CHROME. Every control, every panel and every piece of
+   * data is identical in both — this switch must never become a place where one
+   * surface quietly gets a feature another does not.
+   */
+  variant?: "bar" | "card";
   /** Workspace/branch switchers, an Admin badge — whatever names the context. */
   context?: ReactNode;
   /** Surface-owned live controls (e.g. the sales realtime indicator). */
@@ -163,9 +185,78 @@ export async function AppHeader({
     orgId,
   );
 
+  const card = variant === "card";
+
+  /* Declared once and placed twice. In the bar it follows the brand, on the
+     left, where a crumb trail belongs. In the card the left is spent on search,
+     so the workspace and branch move over to sit with the account controls they
+     are a scope for. Same element either way — the alternative is two copies
+     that drift. */
+  const contextBlock = context ? (
+    <div
+      className={cn(
+        "hidden min-w-0 items-center gap-2",
+        // THE CARD SHOWS IT LATER THAN THE BAR DOES, and the reason is that the
+        // card is not the full viewport: the sidebar takes 280px before it
+        // starts. At 834pt that leaves ~540pt for a command field, an
+        // organization crumb, a branch crumb and seven controls, and they do not
+        // fit — the crumbs rendered straight over the search field.
+        //
+        // Hiding the crumbs rather than the controls is the right half to drop,
+        // because in this shell they are the one piece of the header that is
+        // duplicated: the workspace card at the foot of the sidebar carries the
+        // same organization and the same branch, on screen at the same time. The
+        // bar variant has no sidebar and therefore no duplicate, so it keeps the
+        // crumbs from `tablet` exactly as before.
+        card ? "desktop:flex" : "tablet:flex",
+      )}
+    >
+      {context}
+    </div>
+  ) : null;
+
   return (
     <header
-      className="sticky top-0 border-b bg-surface/85 backdrop-blur"
+      /* Identifies THIS header uniquely, AND WHICH VARIANT IT IS, for CSS that
+         must reach only the shell's own bar — never another `<header>` a page
+         happens to render further down (a dashboard board, an article, ...),
+         and never a different shell's bar.
+
+         Both halves are load-bearing and both were learned the expensive way:
+           — WITHOUT the attribute, a bare `header` selector caught every
+             dashboard board's own title row, freezing each card's header to the
+             viewport while the card scrolled under it.
+           — WITHOUT the VALUE, promoting the card's translucent material would
+             reach the Personal home and the Admin console too. Those two render
+             the `bar` variant on `bg-canvas` with no workspace atmosphere behind
+             them, so a translucent bar there composites over nothing and reads
+             as a washed-out strip.
+
+         See the canonical chrome rules in globals.css, which key entirely off
+         `header[data-app-header="card"]`. */
+      data-app-header={card ? "card" : "bar"}
+      /* A DISTINCT SHELL SURFACE, not a translucent strip over the page.
+         It used to be `bg-surface/85 backdrop-blur`, which let the workspace
+         scroll through it as a smear. That was survivable against flat white;
+         against the navy shell and the body's ambient wash it is not — the
+         header picked up whatever tint happened to be under it and its boundary
+         with the body dissolved exactly where the design needs three separate
+         planes (shell, header, body) to read as three. So: opaque, with a
+         hairline and a short shadow that sits the header ABOVE the page rather
+         than in it. The blur goes with the transparency; there is nothing left
+         to blur. */
+      className={cn(
+        "bg-surface",
+        card
+          ? /* A CARD, and therefore NOT STICKY. It is an object on the page with
+               air on all four sides, and an object that detaches and follows the
+               scroll while the body it was paired with slides underneath reads as
+               a rendering fault rather than as persistence. Below `tablet` there
+               is no frame and no sidebar, so it reverts to the bar in every
+               respect — edge, shadow, stickiness and all. */
+            "sticky top-0 border-b shadow-raised tablet:static tablet:rounded-[1.25rem] tablet:border tablet:shadow-card"
+          : "sticky top-0 border-b shadow-raised",
+      )}
       // Above the page, below the sidebar's hover reveal (300) so that reveal can
       // float over the header rather than sliding under it.
       style={{ zIndex: 200 }}
@@ -186,27 +277,54 @@ export async function AppHeader({
              the mark three pixels high of true centre. Making the anchor a flex
              container removes the line box, so the mark centres on the row and
              not on a phantom text baseline. */
-          className="flex shrink-0 items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+          className={cn(
+            "flex shrink-0 items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
+            // In the card the sidebar draws the lockup, so drawing it here too
+            // would put two Aladdin marks 40px apart. It stays below `tablet`,
+            // where the sidebar is not rendered at all and this is once again the
+            // only place the product is named.
+            card && "tablet:hidden",
+          )}
         >
           {/* `md`, the header lockup — see `Brand`. The pre-workspace screens
               keep `sm`; this is the only surface that grew. */}
           <Brand name={appName} size="md" />
         </Link>
 
-        {context ? (
+        {!card && context ? (
           <>
             <HeaderSeparator />
-            <div className="hidden min-w-0 items-center gap-2 tablet:flex">{context}</div>
+            {contextBlock}
           </>
         ) : null}
 
-        <div className="ms-auto flex shrink-0 items-center gap-1 tablet:gap-2">
+        <div
+          className={cn(
+            // `min-w-0` so this can actually give width back under pressure. A
+            // flex item defaults to `min-width: auto`, which refuses to shrink
+            // below its content and is how a "flexible" field ends up pushing
+            // its siblings off the end of the row instead of narrowing.
+            "flex min-w-0 items-center",
+            card
+              ? // The card's lead. `me-auto` rather than a fixed width so the
+                // field grows with the shell and the controls stay hard right;
+                // capped, because a 900px command field on a wide display is not
+                // a better search, just a longer one.
+                "ms-auto tablet:ms-1 tablet:me-auto tablet:max-w-[30rem] tablet:flex-1"
+              : "ms-auto",
+          )}
+        >
           <GlobalSearch
             capabilities={capabilities}
             stance={stance}
             hasWorkspace={hasWorkspace}
             canAdmin={canAdmin}
+            size={card ? "lead" : "compact"}
           />
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1 tablet:gap-2">
+          {card ? contextBlock : null}
 
           {actions ? <div className="hidden items-center gap-sm tablet:flex">{actions}</div> : null}
 

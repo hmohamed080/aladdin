@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { IDENTITIES, signIn } from "./helpers/auth";
+import { setSidebarMode } from "./helpers/sidebar";
 
 /**
  * PRE-UAT ACCEPTANCE for the shared authenticated shell and the supply-side
@@ -65,7 +66,25 @@ async function expectNoHorizontalOverflow(page: Page) {
  */
 async function expectDenseHead(page: Page) {
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.locator("main .rounded-md.border.shadow-card").first()).toBeVisible();
+  /* THE PAGE'S FIRST OPERATIONAL SURFACE, located by the design system's own
+     surface token rather than by a snapshot of one component's utility classes.
+
+     This used to be `main .rounded-md.border.shadow-card`, which is a
+     COMBINATION OF UTILITIES that no longer describes anything: `Board` — the
+     canonical surface on every seller page — is `rounded-2xl … shadow-sm`, and
+     its own comment records why (`shadow-card` "made six cards look like six
+     floating tiles"). So the selector had been matching nothing on the dashboard
+     since well before this branch, which is why it failed identically on the
+     pre-globalization checkpoint.
+
+     `bg-surface` is the right level to assert at: it is the semantic token every
+     raised surface in the system consumes — Board, the table shell, the card
+     primitive — and the globalization's own elevation rule is written against
+     exactly this contract (`.workspace-body .bg-surface` in globals.css). A page
+     that fell back to a loose grid of unstyled tiles would still have no
+     `bg-surface` inside `main`, so the check keeps the property it was written
+     for while no longer depending on one component's styling of the day. */
+  await expect(page.locator("main .bg-surface").first()).toBeVisible();
 }
 
 test.describe("supply-side visual acceptance", () => {
@@ -132,10 +151,16 @@ test.describe("shared shell regression (Showroom)", () => {
     await prefs(page, "en");
     await signIn(page, request, IDENTITIES.showroom);
 
-    await page.getByTestId("sidebar-control").click();
-    await page.getByTestId("sidebar-mode-collapsed").click();
+    await setSidebarMode(page, "collapsed");
 
-    const link = page.getByRole("link", { name: "Reports", exact: true });
+    /* A QUICK-ACCESS MODULE, NOT "Reports". The approved rail keeps the
+       frequently-used modules immediately visible and files the rest into
+       collapsible groups — on a COLLAPSED rail a secondary group is one icon and
+       its children are `inert` until that icon is clicked. "Reports" is inside
+       the Business group, so hovering it here asserted nothing about the icon
+       treatment and everything about a group being shut. "Purchase requests" is
+       quick access for a showroom, so it is on screen in every mode. */
+    const link = page.getByRole("link", { name: "Purchase requests", exact: true });
     await expect(link).toBeVisible();
     // The label survives as the accessible name only.
     await expect(link).toHaveText("");
@@ -145,8 +170,7 @@ test.describe("shared shell regression (Showroom)", () => {
     await expect(page.getByRole("tooltip")).toHaveCount(0);
 
     // Restore, so the mode cookie does not leak into the next test's expectations.
-    await page.getByTestId("sidebar-control").click();
-    await page.getByTestId("sidebar-mode-expanded").click();
+    await setSidebarMode(page, "expanded");
   });
 
   test("CardRail advances exactly one card per arrow click", async ({ page, request }) => {
@@ -270,20 +294,31 @@ test.describe("shared shell regression (Showroom)", () => {
   });
 
   /**
-   * The sidebar's bottom mode control is ICON-ONLY in every mode, and its glyph
-   * shares one column with every navigation icon above it.
+   * The sidebar's mode control is ICON-ONLY in every mode, expanded included.
    *
-   * Both halves have been regressions. The caption returned as "Expanded" at the
-   * foot of a wide panel — a control captioning a state the user can already see.
-   * The alignment drifted 4px because the control's padding was set in a different
-   * file from the nav rows'. Asserting the CENTRES rather than the classes is what
-   * makes this survive a refactor of either file.
+   * THE COLUMN HALF OF THIS TEST IS GONE, AND DELIBERATELY. It used to also
+   * assert that the control's glyph shared one centre-line with every navigation
+   * icon above it, which was right while the control lived in the sidebar's
+   * FOOTER, inside the navigation's own column — a centred glyph there would have
+   * landed ~120px off the icons in a 15rem panel.
+   *
+   * The control has moved to the TOP row. Expanded it sits at that row's trailing
+   * edge beside the wordmark; collapsed it is the row's only occupant and
+   * centres. Neither position is the nav column, so the old assertion now
+   * describes a layout the approved design does not have.
+   *
+   * What survives is the half that was always the real regression: the caption.
+   * It came back once as "Expanded" at the foot of a wide panel — a control
+   * captioning a state the user is looking at. That is asserted in every mode,
+   * plus the accessible name that carries the meaning instead, plus the fact
+   * that the control is the same 36px tile the nav icons are (a size, not a
+   * position — that part does survive a move).
    */
   for (const [locale, dir] of [
     ["en", "ltr"],
     ["ar", "rtl"],
   ] as const) {
-    test(`sidebar bottom control is icon-only and in the icon column (${dir})`, async ({
+    test(`sidebar mode control is icon-only and the shared tile (${dir})`, async ({
       page,
       request,
     }) => {
@@ -293,40 +328,52 @@ test.describe("shared shell regression (Showroom)", () => {
       await page.goto("/b2b");
 
       for (const mode of ["expanded", "collapsed", "hover"] as const) {
-        await page.getByTestId("sidebar-control").click();
-        await page.getByTestId(`sidebar-mode-${mode}`).click();
+        await setSidebarMode(page, mode);
 
         const control = page.getByTestId("sidebar-control");
         // Icon-only. In EVERY mode, expanded included.
         await expect(control, `visible caption in ${mode} mode`).toHaveText("");
-        // The accessible name is what carries the meaning instead.
+        // The accessible name is what carries the meaning instead, and it names
+        // the ACTIVE MODE — so a screen-reader user is told strictly more than
+        // the sighted user sees, which is the whole trade the caption paid for.
         await expect(control).toHaveAttribute("aria-label", /.+/);
 
         const geometry = await page.evaluate(() => {
           const ctrl = document.querySelector('[data-testid="sidebar-control"]') as HTMLElement;
+          /* GROUPED CHILDREN ARE EXCLUDED, DELIBERATELY. The approved rail
+             indents a group's children by 8px (`ps-2`) so a child reads as
+             sitting inside its group's own highlight rather than as a
+             misaligned top-level row. That is a design decision, not drift, so
+             counting those rows here would assert against the approved design.
+             What still has to hold — and is what this measurement is for — is
+             that every UNGROUPED row shares one column with the others. */
           const icons = [...document.querySelectorAll("[data-sidebar-mode] a")]
+            .filter((a) => !a.closest(".ps-2"))
             .map((a) => a.querySelector("svg"))
             .filter(Boolean) as SVGElement[];
           const cx = (el: Element) => {
             const r = el.getBoundingClientRect();
             return Math.round((r.left + r.width / 2) * 10) / 10;
           };
+          const box = ctrl.getBoundingClientRect();
           return {
-            control: cx(ctrl.querySelector("svg")!),
-            nav: [...new Set(icons.map(cx))],
+            controlSize: [Math.round(box.width), Math.round(box.height)],
+            navColumns: [...new Set(icons.map(cx))].length,
           };
         });
 
-        // One column: every nav icon on the same centre, and the control on it too.
-        expect(geometry.nav, `nav icons not in one column (${mode})`).toHaveLength(1);
-        expect(
-          Math.abs(geometry.control - geometry.nav[0]!),
-          `control off the icon column in ${mode} mode`,
-        ).toBeLessThanOrEqual(0.5);
+        /* The UNGROUPED nav icons still share ONE column — that rule is about
+           the list and is unaffected by where the control went. It is asserted
+           here because this is the only place in the suite that measures it. */
+        expect(geometry.navColumns, `ungrouped nav icons not in one column (${mode})`).toBe(1);
+        /* And the control is still the shared 36px tile, which is what makes it
+           read as part of the same system after moving out of the nav column. */
+        expect(geometry.controlSize, `control is not the shared tile in ${mode} mode`).toEqual([
+          36, 36,
+        ]);
       }
 
-      await page.getByTestId("sidebar-control").click();
-      await page.getByTestId("sidebar-mode-expanded").click();
+      await setSidebarMode(page, "expanded");
     });
   }
 
@@ -347,6 +394,20 @@ test.describe("shared shell regression (Showroom)", () => {
 
     const html = page.locator("html");
     const themeSwitch = page.getByTestId("theme-switch");
+
+    /* WAIT FOR THE CONTROL BEFORE EACH PRESS, AND THIS IS THE TEST'S BUG RATHER
+       THAN THE APP'S. `ThemeSwitch` writes the preference through a server
+       action inside `useTransition` and sets `disabled={pending}` while it is in
+       flight — correct behaviour, and the reason it also paints
+       `disabled:opacity-60`. A press issued during that window is not dropped by
+       the app; Playwright simply refuses to click a disabled control and spins
+       in "element is not enabled" until the test times out.
+
+       That is exactly what happened here, and it is pre-existing: the same race
+       makes this test flaky on the checkpoint commit, where it failed the first
+       attempt with the identical retry loop and passed on retry. Waiting for
+       `toBeEnabled()` removes the race without touching the control. */
+    await expect(themeSwitch).toBeEnabled();
     await themeSwitch.click();
     await expect(html).toHaveClass(/dark/);
     await expect(html).toHaveAttribute("data-theme-pref", "dark");
@@ -355,12 +416,35 @@ test.describe("shared shell regression (Showroom)", () => {
     await openAccountMenu(page);
     await expect(page.getByTestId("theme-dark")).toHaveAttribute("aria-checked", "true");
     await page.keyboard.press("Escape");
+    /* AND WAIT FOR THE MENU TO ACTUALLY GO. Escape starts the portaled menu
+       unmounting; the press below lands on a control that sits behind it. */
+    await expect(page.getByTestId("profile-menu")).toBeHidden();
 
+    /* SECOND PRESS — AND THIS WAIT IS THE REGRESSION GUARD.
+       `toggle()` applies the preference optimistically and then persists it in
+       `start(async () => setTheme(next))`, so `disabled={pending}` stays true
+       until that transition COMMITS. It used not to: `setTheme` ended in
+       `revalidatePath("/", "layout")`, which held the transition open for as
+       long as the whole B2B shell took to rebuild server-side and left the
+       control dead after a single press. The revalidation bought nothing — the
+       theme is a class on <html>, which a server revalidation does not
+       re-render — and is gone; see `server/actions/preferences.ts`.
+
+       Waiting on `toBeEnabled` is still the right way to drive a control that
+       disables itself while writing, and it is what would catch the defect
+       coming back. */
+    await expect(themeSwitch).toBeEnabled();
     await themeSwitch.click();
     await expect(html).not.toHaveClass(/dark/);
     await expect(html).toHaveAttribute("data-theme-pref", "light");
 
-    // And it survives a reload — the cookie, not component state, is the store.
+    /* And it survives a reload — the cookie, not component state, is the store.
+       Wait for the control to come back first: `disabled` IS the "write still in
+       flight" signal, and reloading mid-write would race the cookie rather than
+       test that it persisted. A user who reloads inside that window loses the
+       preference, which is the deliberate trade for a control that stays usable
+       (see `ThemeSwitch`) — the write is one round trip, not a tree rebuild. */
+    await expect(themeSwitch).toBeEnabled();
     await page.reload();
     await expect(html).not.toHaveClass(/dark/);
     // In light, the single icon offers the theme you would GET: dark.

@@ -51,10 +51,45 @@ import { cn } from "@/lib/ui/cn";
 export function Brand({
   name,
   size = "md",
+  tone = "ink",
+  wordmark = true,
   className,
 }: {
   name: string;
   size?: "sm" | "md" | "lg";
+  /**
+   * Which ground the lockup is standing on.
+   *
+   * `ink` is the default and is every existing call site: a light surface, dark
+   * wordmark. `shell` is the navy sidebar, where `text-fg` resolves to near-black
+   * and the wordmark disappears into the panel.
+   *
+   * A prop rather than a `className` override, because the override would have to
+   * reach a nested span and would therefore be written as an arbitrary descendant
+   * selector at the call site — which is a rule about this component's internals
+   * living somewhere that cannot be updated when the internals change.
+   */
+  tone?: "ink" | "shell";
+  /**
+   * Whether the localized name is painted beside the mark.
+   *
+   * `false` is the COLLAPSED SIDEBAR RAIL and nothing else. At 56px there is no
+   * room for a wordmark, but there is room for the emblem, and the emblem alone
+   * is still the brand — a rail with no mark at all leaves the product
+   * unidentified on screen for anyone who prefers a collapsed sidebar, which is
+   * what this prop exists to stop.
+   *
+   * The mark is the SAME element either way, so a caller toggling this does not
+   * unmount and remount the artwork; only the text beside it comes and goes.
+   * That is what lets the collapse read as one lockup narrowing rather than as
+   * two different lockups.
+   *
+   * Nothing is lost to assistive technology. The mark is `aria-hidden` and
+   * always was — it carries no accessible name in either state — so the sidebar
+   * is not relying on this text to be announced, and the rail's navigation
+   * landmark still names itself.
+   */
+  wordmark?: boolean;
   className?: string;
 }) {
   // The emblem is PORTRAIT (the ponytail carries it well above the circle), so
@@ -116,7 +151,17 @@ export function Brand({
         priority
         className={cn("w-auto shrink-0 object-contain", mark)}
       />
-      <span className={cn("font-display-ar leading-none text-fg", text)}>{name}</span>
+      {wordmark ? (
+        <span
+          className={cn(
+            "font-display-ar leading-none",
+            tone === "shell" ? "text-shell-fg" : "text-fg",
+            text,
+          )}
+        >
+          {name}
+        </span>
+      ) : null}
     </span>
   );
 }

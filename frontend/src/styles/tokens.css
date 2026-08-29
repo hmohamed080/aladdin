@@ -17,6 +17,40 @@
   --basalt-2: #1b2226;
   --basalt-3: #232b30;
 
+  /* ---- Navy ramp — WHAT SURVIVES OF IT, AND WHAT DOES NOT ----
+   * This was the shell's ground: `--navy` #001537 and two neighbours, sampled
+   * off a rendered concept. All three surface entries are GONE. The sidebar
+   * stands on `--shell` now (see the Shell block below), an architectural blue
+   * chosen against the light workspace beside it rather than sampled from an
+   * image — a fully saturated 217° blue could never say what it was a shade of.
+   *
+   * Two members survive because they were never surfaces:
+   *
+   *   `--navy-air`    THE TINT SOURCE, and it exists because of a colour-mixing
+   *                   fact that cost a whole pass: tinting a light ground TOWARD
+   *                   a near-black blue does not make it blue. Navy is (0,21,55);
+   *                   mixing it into a light ground at 15% pulls red down 36 and
+   *                   blue down 27, so the ground goes GREY, gaining barely 9
+   *                   points of blue-minus-red. The workspace needs ~25 points at
+   *                   the sidebar edge, and no percentage of a near-black reaches
+   *                   that without also going dark. So this is the same HUE
+   *                   carried up to PAGE lightness, and it is what the
+   *                   atmosphere's cool pools are actually mixed from.
+   *                   NEVER paint a surface with it.
+   *   `--navy-edge`   the second, quieter pool's hue, for the same reason.
+   *
+   * The text ramp survives too: these are the inks that sit ON the shell, and
+   * they are tinted FROM the shell's hue rather than grey, because a neutral
+   * grey on a saturated ground reads as dirty.
+   *
+   *   on-shell text  19.1:1   secondary  12.2:1   muted  5.3:1   (all AA+)
+   */
+  --navy-edge: #153860;
+  --navy-air: #5986cf;
+  --navy-text: #f2f5fa;
+  --navy-text-secondary: #ccd6e4;
+  --navy-text-muted: #7e90ab;
+
   /* ---- Carbon ramp — the DARK-THEME ground ----
    * Basalt is a BRAND colour: a cool, blue-black stone, right for the Aperture
    * mark, the auth brand panel and every modal scrim. It was never a good
@@ -302,6 +336,198 @@
   --shadow-raised: 0 1px 2px rgba(16, 16, 18, 0.06);
   --shadow-card: 0 1px 2px rgba(16, 16, 18, 0.04), 0 8px 24px rgba(16, 16, 18, 0.05);
   --shadow-overlay: 0 10px 30px rgba(16, 16, 18, 0.1), 0 2px 8px rgba(16, 16, 18, 0.06);
+
+  /* ---- Form fields · LIGHT ----
+   * A COMMAND FIELD IS NOT A BLOCK OF PROSE, and this family exists because it
+   * was being painted as though it were.
+   *
+   * The global foreground ramp is COOL — `--fg-secondary` is #5c6066, ten points
+   * bluer than it is red — while every light ground in the product is WARM:
+   * Quartz #f4f3f0, `--surface` #fdfcfb, `--border` #dbd8d5. On a body of text
+   * that mismatch is invisible; on a 40px control whose entire visual content is
+   * one line of placeholder inside one warm rounded rectangle, it is the whole
+   * impression the control makes. The search field read as a blue-grey object
+   * imported from another design system, and it read that way because a cool
+   * grey was the only ink on it.
+   *
+   * These are the same neutrals derived the other way: Ink mixed INTO Quartz, so
+   * every step down the ramp keeps the ground's temperature.
+   *
+   *   --field-placeholder  Ink at 58% into Quartz. 4.5:1 on `--surface`, so the
+   *                        prompt is real type rather than a suggestion of it.
+   *   --field-hint         Ink at 45%. The shortcut badge, which must read as
+   *                        quieter than the prompt beside it — it is an
+   *                        accelerator, not an instruction, and it is already
+   *                        carried properly by `aria-keyshortcuts`.
+   *   --field-line         A step lighter than `--border`: the field is sunk
+   *                        into a card, so its edge is a change of surface, not
+   *                        a division between two regions.
+   *   --field-focus        Lumen at 38%. The brand accent at LOW intensity, in
+   *                        place of the hard two-pixel ring the control used to
+   *                        take from `--focus`. `--focus` itself is unchanged
+   *                        and still correct for everything that is not sitting
+   *                        inside a floating header card.
+   */
+  --field: var(--quartz);
+  --field-line: #e5e2de;
+  --field-fg: var(--ink);
+  --field-placeholder: #747574;
+  --field-hint: #919190;
+  --field-focus: rgba(243, 171, 62, 0.38);
+
+  /* ---- Shell · LIGHT ----
+   * The chrome semantics. `shell` is the sidebar ground; `shell-2` is anything
+   * raised onto it; `shell-line` is the hairline that divides them. Foregrounds
+   * are tinted FROM the shell's own hue rather than grey, because a neutral grey
+   * on a saturated ground reads as dirty.
+   *
+   * TWO MATERIALS, DELIBERATELY DIFFERENT LIGHTNESS — the whole composition.
+   * The sidebar carries the saturated dark colour and the WORKSPACE is light.
+   * Not the other way round: a large expanse of low-luminance colour is not what
+   * "atmospheric" means, and spreading the ink across the whole page read as
+   * heavy and uncomfortable through two full rounds of review. The workspace
+   * mesh's own lit pool picks up THIS hue at the seam, which is what makes the
+   * two read as one designed transition rather than as a dark rectangle and a
+   * light rectangle touching. See `--workspace-mesh-*` below.
+   *
+   * WHY NOT `--navy` (#001537) ANY MORE. Navy is hue 217° at 100% saturation —
+   * a fully saturated blue that is not in the Aladdin palette and does not
+   * derive from anything in it. It was sampled off a rendered concept, which
+   * matches an image and does not own a colour. This ramp reads as the
+   * "architectural blue" the brief asked for rather than a corporate navy, while
+   * still holding `--shell-fg`'s contrast and staying clearly the darker of the
+   * two materials beside the workspace's light field.
+   */
+  --shell: #24384d;
+  --shell-lit: #32506a;
+  --shell-deep: #182636;
+  --shell-2: rgba(255, 255, 255, 0.055);
+  --shell-line: rgba(255, 255, 255, 0.09);
+  --shell-fg: var(--navy-text);
+  --shell-fg-secondary: var(--navy-text-secondary);
+  --shell-fg-muted: var(--navy-text-muted);
+  /* THE ACTIVE SURFACE IS A WASH OF THE SHELL ITSELF, NOT OF THE WORKSPACE.
+     It used to be `#eef2f6` — the page's own light ground — on the theory that
+     the carve reads as "the BODY arriving into the sidebar". Against this
+     lighter shell that theory stops paying: a near-white pill on the material
+     reads as a white object pasted over it, not as a row carved out of it.
+     Mixing a little white into the sidebar's own lit tone keeps the active row
+     in the SAME colour family as the rest of the rail — close enough in hue and
+     lightness to read as "this row lifted slightly". */
+  --shell-active: color-mix(in srgb, white 14%, var(--shell-lit));
+  /* Follows the surface it sits on. `--navy` was tuned for a near-white active
+     pill (dark ink on light); against a translucent wash of the shell itself
+     that ink is close to invisible, so the active label stays the same light
+     family every other row's text is — just at full strength. */
+  --shell-active-fg: var(--shell-fg);
+  /* The brand hairline that traces the shell's trailing edge and the arabesque
+     flow lines behind the navigation. Lumen at low alpha — the same gold the
+     mark and the primary action use, spent here as a line rather than a fill.
+     Pulled back from 0.55/0.14: the same alpha over a lighter shell reads
+     louder, and the gold is meant to be the one warm note on the rail. */
+  --shell-gold: rgba(243, 171, 62, 0.5);
+  --shell-gold-soft: rgba(243, 171, 62, 0.12);
+  /* The tonal pools in `ShellAtmosphere`. A SEMANTIC name because the component
+     was reaching for `--navy-edge` directly — a raw palette entry — which meant
+     the shell's material could not be re-grounded without editing a component. */
+  --shell-pool: #345070;
+
+  /* THE BODY'S ALPHA RAMP IS GONE TOO (`--body-veil`, `--body-veil-mid`,
+     `--body-solid`). It made the body surface barely present at its top edge and
+     opaque a screen down, so the plane behind it read through around the page
+     heading. The body paints NOTHING now — content sits directly on the
+     atmosphere — so there is no fill left to ramp. */
+
+  /* ---- Workspace FRAME · LIGHT ----
+   * Three grounds, not one, and the whole shell composition depends on them
+   * being distinguishable:
+   *
+   *   `frame`      the ground the chrome floats ON — the gutter between the
+   *                sidebar and the header card, and the margin around both. It
+   *                is the DARKEST of the three, which is what makes the header
+   *                and the body read as raised rather than as two regions of
+   *                one flat page.
+   *   `workspace`  the surface the dashboard is composed on. Lighter than the
+   *                frame and darker than a panel, so a white card sitting on it
+   *                has something to be lighter THAN. This is the lightly tinted
+   *                premium workspace; panels themselves stay `surface`.
+   *   `surface`    unchanged. Panels are still near-white, and still the same
+   *                near-white every other route uses.
+   *
+   * IT IS CALLED `workspace` AND NOT `body`, WHICH IS THE OBVIOUS NAME.
+   * `body` is already a step in the TYPE scale, and Tailwind derives utilities
+   * from every scale independently: a `body` colour makes `text-body` mean both
+   * "0.875rem" and "this colour", emits two rules with the same selector, and
+   * lets source order decide. It does not warn. The failure it produced was
+   * exactly as quiet as that description suggests — `tablet:text-body` on the
+   * command field painted 13px type in the WORKSPACE GROUND colour, which on a
+   * white header is invisible, and 185 other uses of `text-body` across the
+   * product were one stylesheet-ordering change away from the same thing. Never
+   * name a colour after a type step.
+   *
+   * All three are COOL, and that is the one departure from Quartz. It is not a
+   * preference: the shell's navy is a saturated blue-black, and a warm grey page
+   * beside it reads as two unrelated images pasted together rather than as one
+   * room. Values sampled from the approved concept rather than estimated — see
+   * `design-lab/sample-ref.mjs`, which prints the actual bytes.
+   *
+   * SCOPE. These are the WORKSPACE FRAME's grounds and `AppShell` is their only
+   * consumer. `--canvas` is deliberately untouched, so every surface outside the
+   * B2B shell keeps exactly the ground it already had.
+   */
+  /* THE FRAME TOKENS ARE GONE, AND THAT IS THE POINT OF THIS PASS.
+     `--frame`, `--frame-2`, `--frame-tint`, `--frame-tint-soft` and
+     `--frame-warm` described a flat near-white plane with a cool pool at the
+     sidebar and a warm corner away from it. Nothing paints that plane any more:
+     `.workspace-frame` is a transparent layout box and the field behind it is
+     `--workspace-mesh*` / `--workspace-pool-*` above. Keeping them would have
+     left two vocabularies for one ground, which is how the seam this
+     composition spent two passes closing got opened in the first place. */
+
+  /* THE BODY IS NEAR-WHITE AND THAT IS THE CORRECTION. It was #eff1f6 — a cool
+     grey only 18 steps off the old frame, so the two planes had no order and the
+     body read as a region of the page rather than as a surface floating on it.
+     The concept measures #fbfdfe / #fdfdfd across the body's open ground: a
+     light surface, with all of its colour coming from the corner wash above and
+     none from the fill. Panels stay `--surface`, one step lighter again. */
+  --workspace: #fbfcfe;
+  --workspace-line: rgba(0, 21, 55, 0.06);
+  /* The body's edge treatment. It floats, so it casts: a wide ambient drop plus
+     a tight contact shadow, both tinted navy rather than black — a neutral
+     shadow on a blue frame reads as dirt. */
+  --workspace-shadow:
+    0 1px 2px rgba(0, 21, 55, 0.05),
+    0 12px 32px -12px rgba(0, 21, 55, 0.16),
+    0 2px 8px -4px rgba(0, 21, 55, 0.08);
+
+  /* ---- Workspace ATMOSPHERE · LIGHT ----
+   * The field the workspace is actually composed on, and it is a MESH, not a
+   * fill: a soft cool-mineral base with three restrained pools in it. Painted by
+   * `.workspace-atmosphere` in globals.css, fixed to the viewport so it never
+   * drifts or re-tiles as a long dashboard scrolls.
+   *
+   * IT IS LIGHT, AND THAT IS THE DECISION THE WHOLE DIRECTION TURNS ON. The ink
+   * belongs to the SIDEBAR (see `--shell` above); the workspace only borrows its
+   * HUE, faintly, at the seam. What the reader's attention is supposed to land
+   * on is the CARDS, not the field behind them — so the field is held light
+   * throughout and carries form rather than weight.
+   *
+   * `--workspace-mesh` is the base; `--workspace-mesh-lit` is the tone the pools
+   * are mixed TOWARD (mixing toward white instead produces a spotlight, which is
+   * not what a room looks like).
+   */
+  --workspace-mesh: #e6ebf2;
+  --workspace-mesh-lit: #eef2f8;
+  /* THE SEAM POOL's hue, and it is the mechanism behind "the sidebar is
+     integrated with the environment rather than pasted beside it": the
+     workspace's lightest, most saturated blue is the sidebar's own hue. */
+  --workspace-pool-cool: var(--navy-air);
+  /* A second, quieter mineral pool lower in the page — depth without a second
+     hue. */
+  --workspace-pool-cool-2: var(--navy-edge);
+  /* THE ONE WARM NOTE. Lumen, kept restrained: the brand's own accent inside a
+     cool field, not a second temperature competing with it. */
+  --workspace-pool-warm: var(--lumen);
 }
 
 .dark {
@@ -385,6 +611,95 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.32);
   --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-overlay: 0 8px 28px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+
+  /* ---- Shell · DARK ----
+   * The navy does NOT carry over unchanged. In light theme the sidebar is the
+   * darkest thing on screen and the contrast with the page is what separates
+   * chrome from content; on the Carbon ground the SAME navy would be lighter
+   * and far more saturated than the workspace it frames, so the sidebar would
+   * become the brightest, loudest element on a dark page — the tail wagging the
+   * dog. So the ramp drops below Carbon and keeps only enough chroma to stay
+   * recognisably the same material.
+   *
+   * `shell-active` follows the same rule it does in light: the carved surface is
+   * the page's own ground, so the notch still reads as the body arriving.
+   */
+  /* DARK IS A RE-DERIVATION, NOT AN INVERSION, AND THE RELATIONSHIP IS THE
+     PART THAT CHANGES. In LIGHT the sidebar is much darker than the workspace
+     and that large gap is what separates chrome from content. Reusing the light
+     ramp here put a sidebar tuned to read as "the dark one" on top of an even
+     darker workspace, inverting the relationship and reading as an
+     undifferentiated stack of near-black regions.
+
+     So in DARK the sidebar is only MODERATELY darker than the workspace. Light
+     mode keeps the large gap; dark mode deliberately does not. Both stay clear
+     of pure black — the brief rules out giant near-black zones, and a dense
+     operational workspace is looked at for hours. */
+  --shell: #0b131c;
+  --shell-lit: #131f2a;
+  --shell-deep: #070d13;
+  --shell-2: rgba(255, 255, 255, 0.045);
+  --shell-line: rgba(255, 255, 255, 0.07);
+  --shell-fg: var(--carbon-text);
+  --shell-fg-secondary: #9aa6ba;
+  --shell-fg-muted: #78849a;
+  /* THE ACTIVE WASH AND THE GOLD ARE THE SAME IN BOTH THEMES, ON PURPOSE.
+     Each is stated here anyway rather than left to inherit, because what they
+     must equal is a MEASURED value from the approved build, and an inherited
+     value is one edit away from silently becoming something else.
+
+     They read as theme-independent because the tokens they are mixed FROM
+     already carry the theme: `--shell-lit` is the dark ramp's own lit tone here,
+     so "white 14% into the lit tone" lands on a dark row in dark and a lighter
+     one in light without the percentage changing. Re-deriving the percentage on
+     top of an already-re-derived base double-counts the theme — tried at 9% and
+     it visibly flattened the active row against the rail. Same for the gold:
+     it is a fixed-alpha Lumen line, and the ground beneath it is what differs. */
+  --shell-active: color-mix(in srgb, white 14%, var(--shell-lit));
+  --shell-active-fg: var(--shell-fg);
+  --shell-gold: rgba(243, 171, 62, 0.5);
+  --shell-gold-soft: rgba(243, 171, 62, 0.12);
+  --shell-pool: #16222e;
+
+  /* ---- Form fields · DARK ----
+   * The same relationship re-derived, not re-tinted: the field is a step SUNK
+   * into the raised surface it sits on rather than a step lighter, because on a
+   * near-black ground "recessed" is the only direction depth has left. The two
+   * inks are Carbon's own text ramp brought down to the same two roles, and the
+   * focus wash is Lumen again — brighter, because 38% of a warm gold over
+   * near-black is nothing at all.
+   */
+  --field: #16181c;
+  --field-line: rgba(255, 255, 255, 0.09);
+  --field-fg: var(--carbon-text);
+  --field-placeholder: #8d9199;
+  --field-hint: #6f747c;
+  --field-focus: rgba(243, 171, 62, 0.5);
+
+
+  --workspace: var(--carbon);
+  --workspace-line: rgba(255, 255, 255, 0.05);
+  /* Dark surfaces do not cast believable shadows onto darker ones, so the body
+     floats on a light hairline instead — the same job done by the one cue that
+     still works at this end of the scale. */
+  --workspace-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 16px 40px -16px rgba(0, 0, 0, 0.7);
+
+  /* ---- Workspace ATMOSPHERE · DARK ----
+   * A soft charcoal-ink, and deliberately NOT the app's own near-black
+   * `--carbon` (#131415) and not black. The workspace is the LIGHTER of the two
+   * materials here — see `--shell` above for why that relationship is inverted
+   * relative to light theme rather than mirrored.
+   *
+   * The pools keep their HUES (the seam pool is still the sidebar's own colour,
+   * the warm note is still Lumen) but the mesh they mix into is dark, so the
+   * same `color-mix` percentages in globals.css land as a tint rather than a
+   * glow. Nothing about the mesh's structure is theme-conditional — only the two
+   * grounds it is composed from.
+   */
+  --workspace-mesh: #111a24;
+  --workspace-mesh-lit: #1b2836;
 }
 
 /* ---- Header height, at tablet and above ----
@@ -402,3 +717,18 @@
     --app-header-h: 4.25rem;
   }
 }
+
+
+/* ==================================================================
+ * SHELL PALETTE — SETTLED. Do not re-open as a proposal.
+ *
+ * Two candidates used to live here as a side-by-side: option A (`--navy`
+ * #001537, a fully saturated enterprise navy sampled off a rendered concept)
+ * and option B (`data-shell-palette="ink"`, a Basalt/Lapis derivation). Neither
+ * won. The approved direction is a THIRD thing — the light-workspace/dark-rail
+ * composition now grounded in `--shell` and `--workspace-mesh-*` above — and it
+ * was chosen by reviewing the running application, not by comparing swatches.
+ *
+ * The `[data-shell-palette]` switch is gone with the proposal. A shell palette
+ * is not a user preference, and leaving the switch wired would have made it one.
+ * ================================================================== */

@@ -135,7 +135,12 @@ export function ProfileMenu({
     // observes it — here and in the header's switch at the same instant.
     applyThemePreference(next);
     start(async () => {
-      await setTheme(next);
+      try {
+        await setTheme(next);
+      } catch {
+        /* Same contract as the header switch: a failed WRITE must not strand the
+           transition and disable this group. The choice is already applied. */
+      }
     });
   };
 

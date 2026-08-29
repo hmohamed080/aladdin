@@ -1,0 +1,682 @@
+<title>Aladdin Carve Pass</title>
+<style>
+  /* ------------------------------------------------------------------
+     The palette is the one under review. That is the point: a page that
+     judges Aladdin's shell colours has no business introducing a seventh
+     hue of its own, so every value here is a token from tokens.css —
+     Basalt and Quartz for the grounds, Lumen for the single accent,
+     Lapis reserved for the one thread that is actually about Lapis.
+     Neutrals are biased warm toward Quartz, matching the `field-*` ramp
+     this pass derived.
+     ------------------------------------------------------------------ */
+  :root {
+    --basalt: #0e1113;
+    --basalt-2: #1b2226;
+    --ink: #17191a;
+    --quartz: #f4f3f0;
+    --quartz-raised: #fdfcfb;
+    --lumen: #f3ab3e;
+    --lumen-ink: #855a15;
+    --lapis: #2f6088;
+
+    --ground: var(--quartz);
+    --surface: var(--quartz-raised);
+    --surface-2: #eceae6;
+    --line: #dedbd6;
+    --line-soft: #e9e6e1;
+    --fg: var(--ink);
+    --fg-2: #55554f;
+    --fg-3: #85857e;
+    --accent: var(--lumen-ink);
+    --accent-bright: var(--lumen);
+    --accent-wash: rgba(243, 171, 62, 0.14);
+    --alt: var(--lapis);
+    --alt-wash: rgba(47, 96, 136, 0.1);
+    --good: #2f6b46;
+    --good-wash: rgba(47, 107, 70, 0.12);
+    --shot-mat: #e4e1dc;
+
+    --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: var(--basalt);
+      --surface: var(--basalt-2);
+      --surface-2: #232b30;
+      --line: #2c3438;
+      --line-soft: #232a2e;
+      --fg: #ededec;
+      --fg-2: #a9aeb0;
+      --fg-3: #7d8385;
+      --accent: var(--lumen);
+      --accent-bright: var(--lumen);
+      --accent-wash: rgba(243, 171, 62, 0.16);
+      --alt: #6fa8d2;
+      --alt-wash: rgba(111, 168, 210, 0.14);
+      --good: #6fc08f;
+      --good-wash: rgba(111, 192, 143, 0.14);
+      --shot-mat: #0a0d0e;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: var(--basalt);
+    --surface: var(--basalt-2);
+    --surface-2: #232b30;
+    --line: #2c3438;
+    --line-soft: #232a2e;
+    --fg: #ededec;
+    --fg-2: #a9aeb0;
+    --fg-3: #7d8385;
+    --accent: var(--lumen);
+    --accent-bright: var(--lumen);
+    --accent-wash: rgba(243, 171, 62, 0.16);
+    --alt: #6fa8d2;
+    --alt-wash: rgba(111, 168, 210, 0.14);
+    --good: #6fc08f;
+    --good-wash: rgba(111, 192, 143, 0.14);
+    --shot-mat: #0a0d0e;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--fg);
+    font: 400 16px/1.62 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 56px 24px 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 56px;
+  }
+
+  .prose { max-width: 68ch; }
+
+  /* ---- masthead ---- */
+  .masthead { display: flex; flex-direction: column; gap: 18px; }
+  .eyebrow {
+    font: 600 11px/1 var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+  h1 {
+    margin: 0;
+    font: 800 clamp(34px, 5.2vw, 52px)/1.04 var(--sans);
+    letter-spacing: -0.032em;
+    text-wrap: balance;
+  }
+  .lede { margin: 0; max-width: 62ch; font-size: 18px; color: var(--fg-2); }
+
+  /* ---- the four confirmations ---- */
+  .verdicts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .verdict { background: var(--surface); padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; }
+  .verdict b { font: 600 14px/1.3 var(--sans); }
+  .verdict span { font-size: 13px; color: var(--fg-2); line-height: 1.45; }
+  .tick { color: var(--good); font: 700 13px/1 var(--mono); letter-spacing: 0.04em; }
+
+  /* ---- review items ----
+     Numbered by the BRIEF's own numbering, because that numbering is real
+     information: it maps each change back to the paragraph that asked for
+     it. Nothing here is numbered for decoration. */
+  .item { display: flex; flex-direction: column; gap: 20px; scroll-margin-top: 24px; }
+  .item-head { display: flex; gap: 16px; align-items: baseline; }
+  .num {
+    flex: none;
+    font: 700 13px/1 var(--mono);
+    color: var(--accent);
+    background: var(--accent-wash);
+    padding: 7px 9px;
+    border-radius: 6px;
+    letter-spacing: 0.02em;
+  }
+  h2 {
+    margin: 0;
+    font: 700 clamp(21px, 2.4vw, 27px)/1.2 var(--sans);
+    letter-spacing: -0.018em;
+    text-wrap: balance;
+  }
+  h3 {
+    margin: 0 0 -4px;
+    font: 600 12px/1 var(--mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+  p { margin: 0; }
+  .item p + p { margin-top: 0.9em; }
+  .rule { height: 1px; background: var(--line-soft); border: 0; margin: 0; }
+
+  code {
+    font: 500 0.885em/1.4 var(--mono);
+    background: var(--surface-2);
+    padding: 0.1em 0.36em;
+    border-radius: 4px;
+  }
+  a { color: var(--accent); text-underline-offset: 3px; }
+
+  /* ---- evidence frames ---- */
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .shot {
+    background: var(--shot-mat);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    overflow-x: auto;
+  }
+  .shot img { display: block; max-width: 100%; height: auto; border-radius: 4px; margin: 0 auto; }
+  figcaption { font-size: 13.5px; color: var(--fg-2); line-height: 1.5; }
+  figcaption b { color: var(--fg); font-weight: 600; }
+
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .pair .shot { padding: 12px; }
+
+  /* ---- sampled-value tables ----
+     Every number on this page was read out of a capture by
+     design-lab/sample-shot.mjs, so the columns are data and get tabular
+     figures and a mono face. */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; min-width: 520px; background: var(--surface); }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line-soft); }
+  tr:last-child td { border-bottom: 0; }
+  th {
+    font: 600 11px/1.3 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  td { font: 500 13.5px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+  td:first-child { font-family: var(--sans); font-weight: 500; color: var(--fg-2); }
+  .warm { color: var(--accent); }
+  .cool { color: var(--alt); }
+  .sw {
+    display: inline-block;
+    width: 11px; height: 11px;
+    border-radius: 3px;
+    border: 1px solid rgba(128, 128, 128, 0.35);
+    vertical-align: -1px;
+    margin-inline-end: 7px;
+  }
+
+  ul { margin: 0; padding-inline-start: 1.15em; display: flex; flex-direction: column; gap: 7px; }
+  li::marker { color: var(--fg-3); }
+
+  .note {
+    border-inline-start: 3px solid var(--alt);
+    background: var(--alt-wash);
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    font-size: 14.5px;
+    color: var(--fg-2);
+  }
+  .note b { color: var(--fg); }
+
+  .open {
+    border-inline-start: 3px solid var(--accent-bright);
+    background: var(--accent-wash);
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    font-size: 14.5px;
+    color: var(--fg-2);
+  }
+  .open b { color: var(--fg); }
+
+  @media (max-width: 640px) {
+    .page { padding: 36px 16px 80px; gap: 44px; }
+    .item-head { flex-direction: column; gap: 10px; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">Supplier workspace · visual pass · not committed</div>
+    <h1>One sidebar, one carve, one continuous body</h1>
+    <p class="lede">
+      Ten corrections against <code>sidebar.png</code>, <code>dashboardSidebarAnimation.mp4</code>
+      and <code>dashboard.png</code>. Every colour below was sampled out of a capture rather than
+      judged by eye, and every frame is the built page at 1440×1024.
+    </p>
+  </header>
+
+  <section class="verdicts">
+    <div class="verdict">
+      <span class="tick">CONFIRMED</span>
+      <b>The hover side-panel is gone</b>
+      <span>The shadow moved off the panel box onto the material inside it. The 40px strip that read as a second floating surface was that shadow, cast around nothing.</span>
+    </div>
+    <div class="verdict">
+      <span class="tick">CONFIRMED</span>
+      <b>The footnote is gone</b>
+      <span>Element removed, and the now-unused string deleted from both <code>en</code> and <code>ar</code>. Nothing replaces it.</span>
+    </div>
+    <div class="verdict">
+      <span class="tick">CONFIRMED</span>
+      <b>Body and frame are continuous</b>
+      <span>Measured 0px between the body's foot and the viewport on a short route <em>and</em> at the end of the dashboard.</span>
+    </div>
+    <div class="verdict">
+      <span class="tick">CONFIRMED</span>
+      <b>Nothing committed or pushed</b>
+      <span>All changes are in the working tree on <code>feature/supplier-dashboard-visual-refresh</code>.</span>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ============================================ 1 + 10 -->
+  <section class="item">
+    <div class="item-head">
+      <span class="num">01 · 10</span>
+      <h2>The three active mechanics became one</h2>
+    </div>
+    <div class="prose">
+      <p>
+        The rejected decision was structural, not cosmetic. The sidebar had <b>three</b> different
+        answers to “which page am I on”: a carved band when docked and expanded, an accent-tinted
+        tile plus a 2px marker bar on the rail, and a translucent accent wash in the hover reveal.
+        Collapsing the sidebar therefore did not narrow one object — it swapped in a different one
+        that happened to list the same modules.
+      </p>
+      <p>
+        There is now one element, and it <b>morphs</b>. At rail width it is the icon's own 36×36
+        tile, fully round, standing clear of the trailing edge, with its fillets faded out because
+        there is no edge to close around. Open, it is the band: flush with the shell's edge, pill on
+        the leading side, with the two concave fillets closing the material back around it. Between
+        the two it is the same span travelling and re-proportioning.
+      </p>
+    </div>
+
+    <figure>
+      <div class="pair">
+        <div class="shot"><img src="__IMG_expanded__" alt="Expanded sidebar with the carved band at Home"></div>
+        <div class="shot"><img src="__IMG_collapsed__" alt="Collapsed rail with the Aladdin mark and a circular carve at Home"></div>
+      </div>
+      <figcaption>
+        <b>Expanded and collapsed.</b> Same leading edge (10px), same light surface, same ink glyph —
+        the rail's carve is the reference's white circle, not a tinted tile.
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="shot"><img src="__IMG_hoverProgress__" alt="Expand-on-hover caught mid-reveal"></div>
+      <figcaption>
+        <b>Expand-on-hover, in progress.</b> This frame is where the implementation had to prove
+        itself, and where the first version failed: the band ends flush with the shell's edge at
+        every point of the animation, with both fillets already joining it to the material.
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="shot"><img src="__IMG_hoverOpen__" alt="Expand-on-hover settled open over the page"></div>
+      <figcaption>
+        <b>Hover-expanded, settled.</b> One continuous ground, no secondary panel, no duplicated
+        background, no strip beside it. The reveal still opens <em>over</em> the page rather than
+        reflowing it — a hover that relayouts the document on every pointer pass is the flicker the
+        earlier brief ruled out — but the carve now ends on a body that is directly beneath it and
+        the same light, so it merges instead of pointing at nothing.
+      </figcaption>
+    </figure>
+
+    <div class="note">
+      <b>Two defects found and fixed on the way.</b>
+      The rail's carve rendered square-ended because <code>rounded-s-pill</code> asks for
+      <code>9999px</code>: when two radii along one edge exceed its length, CSS scales
+      <em>every</em> corner of the box by the same factor, so a 36px tile got
+      <code>36 / 1019</code> and its 20px trailing radius came out at 0.7px. Both radii are now
+      half the measured height.
+      Separately, the band lagged the shell's edge by ~30px mid-reveal: its width was a spring
+      chasing a measurement that was itself a spring. The width is now a <code>calc()</code> over
+      <code>--shell-nav-w</code>, the variable the panel animates, so it cannot lag by construction.
+    </div>
+
+    <figure>
+      <div class="pair">
+        <div class="shot"><img src="__IMG_carveDashboard__" alt="Carve at Dashboard"></div>
+        <div class="shot"><img src="__IMG_carveOrders__" alt="Carve at Orders"></div>
+        <div class="shot"><img src="__IMG_carveRtl__" alt="Carve in Arabic, mirrored"></div>
+        <div class="shot"><img src="__IMG_carveDark__" alt="Carve in the dark theme"></div>
+      </div>
+      <figcaption>
+        <b>The carve at two positions, then mirrored and in dark.</b> Same shape in both places, so
+        the travel is one element moving rather than two backgrounds cross-fading. Arabic is the
+        mirror with no Arabic-only rule: the inset is logical and the width is a
+        direction-agnostic expression.
+      </figcaption>
+    </figure>
+
+    <div class="prose">
+      <h3>Motion</h3>
+      <p>
+        <code>motion@13.1.1</code> was already installed; imports are from <code>motion/react</code>.
+        It drives four things and nothing else: the panel's width (as a spring on
+        <code>--shell-nav-w</code>, so the plate, the nav column, the footer and the carve all move
+        from one animated value), the carve's vertical travel, the carve's shape parameter, and the
+        nav label reveal. No dashboard card animates.
+        <code>prefers-reduced-motion</code> is asserted rather than assumed — the carve was sampled
+        across the frames after a navigation and showed <b>2</b> positions with the preference set
+        against <b>19</b> without it.
+      </p>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ============================================ 2 -->
+  <section class="item">
+    <div class="item-head">
+      <span class="num">02</span>
+      <h2>The brand mark never leaves</h2>
+    </div>
+    <div class="prose">
+      <p>
+        The rail used to suppress the whole lockup on the reasoning that 56px cannot hold a
+        wordmark. It cannot — but a wordmark is not the brand, and dropping the emblem with it left
+        the product unidentified on screen for anyone who prefers a collapsed sidebar. Only the
+        wordmark is conditional now, via a <code>wordmark</code> prop on <code>Brand</code>. The
+        emblem is the same element in the same place in both states, so it transitions rather than
+        unmounting and remounting.
+      </p>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ============================================ 3 + 4 -->
+  <section class="item">
+    <div class="item-head">
+      <span class="num">03 · 04</span>
+      <h2>The workspace stopped ending</h2>
+    </div>
+    <div class="prose">
+      <p>
+        The footnote is deleted, and so is the string behind it in both locales. But it was only the
+        last item in a stack that read as a footer: the body closed 16px above the viewport, drew a
+        rounded bottom edge and a border across the page, and left a strip of frame under it — and
+        the shell's own plate closed above that with a 32px radius, lifting the sidebar off the
+        bottom of the screen.
+      </p>
+      <p>
+        Three things changed and they are the same decision: the column lost its bottom margin
+        (<code>py-4</code> → <code>pt-4</code>), the body rounds and borders <b>only its top</b>, and
+        the shell's plate is square. A rounded bottom corner is a statement that a surface has
+        ended, and it has not.
+      </p>
+    </div>
+
+    <figure>
+      <div class="shot"><img src="__IMG_shortContent__" alt="A route whose content is far shorter than the viewport, with the body still reaching the bottom"></div>
+      <figcaption>
+        <b>Content shorter than the screen</b>, at a 1300px-tall viewport where the page ends around
+        640px. The body reaches the viewport foot with <code>0px</code> to spare, measured, and the
+        document does not scroll.
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="shot"><img src="__IMG_scrolledEnd__" alt="The dashboard scrolled to the end of the page"></div>
+      <figcaption>
+        <b>The other half of the same question</b> — the dashboard scrolled to the end. Body and
+        shell both measure <code>0px</code> from the viewport foot. No detached region, no closing
+        edge, ordinary document scrolling throughout: there is no inner scroll container anywhere in
+        the shell.
+      </figcaption>
+    </figure>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ============================================ 5 + 6 -->
+  <section class="item">
+    <div class="item-head">
+      <span class="num">05 · 06</span>
+      <h2>One frame plane, seen twice</h2>
+    </div>
+    <div class="prose">
+      <p>
+        Sampling found the frame was blue in a 400px band beside the sidebar and <b>warm cream
+        everywhere else</b> — which is three of the four apertures it is visible through. That is
+        the “white gap breaking them apart”, measured:
+      </p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Where the frame shows</th><th>Before</th><th>cool</th><th>After</th><th>cool</th><th>Concept</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Above the header card</td><td><span class="sw" style="background:#f5f1eb"></span>#f5f1eb</td><td class="warm">−10</td><td><span class="sw" style="background:#e9ecf2"></span>#e9ecf2</td><td class="cool">+9</td><td>—</td></tr>
+          <tr><td>Gutter, at the shell's head</td><td><span class="sw" style="background:#dde2ea"></span>#dde2ea</td><td class="cool">+13</td><td><span class="sw" style="background:#d9e1ee"></span>#d9e1ee</td><td class="cool">+21</td><td>+20</td></tr>
+          <tr><td>Gutter, at the foot</td><td><span class="sw" style="background:#eceded"></span>#eceded</td><td>+1</td><td><span class="sw" style="background:#e3e8f1"></span>#e3e8f1</td><td class="cool">+14</td><td>+3</td></tr>
+          <tr><td>Between header and body</td><td><span class="sw" style="background:#eeebe4"></span>#eeebe4</td><td class="warm">−10</td><td><span class="sw" style="background:#e2e5eb"></span>#e2e5eb</td><td class="cool">+9</td><td>—</td></tr>
+          <tr><td>Far edge</td><td><span class="sw" style="background:#f2f0ec"></span>#f2f0ec</td><td class="warm">−6</td><td><span class="sw" style="background:#e6e9ef"></span>#e6e9ef</td><td class="cool">+9</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="prose">
+      <p>
+        <code>--frame</code>'s resting value now carries the cool and the warm radial is an accent
+        at the far corner rather than the ground everything else is an exception to.
+      </p>
+      <h3>The heading zone</h3>
+      <p>
+        The area behind <em>Your supply at a glance</em> measured <code>#dee7f6</code> while the
+        gutter three pixels away measured <code>#dde2ea</code> — a periwinkle butted against a
+        grey-blue. They could not be reconciled by tuning, because they were two planes: the frame,
+        and a separately-tuned “wash” painted <em>inside</em> the body to stand in for it.
+      </p>
+      <p>
+        There is one plane now. The body's fill is a <b>ramp in the alpha channel</b> — barely
+        present at its top edge, fully opaque a screen down — so the colour behind the page heading
+        is the frame itself, the same pixels the gutter shows. No blur, no
+        <code>backdrop-filter</code>, no saturation trick: one <code>linear-gradient</code>.
+        The wash tokens are deleted.
+      </p>
+    </div>
+
+    <figure>
+      <div class="shot"><img src="__IMG_dashboard__" alt="Full English light Supplier Dashboard"></div>
+      <figcaption>
+        <b>Full English light Supplier Dashboard.</b> The frame runs continuously above the header,
+        through the gutter, between the cards and down the far edge, and reads through the heading
+        band into the body.
+      </figcaption>
+    </figure>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ============================================ 7 -->
+  <section class="item">
+    <div class="item-head">
+      <span class="num">07</span>
+      <h2>The search field speaks the same neutrals as its ground</h2>
+    </div>
+    <div class="prose">
+      <p>
+        The blue-grey was real and it was the <em>ink</em>, not the fill. The control took
+        <code>--fg-secondary</code> — <code>#5c6066</code>, ten points bluer than it is red — and
+        painted it on Quartz <code>#f4f3f0</code> inside a <code>#fdfcfb</code> card, every one of
+        which is warm. On a paragraph that mismatch is invisible; on a control whose entire visible
+        content is one line of placeholder, it <em>is</em> the control.
+      </p>
+      <p>
+        A <code>field-*</code> family now derives the same neutrals the other way — Ink mixed
+        <em>into</em> Quartz, so each step keeps the ground's temperature.
+        <code>--field-placeholder</code> is Ink at 58% (4.5:1 on the card, so the prompt is real
+        type); <code>--field-hint</code> is Ink at 45% for the icon and the shortcut badge, which
+        must recede — it is an accelerator, and <code>aria-keyshortcuts</code> is what actually
+        carries it.
+      </p>
+      <p>
+        Focus was a hard 2px band of <code>--focus</code>. It is now <code>--field-focus</code>:
+        Lumen at 38% as a soft halo, with the border stepping up to <code>accent</code> so the
+        field's own edge carries the state. No blue ring anywhere in the control.
+      </p>
+    </div>
+
+    <figure>
+      <div class="shot"><img src="__IMG_searchRest__" alt="The search field at rest"></div>
+      <figcaption><b>At rest.</b> Quartz surface, subtle warm border, warm-neutral prompt, badge quieter than the prompt beside it.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="shot"><img src="__IMG_searchFocus__" alt="The search field with keyboard focus, showing a soft gold halo"></div>
+      <figcaption>
+        <b>Keyboard focus</b>, magnified. Reached by tabbing rather than clicking — a click opens
+        the palette, and a programmatic <code>.focus()</code> deliberately does not set
+        <code>:focus-visible</code>, so neither would have photographed the state under test.
+      </figcaption>
+    </figure>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ============================================ 8 -->
+  <section class="item">
+    <div class="item-head">
+      <span class="num">08</span>
+      <h2>Two shells, and the difference is saturation</h2>
+    </div>
+    <div class="prose">
+      <p>
+        <b>Settled — and neither option won.</b> This section is kept as the record of a
+        decision, not as a live choice. Option B lived in a CSS block keyed on
+        <code>data-shell-palette="ink"</code>; both that block and the script that
+        photographed it are gone. The adopted shell is a third thing —
+        <code>--shell</code> <code>#24384D</code>, an architectural blue chosen by reviewing
+        the running application against a light workspace rather than by comparing swatches.
+        The switch was deliberately never wired to a cookie: a shell palette is not a user
+        preference, and shipping the switch would have made it one.
+      </p>
+      <p>
+        Option A's <code>#001537</code> is hue 217°, saturation <b>100%</b>. It was sampled off a
+        rendered concept, which matches an image but cannot say what the colour is a shade
+        <em>of</em>. Option B is built from two colours that are already the brand's:
+      </p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Token</th><th>Derivation</th><th>Value</th><th>Role</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>--shell</td><td>Basalt 78% + Lapis 22%</td><td><span class="sw" style="background:#15222d"></span>#15222d</td><td>the material · hue 206°, sat 37%</td></tr>
+          <tr><td>--shell-lit</td><td>Basalt 68% + Lapis 32%</td><td><span class="sw" style="background:#192a38"></span>#192a38</td><td>head of the ramp</td></tr>
+          <tr><td>--shell-deep</td><td>Basalt 88% + Lapis 12%</td><td><span class="sw" style="background:#121a21"></span>#121a21</td><td>foot of the ramp</td></tr>
+          <tr><td>--shell-pool</td><td>Basalt 45% + Lapis 55%</td><td><span class="sw" style="background:#203c53"></span>#203c53</td><td>tonal pools</td></tr>
+          <tr><td>--ink-air</td><td>lapis-bright 75% + Lapis 25%</td><td><span class="sw" style="background:#5f96c0"></span>#5f96c0</td><td>Lapis lifted into air</td></tr>
+          <tr><td>--frame</td><td>Quartz family + ink-air</td><td><span class="sw" style="background:#e5ebed"></span>#e5ebed</td><td>resting plane · <span class="cool">cool +8</span></td></tr>
+          <tr><td>--frame + tint</td><td>frame + ink-air @ 22%</td><td><span class="sw" style="background:#d7e1e7"></span>#d7e1e7</td><td>at the shell's head · <span class="cool">+22</span></td></tr>
+          <tr><td>--workspace</td><td>warm Quartz</td><td><span class="sw" style="background:#fdfcfa"></span>#fdfcfa</td><td>the body · <span class="warm">−3</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="prose">
+      <p>
+        The audible difference is <b>saturation, not hue</b>: 37% against 100%. That is the whole
+        distinction between an ink and an enterprise navy, and it is why Lumen Gold reads as an
+        accent on B rather than as a second primary competing with it. The frame is
+        <em>derived</em>, not painted at low opacity — you cannot reach a light blue by adding a
+        dark one, so the tint comes from Lapis lifted into air and mixed into a Quartz ground.
+      </p>
+      <p>
+        Contrast on <code>#15222d</code>, measured: <code>--shell-fg</code> 14.6:1,
+        <code>--shell-fg-secondary</code> 10.3:1, <code>--shell-fg-muted</code> 4.6:1,
+        Lumen 8.2:1. All clear.
+      </p>
+    </div>
+
+    <figure>
+      <div class="shot"><img src="__IMG_palettes__" alt="The two shell palette options side by side"></div>
+      <figcaption>
+        <b>A and B side by side</b>, same route, same frame, same moment. Note that B also warms the
+        body to Quartz — the brief's “dark Aladdin ink shell → soft airy blue-grey frame → light
+        premium body” is a three-part relationship, and changing only the shell would leave a warm
+        gold accent sitting on a cool white page.
+      </figcaption>
+    </figure>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ============================================ 9 -->
+  <section class="item">
+    <div class="item-head">
+      <span class="num">09</span>
+      <h2>Body fidelity: what closed, and what is still open</h2>
+    </div>
+    <div class="prose">
+      <p>
+        This pass took the <b>composition-level</b> half — the relationships that decide whether the
+        modules read as one designed page: the frame plane, the heading band, the body's
+        continuity, and the shell's edge. It did not re-cut the individual boards against
+        <code>dashboard.png</code>.
+      </p>
+    </div>
+
+    <figure>
+      <div class="shot"><img src="__IMG_vsReference__" alt="The approved concept and the built page side by side at matched width"></div>
+      <figcaption><b>Concept and build at matched width.</b> Proportions, column ratios and plane order line up; density does not.</figcaption>
+    </figure>
+
+    <div class="open">
+      <b>Still open, in the order I would take them.</b>
+      <ul>
+        <li><b>The page heading is oversized.</b> The concept's <em>Dashboard</em> sits at ~32px over a single quiet line; ours runs much larger and pushes the KPI strip roughly 55px further down, which costs the fold its second board.</li>
+        <li><b>KPI tiles are taller than the concept's</b> and their captions wrap. The concept pairs a tinted icon chip with a one-line delta (<em>▲ 12% vs. last 30 days</em>); ours carries a wrapping description line instead.</li>
+        <li><b>The attention board's filter row differs</b> — the concept uses two compact selects (<em>All types</em> / <em>Due date</em>) on the header line; ours uses a row of count chips, which is a taller and looser treatment.</li>
+        <li><b>The sidebar's trailing edge is straight.</b> The concept draws an organic gold-edged curve. We have the gold hairline and the flow lines, but not the curve — and a curved edge has to coexist with a carve travelling down it, which is a real design problem rather than a missing asset.</li>
+        <li><b>Density gaps that are seed data, not design</b> — product thumbnails, and an incoming-demand list two rows tall against the concept's five. Worth not "fixing" in CSS.</li>
+      </ul>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section class="item">
+    <div class="item-head">
+      <span class="num">✓</span>
+      <h2>Verification</h2>
+    </div>
+    <div class="prose">
+      <ul>
+        <li><code>tsc --noEmit</code> clean.</li>
+        <li><code>eslint</code> clean.</li>
+        <li><b>447 unit tests pass</b>, including 29 layout tests. The test that encoded the rejected rule — <em>“does not carve on the collapsed rail or a floating hover panel”</em> — was replaced by its inverse, which asserts one carve in every mode and a shape that changes.</li>
+        <li>Reduced motion asserted end-to-end: 2 carve positions with the preference, 19 without.</li>
+        <li>No horizontal overflow at tablet (834px) or phone (390px).</li>
+        <li>Nothing committed, nothing pushed.</li>
+      </ul>
+    </div>
+  </section>
+
+</div>

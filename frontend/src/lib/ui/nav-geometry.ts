@@ -110,3 +110,22 @@ export const NAV_ICON_SELF_HOVER_CLASS =
 
 /** Glyph size, shared so the column reads as one weight of line. */
 export const NAV_ICON_SIZE = 19;
+
+/**
+ * Where the icon column STARTS, in px, measured from the shell's leading edge.
+ *
+ * DERIVED, NOT CHOSEN. At rail width the shell is `SIDEBAR_WIDTH.rail` (3.5rem
+ * = 56px), `navColumnClass(true)` insets it by `px-2` (8px each side) leaving a
+ * 40px track, and `navRowClass(true)` centres the 36px tile in that track — so
+ * the tile's leading edge lands at 8 + (40 - 36) / 2 = 10.
+ *
+ * It is exported because the CARVE needs it and must not re-derive it. The carve
+ * is one element that becomes the icon's tile at rail width and a full-width
+ * band when the shell opens, and its leading edge is the one thing that should
+ * not move between those two shapes: a band starting 8px in while the tile it
+ * grew out of started at 10px is a 2px slide of the whole active surface every
+ * time the sidebar opens, which is small enough to look like a bug rather than
+ * an effect. Both shapes therefore start HERE, and the number lives in the
+ * module that owns the padding it comes from.
+ */
+export const NAV_COLUMN_START = 10;

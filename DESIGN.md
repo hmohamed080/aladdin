@@ -5,6 +5,43 @@ colors:
   basalt: "#0E1113"
   basalt-2: "#1B2226"
   basalt-3: "#232B30"
+  # ---- The SHELL, i.e. the sidebar's own material ----
+  # An architectural blue, NOT an enterprise navy. `navy` (#001537) is hue 217°
+  # at 100% saturation — a colour sampled off a rendered concept, which matches
+  # an image and does not own a colour: nothing in this system can say what it
+  # is a shade of. The shell ramp below is the approved one; `navy-air` survives
+  # from the old family only as a TINT SOURCE (see below), never as a surface.
+  shell: "#24384D"
+  shell-lit: "#32506A"
+  shell-deep: "#182636"
+  shell-pool: "#345070"
+  # The carved active row is a WASH OF THE SHELL ITSELF (white 14% into
+  # shell-lit), not the page's ground. A near-white pill on this material reads
+  # as an object pasted onto it rather than a row lifted out of it.
+  shell-active: "white 14% + shell-lit"
+  navy-text: "#F2F5FA"
+  navy-text-secondary: "#CCD6E4"
+  navy-text-muted: "#7E90AB"
+  # Navy at PAGE lightness. Never paint a surface with it — it is the pigment
+  # the workspace's cool pools are mixed from, because tinting a light ground
+  # toward a near-black navy produces grey, not blue.
+  navy-air: "#5986CF"
+  # ---- The WORKSPACE, i.e. what the sidebar stands beside ----
+  # TWO MATERIALS, DELIBERATELY DIFFERENT LIGHTNESS, and the direction matters:
+  # the SIDEBAR carries the saturated dark colour and the WORKSPACE is light.
+  # Spreading the ink across the whole page was tried and rejected twice for
+  # reading as heavy — a large expanse of low-luminance colour is not what
+  # "atmospheric" means. The workspace is an ATMOSPHERE (a mesh with three
+  # restrained pools), not a flat fill; its seam pool borrows the shell's own
+  # hue, which is the entire mechanism behind the sidebar reading as integrated
+  # with the room rather than pasted beside it.
+  workspace-mesh: "#E6EBF2"
+  workspace-mesh-lit: "#EEF2F8"
+  workspace-pool-cool: "navy-air"
+  workspace-pool-cool-2: "#153860"
+  workspace-pool-warm: "lumen"
+  # The operational surface the cards are drawn on. Panels stay `surface`.
+  workspace: "#FBFCFE"
   limestone: "#F4F1EA"
   plaster: "#FBF9F4"
   sand: "#EAE5DB"
@@ -84,6 +121,15 @@ typography:
     fontWeight: 500
     lineHeight: 1.2
     letterSpacing: "0.02em"
+  # The METADATA step, below label. Dates, counts, comparison lines and the
+  # secondary line of a dense row. Regular weight: it earns its place by size
+  # and colour, and a bolder small step would just be a second label.
+  caption:
+    fontFamily: "Readex Pro, system-ui, sans-serif"
+    fontSize: "0.75rem"
+    fontWeight: 400
+    lineHeight: 1.35
+    letterSpacing: "0.01em"
   mono:
     fontFamily: "JetBrains Mono, ui-monospace, monospace"
     fontSize: "0.8125rem"
