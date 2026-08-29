@@ -72,10 +72,44 @@ const ROUTES = [
   "/b2b/settings",
 ] as const;
 
+/* Each account carries the two things that actually prove the dashboard is
+   showing THIS organization's records rather than a shell:
+
+     `voice`      the one line on the page that differs between a Distributor, a
+                  Manufacturer and an Importer — derived from the org's own
+                  `org_type`, so it cannot be right by accident.
+     `signature`  a product that exists only in this organization's seeded
+                  catalogue, so seeing it means the page reached that org's rows.
+
+   `org` (the organization's NAME) is still here because the header's workspace
+   switcher carries it — but it is deliberately no longer asserted inside
+   <main>. The supply dashboard has never rendered the org's own name in the
+   page body: it opens on "Your supply at a glance" and states the org's SEAT in
+   the subtitle instead. The old assertion looked for a UI element that does not
+   exist and never did, so it failed identically on the pre-globalization
+   checkpoint. */
 const ACCOUNTS = [
-  { name: "Distributor", email: IDENTITIES.distributor, org: "Suez Paints & Coatings" },
-  { name: "Manufacturer", email: IDENTITIES.manufacturer, org: "Alexandria Glass & Aluminium" },
-  { name: "Importer", email: IDENTITIES.importer, org: "Cairo Sanitary Ware Trading" },
+  {
+    name: "Distributor",
+    email: IDENTITIES.distributor,
+    org: "Suez Paints & Coatings",
+    voice: "Demand from showrooms and businesses",
+    signature: "Interior Emulsion - Matte White",
+  },
+  {
+    name: "Manufacturer",
+    email: IDENTITIES.manufacturer,
+    org: "Alexandria Glass & Aluminium",
+    voice: "Demand for what you manufacture",
+    signature: "Tempered Glass Partition 10mm",
+  },
+  {
+    name: "Importer",
+    email: IDENTITIES.importer,
+    org: "Cairo Sanitary Ware Trading",
+    voice: "Demand for what you import",
+    signature: "Ceramic Wash Basin",
+  },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -144,17 +178,40 @@ for (const account of ACCOUNTS) {
       await page.goto("/b2b");
 
       await expect(page.locator("main h1")).toHaveText("Your supply at a glance");
-      // The organization's own name, from its own context — not a fixture label.
-      await expect(page.locator("main")).toContainText(account.org);
+
+      /* THIS ORGANIZATION'S DASHBOARD, not a shell and not another org's.
+         Two independent facts, because either alone is weak: the SEAT (a line
+         derived from the org's own classification, so a Manufacturer's page
+         cannot read as an Importer's) and a PRODUCT that exists only in this
+         org's seeded catalogue (so the page reached that org's rows). */
+      await expect(page.locator("main")).toContainText(account.voice);
+      await expect(page.locator("main")).toContainText(account.signature);
+
+      /* And the header names the organization the workspace is scoped to.
+         `.first()` because the header DECLARES the context block once and PLACES
+         it twice (see `AppHeader`) — the bar and card layouts each get a copy,
+         and only one is visible at a given width. Either copy names the same
+         organization, so the first is the right one to read. */
+      await expect(page.getByTestId("workspace-switcher").first()).toContainText(account.org);
 
       // The leading tile: requests nobody has priced. The seed guarantees a
       // non-zero queue for all three, so this asserts live data, not a shell.
       await expect(visibleText(page, "Requests to answer")).toBeVisible();
       await expect(page.locator("main")).toContainText("EGP");
 
-      // Each chart is an accessible image with its own name, so this asserts the
-      // chart EXISTS rather than that some <svg> is on the page.
-      await expect(page.getByRole("img", { name: "Order value won, by month" })).toBeVisible();
+      /* Each chart is an accessible image with its own name, so this asserts the
+         chart EXISTS rather than that some <svg> is on the page.
+
+         THE NAME CHANGED BECAUSE THE OLD ONE WAS NEVER ON THIS PAGE. This asked
+         for "Order value won, by month" (`supply.chart.valueTrend`), which is
+         drawn by `features/reports/supply-report.tsx` — the REPORTS page. The
+         dashboard's own chart is the pipeline board's `DonutSplit`, named after
+         `supply.pipeline.orders`. Same class of staleness as the organization-
+         name assertion above, and pre-existing for the same reason: it was
+         simply never reached, because that assertion failed first. */
+      await expect(
+        page.locator("main").getByRole("img", { name: "Orders", exact: true }),
+      ).toBeVisible();
       await expect(visibleText(page, "Your top products")).toBeVisible();
       await expect(visibleText(page, "Your top customers")).toBeVisible();
     });

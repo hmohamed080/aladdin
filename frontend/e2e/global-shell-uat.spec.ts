@@ -66,7 +66,25 @@ async function expectNoHorizontalOverflow(page: Page) {
  */
 async function expectDenseHead(page: Page) {
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.locator("main .rounded-md.border.shadow-card").first()).toBeVisible();
+  /* THE PAGE'S FIRST OPERATIONAL SURFACE, located by the design system's own
+     surface token rather than by a snapshot of one component's utility classes.
+
+     This used to be `main .rounded-md.border.shadow-card`, which is a
+     COMBINATION OF UTILITIES that no longer describes anything: `Board` — the
+     canonical surface on every seller page — is `rounded-2xl … shadow-sm`, and
+     its own comment records why (`shadow-card` "made six cards look like six
+     floating tiles"). So the selector had been matching nothing on the dashboard
+     since well before this branch, which is why it failed identically on the
+     pre-globalization checkpoint.
+
+     `bg-surface` is the right level to assert at: it is the semantic token every
+     raised surface in the system consumes — Board, the table shell, the card
+     primitive — and the globalization's own elevation rule is written against
+     exactly this contract (`.workspace-body .bg-surface` in globals.css). A page
+     that fell back to a loose grid of unstyled tiles would still have no
+     `bg-surface` inside `main`, so the check keeps the property it was written
+     for while no longer depending on one component's styling of the day. */
+  await expect(page.locator("main .bg-surface").first()).toBeVisible();
 }
 
 test.describe("supply-side visual acceptance", () => {
@@ -376,6 +394,20 @@ test.describe("shared shell regression (Showroom)", () => {
 
     const html = page.locator("html");
     const themeSwitch = page.getByTestId("theme-switch");
+
+    /* WAIT FOR THE CONTROL BEFORE EACH PRESS, AND THIS IS THE TEST'S BUG RATHER
+       THAN THE APP'S. `ThemeSwitch` writes the preference through a server
+       action inside `useTransition` and sets `disabled={pending}` while it is in
+       flight — correct behaviour, and the reason it also paints
+       `disabled:opacity-60`. A press issued during that window is not dropped by
+       the app; Playwright simply refuses to click a disabled control and spins
+       in "element is not enabled" until the test times out.
+
+       That is exactly what happened here, and it is pre-existing: the same race
+       makes this test flaky on the checkpoint commit, where it failed the first
+       attempt with the identical retry loop and passed on retry. Waiting for
+       `toBeEnabled()` removes the race without touching the control. */
+    await expect(themeSwitch).toBeEnabled({ timeout: 30_000 });
     await themeSwitch.click();
     await expect(html).toHaveClass(/dark/);
     await expect(html).toHaveAttribute("data-theme-pref", "dark");
@@ -384,7 +416,28 @@ test.describe("shared shell regression (Showroom)", () => {
     await openAccountMenu(page);
     await expect(page.getByTestId("theme-dark")).toHaveAttribute("aria-checked", "true");
     await page.keyboard.press("Escape");
+    /* AND WAIT FOR THE MENU TO ACTUALLY GO. Escape starts the portaled menu
+       unmounting; the press below lands on a control that sits behind it. */
+    await expect(page.getByTestId("profile-menu")).toBeHidden();
 
+    /* SECOND PRESS — AND THIS WAIT IS CURRENTLY THE TEST'S FAILURE POINT.
+       `toggle()` applies the preference optimistically and then persists it in
+       `start(async () => setTheme(next))`. `disabled={pending}` therefore stays
+       true until that transition COMMITS. Measured here, it does not: the
+       control is still disabled after 30s, so the press below never lands and
+       the theme never returns to light.
+
+       That is an APPLICATION defect, not a stale expectation, and it is
+       PRE-EXISTING — the checkpoint commit `d70ba3b`, which contains none of the
+       globalization, fails its first attempt with the identical "element is not
+       enabled" retry loop and only passes on a retry against a fresh page.
+       Fixing it means changing `ThemeSwitch`'s pending handling, which is out of
+       scope for a test-only pass; it is reported rather than papered over.
+
+       The wait is kept (it is the correct way to drive a control that disables
+       itself) and given a modest budget, so the failure stays fast and legible
+       rather than burning the full test timeout. */
+    await expect(themeSwitch).toBeEnabled({ timeout: 15_000 });
     await themeSwitch.click();
     await expect(html).not.toHaveClass(/dark/);
     await expect(html).toHaveAttribute("data-theme-pref", "light");
