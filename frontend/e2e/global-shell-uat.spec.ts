@@ -135,7 +135,14 @@ test.describe("shared shell regression (Showroom)", () => {
 
     await setSidebarMode(page, "collapsed");
 
-    const link = page.getByRole("link", { name: "Reports", exact: true });
+    /* A QUICK-ACCESS MODULE, NOT "Reports". The approved rail keeps the
+       frequently-used modules immediately visible and files the rest into
+       collapsible groups — on a COLLAPSED rail a secondary group is one icon and
+       its children are `inert` until that icon is clicked. "Reports" is inside
+       the Business group, so hovering it here asserted nothing about the icon
+       treatment and everything about a group being shut. "Purchase requests" is
+       quick access for a showroom, so it is on screen in every mode. */
+    const link = page.getByRole("link", { name: "Purchase requests", exact: true });
     await expect(link).toBeVisible();
     // The label survives as the accessible name only.
     await expect(link).toHaveText("");
@@ -293,7 +300,7 @@ test.describe("shared shell regression (Showroom)", () => {
     ["en", "ltr"],
     ["ar", "rtl"],
   ] as const) {
-    test(`sidebar bottom control is icon-only and in the icon column (${dir})`, async ({
+    test(`sidebar mode control is icon-only and the shared tile (${dir})`, async ({
       page,
       request,
     }) => {
@@ -315,7 +322,15 @@ test.describe("shared shell regression (Showroom)", () => {
 
         const geometry = await page.evaluate(() => {
           const ctrl = document.querySelector('[data-testid="sidebar-control"]') as HTMLElement;
+          /* GROUPED CHILDREN ARE EXCLUDED, DELIBERATELY. The approved rail
+             indents a group's children by 8px (`ps-2`) so a child reads as
+             sitting inside its group's own highlight rather than as a
+             misaligned top-level row. That is a design decision, not drift, so
+             counting those rows here would assert against the approved design.
+             What still has to hold — and is what this measurement is for — is
+             that every UNGROUPED row shares one column with the others. */
           const icons = [...document.querySelectorAll("[data-sidebar-mode] a")]
+            .filter((a) => !a.closest(".ps-2"))
             .map((a) => a.querySelector("svg"))
             .filter(Boolean) as SVGElement[];
           const cx = (el: Element) => {
@@ -329,10 +344,10 @@ test.describe("shared shell regression (Showroom)", () => {
           };
         });
 
-        /* The nav icons still share ONE column — that rule is about the list and
-           is unaffected by where the control went. It is asserted here because
-           this is the only place in the suite that measures it. */
-        expect(geometry.navColumns, `nav icons not in one column (${mode})`).toBe(1);
+        /* The UNGROUPED nav icons still share ONE column — that rule is about
+           the list and is unaffected by where the control went. It is asserted
+           here because this is the only place in the suite that measures it. */
+        expect(geometry.navColumns, `ungrouped nav icons not in one column (${mode})`).toBe(1);
         /* And the control is still the shared 36px tile, which is what makes it
            read as part of the same system after moving out of the nav column. */
         expect(geometry.controlSize, `control is not the shared tile in ${mode} mode`).toEqual([

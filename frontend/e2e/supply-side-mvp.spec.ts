@@ -278,24 +278,40 @@ test.describe("shared B2B chrome on a supply-side workspace", () => {
     await page.goto("/b2b");
 
     const nav = page.getByRole("navigation", { name: "Workspace" }).first();
-    // Supply leads; Sourcing is the demoted buying group; the rest are the same
-    // sections a showroom sees.
-    for (const heading of ["Supply", "Network", "Selling", "Sourcing", "Business"]) {
-      await expect(nav.getByRole("heading", { name: heading, exact: true })).toBeVisible();
-    }
 
-    for (const label of [
-      "Incoming demand",
-      "Quotations",
-      "Orders",
-      "My products",
-      "Customers & showrooms",
-      "Distributors",
-      "Reports",
-      "Settings",
-    ]) {
+    /* THE APPROVED IA IS QUICK ACCESS + COLLAPSIBLE GROUPS, and this assertion
+       was written against the older flat rail where every section was a static
+       <h2> and every module was on screen at once.
+
+       What the rail does now:
+         - the seller's daily modules (Supply) are UNGROUPED and always visible,
+           with no heading at all — a caption over the five rows a user opens
+           every day is a label nobody reads;
+         - Network / Selling / Sourcing / Business are collapsible GROUPS, so
+           their toggles are <button>s (not headings) and their children are
+           `inert` until opened. */
+    for (const label of ["Incoming demand", "Quotations", "Orders", "My products"]) {
       await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
+
+    for (const group of ["Network", "Selling", "Sourcing", "Business"]) {
+      await expect(nav.getByRole("button", { name: group, exact: true })).toBeVisible();
+    }
+
+    // Opening a group reveals its own children — the modules are filed, not lost.
+    await nav.getByRole("button", { name: "Network", exact: true }).click();
+    await expect(
+      nav.getByRole("link", { name: "Customers & showrooms", exact: true }),
+    ).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Distributors", exact: true })).toBeVisible();
+
+    /* SETTINGS IS NOT IN THE NAV LIST, AND EXACTLY ONCE ON THE RAIL. It is the
+       fixed bottom action beneath the scrolling list — a sibling of <nav>, not a
+       child — so it keeps the same position no matter which groups are open. It
+       used to appear here too, under Business, which put it on screen twice. */
+    await expect(nav.getByRole("link", { name: "Settings", exact: true })).toHaveCount(0);
+    const rail = page.locator("[data-sidebar-mode]");
+    await expect(rail.getByRole("link", { name: "Settings", exact: true })).toHaveCount(1);
 
     // Same hrefs as the showroom's — one module set, two orderings.
     await expect(nav.getByRole("link", { name: "Incoming demand", exact: true })).toHaveAttribute(
