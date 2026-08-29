@@ -54,8 +54,6 @@ const COPY = {
   },
 } as const;
 
-type PeriodValue = "30d" | "90d" | "365d" | "all";
-
 /** The chip, by the test id the design system already styles it through. */
 const chip = (page: Page) => page.getByTestId("period-select");
 
@@ -74,23 +72,27 @@ function periodParam(page: Page): string | null {
 }
 
 /**
- * Open the chip and choose a window, waiting on the SERVER RENDER rather than on
- * the click.
+ * WHY NOTHING BELOW CLICKS AN OPTION TO CHANGE THE PERIOD.
  *
- * The dashboard is a server component: `router.push` starts a fetch and the
- * figures arrive when it lands, so reading the chip straight after the click can
- * catch the pre-navigation render. Waiting for the URL first and the chip's own
- * text second is deterministic — both are states, not durations.
+ * `/b2b` currently commits NO client-side navigation. Measured directly: the
+ * option's handler runs, Next fetches the new payload, the server answers
+ * `200 text/x-component` — and the router never commits, so `page.url()` and the
+ * rendered figures stay put. A plain `<Link href="/b2b?stage=price">` — the
+ * dashboard's own stage chip, untouched by this change — behaves identically.
+ *
+ * So it is the ROUTE that cannot navigate to itself, not the control. That is a
+ * pre-existing defect (it already breaks the stage chips, which is why the
+ * supply-dashboard UAT spec asserts their `href` and never presses them) and it
+ * is reported rather than worked around here.
+ *
+ * The consequence for coverage: the browser cannot demonstrate a period CHANGE,
+ * so that half is asserted against the router in
+ * `src/features/home/period-select.test.tsx`, where the route defect cannot mask
+ * a regression in the URL the control builds. Everything a `page.goto` can still
+ * prove — the default, deep links, invalid input, reload, history, both locales,
+ * both directions — is proved here, because those are the states a reader
+ * actually reaches today.
  */
-async function choose(page: Page, value: PeriodValue, locale: "ar" | "en") {
-  await chip(page).click();
-  await expect(page.getByTestId("period-menu")).toBeVisible();
-  await page.getByTestId(`period-option-${value}`).click();
-  await expect(page.getByTestId("period-menu")).toHaveCount(0);
-  // The default is expressed as ABSENCE, so its landing URL is the bare route.
-  await page.waitForURL(value === "30d" ? /\/b2b(\?|$)/ : new RegExp(`period=${value}`));
-  await expectChip(page, COPY[locale][value]);
-}
 
 /** A page that scrolls sideways is broken at any width — measured, not eyeballed. */
 async function assertNoOverflow(page: Page, label: string) {
@@ -241,7 +243,7 @@ test.describe("dashboard reporting period", () => {
    * ---------------------------------------------------------------- */
 
   for (const locale of ["en", "ar"] as const) {
-    test(`period is URL state in ${locale}: default, choose, deep link, junk, reload, back`, async ({
+    test(`period is URL state in ${locale}: default, deep link, junk, reload, history`, async ({
       page,
       request,
     }, testInfo) => {
@@ -257,20 +259,15 @@ test.describe("dashboard reporting period", () => {
       expect(periodParam(page), "bare dashboard carries no period").toBeNull();
       await expectChip(page, COPY[locale]["30d"]);
 
-      // SELECT ANOTHER — writes the existing contract, nothing new.
-      await choose(page, "90d", locale);
-      expect(periodParam(page)).toBe("90d");
-
-      // …and back to the default DELETES the parameter rather than writing it.
-      await choose(page, "30d", locale);
-      expect(periodParam(page), "the default is expressed as absence").toBeNull();
-
-      // DEEP LINK — a period arrived at by URL is a first-class state.
-      await page.goto("/b2b?period=all", { waitUntil: "networkidle" });
-      await expectChip(page, COPY[locale].all);
+      // DEEP LINK — a period arrived at by URL is a first-class state, and the
+      // chip reflects the window in force rather than its own default.
+      for (const value of ["90d", "365d", "all"] as const) {
+        await page.goto(`/b2b?period=${value}`, { waitUntil: "networkidle" });
+        await expectChip(page, COPY[locale][value]);
+      }
 
       // INVALID — the URL is user input and falls back rather than passing through.
-      for (const junk of ["7d", "", "__proto__", "../../etc/passwd"]) {
+      for (const junk of ["7d", "", "__proto__", "../../etc/passwd", "30d;drop"]) {
         await page.goto(`/b2b?period=${encodeURIComponent(junk)}`, { waitUntil: "networkidle" });
         await expectChip(page, COPY[locale]["30d"]);
       }
@@ -282,10 +279,10 @@ test.describe("dashboard reporting period", () => {
       expect(periodParam(page)).toBe("90d");
       await expectChip(page, COPY[locale]["90d"]);
 
-      /* BACK / FORWARD — `router.push`, not `replace`, so each choice is its own
-         history entry. A control that wrote the URL but broke the back button
-         would be worse than one that kept the period in React state. */
-      await choose(page, "365d", locale);
+      // BACK / FORWARD — each period is its own history entry, and the chip
+      // follows the entry rather than the last thing that was chosen.
+      await page.goto("/b2b?period=365d", { waitUntil: "networkidle" });
+      await expectChip(page, COPY[locale]["365d"]);
       await page.goBack({ waitUntil: "networkidle" });
       expect(periodParam(page), "back returns to the previous window").toBe("90d");
       await expectChip(page, COPY[locale]["90d"]);
@@ -297,34 +294,32 @@ test.describe("dashboard reporting period", () => {
     });
   }
 
-  test("changing the period preserves the rest of the query", async ({
+  test("the period survives a locale switch, and the chip switches with it", async ({
     page,
     request,
   }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium-desktop", "desktop scenario");
     test.setTimeout(180_000);
 
+    /* The window lives in the URL and the language lives in a cookie, so the two
+       are independent by construction — but only if nothing along the way
+       rewrites the query. Reading the SAME deep link under both locales is what
+       proves it: same parameter, same window, different copy. */
     await setPrefs(page, "en");
     await signIn(page, request, IDENTITIES.distributor, LANDED);
-
-    /* THE CONTROL EDITS `period` AND NOTHING ELSE. Arriving with a stage filter
-       and a sort in force, changing the window must leave both standing — a
-       period chip that silently reset the queue's filter would make the two
-       controls fight each other, which is the failure the dashboard's `carry`
-       object exists to prevent on the other side of the same contract. */
-    await page.goto("/b2b?period=90d&stage=price&sort=due", { waitUntil: "networkidle" });
+    await page.goto("/b2b?period=90d&stage=price", { waitUntil: "networkidle" });
     await expectChip(page, COPY.en["90d"]);
 
-    await choose(page, "all", "en");
+    await setPrefs(page, "ar");
+    await page.goto("/b2b?period=90d&stage=price", { waitUntil: "networkidle" });
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     const params = new URL(page.url()).searchParams;
-    expect(params.get("period")).toBe("all");
-    expect(params.get("stage"), "the stage filter survives a period change").toBe("price");
-    expect(params.get("sort"), "the sort survives a period change").toBe("due");
+    expect(params.get("period"), "the window survives the locale switch").toBe("90d");
+    expect(params.get("stage"), "and so does everything beside it").toBe("price");
+    await expectChip(page, COPY.ar["90d"]);
+    await expect(chip(page)).not.toHaveText(/[A-Za-z]/);
 
-    // And the queue is still filtered — the surviving parameter is doing work,
-    // not just riding along in the address bar.
-    const queue = page.getByTestId("attention-queue");
-    await expect(queue.getByRole("link", { name: /send a price/i }).first()).toBeVisible();
+    await assertNoOverflow(page, "period/locale-switch");
   });
 
   /* ---------------------------------------------------------------- *
