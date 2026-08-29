@@ -407,7 +407,7 @@ test.describe("shared shell regression (Showroom)", () => {
        makes this test flaky on the checkpoint commit, where it failed the first
        attempt with the identical retry loop and passed on retry. Waiting for
        `toBeEnabled()` removes the race without touching the control. */
-    await expect(themeSwitch).toBeEnabled({ timeout: 30_000 });
+    await expect(themeSwitch).toBeEnabled();
     await themeSwitch.click();
     await expect(html).toHaveClass(/dark/);
     await expect(html).toHaveAttribute("data-theme-pref", "dark");
@@ -420,29 +420,31 @@ test.describe("shared shell regression (Showroom)", () => {
        unmounting; the press below lands on a control that sits behind it. */
     await expect(page.getByTestId("profile-menu")).toBeHidden();
 
-    /* SECOND PRESS — AND THIS WAIT IS CURRENTLY THE TEST'S FAILURE POINT.
+    /* SECOND PRESS — AND THIS WAIT IS THE REGRESSION GUARD.
        `toggle()` applies the preference optimistically and then persists it in
-       `start(async () => setTheme(next))`. `disabled={pending}` therefore stays
-       true until that transition COMMITS. Measured here, it does not: the
-       control is still disabled after 30s, so the press below never lands and
-       the theme never returns to light.
+       `start(async () => setTheme(next))`, so `disabled={pending}` stays true
+       until that transition COMMITS. It used not to: `setTheme` ended in
+       `revalidatePath("/", "layout")`, which held the transition open for as
+       long as the whole B2B shell took to rebuild server-side and left the
+       control dead after a single press. The revalidation bought nothing — the
+       theme is a class on <html>, which a server revalidation does not
+       re-render — and is gone; see `server/actions/preferences.ts`.
 
-       That is an APPLICATION defect, not a stale expectation, and it is
-       PRE-EXISTING — the checkpoint commit `d70ba3b`, which contains none of the
-       globalization, fails its first attempt with the identical "element is not
-       enabled" retry loop and only passes on a retry against a fresh page.
-       Fixing it means changing `ThemeSwitch`'s pending handling, which is out of
-       scope for a test-only pass; it is reported rather than papered over.
-
-       The wait is kept (it is the correct way to drive a control that disables
-       itself) and given a modest budget, so the failure stays fast and legible
-       rather than burning the full test timeout. */
-    await expect(themeSwitch).toBeEnabled({ timeout: 15_000 });
+       Waiting on `toBeEnabled` is still the right way to drive a control that
+       disables itself while writing, and it is what would catch the defect
+       coming back. */
+    await expect(themeSwitch).toBeEnabled();
     await themeSwitch.click();
     await expect(html).not.toHaveClass(/dark/);
     await expect(html).toHaveAttribute("data-theme-pref", "light");
 
-    // And it survives a reload — the cookie, not component state, is the store.
+    /* And it survives a reload — the cookie, not component state, is the store.
+       Wait for the control to come back first: `disabled` IS the "write still in
+       flight" signal, and reloading mid-write would race the cookie rather than
+       test that it persisted. A user who reloads inside that window loses the
+       preference, which is the deliberate trade for a control that stays usable
+       (see `ThemeSwitch`) — the write is one round trip, not a tree rebuild. */
+    await expect(themeSwitch).toBeEnabled();
     await page.reload();
     await expect(html).not.toHaveClass(/dark/);
     // In light, the single icon offers the theme you would GET: dark.
