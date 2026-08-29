@@ -11,7 +11,8 @@ import {
 } from "@/server/queries/commerce";
 import { listOrders, quotationsWithOrders } from "@/server/queries/execution";
 import { supplySummary } from "@/server/queries/reports";
-import { resolvePeriod, periodDays } from "@/lib/workspace/period";
+import { resolvePeriod, periodDays, PERIOD_ORDER } from "@/lib/workspace/period";
+import { PeriodSelect } from "./period-select";
 import { type Kpi, type KpiDelta } from "@/components/ui/workspace-layout";
 import { RankedBars, DonutSplit } from "@/components/ui/charts";
 import {
@@ -776,18 +777,15 @@ export async function SupplyDashboard({
         subtitle={m.supply.voice[voice].subtitle}
         actions={
           <>
-            {/* NO PERIOD CONTROL IN THIS ROW, BY REVIEW DECISION. It used to sit
-                here with the actions, and was pulled on direct request: against
-                the approved composition it read as competing with "+ New
-                product" for the same corner of the page.
+            {/* STILL NO PERIOD CONTROL IN THIS ROW, AND THAT IS THE STANDING
+                REVIEW DECISION. It sat here once and was pulled on direct
+                request: against the approved composition it competed with
+                "+ New product" for the same corner of the page. The primary
+                action stays visually alone.
 
-                WHAT DID NOT CHANGE: the period still resolves from the URL
-                exactly as before (`?period=`), every KPI still computes its
-                period-over-period comparison from it, and each card still names
-                its own window in its hint. What is missing is only the UI for
-                CHANGING it — a gap worth closing deliberately (most likely
-                inside the metric panel's own affordances) rather than by
-                re-adding a control the review already rejected from this row. */}
+                The control it was replaced by now lives directly above the
+                metric strip, which is the only region it actually governs —
+                see the row below this head. */}
             {managesCatalog ? (
               <PrimaryAction href="/b2b/products/new">
                 <PlusIcon size={16} />
@@ -801,6 +799,55 @@ export async function SupplyDashboard({
           </>
         }
       />
+
+      {/* THE REPORTING-SCOPE ROW — the metric strip's own control, not the
+          page's.
+
+          WHY IT IS HERE AND NOT IN THE HEAD. `?period=` is not a dashboard
+          filter, and the code is unambiguous about it: `supplySummary` is called
+          with NO date filter (`{}`) and `days` only as `compareDays`, which
+          builds `supply.period` and nothing else. The pipeline counts, both
+          rankings, the trend, the attention queue, the incoming rail, the
+          activity list and the reels are all lifetime reads that do not move
+          when this changes. The one other thing it reaches is `movementDays`,
+          the demand-movement window — which is a reporting window of the same
+          kind. So the honest scope is "the instrument panel and its comparison",
+          and the honest placement is against the instrument panel.
+
+          A page-level chip beside the actions would have claimed the whole
+          screen and been wrong about six blocks of it.
+
+          WHAT IT IS MADE OF. A bare flex row — no card, no panel, no pill. The
+          chip itself is the shell's existing quiet filter-chip primitive
+          (globals.css paints `[data-testid="period-select"]` flat and
+          borderless, alongside the board headers' stage select), so it reads as
+          the same class of utility control the boards below already use.
+
+          `justify-end` is the FLEX end, so it lands right in English and left in
+          Arabic without a second rule; the chip's own padding and menu anchor
+          are logical properties already. The negative bottom margin halves the
+          column gap on this side only, so the row hangs off the strip rather
+          than floating equidistant between the heading and the panel.
+
+          GATED ON `supply`, NOT on the strip being non-empty. A catalogue-only
+          seat gets a strip of product COUNTS, and not one of them is
+          period-scoped — offering a window control over figures that ignore it
+          would be a worse lie than offering none. */}
+      {supply ? (
+        <div className="-mb-1.5 flex flex-wrap items-center justify-end gap-2">
+          {/* `aria-hidden`: the chip's own `aria-label` is this exact string, so
+              leaving it readable would announce the name twice. */}
+          <span aria-hidden="true" className="text-caption text-fg-muted">
+            {m.supply.period.scope}
+          </span>
+          <PeriodSelect
+            value={period}
+            basePath="/b2b"
+            label={m.supply.period.scope}
+            options={PERIOD_ORDER.map((k) => ({ value: k, label: m.supply.period[k] }))}
+          />
+        </div>
+      ) : null}
 
       <MetricStrip items={metrics} />
 

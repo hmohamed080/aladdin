@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/ui/cn";
-import type { PeriodKey } from "@/lib/workspace/period";
+import { DEFAULT_PERIOD, type PeriodKey } from "@/lib/workspace/period";
 import { CalendarIcon, ChevronDownIcon, CheckIcon } from "@/components/ui/icons";
 import { menuSurfaceClass } from "@/components/ui/menu";
 
@@ -134,7 +134,7 @@ export function PeriodSelect({
     const q = new URLSearchParams(params.toString());
     // The default carries no parameter, so the plain dashboard URL stays clean
     // and a shared link only ever names a period deliberately chosen.
-    if (next === "30d") q.delete("period");
+    if (next === DEFAULT_PERIOD) q.delete("period");
     else q.set("period", next);
     const qs = q.toString();
     router.push(qs ? `${basePath}?${qs}` : basePath);
