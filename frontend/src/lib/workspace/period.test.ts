@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PERIOD_DAYS, periodDays, resolvePeriod } from "./period";
+import { DEFAULT_PERIOD, PERIOD_DAYS, PERIOD_ORDER, periodDays, resolvePeriod } from "./period";
 
 describe("resolvePeriod treats the URL as untrusted input", () => {
   it("accepts every period it offers", () => {
@@ -42,5 +42,30 @@ describe("periodDays", () => {
       expect(resolvePeriod(key)).toBe(key);
       expect(periodDays(key)).toBe(PERIOD_DAYS[key]);
     }
+  });
+});
+
+describe("the offered option set", () => {
+  it("is the same four windows the resolver accepts, and nothing else", () => {
+    // The control renders PERIOD_ORDER and the server validates with
+    // resolvePeriod. If those two ever disagree, the dashboard offers a value
+    // it will then silently discard — which looks to the reader like the
+    // selector is broken rather than like a bug.
+    for (const key of PERIOD_ORDER) expect(resolvePeriod(key)).toBe(key);
+    expect(PERIOD_ORDER).toHaveLength(4);
+    expect(new Set(PERIOD_ORDER).size).toBe(PERIOD_ORDER.length);
+  });
+
+  it("runs shortest to longest and puts the unbounded window last", () => {
+    expect(PERIOD_ORDER).toEqual(["30d", "90d", "365d", "all"]);
+    expect(periodDays(PERIOD_ORDER[PERIOD_ORDER.length - 1]!)).toBeUndefined();
+  });
+
+  it("offers the default, which is what makes the bare URL a legal state", () => {
+    // The control DELETES `?period=` when the default is chosen, so the default
+    // has to be reachable from an option and has to be what a bare URL resolves
+    // to. Those are the same fact and this pins both halves of it.
+    expect(PERIOD_ORDER).toContain(DEFAULT_PERIOD);
+    expect(resolvePeriod(undefined)).toBe(DEFAULT_PERIOD);
   });
 });

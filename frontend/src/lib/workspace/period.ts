@@ -17,8 +17,21 @@ export const PERIOD_DAYS: Record<Exclude<PeriodKey, "all">, number> = {
   "365d": 365,
 };
 
+/**
+ * The offered windows, in the order they are shown.
+ *
+ * Declared here rather than at the one control that renders them, because the
+ * order is part of the vocabulary: shortest to longest, then the unbounded one
+ * last. A second control offering the same four in a different order would read
+ * as a different set.
+ */
+export const PERIOD_ORDER = ["30d", "90d", "365d", "all"] as const satisfies readonly PeriodKey[];
+
+/** The window every route falls back to when the URL names nothing valid. */
+export const DEFAULT_PERIOD: PeriodKey = "30d";
+
 /** The URL is user input: anything not on this list is not a period. */
-export function resolvePeriod(raw: string | undefined, fallback: PeriodKey = "30d"): PeriodKey {
+export function resolvePeriod(raw: string | undefined, fallback: PeriodKey = DEFAULT_PERIOD): PeriodKey {
   return raw === "30d" || raw === "90d" || raw === "365d" || raw === "all" ? raw : fallback;
 }
 

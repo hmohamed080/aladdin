@@ -1520,6 +1520,14 @@ export const en = {
     },
     period: {
       label: "Period",
+      /* The control's OWN name, and it is deliberately narrower than "Period".
+         `?period=` reaches exactly two things on this page: the five metric
+         cells' current/previous figures, and the demand-movement window. The
+         attention queue, the incoming rail, the pipeline counts and both
+         rankings are lifetime reads that do not move when this changes. A chip
+         labelled "Period" sitting at the top of a dashboard claims the whole
+         page; this one says which part it governs. */
+      scope: "Metrics period",
       "30d": "Last 30 days",
       "90d": "Last 90 days",
       "365d": "Last 12 months",

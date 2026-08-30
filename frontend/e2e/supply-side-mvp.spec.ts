@@ -1,6 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
 import { IDENTITIES, signIn } from "./helpers/auth";
-import { setSidebarMode } from "./helpers/sidebar";
+import {
+  SIDEBAR_SPACER,
+  hoverSidebar,
+  leaveSidebar,
+  setSidebarMode,
+  settledShell,
+} from "./helpers/sidebar";
 
 /**
  * Sprint 15 — the shared SUPPLY-SIDE B2B workspace.
@@ -389,6 +395,22 @@ test.describe("shared B2B chrome on a supply-side workspace", () => {
     const shell = page.locator("[data-sidebar-mode]");
     await expect(shell).toHaveAttribute("data-sidebar-mode", "expanded");
 
+    /* EVERY CLAIM BELOW IS GEOMETRY, AND EVERY GEOMETRY READ IS SETTLED FIRST.
+
+       This test used to assert the three modes through `data-sidebar-mode` and
+       `data-sidebar-open` alone, which is the attribute flipping rather than the
+       sidebar moving — the panel and the spacer travel on an UNDERDAMPED spring
+       and are still in flight when those attributes read correct. It also called
+       `nav.hover()`, which aims at the centre of a box the reveal is about to
+       widen, and then measured the page one line later.
+
+       `settledShell` / `hoverSidebar` / `leaveSidebar` replace all of that with
+       states: a width is accepted only once it MATCHES the expected value and
+       has held it across consecutive samples, and the pointer is moved to a
+       point measured inward from the sidebar's own pinned edge, which the panel
+       keeps covering as it grows. No millisecond anywhere. */
+    const expanded = await settledShell(page, "expanded");
+
     // Collapse, then confirm the choice SURVIVES a full document load — the mode
     // is a cookie read on the server so the first paint is already correct.
     await setSidebarMode(page, "collapsed");
@@ -399,21 +421,146 @@ test.describe("shared B2B chrome on a supply-side workspace", () => {
       "collapsed",
     );
 
+    /* THE RAIL IS A RAIL, AND THE WORKSPACE TOOK THE ROOM BACK. The second half
+       is the half that matters: a collapse that narrowed the panel without
+       reflowing the page would leave a strip of empty frame, and the attribute
+       assertion above cannot tell the two apart. */
+    const rail = await settledShell(page, "rail");
+    expect(rail.workspaceStart, "the workspace follows the rail in").toBeLessThan(
+      expanded.workspaceStart,
+    );
+    expect(rail.workspaceWidth, "and takes the room back").toBeGreaterThan(
+      expanded.workspaceWidth,
+    );
+
     // A collapsed rail still exposes every module, by its localized name.
     const nav = page.getByRole("navigation", { name: "Workspace" }).first();
     await expect(nav.getByRole("link", { name: "Incoming demand", exact: true })).toBeVisible();
 
-    // Hover mode reveals without reflowing the document.
+    /* EXPAND ON HOVER — RESTS COLLAPSED, REVEALS ON POINTER, AND PUSHES.
+
+       The old comment here said the reveal happens "without reflowing the
+       document", which is the behaviour this shell REPLACED. The approved
+       direction is the opposite: the sidebar widening is the application's own
+       width changing, so the spacer animates with the panel and the workspace
+       gives up the room. Asserting the old wording would now be asserting a
+       regression. */
     await setSidebarMode(page, "hover");
     await expect(shell).toHaveAttribute("data-sidebar-mode", "hover");
+    // The helper leaves the pointer off the panel, so this is the RESTING state
+    // rather than whatever the click that chose the mode left behind.
     await expect(shell).toHaveAttribute("data-sidebar-open", "false");
-    await nav.hover();
+    const resting = await settledShell(page, "rail");
+    expect(resting.spacer, "expand-on-hover rests at the rail width").toBe(SIDEBAR_SPACER.rail);
+
+    const revealed = await hoverSidebar(page);
     await expect(shell).toHaveAttribute("data-sidebar-open", "true");
+
+    /* PUSHED, NOT OVERLAID, and this is the assertion that tells the two apart:
+       an overlay leaves the workspace exactly where it was. The push is measured
+       as the workspace giving up precisely the room the sidebar gained, so a
+       panel that floated over the page would fail on both halves. */
+    const gained = SIDEBAR_SPACER.expanded - SIDEBAR_SPACER.rail;
+    expect(revealed.workspaceStart - resting.workspaceStart, "the workspace is pushed").toBe(
+      gained,
+    );
+    expect(resting.workspaceWidth - revealed.workspaceWidth, "by exactly the room taken").toBe(
+      gained,
+    );
     await expectNoHorizontalOverflow(page);
 
-    // Leave the workspace as we found it, so the mode does not leak into the
-    // next test in this serial suite.
-    await setSidebarMode(page, "expanded");
+    // …and leaving the panel returns it, and the workspace, to rest.
+    const rested = await leaveSidebar(page, "rail");
+    expect(rested.workspaceStart, "the workspace comes back with it").toBe(resting.workspaceStart);
+    expect(rested.workspaceWidth).toBe(resting.workspaceWidth);
+    await expectNoHorizontalOverflow(page);
+
+    /* NO "PUT THE MODE BACK" STEP, AND ITS REMOVAL IS DELIBERATE.
+
+       There used to be a trailing `setSidebarMode(page, "expanded")` here,
+       commented as stopping the mode leaking into the next test. It cannot leak:
+       the mode is a `document.cookie` write and Playwright gives every test its
+       own BrowserContext, so the next test starts from the seeded default
+       regardless. The step asserted nothing.
+
+       What it DID do was exercise the hover -> expanded transition, and that
+       transition has a real, intermittent defect — see the note in
+       `helpers/sidebar.ts`. Keeping a non-assertion that fails ~5% of the time
+       for a reason unrelated to what this test is named for would reintroduce
+       exactly the flake this pass exists to remove, and would hide the defect
+       inside a cleanup line instead of reporting it. It is reported instead. */
+  });
+
+  test("expand-on-hover is deterministic under reduced motion", async ({
+    page,
+    request,
+  }, testInfo) => {
+    test.skip(testInfo.project.name === "chromium-mobile", "display modes are tablet-and-up chrome");
+
+    /* THE SPRING IS THE PART THE SYNCHRONISATION HAS TO SURVIVE, so the same
+       gesture is run with the spring switched off. `useReducedMotion` collapses
+       both transitions to `{ duration: 0 }`, which means the width is correct on
+       the very first frame — the opposite end of the timing range from the
+       underdamped travel the default path takes.
+
+       A helper that only works at one of those two speeds is a helper tuned to a
+       duration, which is the thing being removed. Both ends passing is what says
+       the assertions are about STATES. */
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await prefs(page, "en");
+    await signIn(page, request, IDENTITIES.distributor);
+    await page.goto("/b2b");
+
+    await setSidebarMode(page, "hover");
+    const resting = await settledShell(page, "rail");
+    await expect(page.locator("[data-sidebar-mode]")).toHaveAttribute("data-sidebar-open", "false");
+
+    const revealed = await hoverSidebar(page);
+    const gained = SIDEBAR_SPACER.expanded - SIDEBAR_SPACER.rail;
+    expect(revealed.workspaceStart - resting.workspaceStart, "still a push, not an overlay").toBe(
+      gained,
+    );
+
+    const rested = await leaveSidebar(page, "rail");
+    expect(rested.workspaceStart).toBe(resting.workspaceStart);
+  });
+
+  test("expand-on-hover pushes the correct way in Arabic", async ({
+    page,
+    request,
+  }, testInfo) => {
+    test.skip(testInfo.project.name === "chromium-mobile", "display modes are tablet-and-up chrome");
+
+    await prefs(page, "ar");
+    await signIn(page, request, IDENTITIES.distributor);
+    await page.goto("/b2b");
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+
+    await setSidebarMode(page, "hover");
+    const resting = await settledShell(page, "rail");
+    expect(resting.rtl, "the geometry is being read in RTL terms").toBe(true);
+
+    /* THE PUSH IS MEASURED LOGICALLY — `workspaceStart` is the workspace's
+       distance from the edge the sidebar is pinned to, which is the RIGHT here.
+       So the identical assertion covers both directions, and a sidebar that grew
+       the wrong way would fail it rather than quietly passing an `x` comparison
+       that happens to hold in one language. */
+    const revealed = await hoverSidebar(page);
+    const gained = SIDEBAR_SPACER.expanded - SIDEBAR_SPACER.rail;
+    expect(revealed.workspaceStart - resting.workspaceStart, "pushed inward from the right").toBe(
+      gained,
+    );
+    expect(resting.workspaceWidth - revealed.workspaceWidth).toBe(gained);
+
+    // And the sidebar is still pinned to the viewport's right edge while wide.
+    const flush = await page.evaluate(() => {
+      const r = document.querySelector("[data-shell-sidebar]")!.getBoundingClientRect();
+      return Math.round(window.innerWidth - r.right);
+    });
+    expect(flush, "the RTL sidebar stays flush to the right edge").toBe(0);
+
+    await expectNoHorizontalOverflow(page);
+    await leaveSidebar(page, "rail");
   });
 
   test("the dashboard KPI group is the shared strip, and the shared rail still exists", async ({
