@@ -4,6 +4,121 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — The one approved earning event, and the approval path that must pay nothing
+
+**Date:** 2026-08-30 · **Branch:** `feature/points-core` · **Base:** `main` @ `2f81682` · **Prior:** `82a3e3b` (Points foundation)
+
+D1 closed: **`referral.organization_approved` = 100 Points**. This increment adds
+a **call site and nothing else** — no table, column, policy, index or function.
+That was the whole point of building the foundation first, and it held: the
+diff is one migration that recreates one existing function, plus its test suite.
+
+### Two outcomes hid behind one RPC
+
+`public.showroom_referral_approve` is the authoritative Admin approval
+transition — the sole writer of `organizations.referred_by_user_id` and the
+emitter of `referral.approved`. Reading it closely turned up the fact that
+shaped this increment: it has **two** outcomes, not one.
+
+- It **creates** the referred business, writing
+  `source = 'salesperson_referral'` and the referring salesperson into the
+  write-once provenance columns.
+- Or it **links** the candidate to a business that already existed, which keeps
+  its own provenance (typically `self_created`) and gains no attribution.
+
+So "approve a referral" and "a salesperson brought this business to Aladdin"
+are not the same event. Awarding on the referral *request*
+(`organization_referrals.referred_by`) would have paid a salesperson for
+referring a showroom that was already on the platform — the obvious fraud route,
+and one that would have looked correct in every test written from the request's
+point of view.
+
+The award therefore reads its recipient back from
+`organizations.referred_by_user_id`, the **canonical write-once column**, in
+both paths uniformly. On the linking path that column is null and **nothing is
+awarded**. This is the first code in the product that actually depends on
+`app.organizations_provenance_immutable()`, and it depends on it for exactly the
+reason Sprint 13 created it: *"a reward paid on a mutable field is a reward paid
+to whoever wrote last."* Both readings were put to product and approved.
+
+### The function was extracted, not retyped
+
+Editing a historical migration is forbidden, so the RPC is recreated
+forward-only (`create or replace`, identical signature) in
+`20260830090002_referral_points_wiring.sql`. Retyping 135 lines of working
+approval logic to add six is a bad trade: the risk is not the new code, it is a
+silent transcription error in the old code.
+
+So the function was extracted from `20260815090002` programmatically, the two
+insertions applied, and the result diffed against the original: **36 lines
+added, 0 lines removed.** That diff is the evidence the pre-existing approval
+behaviour is unchanged, and it is cheaper and stronger than any amount of
+re-reading.
+
+### Where the award sits, and why that is the whole safety argument
+
+`perform app.award_points(...)` sits inside the function, immediately after the
+existing `app.record_audit_event('referral.approved', …)` call — the placement
+`notifications-core.md` established. One transaction, so approval and award
+commit together or roll back together. Proven in **both** directions: a failed
+approval leaves no ledger entry, and an award that cannot be written aborts the
+whole approval, leaving no organization, no audit row, and the referral still
+`submitted`.
+
+Nothing is accepted from the browser — recipient, organization, source and
+amount are all derived server-side, and `app.award_points` remains unreachable
+by every client role. The **100 is a literal** in the RPC, deliberately not
+configuration: a reward whose value lives in a mutable setting is a reward
+decided by whoever can write that setting.
+
+Idempotency has two independent guards. The RPC already returns early on an
+already-approved referral, and beneath it the unique index on
+`(user_id, event_type, 'organization', organization_id)` catches what the status
+check cannot — two simultaneous approvals both reading `submitted` before either
+commits. The suite proves both, plus that a replay through the trusted primitive
+collapses to a no-op rather than raising.
+
+### Validation
+
+New `36_referral_points_test.sql` (**52 assertions**) drives the real flow —
+save, submit, reject, approve — through the real RPCs rather than inserting
+fixtures, so what it proves is the transition's behaviour and not a
+reconstruction of it. It covers: +100 exactly, to the salesperson named by the
+immutable provenance; correct `event_type`, `source_type`/`source_id` and
+organization context; the approver, the organization owner and an unrelated
+salesperson all receiving nothing; submission and rejection awarding nothing;
+retry and concurrent-equivalent duplication; the linking path awarding zero; both
+directions of transactional coupling; the derived balance rising by exactly 100;
+and that attribution, membership shape, the "never Owner" rule and the
+`referral.approved` audit row are all unchanged.
+
+Two complete clean cycles — `db reset` → `db lint --schema public,app` →
+`supabase test db` — both **1116/1116 PASS across 37 files**. Lint reports only
+the two pre-existing unrelated warnings. Generated types are **byte-identical**:
+the signature did not change, so the frontend sees nothing new. Not run, per
+scope: Playwright, frontend tests, unrelated suites. No `.pen` file touched.
+
+### Three small corrections the tests forced
+
+`showroom_referral_reject` returns `void`, so `isnt()` could not wrap it
+(`lives_ok`); `memberships` has no `is_owner` column, so "never Owner" is stated
+as the absence of `org.manage`, the idiom `28_persona_sales_affiliation`
+already uses; and the coupling test's temporary blocking constraint has to be
+`NOT VALID`, or it fails against the award already sitting on the ledger instead
+of against the one under test.
+
+### Scope
+
+`referral.organization_approved` is still the **only** earning event — the live
+allow-list holds it and `admin.adjustment`, which is a correction primitive, and
+the repository contains exactly two `app.award_points` call sites. No Tier B
+commerce event was wired, no notification is emitted for an award, no frontend
+Points behaviour was built, and Points remain user-owned. **D3** (manager
+visibility), **D4** (expiry) and **D5** (relationship to Sales Score, still
+undefined repo-wide) stay open and block nothing.
+
+---
+
 ## Session — Points Core: the ledger, specified first and then built, with nothing wired to it
 
 **Date:** 2026-08-30 · **Branch:** `feature/points-core` · **Base:** `main` @ `2f81682` · **Spec commit:** `79c3b92`

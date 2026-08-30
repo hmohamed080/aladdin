@@ -1,8 +1,8 @@
 # Points Core — Database Specification
 
-**Status:** **Approved** · 2026-08-30 · **foundation implemented** by `20260830090001_points_core.sql` (ledger, RLS, idempotency, correction primitives, derived balance) · proven by `supabase/tests/35_points_core_test.sql` · **no earning event is wired** — see D1
+**Status:** **Approved and implemented** · 2026-08-30 · `20260830090001_points_core.sql` (ledger, RLS, idempotency, correction primitives, derived balance) and `20260830090002_referral_points_wiring.sql` (the one approved earning event) · proven by `supabase/tests/35_points_core_test.sql` and `36_referral_points_test.sql`
 
-**Product decisions closed 2026-08-30:** the Pilot's approved earning-event set is **`referral.organization_approved` alone** (D6 — no Tier B commerce events); a derived balance **may display negative** after a correction and is never clamped or floored (D2); **numeric point values remain unresolved for every event, including the approved one** (D1, still open). See [Open product decisions](#open-product-decisions).
+**Product decisions closed 2026-08-30:** the Pilot's approved earning-event set is **`referral.organization_approved` alone** (D6 — no Tier B commerce events); a derived balance **may display negative** after a correction and is never clamped or floored (D2); and **`referral.organization_approved` = 100 Points** (D1, closed 2026-08-30 and wired). See [Open product decisions](#open-product-decisions).
 
 ## Purpose
 
@@ -15,9 +15,9 @@ of engagement credit, plus the authority and idempotency rules that make it
 safe to write to. It is a **specification increment**. It creates no table, no
 RPC, no policy, no route body and no seed data. Its success criterion is that
 the following database increment can be implemented **without inventing a
-single product rule** — a bar that now holds for everything except one approved
-event's point value ([**D1**](#open-product-decisions)), which the wiring
-increment must obtain from product rather than choose.
+single product rule** — a bar that held: the wiring increment
+obtained the one outstanding number ([**D1**](#open-product-decisions)) from
+product rather than choosing it.
 
 ### What Points are
 
@@ -437,14 +437,24 @@ to exist at all.
 | **Recipient** | `organizations.referred_by_user_id` — the referring salesperson, **not** their employer and **not** the approving Admin |
 | **Authoritative source record** | `public.organizations`, where `source = 'salesperson_referral'`. Both provenance columns are **write-once**, enforced by `app.organizations_provenance_immutable()` |
 | **Trigger point** | The Admin approval that verifies the referred organization — inside the existing verification-approval transaction, beside its existing audit call |
-| **Proposed amount** | **PRODUCT DECISION REQUIRED** |
+| **Point value** | **100 Points** — approved by product 2026-08-30 (D1). A literal in the RPC, deliberately not configuration: a reward whose value lives in a mutable setting is a reward decided by whoever can write that setting. |
 | **Repeatability** | **Once per organization, ever.** An organization has exactly one provenance and can be approved once |
 | **Idempotency identity** | `(referred_by_user_id, 'referral.organization_approved', 'organization', organizations.id)` |
 | **Abuse risk** | **Low, and already mitigated.** The salesperson cannot self-approve — approval is a platform-role action by a different party. Fabricated referrals are caught at the same review that already gates the organization's existence. The credited column cannot be rewritten to redirect an award, which is exactly why Sprint 13 made it immutable: *"a reward paid on a mutable field is a reward paid to whoever wrote last."* |
 
-This event is **technically eligible today**, and is the **Pilot's entire
-approved earning-event set** (D6). Its point value is the one thing still
-missing (D1) — it is eligible, specified, and worth an amount nobody has set.
+This event is the **Pilot's entire approved earning-event set** (D6), and since
+2026-08-30 it is **wired and worth 100 Points** (D1). It is emitted from
+`public.showroom_referral_approve` — the authoritative Admin approval
+transition — in the same transaction as the approval, beside the existing
+`app.record_audit_event('referral.approved', …)` call.
+
+**It awards only on the CREATING path.** `showroom_referral_approve` may instead
+*link* a candidate to a business that already exists, and such an organization
+carries no `salesperson_referral` provenance, so there is no attributed
+recipient and nothing is awarded. That is the intended behaviour, not a gap: a
+business already on the platform was not brought here by this referral, and
+crediting the referral *request* instead of the organization's write-once
+provenance would pay a salesperson for referring what was already present.
 
 ### Tier B — DEFERRED candidates, explicitly not approved
 
@@ -786,9 +796,9 @@ approved specification:
 
 ## Open product decisions
 
-**Numbering is stable.** D2 and D6 were closed by product on 2026-08-30 and are
-recorded under [Decided](#decided-2026-08-30) below rather than renumbered away,
-so that every reference to a decision id keeps meaning the same thing.
+**Numbering is stable.** D1, D2 and D6 were closed by product on 2026-08-30 and
+are recorded under [Decided](#decided-2026-08-30) below rather than renumbered
+away, so that every reference to a decision id keeps meaning the same thing.
 
 An item is listed as open **only** because existing repository authority
 genuinely does not settle it; everything the repository does settle, and
@@ -798,20 +808,20 @@ everything product has since decided, is closed rather than deferred.
 
 | # | Decision | Why it is open | Blocks |
 |---|---|---|---|
-| **D1** | **Numeric point value for `referral.organization_approved`** — the Pilot's only earning event | The repository contains **no approved numeric point amount for anything**, and product has reaffirmed (2026-08-30) that values remain unresolved **even for the approved event**. Inventing one would be a product decision made by an engineer | The **wiring** increment only. Does **not** block the table, RLS, idempotency or the reversal path |
 | **D3** | **Do managers or owners get any visibility of team points?** | Refused by default here, because it is leaderboard-shaped and Sprints 13 and 14 both refused leaderboards. But manager visibility was never asked and answered on its own terms | Nothing today. Reopening it later is a **new specification**, not an RLS tweak |
 | **D4** | **Do points ever expire or decay?** | No authority. Expiry is a product stance on whether standing is cumulative or current | Nothing today. Expiry is implementable additively as scheduled compensating entries — **never** as deletion |
 | **D5** | **Future relationship to Sales Score, reputation and leaderboard** | "Sales Score" is **undefined in the repository**; "Sales Passport" appears once as a deferred feature set with no content. Neither can be designed against | Nothing today. Now the **only** decision that could reopen the event set, since D6 closed Tier B — a future consumer's needs are the plausible reason to revisit which events are worth recording |
 
-**D1 is the only item on the critical path**, and it blocks strictly less than
-it appears to: the ledger, its RLS, its idempotency key and its reversal path
-are all fully specified without it. D3, D4 and D5 block nothing that is being
-built.
+**Nothing on this list is on the critical path.** D1, the only item that ever
+was, is closed and wired. D3, D4 and D5 block nothing that is being built, and
+each would arrive as its own specification rather than as an amendment to this
+one.
 
 ### Decided 2026-08-30
 
 | # | Decision | Resolution |
 |---|---|---|
+| **D1** | Numeric point value for `referral.organization_approved` | **100 Points.** Wired in `20260830090002_referral_points_wiring.sql` as a literal inside `public.showroom_referral_approve`, never configuration, frontend input, metadata or a mutable admin setting — a reward whose value can be edited is a reward decided by whoever can edit it. Values for any *other* event remain undecided, and no other event is approved. |
 | **D2** | May a derived balance display negative after a correction? | **Yes.** The displayed balance is `SUM(points_delta)`, faithfully — **no clamping, no visual floor, no suppression**, in either language. The adjustment history explains the sign. Storage was already settled; this closed the display rule. See [Can a derived balance go negative?](#can-a-derived-balance-go-negative) |
 | **D6** | Which Tier B commerce events are approved? | **None.** `quotation.accepted`, `order.completed` and `project.completed` stay **deferred candidates**, not earning rules and not an implementation backlog. The Pilot's approved set is **`referral.organization_approved` alone**. See [Tier B](#tier-b--deferred-candidates-explicitly-not-approved) |
 
@@ -820,7 +830,8 @@ user; the ledger is append-only; balance is derived and displayed unmodified;
 no client write path exists; idempotency is deterministic; corrections are
 compensating entries; points survive every organization change; colleagues
 cannot read each other's ledgers; chat never earns points; there is no monetary
-conversion; and the Pilot has exactly one earning event.
+conversion; the Pilot has exactly one earning event; and that event is worth
+100 Points.
 
 ## Blockers
 
@@ -831,11 +842,12 @@ point this specification depends on already exists and is merged —
 `app.forbid_mutation`, and the verification-approval transaction the one
 approved event attaches to.
 
-**Implementation of the ledger, its RLS, its idempotency key and its reversal
-path can begin on approval of this document.** Wiring the one approved earning
-event additionally requires [**D1**](#open-product-decisions) — its point value.
-No other decision blocks anything: D6 closed the event set to
-`referral.organization_approved` alone, and D2 closed the display rule.
+**Fully implemented.** The ledger, its RLS, its idempotency key and its
+reversal path shipped in `20260830090001_points_core.sql`, and the one approved
+earning event was wired at 100 Points in `20260830090002_referral_points_wiring.sql`
+once D1 closed. No decision blocks anything further: D6 closed the event set to
+`referral.organization_approved` alone, D2 closed the display rule, and D1
+closed the value.
 
 ## References
 
