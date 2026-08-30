@@ -1636,6 +1636,80 @@ export type Database = {
           },
         ]
       }
+      points_ledger: {
+        Row: {
+          awarded_by_user_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+          organization_id: string | null
+          points_delta: number
+          reason_code: string | null
+          reverses_entry_id: string | null
+          source_id: string
+          source_type: string
+          user_id: string
+        }
+        Insert: {
+          awarded_by_user_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          organization_id?: string | null
+          points_delta: number
+          reason_code?: string | null
+          reverses_entry_id?: string | null
+          source_id: string
+          source_type: string
+          user_id: string
+        }
+        Update: {
+          awarded_by_user_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          organization_id?: string | null
+          points_delta?: number
+          reason_code?: string | null
+          reverses_entry_id?: string | null
+          source_id?: string
+          source_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "points_ledger_awarded_by_user_id_fkey"
+            columns: ["awarded_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "points_ledger_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "points_ledger_reverses_entry_id_fkey"
+            columns: ["reverses_entry_id"]
+            isOneToOne: false
+            referencedRelation: "points_ledger"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "points_ledger_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           brand: string | null
@@ -3434,6 +3508,15 @@ export type Database = {
         }
         Returns: string
       }
+      adjust_points: {
+        Args: {
+          p_organization_id?: string
+          p_points_delta: number
+          p_reason_code: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       admin_showroom_referrals_list: {
         Args: { p_pending_only?: boolean }
         Returns: {
@@ -3802,6 +3885,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      points_balance: { Args: { p_user_id?: string }; Returns: number }
       reassign_follow_up: {
         Args: {
           p_assignee_membership_id: string
@@ -3823,6 +3907,10 @@ export type Database = {
         Args: {
           p_requested_account_type: Database["public"]["Enums"]["persona_type"]
         }
+        Returns: string
+      }
+      reverse_points_entry: {
+        Args: { p_entry_id: string; p_reason_code: string }
         Returns: string
       }
       review_approve: {

@@ -440,11 +440,18 @@ select throws_ok(
      where name = 'Zayed Tiles' $$,
   '23514', null, '12: referral attribution is IMMUTABLE, even to a platform actor');
 -- No rewards machinery was built — only the provenance a future one would read.
+-- SUPERSEDED IN PART 2026-08-30: Points Core (docs/database/points-core.md) added
+-- public.points_ledger, an append-only ENGAGEMENT ledger that is explicitly not
+-- money and awards nothing yet — its own contract is proven by
+-- 35_points_core_test, including that it has no balance column and no monetary
+-- column. The rest of this guard stands unamended: wallet and reward tables are
+-- still forbidden, and Sprint 13's rule that attribution exists WITHOUT a payout
+-- mechanism is unchanged.
 select is(
   (select count(*)::int from information_schema.tables
    where table_schema = 'public'
-     and (table_name like '%wallet%' or table_name like '%points%' or table_name like '%reward%')),
-  0, '12: no wallet/points/rewards table was introduced');
+     and (table_name like '%wallet%' or table_name like '%reward%')),
+  0, '12: no wallet/rewards table was introduced');
 
 -- 13. The referrer's relationship to the business they referred.
 select is(

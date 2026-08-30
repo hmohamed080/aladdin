@@ -4,6 +4,152 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Points Core: the ledger, specified first and then built, with nothing wired to it
+
+**Date:** 2026-08-30 · **Branch:** `feature/points-core` · **Base:** `main` @ `2f81682` · **Spec commit:** `79c3b92`
+
+Two increments in one session, deliberately separated: the approved contract
+(`docs/database/points-core.md`) and then the schema that implements it. The
+second was not allowed to invent anything the first had not settled — which is
+the only reason the ledger could ship while the product question that blocks
+every award remains open.
+
+### The pinned base was stale, not divergent
+
+The task pinned `main` at `f975c38`. `main` was actually at `2f81682`.
+`git merge-base --is-ancestor` settled it in one command: `f975c38` (PR #36,
+the governance note) is an **ancestor**, and `main` had since taken two
+unrelated UI/e2e merges (PR #37, #38). Ancestor means branching from `main` is a
+strict superset; a non-ancestor would have meant a force-push and a stop.
+Rewinding would have produced a branch that silently excluded two merged PRs.
+
+### Ownership was not a judgment call
+
+The temptation with a Points model is to make it organization-scoped, because
+every other B2B table is. Two shipped artefacts had already decided otherwise:
+`app/b2b/points/page.tsx` states that Points are *"the caller's own standing on
+the platform, not an organization record"*, and `lib/nav/modules.test.ts`
+**asserts** that `points` appears in the navigation of a member holding **zero
+capabilities**. Re-deciding it would have contradicted merged, tested behaviour.
+So `user_id` is the only authority column, and `organization_id` is context that
+never reaches a `USING` clause — the rule `notifications-core.md` already
+enforces for its own `organization_id`, adopted verbatim.
+
+The direction guide supplied the other half: referral provenance is kept
+write-once *"so a future rewards feature can credit the salesperson"* — a
+**person**, not their employer. That sentence is the only statement in the
+repository authorizing any Points award to exist, and it is why the approved
+earning set has exactly one member.
+
+### Enforcement was inherited, not invented
+
+Three patterns already existed and all three were reused rather than rebuilt:
+`app.forbid_mutation()` for append-only (as `audit_log` runs it), the
+recipient-only SELECT policy shape from `notifications`, and awards emitted from
+inside an existing transition beside its `app.record_audit_event` call. The
+triggers are not redundant with the missing policies — policies bind
+`authenticated`, the triggers bind **everyone**, including the security-definer
+functions this migration itself introduces. The guarantee has to survive a
+mistake in our own RPC, not only a hostile browser.
+
+`app.forbid_mutation()` was generalized to name the table it fired on. It had
+hard-coded "audit_log" and would have reported *"audit_log is append-only
+(UPDATE points_ledger forbidden)"*. Same behaviour, same `P0001`; both audit
+suites match on the code, not the text.
+
+### Authority and idempotency turned out to be one property
+
+Because awards fire from inside the business transaction rather than from an
+award endpoint, *"can the browser award itself points?"* and *"can a retry
+double-award?"* have the same answer: there is no separate write path.
+`app.award_points` holds **no EXECUTE for any client role** (catalog-verified),
+so there is nothing to forge a request to; and the identity is the deterministic
+tuple `(user_id, event_type, source_type, source_id)` behind a **unique index**,
+not a client token — a frontend key only protects a client from its own retry
+and makes correctness depend on the least trusted participant. A duplicate
+collapses to `null` via `ON CONFLICT … DO NOTHING`, so the surrounding
+transaction still commits; the index (not an application `if not exists`, which
+races between its SELECT and its INSERT) is what makes two concurrent writers
+safe.
+
+Two smaller decisions carried real weight. The **administrative adjustment's
+`source_id` is its own audit row**, which gave every correction a unique,
+auditable identity and let it flow through the same idempotency rule as
+everything else — no special case, no second code path. And `points_balance` is
+**SECURITY INVOKER** while every writer is DEFINER: a definer balance function
+would have quietly become a read path around the policies, returning totals for
+ledgers the caller cannot see.
+
+### What the product decided, and what it did not
+
+D6 closed to **no Tier B commerce events** — `quotation.accepted`,
+`order.completed` and `project.completed` stay deferred candidates, not
+flagged-off code, because a deferred candidate sitting in the allow-list is an
+approved event with an extra step. D2 closed to **a negative balance displays
+negative**: a floor at zero hides the correction a person would need in order to
+dispute it, and is itself an invented balance. **D1 stayed open on purpose** —
+`referral.organization_approved` is eligible, specified, in the allow-list, and
+worth an amount nobody has set. It has **no call site**, and no numeric value
+appears anywhere in the migration.
+
+That separation is the point of the increment: the foundation is independently
+complete and testable without choosing that number, and the wiring increment
+adds a call site and nothing else.
+
+### A guard that had encoded "not yet" as "never"
+
+`28_persona_sales_affiliation_test.sql` asserted *"no wallet/points/rewards
+table was introduced"* — a Sprint 13 guard that turned a temporary absence into
+a permanent invariant. It was **narrowed, not deleted**: `%wallet%` and
+`%reward%` still fail the build, `%points%` was dropped, and a comment records
+why. Sprint 13's actual rule — attribution exists *without* a payout mechanism —
+is unchanged and still enforced.
+
+### Scope held
+
+`points_ledger` has **no balance column, no `updated_at`, and no monetary
+column**; the suite asserts all three absent. No Points UI, no Realtime, no
+Notifications or Chat integration, no manager/team visibility, no leaderboard,
+no expiry, no wallet, no commission. No historical migration was edited. The
+referral approval RPC was not touched.
+
+Colleagues, managers and owners read **nothing** — the assertion that matters
+most proves that a user who is an *active `org.manage` member of the very
+organization an entry carries* reads zero rows of it. Platform
+support/administrator read-only is a deliberate, documented divergence from
+Notifications: a points entry is a contested record, and a correction cannot be
+issued responsibly by someone who cannot see what they are correcting.
+
+### Validation
+
+**Two complete clean cycles** — `db reset` → `db lint --schema public,app` →
+`supabase test db` — both **1064/1064 PASS across 36 files**, including the new
+`35_points_core_test.sql` (**60 assertions**: schema and the absence of a
+balance, owner / colleague / org-owner / cross-tenant / non-member / platform
+visibility, the four denied client write paths, retry and concurrent-duplicate
+idempotency, reversal with the original provably unchanged, a negative derived
+balance, and organization context retained without being promoted). `db lint`
+reports only the two pre-existing warnings (`set_customer_ownership`,
+`business_save`), both unrelated. `database.types.ts` regenerated: **+88 lines,
+0 removed** — purely additive; `tsc --noEmit` clean. Catalog inspection
+confirmed RLS enabled with two read-only policies and no write policy,
+`authenticated` holding SELECT only, `anon`/`service_role` holding nothing,
+`app.award_points` and `app.points_metadata_is_flat` unreachable by every client
+role, and `search_path` pinned on every definer.
+
+Deliberately **not** run, per scope: Playwright, persona UAT, frontend visual
+tests, Lighthouse, backend suites. No `.pen` file was touched.
+
+### Open, and blocking only the wiring increment
+
+**D1** (point value for the one approved event) · **D3** (manager visibility) ·
+**D4** (expiry) · **D5** (relationship to Sales Score, which remains **undefined
+repo-wide** and so is not designed against). Only D1 is on the critical path,
+and it blocks the call site alone — not the table, the RLS, the idempotency key
+or the reversal path.
+
+---
+
 ## Session — The approved visual direction stops being one account's prototype
 
 **Date:** 2026-08-26 · **Branch:** `feature/supplier-dashboard-visual-refresh` · **Base:** `main` @ `f975c38` · **Checkpoint:** `d70ba3b`

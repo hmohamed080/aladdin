@@ -1,6 +1,6 @@
 # Points Core — Database Specification
 
-**Status:** **Proposed — awaiting review** · 2026-08-30 · branch `feature/points-core` · **no migration exists and none may be written until this document is approved**
+**Status:** **Approved** · 2026-08-30 · **foundation implemented** by `20260830090001_points_core.sql` (ledger, RLS, idempotency, correction primitives, derived balance) · proven by `supabase/tests/35_points_core_test.sql` · **no earning event is wired** — see D1
 
 **Product decisions closed 2026-08-30:** the Pilot's approved earning-event set is **`referral.organization_approved` alone** (D6 — no Tier B commerce events); a derived balance **may display negative** after a correction and is never clamped or floored (D2); **numeric point values remain unresolved for every event, including the approved one** (D1, still open). See [Open product decisions](#open-product-decisions).
 
@@ -154,7 +154,7 @@ what is settled here.
 | `event_type` | yes | Bounded enumeration of known keys, enforced by a CHECK against an explicit allow-list — the pattern `ck_notifications_event_type_known` already uses. An unknown key must fail the write, not be stored. |
 | `points_delta` | yes | **Signed integer.** Positive for an award, negative for a reversal or debit. **Never zero** — a zero entry records nothing and only pollutes history. No decimals, no currency, no rate. |
 | `source_type` | yes | The kind of authoritative record that justified the entry — e.g. `organization`, `order`, `quotation`. Bounded, like `event_type`. |
-| `source_id` | conditional | The identifier of that record. **Required for every event whose award derives from a business record**, which in the Pilot is all of them. |
+| `source_id` | **yes** | The identifier of that record. Shipped **NOT NULL**: it is part of the unique idempotency identity, and SQL treats NULLs as distinct, so a nullable column would silently disable duplicate protection for exactly the events that most need it. An event with no natural source record is not Pilot-eligible anyway ([Idempotency](#idempotency)), so the stricter column matches the rule rather than narrowing it. |
 | `reverses_entry_id` | no | Set **only** on a compensating entry; references the entry being reversed. Null on every ordinary award. |
 | *(idempotency)* | yes | **Not a column.** Derived from `(user_id, event_type, source_type, source_id)` — see [Idempotency](#idempotency). |
 | `awarded_by_user_id` | no | The platform actor responsible, for **administrative** entries only. Null for system-issued awards, whose actor is the transaction that fired them. |
@@ -490,8 +490,15 @@ This is the decided scope, not a provisional minimum. It proves the ledger, the
 idempotency key, the authority model and the reversal path against a real,
 low-risk, already-approved business intent, and it leaves the gamification
 surface unbuilt — which every prior sprint deliberately chose. The
-`event_type` allow-list therefore contains **one** value, and adding a second
-requires a new product decision, not a new migration.
+`event_type` allow-list therefore contains exactly **one earning event**, and
+adding a second requires a new product decision, not a new migration.
+
+**Reconciled against the implementation (2026-08-30).** The shipped allow-list
+carries **two** keys: `referral.organization_approved`, the one approved earning
+event, and `admin.adjustment`, which is **not an earning event** — it is the
+standalone administrative correction primitive that
+[Reversals and corrections](#reversals-and-corrections) requires, and the only
+key that can be written today. Counting earning events, the number is still one.
 
 ## Event quality and anti-gaming
 
