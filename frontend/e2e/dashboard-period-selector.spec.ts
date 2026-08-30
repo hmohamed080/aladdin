@@ -10,16 +10,20 @@ import { signIn, IDENTITIES } from "./helpers/auth";
  * reachable only by hand-typing a URL. It now sits directly above the metric
  * strip, which is the only region it governs.
  *
- * WHAT THIS SPEC OWNS, and it is only this: that the control is present where
- * the review put it, that it drives the EXISTING `?period=` contract, and that
- * every way a reader can arrive at a period — click, deep link, reload, back
- * button, junk in the query string — lands on the same, correct state in both
- * locales and both writing directions.
+ * WHY THE CLICK-DRIVEN CASES ARE BACK. They were absent for one release cycle
+ * because `/b2b` could not commit ANY same-path query navigation in a production
+ * build — a route-level defect that broke the dashboard's own stage chips too.
+ * The cause was the segment's `loading.tsx` boundary; with it gone the router
+ * commits reliably, so the contract is proved here by real interaction rather
+ * than against a mocked router.
  *
- * WHAT IT DELIBERATELY DOES NOT CLAIM: that the figures are right. The period's
- * effect on the numbers is `comparePeriods`' business and is covered by the
- * report/summary unit tests; asserting a seeded delta here would pin this spec
- * to the demand seed and fail every time the fixtures moved.
+ * HOW A PERIOD CHANGE IS PROVED TO HAVE REACHED THE SERVER. The chip's caption
+ * is rendered from the RESOLVED period on the server (`<PeriodSelect value={period}>`),
+ * so a changed caption is proof the page re-rendered with the new window — not
+ * merely that the address bar moved. The delta captions carry a second, one-way
+ * check: `vsMonth` ("from last month") is only ever emitted for the 30-day
+ * window, so it must be ABSENT on every other one. That holds whatever the seed
+ * contains, which a figure-by-figure assertion would not.
  */
 
 const SHOTS = "test-results/period";
@@ -44,6 +48,7 @@ const COPY = {
     "90d": "Last 90 days",
     "365d": "Last 12 months",
     all: "All time",
+    vsMonth: "from last month",
   },
   ar: {
     scope: "فترة المؤشرات",
@@ -51,8 +56,11 @@ const COPY = {
     "90d": "آخر ٩٠ يوم",
     "365d": "آخر ١٢ شهر",
     all: "كل الفترات",
+    vsMonth: "من الشهر الماضي",
   },
 } as const;
+
+type PeriodValue = "30d" | "90d" | "365d" | "all";
 
 /** The chip, by the test id the design system already styles it through. */
 const chip = (page: Page) => page.getByTestId("period-select");
@@ -61,9 +69,18 @@ function escapeRe(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** What the chip currently says it is showing. */
-async function expectChip(page: Page, label: string) {
-  await expect(chip(page)).toHaveText(new RegExp(escapeRe(label)));
+/**
+ * How long a period change may take to come back from the server.
+ *
+ * `/b2b` is `force-dynamic` and every figure is fetched inside RLS, so a change
+ * is a full RSC round trip rather than a client-side filter. This is a ceiling
+ * on a state that is polled for, not a duration anything waits out.
+ */
+const SETTLE = 20_000;
+
+/** What the chip currently says it is showing — server-rendered from `period`. */
+async function expectChip(page: Page, label: string, timeout = SETTLE) {
+  await expect(chip(page)).toHaveText(new RegExp(escapeRe(label)), { timeout });
 }
 
 /** The `?period=` the URL is currently carrying, or null for the bare default. */
@@ -72,27 +89,65 @@ function periodParam(page: Page): string | null {
 }
 
 /**
- * WHY NOTHING BELOW CLICKS AN OPTION TO CHANGE THE PERIOD.
+ * Wait for a period change to LAND, by polling state.
  *
- * `/b2b` currently commits NO client-side navigation. Measured directly: the
- * option's handler runs, Next fetches the new payload, the server answers
- * `200 text/x-component` — and the router never commits, so `page.url()` and the
- * rendered figures stay put. A plain `<Link href="/b2b?stage=price">` — the
- * dashboard's own stage chip, untouched by this change — behaves identically.
- *
- * So it is the ROUTE that cannot navigate to itself, not the control. That is a
- * pre-existing defect (it already breaks the stage chips, which is why the
- * supply-dashboard UAT spec asserts their `href` and never presses them) and it
- * is reported rather than worked around here.
- *
- * The consequence for coverage: the browser cannot demonstrate a period CHANGE,
- * so that half is asserted against the router in
- * `src/features/home/period-select.test.tsx`, where the route defect cannot mask
- * a regression in the URL the control builds. Everything a `page.goto` can still
- * prove — the default, deep links, invalid input, reload, history, both locales,
- * both directions — is proved here, because those are the states a reader
- * actually reaches today.
+ * NOT `page.waitForURL`: that waits on a load event, and `router.push` is a soft
+ * navigation, so the document never loads again. Reading `page.url()` on a poll
+ * is the same fact observed rather than awaited.
  */
+async function expectPeriodParam(page: Page, expected: string | null) {
+  await expect.poll(() => periodParam(page), { timeout: SETTLE }).toBe(expected);
+}
+
+/** Open the chip and choose a window, then wait for the server render to land. */
+async function choose(page: Page, value: PeriodValue, locale: "ar" | "en") {
+  await chip(page).click();
+  await expect(page.getByTestId("period-menu")).toBeVisible();
+  await page.getByTestId(`period-option-${value}`).click();
+  await expect(page.getByTestId("period-menu")).toHaveCount(0);
+  // The default is expressed as ABSENCE, so choosing it clears the parameter.
+  await expectPeriodParam(page, value === "30d" ? null : value);
+  await expectChip(page, COPY[locale][value]);
+}
+
+/**
+ * Whether the strip is showing the 30-day comparison caption.
+ *
+ * `vsMonth` is emitted ONLY for the 30-day window, so this is a period-specific
+ * fact about the RENDERED FIGURES rather than about the URL.
+ */
+async function stripSaysVsMonth(page: Page, locale: "ar" | "en") {
+  const strip = page.locator("main .grid.grid-cols-2").first();
+  return ((await strip.textContent()) ?? "").includes(COPY[locale].vsMonth);
+}
+
+/**
+ * The attention queue, narrowed to the pricing stage.
+ *
+ * Scoped to `main` rather than to a test id: the queue's own
+ * `data-testid="attention-queue"` belongs to `AttentionQueue`, which the visual
+ * rebuild replaced on this dashboard with `AttentionBoard` — the id still exists
+ * in the codebase but never renders here, so a locator built on it silently
+ * matches nothing and "no later-stage work" passes for the wrong reason.
+ *
+ * The CTA verbs are the real signal: only a price-stage row offers "Send a
+ * price", and only later stages offer theirs. Asserting BOTH directions is what
+ * makes this a filter check rather than a "something rendered" check.
+ *
+ * The names are ANCHORED, and that is load-bearing rather than tidy: the board's
+ * own stage chips are links too, and they are named after the same stages ("To
+ * follow up 1"). An unanchored /follow up/ therefore matches the FILTER rather
+ * than the work, and the "no later-stage work" assertion fails while the queue
+ * is filtered exactly as asked. Only the CTA is named for the verb alone.
+ */
+async function expectPriceOnlyQueue(page: Page) {
+  const main = page.locator("#main");
+  await expect(main.getByRole("link", { name: /^Send a price$/ }).first()).toBeVisible();
+  expect(
+    await main.getByRole("link", { name: /^(Follow up|Create the order|Progress it)$/ }).count(),
+    "a price-filtered queue shows no later-stage work",
+  ).toBe(0);
+}
 
 /** A page that scrolls sideways is broken at any width — measured, not eyeballed. */
 async function assertNoOverflow(page: Page, label: string) {
@@ -109,7 +164,7 @@ test.describe("dashboard reporting period", () => {
   );
 
   /* ---------------------------------------------------------------- *
-   * PLACEMENT — the half of this that was actually deferred.
+   * PLACEMENT — the half of this that was deferred.
    * ---------------------------------------------------------------- */
 
   test("sits at the metric strip's trailing edge, not beside the primary action", async ({
@@ -135,22 +190,19 @@ test.describe("dashboard reporting period", () => {
 
     /* THE PRIMARY ACTION STAYS VISUALLY ALONE. Not "is not the same element" —
        that would pass with the chip tucked against the button. The chip must be
-       on its OWN ROW, strictly below the action band, which is the thing the
-       review actually asked for. */
+       on its OWN ROW, strictly below the action band. */
     expect(chipBox.y, "chip starts below the primary action").toBeGreaterThan(
       ctaBox.y + ctaBox.height - 1,
     );
 
     /* AND IT BELONGS TO THE STRIP. Directly above it, and closer to it than to
        the action above — proximity is the entire mechanism by which a control
-       with no visible container declares its scope, so it is asserted rather
-       than left to a screenshot. */
+       with no visible container declares its scope. */
     expect(chipBox.y, "chip is above the strip").toBeLessThan(stripBox.y);
     const toStrip = stripBox.y - (chipBox.y + chipBox.height);
     const toAction = chipBox.y - (ctaBox.y + ctaBox.height);
     expect(toStrip, "chip hangs off the strip, not off the heading band").toBeLessThan(toAction);
 
-    // LTR: aligned to the content column's RIGHT edge, which is the strip's.
     expect(
       Math.abs(chipBox.x + chipBox.width - (stripBox.x + stripBox.width)),
       "chip's trailing edge lines up with the strip's",
@@ -176,18 +228,15 @@ test.describe("dashboard reporting period", () => {
     const chipBox = (await chip(page).boundingBox())!;
     const stripBox = (await strip.boundingBox())!;
 
-    // RTL: the logical end is the LEFT, so the chip's left edge is the strip's.
     expect(
       Math.abs(chipBox.x - stripBox.x),
       "chip's trailing edge lines up with the strip's left side in RTL",
     ).toBeLessThanOrEqual(2);
     expect(chipBox.y, "still above the strip in RTL").toBeLessThan(stripBox.y);
 
-    /* THE MENU HANGS FROM THE SAME EDGE THE CHIP IS ANCHORED TO. `start-0` in an
-       RTL document is the RIGHT, and a menu that opened the wrong way here would
-       run off the content column. Asserted as containment rather than as a
-       coordinate, because the exact anchor is the component's business and
-       "stays on screen" is the contract. */
+    /* THE MENU HANGS FROM THE EDGE THE CHIP IS ANCHORED TO. Asserted as
+       containment rather than as a coordinate: the exact anchor is the
+       component's business, "stays on screen" is the contract. */
     await chip(page).click();
     const menu = page.getByTestId("period-menu");
     await expect(menu).toBeVisible();
@@ -199,7 +248,6 @@ test.describe("dashboard reporting period", () => {
     await page.keyboard.press("Escape");
     await expect(menu).toHaveCount(0);
 
-    // The Arabic copy is the Arabic copy — no English leaking through the chip.
     await expectChip(page, COPY.ar["30d"]);
     await expect(chip(page)).not.toHaveText(/[A-Za-z]/);
 
@@ -226,8 +274,7 @@ test.describe("dashboard reporting period", () => {
     expect(chipBox.y, "above the strip in dark mode too").toBeLessThan(stripBox.y);
 
     /* COMPACT ON A PHONE, NOT FULL-WIDTH. It is a utility control; stretching it
-       across a 390px screen would give it the weight of the primary action,
-       which is the exact mistake this placement exists to avoid. */
+       across a 390px screen would give it the weight of the primary action. */
     if (mobile) {
       expect(chipBox.width, "chip stays compact on a phone").toBeLessThan(stripBox.width * 0.75);
     }
@@ -239,11 +286,11 @@ test.describe("dashboard reporting period", () => {
   });
 
   /* ---------------------------------------------------------------- *
-   * URL STATE — the existing `?period=` contract, exercised through the UI.
+   * REAL INTERACTION — the acceptance a component test cannot give.
    * ---------------------------------------------------------------- */
 
   for (const locale of ["en", "ar"] as const) {
-    test(`period is URL state in ${locale}: default, deep link, junk, reload, history`, async ({
+    test(`choosing a window moves the URL and the figures (${locale})`, async ({
       page,
       request,
     }, testInfo) => {
@@ -254,13 +301,111 @@ test.describe("dashboard reporting period", () => {
       await signIn(page, request, IDENTITIES.distributor, LANDED);
       await page.goto("/b2b", { waitUntil: "networkidle" });
 
-      // DEFAULT — and the default carries NO parameter, so a plain dashboard
-      // link stays clean and a shared link only ever names a deliberate choice.
+      // DEFAULT — no parameter, and whatever 30-day comparison the seed supports.
       expect(periodParam(page), "bare dashboard carries no period").toBeNull();
       await expectChip(page, COPY[locale]["30d"]);
+      const vsMonthAtDefault = await stripSaysVsMonth(page, locale);
 
-      // DEEP LINK — a period arrived at by URL is a first-class state, and the
-      // chip reflects the window in force rather than its own default.
+      await choose(page, "90d", locale);
+      expect(periodParam(page)).toBe("90d");
+      expect(
+        await stripSaysVsMonth(page, locale),
+        "the 30-day comparison caption cannot survive into a 90-day window",
+      ).toBe(false);
+
+      await choose(page, "365d", locale);
+      expect(periodParam(page)).toBe("365d");
+      expect(await stripSaysVsMonth(page, locale)).toBe(false);
+
+      // "All time" has no previous window, so it carries no comparison at all.
+      await choose(page, "all", locale);
+      expect(periodParam(page)).toBe("all");
+      expect(await stripSaysVsMonth(page, locale)).toBe(false);
+
+      await choose(page, "30d", locale);
+      expect(periodParam(page), "the default is expressed as absence").toBeNull();
+      expect(
+        await stripSaysVsMonth(page, locale),
+        "returning to the default restores the comparison it started with",
+      ).toBe(vsMonthAtDefault);
+
+      // BACK / FORWARD across the clicked history entries.
+      await page.goBack();
+      await expectPeriodParam(page, "all");
+      await expectChip(page, COPY[locale].all);
+      await page.goForward();
+      await expectPeriodParam(page, null);
+      await expectChip(page, COPY[locale]["30d"]);
+
+      await assertNoOverflow(page, `period/${locale}/interaction`);
+    });
+  }
+
+  test("changing the window leaves the rest of the query alone", async ({
+    page,
+    request,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium-desktop", "desktop scenario");
+    test.setTimeout(180_000);
+
+    /* The queue's stage filter and its sort ride in the same query string. A
+       period change that dropped them would make the two controls fight each
+       other — the dashboard's `carry` object exists to prevent exactly that on
+       the server side, and this is the client half of the same rule. */
+    await setPrefs(page, "en");
+    await signIn(page, request, IDENTITIES.distributor, LANDED);
+    await page.goto("/b2b?period=90d&stage=price&sort=due", { waitUntil: "networkidle" });
+    await expectChip(page, COPY.en["90d"]);
+
+    await choose(page, "all", "en");
+    const params = new URL(page.url()).searchParams;
+    expect(params.get("period")).toBe("all");
+    expect(params.get("stage"), "the stage filter survives a period change").toBe("price");
+    expect(params.get("sort"), "the sort survives a period change").toBe("due");
+
+    // And the queue is still filtered — the surviving parameter is doing work,
+    // not just riding along in the address bar.
+    await expectPriceOnlyQueue(page);
+  });
+
+  test("the dashboard's own stage chips navigate too", async ({ page, request }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium-desktop", "desktop scenario");
+    test.setTimeout(180_000);
+
+    /* Same-path query navigation driven by an ordinary `<Link>` rather than by
+       `router.push`. It is in this spec because it shares the defect the period
+       control hit: while the segment carried a `loading.tsx`, neither committed. */
+    await setPrefs(page, "en");
+    await signIn(page, request, IDENTITIES.distributor, LANDED);
+    await page.goto("/b2b", { waitUntil: "networkidle" });
+
+    await page
+      .getByRole("link", { name: /^to price/i })
+      .first()
+      .click();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("stage"), { timeout: SETTLE })
+      .toBe("price");
+
+    await expectPriceOnlyQueue(page);
+  });
+
+  /* ---------------------------------------------------------------- *
+   * URL STATE reached WITHOUT the control — deep links and history.
+   * ---------------------------------------------------------------- */
+
+  for (const locale of ["en", "ar"] as const) {
+    test(`period is URL state in ${locale}: deep link, junk, reload, history`, async ({
+      page,
+      request,
+    }, testInfo) => {
+      test.skip(testInfo.project.name !== "chromium-desktop", "desktop scenario");
+      test.setTimeout(240_000);
+
+      await setPrefs(page, locale);
+      await signIn(page, request, IDENTITIES.distributor, LANDED);
+
+      // DEEP LINK — every window is a first-class state.
       for (const value of ["90d", "365d", "all"] as const) {
         await page.goto(`/b2b?period=${value}`, { waitUntil: "networkidle" });
         await expectChip(page, COPY[locale][value]);
@@ -274,13 +419,11 @@ test.describe("dashboard reporting period", () => {
 
       // RELOAD — the period is in the URL, so it survives a full document load.
       await page.goto("/b2b?period=90d", { waitUntil: "networkidle" });
-      await expectChip(page, COPY[locale]["90d"]);
       await page.reload({ waitUntil: "networkidle" });
       expect(periodParam(page)).toBe("90d");
       await expectChip(page, COPY[locale]["90d"]);
 
-      // BACK / FORWARD — each period is its own history entry, and the chip
-      // follows the entry rather than the last thing that was chosen.
+      // BACK / FORWARD across document loads.
       await page.goto("/b2b?period=365d", { waitUntil: "networkidle" });
       await expectChip(page, COPY[locale]["365d"]);
       await page.goBack({ waitUntil: "networkidle" });
@@ -303,8 +446,8 @@ test.describe("dashboard reporting period", () => {
 
     /* The window lives in the URL and the language lives in a cookie, so the two
        are independent by construction — but only if nothing along the way
-       rewrites the query. Reading the SAME deep link under both locales is what
-       proves it: same parameter, same window, different copy. */
+       rewrites the query. Reading the SAME deep link under both locales proves
+       it: same parameter, same window, different copy. */
     await setPrefs(page, "en");
     await signIn(page, request, IDENTITIES.distributor, LANDED);
     await page.goto("/b2b?period=90d&stage=price", { waitUntil: "networkidle" });
@@ -322,10 +465,6 @@ test.describe("dashboard reporting period", () => {
     await assertNoOverflow(page, "period/locale-switch");
   });
 
-  /* ---------------------------------------------------------------- *
-   * SCOPE HONESTY — the reason this placement was chosen over a page-level one.
-   * ---------------------------------------------------------------- */
-
   test("the buyer seat gets no period control, because none of its figures move", async ({
     page,
     request,
@@ -335,8 +474,7 @@ test.describe("dashboard reporting period", () => {
 
     /* A Showroom is the buyer seat: it renders `BuyerDashboard`, which has no
        period-scoped figures at all. Offering a window control over numbers that
-       ignore it is a worse lie than offering none, so the chip must be absent
-       rather than present-and-inert. */
+       ignore it is a worse lie than offering none. */
     await setPrefs(page, "en");
     await signIn(page, request, IDENTITIES.showroom, LANDED);
     await page.goto("/b2b?period=90d", { waitUntil: "networkidle" });

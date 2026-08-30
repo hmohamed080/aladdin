@@ -6,21 +6,20 @@ import { PERIOD_ORDER, DEFAULT_PERIOD, type PeriodKey } from "@/lib/workspace/pe
 import { en } from "@/lib/i18n/messages/en";
 
 /**
- * THE CLICK BEHAVIOUR LIVES HERE RATHER THAN IN THE E2E SPEC, AND NOT BY
- * PREFERENCE.
+ * THE COMPONENT-LEVEL CONTRACT: which URL this control asks the router for.
  *
- * `/b2b` currently commits NO client-side navigation — not from `router.push`
- * and not from a plain `<Link>` either. Clicking the dashboard's own stage chips
- * has the same result, which is why the supply-dashboard UAT spec asserts their
- * `href` attributes and never clicks them, and why every navigation in these
- * specs is a `page.goto`. That is a pre-existing route-level defect and it is
- * not this control's to fix.
+ * These cases were written while `/b2b` could not commit any same-path query
+ * navigation in a production build, so the browser could not demonstrate a
+ * period CHANGE at all. That defect is fixed (the segment's `loading.tsx`
+ * boundary was the cause), and the real-browser acceptance is back in
+ * `e2e/dashboard-period-selector.spec.ts`.
  *
- * It does mean the browser cannot demonstrate what this control DOES on a click.
- * So the contract the component actually owns — which URL it asks for — is
- * asserted directly against the router, where the route defect cannot mask a
- * regression in it. Everything the browser can still prove (default, deep link,
- * invalid fallback, reload, back/forward, placement, RTL) stays in the E2E spec.
+ * They stay because they assert something the browser test cannot isolate: the
+ * exact URL the component BUILDS, independent of whether the route then
+ * navigates. A regression that dropped `stage` from the query, or wrote
+ * `?period=30d` instead of clearing the parameter, would still render a
+ * plausible page end-to-end — here it fails immediately and points at the
+ * builder rather than at the route.
  */
 
 const push = vi.fn();
