@@ -1000,10 +1000,51 @@ export const en = {
   },
   points: {
     title: "Points",
-    subtitle: "Your standing on Aladdin.",
+    subtitle: "Your own standing on Aladdin, and how it changed.",
+    balance: {
+      label: "Your Points",
+      /* Read by screen readers in place of the bare figure. */
+      description: "{amount} Points",
+      negativeHint: "A correction has brought your total below zero.",
+      unit: "Points",
+    },
+    earn: {
+      title: "How you earn Points",
+      ruleTitle: "An approved referral",
+      ruleBody:
+        "When a business you refer is approved and joins Aladdin, you earn 100 Points.",
+      ruleNote:
+        "This applies to a business that is new to Aladdin. If your referral turns out to be a company already on the platform, it is still linked for you, but no Points are earned.",
+      more: "More ways to earn Points may open later in the pilot.",
+    },
+    history: {
+      title: "Points activity",
+      more: "Show more activity",
+    },
+    entry: {
+      referral: {
+        title: "Referral approved",
+        body: "You earned 100 Points after a business you referred joined Aladdin.",
+      },
+      adjustment: { title: "Points adjustment" },
+      correction: { title: "Points correction" },
+      fallback: { title: "Points activity" },
+    },
+    reason: {
+      support_correction: "Adjusted by the Aladdin team after a review.",
+      event_invalidated: "The activity this was awarded for no longer qualifies.",
+    },
+    delta: {
+      earned: "earned {amount} Points",
+      deducted: "{amount} Points deducted",
+    },
     empty: {
-      title: "Points are not running yet",
-      body: "When the programme opens, what you earn and where it counts will be shown here.",
+      title: "No Points activity yet",
+      body: "Your Points appear here as soon as you earn them. Refer a business to Aladdin to get started.",
+    },
+    error: {
+      title: "Points could not be loaded",
+      body: "Something went wrong reading your Points. Refresh the page to try again.",
     },
   },
 
