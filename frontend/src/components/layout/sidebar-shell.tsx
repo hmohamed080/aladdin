@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+import { motion, AnimatePresence, useReducedMotion, useMotionValue, animate } from "motion/react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
 import { menuItemClass, menuSurfaceClass } from "@/components/ui/menu";
@@ -403,30 +403,64 @@ export function SidebarShell({
 
      The approved direction is the opposite: the sidebar widening IS the
      application's own width changing, not a drawer sliding over it. So the
-     SPACER carries the same animated value the panel does. That costs only
-     handing it the identical `animate`/`transition` pair — the panel's own
-     animation is untouched, and the two stay in lockstep because they are driven
-     by the same spring off the same `visual`, not because one waits on the
-     other.
+     SPACER carries the same animated value the panel does — and it now carries
+     the SAME VALUE OBJECT rather than a second animation given identical
+     arguments, so the two cannot drift apart even in principle.
 
      The width the server renders is still the mode cookie's (read in
      `AppShell`), so first paint is correct before this spring ever runs. */
-  // `animate`/`transition` take Motion's own types, not `CSSProperties` — the
-  // panel below gets away with an inline object literal because JSX gives it
-  // contextual typing; pulled into a variable (so the spacer can share the exact
-  // same value) that inference is lost, so both are typed loosely here rather
-  // than fighting Motion's generics for a value this narrow.
-  const springTransition = reduced
-    ? { duration: 0 }
-    : ({ type: "spring", stiffness: 520, damping: 42, mass: 1 } as const);
-  const spacerAnimate: Record<string, string> = { "--shell-nav-w": visual };
-  const spacerStyle: CSSProperties = {
+  /* ONE WRITER FOR `--shell-nav-w`, AND THAT IS THE WHOLE FIX.
+     ---------------------------------------------------------------------
+     The width used to have TWO owners. Every render passed the resolved string
+     to React through `style={{ "--shell-nav-w": visual }}`, and the same string
+     to Motion through `animate={{ "--shell-nav-w": visual }}`. Both then wrote
+     the same custom property on the same element, and they write it on
+     different schedules: React only touches the DOM when the string CHANGES
+     between two renders, while Motion writes it every frame of a spring and
+     stops wherever it was stopped.
+
+     That is enough to desynchronise state from geometry, and it was observed
+     doing exactly that: `data-sidebar-mode="expanded"`, `data-sidebar-open="true"`
+     — so React had computed `visual` as the expanded width — while the property
+     itself still read `3.5rem`, the rail. The reason neither owner corrected it
+     is the same fact from both sides: an interrupted Motion animation leaves the
+     property at an arbitrary value, and if `visual` is UNCHANGED across the next
+     render (which it is on `hover` -> `expanded`, because `open` is true either
+     way) React writes nothing and Motion re-targets nothing. Both writers
+     believe the value is already correct; the DOM disagrees with both.
+
+     So the property now has exactly one writer: this MotionValue. React never
+     puts the raw string in `style` again — it passes the VALUE OBJECT, which
+     Motion renders on the server from `.get()` (first paint stays correct, off
+     the mode cookie) and owns exclusively on the client.
+
+     The animation is driven from an effect keyed on the TARGET rather than from
+     a render-time prop. That is what makes the transition authoritative: the
+     effect re-runs only when the target genuinely changes, and when it does it
+     animates from wherever the value actually IS to where the state says it
+     should be. An interrupted animation cannot strand the property any more,
+     because the next target change starts from the real current value, and an
+     unchanged target leaves the in-flight animation alone to finish.
+
+     Nothing about the motion itself moves: same spring, same widths, same
+     reduced-motion behaviour. */
+  const navWidth = useMotionValue(visual);
+  useEffect(() => {
+    const controls = animate(
+      navWidth,
+      visual,
+      reduced ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 42, mass: 1 },
+    );
+    return () => controls.stop();
+  }, [navWidth, visual, reduced]);
+
+  const spacerStyle = {
     width: "calc(var(--shell-nav-w) + var(--shell-gutter-w))",
-    ["--shell-nav-w" as string]: visual,
+    "--shell-nav-w": navWidth,
     zIndex: 300,
     top: 0,
     height: "100dvh",
-  };
+  } as unknown as CSSProperties;
 
   /* THROUGH THE MESSAGE CATALOGUE, NOT A TERNARY ON `locale`. While this was a
      one-account prototype an inline `locale === "ar" ? ... : ...` was a
@@ -451,8 +485,6 @@ export function SidebarShell({
       // z above the header (200) so a hover reveal floats over it rather than
       // sliding underneath, which reads as a rendering bug.
       initial={false}
-      animate={spacerAnimate}
-      transition={springTransition}
       style={spacerStyle}
       data-shell-sidebar=""
       data-sidebar-mode={mode}
@@ -500,17 +532,15 @@ export function SidebarShell({
            gesture, and two easings on one gesture is visible as the band lagging
            or leading the edge it is supposed to be flush with. */
         initial={false}
-        animate={{ "--shell-nav-w": visual }}
-        transition={
-          reduced ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 42, mass: 1 }
-        }
         style={
           {
             width: "calc(var(--shell-nav-w) + var(--shell-gutter-w))",
-            // The resting value, so the FIRST paint is already the right width.
-            // Server-rendered from the cookie; motion takes over from here.
-            "--shell-nav-w": visual,
-          } as CSSProperties
+            // THE SAME MotionValue THE SPACER USES — not a second copy of the
+            // same number. The two are now in lockstep because they are reading
+            // one value object, rather than because two springs were given
+            // identical arguments and trusted to stay in step.
+            "--shell-nav-w": navWidth,
+          } as unknown as CSSProperties
         }
       >
         {/* THE NAVY PLATE. Its own box, inset to `--shell-nav-w`, so the gutter
