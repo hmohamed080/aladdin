@@ -8,6 +8,8 @@ import { searchShowrooms, showroomBranches } from "@/server/queries/affiliation"
 import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { ShowroomSearch } from "@/features/accounts/showroom-search";
+import { ShowroomNotAvailable } from "@/features/accounts/showroom-not-available";
+import { loadIsSalesPersona } from "@/server/queries/sales-persona";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +17,15 @@ export const dynamic = "force-dynamic";
  * "Connect your showroom" — a Salesperson's route to the Sales tools of the
  * business they work for.
  *
- * The page is reachable by any personal account, and reaching it grants nothing:
- * every result comes from the public business-directory projection, and asking to
- * join creates a request that an Owner/Manager of that showroom must approve.
+ * The page is for SALES accounts, and reaching it grants nothing: every result
+ * comes from the public business-directory projection, and asking to join creates
+ * a request that an Owner/Manager of that showroom must approve.
+ *
+ * A non-Sales personal account gets the unavailable state instead of the form.
+ * `app.is_sales_persona` already refuses these writes in the database, so the gate
+ * here is honesty, not authority: without it an Installer/Technician who typed the
+ * URL would fill in a search, pick a showroom, submit, and be met with a bare
+ * failure for a flow that was never theirs.
  *
  * It is deliberately NOT "Add Business". A salesperson connecting to their employer
  * does not become its Owner, which is why the fallback for "my showroom isn't here"
@@ -36,6 +44,7 @@ export default async function ConnectShowroomPage({
   const { entries } = await loadWorkspaces(supabase);
   // A caller with no personal workspace has no personal Sales setup to do.
   if (!personalEntry(entries)) redirect("/");
+  if (!(await loadIsSalesPersona())) return <ShowroomNotAvailable />;
 
   const { q, org, error } = await searchParams;
   const query = (q ?? "").trim();

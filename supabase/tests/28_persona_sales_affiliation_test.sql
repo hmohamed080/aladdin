@@ -25,13 +25,27 @@ select plan(79);
 --   70000001 — owner of Cairo Ceramics Showroom (business-only: NULL persona)
 --   70000007 — Laila, `sales` persona, org-manager of an UNRELATED business
 --   70000009 — an installer persona, our unauthorised third party
+--   70000005 — a DECLARED `sales` persona (upgrade submitted, not yet applied):
+--              the second salesperson used by sections 9 and 11
 --   55555555 — platform administrator
 --   9c00…001 — Cairo Ceramics Showroom  ·  b0000001-…001 — its Nasr City branch
 --   9f00…004 — Delta Wholesale Supply (a different tenant, for the RLS check)
 update auth.users set email_confirmed_at = now()
   where id in ('70000001-0000-4000-8000-000000000001', '70000007-0000-4000-8000-000000000007',
                '70000009-0000-4000-8000-000000000009', '55555555-5555-4555-8555-555555555555',
-               '70000002-0000-4000-8000-000000000002');
+               '70000002-0000-4000-8000-000000000002', '70000005-0000-4000-8000-000000000005');
+
+-- The SECOND salesperson this suite needs (sections 9 and 11) is a DECLARED one:
+-- 70000005 completed the professional onboarding that names `sales`, but the
+-- canonical persona is written only when an Admin applies the upgrade, so
+-- users.primary_account_type is still NULL. That is a real, active salesperson —
+-- and since the Installer Pilot Increment 1 hardening the affiliation flow admits
+-- exactly this case (app.is_sales_persona), which is why the suite can no longer
+-- borrow the installer fixture as a stand-in for "a second salesperson".
+insert into public.individual_onboarding (user_id, prof_concrete_type, professional_completed_at)
+values ('70000005-0000-4000-8000-000000000005', 'sales', now())
+on conflict (user_id) do update
+  set prof_concrete_type = 'sales', professional_completed_at = now();
 
 -- ===========================================================================
 -- 1 + 2. The two types are DISJOINT — enforced by the type system
@@ -324,7 +338,7 @@ select ok(app.has_capability('9c000000-cccc-4ccc-8ccc-000000000001', 'sales.oppo
 -- 9. A REJECTED request grants nothing, and disables nothing
 -- ===========================================================================
 -- A second salesperson asks to join Delta Wholesale and is declined.
-set local request.jwt.claims = '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"70000005-0000-4000-8000-000000000005","role":"authenticated"}';
 -- Delta is a wholesaler, not a showroom: affiliation is a showroom concept.
 select throws_ok(
   $$ select public.showroom_join_request_create('9f000000-ffff-4fff-8fff-000000000004') $$,
@@ -337,16 +351,16 @@ set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","r
 select throws_ok(
   format($$ select public.org_join_request_reject(%L, '  ') $$,
     (select id from public.organization_join_requests
-     where user_id = '70000009-0000-4000-8000-000000000009')),
+     where user_id = '70000005-0000-4000-8000-000000000005')),
   '22023', null, '9: a rejection without a reason is refused');
 select lives_ok(
   format($$ select public.org_join_request_reject(%L, 'Not on our sales team') $$,
     (select id from public.organization_join_requests
-     where user_id = '70000009-0000-4000-8000-000000000009')),
+     where user_id = '70000005-0000-4000-8000-000000000005')),
   '9: the owner declines with a reason');
 select is(
   (select count(*)::int from public.memberships m
-   where m.user_id = '70000009-0000-4000-8000-000000000009'
+   where m.user_id = '70000005-0000-4000-8000-000000000005'
      and m.organization_id = '9c000000-cccc-4ccc-8ccc-000000000001'
      and m.status = 'active'),
   0, '9: a rejected request leaves NO active membership');
@@ -354,9 +368,9 @@ select is(
 reset role;
 select is(
   (select u.status::text from public.users u
-   where u.id = '70000009-0000-4000-8000-000000000009'),
+   where u.id = '70000005-0000-4000-8000-000000000005'),
   'active', '9: ...and the personal account is still ACTIVE');
-select is(app.has_personal_persona('70000009-0000-4000-8000-000000000009'), true,
+select is(app.has_personal_persona('70000005-0000-4000-8000-000000000005'), true,
   '9: ...and still has its Personal workspace');
 
 -- ===========================================================================
@@ -388,7 +402,7 @@ set local role authenticated;
 -- 11. Approval prefers LINKING to an organization that already exists. A second
 -- salesperson refers Cairo Ceramics under a differently-cased, differently-spaced
 -- name — the classic route to a duplicate business.
-set local request.jwt.claims = '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"70000005-0000-4000-8000-000000000005","role":"authenticated"}';
 select isnt(public.showroom_referral_save(
   null, null, '  cairo ceramics showroom ', null, 'cairo', 'nasr_city', 'Nasr City'),
   null, '11: a second salesperson refers a showroom that already exists');
@@ -404,7 +418,7 @@ select is(
 select is(
   public.showroom_referral_approve(
     (select id from public.organization_referrals
-     where referred_by = '70000009-0000-4000-8000-000000000009' and status = 'submitted')),
+     where referred_by = '70000005-0000-4000-8000-000000000005' and status = 'submitted')),
   '9c000000-cccc-4ccc-8ccc-000000000001',
   '11: approval LINKS to the existing organization instead of creating one');
 reset role;

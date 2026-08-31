@@ -4,6 +4,7 @@ import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/context";
 import { getMessages } from "@/lib/i18n/translate";
 import { getWorkspaces } from "@/server/queries/workspace";
+import { loadIsSalesPersona } from "@/server/queries/sales-persona";
 import { PERSONAL_CONTEXT, personalEntry } from "@/lib/workspace/model";
 import { AppHeader } from "@/components/layout/app-header";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
@@ -35,8 +36,18 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
   const { entries } = await getWorkspaces();
   // A Salesperson's Sales tools live in a business someone ELSE owns, so the
   // switcher offers them the affiliation path alongside "add my own business".
+  //
+  // Resolved the SAME way /home/showroom resolves it, and not from
+  // `personal.persona`: that column is `users.primary_account_type` alone, while
+  // the Personal row it belongs to is emitted on the broader
+  // `app.has_personal_persona` test. A salesperson whose upgrade is still under
+  // review therefore has a personal workspace with a NULL persona — admitted by the
+  // page and by the database, but silently never offered the link.
+  //
+  // Still gated on having a personal workspace at all, because the page redirects
+  // a caller without one; offering a link to a redirect is not navigation.
   const personal = personalEntry(entries);
-  const showConnectShowroom = personal?.persona === "sales";
+  const showConnectShowroom = Boolean(personal) && (await loadIsSalesPersona());
 
   return (
     <I18nProvider locale={locale} dir={dir}>

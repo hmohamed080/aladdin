@@ -4,6 +4,130 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — An installer who knew a showroom could become its salesperson
+
+**Date:** 2026-08-31 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `9d5b2e0` (Installer Pilot specification)
+
+Increment 1 of the fourteen-increment Installer Pilot sequence, and deliberately
+the one that ships no feature. The specification committed in `9d5b2e0` closed a
+product decision (D3-residual) that only existed because the audit found a live
+authority defect: the Sales-affiliation flow checked that the target was a
+showroom and that the caller was verified, but never checked **who the caller
+was**. An `installer_technician` could create a showroom join request, and its
+approval granted the eleven `sales.*` capabilities. The referral path reached the
+same place and awarded 100 Points on the way.
+
+### The guard is on the grant, not on the doors
+
+The specification anticipated gating each entry point. Building it exposed a
+better shape: every route to `sales.*` — `org_join_request_approve`,
+`showroom_referral_approve`, and anything added later — passes through
+`app.membership_grant_sales`. Guarding the capability grant itself, before it
+takes a lock or writes a row, makes the property structural instead of a list of
+doors somebody must remember to keep adding to. The door-level checks stayed
+anyway, so a non-Sales caller is refused at the moment they ask rather than at
+the moment someone approves them; but the chokepoint is what makes the claim
+true, and §7.2 of the specification was reconciled to say so.
+
+`public.showroom_referral_approve` was deliberately **not** recreated. It carries
+the frozen `referral.organization_approved` = +100 Points wiring, and
+reproducing ~150 lines of it to insert one guard would risk an approved contract
+for no additional protection: its refusal already arrives from the chokepoint
+inside the same transaction, leaving no organization, membership, join request,
+audit row or Points entry behind. A test asserts exactly that.
+
+### Sales identity is canonical OR declared, in the database and in the UI
+
+`users.primary_account_type` is written only by the applied upgrade, so a genuine
+salesperson has null there for the whole review window while their account is
+active and usable — activation is not verification. `app.is_sales_persona`
+therefore accepts the canonical persona **or** the declared
+`individual_onboarding.prof_concrete_type`, which is the resolution
+`loadPersonalHome` already used. Reading the canonical column alone would have
+been a regression wearing a security fix's clothes.
+
+### Two existing test suites had encoded the vulnerability
+
+`28_persona_sales_affiliation_test` and `36_referral_points_test` both failed
+against the new guard, and both were right to. Each used fixture `70000009` — the
+installer — as a stand-in labelled *"a second salesperson"*, and 36 literally
+granted the installer a sales membership to produce a referral. The tests were
+asserting that the hole worked. Fixed by **actor substitution only** (28 →
+`70000005`, given a declared-sales row; 36 → `70000007`): every assertion,
+ordering and plan count is unchanged, and `70000009` was kept in the two places
+where being an unrelated third party is the point.
+
+### The frontend was refused nothing, because it never asked
+
+Increment 1 was database-only by contract, with a STOP condition for any
+Installer-reachable surface that invokes the affiliation RPC. `/home/showroom`
+and `/home/showroom/refer` were guarded on registration state and the existence
+of a personal workspace and nothing else — the page's own comment read *"reachable
+by any personal account, and reaching it grants nothing"*, which had been true
+before the capability grant made it false. Reported rather than fixed, and then
+fixed under separate approval: both routes now render a localized
+*not-for-your-account* state (EN + AR) instead of a form the database was always
+going to refuse with a bare `42501`.
+
+Then the navigation link disagreed with the pages it led to. `my_workspaces()`
+emits the Personal row on `app.has_personal_persona()` — three signals, including
+a reached onboarding terminal — but fills the `persona` column from
+`users.primary_account_type` alone. A salesperson mid-review therefore holds a
+personal workspace whose persona is **null**: admitted by the page and by the
+database, and silently never offered the link. The row-existence rule and the
+row-content rule disagreed, and any UI reading the column inherited a stricter
+test than the one that produced the row. The layout now uses the same shared
+resolution as the pages, still gated on having a personal workspace at all,
+because offering a link to a redirect is not navigation.
+
+### Validation
+
+Database (2026-08-31, clean local `supabase db reset` before each run, per the
+project's pgTAP requirement):
+
+- `37_sales_affiliation_persona_hardening_test` — **43/43** (new)
+- `28_persona_sales_affiliation_test` — **79/79** (plan unchanged)
+- `36_referral_points_test` — **52/52** (plan unchanged)
+
+Frontend (2026-08-31): `vitest` **536 passed / 50 files**; `tsc --noEmit` clean;
+`eslint` clean on every changed path; `next build` succeeds with `/home`,
+`/home/showroom` and `/home/showroom/refer` all dynamic.
+
+The database suites were run when the migration was written and were **not**
+re-run at commit time; every file under `supabase/` is byte-identical to the
+state that produced those results. No Playwright, E2E or backend suite was run —
+none is affected, and the increment's contract excluded them.
+
+### What this increment did NOT do
+
+No table, column, type, policy, index, view, trigger or grant changed —
+`create or replace` with identical signatures throughout, forward-only. No
+Installer domain exists yet: `jobs`, `job_applications`, `job_assignments`,
+`job_progress_updates`, `trades` and `job_reviews` are specified and unbuilt.
+Notifications, Transactional Chat, Points Core and supply-side behaviour are
+untouched, as is `UI-UX/design.pen`.
+
+### Unfinished work, explicitly
+
+- **Increments 2–14 are not started.** Increment 2 (Storage) blocks portfolio and
+  certificates; it is a hard prerequisite, not a nicety — the repository has no
+  `media` table, no bucket, and zero `.storage.from()` calls, while
+  `avatar_media_id` / `logo_media_id` are bare uuid columns with no foreign key.
+- **`RUNTIME_STATE.md` was not refreshed in this session** (checklist item 1). It
+  carries pre-existing drift from before this branch — its Current Branch row
+  still reads `chore/staging-demo-accounts` and its Sprint rows still read Sprint
+  14 — and correcting that is a snapshot rewrite well outside an approved
+  single-increment commit. It needs its own pass.
+- **An organization-less installer cannot reach their own Points.** `/b2b/points`
+  is the only Points surface and `/b2b/layout.tsx` redirects org-less callers to
+  `/home`. Found during the audit, unresolved, and it will bite as soon as an
+  installer earns anything.
+- The frontend Sales predicate mirrors `app.is_sales_persona` in two places by
+  hand. The unit tests deliberately assert the same cases as the pgTAP suite so
+  the pair cannot drift silently, but nothing enforces it mechanically.
+
+---
+
 ## Session — Points on screen: a balance that may be negative, and a history that never rewrites itself
 
 **Date:** 2026-08-30 · **Branch:** `feature/points-core` · **Base:** `main` @ `2f81682` · **Prior:** `5ec9356` (referral wiring)

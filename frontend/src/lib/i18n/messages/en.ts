@@ -374,6 +374,11 @@ export const en = {
     addShowroom: "Add showroom",
     referralNote: "This tells us about your employer — it doesn't create a business you own.",
     error: "Something went wrong. Please try again.",
+    notSales: {
+      title: "Connecting a showroom is for sales accounts",
+      body: "Your account isn't set up for sales work, so there's no showroom to connect. Nothing is wrong with your account — this part of Aladdin just belongs to a different account type.",
+      back: "Back to your home",
+    },
     refer: {
       eyebrow: "Sales setup",
       title: "Add your showroom",

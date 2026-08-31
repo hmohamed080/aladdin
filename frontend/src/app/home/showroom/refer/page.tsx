@@ -8,6 +8,8 @@ import { getOpenReferral } from "@/server/queries/affiliation";
 import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { ShowroomReferralForm } from "@/features/accounts/showroom-referral-form";
+import { ShowroomNotAvailable } from "@/features/accounts/showroom-not-available";
+import { loadIsSalesPersona } from "@/server/queries/sales-persona";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,9 @@ export const dynamic = "force-dynamic";
  * The form hydrates from the caller's open referral, so a half-filled candidate
  * survives a closed tab, and a re-submission is the same referral rather than a
  * second business.
+ *
+ * Sales accounts only. A non-Sales personal account gets the unavailable state
+ * rather than a form whose submission the database was always going to refuse.
  */
 export default async function ReferShowroomPage({
   searchParams,
@@ -35,6 +40,10 @@ export default async function ReferShowroomPage({
   const supabase = await getServerSupabase();
   const { entries } = await loadWorkspaces(supabase);
   if (!personalEntry(entries)) redirect("/");
+  // Same gate as /home/showroom: referring an employer is Sales setup, and the
+  // database refuses the write for any other persona. Checked BEFORE the open
+  // referral is loaded, so a non-Sales account never sees referral state either.
+  if (!(await loadIsSalesPersona())) return <ShowroomNotAvailable />;
 
   const [{ error }, referral] = await Promise.all([searchParams, getOpenReferral()]);
 

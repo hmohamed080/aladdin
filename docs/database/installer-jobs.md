@@ -540,7 +540,23 @@ the account actually is"*). Gating on the canonical value alone would break real
 when the requester is not a sales persona — because a request created before this increment could
 otherwise still be approved into `sales.*`.
 
+**The chokepoint — `app.membership_grant_sales` (added during implementation).** Building this
+increment exposed a better guard than gating each door. *Every* route to `sales.*` runs through
+`app.membership_grant_sales`: `org_join_request_approve` calls it, `showroom_referral_approve` calls
+it, and any future path would too. Guarding the capability grant itself, before it takes a lock or
+writes a row, makes the property structural rather than procedural.
+
+That is why this increment **does not recreate `public.showroom_referral_approve`**, as an earlier
+draft of this section implied it would. That function carries the approved Points wiring
+(`referral.organization_approved` = +100); reproducing ~150 lines of it to insert one guard would put
+a frozen contract at risk for **no additional protection**, since its refusal already arrives from
+the chokepoint inside the same transaction — leaving no organization, membership, join request,
+audit row or Points entry behind.
+
 Refusals raise `42501`, consistent with every other authority failure in the schema.
+
+**Implemented** by `supabase/migrations/20260831090001_sales_affiliation_persona_hardening.sql`,
+proven by `supabase/tests/37_sales_affiliation_persona_hardening_test.sql`.
 
 ### 7.3 The Installer side stays separate
 
