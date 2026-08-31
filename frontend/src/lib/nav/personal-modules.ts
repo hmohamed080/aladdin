@@ -15,6 +15,11 @@
  *   * every personal account has a home;
  *   * a professional has a professional profile; a consumer does not, because
  *     there is no professional profile to show — not because it is withheld;
+ *   * a professional has Points, for the same reason they have a profile: the
+ *     ledger is user-owned and the one approved earning rule credits a person,
+ *     not an organization. It is deliberately NOT gated on holding a balance —
+ *     a page that appears only once you have something is a page nobody can find
+ *     the first time;
  *   * a salesperson has the showroom-affiliation route, which the database
  *     refuses to anyone else (`app.is_sales_persona`);
  *   * anyone may start a business, because owning one is a relationship, never an
@@ -29,13 +34,15 @@
  * Pure module: no server imports, so the derivation is unit-testable.
  */
 
-export type PersonalNavKey = "home" | "profile" | "connectShowroom" | "addBusiness";
+export type PersonalNavKey = "home" | "profile" | "points" | "connectShowroom" | "addBusiness";
 
 /**
- * Two groups, not four. The reference pack shows a richer rail (learning,
- * points, network, reviews), but every one of those is a later increment or an
- * unapproved element — and a heading with nothing under it is worse than no
- * heading. Sections are dropped when empty, so this grows without being edited.
+ * Two groups, not four. The reference pack shows a richer rail — learning,
+ * points, network, reviews — and Points has since arrived under "account", where
+ * it belongs: the ledger is the caller's own standing, not a separate programme.
+ * The rest are later increments or unapproved elements, and a heading with
+ * nothing under it is worse than no heading. Sections are dropped when empty, so
+ * this grows without being edited.
  */
 export type PersonalNavSection = "account" | "business";
 
@@ -49,6 +56,7 @@ export type PersonalNavItem = {
 const ITEMS: Record<PersonalNavKey, PersonalNavItem> = {
   home: { key: "home", href: "/home", labelKey: "personalNav.home" },
   profile: { key: "profile", href: "/home/profile", labelKey: "personalNav.profile" },
+  points: { key: "points", href: "/home/points", labelKey: "personalNav.points" },
   connectShowroom: {
     key: "connectShowroom",
     href: "/home/showroom",
@@ -58,7 +66,7 @@ const ITEMS: Record<PersonalNavKey, PersonalNavItem> = {
 };
 
 const SECTIONS: { section: PersonalNavSection; keys: PersonalNavKey[] }[] = [
-  { section: "account", keys: ["home", "profile"] },
+  { section: "account", keys: ["home", "profile", "points"] },
   { section: "business", keys: ["connectShowroom", "addBusiness"] },
 ];
 
@@ -77,6 +85,7 @@ export type PersonalNavInput = {
 function isReachable(key: PersonalNavKey, input: PersonalNavInput): boolean {
   switch (key) {
     case "profile":
+    case "points":
       return input.variant === "professional";
     case "connectShowroom":
       return input.isSalesPersona;

@@ -10,7 +10,7 @@ import {
   activePersonalNavKey,
   type PersonalNavKey,
 } from "@/lib/nav/personal-modules";
-import { HomeIcon, UserIcon, StorefrontIcon, BuildingIcon } from "@/components/ui/icons";
+import { HomeIcon, UserIcon, GaugeIcon, StorefrontIcon, BuildingIcon } from "@/components/ui/icons";
 
 /**
  * The personal rail — HORIZONTAL, and that is a decision rather than a shortcut.
@@ -41,6 +41,8 @@ import { HomeIcon, UserIcon, StorefrontIcon, BuildingIcon } from "@/components/u
 const ICONS: Record<PersonalNavKey, ComponentType<{ size?: number }>> = {
   home: HomeIcon,
   profile: UserIcon,
+  // The same glyph the workspace Points module uses — one feature, one mark.
+  points: GaugeIcon,
   connectShowroom: StorefrontIcon,
   addBusiness: BuildingIcon,
 };

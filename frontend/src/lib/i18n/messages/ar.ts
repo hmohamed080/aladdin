@@ -342,6 +342,7 @@ export const ar: Messages = {
     label: "التنقل الشخصي",
     home: "الرئيسية",
     profile: "ملفي",
+    points: "النقاط",
     connectShowroom: "ربط معرض",
     addBusiness: "إضافة نشاط",
   },

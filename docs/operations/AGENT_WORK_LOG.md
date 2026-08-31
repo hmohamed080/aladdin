@@ -4,6 +4,119 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — A ledger with a balance in it and no door to reach it
+
+**Date:** 2026-08-31 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `ff859c0` (Increment 2)
+
+Increment 3 of the Installer Pilot, and the smallest one so far: no schema, no
+migration, no earning rule, no wallet, no tier, no redeem control. Points Core
+shipped in `b25e249` and worked. The defect was that nobody it was built for could
+get to it.
+
+### The whole increment is one missing route
+
+`/b2b/points` was the only Points destination, and `/b2b/layout.tsx` redirects an
+organization-less caller to `/home` before any navigation is drawn. So an
+`installer_technician` who earned the one approved award —
+`referral.organization_approved`, +100, credited to a **person** — held a real
+balance in a real ledger with no way to see it. The page was correct; it was
+simply behind a door that persona cannot open.
+
+`/home/points` is that route. It reuses the shipped queries, view model, history
+paging, negative-balance behaviour, localization and non-monetary contract as
+they are.
+
+### Read authority did not change, and structurally cannot
+
+`points_ledger` carries one owner policy (`user_id = auth.uid()`).
+`points_balance()` is called with **no argument**, so it defaults to the caller.
+The query layer accepts no user id at all. The personal route therefore gains no
+read the workspace route did not already have, and neither route can be pointed at
+someone else's ledger — not because a check refuses it, but because there is no
+parameter through which to ask.
+
+### One loader, two surfaces — the refactor was the point
+
+`features/points/points-page.ts` now owns what the two surfaces must never
+disagree about: which reads happen, the all-or-nothing failure contract, the view
+mapping, and the "more" rule. Both routes call it. `/b2b/points` was refactored
+onto it rather than left alone and copied from — a second copy of the failure
+contract is exactly the thing that drifts, and the drift would be two pages
+quoting different totals for the same ledger.
+
+What stays per-route is **chrome only**. `/b2b/points` keeps `PageHeader` /
+`Panel`; `/home/points` uses `HomeHeader` / `HomeSection` / `Card` so it sits with
+`/home/profile` instead of importing the cockpit's density onto a surface that has
+no sidebar to justify it. The one parameter that legitimately differs is
+`basePath`: the pagination link must return to the surface it was rendered from.
+Asserted in both directions.
+
+`/b2b/points` behaviour is unchanged — same queries, same single try around both
+reads, same cap arithmetic, same chrome.
+
+### Points is not gated on having any
+
+The rail entry appears for every professional personal account, on the same
+eligibility as the profile hub. It is deliberately **not** conditioned on holding
+a balance: a destination that appears only once you already have something is one
+nobody finds the first time, and the first thing this page has to explain is *how*
+the 100 points are earned. The guarantee is structural rather than remembered —
+`PersonalNavInput` carries no balance, so no amount of one can change the answer.
+
+### A comment that had gone stale
+
+`lib/nav/modules.ts` still described Points as *"a UI shell in this sprint"* that
+*"says plainly that there is nothing to show yet"*. Untrue since `b25e249`. It now
+records what the module actually is: `points: null` because Points is the caller's
+**own** standing and no capability could gate it, and — the part worth writing
+down — that the workspace entry is the *secondary* copy. The primary home for a
+user-owned ledger is the personal one, because that is the only surface an
+organization-less professional can reach.
+
+### Validation
+
+Frontend only, as instructed — no `supabase db reset`, no pgTAP, no Playwright,
+because nothing in this increment touches the database.
+
+- `vitest` **603 passed / 57 files** (from 584 / 55)
+- `tsc --noEmit` clean · `eslint` clean on every changed path
+- `next build` clean, with `/home/points` and `/b2b/points` both building
+
+New and extended coverage, 32 assertions:
+
+- `features/points/points-page.test.ts` (new, 9) — **zero, positive and negative**
+  balances; the balance is never summed from the capped rows; the more-link is
+  per-surface; the cap ceiling; both halves of the failure contract
+- `components/layout/personal-rail.test.tsx` (new, 4) — Points labelled and linked
+  in **EN and AR**, `aria-current` only on the current route, and that the rail
+  derives nothing itself
+- `lib/nav/personal-modules.test.ts` (11 → 15) — an org-less professional gets
+  Points, a consumer does not, and it is not gated on having a balance
+- `features/points/points-ui.test.tsx` (42 → 45) — **Arabic negative and Arabic
+  zero**
+
+That last one is worth naming. The suite already pinned EN zero/positive/negative
+and AR positive. Arabic is the **default** locale, so the Arabic negative
+rendering is the one a Pilot user is most likely to meet, and it was the one case
+nobody had asserted. It passes: the sign survives Arabic-Indic digits, and the
+correction explanation renders.
+
+### Unfinished work, explicitly
+
+- **Still no browser verification.** Nothing serves on `:3000` and
+  `.claude/launch.json` remains attach-only (a `url` with no command), so the
+  preview tooling can attach but cannot start a server. The rail now carries four
+  entries for a salesperson and three for an installer; how that row behaves at
+  390px is the thing most worth a human look.
+- **`RUNTIME_STATE.md` is still not refreshed** (checklist item 1) and now carries
+  three increments of drift. Untouched here by instruction; it needs its own pass.
+- **`features/home/professional-home.tsx` still has the language-label defect.**
+  Pre-existing, authenticated surface, excluded by instruction.
+- Points still has no Rewards, Wallet, tiers or redemption, and exactly one
+  earning rule. That is the approved contract, not an omission.
+
+---
+
 ## Session — A profile the Pilot could publish but nobody could edit
 
 **Date:** 2026-08-31 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `52ed8dd` (Increment 1)

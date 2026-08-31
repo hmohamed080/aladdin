@@ -349,6 +349,7 @@ export const en = {
     label: "Personal navigation",
     home: "Home",
     profile: "My profile",
+    points: "Points",
     connectShowroom: "Connect showroom",
     addBusiness: "Add business",
   },

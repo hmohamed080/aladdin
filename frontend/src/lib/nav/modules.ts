@@ -109,9 +109,14 @@ export const NAV_CAPS: Record<NavKey, string[] | null> = {
   products: ["catalog.write", "catalog.publish"],
 
   // Points is the caller's OWN standing on the platform, not an organization
-  // record, so no capability could gate it and none does. It is a UI shell in
-  // this sprint: the route exists and says plainly that there is nothing to show
-  // yet — see `app/b2b/points/page.tsx`.
+  // record, so no capability could gate it and none does. The page is SHIPPED —
+  // balance, the one earning rule, and history (`app/b2b/points/page.tsx`).
+  //
+  // Because it is user-owned, the same page also belongs on the personal home
+  // (`/home/points`, `lib/nav/personal-modules.ts`): this entry is the copy that
+  // exists for a caller who happens to be in a workspace, not the primary one. An
+  // organization-less professional reaches their Points there, since this layout
+  // redirects them away before any nav is drawn.
   points: null,
 
   projects: ["project.write", "project.read", "order.manage"],

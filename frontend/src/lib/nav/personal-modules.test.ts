@@ -21,13 +21,14 @@ describe("personalNavKeys", () => {
   it("gives a consumer a home and the option to start a business — and no profile", () => {
     const keys = personalNavKeys({ variant: "consumer", isSalesPersona: false });
     expect(keys).toEqual(["home", "addBusiness"]);
+    expect(keys).not.toContain("points");
     // Not withheld — a consumer has no professional profile to show.
     expect(keys).not.toContain("profile");
   });
 
   it("gives a professional the profile hub", () => {
     const keys = personalNavKeys({ variant: "professional", isSalesPersona: false });
-    expect(keys).toEqual(["home", "profile", "addBusiness"]);
+    expect(keys).toEqual(["home", "profile", "points", "addBusiness"]);
   });
 
   it("NEVER offers the showroom entry to a non-Sales professional", () => {
@@ -40,7 +41,26 @@ describe("personalNavKeys", () => {
     // The caller resolves canonical-or-declared before this point, so both kinds
     // of salesperson arrive here as the same `true`.
     const keys = personalNavKeys({ variant: "professional", isSalesPersona: true });
-    expect(keys).toEqual(["home", "profile", "connectShowroom", "addBusiness"]);
+    expect(keys).toEqual(["home", "profile", "points", "connectShowroom", "addBusiness"]);
+  });
+
+  it("gives an org-less professional a route to their OWN Points", () => {
+    // The reachability fix this increment exists for: `/b2b/points` was the only
+    // Points route and `/b2b/layout.tsx` redirects an org-less caller away, so an
+    // installer held a real balance with no door to it.
+    const installer = personalNavKeys({ variant: "professional", isSalesPersona: false });
+    expect(installer).toContain("points");
+    expect(personalNavItem("points").href).toBe("/home/points");
+  });
+
+  it("does not gate Points on already having some", () => {
+    // A destination that appears only once you have something is one nobody
+    // finds the first time. The guarantee is structural: the derivation's INPUT
+    // carries no balance, so no amount of it can change the answer — every
+    // professional gets the entry whatever else is true of them.
+    for (const isSalesPersona of [true, false]) {
+      expect(personalNavKeys({ variant: "professional", isSalesPersona })).toContain("points");
+    }
   });
 
   it("offers a business to everyone, because owning one is a relationship", () => {
@@ -62,7 +82,7 @@ describe("personalNavKeys", () => {
     }
     // And the union covers the whole key space — a key nothing can reach would be
     // an entry that exists only in the map.
-    expect(emitted.size).toBe(4);
+    expect(emitted.size).toBe(5);
   });
 });
 
@@ -80,6 +100,13 @@ describe("personalNavSections", () => {
 });
 
 describe("activePersonalNavKey", () => {
+  it("keeps Points on its own entry", () => {
+    // `usePathname()` never carries the query string, so `?show=` is not a case
+    // this function can see — the pagination link stays on the Points entry
+    // because the PATH is unchanged, not because a query is parsed away.
+    expect(activePersonalNavKey("/home/points")).toBe("points");
+  });
+
   it("does not let /home swallow /home/profile", () => {
     // The reason the lookup sorts by href length: a prefix match against "/home"
     // matches every personal route there is.
