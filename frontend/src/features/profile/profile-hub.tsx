@@ -6,6 +6,7 @@ import type { PersonalHomeData } from "@/server/queries/personal-home";
 import type { ProfilePublication } from "@/server/queries/professional-profile";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import { languageLabel } from "@/lib/i18n/language-label";
+import { AvailabilityControl } from "@/features/profile/availability-control";
 import { ChipList, DetailCard, HomeHeader, HomeSection, VerificationBadge } from "@/features/home/parts";
 
 /**
@@ -54,7 +55,12 @@ export function ProfileHub({
       value: p.yearsExperience === null ? null : t("personalHome.professional.years", { n: p.yearsExperience }),
     },
     {
-      label: t("onboarding.professional.services.availabilityLabel"),
+      // DELIBERATELY NOT "Availability". This row is the one-off LEAD TIME picked
+      // during onboarding (within a week / within a month / flexible). Increment 4
+      // added a live availability flag to this same page, and two rows sharing one
+      // word would make both meaningless. The onboarding label is left alone —
+      // in that flow, in context, it is not ambiguous.
+      label: t("profile.hub.leadTime"),
       value: p.availability ? t(`onboarding.professional.availabilities.${p.availability}`) : null,
     },
     {
@@ -88,6 +94,13 @@ export function ProfileHub({
         lead={p.headline ?? t("personalHome.professional.noHeadline")}
         meta={<VerificationBadge state={verification.state} t={t} />}
       />
+
+      <HomeSection
+        title={t("profile.availability.title")}
+        description={t("profile.availability.body")}
+      >
+        <AvailabilityControl availability={data.availability} />
+      </HomeSection>
 
       <HomeSection
         title={t("profile.hub.title")}

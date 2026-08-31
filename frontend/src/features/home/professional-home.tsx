@@ -14,6 +14,7 @@ import {
   VerificationBadge,
 } from "./parts";
 import { SalesAffiliationPanel } from "./sales-affiliation";
+import { AvailabilityBadge } from "@/features/profile/availability-status";
 
 /**
  * The PROFESSIONAL variant of the personal surface — ONE structure for every
@@ -118,7 +119,17 @@ export function ProfessionalHome({ data, t }: { data: PersonalHomeData; t: Trans
         title={t("personalHome.greeting", { name })}
         name={data.displayName}
         lead={p.headline ?? t("personalHome.professional.noHeadline")}
-        meta={<VerificationBadge state={verification.state} t={t} />}
+        meta={
+          <>
+            <VerificationBadge state={verification.state} t={t} />
+            {/* The STATE only — the control and the "last updated" line live on
+                the profile hub. The dashboard answers "where do I stand"; two
+                copies of the same control would raise the question of which one
+                is authoritative, and the age matters at the moment you decide
+                whether to change it, which happens there. */}
+            <AvailabilityBadge available={data.availability.available} t={t} />
+          </>
+        }
       />
 
       {/* A salesperson's Sales setup is the first thing that matters to them, so it

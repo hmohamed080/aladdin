@@ -52,13 +52,24 @@ select columns_are(
 -- areas. Each is a value the professional wrote about their own practice in order
 -- to be found, each was already visible to any workspace user through the trade
 -- directory's filters, and the LISTING PREDICATE did not move — the same rows
--- return, with more columns. Availability, travel radius, base address, the
--- secondary service list and every consumer_* answer stay out; 38_ asserts each
--- of those absences by name.
+-- return, with more columns.
+--
+-- The two AVAILABILITY columns were added in 20260831090004 (Increment 4, §8.4):
+-- the self-declared flag and the timestamp of its last change. Both are shown so
+-- a reader can judge the claim AND its age for themselves; neither filters or
+-- gates anything, and the listing predicate again did not move — an unavailable
+-- professional stays listed, because hiding them would be the platform deciding
+-- that "not right now" means "not at all" (O3).
+--
+-- Still out, and asserted by name in 38_ and 40_: `prof_availability` — the
+-- PRIVATE one-off lead-time preference, which is a different fact from the live
+-- flag and must not be confused with it — plus travel radius, base address, the
+-- secondary service list and every consumer_* answer.
 select columns_are(
   'public'::name, 'profile_public_directory'::name,
   array['id','display_name','headline','bio','avatar_media_id','locality_id','languages','persona',
-        'specialization','services','years_experience','service_areas'],
+        'specialization','services','years_experience','service_areas',
+        'available_for_work','availability_updated_at'],
   'profile_public_directory still exposes only approved display columns');
 
 -- --- 3. The backing readers are SECURITY DEFINER, in `app`, search_path pinned

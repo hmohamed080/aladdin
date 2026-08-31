@@ -51,11 +51,12 @@ export default async function PublicProfilePage({
   if (!profile) notFound();
 
   const store = await cookies();
-  const t = createTranslator(resolveLocale(store.get(LOCALE_COOKIE)?.value));
+  const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
+  const t = createTranslator(locale);
 
   return (
     <main className={cn(contentColumnClass, "py-xl")} id="main">
-      <PublicProfileView profile={profile} t={t} />
+      <PublicProfileView profile={profile} t={t} locale={locale} />
     </main>
   );
 }

@@ -24,7 +24,7 @@
 |---|---|
 | **O1** | **Verification gates *publishing*, not drafting.** A member with `job.post` may create and manage a draft; publishing into discovery requires the posting organization to be **verified**. Losing verification suppresses discovery and new applications while **preserving** existing ones (§10.3). |
 | **O2** | Reviews stay **immutable** — no reviewer edit, delete or correction workflow. A **separate moderation/suppression record** lets Platform Support hide an abusive review from presentation **without altering the evidence** (§6.5). Full dispute workflow deferred. |
-| **O3** | **No automatic availability expiry.** `available_for_work` is user-controlled; `availability_updated_at` is persisted and displayable. No 7/14/30-day policy may be invented (§8.3). |
+| **O3** | **No automatic availability expiry.** `available_for_work` is user-controlled; `availability_updated_at` is **server-derived** (trigger-stamped, in no client grant) and is persisted and displayable. No 7/14/30-day policy may be invented (§8.3). |
 | **O4** | **No automatic job expiry.** An explicit manual **`closed`** state lets a poster close an unawarded job; it is terminal and accepts no applications. Reposting requires a new job. `awarded → open` on assignment cancellation is preserved (§3.5). |
 | **O5** | An installer **may apply outside their declared specialties.** Trade is a discovery/profile **signal, never an authorization boundary** — RLS and the write path must not use trade membership as application authority (§4.5). |
 | **O6** | A public review identifies the **posting organization**, never the acting member. `reviewer_user_id` is retained internally for audit/authority only (§6.1, §11). |
@@ -588,11 +588,29 @@ Persisted, user-controlled profile state. **Two columns on `public.profiles`:**
 
 | Column | Type | Notes |
 |---|---|---|
-| `available_for_work` | `boolean` **not null** default `false` | Self-declared. |
-| `availability_updated_at` | `timestamptz` | Stamped on every change. |
+| `available_for_work` | `boolean` **not null** default `false` | Self-declared. **The one column the user writes.** |
+| `availability_updated_at` | `timestamptz` | **Server-derived.** Stamped by `app.stamp_availability()` on every change; **not client-writable**. `NULL` = never set. |
 
-Added to the existing narrow `grant update` on `profiles` (alongside `display_name`, `headline`,
-`bio`, `languages`, …) so the user controls it directly — no RPC needed.
+`available_for_work` — and **only** that column — is added to the existing narrow `grant update` on
+`profiles` (alongside `display_name`, `headline`, `bio`, `languages`, …), so the user controls the
+claim directly with no RPC.
+
+**`availability_updated_at` is deliberately excluded from every client grant**, and the reason is O3
+(§8.3) read from the other side. O3 keeps the timestamp so a *reader* can weigh staleness for
+themselves. A client-writable timestamp defeats exactly that: a professional could re-stamp `now()`
+indefinitely without ever revisiting whether the claim is still true, and the single signal a poster
+has for judging it would become the thing most worth faking. That is the same failure O3 forbids,
+inverted — the platform would not be manufacturing state, but it *would* be publishing a freshness
+claim nobody made. The value is therefore derived from `now()` by the trigger and any caller-supplied
+value is discarded, including one from the table owner.
+
+The same trigger carries the **non-professional guard**, at the column rather than at each entry
+point (the shape §7.2 settled on for Sales): claiming availability requires a professional identity,
+canonical or declared, via `app.is_professional_persona`. **Withdrawing it is always permitted** — an
+identity that stops being a professional while marked available must still be able to turn it off,
+or the platform goes on publishing a claim the person may no longer retract.
+
+Implemented by `20260831090004_professional_availability.sql`; proven by pgTAP `40_`.
 
 **Rejected alternative:** a separate `professional_availability` table. A boolean and a timestamp do
 not earn a table, a policy set and a join on every profile read.
@@ -609,7 +627,9 @@ is no heartbeat, no session hook, and nothing writes it except the person.
 > job, cron, trigger or query may silently flip the flag to false.
 
 `availability_updated_at` is still persisted and **displayable** — the UI may show *when* the state
-was last set, so a reader can weigh it themselves. Showing the age is information; expiring the flag
+was last set, so a reader can weigh it themselves. It is **server-derived** precisely so that reading
+is worth something (§8.1): a freshness stamp the claimant could write is one they would have every
+reason to keep refreshing. Showing the age is information; expiring the flag
 would be the platform asserting something the person never said.
 
 This is the same distinction the product applies to verification: surface the signal, let the human

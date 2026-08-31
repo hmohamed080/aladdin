@@ -1784,6 +1784,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          availability_updated_at: string | null
+          available_for_work: boolean
           avatar_media_id: string | null
           bio: string | null
           created_at: string
@@ -1798,6 +1800,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          availability_updated_at?: string | null
+          available_for_work?: boolean
           avatar_media_id?: string | null
           bio?: string | null
           created_at?: string
@@ -1812,6 +1816,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          availability_updated_at?: string | null
+          available_for_work?: boolean
           avatar_media_id?: string | null
           bio?: string | null
           created_at?: string
@@ -2757,6 +2763,8 @@ export type Database = {
       }
       profile_public_directory: {
         Row: {
+          availability_updated_at: string | null
+          available_for_work: boolean | null
           avatar_media_id: string | null
           bio: string | null
           display_name: string | null

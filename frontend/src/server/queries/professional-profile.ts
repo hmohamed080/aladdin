@@ -18,10 +18,12 @@ import type { Database } from "@/types/database.types";
  *
  * WHAT IS PUBLIC. Identity (name, headline, summary, languages, persona) plus the
  * four practice fields `20260831090002` added — specialization, core services,
- * years of experience, service areas. The private side of onboarding does not
- * come with them: availability, travel radius, base address, the secondary
- * service list and every consumer answer stay in `individual_onboarding`, which
- * remains readable only by its owner.
+ * years of experience, service areas — plus self-declared availability and the
+ * timestamp of its last change (`20260831090004`, §8.4). The private side of
+ * onboarding does not come with them: `prof_availability` (the one-off LEAD-TIME
+ * preference, which is a different fact from the live flag), travel radius, base
+ * address, the secondary service list and every consumer answer stay in
+ * `individual_onboarding`, which remains readable only by its owner.
  *
  * THE PUBLICATION BOUNDARY IS THE WHOLE POINT. `public_profile_status` is written
  * only by `apply_account_upgrade`, so a professional cannot publish themselves,
@@ -49,6 +51,17 @@ export type PublicProfile = {
   services: string[];
   yearsExperience: number | null;
   serviceAreas: string[];
+  /**
+   * Self-declared availability, added to the projection by `20260831090004`
+   * (§8.4). Shown WITH its age so a reader can weigh the claim themselves — the
+   * page never decides for them, and the flag filters nothing: an unavailable
+   * professional is still listed and still found.
+   *
+   * `availabilityUpdatedAt` is null when the person has never set availability.
+   * That is a different statement from "unavailable", and the page says so.
+   */
+  availableForWork: boolean;
+  availabilityUpdatedAt: string | null;
 };
 
 /** Where the caller's own profile stands with public discovery. */
@@ -106,7 +119,7 @@ export async function loadPublicProfile(profileId: string): Promise<PublicProfil
   const { data, error } = await supabase
     .from("profile_public_directory")
     .select(
-      "id, display_name, headline, bio, languages, persona, specialization, services, years_experience, service_areas",
+      "id, display_name, headline, bio, languages, persona, specialization, services, years_experience, service_areas, available_for_work, availability_updated_at",
     )
     .eq("id", profileId)
     .maybeSingle();
@@ -124,6 +137,8 @@ export async function loadPublicProfile(profileId: string): Promise<PublicProfil
     services: data.services ?? [],
     yearsExperience: data.years_experience,
     serviceAreas: data.service_areas ?? [],
+    availableForWork: data.available_for_work ?? false,
+    availabilityUpdatedAt: data.availability_updated_at ?? null,
   };
 }
 

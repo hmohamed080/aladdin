@@ -358,6 +358,20 @@ export const en = {
       title: "Your professional profile",
       body: "What Aladdin knows about the work you do. Keep it accurate — it is what businesses read when they are choosing who to work with.",
       edit: "Edit profile",
+      leadTime: "How soon you can start",
+    },
+    availability: {
+      title: "Are you taking work?",
+      body: "Tell businesses whether you are open to new work right now. You can change this whenever it changes.",
+      available: "Available for work",
+      unavailable: "Not taking work",
+      neverSet: "Not set yet",
+      updated: "Updated {when}",
+      markAvailable: "Mark me available",
+      markUnavailable: "Mark me unavailable",
+      explainer:
+        "This stays exactly as you set it until you change it — nothing switches it off for you. It is not a calendar and it does not affect anything else in your account.",
+      notProfessional: "Availability is part of a professional profile, and this account does not have one.",
     },
     public: {
       title: "Your public profile",
@@ -366,7 +380,8 @@ export const en = {
       hiddenBody:
         "Your profile is private while your professional details are being verified. Publishing is handled by the Aladdin team once that is done — there is nothing for you to switch on. Your account works normally in the meantime.",
       listedTitle: "Your profile is published",
-      listedBody: "Anyone with the link can see your name, headline, summary and languages.",
+      listedBody:
+        "Anyone with the link can see your name, headline, summary, languages, the work you do and whether you are taking work.",
       view: "View public profile",
     },
     notProfessional: {

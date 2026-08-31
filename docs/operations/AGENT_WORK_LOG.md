@@ -4,6 +4,156 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — A claim about yourself, and a date you are not allowed to write
+
+**Date:** 2026-08-31 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `206f4d3` (Increment 3)
+
+Increment 4: availability (D6/O3, §8). Two columns on `public.profiles`, one
+trigger, one narrow grant, and the surfaces that read them. The interesting part
+is not the boolean — it is the timestamp beside it, and who is allowed to write
+it.
+
+### The departure from §8.1, and why it is the same rule rather than a new one
+
+§8.1 says both columns join the existing narrow `grant update` on `profiles`.
+**Only `available_for_work` did.** `availability_updated_at` is stamped by
+`app.stamp_availability()` and is in no client grant.
+
+O3 forbids expiring the flag because that would be the platform asserting
+something the person never said, and it KEEPS the timestamp so a reader can weigh
+staleness themselves. A client-writable timestamp defeats exactly that: a
+professional could re-stamp `now()` indefinitely without ever revisiting whether
+the claim is still true, and the single signal a poster has for judging it becomes
+the thing most worth faking. That is the same failure O3 guards against, read from
+the other side — the platform would not be manufacturing state, but it would be
+publishing a freshness claim nobody made.
+
+So the value is derived from `now()` and any supplied value is discarded,
+**including from the table owner**. `40_` asserts that with the strongest writer
+there is. §8.1, the O3 invariant row and §8.3 were reconciled to say so; the model
+now reads the same in all three places instead of only one.
+
+### The guard is on claiming it, not on every change
+
+First draft refused any availability change from a non-professional. That traps a
+stale `true`: an identity that stops being a professional while marked available
+could never turn it off, and the platform would go on publishing a claim the
+person is no longer permitted to retract. **Withdrawing availability is always
+allowed** — there is no state in which "I am not taking work" is worth refusing.
+Claiming it still requires a professional identity, canonical or declared, through
+`app.is_professional_persona`.
+
+The check lives in the trigger rather than in the Server Action, for the reason
+Increment 1 put the Sales guard on `app.membership_grant_sales`: a rule at the
+chokepoint is structural, while a rule repeated at every entry point is a list
+somebody must remember to keep adding to. `profiles_update_self` already restricts
+the ROW to its owner; this restricts CLAIMING the column. A `WHEN` clause keeps it
+inert for every other write, so `individual_save_professional` and every existing
+writer are untouched.
+
+### Two facts had been sharing one word
+
+`individual_onboarding.prof_availability` already existed: a one-off LEAD TIME
+(`within_week`/`within_month`/`flexible`) chosen during onboarding, and the
+profile hub rendered it in a row labelled **"Availability"**. Adding a live
+availability control to the same page would have put two different facts under one
+word — and the failure is silent, because both render perfectly. The hub row is
+now "How soon you can start"; the onboarding label was left alone, because in that
+flow, in context, it is not ambiguous. `profile-hub.test.tsx` pins the pair.
+
+The lead-time column also stayed OUT of the public projection. Publishing a
+one-off onboarding answer as though it were a current claim is the same confusion
+in the other direction; `38_` asserts its absence under both possible names.
+
+### It gates nothing, and that is asserted rather than promised
+
+Nothing reads `available_for_work` to decide what anybody may do — no route, RPC,
+policy or capability. `40_` proves it structurally: no function in `app` or
+`public` mentions the column except the trigger and the projection reader. The
+listing predicate did not move either, so an **unavailable professional stays
+listed and stays findable**. Hiding them would be the platform deciding that "not
+right now" means "not at all".
+
+The same reasoning drives the one styling decision worth recording: unavailable is
+`neutral`, never `danger`. Nothing is wrong with a professional who is not taking
+work, and painting it red would push everyone toward leaving the flag on — which
+is how an availability signal stops meaning anything. "Never set" is a THIRD
+state, not a synonym for unavailable.
+
+### The control is a button, because it can be refused
+
+A switch reads as instantly applied; this is a server round trip the database can
+refuse, and a control that visibly moves and then snaps back explains nothing. The
+button names the destination state and the current state is stated beside it. It
+posts a VALUE rather than a flip, so a double-click converges instead of landing
+the person on the opposite of what they clicked. No optimistic update: the
+timestamp comes from the database, and inventing one client-side would be the same
+lie the write path is shaped to prevent.
+
+Placement: the control and the age on `/home/profile`; the state alone on `/home`,
+beside the verification badge; state AND age on `/p/[profileId]`, because a
+visitor deciding whether to make contact needs both. The public page still ships
+143 B of client JS — the status components are server-rendered.
+
+### Staging
+
+`supabase/staging/demo-enrichment.sql` marks **only** Sayed Abdel-Rahman
+(`sayed-marble-fixer`) available, so the reviewed installer persona exercises the
+state. The other listed professionals stay at "never set" on purpose: the contrast
+is the demo. The enrichment writes through the real trigger, guard included — it
+is not a privileged bypass, and a future enrichment marking a non-professional
+available will fail loudly at load. It cannot backdate the stamp either, which is
+itself the property on display.
+
+### Validation
+
+Database, on a clean `supabase db reset`:
+
+- `40_professional_availability` — **38/38** (new)
+- `08_public_discovery` · `17_public_directory_hardening` ·
+  `38_public_profile_professional_fields` — projection allow-lists updated in
+  **three** places, because three tests guard the same view
+- `01` · `09` · `10` · `11` · `14` · `21` · `25` · `28` · `39` — unchanged
+- **13 files, 435 assertions, PASS**
+
+Staging: `scripts/rehearse_staging_seed.py` — first apply loaded, 26 accounts
+verified, second apply refused with zero rows written. `verify-staging-seed.sql`
+predates availability, so the new state was checked separately in a rolled-back
+transaction: Sayed available with a stamped age, seven others still never-set, and
+the statement idempotent on re-run.
+
+Frontend: `vitest` **637 passed / 61 files**; `tsc --noEmit` clean; `eslint` clean
+on every changed path (the one warning in the tree is pre-existing, in
+`sidebar-shell.tsx`); `next build` clean. `database.types.ts` regenerated: **+8
+lines**, no unrelated churn. Docs: 947 internal links, 0 broken.
+
+### Three things worth knowing next time
+
+- **`data-*` props typecheck on any React component and are silently dropped**
+  unless the component forwards them. A `data-testid` on `Card` compiled fine and
+  never reached the DOM. Removed rather than left looking functional.
+- **The projection has three allow-list guards** (`08_`, `17_`, `38_`). Defence in
+  depth, but a projection change costs three edits and the first two passes will
+  look like unrelated failures.
+- **A test can pass for the wrong reason after a fixture reorder.** Adding the
+  withdrawal section left the flag at `false`, so a later "set false" was no longer
+  a change, the `WHEN` clause correctly skipped the trigger, and the bogus
+  timestamp survived. The product was right; the test's assumed state was stale.
+
+### Unfinished work, explicitly
+
+- **Still no browser verification.** Nothing serves on `:3000` and
+  `.claude/launch.json` remains attach-only. The hub's control row and the public
+  page's badge-plus-age pair at 390px are what a human should look at.
+- **`RUNTIME_STATE.md` is still not refreshed** (checklist item 1), now four
+  increments behind. It needs its own pass.
+- **`features/home/professional-home.tsx` still has the language-label defect.**
+  Pre-existing; this increment touched only its header `meta` slot.
+- Availability has no discovery FILTER yet. §8.4 says the projection enables one
+  and that it is specified when built — the columns are there, the filter is not.
+
+---
+
 ## Session — A ledger with a balance in it and no door to reach it
 
 **Date:** 2026-08-31 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `ff859c0` (Increment 2)

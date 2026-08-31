@@ -5,7 +5,8 @@
 --   1. A listed professional's self-declared practice — specialization, core
 --      services, years of experience, service areas — is readable through
 --      `profile_public_directory`, by `anon` as well as `authenticated`, while
---      NOTHING private travels with it: no consumer answers, no availability, no
+--      NOTHING private travels with it: no consumer answers, no lead-time
+--      preference, no
 --      travel radius, no base address, no user_id, no contact, no timestamps.
 --
 --   2. The four columns arrive by LEFT JOIN. Every listed profile in the Pilot
@@ -27,7 +28,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(39);
+select plan(40);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: one listed installer gains a real professional onboarding row.
@@ -91,7 +92,12 @@ select columns_are(
   'public', 'profile_public_directory',
   array['id', 'display_name', 'headline', 'bio', 'avatar_media_id', 'locality_id',
         'languages', 'persona', 'specialization', 'services', 'years_experience',
-        'service_areas'],
+        'service_areas',
+        -- Added by 20260831090004 (Increment 4, §8.4). The self-declared flag and
+        -- the timestamp of its last change. `prof_availability` — the PRIVATE
+        -- lead-time preference asserted absent further down — is a different fact
+        -- and is still not here.
+        'available_for_work', 'availability_updated_at'],
   'the projection exposes exactly the approved identity + practice columns'
 );
 
@@ -99,8 +105,15 @@ select columns_are(
 -- says "the list differs" while these say WHICH boundary was crossed.
 select hasnt_column('public', 'profile_public_directory', 'user_id',
   'the projection never exposes user_id');
+-- The PRIVATE lead-time preference (individual_onboarding.prof_availability —
+-- within_week/within_month/flexible) is a different fact from the public
+-- available_for_work flag that 20260831090004 added, and it is still not
+-- projected under this name or any other. Conflating the two would publish a
+-- one-off onboarding answer as though it were a live claim.
 select hasnt_column('public', 'profile_public_directory', 'availability',
-  'availability is out of scope for this increment and is not exposed');
+  'the private lead-time preference is still not exposed');
+select hasnt_column('public', 'profile_public_directory', 'prof_availability',
+  'nor under its own column name');
 select hasnt_column('public', 'profile_public_directory', 'max_travel_km',
   'travel radius stays unexposed — the distance display is unapproved');
 select hasnt_column('public', 'profile_public_directory', 'governorate',

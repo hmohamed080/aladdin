@@ -80,6 +80,30 @@ export type SalesAffiliation = {
   referrals: Referral[];
 };
 
+/**
+ * What the professional currently says about taking work (§8).
+ *
+ * A SEPARATE object from `completeness` and `verification`, for the same reason
+ * those two are separate from each other: it is a fifth independent state and
+ * merging it into any of them would imply a relationship that does not exist.
+ * Availability is not progress, not trust, and not access — an unavailable
+ * professional is fully verified, fully complete and fully able to use every
+ * surface. It gates nothing.
+ *
+ * `updatedAt` is null until the person first sets it. That is displayed as
+ * "never set" rather than as a stale date, because "unavailable since the
+ * beginning of time" is a claim they never made.
+ *
+ * NOT `professional.availability` — that is the one-off LEAD TIME chosen during
+ * onboarding (`within_week`/`within_month`/`flexible`), which is private and
+ * means something else. Both exist; they are labelled differently everywhere.
+ */
+export type Availability = {
+  available: boolean;
+  /** When it last CHANGED — stamped by the database, never by the client. */
+  updatedAt: string | null;
+};
+
 export type PersonalHomeData = {
   variant: "consumer" | "professional";
   displayName: string;
@@ -90,6 +114,8 @@ export type PersonalHomeData = {
   phone: string | null;
   completeness: Completeness;
   verification: { state: VerificationState; reason: string | null; decidedAt: string | null };
+  /** Self-declared, professional variant only. Never gates anything. */
+  availability: Availability;
   consumer: CompletenessInput["consumer"];
   professional: CompletenessInput["professional"] & { additionalServices: string[] };
   /** Only loaded for a salesperson; null for every other persona. */
@@ -130,7 +156,11 @@ export const loadPersonalHome = cache(async function loadPersonalHome(): Promise
 
   const [{ data: profile }, { data: userRow }, { data: progress }, { data: io }, { data: ver }] =
     await Promise.all([
-      supabase.from("profiles").select("display_name, headline, bio, languages").eq("user_id", user.id).maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("display_name, headline, bio, languages, available_for_work, availability_updated_at")
+        .eq("user_id", user.id)
+        .maybeSingle(),
       supabase.from("users").select("primary_account_type").eq("id", user.id).maybeSingle(),
       supabase.from("onboarding_progress").select("phone, selected_track").eq("user_id", user.id).maybeSingle(),
       supabase.from("individual_onboarding").select("*").eq("user_id", user.id).maybeSingle(),
@@ -204,6 +234,12 @@ export const loadPersonalHome = cache(async function loadPersonalHome(): Promise
       state: verificationStateFor(ver?.status),
       reason: ver?.reason ?? null,
       decidedAt: ver?.decided_at ?? null,
+    },
+    availability: {
+      // `not null default false` in the database, so the coalesce covers only the
+      // no-profile-row case rather than papering over a real null.
+      available: profile?.available_for_work ?? false,
+      updatedAt: profile?.availability_updated_at ?? null,
     },
     consumer: input.consumer,
     professional: { ...input.professional, additionalServices: io?.prof_additional_services ?? [] },

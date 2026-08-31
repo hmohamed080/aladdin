@@ -1,18 +1,28 @@
 import { Badge, Card } from "@/components/ui/primitives";
 import type { PublicProfile } from "@/server/queries/professional-profile";
 import type { TranslateFn } from "@/lib/i18n/translate";
+import type { Locale } from "@/lib/i18n/locales";
 import { languageLabel } from "@/lib/i18n/language-label";
+import { AvailabilityBadge, AvailabilityAge } from "@/features/profile/availability-status";
 
 /**
  * A professional's public page — everything a stranger may see, and nothing else.
  *
  * WHAT IS HERE IS EXACTLY WHAT THE PROJECTION EXPOSES: name, persona, headline,
  * summary, languages, and — since `20260831090002` — the self-declared practice:
- * specialization, core services, years of experience, service areas.
- * `profile_public_directory` returns those and no more, and this component reads
- * nothing else: not the private side of `individual_onboarding` (availability,
- * travel radius, base address, the secondary service list, every consumer
- * answer), not the verification row, not contacts.
+ * specialization, core services, years of experience, service areas — and, since
+ * `20260831090004`, the self-declared availability flag with the age of the
+ * claim. `profile_public_directory` returns those and no more, and this component
+ * reads nothing else: not the private side of `individual_onboarding`
+ * (`prof_availability`, the one-off LEAD TIME, which is a different fact from the
+ * live flag; travel radius; base address; the secondary service list; every
+ * consumer answer), not the verification row, not contacts.
+ *
+ * AVAILABILITY IS SHOWN WITH ITS AGE AND NO VERDICT. The visitor is usually
+ * deciding whether to contact this person, and "available, set eight months ago"
+ * is a different fact from "available, set this morning". The page gives them
+ * both and stops there — no staleness threshold, no dimming, no hiding of an
+ * unavailable professional (O3).
  *
  * EVERY PRACTICE FIELD IS INDEPENDENTLY OPTIONAL, and that is not defensive
  * coding — the projection LEFT JOINs the onboarding row, and every listed
@@ -28,7 +38,15 @@ import { languageLabel } from "@/lib/i18n/language-label";
  * Server component: no interactivity, so a signed-out visitor is served plain
  * rendered HTML.
  */
-export function PublicProfileView({ profile, t }: { profile: PublicProfile; t: TranslateFn }) {
+export function PublicProfileView({
+  profile,
+  t,
+  locale,
+}: {
+  profile: PublicProfile;
+  t: TranslateFn;
+  locale: Locale;
+}) {
   const name = profile.displayName?.trim() || t("profile.publicPage.unnamed");
   const persona = profile.persona ? t(`accountType.${profile.persona}`) : null;
   const hasPractice =
@@ -55,6 +73,13 @@ export function PublicProfileView({ profile, t }: { profile: PublicProfile; t: T
             {profile.headline ? (
               <p className="max-w-prose text-body-lg text-fg-secondary">{profile.headline}</p>
             ) : null}
+            {/* Directly under the name, because it is the first thing a visitor
+                deciding whether to make contact needs — and paired with its age,
+                which is the only thing that makes the claim weighable. */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <AvailabilityBadge available={profile.availableForWork} t={t} />
+              <AvailabilityAge updatedAt={profile.availabilityUpdatedAt} locale={locale} t={t} />
+            </div>
           </div>
         </div>
       </header>

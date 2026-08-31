@@ -72,6 +72,8 @@ describe("loadPublicProfile", () => {
       services: ["finishing"],
       years_experience: 12,
       service_areas: ["nasr_city"],
+      available_for_work: true,
+      availability_updated_at: "2026-08-28T10:00:00Z",
     };
 
     const profile = await loadPublicProfile(ID);
@@ -87,6 +89,8 @@ describe("loadPublicProfile", () => {
       services: ["finishing"],
       yearsExperience: 12,
       serviceAreas: ["nasr_city"],
+      availableForWork: true,
+      availabilityUpdatedAt: "2026-08-28T10:00:00Z",
     });
     // Read from the hardened projection, never the private base table.
     expect(asked.from).toEqual(["profile_public_directory"]);
