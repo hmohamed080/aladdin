@@ -87,6 +87,8 @@ Every arrow above maps to exactly one state transition in §3.
 | `20260823090001_chat_core.sql` | Conversations are org↔org over a **closed** `subject_type` allow-list. **Unchanged.** |
 | `20260830090001_points_core.sql` | Points are user-owned, append-only, **derived** balance. **Unchanged**; no job event earns Points. |
 | [`points-core.md`](points-core.md) | The pattern this spec follows, including *"a derived value is never a writable column"* — applied to rating aggregates in §6.4. |
+| `20260831090002_public_profile_professional_fields.sql` | `profile_public_directory` now also carries the professional's **self-declared practice** — `specialization`, core `services`, `years_experience`, `service_areas` — LEFT JOINed from `individual_onboarding`. This is the projection the applicant side of this domain reads (§11); it is what lets a poster judge a candidate without any new job-domain column. |
+| `20260831090003_professional_profile_edit_authority.sql` | `app.is_professional_persona(uuid)` — an individual professional is recognised by **canonical persona OR declared `prof_concrete_type`**, never by onboarding track. Sibling of `app.is_sales_persona` (§7). Governs who may maintain the profile this domain matches on. |
 
 ---
 
@@ -558,6 +560,17 @@ Refusals raise `42501`, consistent with every other authority failure in the sch
 **Implemented** by `supabase/migrations/20260831090001_sales_affiliation_persona_hardening.sql`,
 proven by `supabase/tests/37_sales_affiliation_persona_hardening_test.sql`.
 
+**The same shape was needed again, one increment later.** `20260831090003` added
+`app.is_professional_persona(uuid)` — canonical persona **or** declared `prof_concrete_type`,
+resolved against the five individual-professional types — because
+`individual_save_professional` had been gating profile edits on
+`onboarding_progress.selected_track`, which records *how* an identity was created rather than *what
+it is*. No seeded or Admin-upgraded professional has that track, so every professional the Pilot
+actually runs on was locked out of their own profile. The two predicates are deliberately siblings
+with the same two sources: **the declared branch is what keeps a real professional usable between
+submitting their profile and an Admin applying the upgrade**, and any future authority question about
+a personal professional identity should be answered the same way rather than by a third rule.
+
 ### 7.3 The Installer side stays separate
 
 The Installer's business network is **derived** (§13) and creates **no** organization membership and
@@ -766,7 +779,7 @@ one org-membership check would silently hand installers tenant reads.
 | Rule | Enforcement |
 |---|---|
 | **General location at discovery; precise site address only after assignment.** | `site_address` excluded from `open_job_opportunities`; base-table policies require assignment or org membership. Mirrors the onboarding rule: *"no detailed address is requested at onboarding; that is asked later, per-request, with consent."* |
-| **A poster sees a candidate's public projection, not their raw record.** | Application views join `profile_public_directory`. `individual_onboarding`, `contacts`, phone and email are never exposed by this domain. |
+| **A poster sees a candidate's public projection, not their raw record.** | Application views join `profile_public_directory` and read nothing else. Since `20260831090002` that projection carries four `individual_onboarding` columns — `specialization`, core `services`, `years_experience`, `service_areas` — which the professional wrote about their own practice in order to be found. The rest of `individual_onboarding` stays private (availability, travel radius, base address, the secondary service list, every `consumer_*` answer), and `contacts`, phone and email are never exposed by this domain. The base table's RLS is unchanged: only the definer reader behind the view crosses into it. |
 | **An applicant never sees competing applicants.** | §10.4. |
 | **A public review names the organization, never the reviewing person.** | The public projection exposes score, body, date, job title/trade and the poster org's public display name. `reviewer_user_id` is audit-only. |
 | **Applying is not consent to be contacted off-platform.** | No contact channel is disclosed by this domain at any stage. |

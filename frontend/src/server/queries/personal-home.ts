@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
 import {
   consumerCompleteness,
@@ -114,7 +115,13 @@ function verificationStateFor(status: string | null | undefined): VerificationSt
   }
 }
 
-export async function loadPersonalHome(): Promise<PersonalHomeData | null> {
+/**
+ * `cache()`d per render: the personal layout derives the rail from `variant`
+ * while the page it wraps renders the whole object, and this is five round trips
+ * (plus a salesperson's three more). React scopes the cache to one render, so
+ * nothing is shared across requests or callers.
+ */
+export const loadPersonalHome = cache(async function loadPersonalHome(): Promise<PersonalHomeData | null> {
   const supabase = await getServerSupabase();
   const {
     data: { user },
@@ -204,7 +211,7 @@ export async function loadPersonalHome(): Promise<PersonalHomeData | null> {
     // extra round trips.
     sales: isSalesperson ? await loadSalesAffiliation() : null,
   };
-}
+});
 
 /**
  * The salesperson's affiliation state, read through the trusted RPCs.

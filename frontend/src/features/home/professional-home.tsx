@@ -34,31 +34,40 @@ import { SalesAffiliationPanel } from "./sales-affiliation";
  * says plainly that verification affects trust and discoverability, not access.
  */
 
-/** Which onboarding step fixes each outstanding profile item. */
+/**
+ * Where each outstanding item is fixed.
+ *
+ * Every professional field now points at the EDITOR rather than back into the
+ * onboarding wizard. Re-entering a six-step flow to fill in one missing field was
+ * the only route available before `/home/profile/edit` existed, and it is the
+ * reason Pilot UAT read this page as a review queue. The three items the editor
+ * does not own — display name, phone, and the consumer answers — still resolve to
+ * the steps that do own them.
+ */
 const STEP_FOR_ITEM: Record<CompletenessItemKey, string> = {
   displayName: "/onboarding/profile",
   phone: "/onboarding/contact",
   intent: "/onboarding/consumer",
   interests: "/onboarding/consumer",
   budget: "/onboarding/consumer",
-  professionalType: "/onboarding/professional",
-  headline: "/onboarding/professional",
-  experience: "/onboarding/professional",
-  specialization: "/onboarding/professional",
-  services: "/onboarding/professional",
-  bio: "/onboarding/professional",
-  languages: "/onboarding/professional",
-  availability: "/onboarding/professional",
-  serviceArea: "/onboarding/professional",
-  location: "/onboarding/professional",
-  travelRadius: "/onboarding/professional",
+  professionalType: "/home/profile/edit",
+  headline: "/home/profile/edit",
+  experience: "/home/profile/edit",
+  specialization: "/home/profile/edit",
+  services: "/home/profile/edit",
+  bio: "/home/profile/edit",
+  languages: "/home/profile/edit",
+  availability: "/home/profile/edit",
+  serviceArea: "/home/profile/edit",
+  location: "/home/profile/edit",
+  travelRadius: "/home/profile/edit",
 };
 
 export function ProfessionalHome({ data, t }: { data: PersonalHomeData; t: TranslateFn }) {
   const { professional: p, completeness, verification } = data;
   const name = data.displayName || t("personalHome.professional.friend");
   const persona = t(`accountType.${data.accountType}`);
-  const nextStep = completeness.missing[0] ? STEP_FOR_ITEM[completeness.missing[0]] : "/onboarding/professional";
+  const nextStep = completeness.missing[0] ? STEP_FOR_ITEM[completeness.missing[0]] : "/home/profile/edit";
 
   const location = [
     p.governorate ? t(`onboarding.consumer.governorates.${p.governorate}`) : null,
@@ -122,7 +131,7 @@ export function ProfessionalHome({ data, t }: { data: PersonalHomeData; t: Trans
       >
         <ActionGrid>
           <ActionCard
-            href="/onboarding/professional"
+            href="/home/profile"
             icon={<UserIcon size={20} />}
             label={t("personalHome.professional.action.editProfile")}
             body={t("personalHome.professional.action.editProfileBody")}

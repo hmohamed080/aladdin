@@ -5,6 +5,9 @@ import { I18nProvider } from "@/lib/i18n/context";
 import { getMessages } from "@/lib/i18n/translate";
 import { getWorkspaces } from "@/server/queries/workspace";
 import { loadIsSalesPersona } from "@/server/queries/sales-persona";
+import { loadPersonalHome } from "@/server/queries/personal-home";
+import { personalNavKeys } from "@/lib/nav/personal-modules";
+import { PersonalRail } from "@/components/layout/personal-rail";
 import { PERSONAL_CONTEXT, personalEntry } from "@/lib/workspace/model";
 import { AppHeader } from "@/components/layout/app-header";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
@@ -49,6 +52,18 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
   const personal = personalEntry(entries);
   const showConnectShowroom = Boolean(personal) && (await loadIsSalesPersona());
 
+  /**
+   * The rail's destinations, derived from the SAME two answers the pages use —
+   * the variant `loadPersonalHome` resolves (track, then persona) and the Sales
+   * answer above. A caller with no personal workspace gets no rail at all: the
+   * pages under here redirect them, and a rail of links to redirects is worse
+   * than none. Both loaders are render-scoped, so the page below pays nothing.
+   */
+  const home = personal ? await loadPersonalHome() : null;
+  const navKeys = home
+    ? personalNavKeys({ variant: home.variant, isSalesPersona: showConnectShowroom })
+    : [];
+
   return (
     <I18nProvider locale={locale} dir={dir}>
       <div className="flex min-h-dvh flex-col bg-canvas">
@@ -72,6 +87,10 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
             />
           }
         />
+
+        <div className={cn(contentColumnClass, "pt-md")}>
+          <PersonalRail keys={navKeys} />
+        </div>
 
         <main className={cn(contentColumnClass, "py-xl")} id="main">
           {children}

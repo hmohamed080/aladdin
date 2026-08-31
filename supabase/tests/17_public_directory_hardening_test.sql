@@ -46,9 +46,19 @@ select columns_are(
 -- persona is ALREADY the eligibility gate for appearing in this view at all, so
 -- surfacing it publishes no new fact about a person. Everything private
 -- (user_id, contacts, timestamps, deleted_at, verification) stays out.
+--
+-- The four PRACTICE columns were added in 20260831090002 (Installer Pilot
+-- Increment 2): specialization, core services, years of experience and service
+-- areas. Each is a value the professional wrote about their own practice in order
+-- to be found, each was already visible to any workspace user through the trade
+-- directory's filters, and the LISTING PREDICATE did not move — the same rows
+-- return, with more columns. Availability, travel radius, base address, the
+-- secondary service list and every consumer_* answer stay out; 38_ asserts each
+-- of those absences by name.
 select columns_are(
   'public'::name, 'profile_public_directory'::name,
-  array['id','display_name','headline','bio','avatar_media_id','locality_id','languages','persona'],
+  array['id','display_name','headline','bio','avatar_media_id','locality_id','languages','persona',
+        'specialization','services','years_experience','service_areas'],
   'profile_public_directory still exposes only approved display columns');
 
 -- --- 3. The backing readers are SECURITY DEFINER, in `app`, search_path pinned

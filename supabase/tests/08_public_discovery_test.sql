@@ -15,7 +15,8 @@ select columns_are(
   'organization_public_directory exposes only approved public columns');
 select columns_are(
   'public'::name, 'profile_public_directory'::name,
-  array['id','display_name','headline','bio','avatar_media_id','locality_id','languages','persona'],
+  array['id','display_name','headline','bio','avatar_media_id','locality_id','languages','persona',
+        'specialization','services','years_experience','service_areas'],
   'profile_public_directory exposes only approved display columns (no user_id)');
 
 -- Anonymous discovery through the views.

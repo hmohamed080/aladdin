@@ -4,6 +4,142 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — A profile the Pilot could publish but nobody could edit
+
+**Date:** 2026-08-31 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `52ed8dd` (Increment 1)
+
+Increment 2 of the Installer Pilot: the personal shell, navigation, professional
+profile hub, standalone editor and public profile route. It began as a no-schema
+increment and ended with two migrations, both of which exist because building the
+surfaces exposed rules that were asking the wrong question.
+
+### Correction to the previous entry
+
+The Increment 1 entry (`52ed8dd`) states *"Increment 2 (Storage) blocks portfolio
+and certificates"*. **That is wrong.** Storage is **Increment 10**; Increment 2 is
+this one — personal shell, nav and profile. The dependency claim itself holds —
+portfolio and certificates are blocked on the media/storage foundation — but it is
+Increment 10 that blocks them, not Increment 2. The work log is append-only, so
+that entry stands as written and this paragraph is the correction.
+
+### Navigation is derived from persona, not from capabilities
+
+`lib/nav/personal-modules.ts` is a SIBLING of `modules.ts`, not an extension of
+it. `modules.ts` answers a question a personal account cannot ask — *which modules
+does this membership's capability set unlock* — and a person has no membership.
+Reusing it would have meant inventing pseudo-capabilities for a human being, which
+is the exact conflation the account model exists to prevent. The personal rule is
+narrower and different in kind: a consumer has no professional profile because
+there is none to show, not because it is withheld; a salesperson has the showroom
+route because the database admits them to it; anyone may start a business, because
+owning one is a relationship and never an account type.
+
+The rail is HORIZONTAL, and deliberately. `SidebarShell` is a full-height panel
+because a workspace has twenty-odd capability-gated modules and an entire
+composition built around that panel being the outermost thing on its side. Four
+destinations do not earn that; reproducing its display modes, hover reveal and
+mobile sheet for four links is machinery with nothing to carry.
+
+### The editor needed no new write path, and the public page needed one column
+
+`individual_save_professional` was already re-entrant (`on conflict do update`) —
+built that way so it could back something other than a wizard. The standalone
+editor is the same data on one page with one Save, and every validation stayed in
+the database. `/home/profile/edit` also replaced the wizard as the target of every
+professional completeness item: sending an established professional back through a
+six-step onboarding flow to fix one line is why Pilot UAT read `/home` as a review
+queue.
+
+### Two rules that were asking the wrong question
+
+**The public projection was too thin to be honest.** `/p/[profileId]` could say a
+professional's name, trade label, headline and languages — and nothing about what
+they do. The `/b2b/technicians` directory that links to it showed more than the
+profile it opened. `20260831090002` widened `profile_public_directory` with four
+columns the professional had already written about their own practice in order to
+be found: specialization, core services, years of experience, service areas. The
+listing predicate did not move; the same rows return with more columns, and
+`individual_onboarding` stays private behind unchanged RLS.
+
+**The edit gate was asking how an identity was created, not what it is.**
+`individual_save_professional` required `onboarding_progress.selected_track =
+'professional'`. That was right while the wizard was its only caller. It is wrong
+for an editor: **no seeded Pilot identity has a selected_track at all**, so every
+professional the Pilot runs on — listed in the public directory, rendered a
+professional home, given a public profile page by this very increment — was
+refused their own edit. `20260831090003` made the gate ask about the professional
+IDENTITY, canonical or declared, via `app.is_professional_persona` — the sibling
+of Increment 1's `app.is_sales_persona`, same two sources, same reason. The track
+branch was KEPT: a first-time caller has only a track, because this call is what
+writes the declared type.
+
+The frontend had briefly carried a read-only fallback for exactly that case. It is
+gone. A frontend gate stricter than the write path is not caution, it is a second
+rule to keep in step.
+
+### Three defects the tests caught, not the review
+
+**The LEFT JOIN.** Every listed profile in the Pilot seed has no
+`individual_onboarding` row. An inner join in the widened projection would have
+emptied the technicians directory, the consultants directory and every public
+profile page at once — while every assertion *about the new columns* still passed
+on the rows that survived. Guarded three ways in `38_`.
+
+**Two conventions for one column.** `profiles.languages` holds `arabic`/`english`
+from the onboarding flow and ISO `ar`/`en` in every seeded row. The public page
+used the onboarding catalog and printed `onboarding.professional.languages.ar`
+verbatim — on a page whose audience cannot tell whether the profile or the
+platform is broken. `lib/i18n/language-label.ts` now resolves both conventions.
+
+**A test that passed for the wrong reason.** In an early draft of `38_`, three
+assertions ran under a role whose RLS hid the rows being compared, so an "is null"
+check passed on a missing row rather than on a null column. Moved to the right
+level.
+
+### Validation
+
+Database, on a clean `supabase db reset`:
+
+- `38_public_profile_professional_fields` — **39/39** (new)
+- `39_professional_profile_edit_authority` — **33/33** (new)
+- `08_public_discovery` **14/14** · `17_public_directory_hardening` **29/29** — the
+  projection allow-list guards, updated because the approved column set genuinely
+  changed (the same guards that were updated when `persona` was added in Sprint 14)
+- `01_identity_profiles` 9/9 · `10_account_type_eligibility` 12/12 ·
+  `11_account_upgrade` 26/26 · `11_individual_persona_onboarding` 18/18 ·
+  `21_shared_onboarding` 27/27 · `28_persona_sales_affiliation` 79/79 ·
+  `37_sales_affiliation_persona_hardening` 43/43 — all unchanged
+
+Frontend: `vitest` **584 passed / 55 files**; `tsc --noEmit` clean; `eslint` clean
+on every changed path; `next build` clean, with `/home/profile`,
+`/home/profile/edit` and `/p/[profileId]` all building.
+
+Docs: `scripts/check_doc_links.py` — 947 internal links, 0 broken.
+
+**AR/EN parity is compiler-enforced, not test-enforced**: `ar` is typed
+`Messages = DeepStringShape<typeof en>`, so a missing or misshapen Arabic key is a
+type error. `tsc` passing is the parity proof.
+
+### Unfinished work, explicitly
+
+- **No browser verification was possible in any session of this increment.**
+  Nothing serves on `:3000` and `.claude/launch.json` is attach-only (a `url` with
+  no command), so the preview tooling can attach but cannot start a server. Every
+  visual and RTL claim here rests on the type system, unit tests and the build —
+  **not** on a rendered page. The rail at 390px and the hub's two-column grid are
+  the two things most worth a human look.
+- **`features/home/professional-home.tsx` still has the language-label defect**
+  fixed everywhere else in this increment. Left deliberately: it is pre-existing,
+  on an authenticated surface, and outside the increment's scope.
+- **`RUNTIME_STATE.md` is still not refreshed** (checklist item 1), and now carries
+  two increments of drift on top of what it already had. It needs its own pass.
+- **An organization-less installer still cannot reach their own Points.** That is
+  Increment 3, unstarted.
+- The public profile shows no availability, and no portfolio or certificates.
+  Those are Increments 4, 10 and 11 — deferred by instruction, not overlooked.
+
+---
+
 ## Session — An installer who knew a showroom could become its salesperson
 
 **Date:** 2026-08-31 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `9d5b2e0` (Installer Pilot specification)

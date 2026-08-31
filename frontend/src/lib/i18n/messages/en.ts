@@ -345,6 +345,50 @@ export const en = {
       },
     },
   },
+  personalNav: {
+    label: "Personal navigation",
+    home: "Home",
+    profile: "My profile",
+    connectShowroom: "Connect showroom",
+    addBusiness: "Add business",
+  },
+  profile: {
+    hub: {
+      title: "Your professional profile",
+      body: "What Aladdin knows about the work you do. Keep it accurate — it is what businesses read when they are choosing who to work with.",
+      edit: "Edit profile",
+    },
+    public: {
+      title: "Your public profile",
+      body: "What people outside Aladdin can see about you.",
+      hiddenTitle: "Not published yet",
+      hiddenBody:
+        "Your profile is private while your professional details are being verified. Publishing is handled by the Aladdin team once that is done — there is nothing for you to switch on. Your account works normally in the meantime.",
+      listedTitle: "Your profile is published",
+      listedBody: "Anyone with the link can see your name, headline, summary and languages.",
+      view: "View public profile",
+    },
+    notProfessional: {
+      title: "This page is for professional accounts",
+      body: "Your account is set up as a personal one, so there is no professional profile to show here. Nothing is wrong with your account.",
+      back: "Back to your home",
+    },
+    edit: {
+      title: "Edit your profile",
+      body: "Change anything here and save once. Your profession is set when your account is reviewed and is not edited here.",
+      personaFixed: "Set during account review",
+      save: "Save changes",
+      saving: "Saving…",
+      cancel: "Cancel",
+      saveFailed: "We could not save your changes. Please check the fields and try again.",
+    },
+    publicPage: {
+      unnamed: "Aladdin professional",
+      practice: "Work and specialties",
+      about: "About",
+      footnote: "Profile details are provided by the professional and verified by Aladdin before publishing.",
+    },
+  },
   showroom: {
     eyebrow: "Sales setup",
     title: "Connect your showroom",

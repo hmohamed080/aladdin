@@ -2765,6 +2765,10 @@ export type Database = {
           languages: string[] | null
           locality_id: string | null
           persona: Database["public"]["Enums"]["persona_type"] | null
+          service_areas: string[] | null
+          services: string[] | null
+          specialization: string | null
+          years_experience: number | null
         }
         Relationships: []
       }
