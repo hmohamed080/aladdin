@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
 import { SidebarShell } from "./sidebar-shell";
+import { WorkspaceNavPanel } from "./workspace-nav";
 import { ar } from "@/lib/i18n/messages/ar";
 import { allowedNavKeys } from "@/lib/nav/modules";
 import { SIDEBAR_MODE_COOKIE } from "@/lib/ui/sidebar-mode";
@@ -17,7 +18,12 @@ const MODULE_COUNT = allowedNavKeys(CAPS).length;
 function shell(mode: "expanded" | "collapsed" | "hover" = "expanded") {
   return renderWithI18n(
     <SidebarShell
-      allowed={CAPS}
+      /* The shell no longer owns the navigation — it publishes its display
+         state and mounts whatever element it is handed. These tests still
+         exercise the B2B rail because that is the composition under regression
+         control here; the point is that a DIFFERENT nav could be passed without
+         the panel, the modes, the carve or the gutter changing at all. */
+      nav={<WorkspaceNavPanel allowed={CAPS} />}
       mode={mode}
       /* The shell draws the lockup itself, so this is required rather than
          optional. A fixture, not an assertion — nothing below reads it; it

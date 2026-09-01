@@ -3,6 +3,7 @@ import { BadgeCheckIcon, BuildingIcon, TargetIcon, UserIcon } from "@/components
 import type { PersonalHomeData } from "@/server/queries/personal-home";
 import type { CompletenessItemKey } from "@/lib/profile/completeness";
 import type { TranslateFn } from "@/lib/i18n/translate";
+import { languageLabel } from "@/lib/i18n/language-label";
 import {
   AccountStrip,
   ActionCard,
@@ -87,12 +88,28 @@ export function ProfessionalHome({ data, t }: { data: PersonalHomeData; t: Trans
       value: p.yearsExperience === null ? null : t("personalHome.professional.years", { n: p.yearsExperience }),
     },
     {
-      label: t("onboarding.professional.services.availabilityLabel"),
+      /* DELIBERATELY NOT "Availability" — the same disambiguation `profile-hub`
+         already carries, and this is the page that actually needed it. This row
+         is the one-off LEAD TIME picked during onboarding (within a week /
+         within a month / flexible), and Increment 4 put the LIVE availability
+         badge in this page's own header. Two things called "Availability" a few
+         hundred pixels apart, one of them changeable and one of them not, makes
+         both unreadable. The onboarding label is left alone: in that flow, in
+         context, there is nothing for it to collide with. */
+      label: t("profile.hub.leadTime"),
       value: p.availability ? t(`onboarding.professional.availabilities.${p.availability}`) : null,
     },
     {
       label: t("onboarding.professional.services.languagesLabel"),
-      value: p.languages.map((k) => t(`onboarding.professional.languages.${k}`)).join(" · ") || null,
+      /* STORED values, so they go through the normalizer. `profiles.languages`
+         holds two conventions — `arabic`/`english` written by the onboarding
+         flow, and ISO `ar`/`en` in every seeded row — and the onboarding catalog
+         only has keys for the first. This line used to print
+         `onboarding.professional.languages.ar` verbatim to the account's owner.
+         The two remaining catalog call sites (the onboarding flow and the
+         profile editor) are CORRECT as written: they label selectable choice
+         chips whose keys come from the catalog itself and always resolve. */
+      value: p.languages.map((k) => languageLabel(t, k)).join(" · ") || null,
     },
   ];
 

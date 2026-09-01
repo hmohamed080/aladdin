@@ -35,6 +35,27 @@
  * style for wide panels.
  */
 
+/**
+ * How one navigation GROUP is separated from the one above it, where there is no
+ * heading between them.
+ *
+ * The expanded workspace rail separates its groups with a section heading, which
+ * supplies its own vertical rhythm. Two lists have no heading to lean on — the
+ * COLLAPSED rail, where 3.5rem leaves no room for a word, and the personal
+ * navigation, whose three-to-five destinations would spend more height on a
+ * heading than on the group it introduces. Both draw a rule instead, and this is
+ * that rule, defined once.
+ *
+ * It lives here rather than in either list because the two were drifting the
+ * moment there were two: the rail wrote `mt-sm … pt-sm` on the group's own
+ * wrapper, the personal list wrote `mx-3 my-1.5` on a bare `<div>` — a
+ * DIFFERENT inset, a DIFFERENT rhythm and a rule that stopped short of the
+ * column on both sides, for the same structural statement. A shared string is
+ * what makes "the navigation language may not vary" true by construction rather
+ * than by review.
+ */
+export const NAV_GROUP_SEPARATOR_CLASS = "mt-sm border-t border-shell-line pt-sm";
+
 /** Horizontal inset of the column that holds the rows. */
 export function navColumnClass(narrow: boolean): string {
   return narrow ? "px-2" : "px-3";

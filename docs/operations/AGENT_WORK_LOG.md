@@ -4,6 +4,222 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Five layouts wrote the same shell, and none of them named it
+
+**Date:** 2026-09-01 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `8be3cdd` (Increment 4)
+
+UI Foundation v1, from a read-only audit through implementation to a real-browser
+UAT. Not a redesign: the approved B2B workspace is the reference, and everything
+here is about giving the rest of the product access to it. No page composition
+changed except one label.
+
+### What the audit corrected about its own brief
+
+Three of the premises were wrong, and saying so is the useful part.
+
+**Token discipline was already clean** — zero raw hex, zero arbitrary colour
+values, zero palette escapes across the app. The one real gap was narrower and
+worse: `bg-accent-solid` was painted with `text-brand-basalt` in four places and
+`text-brand-lumen-ink` in two. Two inks on one fill, a visible difference nobody
+chose. That is the whole of the token work — `--on-accent`, defined once, shared
+by both themes because Lumen is a bright amber on either ground.
+
+**The Installer rail was not the worst offender.** Admin's bespoke aside and the
+byte-identical Business/Onboarding headers are older and further out. The rail was
+merely the newest, which is not the same thing.
+
+**Forms were not a drift area** — one visible raw `<input>` in the whole
+repository.
+
+The actual root cause was structural: **five layouts each wrote
+`flex min-h-dvh flex-col bg-canvas` by hand.** That string WAS the shell — an
+unnamed one nobody could change centrally — and the approved ground (frame,
+atmosphere, apertures) was welded inside `SidebarShell`, so reaching it required
+adopting the B2B navigation wholesale. A personal account and a workspace read as
+two products for that reason and no other.
+
+### The split, which is the whole architecture
+
+`AppShell` now owns the GROUND — frame, atmosphere, content measure, header
+placement, mobile slot — and knows nothing about navigation. `WorkspaceShell`
+(capabilities, commerce stance, branch scope, sales realtime) and `/home`'s layout
+are two FILLS of it. `NavLink` moved out of `workspace-nav.tsx` into
+`nav-item.tsx` so it stopped being structurally B2B property; `PersonalSidebar`
+and `Sidebar` are now two information architectures in one visual language rather
+than two navigations.
+
+The B2B workspace migrated FIRST, deliberately: it is the reference, so any
+regression there is a regression in the reference itself.
+
+The horizontal personal rail is deleted. Its reasoning — four destinations do not
+earn a 280px column — was sound and was about IA; answering it with a different
+visual language was the mistake. Route count does not authorize a new shell.
+
+`PageHeader`'s hand-styled primary action became the canonical `Button` **in the
+foundation component**, not at the call sites: the duplicate lived inside the
+foundation, so every workspace module inherited a second primary treatment and the
+divergence was invisible page by page.
+
+### The browser found a total outage that nothing else could
+
+`SidebarShell` briefly took `nav: (state) => ReactNode`. It reads better than a
+context and it is impossible: the shell is a Client Component, the layouts mounting
+it are Server Components, and React cannot serialize a function across that
+boundary. **Both `/home` and `/b2b` returned 500.**
+
+`tsc` accepted it. `next build` compiled it. All 33 shell tests passed — a
+client-side test render has no boundary to cross. The prior report's claim that
+"B2B behaviour is unchanged, all tests pass unmodified" was true in tests and false
+in the product.
+
+Replaced with `SidebarDisplayContext` + `useSidebarDisplay()`, so layouts pass
+plain elements (`<PersonalNavPanel/>`, `<WorkspaceNavPanel/>`) and the thin client
+wrappers read display state once mounted.
+
+### Two more the browser found on `/home`
+
+**No carve.** `carved: true` tells `NavLink` to suppress its own 2px marker
+BECAUSE a carve is drawing the active surface — and `PersonalSidebar` rendered
+none. Measured: active row `background: transparent`, `box-shadow: none`. The only
+cue was a marginally brighter glyph. Fixed with the callback-ref container and
+`ActiveCarve` as a sibling of `<nav>`, exactly as `Sidebar` arranges them.
+
+**Two `/b2b` links inside a personal sidebar.** The shell's fixed footer hardcoded
+Settings and "Upgrade your plan", both pointing at `/b2b/settings` — a route an
+org-less installer is redirected out of, plus a billing concept that does not apply
+to a person. `footer` is now a slot; `/home` passes `"none"`.
+
+### The rail geometry, and why it was never a carve bug
+
+Review then reported an oversized/offset carve blob on the collapsed personal rail
+and separator spacing that did not match. Both had **one cause**, and it was not in
+the carve.
+
+`PersonalSidebar`'s `<nav>` was missing `width: var(--shell-nav-w)`. The scrolling
+panel spans the sidebar INCLUDING its 14px gutter — deliberately, because
+`overflow-y: auto` clips both axes and a scroller sized to the navy alone would
+sever the carve at the edge it exists to cross. Every nav inside it must therefore
+clamp itself. The workspace one does; this one inherited the gutter.
+
+Fourteen pixels, all of it visible at rail width: the row became 54×40 instead of
+40×40, `navRowClass`'s `justify-center` centred the 36px tile in a 54px track
+instead of a 40px one, and the glyph landed at x=17 instead of x=10. The carve is
+pinned to `NAV_COLUMN_START` — a DERIVED number, correct for a 56px rail — so it
+drew its tile **seven pixels behind the icon it was under**. Rows also carried
+their hover surface and focus ring past the navy onto the frame. Expanded, rows
+were 230px wide against a 220px carve.
+
+One declaration fixes row height, hit area, vertical rhythm, icon centre line,
+focus geometry and carve alignment together, because all six were derived from the
+same width. **Nothing in `nav-carve.tsx` changed.**
+
+Separator: `mx-3 my-1.5 border-t` on a bare `<div>` was a second answer to a
+question the collapsed rail had already answered — different inset, different
+rhythm, a rule stopping short of the column at both ends. Both lists now use
+`NAV_GROUP_SEPARATOR_CLASS`, defined once in `nav-geometry` beside the padding it
+derives from. The workspace's own inline literal is gone; this is a shared
+constant, not persona-specific CSS.
+
+### The UAT, measured rather than eyeballed
+
+Signed into a real B2B workspace (`a-owner@example.test`) to measure the canonical
+rail rather than infer it, then back into the installer persona, same collapsed
+cookie, same viewport:
+
+| | B2B | Personal |
+|---|---|---|
+| nav / scroller | 56 / 70 | 56 / 70 |
+| row | 40×40 | 40×40 |
+| icon x | 1384 | 1384 |
+| carve | 36×36 @ 1384, y 74 | 36×36 @ 1384, y 74 |
+| pitch — plain / across rule | 42 / 61 | 42 / 61 |
+| separator | mt 8 · border 1 · pt 8 · ml 0 | identical |
+
+Every number, not "close". Expanded preserved: band 220×40 at x=10, radius 10px,
+0 fillets — matching B2B, and now correctly sized against a 216px row.
+
+**AR RTL light:** nav 1374–1430, carve mirrored to 10px from the trailing edge.
+**EN LTR dark:** nav x=0, icon x=10, exact mirror; body `rgb(17,26,36)`; separator
+flips to `rgba(255,255,255,.071)`; carve `srgb(.204 .245 .282)`. **Focus:**
+`:focus-visible` true, 1px shell offset + 2px `#855a15` ring, tile takes
+`bg-surface-2`, row fully inside the plate with symmetric 8px gaps. **Zero raw
+i18n keys** on any surface in either locale. Mobile bar at 375px pinned to the
+bottom with 64px clearance at full scroll.
+
+Pointer `:hover` could not be driven — the pane's screenshot frame is 800×500
+against a 1440×900 emulated viewport, and synthetic moves produced no `:hover`
+match at either scale. Hover paint is unchanged shared code; what this pass changed
+about it — that the surface no longer overruns the navy — is settled by the 40px
+row measurement.
+
+### The one label change
+
+`/home`'s dashboard called the onboarding LEAD TIME "Availability" while Increment
+4's live availability badge sat in the same page's header. Two different facts
+under one word, a few hundred pixels apart, one changeable and one not. Now
+`profile.hub.leadTime` — the same key the hub already carries. The onboarding
+label is left alone; in that flow there is nothing for it to collide with.
+
+The stored-language defect in `professional-home.tsx` is also fixed (it printed
+`onboarding.professional.languages.ar` verbatim to the account's own owner). The
+two onboarding CHOICE-chip sites keep the catalog and are pinned as correct —
+their keys come from the catalog itself and always resolve.
+
+### Governance
+
+`docs/frontend/UI_CONTRACT.md` states the rules and marks which are mechanically
+enforceable. `src/lib/ui/foundation.test.ts` is the enforcement, and the bar for
+an entry is deliberately high: **every check guards a failure that has already
+happened once here.** A rule nobody has broken is a comment; a rule that caught
+something is a test. Twelve currently — theme parity, single `--on-accent`, no
+brand primitive on the accent fill, the hand-written shell held to a shrinking
+legacy list, one frame painter, the foundation's primary action, stored-language
+surfaces, the RSC boundary (both directions), nav width, and the shared separator.
+
+The eslint additions are the smallest useful static guard, not a lint programme.
+
+### Validation
+
+`vitest` **658 passed / 62 files** · `tsc --noEmit` clean · `eslint src` 0 errors
+(1 pre-existing warning, `sidebar-shell.tsx:160`) · `next build` clean. No database
+work, no migrations, no `design.pen`.
+
+### A correction to the previous entry
+
+The Increment 4 entry records `40_professional_availability` as **38/38**. The
+actual plan is **35/35**. The suite passed; the number was wrong.
+
+### Three things worth knowing next time
+
+- **A Client Component prop that typechecks can still be unserializable.** The RSC
+  boundary is invisible to `tsc`, to `next build`, and to every client-side test
+  render. If a Server Component hands a Client Component anything but data, only a
+  browser will tell you.
+- **A derived constant is only correct for the geometry it was derived from.**
+  `NAV_COLUMN_START` is right for a 56px rail; the bug was 14px away, three levels
+  up, in a width the component never mentions.
+- **`carved` is a contract, not a flag.** Setting it tells the row to stop drawing
+  its own active state. If nothing else draws one, the active row silently has none
+  — and the tests still pass, because the rows are right.
+
+### Unfinished work, explicitly
+
+- **`RUNTIME_STATE.md` is still not refreshed** (checklist item 1), now five
+  increments behind. Untouched here by instruction.
+- **Admin, Business and Onboarding are deferred by design** and named in the
+  contract under MIGRATE WHEN TOUCHED, with `no-org-notice.tsx`. The
+  hand-written-shell test pins that list so it can only shrink.
+- **`/home/points` still renders `HomeHeader`'s identity band** — a monogram tile
+  of the first letter of the page title, and "Points" printed twice. Pre-existing
+  from Increment 3; a composition choice, not foundation.
+- The §11 Global Consistency Milestone (Admin shell, Business/Onboarding headers,
+  card-vocabulary collapse, deleting `Band`) is unstarted.
+- `.claude/launch.json` is now launchable rather than attach-only, which is what
+  made any of this verification possible. It is gitignored, so it is in no commit
+  and the next session will have to write it again.
+
+---
+
 ## Session — A claim about yourself, and a date you are not allowed to write
 
 **Date:** 2026-08-31 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `206f4d3` (Increment 3)

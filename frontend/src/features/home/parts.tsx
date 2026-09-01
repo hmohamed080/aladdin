@@ -5,6 +5,7 @@ import type { Completeness } from "@/lib/profile/completeness";
 import type { VerificationState } from "@/server/queries/personal-home";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import { cn } from "@/lib/ui/cn";
+import { IdentityBand, Section } from "@/components/ui/page-band";
 
 /**
  * Shared building blocks for the ONE personal surface (`/home`), used by both the
@@ -27,74 +28,32 @@ import { cn } from "@/lib/ui/cn";
  * everything.
  */
 
-/** First letter of the name, for the identity monogram. */
-function monogram(name: string): string {
-  return [...name.trim()][0]?.toUpperCase() ?? "•";
-}
-
 /**
- * The page's identity area: who this account is, what it can do, and — quietly,
- * to the side — how the platform currently regards it.
+ * The personal surface's page header — an ADAPTER over the foundation's
+ * `IdentityBand`, not a second implementation.
+ *
+ * It keeps its own name and its own props so no personal page changed, and it
+ * carries no layout of its own any more. Same relationship `PageHeader` has with
+ * `PageHead` on the workspace side: one band, two vocabularies.
  */
-export function HomeHeader({
-  eyebrow,
-  title,
-  lead,
-  name,
-  meta,
-}: {
+export function HomeHeader(props: {
   eyebrow: string;
   title: string;
   lead?: string;
-  /** Used for the monogram; falls back to the title. */
   name?: string;
-  /** Secondary chips (verification, persona). Deliberately small. */
   meta?: ReactNode;
 }) {
-  return (
-    <header className="flex flex-col gap-md">
-      <div className="flex flex-wrap items-start gap-md">
-        <span
-          aria-hidden="true"
-          className="grid size-14 shrink-0 place-items-center rounded-md bg-accent-solid/15 text-headline text-accent"
-        >
-          {monogram(name ?? title)}
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <p className="text-label font-semibold uppercase tracking-wide text-fg-muted">{eyebrow}</p>
-          <h1 className="text-headline text-fg">{title}</h1>
-          {lead ? <p className="max-w-prose text-body-lg text-fg-secondary">{lead}</p> : null}
-        </div>
-      </div>
-      {meta ? <div className="flex flex-wrap items-center gap-sm">{meta}</div> : null}
-    </header>
-  );
+  return <IdentityBand {...props} />;
 }
 
-/** A titled band of the page. Spacing, not dividers, is the grouping tool. */
-export function HomeSection({
-  title,
-  description,
-  action,
-  children,
-}: {
+/** The personal surface's section — an adapter over the foundation's `Section`. */
+export function HomeSection(props: {
   title: string;
   description?: string;
   action?: ReactNode;
   children: ReactNode;
 }) {
-  return (
-    <section className="flex flex-col gap-md">
-      <div className="flex flex-wrap items-end justify-between gap-sm">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <h2 className="text-title text-fg">{title}</h2>
-          {description ? <p className="text-body text-fg-secondary">{description}</p> : null}
-        </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
-      </div>
-      {children}
-    </section>
-  );
+  return <Section {...props} />;
 }
 
 /**

@@ -267,6 +267,13 @@
 
   --accent: var(--lumen-ink); /* AA-safe Lumen tone for text/strokes */
   --accent-solid: var(--lumen); /* the light itself — glows & fills */
+  /* THE INK THAT GOES ON `--accent-solid`, and the reason it is a token.
+     Lumen is a bright amber: it takes DARK ink, in both themes, which is why
+     this is one value here rather than a light/dark pair. Before it existed,
+     three components picked `--basalt` (#0e1113) and two picked `--lumen-ink`
+     (#855a15) for the same fill — a visible difference nobody chose. Any
+     foreground on an accent fill uses this and nothing else. */
+  --on-accent: var(--basalt);
 
   --bronze-sem: var(--bronze-ink);
   --lapis-sem: var(--lapis);

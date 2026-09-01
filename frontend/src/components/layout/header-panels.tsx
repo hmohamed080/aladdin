@@ -223,7 +223,7 @@ function HeaderMenu({
           <span
             aria-hidden="true"
             data-testid={`${testId}-badge`}
-            className="absolute -top-0.5 end-[-2px] grid h-4 min-w-4 place-items-center rounded-pill bg-accent-solid px-1 text-[10px] font-semibold leading-none text-brand-lumen-ink"
+            className="absolute -top-0.5 end-[-2px] grid h-4 min-w-4 place-items-center rounded-pill bg-accent-solid px-1 text-[10px] font-semibold leading-none text-on-accent"
           >
             {badge.display}
           </span>
@@ -493,7 +493,7 @@ export function FeedbackMenu() {
           type="button"
           disabled
           data-testid="feedback-send"
-          className="mt-0.5 w-full rounded-sm bg-accent-solid px-3 py-2 text-label font-semibold text-brand-lumen-ink disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-0.5 w-full rounded-sm bg-accent-solid px-3 py-2 text-label font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
           {t("feedback.send")}
         </button>
