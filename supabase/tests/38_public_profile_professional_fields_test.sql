@@ -97,7 +97,12 @@ select columns_are(
         -- the timestamp of its last change. `prof_availability` — the PRIVATE
         -- lead-time preference asserted absent further down — is a different fact
         -- and is still not here.
-        'available_for_work', 'availability_updated_at'],
+        'available_for_work', 'availability_updated_at',
+        -- Added by 20260901090001 (Increment 5, §4.6). The canonical trade
+        -- taxonomy, projected as KEYS — the structured specialty signal that now
+        -- leads the public page, with the free-text `specialization` above kept
+        -- as supporting prose rather than deleted.
+        'trade_keys', 'primary_trade_key'],
   'the projection exposes exactly the approved identity + practice columns'
 );
 

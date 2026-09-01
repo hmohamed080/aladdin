@@ -288,11 +288,11 @@ the poster then confirms. Either party may **cancel**, with a reason.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `uuid` pk | The FK target. |
-| `key` | `text` **not null unique** | Stable machine identifier (`kitchens_doors`, `plumbing`, …). ≤ 64 chars, lower snake case. |
+| `id` | `uuid` pk | The FK target — what a future `jobs.trade_id` names (§4.4). |
+| `key` | `text` **not null unique** | Stable machine identifier (`kitchens_doors`, `plumbing`, …). Shape enforced by `trades_key_shape`: 2–64 chars, `^[a-z][a-z0-9_]*$`. |
 | `is_active` | `boolean` **not null** default `true` | Retire a trade without deleting history. |
 | `sort_order` | `smallint` **not null** default 0 | Deterministic presentation order. |
-| `created_at`, `updated_at` | `timestamptz` **not null** | |
+| `created_at`, `updated_at` | `timestamptz` **not null** | `updated_at` via `app.set_updated_at()`. |
 
 **Display names are NOT columns.** They live in the existing i18n message catalogs keyed by `key`,
 exactly as the shipped code already does (`t(\`onboarding.professional.specializations.${key}\`)`).
@@ -301,7 +301,17 @@ Putting `name_en`/`name_ar` here would create a **second translation source of t
 Seeding is reference data, not user content: rows are inserted by migration, and the table carries
 **no client write grant at all**.
 
-Reads are open to `authenticated` (it is a public vocabulary; there is nothing to isolate).
+Reads are open to `authenticated` (it is a public vocabulary; there is nothing to isolate), but
+`trades_select_active` withholds **inactive** rows from ordinary callers — a retired trade a client
+cannot see is one it cannot offer. `app.is_platform('support')` reads the whole vocabulary, retired
+rows included, because a support conversation about a withdrawn trade is unanswerable against a
+filtered list. `anon` does not read the table at all: the public profile needs trade KEYS, and it
+gets them from the §4.6 projection.
+
+**Implemented by `20260901090001_trade_taxonomy.sql`.** The seeded Pilot vocabulary is seven keys —
+`kitchens_doors`, `plumbing`, `electrical`, `hvac`, `gypsum_paint` (the five
+`SPECIALIZATIONS.installer_technician` chips) plus `tiling` and `marble_granite`, which the demo
+world already contains and the five cannot express.
 
 ### 4.3 `public.user_trades` — the minimum user↔specialty relation
 
@@ -316,8 +326,46 @@ The minimum relation the spec requires, and no more.
 
 - Primary key `(user_id, trade_id)` — **an installer may hold many specialties (D8)**.
 - `ux_user_trades_one_primary unique (user_id) where is_primary` — at most one primary per person.
-- RLS: a user reads and writes **their own** rows (`user_id = auth.uid()`); platform staff read all.
-  The public projection (§4.6) is what exposes another person's trades.
+- RLS: a user **reads** their own rows (`user_id = auth.uid()`); platform staff read all. The public
+  projection (§4.6) is what exposes another person's trades.
+- **Writes are narrower than this section originally specified, and deliberately so.** There is no
+  client insert/update/delete grant and no write policy in any role: the only writer is
+  `public.user_trades_set` (§4.3a), which is `security definer`. A client able to write rows directly
+  would perform one user gesture as three statements, and between any two of them the selection is a
+  state nobody asked for — zero primaries mid-swap, or two if the calls landed out of order. Removing
+  the grant makes that unreachable rather than merely unlikely.
+
+### 4.3a `user_trades_set` — the whole selection, atomically
+
+`public.user_trades_set(p_trade_keys text[], p_primary_key text default null)`. It takes **no user
+id**: acting on someone else is not a refused request, it is an unexpressible one. Authority is the
+professional IDENTITY through `app.is_professional_persona` — canonical `users.primary_account_type`
+or the declared `individual_onboarding.prof_concrete_type` — and **never** the caller's existing
+trades, so holding a trade can never be what proves you were allowed to hold it.
+
+It is **narrower than `individual_save_professional`**, which also admits a caller mid-professional
+onboarding on the strength of their selected TRACK. A track carries no concrete type, so there is no
+answer yet to which trades apply, and no onboarding step declares trades today.
+
+**Exactly one primary whenever the selection is non-empty**, none when it is empty. `p_primary_key`
+null means "you choose", and the choice is the FIRST submitted key — an order the caller controls and
+can therefore predict. The complete behaviour:
+
+| Case | Result |
+|---|---|
+| first trade selected | it becomes primary |
+| primary changed | the named key is primary; the previous one stays selected |
+| primary removed | the first REMAINING submitted key becomes primary |
+| non-primary removed | the primary is untouched |
+| duplicates submitted | deduplicated; converges rather than erroring |
+| empty or null set | every row deleted; no primary |
+| primary not in the set | `22023` — a contradiction, not a hint |
+| unknown key | `22023`, **whole call refused** — a silently dropped key leaves the person believing they saved it |
+| inactive key **not** held | `22023` — an inactive trade cannot be NEWLY selected |
+| inactive key **already** held | accepted, so a retirement cannot trap a profile that could then never save again |
+
+Because the call is a complete DESCRIPTION rather than a delta, two submissions in flight converge on
+whichever lands last. `ux_user_trades_one_primary` is the backstop underneath that.
 
 ### 4.4 A job holds exactly one trade
 
@@ -347,7 +395,21 @@ tiler who has done gypsum work before is the platform's problem to inform, not t
 
 - Seed `trades` from `SPECIALIZATIONS.installer_technician` plus the trades the references imply, as
   approved reference data.
-- Backfill `user_trades` from `individual_onboarding.prof_specialization` (one row, `is_primary`).
+- Backfill `user_trades` from `individual_onboarding.prof_specialization` (one row, `is_primary`)
+  **by exact key equality only.** That column holds two kinds of value: a stable vocabulary key where
+  the onboarding chips wrote it, and free prose ("Marble and granite fixing") in every seeded and
+  staging professional. The migration matches the first kind and leaves the second alone — nothing
+  parses, matches or infers from prose. Mapping "Plumbing and sanitary fitting" onto `plumbing` looks
+  obvious and is a guess; the next sentence is "Plumbing and gypsum", and a guess that is right four
+  times and wrong once has published a false claim on somebody's public profile.
+- The demo world's prose is resolved **explicitly, by user id**, in `supabase/seed-pilot.sql` §10.3b,
+  where a human wrote each pair down and a reviewer can check them line by line. Values outside the
+  Pilot's installer vocabulary (the interior designer, the site engineer) are left **unmapped**
+  rather than covered by inventing two more professions' worth of taxonomy.
+- The §4.6 public projection carries `trade_keys` (ACTIVE trades, primary first, then `sort_order`)
+  and `primary_trade_key`. Keys, not ids — the label is an i18n lookup, and a uuid would be an
+  internal identifier published for no reader's benefit. A retired trade leaves every published
+  profile at once, which is what retiring one has to mean; the `user_trades` row survives.
 - `individual_onboarding.prof_specialization` is retained as **transitional debt** and **stops being
   authority** the moment `user_trades` exists. Its removal is a later mechanical migration, recorded
   now so it is not forgotten.
@@ -735,8 +797,8 @@ buried. **`open_job_opportunities` and `job_application_submit` must read the li
 | `job_assignments` | the assigned installer; poster-org members; platform staff |
 | `job_progress_updates` | the parties of the parent assignment; platform staff |
 | `job_reviews` | the reviewee; poster-org members; platform staff — plus the **public projection** in §6.4 |
-| `trades` | `authenticated` (public vocabulary) |
-| `user_trades` | own rows; platform staff; plus the public directory projection |
+| `trades` | `authenticated`, ACTIVE rows only; platform staff also read retired ones; **no write grant in any role** |
+| `user_trades` | own rows (read); platform staff; plus the public directory projection. **No client write grant** — `user_trades_set` is the only writer (§4.3a) |
 
 **Discovery is a hardened view, not a policy on the base table.** Open jobs reach the installer pool
 through `public.open_job_opportunities` — a `security_invoker` view over
@@ -771,7 +833,7 @@ client `INSERT`/`UPDATE` grant (except the `profiles` availability columns, §8.
 | `job_assignment_cancel` | either party | poster capability **or** `installer_user_id = auth.uid()` |
 | `job_review_create` | poster org | §6.2 |
 | **`job_review_moderate`** | **platform only** | `app.is_platform('support')` (O2, §6.5) |
-| `user_trades_set` | self | `user_id = auth.uid()` |
+| `user_trades_set` | self | `app.is_professional_persona(auth.uid())`; **no user-id parameter exists** (§4.3a) |
 
 **Two authority shapes here are new and must be tested, not assumed:**
 

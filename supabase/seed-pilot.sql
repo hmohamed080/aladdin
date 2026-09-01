@@ -544,6 +544,42 @@ from (values
 where p.user_id = v.user_id;
 
 -- ---------------------------------------------------------------------------
+-- 10.3b Canonical trades for the listed installers (D8, §4)
+-- ---------------------------------------------------------------------------
+-- THE HEADLINES ABOVE ARE PROSE, AND PROSE IS NOT A TAXONOMY. Each installer's
+-- trade is written here ONCE, by hand, as an explicit user-id → trade-key pair.
+-- The migration's own backfill maps only `prof_specialization` values that are
+-- EXACTLY a seeded key; it deliberately parses nothing, so "Marble and granite
+-- fixing" reaches it as a sentence and is left alone. This is where a human
+-- resolves that sentence, in a form a reviewer can check line by line.
+--
+-- One trade each, primary, which is what these five personas actually are. A
+-- second trade would be inventing a skill nobody stated, and the multi-trade
+-- case is exercised by the editor rather than faked in a fixture.
+--
+-- DELIBERATELY UNMAPPED: Heba Kamal (interior designer) and the site engineer
+-- above them. The Pilot vocabulary is finishing/construction INSTALLER trades;
+-- `residential` and `site_supervision` are interior-design and engineering
+-- specializations, and seeding a trade to cover them would be modelling two more
+-- professions to make a fixture look full.
+insert into public.user_trades (user_id, trade_id, is_primary)
+select v.user_id, t.id, true
+from (values
+  -- 'Ceramic and porcelain tiling'
+  ('70000009-0000-4000-8000-000000000009'::uuid, 'tiling'),
+  -- 'Marble and granite fixing'
+  ('71000006-0000-4000-8000-000000000006'::uuid, 'marble_granite'),
+  -- 'Electrical installation and lighting'
+  ('71000007-0000-4000-8000-000000000007'::uuid, 'electrical'),
+  -- 'Plumbing and sanitary fitting'
+  ('71000008-0000-4000-8000-000000000008'::uuid, 'plumbing'),
+  -- 'Gypsum board and false ceilings'
+  ('71000009-0000-4000-8000-000000000009'::uuid, 'gypsum_paint')
+) as v(user_id, trade_key)
+join public.trades t on t.key = v.trade_key
+on conflict (user_id, trade_id) do nothing;
+
+-- ---------------------------------------------------------------------------
 -- 10.4 Distributor catalogues (published, with product imagery)
 -- ---------------------------------------------------------------------------
 -- image_ref points at a local demo swatch under /demo/products. Material swatches

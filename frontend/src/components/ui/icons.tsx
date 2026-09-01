@@ -254,6 +254,21 @@ export const BookmarkIcon = (p: IconProps) => (
   </Svg>
 );
 
+/**
+ * The PRIMARY-trade mark. Filled rather than outlined, because it appears beside
+ * an outlined trade chip and has to read as "this one" at a glance rather than as
+ * one more item in the row.
+ */
+export const StarIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path
+      d="m12 3.6 2.6 5.27 5.82.85-4.21 4.1.99 5.79L12 16.88l-5.2 2.73.99-5.79-4.21-4.1 5.82-.85z"
+      fill="currentColor"
+      stroke="none"
+    />
+  </Svg>
+);
+
 export const BookmarkFilledIcon = (p: IconProps) => (
   <Svg {...p} fill="currentColor">
     <path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z" />

@@ -43,6 +43,8 @@ const data = (over: Partial<PersonalHomeData> = {}): PersonalHomeData => ({
 });
 
 const publication = { profileId: null, listed: false };
+/** No canonical trades unless a test says so — the common state at Pilot start. */
+const noTrades = { keys: [], primaryKey: null };
 
 /**
  * The hub's wiring for availability.
@@ -56,7 +58,7 @@ const publication = { profileId: null, listed: false };
 describe("ProfileHub", () => {
   it("gives the professional a control for their own availability", () => {
     renderWithI18n(
-      <ProfileHub data={data()} publication={publication} t={createTranslator("en")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} t={createTranslator("en")} />,
       "en",
     );
     expect(screen.getByRole("button", { name: "Mark me available" })).toBeTruthy();
@@ -64,7 +66,7 @@ describe("ProfileHub", () => {
 
   it("keeps the live flag and the onboarding LEAD TIME as two different things", () => {
     renderWithI18n(
-      <ProfileHub data={data()} publication={publication} t={createTranslator("en")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} t={createTranslator("en")} />,
       "en",
     );
     // The lead-time row is no longer called "Availability"…
@@ -85,6 +87,7 @@ describe("ProfileHub", () => {
           },
         })}
         publication={publication}
+        trades={noTrades}
         t={createTranslator("en")}
       />,
       "en",
@@ -96,11 +99,67 @@ describe("ProfileHub", () => {
 
   it("renders in Arabic with no key leak", () => {
     const { container } = renderWithI18n(
-      <ProfileHub data={data()} publication={publication} t={createTranslator("ar")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} t={createTranslator("ar")} />,
       "ar",
     );
     expect(screen.getByText("لا أقبل أعمالًا حاليًا")).toBeTruthy();
     expect(screen.getByText("متى يمكنك البدء")).toBeTruthy();
     expect(container.textContent).not.toMatch(/profile\.|onboarding\./);
+  });
+
+  /**
+   * The canonical taxonomy on the hub (Increment 5).
+   *
+   * The assertion that earns its place is the second one. `specialization` (free
+   * text) and the canonical trade are THE SAME CLAIM in two vocabularies, and
+   * this fixture holds both — `gypsum_paint` in the legacy column and
+   * `marble_granite` in the taxonomy. Showing both would put two different
+   * specialties on one profile with nothing to say which one the platform means.
+   */
+  it("states the canonical trades and marks the primary", () => {
+    renderWithI18n(
+      <ProfileHub
+        data={data()}
+        publication={publication}
+        trades={{ keys: ["marble_granite", "tiling"], primaryKey: "marble_granite" }}
+        t={createTranslator("en")}
+      />,
+      "en",
+    );
+    expect(screen.getByText("Main trade")).toBeTruthy();
+    expect(screen.getByText("Marble & granite")).toBeTruthy();
+    expect(screen.getByText("Tiling")).toBeTruthy();
+  });
+
+  it("drops the legacy free-text specialty once a canonical trade exists", () => {
+    renderWithI18n(
+      <ProfileHub
+        data={data()}
+        publication={publication}
+        trades={{ keys: ["marble_granite"], primaryKey: "marble_granite" }}
+        t={createTranslator("en")}
+      />,
+      "en",
+    );
+    // The fixture's legacy value is `gypsum_paint` — visible with no trades…
+    expect(screen.queryByText("Gypsum & paint")).toBeNull();
+  });
+
+  it("keeps the legacy free text where there is no canonical trade to replace it", () => {
+    renderWithI18n(
+      <ProfileHub data={data()} publication={publication} trades={noTrades} t={createTranslator("en")} />,
+      "en",
+    );
+    // …and still the only answer there is without one. This increment deletes
+    // nothing: a profile untouched since Increment 4 reads exactly as before.
+    expect(screen.getByText("Gypsum & paint")).toBeTruthy();
+  });
+
+  it("tells a professional with no trades what to do about it", () => {
+    renderWithI18n(
+      <ProfileHub data={data()} publication={publication} trades={noTrades} t={createTranslator("en")} />,
+      "en",
+    );
+    expect(screen.getByTestId("trade-summary-empty")).toBeTruthy();
   });
 });

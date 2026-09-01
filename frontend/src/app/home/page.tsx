@@ -5,6 +5,7 @@ import { loadPlatformRole } from "@/server/queries/platform";
 import { loadWorkspaces } from "@/server/queries/workspace";
 import { personalEntry, businessEntries } from "@/lib/workspace/model";
 import { loadPersonalHome } from "@/server/queries/personal-home";
+import { loadMyTrades } from "@/server/queries/trades";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { NoPersonalWorkspace } from "@/features/home/no-personal-workspace";
 import { createTranslator } from "@/lib/i18n/translate";
@@ -55,8 +56,10 @@ export default async function PersonalHomePage() {
   const store = await cookies();
   const t = createTranslator(resolveLocale(store.get(LOCALE_COOKIE)?.value));
 
+  // Only a professional has trades to read, so only a professional pays for the
+  // round trip — the same rule the salesperson's affiliation follows.
   return data.variant === "professional" ? (
-    <ProfessionalHome data={data} t={t} />
+    <ProfessionalHome data={data} trades={await loadMyTrades()} t={t} />
   ) : (
     <ConsumerHome data={data} t={t} />
   );

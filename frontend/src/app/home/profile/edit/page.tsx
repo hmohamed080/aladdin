@@ -5,6 +5,8 @@ import { loadWorkspaces } from "@/server/queries/workspace";
 import { personalEntry } from "@/lib/workspace/model";
 import { loadPersonalHome } from "@/server/queries/personal-home";
 import { getIndividualOnboardingData } from "@/server/queries/onboarding";
+import { loadTradeCatalog, loadMyTrades } from "@/server/queries/trades";
+import { TradeSelector } from "@/features/profile/trade-selector";
 import { ProfessionalProfileEditor } from "@/features/profile/professional-profile-editor";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
 
@@ -45,7 +47,20 @@ export default async function EditProfilePage() {
   // canonical, so this is the same answer the hub labels the profile with.
   const concreteType = individual.professional.concreteType ?? home.accountType;
 
+  // Two reads, one round trip each, both scoped to the caller — neither takes a
+  // user id, because neither could act on one.
+  const [catalog, mine] = await Promise.all([loadTradeCatalog(), loadMyTrades()]);
+
   return (
-    <ProfessionalProfileEditor answers={individual.professional} concreteType={concreteType} />
+    <div className="flex flex-col gap-xl">
+      {/* TRADES SAVE THEMSELVES, ABOVE THE FORM RATHER THAN INSIDE IT. They are a
+          different table with a different atomic authority (`user_trades_set`),
+          and one button driving two RPCs would be two transactions that can
+          disagree — leaving the page to explain a half-saved profile. Placed
+          first because the canonical trade is now the profile's category, and the
+          free-text fields below it are description. */}
+      <TradeSelector catalog={catalog} mine={mine} />
+      <ProfessionalProfileEditor answers={individual.professional} concreteType={concreteType} />
+    </div>
   );
 }

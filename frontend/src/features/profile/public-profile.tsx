@@ -3,6 +3,7 @@ import type { PublicProfile } from "@/server/queries/professional-profile";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/locales";
 import { languageLabel } from "@/lib/i18n/language-label";
+import { tradeLabel, specializationLabel } from "@/lib/i18n/trade-label";
 import { AvailabilityBadge, AvailabilityAge } from "@/features/profile/availability-status";
 
 /**
@@ -10,9 +11,11 @@ import { AvailabilityBadge, AvailabilityAge } from "@/features/profile/availabil
  *
  * WHAT IS HERE IS EXACTLY WHAT THE PROJECTION EXPOSES: name, persona, headline,
  * summary, languages, and — since `20260831090002` — the self-declared practice:
- * specialization, core services, years of experience, service areas — and, since
+ * specialization, core services, years of experience, service areas — since
  * `20260831090004`, the self-declared availability flag with the age of the
- * claim. `profile_public_directory` returns those and no more, and this component
+ * claim — and, since `20260901090001`, the canonical trades (§4.6), which are
+ * now the STRUCTURED specialty signal this page leads with.
+ * `profile_public_directory` returns those and no more, and this component
  * reads nothing else: not the private side of `individual_onboarding`
  * (`prof_availability`, the one-off LEAD TIME, which is a different fact from the
  * live flag; travel radius; base address; the secondary service list; every
@@ -49,8 +52,29 @@ export function PublicProfileView({
 }) {
   const name = profile.displayName?.trim() || t("profile.publicPage.unnamed");
   const persona = profile.persona ? t(`accountType.${profile.persona}`) : null;
+  /**
+   * ONE SPECIALTY SIGNAL, NOT TWO. `specialization` (free text) and `tradeKeys`
+   * (canonical) are the same claim in two vocabularies — "Marble and granite
+   * fixing" and `marble_granite` — and printing both would show a visitor the
+   * same specialty twice with nothing to say which one the platform means. The
+   * canonical taxonomy is authority (§4.1), so it wins; the free text is shown
+   * only where there is no trade to show instead, which is every profile that
+   * has not been edited since Increment 5.
+   *
+   * The fallback goes through `specializationLabel` rather than the catalog
+   * directly. That column holds a vocabulary key in some rows and a sentence in
+   * every seeded and staging one, and a raw catalog lookup rendered the message
+   * PATH for the second kind — on a public page, to a stranger who cannot tell
+   * whether the profile is broken or the platform is.
+   */
+  const legacySpecialization =
+    profile.tradeKeys.length === 0 && profile.specialization
+      ? specializationLabel(t, profile.specialization)
+      : null;
+
   const hasPractice =
-    Boolean(profile.specialization) ||
+    profile.tradeKeys.length > 0 ||
+    Boolean(legacySpecialization) ||
     profile.yearsExperience !== null ||
     profile.services.length > 0 ||
     profile.serviceAreas.length > 0;
@@ -88,18 +112,49 @@ export function PublicProfileView({
         <Card className="flex flex-col gap-md">
           <h2 className="text-title text-fg">{t("profile.publicPage.practice")}</h2>
 
+          {/* THE CANONICAL TRADES LEAD. This is the structured category a visitor
+              is scanning for and the field a future job match reads; it belongs
+              above years of experience and well above the service list. The
+              primary is stated on its own and the rest follow as chips, so the
+              one distinction the model actually carries survives the rendering.
+
+              Inactive trades never reach here — the projection filters them —
+              so a retired trade disappears from every published profile at once
+              rather than lingering on the old ones. */}
+          {profile.tradeKeys.length > 0 ? (
+            <div className="flex flex-col gap-sm" data-testid="public-trades">
+              <h3 className="text-label text-fg-muted">
+                {t(profile.primaryTradeKey ? "profile.trades.mainLabel" : "profile.trades.alsoLabel")}
+              </h3>
+              {profile.primaryTradeKey ? (
+                <p className="break-words text-body-lg text-fg">
+                  {tradeLabel(t, profile.primaryTradeKey)}
+                </p>
+              ) : null}
+              {profile.tradeKeys.filter((k) => k !== profile.primaryTradeKey).length > 0 ? (
+                <ul className="flex flex-wrap gap-1.5">
+                  {profile.tradeKeys
+                    .filter((k) => k !== profile.primaryTradeKey)
+                    .map((key) => (
+                      <li key={key}>
+                        <Badge tone="neutral">{tradeLabel(t, key)}</Badge>
+                      </li>
+                    ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
           {/* The two single facts read as a definition list, matching the paired
               label/value rhythm the workspace uses everywhere else. */}
-          {profile.specialization || profile.yearsExperience !== null ? (
+          {legacySpecialization || profile.yearsExperience !== null ? (
             <dl className="grid gap-md tablet:grid-cols-2">
-              {profile.specialization ? (
+              {legacySpecialization ? (
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <dt className="text-label text-fg-muted">
                     {t("onboarding.professional.identity.specializationLabel")}
                   </dt>
-                  <dd className="break-words text-body-lg text-fg">
-                    {t(`onboarding.professional.specializations.${profile.specialization}`)}
-                  </dd>
+                  <dd className="break-words text-body-lg text-fg">{legacySpecialization}</dd>
                 </div>
               ) : null}
               {profile.yearsExperience !== null ? (

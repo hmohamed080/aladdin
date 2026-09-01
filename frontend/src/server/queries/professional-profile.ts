@@ -16,8 +16,9 @@ import type { Database } from "@/types/database.types";
  * already held. What this module adds beyond it is the caller's OWN profile id
  * and whether the platform has listed it.
  *
- * WHAT IS PUBLIC. Identity (name, headline, summary, languages, persona) plus the
- * four practice fields `20260831090002` added — specialization, core services,
+ * WHAT IS PUBLIC. Identity (name, headline, summary, languages, persona), the
+ * canonical trades `20260901090001` added (§4.6 — active keys only, primary
+ * first), plus the four practice fields `20260831090002` added — specialization, core services,
  * years of experience, service areas — plus self-declared availability and the
  * timestamp of its last change (`20260831090004`, §8.4). The private side of
  * onboarding does not come with them: `prof_availability` (the one-off LEAD-TIME
@@ -62,6 +63,23 @@ export type PublicProfile = {
    */
   availableForWork: boolean;
   availabilityUpdatedAt: string | null;
+  /**
+   * The canonical trades (Increment 5, §4.6) — ACTIVE ones only, primary first,
+   * then the vocabulary's own order. Keys, not ids: the label is an i18n lookup
+   * and a uuid would be an internal identifier published for no reader's
+   * benefit.
+   *
+   * These are the STRUCTURED specialty signal and are now what the page leads
+   * with. `specialization` above is the legacy free text — the same claim in a
+   * vocabulary nothing can join on — and is shown only where there is no
+   * canonical trade to show instead.
+   *
+   * An empty array is the common state and is not an error: declaring trades is
+   * optional, and a professional without them is listed and findable exactly as
+   * before (O5 — trades filter nothing).
+   */
+  tradeKeys: string[];
+  primaryTradeKey: string | null;
 };
 
 /** Where the caller's own profile stands with public discovery. */
@@ -119,7 +137,7 @@ export async function loadPublicProfile(profileId: string): Promise<PublicProfil
   const { data, error } = await supabase
     .from("profile_public_directory")
     .select(
-      "id, display_name, headline, bio, languages, persona, specialization, services, years_experience, service_areas, available_for_work, availability_updated_at",
+      "id, display_name, headline, bio, languages, persona, specialization, services, years_experience, service_areas, available_for_work, availability_updated_at, trade_keys, primary_trade_key",
     )
     .eq("id", profileId)
     .maybeSingle();
@@ -139,6 +157,8 @@ export async function loadPublicProfile(profileId: string): Promise<PublicProfil
     serviceAreas: data.service_areas ?? [],
     availableForWork: data.available_for_work ?? false,
     availabilityUpdatedAt: data.availability_updated_at ?? null,
+    tradeKeys: data.trade_keys ?? [],
+    primaryTradeKey: data.primary_trade_key ?? null,
   };
 }
 

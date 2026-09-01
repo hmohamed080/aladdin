@@ -7,6 +7,9 @@ import type { ProfilePublication } from "@/server/queries/professional-profile";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import { languageLabel } from "@/lib/i18n/language-label";
 import { AvailabilityControl } from "@/features/profile/availability-control";
+import { TradeSummary } from "@/features/profile/trade-summary";
+import type { MyTrades } from "@/server/queries/trades";
+import { specializationLabel } from "@/lib/i18n/trade-label";
 import { ChipList, DetailCard, HomeHeader, HomeSection, VerificationBadge } from "@/features/home/parts";
 
 /**
@@ -28,10 +31,13 @@ import { ChipList, DetailCard, HomeHeader, HomeSection, VerificationBadge } from
 export function ProfileHub({
   data,
   publication,
+  trades,
   t,
 }: {
   data: PersonalHomeData;
   publication: ProfilePublication;
+  /** The canonical selection (Increment 5). Read-only here; the editor owns it. */
+  trades: MyTrades;
   t: TranslateFn;
 }) {
   const { professional: p, verification } = data;
@@ -47,8 +53,21 @@ export function ProfileHub({
 
   const practiceRows = [
     {
+      /* THE FREE-TEXT SPECIALIZATION IS NOT SHOWN WHEN A CANONICAL TRADE EXISTS.
+         They are the same claim in two vocabularies, and printing both would put
+         "Marble & granite" above "Marble and granite fixing" with nothing to say
+         which one the platform actually uses. The structured trade is authority
+         (§4.1), so it wins and this row disappears; with no trade declared, the
+         legacy text is still the only answer there is and is kept.
+
+         `specializationLabel`, not the raw catalog: this column holds a
+         vocabulary key in some rows and a sentence in every seeded one, and the
+         catalog lookup printed the message PATH for the second kind. */
       label: t("onboarding.professional.identity.specializationLabel"),
-      value: p.specialization ? t(`onboarding.professional.specializations.${p.specialization}`) : null,
+      value:
+        trades.keys.length > 0 || !p.specialization
+          ? null
+          : specializationLabel(t, p.specialization),
     },
     {
       label: t("onboarding.professional.identity.yearsLabel"),
@@ -94,6 +113,26 @@ export function ProfileHub({
         lead={p.headline ?? t("personalHome.professional.noHeadline")}
         meta={<VerificationBadge state={verification.state} t={t} />}
       />
+
+      <HomeSection
+        title={t("profile.trades.title")}
+        description={t("profile.trades.body")}
+        action={
+          <Link href="/home/profile/edit">
+            <Button type="button" variant="outline">
+              {t("profile.hub.edit")}
+            </Button>
+          </Link>
+        }
+      >
+        {/* STATED HERE, CHOSEN IN THE EDITOR — the same division every other
+            practice fact on this page follows. The one control the hub does own
+            is availability, and it is here because it is the thing a professional
+            changes weekly rather than once. */}
+        <Card>
+          <TradeSummary trades={trades} />
+        </Card>
+      </HomeSection>
 
       <HomeSection
         title={t("profile.availability.title")}

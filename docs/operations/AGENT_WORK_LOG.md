@@ -4,6 +4,203 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Two vocabularies for one claim, and only one of them was authority
+
+**Date:** 2026-09-01 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `143229f` (UI Foundation v1)
+
+Installer Increment 5: the trade taxonomy moves out of free text and into the
+database. Reference data, a join table, one atomic writer, and the three surfaces
+that already showed a specialty now show the canonical one. No Jobs.
+
+### The model
+
+`public.trades` is a vocabulary: `id` (the future `jobs.trade_id` target), a
+`key` shaped by a check constraint, `is_active`, `sort_order`. **No `name_en` /
+`name_ar`** — labels stay in the i18n catalogs keyed by `key`, so a translation
+fix is a frontend change and not a migration. `public.user_trades` is
+`(user_id, trade_id)` with `is_primary`, and no `organization_id`: a trade is a
+person's practice, and hanging it off a membership would delete it the day an
+employment ended.
+
+Seven seeded keys — `kitchens_doors`, `plumbing`, `electrical`, `hvac`,
+`gypsum_paint`, `tiling`, `marble_granite`. The first five are
+`SPECIALIZATIONS.installer_technician` verbatim. The last two exist because the
+demo world already contains them and the five cannot express them.
+
+### The write path is narrower than the approved spec, deliberately
+
+§4.3 of `installer-jobs.md` specified "a user reads and writes their own rows".
+What shipped grants **no client write at all**, in any role, with no write policy:
+`public.user_trades_set` is the only writer.
+
+A client able to write directly would perform one user gesture as three
+statements, and between any two of them the selection is a state nobody asked for
+— zero primaries mid-swap, or two if the calls landed out of order. Removing the
+grant makes that unreachable rather than merely unlikely.
+`ux_user_trades_one_primary unique (user_id) where is_primary` is the backstop
+underneath it. The doc is reconciled to what shipped, with the reasoning, rather
+than left describing a design that was reconsidered.
+
+The RPC takes **no user id**: acting on someone else is not a refused request,
+it is an unexpressible one. Authority is `app.is_professional_persona` —
+Increment 2's predicate, unchanged — which reads `users` and
+`individual_onboarding` and **never `user_trades`**, so holding a trade can never
+be what proves you were allowed to hold it.
+
+It is also narrower than `individual_save_professional`, which additionally admits
+a caller mid-onboarding on the strength of their selected TRACK. A track carries no
+concrete type, so there is no answer yet to which trades apply.
+
+### One primary, and a rule for every case
+
+Exactly one primary whenever the selection is non-empty, none when it is empty.
+A null `p_primary_key` means "you choose", and the choice is the FIRST submitted
+key — an order the caller controls and can therefore predict.
+
+| Case | Result |
+|---|---|
+| first trade selected | it becomes primary |
+| primary changed | named key is primary; the previous one stays selected |
+| primary removed | the first REMAINING key becomes primary |
+| non-primary removed | the primary is untouched |
+| duplicates submitted | deduplicated; converges rather than erroring |
+| empty or null set | every row deleted; no primary |
+| unknown key | `22023`, whole call refused |
+| inactive key, not held | `22023` — cannot be NEWLY selected |
+| inactive key, already held | **accepted** |
+
+The last row is the one worth arguing about. Refusing every inactive key reads as
+stricter and is worse: a trade retired under someone's feet would make every future
+save of their profile fail, for a choice they made before the retirement existed.
+
+Because the call is a complete DESCRIPTION rather than a delta, two submissions in
+flight converge on whichever lands last. The selector posts the same way, and
+applies the same promote-a-survivor rule on screen, so the page after a save is
+the page before it.
+
+**Stricter than the product contract in one place:** the contract says one of the
+selected trades *may* be primary. The implementation requires one whenever the
+selection is non-empty. Optional would have made four of the rows above ambiguous.
+
+### It does not guess
+
+`individual_onboarding.prof_specialization` holds two conventions: a vocabulary key
+where the onboarding chips wrote it, and free prose in every seeded and staging
+professional. The migration's backfill matches **by exact key equality only**. It
+parses nothing.
+
+Mapping "Plumbing and sanitary fitting" onto `plumbing` looks obvious and is a
+guess; the next sentence is "Plumbing and gypsum", and a guess that is right four
+times and wrong once has published a false claim on somebody's public profile.
+
+The demo world is resolved instead **explicitly, by user id**, in `seed-pilot.sql`
+§10.3b, where a human wrote each pair down and a reviewer can check them line by
+line. Heba Kamal (interior designer) and the site engineer are left **unmapped** —
+the Pilot vocabulary is installer trades, and covering them means modelling two
+more professions to decorate a demo.
+
+### A latent defect the taxonomy work surfaced
+
+Because `prof_specialization` holds prose, and all three surfaces rendered it
+through the message catalog, a stranger reading Sayed's public profile saw
+
+    onboarding.professional.specializations.Marble and granite fixing
+
+`t()` returns the KEY PATH when nothing resolves — the same failure mode as the
+stored-language defect fixed one increment ago, one column over.
+`specializationLabel()` translates a key and prints prose as prose. It never
+infers a trade. `tradeLabel()` does the same for canonical keys, falling back to
+the key rather than a path, because a path tells a visitor nothing except that
+something is broken and not whose fault it is.
+
+Where a canonical trade exists it **supersedes** the free text on `/home`, the hub
+and the public page; where none does, the free text is still the only answer.
+Nothing was deleted, and nothing is required.
+
+### UI, under the contract
+
+The first surfaces built entirely under `UI_CONTRACT.md`. No new primitive, no
+persona-local component, one icon added to the canonical set. `/home/profile/edit`
+gains a trade card above the form; `/home/profile` a read-only summary;
+`/home` reads the primary trade through the specialty row **that was already
+there** — a dashboard card announcing "you have declared trades" would be a card
+about the platform's data model rather than about the person's work. The public
+page still ships **143 B** of client JS.
+
+The trade card saves itself rather than riding the profile form's button. One
+button driving two RPCs is two transactions that can disagree, leaving the page to
+explain a half-saved profile; availability set this precedent on the hub.
+
+**`TradeSummary` had to be split into its own module.** It shared a file with
+`TradeSelector`, so a display-only consumer imported the server action and through
+it `server-only`, which fails at runtime rather than at build. Display and write
+now live apart.
+
+### The browser found what the tests could not, again
+
+`data-testid="trade-selector"` was placed on `<Card>`. `data-*` props typecheck on
+any React component and are silently dropped unless it forwards them, and `Card`
+takes `className`, `pad`, `children`. It compiled, it passed review, and it never
+reached the DOM — the **exact** Increment 4 trap, repeated. Moved to a real
+element, and the test that would have caught it is now in the file, with the
+reason written above it.
+
+### Validation
+
+Clean `supabase db reset`. pgTAP **42 files, 1343 tests, PASS**; new
+`41_trade_taxonomy_test.sql` is **73/73**; the three public-projection allow-lists
+(08, 17, 38) were widened **deliberately**, not weakened. Two of the new
+assertions are structural rather than behavioural — that no RLS policy anywhere
+references `user_trades`, and that the only functions mentioning it are its writer
+and the projection reader — because by the time O5 shows up in behaviour, an
+installer has already been refused a job they were allowed to apply for.
+
+`vitest` **713 passed / 67 files** · `tsc --noEmit` clean · `eslint src` 0 errors
+(1 pre-existing warning) · `next build` clean · `check_doc_links.py` 950 links, 0
+broken.
+
+Live UAT as Sayed, driving the real RPC: selected a second trade, promoted it,
+saved, verified in psql that exactly one primary existed; cleared everything and
+confirmed the empty state; read the public page as a visitor. AR RTL showed all
+seven trades in Arabic, and **zero raw keys and zero message paths** on any
+surface in either locale. Seeded state restored afterwards.
+
+### Unfinished work, explicitly
+
+- **The Installer aftercare pass is deferred to its own phase, by instruction.**
+  It was started and stopped after the read-only survey; no file was edited. Its
+  scope — information hierarchy across `/home`, the hub, the editor and Points;
+  the `/home/points` identity band; density and repeated "Not specified"; 390px
+  composition — is unchanged and unaddressed here.
+- **The site-wide UI consistency audit is likewise deferred**, together with the
+  §11 Global Consistency Milestone (Admin shell, Business/Onboarding headers,
+  card-vocabulary collapse, deleting `Band`). `UI_CONTRACT.md` remains in force
+  for all new UI in the meantime, which is what this increment was built under.
+- **`/home/points` still renders `HomeHeader`'s identity band** — "Points" as both
+  eyebrow and title, over a monogram derived from the page name. Pre-existing from
+  Increment 3, in scope for the aftercare pass, out of scope here.
+- Trade labels reuse the `onboarding.professional.specializations.*` namespace per
+  the approved spec. Inherited transitional debt; `tradeLabel()` is the one line
+  that moves when `prof_specialization` retires.
+- `kitchens_doors` and `hvac` are seeded but held by nobody. Correct for a
+  vocabulary, worth confirming.
+- **`RUNTIME_STATE.md` is still not refreshed**, now six increments behind.
+  Untouched here by instruction.
+- `.claude/launch.json` is still gitignored, so the next session writes it again.
+
+### Two things worth knowing next time
+
+- **A column that holds two conventions holds neither.** `prof_specialization` was
+  a key sometimes and a sentence otherwise, and every reader had to guess. The
+  canonical table exists so that the question "what does this person do" has one
+  kind of answer.
+- **Declared trades are a discovery signal, not a permission.** Asserted
+  structurally in pgTAP and stated on the selector itself, because a tester who
+  reads a trade list as a permission list will not take work outside it — and the
+  platform would have taught them a restriction it does not impose.
+
+---
+
 ## Session — Five layouts wrote the same shell, and none of them named it
 
 **Date:** 2026-09-01 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `8be3cdd` (Increment 4)

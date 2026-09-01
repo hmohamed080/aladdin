@@ -74,6 +74,8 @@ describe("loadPublicProfile", () => {
       service_areas: ["nasr_city"],
       available_for_work: true,
       availability_updated_at: "2026-08-28T10:00:00Z",
+      trade_keys: ["marble_granite", "tiling"],
+      primary_trade_key: "marble_granite",
     };
 
     const profile = await loadPublicProfile(ID);
@@ -91,6 +93,11 @@ describe("loadPublicProfile", () => {
       serviceAreas: ["nasr_city"],
       availableForWork: true,
       availabilityUpdatedAt: "2026-08-28T10:00:00Z",
+      // Keys, primary first, exactly as the projection orders them — the loader
+      // passes them through rather than re-sorting, so a disagreement between
+      // the public page and the owner's own profile is impossible.
+      tradeKeys: ["marble_granite", "tiling"],
+      primaryTradeKey: "marble_granite",
     });
     // Read from the hardened projection, never the private base table.
     expect(asked.from).toEqual(["profile_public_directory"]);

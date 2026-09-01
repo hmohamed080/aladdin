@@ -360,6 +360,24 @@ export const en = {
       edit: "Edit profile",
       leadTime: "How soon you can start",
     },
+    trades: {
+      title: "The trades you work in",
+      body: "Pick every trade you take on. The one you mark as your main trade is what businesses see first, and what future job matching will start from.",
+      empty: "You have not chosen a trade yet.",
+      emptyHint: "Choosing your trades is how businesses looking for your line of work find you. You can change them whenever you like.",
+      primary: "Main trade",
+      makePrimary: "Make this the main trade",
+      mainLabel: "Main trade",
+      alsoLabel: "Also works in",
+      selectedCount: "{n} selected",
+      save: "Save trades",
+      saving: "Saving…",
+      saved: "Trades saved",
+      saveFailed: "We could not save your trades. Please try again.",
+      notProfessional: "Trades are part of a professional profile, and this account does not have one.",
+      unavailable: "That trade is no longer offered. Please choose another.",
+      note: "Choosing a trade does not restrict you. You can still take on work outside it.",
+    },
     availability: {
       title: "Are you taking work?",
       body: "Tell businesses whether you are open to new work right now. You can change this whenever it changes.",
@@ -1366,6 +1384,12 @@ export const en = {
         electrical: "Electrical",
         hvac: "HVAC",
         gypsum_paint: "Gypsum & paint",
+        // Added with the canonical trade taxonomy (Increment 5). Not offered as
+        // an onboarding CHIP — `SPECIALIZATIONS.installer_technician` is
+        // unchanged — but both are seeded trades that the demo world already
+        // contains, and a trade with no label prints its own key.
+        tiling: "Tiling",
+        marble_granite: "Marble & granite",
         full_finishing: "Full finishing",
         renovation: "Renovation",
         turnkey: "Turnkey",

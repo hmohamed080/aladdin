@@ -17,6 +17,11 @@ const profile = (over: Partial<PublicProfile> = {}): PublicProfile => ({
   serviceAreas: ["nasr_city"],
   availableForWork: false,
   availabilityUpdatedAt: null,
+  // No canonical trades by default: the seeded Pilot professionals had none
+  // until Increment 5, so this is the state most existing profiles are in and
+  // the one the legacy free-text fallback has to keep working for.
+  tradeKeys: [],
+  primaryTradeKey: null,
   ...over,
 });
 
@@ -223,6 +228,88 @@ describe("PublicProfileView — the practice", () => {
     const age = screen.getByTestId("availability-age").textContent ?? "";
     expect(age).toMatch(/آخر تحديث/);
     expect(age).not.toMatch(/[0-9]/);
+  });
+
+  /**
+   * The canonical taxonomy on the public page (Increment 5, §4.6).
+   *
+   * This is the surface the whole taxonomy exists for: a visitor deciding
+   * whether to make contact is scanning for the CATEGORY, and until now they got
+   * either a sentence, a vocabulary key, or — for every seeded professional —
+   * nothing at all.
+   */
+  it("leads with the canonical trades and marks the primary", () => {
+    render(
+      <PublicProfileView
+        profile={profile({ tradeKeys: ["marble_granite", "tiling"], primaryTradeKey: "marble_granite" })}
+        t={createTranslator("en")}
+        locale="en"
+      />,
+    );
+    expect(screen.getByTestId("public-trades")).toBeTruthy();
+    expect(screen.getByText("Marble & granite")).toBeTruthy();
+    expect(screen.getByText("Tiling")).toBeTruthy();
+  });
+
+  /**
+   * ONE SPECIALTY SIGNAL, NOT TWO. The fixture carries `gypsum_paint` in the
+   * legacy free-text column AND a canonical trade; showing both would print the
+   * same kind of fact twice with nothing to distinguish them.
+   */
+  it("does not print the legacy specialization beside a canonical trade", () => {
+    render(
+      <PublicProfileView
+        profile={profile({ tradeKeys: ["marble_granite"], primaryTradeKey: "marble_granite" })}
+        t={createTranslator("en")}
+        locale="en"
+      />,
+    );
+    expect(screen.queryByText("Gypsum & paint")).toBeNull();
+  });
+
+  it("keeps the legacy specialization where there is no trade to replace it", () => {
+    render(<PublicProfileView profile={profile()} t={createTranslator("en")} locale="en" />);
+    expect(screen.getByText("Gypsum & paint")).toBeTruthy();
+  });
+
+  /**
+   * THE LATENT DEFECT THIS INCREMENT FOUND. `prof_specialization` holds a
+   * vocabulary key in some rows and free PROSE in every seeded and staging one,
+   * and the page used to render it straight through the catalog — so a stranger
+   * reading Sayed's public profile saw
+   * `onboarding.professional.specializations.Marble and granite fixing`.
+   */
+  it("renders a prose specialization as prose, never as a message path", () => {
+    const { container } = render(
+      <PublicProfileView
+        profile={profile({ specialization: "Marble and granite fixing" })}
+        t={createTranslator("en")}
+        locale="en"
+      />,
+    );
+    expect(screen.getByText("Marble and granite fixing")).toBeTruthy();
+    expect(container.textContent).not.toMatch(/onboarding\./);
+  });
+
+  it("shows canonical trades in Arabic with no raw key", () => {
+    const { container } = render(
+      <PublicProfileView
+        profile={profile({ tradeKeys: ["marble_granite", "tiling"], primaryTradeKey: "marble_granite" })}
+        t={createTranslator("ar")}
+        locale="ar"
+      />,
+    );
+    expect(screen.getByText("رخام وجرانيت")).toBeTruthy();
+    expect(container.textContent).not.toMatch(/marble_granite|tiling|onboarding\./);
+  });
+
+  it("stays a complete page for a professional who has declared no trade", () => {
+    // The COMMON case: every seeded Pilot professional was in it until this
+    // increment, and declaring a trade is optional — nothing is hidden or
+    // filtered for the absence (O5).
+    render(<PublicProfileView profile={profile()} t={createTranslator("en")} locale="en" />);
+    expect(screen.queryByTestId("public-trades")).toBeNull();
+    expect(screen.getByTestId("public-profile")).toBeTruthy();
   });
 
   it("still exposes no PRIVATE lead-time preference", () => {

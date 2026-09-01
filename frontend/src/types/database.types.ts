@@ -2413,6 +2413,69 @@ export type Database = {
           },
         ]
       }
+      trades: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_trades: {
+        Row: {
+          created_at: string
+          is_primary: boolean
+          trade_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          is_primary?: boolean
+          trade_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          is_primary?: boolean
+          trade_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_trades_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_trades_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string
@@ -2773,9 +2836,11 @@ export type Database = {
           languages: string[] | null
           locality_id: string | null
           persona: Database["public"]["Enums"]["persona_type"] | null
+          primary_trade_key: string | null
           service_areas: string[] | null
           services: string[] | null
           specialization: string | null
+          trade_keys: string[] | null
           years_experience: number | null
         }
         Relationships: []
@@ -4150,6 +4215,10 @@ export type Database = {
           p_title?: string
         }
         Returns: number
+      }
+      user_trades_set: {
+        Args: { p_primary_key?: string; p_trade_keys: string[] }
+        Returns: undefined
       }
     }
     Enums: {

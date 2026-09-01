@@ -16,6 +16,8 @@ import {
 } from "./parts";
 import { SalesAffiliationPanel } from "./sales-affiliation";
 import { AvailabilityBadge } from "@/features/profile/availability-status";
+import { tradeLabel, specializationLabel } from "@/lib/i18n/trade-label";
+import type { MyTrades } from "@/server/queries/trades";
 
 /**
  * The PROFESSIONAL variant of the personal surface — ONE structure for every
@@ -65,7 +67,16 @@ const STEP_FOR_ITEM: Record<CompletenessItemKey, string> = {
   travelRadius: "/home/profile/edit",
 };
 
-export function ProfessionalHome({ data, t }: { data: PersonalHomeData; t: TranslateFn }) {
+export function ProfessionalHome({
+  data,
+  trades,
+  t,
+}: {
+  data: PersonalHomeData;
+  /** The canonical selection (Increment 5) — the source of the specialty row. */
+  trades: MyTrades;
+  t: TranslateFn;
+}) {
   const { professional: p, completeness, verification } = data;
   const name = data.displayName || t("personalHome.professional.friend");
   const persona = t(`accountType.${data.accountType}`);
@@ -80,8 +91,26 @@ export function ProfessionalHome({ data, t }: { data: PersonalHomeData; t: Trans
 
   const profileRows = [
     {
+      /* THE EXISTING SPECIALTY ROW, NOW READING THE CANONICAL TAXONOMY — the
+         same row in the same card, not a new one. A dashboard card that exists
+         only to say "you have declared trades" would be a card about the
+         platform's own data model.
+
+         The canonical PRIMARY trade wins where there is one; the legacy free
+         text is the fallback where there is not, so an account that has not
+         opened the editor since Increment 5 still reads correctly. Both cannot
+         show at once: they are one claim in two vocabularies, and only one of
+         them is authority (§4.1).
+
+         `specializationLabel` for the fallback, because this column holds a
+         vocabulary key in some rows and a sentence in every seeded one — the
+         catalog lookup printed the message PATH for the second kind. */
       label: t("onboarding.professional.identity.specializationLabel"),
-      value: p.specialization ? t(`onboarding.professional.specializations.${p.specialization}`) : null,
+      value: trades.primaryKey
+        ? tradeLabel(t, trades.primaryKey)
+        : p.specialization
+          ? specializationLabel(t, p.specialization)
+          : null,
     },
     {
       label: t("onboarding.professional.identity.yearsLabel"),
