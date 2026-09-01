@@ -1048,3 +1048,73 @@ values
   ('e7000024-0000-4000-8000-000000000024', 'e5000024-0000-4000-8000-000000000024', '9a000000-aaaa-4aaa-8aaa-000000000005', '91000003-1111-4111-8111-000000000003', 'b0000005-0000-4000-8000-000000000005',
    'Sanitary supply - New Cairo tower', 'New Cairo, Cairo', 'Staged delivery of imported basins, floor by floor.',
    (now() - interval '16 days')::date, (now() + interval '14 days')::date, 'active', 2, now() - interval '16 days', null, now() - interval '20 days', '71000003-0000-4000-8000-000000000003');
+
+-- ===========================================================================
+-- 12. INSTALLER JOBS DOMAIN (Increment 6)
+-- ===========================================================================
+-- The smallest fixture that makes the domain exercisable, and no more. Two
+-- jobs and three capability grants — no applications, no assignments, no
+-- progress. Those are LIFECYCLE, and a lifecycle state that arrives by INSERT
+-- rather than through job_application_accept proves nothing about the authority
+-- that is supposed to produce it. The pgTAP suite generates every one of them.
+--
+-- Both jobs belong to Horizon Contracting, which is a verified
+-- contractor_company that already buys finishing work in this world — so the
+-- opening is something that organization would plausibly post, not a row
+-- invented to give the table a value.
+-- ---------------------------------------------------------------------------
+
+-- 12.1 Poster-side capabilities, split across two people ON PURPOSE.
+--
+-- Mostafa Bakr already holds org.manage, the blanket in-org unlock, so he needs
+-- nothing here and reaches every job path through the fallback. Laila gets
+-- job.post and NOT job.manage: she can author, publish and close an opening but
+-- cannot decide who gets it. That split is the whole reason the two capabilities
+-- are separate keys, and without a fixture holding exactly one of them the
+-- difference is untested.
+insert into public.membership_capabilities (membership_id, capability_key)
+select m.id, v.capability_key
+from (values
+  ('70000007-0000-4000-8000-000000000007'::uuid, 'job.post')
+) as v(user_id, capability_key)
+join public.memberships m
+  on m.user_id = v.user_id
+ and m.organization_id = '9a000000-aaaa-4aaa-8aaa-000000000005'
+on conflict do nothing;
+
+-- 12.2 One OPEN opening and one DRAFT.
+--
+-- The draft exists to prove the negative: it must never appear in
+-- open_job_opportunities, for anyone, however verified its poster is. A domain
+-- whose fixtures are all discoverable cannot demonstrate that.
+--
+-- trade_id is resolved BY KEY, never hard-coded — public.trades.id is a
+-- gen_random_uuid() default and differs on every reset.
+insert into public.jobs (
+  id, poster_org_id, poster_branch_id, title, description, trade_id,
+  offered_amount, governorate, city, site_address,
+  expected_duration_days, starts_on, status, version, published_at,
+  created_by, created_at)
+select v.id, '9a000000-aaaa-4aaa-8aaa-000000000005', 'b0000005-0000-4000-8000-000000000005',
+       v.title, v.description, t.id, v.offered_amount,
+       v.governorate, v.city, v.site_address, v.duration, v.starts_on,
+       v.status::public.job_status, 1, v.published_at, v.created_by, v.created_at
+from (values
+  ('f1000001-0000-4000-8000-000000000001'::uuid,
+   'Marble staircase cladding - Fifth Settlement',
+   'Cladding a villa staircase from ground to first floor, including nosings and skirting. Materials supplied on site.',
+   'marble_granite', 18000.00, 'Cairo', 'New Cairo', '12 Street 90, Fifth Settlement',
+   14::smallint, (now() + interval '10 days')::date,
+   'open', now() - interval '3 days',
+   '70000006-0000-4000-8000-000000000006'::uuid, now() - interval '3 days'),
+  ('f1000002-0000-4000-8000-000000000002'::uuid,
+   'Bathroom sanitary fitting - Maadi handover',
+   'Fitting basins, mixers and concealed cisterns across eight apartments ahead of handover.',
+   'plumbing', 22500.00, 'Cairo', 'Maadi', '5 Road 9, Maadi',
+   21::smallint, (now() + interval '25 days')::date,
+   'draft', null,
+   '70000006-0000-4000-8000-000000000006'::uuid, now() - interval '1 day')
+) as v(id, title, description, trade_key, offered_amount, governorate, city,
+       site_address, duration, starts_on, status, published_at, created_by, created_at)
+join public.trades t on t.key = v.trade_key
+on conflict (id) do nothing;

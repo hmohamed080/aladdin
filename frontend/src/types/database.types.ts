@@ -708,6 +708,302 @@ export type Database = {
           },
         ]
       }
+      job_applications: {
+        Row: {
+          applicant_user_id: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          id: string
+          job_id: string
+          note: string | null
+          status: Database["public"]["Enums"]["job_application_status"]
+          updated_at: string
+        }
+        Insert: {
+          applicant_user_id: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          id?: string
+          job_id: string
+          note?: string | null
+          status?: Database["public"]["Enums"]["job_application_status"]
+          updated_at?: string
+        }
+        Update: {
+          applicant_user_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          id?: string
+          job_id?: string
+          note?: string | null
+          status?: Database["public"]["Enums"]["job_application_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_applications_applicant_user_id_fkey"
+            columns: ["applicant_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_applications_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_applications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_assignments: {
+        Row: {
+          agreed_amount: number
+          agreed_currency: string
+          application_id: string
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          installer_user_id: string
+          job_id: string
+          last_progress_at: string | null
+          latest_progress_percent: number
+          poster_org_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_assignment_status"]
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          agreed_amount: number
+          agreed_currency?: string
+          application_id: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          installer_user_id: string
+          job_id: string
+          last_progress_at?: string | null
+          latest_progress_percent?: number
+          poster_org_id: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_assignment_status"]
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          agreed_amount?: number
+          agreed_currency?: string
+          application_id?: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          installer_user_id?: string
+          job_id?: string
+          last_progress_at?: string | null
+          latest_progress_percent?: number
+          poster_org_id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_assignment_status"]
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_assignments_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "job_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_installer_user_id_fkey"
+            columns: ["installer_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_poster_org_id_fkey"
+            columns: ["poster_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_progress_updates: {
+        Row: {
+          assignment_id: string
+          author_user_id: string
+          created_at: string
+          id: string
+          note: string | null
+          progress_percent: number
+          stage: string | null
+        }
+        Insert: {
+          assignment_id: string
+          author_user_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          progress_percent: number
+          stage?: string | null
+        }
+        Update: {
+          assignment_id?: string
+          author_user_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          progress_percent?: number
+          stage?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_progress_updates_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "job_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_progress_updates_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          city: string | null
+          closed_at: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          ends_by: string | null
+          expected_duration_days: number | null
+          governorate: string | null
+          id: string
+          offered_amount: number
+          offered_currency: string
+          poster_branch_id: string | null
+          poster_org_id: string
+          published_at: string | null
+          site_address: string | null
+          starts_on: string | null
+          status: Database["public"]["Enums"]["job_status"]
+          title: string
+          trade_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          city?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          ends_by?: string | null
+          expected_duration_days?: number | null
+          governorate?: string | null
+          id?: string
+          offered_amount: number
+          offered_currency?: string
+          poster_branch_id?: string | null
+          poster_org_id: string
+          published_at?: string | null
+          site_address?: string | null
+          starts_on?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          title: string
+          trade_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          city?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          ends_by?: string | null
+          expected_duration_days?: number | null
+          governorate?: string | null
+          id?: string
+          offered_amount?: number
+          offered_currency?: string
+          poster_branch_id?: string | null
+          poster_org_id?: string
+          published_at?: string | null
+          site_address?: string | null
+          starts_on?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          title?: string
+          trade_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_jobs_poster_branch"
+            columns: ["poster_org_id", "poster_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "jobs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_poster_org_id_fkey"
+            columns: ["poster_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           assigned_membership_id: string | null
@@ -2660,6 +2956,46 @@ export type Database = {
           },
         ]
       }
+      my_job_applications: {
+        Row: {
+          city: string | null
+          created_at: string | null
+          decided_at: string | null
+          decision_reason: string | null
+          governorate: string | null
+          id: string | null
+          job_id: string | null
+          job_status: Database["public"]["Enums"]["job_status"] | null
+          job_title: string | null
+          note: string | null
+          offered_amount: number | null
+          offered_currency: string | null
+          poster_org_name: string | null
+          status: Database["public"]["Enums"]["job_application_status"] | null
+          trade_key: string | null
+        }
+        Relationships: []
+      }
+      open_job_opportunities: {
+        Row: {
+          city: string | null
+          description: string | null
+          ends_by: string | null
+          expected_duration_days: number | null
+          governorate: string | null
+          has_applied: boolean | null
+          id: string | null
+          offered_amount: number | null
+          offered_currency: string | null
+          poster_org_id: string | null
+          poster_org_name: string | null
+          published_at: string | null
+          starts_on: string | null
+          title: string | null
+          trade_key: string | null
+        }
+        Relationships: []
+      }
       order_category_spend: {
         Row: {
           amount: number | null
@@ -3826,6 +4162,97 @@ export type Database = {
           status: string
         }[]
       }
+      job_application_accept: {
+        Args: { p_application_id: string }
+        Returns: string
+      }
+      job_application_reject: {
+        Args: { p_application_id: string; p_reason: string }
+        Returns: undefined
+      }
+      job_application_submit: {
+        Args: { p_job_id: string; p_note?: string }
+        Returns: string
+      }
+      job_application_withdraw: {
+        Args: { p_application_id: string }
+        Returns: undefined
+      }
+      job_assignment_cancel: {
+        Args: {
+          p_assignment_id: string
+          p_expected_version: number
+          p_reason: string
+        }
+        Returns: number
+      }
+      job_assignment_complete: {
+        Args: { p_assignment_id: string; p_expected_version: number }
+        Returns: number
+      }
+      job_assignment_start: {
+        Args: { p_assignment_id: string; p_expected_version: number }
+        Returns: number
+      }
+      job_cancel: {
+        Args: {
+          p_expected_version: number
+          p_job_id: string
+          p_reason?: string
+        }
+        Returns: number
+      }
+      job_close: {
+        Args: { p_expected_version: number; p_job_id: string }
+        Returns: number
+      }
+      job_create: {
+        Args: {
+          p_branch_id?: string
+          p_city?: string
+          p_description?: string
+          p_ends_by?: string
+          p_expected_duration_days?: number
+          p_governorate?: string
+          p_offered_amount: number
+          p_org_id: string
+          p_site_address?: string
+          p_starts_on?: string
+          p_title: string
+          p_trade_key: string
+        }
+        Returns: string
+      }
+      job_progress_add: {
+        Args: {
+          p_assignment_id: string
+          p_note?: string
+          p_progress_percent: number
+          p_stage?: string
+        }
+        Returns: string
+      }
+      job_publish: {
+        Args: { p_expected_version: number; p_job_id: string }
+        Returns: number
+      }
+      job_update: {
+        Args: {
+          p_city?: string
+          p_description?: string
+          p_ends_by?: string
+          p_expected_duration_days?: number
+          p_expected_version: number
+          p_governorate?: string
+          p_job_id: string
+          p_offered_amount: number
+          p_site_address?: string
+          p_starts_on?: string
+          p_title: string
+          p_trade_key: string
+        }
+        Returns: number
+      }
       mark_all_notifications_read: {
         Args: { p_org_id?: string }
         Returns: number
@@ -4233,6 +4660,23 @@ export type Database = {
       customer_type: "individual" | "company"
       follow_up_status: "open" | "completed" | "cancelled"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
+      job_application_status:
+        | "submitted"
+        | "accepted"
+        | "rejected"
+        | "withdrawn"
+      job_assignment_status:
+        | "scheduled"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
+      job_status:
+        | "draft"
+        | "open"
+        | "awarded"
+        | "completed"
+        | "closed"
+        | "cancelled"
       lead_stage:
         | "new"
         | "contacted"
@@ -4467,6 +4911,26 @@ export const Constants = {
       customer_type: ["individual", "company"],
       follow_up_status: ["open", "completed", "cancelled"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
+      job_application_status: [
+        "submitted",
+        "accepted",
+        "rejected",
+        "withdrawn",
+      ],
+      job_assignment_status: [
+        "scheduled",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ],
+      job_status: [
+        "draft",
+        "open",
+        "awarded",
+        "completed",
+        "closed",
+        "cancelled",
+      ],
       lead_stage: [
         "new",
         "contacted",

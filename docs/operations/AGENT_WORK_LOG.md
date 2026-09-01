@@ -4,6 +4,180 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — One organization, one person, and no client allowed to write it
+
+**Date:** 2026-09-02 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `4df3e64` (Increment 5)
+
+Installer Increment 6: the Jobs domain, database only. Four tables, three enums,
+thirteen RPCs, two read projections, no UI. It is the authority Increments 7, 8
+and 9 will sit on, built ahead of them so the interfaces have nothing to decide.
+
+### Why it does not reuse the commerce domain next to it
+
+An RFQ, a quotation and an order are all **organization ↔ organization**: two
+tenants, two capability sets, and every policy is a pair of org predicates. A job
+is **organization → PERSON**, and the person's authority is `auth.uid()` and
+nothing else.
+
+Reusing `orders` would have given the installer an org-shaped seat at a table
+where they have no organization, and the first refactor that noticed the symmetry
+would have collapsed the installer's read of their own work onto an org-membership
+check — silently handing installers tenant reads. `job_assignments` carries
+`installer_user_id` and `poster_org_id` as flat denormalised columns for exactly
+that reason: every installer-side policy is a column check against `auth.uid()`,
+and none of them can be rewritten into an org predicate without the rewrite being
+obvious.
+
+### Four rules made structural rather than conventional
+
+**No client DML.** Not one `INSERT`/`UPDATE`/`DELETE` grant on any of the four
+tables in any role, `service_role` included, and no non-`SELECT` policy. RLS
+answers who may READ a row; the RPCs answer who may CHANGE it, and the two
+questions never share a predicate.
+
+**Verification suppression is derived.** Nothing caches `is_verified` onto a job.
+Discovery and new applications join the live organizations row, so a lapse hides
+a job with no row rewritten and a restore brings it back with no backfill. A
+denormalised copy freezes the wrong answer in *both* directions — a suppressed
+job staying visible, a re-verified org's jobs staying buried — and neither shows
+up until somebody complains. The test revokes verification and watches discovery
+change while `status` stays `open`.
+
+**One active assignment, at the storage layer.**
+`ux_job_assignments_active_job unique (job_id) where status <> 'cancelled'`. The
+accept path locks the job, but the *guarantee* is the index: two concurrent
+accepts collide on it and the second transaction rolls back whole. The test
+attacks it with a raw INSERT rather than through the RPC, because an RPC-level
+check is only as good as the next RPC.
+
+**Trade is never authority (O5).** Asserted three ways structurally — no policy in
+the domain mentions `user_trades`, no Jobs function reads it, no Jobs function
+writes `public.trades`. This is the most likely regression in the whole milestone
+*because it feels like a feature*: "only show matching jobs", then "only let
+matching installers apply", and O5 is gone without a line of it being discussed.
+By the time it fails behaviourally a real installer has already been refused work
+they were allowed to take. Behaviourally too: Mahmoud, whose only declared trade
+is `electrical`, applies to a `marble_granite` job and succeeds.
+
+### The authority line that matters most
+
+**The installer cannot complete their own work record.** They start, they report
+progress, they reach 100 — and the assignment is still `in_progress` and the job
+still `awarded`. 100% is a *claim of readiness*; the posting organization
+confirms it. A rating anchored to work the rated party declared finished about
+themselves is not evidence, and this is the increment where that becomes true
+rather than intended.
+
+### Nine departures from the approved spec, all deliberate
+
+Recorded in a new §3.6 of `installer-jobs.md`. Seven are narrowings; two are the
+review's own lifecycle corrections.
+
+The one worth arguing about is **"active org"**. §10.3's table says `job_create`
+requires an active organization, and read literally that means
+`status = 'active'` — which would lock an organization in `pending_verification`
+out of drafting, the exact line the same section says verification must never
+cross. Everywhere else in this repository `status = 'active'` is a
+DISCOVERABILITY condition; the public directory and the catalog projection both
+use it that way. So drafting is gated on *not suspended, not archived*, and
+publishing keeps `is_verified AND status = 'active'`, because that IS the
+discoverability gate. The document now says so.
+
+The others: no client write grant (narrows §10.4); the offer freeze extended to
+`trade_id`, because an applicant consented to an amount FOR A TRADE; three
+lifecycle guards as triggers, which catch us rather than a browser; the agreed
+compensation snapshotted onto the assignment; two extra audit actions; and a
+second read seam, `my_job_applications` — needed because the `jobs` policy
+deliberately excludes applicants (the base row carries `site_address`, withheld
+until assignment), which leaves an applicant's own candidacy as a `job_id` and a
+status rather than a record a person can read.
+
+### The two corrections review asked for
+
+**`awarded → cancelled` is gone.** An awarded job has somebody holding live work
+on it. Cancelling the opening in one step ended that engagement as an *unnamed
+side effect* — closed by a path the poster never aimed at the installer, and the
+reason left on the record was the one written about the job, not about the work.
+Now `job_cancel` takes `draft` and `open` only, the trigger refuses the edge, and
+the block inside `job_cancel` that used to cancel the live assignment is gone
+because it became unreachable. The poster ends the engagement first, with its own
+required reason, which returns the job to `open`; the opening is cancelled from
+there. Two acts, two reasons, in the order the installer experiences them.
+
+**A withdrawal is reversible; a decision is not.** `job_application_submit`
+returns a caller's own `withdrawn` row to `submitted` on the **same id**,
+atomically under the job lock — but only after passing the same two gates a
+first-time applicant passes, so withdrawing is never a door back in that a
+newcomer does not have. `created_at` survives, because it is the honest record of
+when this person first put their name forward. `accepted` and `rejected` return
+**unchanged**, not one column touched: both are the poster's decisions, and
+reversing either from the applicant's side would let someone re-enter a
+competition they had already been told they lost.
+`app.job_applications_status_guard()` permits exactly one edge out of a
+non-`submitted` state, so a future write path cannot widen it by accident.
+
+### A deadlock caught by reading rather than by testing
+
+`job_cancel` locked jobs → assignment; `job_assignment_cancel` locked assignment
+→ jobs. A cycle, and two concurrent cancels would have deadlocked. No test would
+have found it — pgTAP runs one transaction. Every write path that touches two
+rows now takes `jobs` first, and the ones that need the child's `job_id` read it
+unlocked, take the job lock, then re-read the child `for update`.
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 43 files, 1505 tests, PASS** — new
+`42_jobs_domain_test.sql` is **162/162**, and 1505 − 1343 is exactly the new file,
+so no existing count moved. Generated types **+464 lines, 0 deletions**, and
+byte-identical after the two corrections (no signature or enum drift).
+`tsc --noEmit` clean · `eslint src` 0 errors (1 pre-existing warning) ·
+`vitest` 713/67 unchanged · `check_doc_links` 950 links, 0 broken.
+
+Fixtures are two jobs and one capability grant, and deliberately no applications,
+assignments or progress: those are LIFECYCLE, and a state that arrives by INSERT
+proves nothing about the authority meant to produce it. Laila holds `job.post`
+and NOT `job.manage`, so the difference between the two keys is testable rather
+than assumed.
+
+### One trap worth knowing
+
+`create extension if not exists pgtap` sits **before** `begin;` in every test
+file, so it commits. Running a single test manually with `psql -f` therefore
+leaves pgTAP's own `tap_funky` and `pg_all_foreign_keys` views in `public` — and
+test 29's "no SECURITY DEFINER view in public" sweep then flags them. It cost a
+real investigation into a failure this increment had not caused. **The suite is
+only trustworthy from a clean reset.**
+
+### Unfinished work, explicitly
+
+- **`NAV_CAPS` does not yet list `job.post` / `job.manage`**
+  (`frontend/src/lib/nav/modules.ts`). Correct for a database-only increment, and
+  Increment 7 needs it or the poster module dead-ends.
+- **Reviews (§6) are not implemented** — Increment 12. The seam is
+  `job_reviews.assignment_id → job_assignments.id` and needed no column here.
+- **No notifications.** `ck_notifications_event_type_known` is untouched and a
+  test asserts zero `job%` notification rows. The seams a later increment would
+  wire are `job.application.submitted` to the poster and `accepted`/`rejected` to
+  the applicant.
+- **The Installer aftercare pass and the site-wide UI consistency audit remain
+  deferred**, unchanged from the previous entry. `UI_CONTRACT.md` stays in force
+  for new UI; this increment had none.
+- **`RUNTIME_STATE.md` is still not refreshed**, now seven increments behind.
+  Untouched here by instruction.
+
+### Two things worth knowing next time
+
+- **A lock cycle is invisible to a test suite that runs one transaction.** The
+  only way it was going to be found was by reading the four write paths together
+  and asking which order each took its locks in.
+- **A literal reading of a spec can contradict the spec.** `status = 'active'`
+  appears in §10.3 and would have broken the rule stated two paragraphs above it.
+  The fix was to look at what that literal means everywhere else in the
+  repository — discoverability, every time — rather than to implement the
+  sentence.
+
+---
+
 ## Session — Two vocabularies for one claim, and only one of them was authority
 
 **Date:** 2026-09-01 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `143229f` (UI Foundation v1)

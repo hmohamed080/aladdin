@@ -228,7 +228,7 @@ draft ──publish──▶ open ──accept application──▶ awarded ─�
 | `open` | `awarded` | **side effect of accepting an application** — never set directly |
 | `awarded` | `completed` | **side effect of the assignment completing** — never set directly |
 | `awarded` | `open` | **side effect of the assignment being cancelled**; the opening returns to the pool |
-| `awarded` | `cancelled` | poster org, cancelling the whole opening (also cancels the live assignment) |
+| ~~`awarded`~~ | ~~`cancelled`~~ | **REMOVED — see §3.6, correction 8.** An awarded job is not cancellable in one step; the assignment is cancelled first (returning the job to `open`), and the opening is then cancelled from there. |
 
 `awarded → open` is why `ux_job_assignments_active_job` excludes cancelled rows. **This behaviour is
 preserved unchanged by O4** — a re-awardable job returns to `open`, never to `closed`.
@@ -257,8 +257,14 @@ transaction, with a system `decision_reason`. Leaving losing candidacies open wo
 installer a live application against an already-awarded job — a lie the model can prevent
 structurally.
 
-All three decided states are **terminal**. There is no un-accept; a mistake is corrected by
-cancelling the assignment, which returns the job to `open` for a fresh round.
+The two **decided** states — `accepted` and `rejected` — are terminal. There is no un-accept and no
+un-reject; a mistake is corrected by cancelling the assignment, which returns the job to `open` for a
+fresh round.
+
+**`withdrawn` is not a decision and is not terminal.** It is the applicant's own statement about their
+own availability, and `job_application_submit` returns that same row to `submitted` while the job is
+open and the poster verified (§3.6, correction 9). Exactly one edge leaves a non-`submitted` state,
+and it is that one.
 
 #### `public.job_assignment_status`
 
@@ -273,6 +279,108 @@ not evidence. The installer signals readiness with a `job_progress_updates` row 
 the poster then confirms. Either party may **cancel**, with a reason.
 
 `completed` and `cancelled` are terminal.
+
+### 3.6 What Increment 6 shipped, and where it narrows this document
+
+`20260902090001_jobs_domain.sql` implements §3.1–§3.5, §10 and §12. **Reviews (§6)
+are NOT implemented** — they remain Increment 12; the seam is
+`job_reviews.assignment_id → job_assignments.id`, and nothing about it required a
+column or a placeholder here.
+
+Nine places where the implementation is deliberately **not** what this document
+says. Seven are narrowings for security, atomicity or internal consistency; the
+last two are approved lifecycle corrections made during review. None was a
+discovery made while typing.
+
+**1. No client write grant on any of the four tables** (narrows §10.4's "a user
+reads and writes their own rows", already reconciled for `user_trades` in §4.3).
+There is no `INSERT`/`UPDATE`/`DELETE` privilege in any role, and no non-`SELECT`
+policy. A client able to write directly would perform one user gesture as several
+statements, and between any two of them the row set is a state nobody asked for.
+
+**2. The offer freeze covers `trade_id` as well** as `offered_amount` and
+`offered_currency` (extends §5.3). An applicant consented to a stated amount *for
+a stated trade*; silently moving either afterwards makes the application a bid on
+something that no longer exists. Same trigger, one more column.
+
+**3. "Active org" is read as NOT suspended and NOT archived**, not as
+`status = 'active'` (§10.3's table). The literal reading contradicts the same
+section's rule two paragraphs above: everywhere else in this repository
+`status = 'active'` is a DISCOVERABILITY condition — the public directory and the
+catalog projection both use it that way — and applying it to `job_create` would
+lock an organization in `pending_verification` out of drafting, which is exactly
+the line verification must never cross. Publishing still requires
+`is_verified AND status = 'active'`, because that IS the discoverability gate.
+
+**4. Three lifecycle guards exist as triggers**, not only inside the RPCs:
+`app.jobs_status_transition_guard()`, `app.job_applications_status_guard()` and
+`app.job_assignments_status_guard()`. There is no client `UPDATE` grant, so these
+cannot catch a browser — they catch **us**. A future write path that sets
+`completed` from `open`, or reopens a `closed` job, fails at the trigger instead
+of producing a job whose history is not a path.
+
+**5. `job_assignments` carries `agreed_amount` / `agreed_currency`** (adds to
+§3.3). The job's own offer is already immutable once an application exists, so
+this is belt and braces — but a work record that must join back to a live row to
+say what was agreed is a work record whose meaning changes when someone edits the
+job. Disclosure only; no payment of any kind is asserted, recorded or implied.
+
+**6. Two audit actions beyond §15** — `job.created` and `job.updated`. A draft is
+private, but drafting an opening and changing its terms are both acts the poster
+organization is answerable for, and the reject/accept trail is unreadable without
+them. No Jobs event carries the offered amount, which §15 already forbids and
+test 42 asserts.
+
+**7. A second read seam, `public.my_job_applications`** (adds to §10.4). The base
+policy on `jobs` deliberately excludes applicants, because the base row carries
+`site_address` and §11 withholds that until assignment. Without a projection an
+applicant's own candidacy is a `job_id` and a status — not a record a person can
+read. Same `security_invoker`-over-definer-reader shape as
+`open_job_opportunities`, and it withholds `site_address` for the same reason.
+
+**RPC surface, as shipped:** `job_create` · `job_update` · `job_publish` ·
+`job_close` · `job_cancel` · `job_application_submit` ·
+`job_application_withdraw` · `job_application_reject` · `job_application_accept` ·
+`job_assignment_start` · `job_progress_add` · `job_assignment_complete` ·
+`job_assignment_cancel`. `job_create` takes a **trade KEY**, not an id:
+`trades.id` is a `gen_random_uuid()` default that differs per environment, and the
+key is the stable identifier the rest of the product already speaks.
+
+**Lock order is `jobs` first, then the child row**, in every write path that
+touches two. Without it `job_cancel` (job → assignment) and
+`job_assignment_cancel` (assignment → job) form a cycle, and two concurrent
+cancels would deadlock. The functions that need the child row's `job_id` first
+read it unlocked, take the job lock, then re-read the child `for update`.
+
+**8. `awarded → cancelled` is removed from the lifecycle** (corrects §3.5's table
+and §10.5's `job_cancel` row). An awarded job has a person holding live work on
+it. Cancelling the opening in one step would end that engagement as an *unnamed
+side effect* — the assignment would be closed by a code path the poster never
+aimed at the installer, and the cancellation reason on the record would be the
+one written about the job, not about the work. So `job_cancel` accepts `draft`
+and `open` only, and the trigger refuses the edge outright. The poster cancels
+the assignment first (`job_assignment_cancel`, which requires its own reason and
+returns the job to `open`), and cancels the opening from there if they still want
+to. Two deliberate acts, two reasons on the record, in the order the installer
+experiences them.
+
+**9. A withdrawal is reversible; a decision is not** (resolves the question this
+section previously recorded as open, and refines §12.1). `job_application_submit`
+returns a caller's own `withdrawn` row to `submitted` **on the same id**,
+atomically under the job lock, and only while the job is `open` and the poster is
+**currently verified** — the same two gates a first-time applicant passes, so a
+withdrawal is never a door back in that a newcomer does not have. `created_at` is
+preserved, because it is the honest record of when this person first put their
+name forward; the note is replaced with whatever they wrote on returning.
+
+`accepted` and `rejected` remain **non-resubmittable**. Both are the poster's
+decisions, and reversing either from the applicant's side would let someone
+re-enter a competition they were already told they had lost. Calling
+`job_application_submit` on a decided candidacy returns that row **unchanged** —
+the caller gets their own record back and can read what happened to it, and not
+one column is touched. `app.job_applications_status_guard()` permits exactly one
+edge out of a non-`submitted` state, `withdrawn → submitted`, so no future write
+path can widen this by accident.
 
 ---
 
@@ -445,7 +553,9 @@ invoice/payment processing · earnings balance · transaction history.
 **Enforcement, belt and braces:**
 
 - **Structural** — a trigger `app.jobs_offer_immutable_after_application()` raises when
-  `offered_amount` or `offered_currency` changes and any `job_applications` row exists for that job.
+  `offered_amount`, `offered_currency` **or `trade_id`** changes and any `job_applications` row
+  exists for that job. The trade is included for the same reason as the amount: an applicant
+  consented to a stated offer FOR A STATED TRADE (§3.6, departure 2).
   This is the `app.organizations_provenance_immutable()` precedent, and it is the authority: a write
   path that forgets the rule still cannot break it.
 - **Ergonomic** — `job_update` checks the same condition first, so the poster gets a clear error
@@ -797,6 +907,8 @@ buried. **`open_job_opportunities` and `job_application_submit` must read the li
 | `job_assignments` | the assigned installer; poster-org members; platform staff |
 | `job_progress_updates` | the parties of the parent assignment; platform staff |
 | `job_reviews` | the reviewee; poster-org members; platform staff — plus the **public projection** in §6.4 |
+| `open_job_opportunities` (view) | `authenticated`; open jobs from CURRENTLY verified posters, display columns only, never `site_address` |
+| `my_job_applications` (view) | the caller's own candidacies joined to the display half of each job (§3.6, departure 7) |
 | `trades` | `authenticated`, ACTIVE rows only; platform staff also read retired ones; **no write grant in any role** |
 | `user_trades` | own rows (read); platform staff; plus the public directory projection. **No client write grant** — `user_trades_set` is the only writer (§4.3a) |
 
@@ -876,6 +988,8 @@ one org-membership check would silently hand installers tenant reads.
 - **Identity:** `uq_job_applications_job_applicant (job_id, applicant_user_id)`.
 - **Behaviour:** a repeat call returns the **existing** application id — the shipped
   `showroom_join_request_create` pattern (*"a retry or a second tap never queues a duplicate"*). Not an error.
+  A `withdrawn` row is the one exception: it is returned to `submitted` in place, on the same id,
+  subject to the same two gates a first-time applicant passes (§3.6, correction 9).
 - **Race:** `select … from public.jobs where id = … for update` before insert, so an apply cannot
   land on a job being awarded or cancelled concurrently.
 
@@ -967,6 +1081,7 @@ placement Points Core and Notifications Core established.
 
 | Event | Subject |
 |---|---|
+| `job.created` · `job.updated` | `job` (added by Increment 6 — §3.6, departure 6) |
 | `job.published` · `job.closed` · `job.cancelled` | `job` |
 | `job.application.submitted` · `job.application.withdrawn` | `job_application` |
 | `job.application.accepted` · `job.application.rejected` | `job_application` (including auto-rejected siblings) |
