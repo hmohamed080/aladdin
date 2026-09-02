@@ -18,6 +18,7 @@ import {
   getJobOpportunity,
   getMyApplicationForJob,
 } from "@/server/queries/job-opportunities";
+import { assignmentIdsByApplication } from "@/server/queries/job-assignments";
 
 export const dynamic = "force-dynamic";
 
@@ -121,6 +122,16 @@ export default async function JobOpportunityPage({
       }
     : null;
 
+  /* §20. Only an ACCEPTED candidacy can have an assignment, so this is the one
+     state that pays for the extra read — and the id comes from
+     `job_assignments.application_id` rather than from anything on this page. */
+  const assignmentId =
+    candidacy?.status === "accepted"
+      ? ((await assignmentIdsByApplication(supabase, [candidacy.applicationId])).get(
+          candidacy.applicationId,
+        ) ?? null)
+      : null;
+
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
       <BackLink href="/home/jobs">{m.jobs.opportunities.title}</BackLink>
@@ -128,6 +139,7 @@ export default async function JobOpportunityPage({
         job={job}
         application={candidacy}
         canApply={home.variant === "professional"}
+        assignmentId={assignmentId}
         locale={locale}
       />
     </div>

@@ -647,6 +647,66 @@ projection, so a job the caller applied to never 404s on them; a caller who neve
 applied to a job that has left discovery gets an ordinary not-found, which is the
 honest answer.
 
+### 4.9 An assignment is a record, not a set of uuids (Increment 9)
+
+`public.my_job_assignments` (`20260905090001`) — a `security_invoker` view over
+`app._my_job_assignments()`, scoped to `auth.uid()` with no parameter, the same
+shape as the two seams above.
+
+**What was already readable, and is not duplicated.**
+`job_assignments_select_installer` is a FLAT column check,
+`installer_user_id = auth.uid()`, with **no status predicate** — the installer
+can already read every assignment row that is theirs, cancelled ones included.
+`job_progress_select_parties` admits both parties of the parent assignment, so
+the progress history needs no seam at all and this migration adds none: both
+sides read `public.job_progress_updates` directly, through one query function.
+
+**Why the projection exists anyway.** An assignment row on its own is a pile of
+uuids and a number. **Three separate policies** stand between the installer and
+the context that makes it a work record, and each one is a rule that should stay
+exactly as it is:
+
+| Policy | What it withholds | Why it must not be relaxed |
+|---|---|---|
+| `organizations_select_member` | the name of the organization that hired them | an installer is not a member; a policy for them would grant the whole pool every future column of the tenancy root |
+| `trades_select_active` | a retired trade's label (§24) | relaxing it puts retired trades back in every catalog, including the "post a job" dropdown — the exact defect §4.7 fixed |
+| `jobs_select_assigned_installer` | the JOB itself once the assignment is `cancelled` (the policy carries `and a.status <> 'cancelled'`) | it is the right rule for the base row; §19 needs the *record*, not the live job |
+
+A projection names its columns; a policy names none, and grants every column
+added after it.
+
+**`site_address` is the one column with a condition on it.** §11 releases the
+address to the professional who is awarded the work, which is precisely what
+`jobs_select_assigned_installer` encodes, cancellation clause included. The
+projection **reproduces** that clause rather than relaxing it: live, the address
+is theirs; cancelled, it is withheld again. Every other column survives
+cancellation, because none of them is what §11 protects.
+
+The assignment's own `version` is projected and has to be —
+`job_assignment_start` and `job_assignment_cancel` take `p_expected_version`, and
+a UI that cannot read it cannot call them. Never a sibling application, never
+another installer, never poster-side management metadata, never a contact detail.
+
+**The state model is not in the query layer.** `readyForCompletion`,
+`featuredAssignment`, `canStart`, `canReportProgress` and `canCancel` live in
+`frontend/src/lib/work/assignment-state.ts` — pure, no server imports — because
+every consumer is a client component and `server-only` said so. Each mirrors a
+guard the RPC enforces and decides only what to OFFER. **There is no completion
+predicate**, on either side of that split, because there is no installer-side
+action for one to gate.
+
+### 4.10 100 percent is not completion, on screen
+
+`in_progress` with `latest_progress_percent = 100` is rendered as *"You reported
+this work as finished — the organization confirms completion"*, with the status
+badge still reading **In progress** and no further control. It is **derived
+presentation**, not a fifth `job_assignment_status` and not a persisted
+`waiting_review` column: the installer's claim must never look like a state the
+installer had authority to set.
+
+The poster's side of the same fact reads *"Reported as finished — waiting for
+your confirmation"*, beside the one control that answers it.
+
 ## 5. Compensation disclosure (D9)
 
 ### 5.1 What the columns mean
@@ -1239,6 +1299,8 @@ amount** (a monetary value in an audit payload invites exactly the payment readi
 | **`/b2b/jobs/[jobId]`** | — | **Poster side.** Detail, publish, close/cancel, awarded summary. **Shipped.** |
 | **`/b2b/jobs/[jobId]/edit`** | — | **Poster side.** Content edit while `draft`/`open`. **Shipped.** |
 | **`/b2b/jobs/[jobId]/applicants`** | — | **Poster side.** The queue, accept and reject, over `job_applicants`. **Shipped.** |
+| **`/home/work`** | — | **Installer side.** My Work: the featured current assignment, the status tabs, the all-work list and the summary breakdown, over `my_job_assignments`. **Shipped (Increment 9).** |
+| **`/home/work/[assignmentId]`** | — | **Installer side.** One assignment: terms, site, progress, append-only history, and the lifecycle action this state permits. **Shipped (Increment 9).** |
 
 The poster-side routes are **required** (§1), not an extra.
 
@@ -1270,6 +1332,25 @@ existing "Start here" grid. No opportunity count: a number there would cost ever
 professional home render an extra read of a board most of them are not about to
 open, and a stale or zero count is worse than none.
 
+**My Work (Increment 9).** `PersonalNavKey` `myWork` at `/home/work`, joining
+`jobs` in the same **work** group and gated on the same persona test. The two
+stay **separate destinations** rather than one "Jobs" with tabs: an opening you
+might take and an engagement you already hold are different states of the world,
+and merging them would make "accepted" mean both *you won* and *you are working*.
+`activePersonalNavKey` keeps the parent lit on `/home/work/[assignmentId]`.
+
+`/home` gained **one** real work integration beside the existing entry point: the
+current assignment with its organization, state and progress, or a compact honest
+entry point when there is none. No counts, no board preview, no list. The final
+Home composition pass remains Increment 14.
+
+**Applications → My Work (§20).** An accepted candidacy on
+`/home/jobs/applications` and on `/home/jobs/[jobId]` now offers *View in My
+work*. The assignment id is **resolved**, never derived: it comes from
+`job_assignments.application_id` — the foreign key `job_application_accept`
+writes once — read back through `my_job_assignments`, one query for a whole page.
+A rejected or withdrawn candidacy has no assignment and gets no link.
+
 ---
 
 ### 16.1 Notification events (Increment 8)
@@ -1293,8 +1374,43 @@ a reachable state. `ck_notifications_event_type_known` gained both values in
 answers — `job.post` (whoever authored the opening) and `job.manage` (whoever
 decides its applications) — with nothing in the approved contract choosing
 between them. Guessing would install a recipient rule by accident. Test 42
-asserts that no Jobs notification ever reaches anyone but the applicant it is
-about.
+asserts by name that it emits nothing.
+
+---
+
+### 16.2 Notification events (Increment 9 — the assignment lifecycle)
+
+| Event | Recipient | Emitted by | Deep link |
+|---|---|---|---|
+| `job.assignment.ready` | the posting organization's `job.manage` holders (owner fallback) | `job_progress_add`, on the **transition** to 100 | `/b2b/jobs/{job_id}` |
+| `job.assignment.completed` | the assigned installer, exactly | `job_assignment_complete` | `/home/work/{assignment_id}` |
+| `job.assignment.cancelled` | whichever party did **not** cancel | `job_assignment_cancel` | `/home/work/{id}` or `/b2b/jobs/{job_id}` |
+
+**Why an organization recipient is not ambiguous here, when it was for
+`job.application.submitted`.** `job.post` has **no role anywhere in the
+assignment lifecycle**: `app.can_post_job` is consulted by `job_create`,
+`job_update`, `job_publish`, `job_close` and `job_cancel`, and by none of the
+four assignment RPCs. Every action a recipient could take in response to these
+notices — confirming completion, ending the engagement, re-awarding the reopened
+job — requires `job.manage` and refuses `job.post`. The capability is therefore
+**read off the action the notice asks somebody to take**, not chosen between two
+candidates. A notice delivered anywhere else would be a notice its reader is
+refused permission to act on.
+
+**Only the transition to 100 is announced.** `job_progress_add` compares the
+figure it is writing against the row it read before the update, so an installer
+who reports 100 twice — correcting a note, adding a stage — announces it once. A
+notice per progress report would make the useful ones unfindable, and progress is
+a thing the poster goes and looks at.
+
+**`job.assignment.cancelled` carries the same two params on both paths**
+(`job_title`, `reason`) because the organization's copy cannot name the
+organization to itself; a body referencing `{org_name}` would render a hole on
+one of the two branches. `view-model.test.ts` enforces exactly that.
+
+Reaching 100 still moves **nothing** (§3.5). The event tells the organization a
+claim was made; the assignment stays `in_progress` until `job_assignment_complete`
+runs.
 
 ---
 

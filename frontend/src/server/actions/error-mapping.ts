@@ -149,3 +149,46 @@ export function mapApplicationError(error: unknown): string {
   if (code === "42501") return "jobs.errors.denied";
   return "states.genericRetry";
 }
+
+/**
+ * The assignment LIFECYCLE — start, progress, complete, cancel.
+ *
+ * A third mapper rather than a branch in either of the other two, because this
+ * is the first domain surface with TWO actors on it. `mapJobError` speaks to a
+ * poster about a job they manage and `mapApplicationError` speaks to an
+ * applicant about their own candidacy; the same SQLSTATE here has to answer for
+ * an installer reporting progress and for an organization confirming completion,
+ * and the sentences are not interchangeable.
+ *
+ * The order matters for the same reason it does in the other two. `42501` is
+ * raised for three genuinely different refusals — not the assigned installer,
+ * not a member of the posting organization, and no `job.manage` — and each is
+ * named before the generic branch can swallow it. An installer told "you lack a
+ * permission" when the real answer is "this is not your assignment" would go
+ * looking for a settings page that does not exist.
+ */
+export function mapAssignmentError(error: unknown): string {
+  const e = (error ?? {}) as PgLikeError;
+  const code = e.code ?? "";
+  const msg = (e.message ?? "").toLowerCase();
+
+  if (code === "40001" || msg.includes("modified concurrently"))
+    return "work.errors.conflict";
+  if (msg.includes("only the assigned installer may start"))
+    return "work.errors.notYoursToStart";
+  if (msg.includes("only the assigned installer may report"))
+    return "work.errors.notYoursToReport";
+  if (msg.includes("only a party to this assignment"))
+    return "work.errors.notAParty";
+  if (msg.includes("cannot be started")) return "work.errors.notScheduled";
+  if (msg.includes("progress can only be reported")) return "work.errors.notInProgress";
+  if (msg.includes("progress must be between")) return "work.errors.progressRange";
+  if (msg.includes("cannot be completed")) return "work.errors.notCompletable";
+  if (msg.includes("cannot be cancelled")) return "work.errors.notCancellable";
+  if (msg.includes("a reason is required")) return "work.errors.reasonRequired";
+  if (msg.includes("job.manage required")) return "work.errors.manageRequired";
+  if (msg.includes("not a member")) return "work.errors.notAMember";
+  if (msg.includes("assignment not found")) return "work.errors.notFound";
+  if (code === "42501") return "jobs.errors.denied";
+  return "states.genericRetry";
+}

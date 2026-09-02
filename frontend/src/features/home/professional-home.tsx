@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/primitives";
+import { ButtonLink } from "@/components/ui/controls";
 import {
   BadgeCheckIcon,
   BriefcaseIcon,
@@ -24,6 +25,9 @@ import { SalesAffiliationPanel } from "./sales-affiliation";
 import { AvailabilityBadge } from "@/features/profile/availability-status";
 import { tradeLabel, specializationLabel } from "@/lib/i18n/trade-label";
 import type { MyTrades } from "@/server/queries/trades";
+import type { Locale } from "@/lib/i18n/locales";
+import type { MyAssignmentRow } from "@/server/queries/job-assignments";
+import { CurrentWorkBlock } from "./current-work-block";
 
 /**
  * The PROFESSIONAL variant of the personal surface — ONE structure for every
@@ -76,11 +80,16 @@ const STEP_FOR_ITEM: Record<CompletenessItemKey, string> = {
 export function ProfessionalHome({
   data,
   trades,
+  currentWork,
+  locale,
   t,
 }: {
   data: PersonalHomeData;
   /** The canonical selection (Increment 5) — the source of the specialty row. */
   trades: MyTrades;
+  /** The one live assignment to lead with, or null (§21). */
+  currentWork: MyAssignmentRow | null;
+  locale: Locale;
   t: TranslateFn;
 }) {
   const { professional: p, completeness, verification } = data;
@@ -226,6 +235,24 @@ export function ProfessionalHome({
             body={t("personalHome.action.addBusinessBody")}
           />
         </ActionGrid>
+      </HomeSection>
+
+      <HomeSection
+        title={t("work.home.title")}
+        action={
+          currentWork ? (
+            <ButtonLink href="/home/work" variant="outline" size="sm">
+              {t("work.home.view")}
+            </ButtonLink>
+          ) : undefined
+        }
+      >
+        {/* §21. ONE real integration, placed after "do next" and before the
+            profile detail, which is the honest hierarchy for somebody who is
+            mid-job: their work first, their record second. The final Home
+            composition pass is Increment 14 and nothing here pre-empts it — the
+            professional and account sections below are untouched. */}
+        <CurrentWorkBlock assignment={currentWork} locale={locale} />
       </HomeSection>
 
       <HomeSection

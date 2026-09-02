@@ -42,7 +42,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(163);
+select plan(164);
 
 update auth.users set email_confirmed_at = now() where email_confirmed_at is null;
 
@@ -957,14 +957,27 @@ select cmp_ok(
 
 -- Notifications were untouched by Increment 6 and this file used to assert a
 -- blanket zero. Increment 8 wired the two APPLICANT-facing decisions and left
--- the poster-facing one reserved, so the blanket claim is superseded by the two
--- specific ones it was standing in for — which are the claims that actually
--- matter, and are stronger than the count it replaced.
+-- the poster-facing one reserved; Increment 9 added the three assignment
+-- lifecycle events. So the blanket claim is superseded twice over, and what
+-- stands in its place is an ALLOW-LIST — which is the shape that keeps earning
+-- its keep, because it fails the moment a sixth event appears without anybody
+-- deciding it should.
 select is(
   (select count(*) from public.notifications
     where event_type like 'job%'
-      and event_type not in ('job.application.accepted', 'job.application.rejected'))::int,
-  0, 'the only Jobs notifications are the two applicant-facing decisions');
+      and event_type not in (
+        'job.application.accepted', 'job.application.rejected',
+        'job.assignment.ready', 'job.assignment.completed', 'job.assignment.cancelled'))::int,
+  0, 'the Jobs domain emits only the five decided events, and no sixth');
+
+-- 'job.application.submitted' -> the posting organization is the one seam this
+-- domain deliberately leaves unwired, and it is asserted by name rather than
+-- left to the allow-list above: an allow-list says "not yet", and this says
+-- "not by accident".
+select is(
+  (select count(*) from public.notifications
+    where event_type = 'job.application.submitted')::int,
+  0, 'and applying still notifies nobody — that recipient rule is reserved, not invented');
 
 -- 'job.application.submitted' -> the posting organization stays UNWIRED: there
 -- is no canonical recipient rule for it in the approved contract, and guessing

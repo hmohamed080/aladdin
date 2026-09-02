@@ -21,6 +21,7 @@ import {
   UserIcon,
   GaugeIcon,
   BriefcaseIcon,
+  ClipboardIcon,
   StorefrontIcon,
   BuildingIcon,
 } from "@/components/ui/icons";
@@ -64,6 +65,9 @@ const ICONS: Record<PersonalNavKey, ComponentType<{ size?: number }>> = {
   // The same glyph the workspace Points module uses — one feature, one mark.
   points: GaugeIcon,
   jobs: BriefcaseIcon,
+  // Distinct from the Jobs briefcase on purpose: they sit adjacent in the same
+  // group, and two identical glyphs would make the two destinations read as one.
+  myWork: ClipboardIcon,
   connectShowroom: StorefrontIcon,
   addBusiness: BuildingIcon,
 };

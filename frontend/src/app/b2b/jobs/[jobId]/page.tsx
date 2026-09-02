@@ -7,6 +7,7 @@ import {
   listJobApplicants,
   isPosterVerified,
 } from "@/server/queries/jobs";
+import { listProgressUpdates } from "@/server/queries/job-assignments";
 import { BackLink, FlashSuccess } from "@/features/sales/page-parts";
 import { JobDetail } from "@/features/jobs/job-detail";
 
@@ -56,10 +57,19 @@ export default async function JobDetailPage({
   // all, and `job_applicants` is the one authorized place their identity exists
   // on this side.
   let assignee: string | null = null;
+  let progress: Awaited<ReturnType<typeof listProgressUpdates>> = [];
   if (assignment) {
-    const applicants = await listJobApplicants(supabase, jobId);
+    const [applicants, updates] = await Promise.all([
+      listJobApplicants(supabase, jobId),
+      // The SAME reader the installer's detail page uses.
+      // `job_progress_select_parties` admits members of the posting
+      // organization, so this side needs no projection of its own — and a second
+      // poster-only copy would be a second thing to keep in step.
+      listProgressUpdates(supabase, assignment.id),
+    ]);
     assignee =
       applicants.find((a) => a.application_id === assignment.application_id)?.display_name ?? null;
+    progress = updates;
   }
 
   return (
@@ -72,6 +82,7 @@ export default async function JobDetailPage({
         job={job}
         assignee={assignee}
         assignment={assignment}
+        progress={progress}
         role={{ canPost, canManage, orgVerified }}
         locale={locale}
       />

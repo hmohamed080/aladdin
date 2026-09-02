@@ -13,11 +13,12 @@ import {
 import { Card, SectionTitle, Field, StatePanel, InlineError } from "@/components/ui/primitives";
 import { ButtonLink, Input, LabeledField, SubmitButton } from "@/components/ui/controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { JobStatusBadge, AssignmentStatusBadge } from "@/features/jobs/badges";
+import { JobStatusBadge } from "@/features/jobs/badges";
+import { PosterAssignmentPanel } from "@/features/work/poster-panel";
 import { formatDate, formatMoney } from "@/lib/ui/format";
-import { UsersIcon } from "@/components/ui/icons";
 import { useActionState } from "react";
 import type { JobListRow, JobAssignmentRow } from "@/server/queries/jobs";
+import type { ProgressUpdateRow } from "@/server/queries/job-assignments";
 
 const initial: FormState = { ok: false };
 
@@ -39,22 +40,26 @@ export type JobRole = {
  * either checking on recruitment or deciding something, and the destructive
  * actions sit last because they are the least likely reason to be here.
  *
- * WHAT IS ABSENT, AND WHY. There are no progress or completion controls, and no
- * review control. An awarded job shows WHO holds it and WHAT STATE the work is
- * in — a read-only summary — because active work management is Increment 9's
- * surface and putting a "mark complete" button here would build half of it in the
- * wrong place.
+ * WHAT IS ABSENT, AND WHY. There is no way to REPORT progress and no review
+ * control. Reporting is the assigned professional's alone — `job_progress_add`
+ * refuses anyone else — so this side reads the history and cannot add to it. What
+ * Increment 9 did add is the completion the poster genuinely owns, inside
+ * `PosterAssignmentPanel`: the installer signals readiness, and confirming it is
+ * this organization's move and nobody else's.
  */
 export function JobDetail({
   job,
   assignee,
   assignment,
+  progress,
   role,
   locale,
 }: {
   job: JobListRow;
   assignee: string | null;
   assignment: JobAssignmentRow | null;
+  /** The professional's own reports. Read-only on this side (§16). */
+  progress: readonly ProgressUpdateRow[];
   role: JobRole;
   locale: Locale;
 }) {
@@ -123,32 +128,20 @@ export function JobDetail({
         </dl>
       </Card>
 
-      {/* 2. Awarded — who holds the work, and its state. Read only. */}
+      {/* 2. Awarded — who holds the work, how far it has got, and the two moves
+             this side of the engagement owns.
+             Increment 9 replaced the read-only summary that stood here. What it
+             did NOT do is grow a second work-management product: this is one
+             panel on the existing job detail, and every control on it calls an
+             RPC that already existed. */}
       {isAwarded || job.status === "completed" ? (
-        <Card>
-          <SectionTitle>{t("jobs.awarded.assignedTo")}</SectionTitle>
-          <div className="mt-md flex flex-wrap items-center justify-between gap-md">
-            <div className="flex items-center gap-2.5">
-              <UsersIcon size={18} />
-              <span className="text-body-lg font-medium text-fg">{assignee ?? "—"}</span>
-            </div>
-            {assignment ? <AssignmentStatusBadge status={assignment.status} /> : null}
-          </div>
-          {assignment ? (
-            <dl className="mt-md grid grid-cols-2 gap-md tablet:grid-cols-3">
-              <Field label={t("jobs.awarded.agreed")}>
-                {formatMoney(assignment.agreed_amount, locale)}
-              </Field>
-              <Field label={t("jobs.awarded.workStatus")}>
-                {t(`jobs.assignmentStatus.${assignment.status}`)}
-              </Field>
-              <Field label={t("jobs.field.startsOn")}>
-                {formatDate(assignment.started_at, locale) || "—"}
-              </Field>
-            </dl>
-          ) : null}
-          <p className="mt-md text-label text-fg-muted">{t("jobs.awarded.progressNote")}</p>
-        </Card>
+        <PosterAssignmentPanel
+          assignment={assignment}
+          assignee={assignee}
+          updates={progress}
+          canManage={role.canManage}
+          locale={locale}
+        />
       ) : null}
 
       {/* 3. The work itself. */}
@@ -220,8 +213,9 @@ export function JobDetail({
           {/* THE TWO-STEP INVARIANT, on screen. An awarded job cannot be
               cancelled — the assignment has to end first, which returns the job
               to open. Rendering a Cancel button here would be offering an action
-              that is guaranteed to fail, so the rule is stated instead. Ending
-              the assignment belongs to Increment 9's surface. */}
+              that is guaranteed to fail, so the rule is stated instead; the
+              control that DOES end the assignment is in the awarded panel
+              above. */}
           {isAwarded ? (
             <p className="mt-md text-body text-fg-secondary">{t("jobs.awarded.cancelBlocked")}</p>
           ) : null}

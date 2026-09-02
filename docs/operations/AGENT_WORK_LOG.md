@@ -4,6 +4,182 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — A hundred percent is a claim, and somebody else answers it
+
+**Date:** 2026-09-05 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `4e5690b` (Increment 8)
+
+Installer Increment 9: the work itself. Two routes for the professional, one
+panel added to the poster's existing job detail, three notifications, and one
+migration. No status was added, no lifecycle rule moved, and the four Increment 6
+RPCs kept their signatures.
+
+### Three policies, one projection
+
+`job_assignments` was already readable: `job_assignments_select_installer` is a
+flat column check, `installer_user_id = auth.uid()`, with **no status
+predicate**. So was the progress history — `job_progress_select_parties` admits
+both parties, which is why this increment added no seam for it and both sides
+read the base table through one query function.
+
+What was not readable was everything that makes an assignment a RECORD rather
+than a pile of uuids, and three separate policies each withheld a different piece
+of it:
+
+* `organizations_select_member` — an installer is not a member of the
+  organization that hired them, so "who am I doing this work for" was
+  unanswerable on the very surface built to answer it;
+* `trades_select_active` — a retired trade vanishes, and §24 needs the label the
+  work was agreed under;
+* `jobs_select_assigned_installer` — carries `and a.status <> 'cancelled'`, so
+  the moment an engagement is cancelled the installer loses the job behind it,
+  while §19 needs exactly the opposite.
+
+Each of those is a rule worth keeping. Relaxing the trades one puts retired
+trades back in the "post a job" dropdown, which is the defect Increment 7 fixed;
+an installer policy on `organizations` would hand the whole pool every future
+column of the tenancy root. So `my_job_assignments` answers past all three
+without widening any, and a projection names its columns where a policy names
+none and grants every column added after it.
+
+`site_address` is the one column with a condition on it. §11 releases the address
+to the professional who holds the work, which is what
+`jobs_select_assigned_installer` already encodes, cancellation clause included.
+The projection **reproduces** that clause rather than relaxing it — live, the
+address is theirs; cancelled, it is withheld again and the rule is stated on
+screen instead of leaving a blank. The projection is never wider than the policy
+it reads past.
+
+### The line this increment exists to draw
+
+The installer reports; the organization confirms. Everything else is arrangement
+around that one fact.
+
+At 100 percent the assignment stays `in_progress`, the job stays `awarded`,
+`completed_at` stays null, and the installer's page says *"You reported this work
+as finished — there is nothing further for you to do here."* It is derived
+presentation, not a fifth `job_assignment_status` and not a persisted
+`waiting_review`: the moment a claim is stored as a state, it starts looking like
+a state its author had the authority to set.
+
+And the absence of a completion control is **structural rather than rendered**.
+`assignment-forms.ts` exports four actions and none of them completes for an
+installer; there is no RPC an installer surface could call if it tried. That is
+why the §16 test can pass — it asserts a capability that does not exist, not a
+button that is merely hidden. pgTAP asserts the other half: the installer is
+refused with 42501 at 100 percent, twice.
+
+### An organization recipient that is not a coin flip
+
+Increment 8 RESERVED `job.application.submitted` → the poster, because
+`app.notify_org` needs a capability and the domain offered two equally plausible
+ones. That reservation still stands, and test 42 now asserts it by name.
+
+The three events wired here are different, and the reason is structural rather
+than editorial: **`job.post` has no role anywhere in the assignment lifecycle.**
+`app.can_post_job` is consulted by `job_create`, `job_update`, `job_publish`,
+`job_close` and `job_cancel` — and by none of the four assignment RPCs. Every
+action a recipient could take in response to these notices requires `job.manage`
+and refuses `job.post`. So the capability is read off the action the notice asks
+somebody to take; a notice delivered anywhere else would be one its reader is
+refused permission to act on.
+
+`job.assignment.ready` fires on the **transition** to 100, not the value —
+`job_progress_add` compares against the row it read before its own update, so an
+installer correcting a note at 100 announces it once. `job.assignment.cancelled`
+carries the same two params on both of its paths, because the organization's copy
+cannot name the organization to itself and a body referencing `{org_name}` would
+render a hole on one branch.
+
+### What the guards found that review would not have
+
+**`server-only` caught a client component reaching into database code.**
+`readyForCompletion` and `featuredAssignment` had been filed under
+`server/queries` beside the reads, and the import threw the moment
+`/home` needed them. The guard was right and the fix was not to mock it away:
+none of that is server code. Every consumer is a client component, so the state
+model moved to `lib/work/assignment-state.ts` — the same split
+`lib/nav/personal-modules.ts` already makes, and for the same stated reason.
+
+**A browser found `1%` where the data said 100.** `formatPercent` already divides
+by 100; four call sites divided again. No test looked at the rendered string —
+they all asserted the aria value, which was correct. The regression tests now
+assert the string, which is the thing a person reads.
+
+**`table-layout: auto` meant `RecordCell` could never truncate.** The visual
+review found the history list clipping its own action column: the table wanted
+966px in a 785px container. `RecordCell` carries `truncate` by design, but a cell
+sized to its content has nothing to truncate against, so a long title silently
+pushed `Agreed`, `Assigned` and `View` into the horizontal scroller — the reader
+had to scroll sideways to discover an action existed. `DataTable` gained an
+opt-in `grow` column flag (`w-full max-w-0`), which is what makes that existing
+`truncate` fire. No existing table changes shape.
+
+The same review found an English job title rendering as `…aircase cladding -
+Fifth Settlement` in the Arabic workspace. An LTR string inside an RTL container
+inherits RTL, so `text-overflow` clips the front and the reader loses precisely
+the words that identify the record. `dir="auto"` on user-entered text resolves
+direction per value from its first strong character — verified in the browser as
+`englishTitle: ltr, arabicTitle: rtl, pageDir: rtl`, in the same node. It is
+deliberately not conditional on locale; a component branching on locale would be
+the Arabic-only rule the UI contract forbids.
+
+### Composition, and what the reference could not have
+
+`03-my-work.jpeg` supplied the skeleton and the weighting: header, status strip,
+one dominant current-work block, the historical list, a context column. What it
+also supplied — a project photograph, a documents-and-files panel, a quick-tools
+rail, client star ratings, "completed this month", and four tabs with no
+`job_assignment_status` behind them — has no authority anywhere in this product,
+so it is absent rather than postponed.
+
+The photo slot is not left empty, because an empty designed slot is worse than
+none: it carries `Monogram`, which is the answer this codebase already gives to
+"there is no image pipeline yet". The list shows **one** status chip per row like
+the reference does; the readiness marker lives on the featured block, the detail,
+the poster's panel and `/home`, and repeating it in the history list was what
+cost the row its action column. The organization folded into the identity cell
+because the monogram beside it was already the organization — a column naming the
+same thing twice.
+
+The page hierarchy survives empty data, which was the point of §22: with no
+assignments at all it still renders its header, its tabs, a designed featured
+empty state and a summary reading honest zeros. Content disappears; structure
+does not.
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 47 files, 1657 tests, PASS** — new
+`46_job_assignment_work_test.sql` is 65/65. The full-suite run earned its keep
+again: it caught test 29's Advisor rule (pgTAP recreated in `public` rather than
+`extensions` by raw psql runs) and test 42's notification claim, now an
+allow-list that fails the moment a sixth event appears without anybody deciding
+it should. Neither was reachable from the files this increment added.
+
+`db lint public,app` three warnings, all pre-existing. Generated types **+32
+lines, 0 deletions**. `tsc --noEmit` clean · `eslint src` 0 errors (1 pre-existing
+warning) · `vitest` **1004/84** (was 898/78) · `next build` clean ·
+`check_doc_links` 950 links, 0 broken.
+
+Browser UAT as both parties, every state through a real RPC: apply → award →
+bridge into My Work → start → 25 → 60 → 100 → verified against the database that
+the assignment was still `in_progress` with the job still `awarded` → poster
+confirmed, completing assignment and job in one transaction → a second engagement
+cancelled by the installer, returning the job to `open` and notifying the
+organization with the reason. Arabic RTL and 390px verified on every surface;
+light and dark on three. Two visual defects were found this way and fixed, and
+both fixes landed in the Foundation rather than on the page.
+
+Every fixture either run created was removed afterwards — five jobs, five
+applications, five assignments, seven progress reports and thirteen
+notifications — and the append-only audit rows were left where they are.
+`public.job_progress_updates`' delete guard was lifted explicitly for each
+teardown and restored immediately; `public.audit_log` was never touched, and
+**29 job audit rows remain**.
+
+`RUNTIME_STATE.md` is untouched and now ten increments behind.
+
+---
+
 ## Session — An application outlives the opening it was for
 
 **Date:** 2026-09-03 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `db1d983` (Increment 7)

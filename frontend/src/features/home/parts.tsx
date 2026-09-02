@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Badge, Card } from "@/components/ui/primitives";
+import { Badge, Card, ProgressMeter } from "@/components/ui/primitives";
 import { BadgeCheckIcon, CheckIcon } from "@/components/ui/icons";
 import type { Completeness } from "@/lib/profile/completeness";
 import type { VerificationState } from "@/server/queries/personal-home";
@@ -159,16 +159,14 @@ export function AccountStrip({
           <h3 className="text-body font-semibold text-fg">{t("personalHome.completeness.title")}</h3>
           <span className="text-body-lg font-semibold tabular-nums text-fg">{percent}%</span>
         </div>
-        <div
-          className="h-1.5 w-full overflow-hidden rounded-pill bg-surface-2"
-          role="progressbar"
-          aria-valuenow={percent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={t("personalHome.completeness.title")}
-        >
-          <div className="h-full rounded-pill bg-accent-solid" style={{ width: `${percent}%` }} />
-        </div>
+        {/* Was a hand-rolled bar here, and it is the reason `ProgressMeter`
+            became a primitive in Increment 9 rather than a second local copy on
+            the work surfaces (R3/R8). Identical markup, one owner. */}
+        <ProgressMeter
+          value={percent}
+          label={t("personalHome.completeness.title")}
+          size="sm"
+        />
         {missing.length > 0 ? (
           <p className="text-label text-fg-secondary">
             {t("personalHome.completeness.count", { done: completed, total })}

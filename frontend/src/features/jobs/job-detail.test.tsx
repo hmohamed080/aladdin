@@ -8,6 +8,13 @@ vi.mock("@/server/actions/job-forms", () => ({
   closeJobAction: async () => ({ ok: true }),
   cancelJobAction: async () => ({ ok: true }),
 }));
+// The awarded panel binds the assignment lifecycle actions (Increment 9).
+vi.mock("@/server/actions/assignment-forms", () => ({
+  startWorkAction: async () => ({ ok: true }),
+  addProgressAction: async () => ({ ok: true }),
+  cancelAssignmentAction: async () => ({ ok: true }),
+  completeAssignmentAction: async () => ({ ok: true }),
+}));
 
 import { JobDetail } from "./job-detail";
 import type { JobListRow, JobAssignmentRow } from "@/server/queries/jobs";
@@ -64,7 +71,7 @@ const assignment = (over: Partial<JobAssignmentRow> = {}): JobAssignmentRow =>
   }) as JobAssignmentRow;
 
 const poster = { canPost: true, canManage: true, orgVerified: true };
-const base = { assignee: null, assignment: null, locale: "en" as const };
+const base = { assignee: null, assignment: null, progress: [], locale: "en" as const };
 
 describe("JobDetail", () => {
   /**

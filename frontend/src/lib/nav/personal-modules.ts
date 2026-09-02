@@ -39,6 +39,7 @@ export type PersonalNavKey =
   | "profile"
   | "points"
   | "jobs"
+  | "myWork"
   | "connectShowroom"
   | "addBusiness";
 
@@ -65,6 +66,7 @@ const ITEMS: Record<PersonalNavKey, PersonalNavItem> = {
   profile: { key: "profile", href: "/home/profile", labelKey: "personalNav.profile" },
   points: { key: "points", href: "/home/points", labelKey: "personalNav.points" },
   jobs: { key: "jobs", href: "/home/jobs", labelKey: "personalNav.jobs" },
+  myWork: { key: "myWork", href: "/home/work", labelKey: "personalNav.myWork" },
   connectShowroom: {
     key: "connectShowroom",
     href: "/home/showroom",
@@ -77,10 +79,12 @@ const SECTIONS: { section: PersonalNavSection; keys: PersonalNavKey[] }[] = [
   { section: "account", keys: ["home", "profile", "points"] },
   /* Work is its own group rather than a fourth entry under "account", because it
      is the only destination here that is about the OUTSIDE world: the other
-     three are the caller's own record. It is also where Increment 9's My Work
-     joins, and a group of one that is about to be a group of two is better than
-     an "account" heading that quietly starts meaning "everything". */
-  { section: "work", keys: ["jobs"] },
+     three are the caller's own record. Increment 9 made it the group of two it
+     was shaped for, and the two stay SEPARATE destinations rather than one
+     "Jobs" with tabs: an opening you might take and an engagement you already
+     hold are different states of the world, and merging them would make
+     "accepted" mean both "you won" and "you are working". */
+  { section: "work", keys: ["jobs", "myWork"] },
   { section: "business", keys: ["connectShowroom", "addBusiness"] },
 ];
 
@@ -107,6 +111,12 @@ function isReachable(key: PersonalNavKey, input: PersonalNavInput): boolean {
        action the page exists for. Discovery itself is open to any authenticated
        caller — this is about not advertising a door that does not open. */
     case "jobs":
+    /* THE SAME TEST AGAIN, and for a sharper reason. Every assignment is
+       created by `job_application_accept` from an application only a
+       professional persona could have submitted, so a consumer cannot hold one
+       — the destination would be permanently empty rather than merely
+       unusable. */
+    case "myWork":
       return input.variant === "professional";
     case "connectShowroom":
       return input.isSalesPersona;

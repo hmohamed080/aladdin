@@ -19,6 +19,7 @@ import {
   APPLICATION_STATUSES,
   type JobApplicationStatus,
 } from "@/server/queries/job-opportunities";
+import { assignmentIdsByApplication } from "@/server/queries/job-assignments";
 
 export const dynamic = "force-dynamic";
 
@@ -65,10 +66,22 @@ export default async function MyApplicationsPage({
     : undefined;
 
   const applications = await listMyApplications(supabase, status);
-  const live = await discoverableJobIds(
-    supabase,
-    applications.map((a) => a.job_id).filter((id): id is string => Boolean(id)),
-  );
+  const [live, assignmentIds] = await Promise.all([
+    discoverableJobIds(
+      supabase,
+      applications.map((a) => a.job_id).filter((id): id is string => Boolean(id)),
+    ),
+    // §20. One read for the page, and only for candidacies that could HAVE an
+    // assignment — a rejected or withdrawn application has none, so asking about
+    // it would be a wasted key in the map rather than a link that appears.
+    assignmentIdsByApplication(
+      supabase,
+      applications
+        .filter((a) => a.status === "accepted")
+        .map((a) => a.id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ]);
 
   return (
     <div className="flex flex-col gap-xl" data-testid="my-applications">
@@ -107,6 +120,7 @@ export default async function MyApplicationsPage({
       <MyApplications
         applications={applications}
         discoverableJobIds={live}
+        assignmentIds={assignmentIds}
         locale={locale}
         filtered={Boolean(status)}
       />

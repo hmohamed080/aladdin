@@ -21,7 +21,7 @@ import { formatMoney, formatRelativeTime } from "@/lib/ui/format";
  */
 
 /**
- * The eighteen event types `ck_notifications_event_type_known` permits.
+ * The twenty-one event types `ck_notifications_event_type_known` permits.
  *
  * Duplicated from the CHECK constraint deliberately: the constraint keeps bad
  * rows OUT of the table, and this list decides which rows the UI has real copy
@@ -33,10 +33,18 @@ import { formatMoney, formatRelativeTime } from "@/lib/ui/format";
  * conversation inherits its transaction's subject), which changes nothing here:
  * the view model reads keys and params, never the subject.
  *
- * The two `job.application.*` events are the newest, and the first whose
+ * The `job.*` events are the newest. `job.application.*` were the first whose
  * recipient is a PERSON rather than a capability-holding membership — an
- * individual installer, named by `job_applications.applicant_user_id`. That also
- * changes nothing here, for the same reason.
+ * individual installer, named by `job_applications.applicant_user_id`. The three
+ * `job.assignment.*` events are the first to go BOTH ways: `completed` reaches
+ * the installer alone, `ready` reaches the organization's `job.manage` holders,
+ * and `cancelled` reaches whichever party did not cause it. None of that changes
+ * anything here — the view model reads keys and params and never a recipient.
+ *
+ * `job.assignment.cancelled` is the one event whose params must be identical on
+ * both of its paths, because the organization's copy cannot name the
+ * organization to itself. Its copy therefore uses `{job_title}` and `{reason}`
+ * only, which the placeholder test below enforces.
  */
 export const KNOWN_NOTIFICATION_EVENTS = [
   "rfq.submitted",
@@ -57,6 +65,9 @@ export const KNOWN_NOTIFICATION_EVENTS = [
   "message.sent",
   "job.application.accepted",
   "job.application.rejected",
+  "job.assignment.ready",
+  "job.assignment.completed",
+  "job.assignment.cancelled",
 ] as const;
 
 export type KnownNotificationEvent = (typeof KNOWN_NOTIFICATION_EVENTS)[number];

@@ -192,3 +192,93 @@ export async function withdrawApplication(
   });
   if (error) throw error;
 }
+
+/* ------------------------------------------------------------------------- */
+/* Assignment lifecycle (Increment 9).                                        */
+/*                                                                            */
+/* Four wrappers, four RPCs, and the actor split is the DATABASE's, reproduced */
+/* here only as a comment. `job_assignment_start` and `job_progress_add` refuse */
+/* anyone but the assigned installer; `job_assignment_complete` refuses anyone  */
+/* but a `job.manage` holder in the posting organization; `job_assignment_      */
+/* cancel` admits either party. No wrapper re-checks any of that, because a     */
+/* check here would be a second opinion that can disagree with the first.       */
+/* ------------------------------------------------------------------------- */
+
+/** Begin work. The ASSIGNED INSTALLER only, and only from `scheduled`. */
+export async function startAssignment(
+  supabase: Client,
+  assignmentId: string,
+  expectedVersion: number,
+): Promise<number> {
+  const { data, error } = await supabase.rpc("job_assignment_start", {
+    p_assignment_id: assignmentId,
+    p_expected_version: expectedVersion,
+  });
+  if (error) throw error;
+  return data as number;
+}
+
+/**
+ * Append one progress report. The ASSIGNED INSTALLER only.
+ *
+ * This moves NO status, including at 100 — reaching 100 is a claim of readiness
+ * that the posting organization then confirms (§3.5). A caller that follows this
+ * with a completion call would be asserting an authority it does not have, and
+ * the database would refuse it.
+ */
+export async function addProgress(
+  supabase: Client,
+  input: { assignmentId: string; percent: number; stage?: string; note?: string },
+): Promise<string> {
+  const { data, error } = await supabase.rpc("job_progress_add", {
+    p_assignment_id: input.assignmentId,
+    p_progress_percent: input.percent,
+    p_stage: input.stage ?? undefined,
+    p_note: input.note ?? undefined,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+/**
+ * Confirm the work is done. THE POSTING ORGANIZATION ONLY.
+ *
+ * The single most important authority line in this domain, and the reason this
+ * wrapper exists in a file the installer's surfaces also import: there must be
+ * exactly one of it, so that "who may call this" is answered once. It completes
+ * the assignment AND the job in one transaction inside the RPC.
+ */
+export async function completeAssignment(
+  supabase: Client,
+  assignmentId: string,
+  expectedVersion: number,
+): Promise<number> {
+  const { data, error } = await supabase.rpc("job_assignment_complete", {
+    p_assignment_id: assignmentId,
+    p_expected_version: expectedVersion,
+  });
+  if (error) throw error;
+  return data as number;
+}
+
+/**
+ * End the engagement. EITHER party, with a reason.
+ *
+ * The assignment is cancelled and never deleted, and an awarded job returns to
+ * `open` — previously rejected candidacies stay rejected. All of that happens
+ * inside the RPC; there is nothing for a caller to do afterwards.
+ */
+export async function cancelAssignment(
+  supabase: Client,
+  assignmentId: string,
+  expectedVersion: number,
+  reason: string,
+): Promise<number> {
+  const { data, error } = await supabase.rpc("job_assignment_cancel", {
+    p_assignment_id: assignmentId,
+    p_expected_version: expectedVersion,
+    p_reason: reason,
+  });
+  if (error) throw error;
+  return data as number;
+}

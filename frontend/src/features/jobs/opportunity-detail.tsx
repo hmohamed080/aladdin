@@ -2,7 +2,7 @@
 
 import { useI18n } from "@/lib/i18n/context";
 import { Card, Badge, StatePanel, Field, InlineError } from "@/components/ui/primitives";
-import { Textarea, LabeledField } from "@/components/ui/controls";
+import { ButtonLink, Textarea, LabeledField } from "@/components/ui/controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { MapPinIcon, BriefcaseIcon, ShieldIcon } from "@/components/ui/icons";
 import { tradeLabel } from "@/lib/i18n/trade-label";
@@ -65,12 +65,15 @@ export function OpportunityDetail({
   job,
   application,
   canApply,
+  assignmentId = null,
   locale,
 }: {
   job: OpportunityView;
   application: MyCandidacy | null;
   /** False for a consumer account — the database refuses them, so nothing is offered. */
   canApply: boolean;
+  /** The assignment this candidacy became, resolved server-side (§20). */
+  assignmentId?: string | null;
   locale: Locale;
 }) {
   const { t } = useI18n();
@@ -169,6 +172,7 @@ export function OpportunityDetail({
             application={application}
             reapplyAllowed={live && application.status === "withdrawn"}
             job={job}
+            assignmentId={assignmentId}
             locale={locale}
           />
         ) : !job.discoverable ? (
@@ -192,11 +196,13 @@ function CandidacyState({
   application,
   reapplyAllowed,
   job,
+  assignmentId,
   locale,
 }: {
   application: MyCandidacy;
   reapplyAllowed: boolean;
   job: OpportunityView;
+  assignmentId: string | null;
   locale: Locale;
 }) {
   const { t } = useI18n();
@@ -213,9 +219,21 @@ function CandidacyState({
       </div>
 
       {application.status === "accepted" ? (
-        <div className="flex flex-col gap-1 rounded-md border border-success/30 bg-success/10 p-md">
-          <p className="text-body-lg font-medium text-fg">{t("jobs.applications.accepted.title")}</p>
-          <p className="text-body text-fg-secondary">{t("jobs.applications.accepted.body")}</p>
+        <div className="flex flex-col items-start gap-sm rounded-md border border-success/30 bg-success/10 p-md">
+          <div>
+            <p className="text-body-lg font-medium text-fg">
+              {t("jobs.applications.accepted.title")}
+            </p>
+            <p className="text-body text-fg-secondary">{t("jobs.applications.accepted.body")}</p>
+          </div>
+          {/* §20. The route the acceptance actually leads to, offered only when
+              the assignment resolved through the caller's own projection — never
+              derived from an id on this page. */}
+          {assignmentId ? (
+            <ButtonLink href={`/home/work/${assignmentId}`} variant="accent" size="sm">
+              {t("work.viewInWork")}
+            </ButtonLink>
+          ) : null}
         </div>
       ) : null}
 

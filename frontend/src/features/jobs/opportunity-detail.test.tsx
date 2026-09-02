@@ -154,8 +154,29 @@ describe("OpportunityDetail", () => {
     }
   });
 
-  /** §15: Increment 9 owns the work. Accepted says what happened and stops. */
-  it("celebrates an acceptance without linking to a My Work route that does not exist", () => {
+  /**
+   * §20. The acceptance now leads somewhere — and the work controls still do NOT
+   * live here. Starting, reporting progress and ending the engagement belong to
+   * `/home/work/[assignmentId]`; this page hands the reader a route and stops.
+   */
+  it("routes an acceptance to My Work without growing work controls of its own", () => {
+    const { container } = renderWithI18n(
+      <OpportunityDetail
+        {...base}
+        job={job()}
+        application={candidacy({ status: "accepted", decidedAt: "2026-09-03T00:00:00Z" })}
+        assignmentId="asg-1"
+      />,
+      "en",
+    );
+    expect(screen.getByText("Your application was accepted")).toBeTruthy();
+    expect(container.querySelector('a[href="/home/work/asg-1"]')).toBeTruthy();
+    for (const name of [/start work/i, /update progress/i, /confirm completion/i, /review/i]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    }
+  });
+
+  it("offers no My Work route when the assignment did not resolve", () => {
     const { container } = renderWithI18n(
       <OpportunityDetail
         {...base}
@@ -164,11 +185,7 @@ describe("OpportunityDetail", () => {
       />,
       "en",
     );
-    expect(screen.getByText("Your application was accepted")).toBeTruthy();
-    expect(container.querySelector('a[href*="work"]')).toBeNull();
-    for (const name of [/start work/i, /progress/i, /mark complete/i, /review/i]) {
-      expect(screen.queryByRole("button", { name })).toBeNull();
-    }
+    expect(container.querySelector('a[href*="/home/work"]')).toBeNull();
   });
 
   it("shows a rejection with the organization's own reason, and no way to argue", () => {

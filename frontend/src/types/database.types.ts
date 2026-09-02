@@ -3009,6 +3009,38 @@ export type Database = {
         }
         Relationships: []
       }
+      my_job_assignments: {
+        Row: {
+          agreed_amount: number | null
+          agreed_currency: string | null
+          application_id: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          city: string | null
+          completed_at: string | null
+          created_at: string | null
+          ends_by: string | null
+          expected_duration_days: number | null
+          governorate: string | null
+          id: string | null
+          job_description: string | null
+          job_id: string | null
+          job_status: Database["public"]["Enums"]["job_status"] | null
+          job_title: string | null
+          last_progress_at: string | null
+          latest_progress_percent: number | null
+          poster_org_name: string | null
+          published_at: string | null
+          site_address: string | null
+          started_at: string | null
+          starts_on: string | null
+          status: Database["public"]["Enums"]["job_assignment_status"] | null
+          trade_is_active: boolean | null
+          trade_key: string | null
+          version: number | null
+        }
+        Relationships: []
+      }
       open_job_opportunities: {
         Row: {
           city: string | null

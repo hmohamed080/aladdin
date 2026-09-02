@@ -12,6 +12,10 @@ import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { ConsumerHome } from "@/features/home/consumer-home";
 import { ProfessionalHome } from "@/features/home/professional-home";
+import {
+  listMyAssignments,
+  featuredAssignment,
+} from "@/server/queries/job-assignments";
 
 export const dynamic = "force-dynamic";
 
@@ -54,13 +58,25 @@ export default async function PersonalHomePage() {
   if (!data) redirect("/auth/sign-in");
 
   const store = await cookies();
-  const t = createTranslator(resolveLocale(store.get(LOCALE_COOKIE)?.value));
+  const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
+  const t = createTranslator(locale);
 
   // Only a professional has trades to read, so only a professional pays for the
-  // round trip — the same rule the salesperson's affiliation follows.
-  return data.variant === "professional" ? (
-    <ProfessionalHome data={data} trades={await loadMyTrades()} t={t} />
-  ) : (
-    <ConsumerHome data={data} t={t} />
+  // round trip — the same rule the salesperson's affiliation follows, and the
+  // same rule the assignment read follows: a consumer holds none by
+  // construction, because every assignment descends from an application only a
+  // professional persona could have submitted.
+  if (data.variant !== "professional") return <ConsumerHome data={data} t={t} />;
+
+  const [trades, assignments] = await Promise.all([loadMyTrades(), listMyAssignments(supabase)]);
+
+  return (
+    <ProfessionalHome
+      data={data}
+      trades={trades}
+      currentWork={featuredAssignment(assignments)}
+      locale={locale}
+      t={t}
+    />
   );
 }

@@ -98,7 +98,27 @@ describe("MyApplications", () => {
     }
   });
 
-  it("states an acceptance without a My Work link Increment 9 has not built", () => {
+  /**
+   * §20. Increment 8 shipped this row with no onward route, because My Work did
+   * not exist. It does now, and the link is offered ONLY where the assignment
+   * genuinely resolved — the id comes from `job_assignments.application_id`,
+   * never from the application id on this page.
+   */
+  it("routes an accepted application to the assignment it became", () => {
+    const { container } = renderWithI18n(
+      <MyApplications
+        {...base}
+        applications={[application({ status: "accepted", job_status: "awarded" })]}
+        discoverableJobIds={none}
+        assignmentIds={new Map([["a1", "asg-1"]])}
+      />,
+      "en",
+    );
+    expect(screen.getByText("Your application was accepted")).toBeTruthy();
+    expect(container.querySelector('a[href="/home/work/asg-1"]')).toBeTruthy();
+  });
+
+  it("states the acceptance without a link when no assignment resolved", () => {
     const { container } = renderWithI18n(
       <MyApplications
         {...base}
@@ -108,7 +128,24 @@ describe("MyApplications", () => {
       "en",
     );
     expect(screen.getByText("Your application was accepted")).toBeTruthy();
-    expect(container.querySelector('a[href*="work"]')).toBeNull();
+    expect(container.querySelector('a[href*="/home/work"]')).toBeNull();
+  });
+
+  /** A decision that went the other way has no work to open. */
+  it("gives a rejected or withdrawn candidacy no My Work route", () => {
+    for (const status of ["rejected", "withdrawn"] as const) {
+      const { container, unmount } = renderWithI18n(
+        <MyApplications
+          {...base}
+          applications={[application({ status, decision_reason: "x" })]}
+          discoverableJobIds={none}
+          assignmentIds={new Map([["a1", "asg-1"]])}
+        />,
+        "en",
+      );
+      expect(container.querySelector('a[href*="/home/work"]')).toBeNull();
+      unmount();
+    }
   });
 
   it("shows a rejection with the reason the organization gave", () => {

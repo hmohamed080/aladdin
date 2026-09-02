@@ -146,3 +146,68 @@ export function InlineSuccess({ children }: { children: ReactNode }) {
     </p>
   );
 }
+
+const meterTones = {
+  neutral: "bg-fg-muted",
+  accent: "bg-accent-solid",
+  success: "bg-success",
+  warning: "bg-warning",
+} as const;
+
+const meterSizes = { sm: "h-1.5", md: "h-2.5" } as const;
+
+/**
+ * A measured proportion, ANNOUNCED — a real `progressbar`, not a decorative bar.
+ *
+ * ADDED TO THE FOUNDATION RATHER THAN TO A FEATURE FOLDER (R3/R6), and the
+ * distinction from the one bar that already existed is not cosmetic.
+ * `PanelRow`'s `share` is `aria-hidden` and structurally welded to a key/value
+ * line: it annotates a figure that is already written beside it, in a summary
+ * list, where the bar is the least important thing in the row. This is the
+ * opposite case. Here the proportion IS the subject of the card, it appears
+ * without a `PanelRow` around it, and it is the single fact a reader most needs —
+ * so a bar that says nothing to a screen reader would hide the headline.
+ *
+ * Hence `role="progressbar"` with the three ARIA values and a required label:
+ * "Progress, 60%" is what the sighted reader gets from the number beside it, and
+ * there is no reason for anyone else to get less.
+ *
+ * It is deliberately NOT a Jobs component. A proportion of a known whole turns
+ * up wherever work is measured, and the moment the second surface wanted one,
+ * two copies would already exist.
+ */
+export function ProgressMeter({
+  value,
+  label,
+  tone = "accent",
+  size = "md",
+}: {
+  /** 0–100. Clamped, so bad data cannot overflow the track. */
+  value: number;
+  /** Accessible name — what this is the progress OF. */
+  label: string;
+  tone?: keyof typeof meterTones;
+  size?: keyof typeof meterSizes;
+}) {
+  const pct = Math.min(100, Math.max(0, Math.round(value)));
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuenow={pct}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      className={cn("w-full overflow-hidden rounded-pill bg-surface-2", meterSizes[size])}
+    >
+      {/* Track and fill both rounded, so the cap shape survives a near-zero
+          value. A zero renders as an empty track rather than a 2% stub: unlike a
+          share in a breakdown, "none of it is done" is a meaningful reading here
+          and should not be dressed up as a sliver of progress. */}
+      <div
+        className={cn("h-full rounded-pill transition-[width]", meterTones[tone])}
+        /* Data, so it cannot be a utility class. */
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}

@@ -28,7 +28,7 @@ describe("personalNavKeys", () => {
 
   it("gives a professional the profile hub and Job Opportunities", () => {
     const keys = personalNavKeys({ variant: "professional", isSalesPersona: false });
-    expect(keys).toEqual(["home", "profile", "points", "jobs", "addBusiness"]);
+    expect(keys).toEqual(["home", "profile", "points", "jobs", "myWork", "addBusiness"]);
   });
 
   it("NEVER offers the showroom entry to a non-Sales professional", () => {
@@ -41,7 +41,15 @@ describe("personalNavKeys", () => {
     // The caller resolves canonical-or-declared before this point, so both kinds
     // of salesperson arrive here as the same `true`.
     const keys = personalNavKeys({ variant: "professional", isSalesPersona: true });
-    expect(keys).toEqual(["home", "profile", "points", "jobs", "connectShowroom", "addBusiness"]);
+    expect(keys).toEqual([
+      "home",
+      "profile",
+      "points",
+      "jobs",
+      "myWork",
+      "connectShowroom",
+      "addBusiness",
+    ]);
   });
 
   it("gives an org-less professional a route to their OWN Points", () => {
@@ -82,7 +90,7 @@ describe("personalNavKeys", () => {
     }
     // And the union covers the whole key space — a key nothing can reach would be
     // an entry that exists only in the map.
-    expect(emitted.size).toBe(6);
+    expect(emitted.size).toBe(7);
   });
 });
 
@@ -185,9 +193,49 @@ describe("Job Opportunities in the personal rail", () => {
     expect(without.includes("jobs")).toBe(true);
   });
 
-  it("puts Jobs in its own group, so Increment 9 has somewhere to land", () => {
+  it("puts Jobs and My Work together in the work group", () => {
     const sections = personalNavSections({ variant: "professional", isSalesPersona: false });
     expect(sections.map((s) => s.section)).toEqual(["account", "work", "business"]);
-    expect(sections.find((s) => s.section === "work")?.keys).toEqual(["jobs"]);
+    expect(sections.find((s) => s.section === "work")?.keys).toEqual(["jobs", "myWork"]);
+  });
+});
+
+/**
+ * My Work (Increment 9, §1). The route now exists, so the destination does.
+ *
+ * The one thing worth guarding is that it stays a SEPARATE destination from Job
+ * Opportunities. They are adjacent in the same group and describe the same
+ * domain, which is exactly the pressure that produces one "Jobs" entry with
+ * tabs — and that would make "accepted" mean both "you won" and "you are
+ * working".
+ */
+describe("My Work in the personal rail", () => {
+  it("resolves to /home/work and its own label key", () => {
+    expect(personalNavItem("myWork")).toEqual({
+      key: "myWork",
+      href: "/home/work",
+      labelKey: "personalNav.myWork",
+    });
+  });
+
+  it("is a destination for a professional and not for a consumer", () => {
+    expect(personalNavKeys({ variant: "professional", isSalesPersona: false })).toContain("myWork");
+    expect(personalNavKeys({ variant: "consumer", isSalesPersona: false })).not.toContain("myWork");
+  });
+
+  /** §1: the parent entry stays lit on the nested assignment route. */
+  it("stays active on a nested assignment route", () => {
+    expect(activePersonalNavKey("/home/work")).toBe("myWork");
+    expect(activePersonalNavKey("/home/work/a1000001-0000-4000-8000-000000000001")).toBe("myWork");
+  });
+
+  it("does not swallow a sibling route that merely starts with the same letters", () => {
+    expect(activePersonalNavKey("/home/workshop")).toBe("home");
+  });
+
+  it("keeps Jobs and My Work as two destinations, never one with tabs", () => {
+    expect(personalNavItem("jobs").href).not.toBe(personalNavItem("myWork").href);
+    expect(activePersonalNavKey("/home/jobs/applications")).toBe("jobs");
+    expect(activePersonalNavKey("/home/work/a1")).toBe("myWork");
   });
 });

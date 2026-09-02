@@ -353,6 +353,7 @@ export const en = {
     profile: "My profile",
     points: "Points",
     jobs: "Job opportunities",
+    myWork: "My work",
     connectShowroom: "Connect showroom",
     addBusiness: "Add business",
   },
@@ -1089,6 +1090,23 @@ export const en = {
         rejected: {
           title: "A decision on your application",
           body: "{org_name} has decided on your application for “{job_title}”.",
+        },
+      },
+      /* Increment 9. `ready` is the only one addressed to an organization, and
+         it deliberately does not say "completed" — the work has been REPORTED
+         as finished and the reader is the person who decides whether it was. */
+      assignment: {
+        ready: {
+          title: "Work reported as finished",
+          body: "The professional reported “{job_title}” as finished and is waiting for your confirmation.",
+        },
+        completed: {
+          title: "Your work was confirmed as complete",
+          body: "{org_name} confirmed “{job_title}” as complete.",
+        },
+        cancelled: {
+          title: "An assignment was cancelled",
+          body: "“{job_title}” was cancelled. Reason: {reason}",
         },
       },
     },
@@ -2879,6 +2897,218 @@ export const en = {
       alreadyDecided: "This application has already been answered and cannot be changed.",
       notWithdrawable: "This application can no longer be withdrawn.",
       notYours: "That application is not yours.",
+    },
+  },
+
+  /**
+   * MY WORK — the assignment side, and a separate namespace from `jobs` on
+   * purpose.
+   *
+   * `jobs.*` is the language of an OPENING: offered, applied, decided. `work.*`
+   * is the language of an ENGAGEMENT that already exists: started, progressing,
+   * confirmed. The four status labels themselves stay in
+   * `jobs.assignmentStatus.*` because that is the one status layer every badge
+   * reads (§22) — nothing here renames a lifecycle value.
+   *
+   * The most carefully chosen words in this block are the readiness ones. The
+   * installer must never read a sentence implying they finished the engagement,
+   * because they cannot: they reported, and somebody else confirms.
+   */
+  work: {
+    title: "My work",
+    subtitle: "Everything you have been assigned — current, finished and cancelled — in one place.",
+    browse: "Find more work",
+    applications: "My applications",
+    viewInWork: "View in My work",
+    viewDetails: "View details",
+    back: "My work",
+
+    tab: {
+      all: "All",
+      current: "Current",
+    },
+
+    summary: {
+      title: "Your work summary",
+      current: "Current work",
+      scheduled: "Waiting to start",
+      in_progress: "Under way",
+      completed: "Completed",
+      cancelled: "Cancelled",
+      total: "All assignments",
+      /* Named as navigation, not as analytics: these are the same counts the
+         tabs carry, offered as a second way in. */
+      hint: "Counts your own assignments only.",
+    },
+
+    quick: {
+      title: "Elsewhere",
+      browse: "Browse job opportunities",
+      applications: "Track my applications",
+      profile: "My professional profile",
+    },
+
+    featured: {
+      eyebrow: "Current work",
+      progress: "Progress",
+      lastUpdate: "Last update",
+      noUpdate: "No progress reported yet",
+      agreed: "Agreed amount",
+      schedule: "Schedule",
+      startsOn: "Starts",
+      noneTitle: "No work under way",
+      noneBody:
+        "When an organization accepts one of your applications, the assignment appears here.",
+    },
+
+    list: {
+      title: "All work",
+      job: "Job",
+      status: "State",
+      amount: "Agreed",
+      date: "Assigned",
+      view: "View",
+      showing: "Your assignments, newest first.",
+    },
+
+    detail: {
+      eyebrow: "Assignment",
+      organization: "Posted by",
+      trade: "Trade",
+      agreed: "Agreed amount",
+      location: "Location",
+      site: "Site address",
+      siteWithheld: "The site address is available while the assignment is active.",
+      schedule: "Schedule",
+      duration: "Expected duration",
+      description: "What the work is",
+      assignedOn: "Assigned",
+      startedOn: "Started",
+      completedOn: "Completed",
+      cancelledOn: "Cancelled",
+      cancellationReason: "Reason given",
+      timeline: "Record",
+      retiredTrade:
+        "This trade is no longer offered for new jobs. It is kept here because it is what this work was agreed as.",
+    },
+
+    start: {
+      action: "Start work",
+      title: "Start this work?",
+      body: "This tells the organization you have begun. You can report progress afterwards.",
+      confirm: "Start work",
+      hint: "Start the work when you are actually on site — the organization sees the change immediately.",
+    },
+
+    progress: {
+      title: "Progress",
+      current: "Reported progress",
+      lastUpdate: "Last update",
+      action: "Update progress",
+      dialogTitle: "Report progress",
+      dialogBody:
+        "Report how far the work has got. Each report is added to the record and cannot be edited afterwards.",
+      confirm: "Send report",
+      percent: "Progress",
+      percentHint: "0 to 100.",
+      stage: "Current stage",
+      stageHint: "Optional — what you are working on now.",
+      note: "Note",
+      noteHint: "Optional — anything the organization should know.",
+      history: "Progress history",
+      historyEmpty: "No progress reported yet. Your first report will appear here.",
+      notStarted: "Progress reporting opens once you have started the work.",
+      appendOnly: "Reports are kept as a record and are not edited or removed.",
+      at: "Reported",
+    },
+
+    ready: {
+      badge: "Reported as finished",
+      title: "You reported this work as finished",
+      body: "The organization has been told. They confirm completion — the assignment stays open until they do.",
+      /* The line that has to be unambiguous: there is nothing else for the
+         installer to press, and that is correct rather than missing. */
+      noAction: "There is nothing further for you to do here.",
+    },
+
+    cancel: {
+      action: "Cancel assignment",
+      title: "Cancel this assignment?",
+      body: "The assignment ends and the organization is told. The job returns to the pool for other professionals. This cannot be undone.",
+      confirm: "Cancel assignment",
+      reason: "Reason",
+      reasonHint: "Required. The organization reads this.",
+    },
+
+    complete: {
+      action: "Confirm completion",
+      title: "Confirm this work is complete?",
+      body: "This completes the assignment and closes the job. It cannot be undone.",
+      confirm: "Confirm completion",
+      hint: "Only your organization can confirm completion — the professional reports progress.",
+    },
+
+    poster: {
+      /* Plain "Progress" — the figure below is already labelled "Reported
+         progress", and stacking the same two words read as a rendering fault. */
+      progressTitle: "Progress",
+      noProgress: "The professional has not reported progress yet.",
+      readyTitle: "Reported as finished",
+      readyBody:
+        "The professional has reported this work as finished and is waiting for your confirmation.",
+      notStarted: "The professional has not started this work yet.",
+      cancelAction: "End assignment",
+      cancelTitle: "End this assignment?",
+      cancelBody:
+        "The assignment is cancelled and kept as a record, and the job returns to open so you can award it again. Applications already declined stay declined.",
+      cancelConfirm: "End assignment",
+      cancelReason: "Reason",
+      cancelReasonHint: "Required. The professional reads this.",
+    },
+
+    empty: {
+      title: "No work yet",
+      body: "Apply to a job opportunity — when an organization accepts your application, the assignment appears here.",
+      filtered: "Nothing in this state",
+      filteredBody: "You have no assignments in this state.",
+    },
+
+    home: {
+      title: "Current work",
+      none: "No work under way",
+      noneBody: "Browse open jobs and apply — accepted applications become assignments here.",
+      view: "Open My work",
+    },
+
+    flash: {
+      started: "Work started.",
+      progressAdded: "Progress reported.",
+      completed: "Completion confirmed.",
+      cancelled: "Assignment cancelled.",
+    },
+
+    validation: {
+      progressRange: "Progress must be a whole number between 0 and 100.",
+      stageTooLong: "Keep the stage under 80 characters.",
+      noteTooLong: "Keep the note under 1000 characters.",
+      reasonRequired: "A reason is required.",
+      reasonTooLong: "Keep the reason under 500 characters.",
+    },
+
+    errors: {
+      conflict: "This assignment changed while you were reading it. Refresh and try again.",
+      notYoursToStart: "Only the assigned professional can start this work.",
+      notYoursToReport: "Only the assigned professional can report progress on this work.",
+      notAParty: "You are not a party to this assignment.",
+      notScheduled: "This work cannot be started from its current state.",
+      notInProgress: "Progress can only be reported on work that is under way.",
+      progressRange: "Progress must be between 0 and 100.",
+      notCompletable: "This assignment cannot be completed from its current state.",
+      notCancellable: "This assignment can no longer be cancelled.",
+      reasonRequired: "A reason is required to cancel an assignment.",
+      manageRequired: "You need job management permission to do this.",
+      notAMember: "You are not a member of the posting organization.",
+      notFound: "That assignment could not be found.",
     },
   },
   execution: {

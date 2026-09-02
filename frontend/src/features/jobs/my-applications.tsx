@@ -25,18 +25,27 @@ import type { MyApplicationRow } from "@/server/queries/job-opportunities";
  *
  * WHAT IS NOT HERE. No sibling applicants, no applicant counts, no ranking, and
  * no "you were 2nd choice" — the read seam has none of it and the poster's side
- * deliberately does not publish it. Nor is there a My Work link on an accepted
- * row: Increment 9 owns that route and it does not exist yet, so the accepted
- * state says what happened and stops.
+ * deliberately does not publish it.
+ *
+ * THE BRIDGE (§20). An accepted candidacy now offers its assignment, and the id
+ * is RESOLVED rather than guessed: `assignmentIds` is keyed by
+ * `job_assignments.application_id`, the foreign key `job_application_accept`
+ * writes once, read back through the caller's own projection. Deriving a route
+ * from the application id and hoping would produce a link that 404s the moment
+ * the two ever differ. A rejected or withdrawn candidacy has no assignment and
+ * gets no link, because there is nothing for the map to contain.
  */
 
 export function MyApplications({
   applications,
   discoverableJobIds,
+  assignmentIds,
   locale,
   filtered,
 }: {
   applications: readonly MyApplicationRow[];
+  /** applicationId -> assignmentId, for accepted candidacies only (§20). */
+  assignmentIds?: ReadonlyMap<string, string>;
   /** Jobs still open AND still from a verified poster — the reapply gate. */
   discoverableJobIds: ReadonlySet<string>;
   locale: Locale;
@@ -66,6 +75,7 @@ export function MyApplications({
           <ApplicationCard
             application={a}
             jobIsDiscoverable={Boolean(a.job_id && discoverableJobIds.has(a.job_id))}
+            assignmentId={(a.id && assignmentIds?.get(a.id)) || null}
             locale={locale}
           />
         </li>
@@ -77,10 +87,13 @@ export function MyApplications({
 function ApplicationCard({
   application: a,
   jobIsDiscoverable,
+  assignmentId,
   locale,
 }: {
   application: MyApplicationRow;
   jobIsDiscoverable: boolean;
+  /** Non-null only for an accepted candidacy whose assignment resolved. */
+  assignmentId: string | null;
   locale: Locale;
 }) {
   const { t } = useI18n();
@@ -127,9 +140,17 @@ function ApplicationCard({
           "you were not selected" are different facts about the same person and
           must never render as the same neutral row (§17). */}
       {a.status === "accepted" ? (
-        <div className="flex flex-col gap-1 rounded-md border border-success/30 bg-success/10 p-md">
-          <p className="text-body font-medium text-fg">{t("jobs.applications.accepted.title")}</p>
-          <p className="text-caption text-fg-secondary">{t("jobs.applications.accepted.body")}</p>
+        <div className="flex flex-col items-start gap-sm rounded-md border border-success/30 bg-success/10 p-md">
+          <div>
+            <p className="text-body font-medium text-fg">{t("jobs.applications.accepted.title")}</p>
+            <p className="text-caption text-fg-secondary">{t("jobs.applications.accepted.body")}</p>
+          </div>
+          {/* Offered only where an assignment genuinely resolved. */}
+          {assignmentId ? (
+            <ButtonLink href={`/home/work/${assignmentId}`} variant="accent" size="sm">
+              {t("work.viewInWork")}
+            </ButtonLink>
+          ) : null}
         </div>
       ) : null}
 
