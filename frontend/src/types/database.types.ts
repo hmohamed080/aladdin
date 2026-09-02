@@ -2990,8 +2990,11 @@ export type Database = {
           created_at: string | null
           decided_at: string | null
           decision_reason: string | null
+          ends_by: string | null
+          expected_duration_days: number | null
           governorate: string | null
           id: string | null
+          job_description: string | null
           job_id: string | null
           job_status: Database["public"]["Enums"]["job_status"] | null
           job_title: string | null
@@ -2999,6 +3002,8 @@ export type Database = {
           offered_amount: number | null
           offered_currency: string | null
           poster_org_name: string | null
+          published_at: string | null
+          starts_on: string | null
           status: Database["public"]["Enums"]["job_application_status"] | null
           trade_key: string | null
         }

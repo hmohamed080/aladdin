@@ -69,3 +69,30 @@ export function AssignmentStatusBadge({ status }: { status: string }) {
     </Badge>
   );
 }
+
+/**
+ * The one decision reason the PRODUCT wrote rather than a person.
+ *
+ * `job_application_accept` closes every other live candidacy with this exact
+ * English sentence, stored in `decision_reason`. Rendering it raw would show an
+ * Arabic reader an English sentence about themselves — and it would also read as
+ * though the organization had typed it, which they did not. Matching our own
+ * constant is the narrowest fix available without changing Increment 6 authority
+ * to store a key instead; if that sentence ever changes in the database, this
+ * has to change with it, which is why it is a named export and not a literal
+ * buried in a component.
+ */
+export const AWARDED_ELSEWHERE_REASON = "the job was awarded to another applicant";
+
+/** A decision reason in the reader's language, whoever wrote it. */
+export function DecisionReason({ reason }: { reason: string | null | undefined }) {
+  const { t } = useI18n();
+  if (!reason) return null;
+  return (
+    <>
+      {reason === AWARDED_ELSEWHERE_REASON
+        ? t("jobs.applications.awardedElsewhere")
+        : reason}
+    </>
+  );
+}

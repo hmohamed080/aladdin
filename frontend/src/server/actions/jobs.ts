@@ -156,3 +156,39 @@ export async function rejectApplication(
   });
   if (error) throw error;
 }
+
+/**
+ * Apply for a job, or return a withdrawn candidacy to `submitted`.
+ *
+ * ONE RPC for both, and that is the Increment 6 contract rather than a shortcut:
+ * `job_application_submit` reuses the SAME row when the caller has a withdrawn
+ * one, so re-applying keeps its `created_at` and cannot produce a duplicate
+ * candidacy. A second "reapply" wrapper would be a second way to write the same
+ * row, and the two would eventually disagree.
+ *
+ * Returns the application id, existing or new — the call is idempotent, so a
+ * double tap returns the candidacy that already exists.
+ */
+export async function submitApplication(
+  supabase: Client,
+  jobId: string,
+  note?: string,
+): Promise<string> {
+  const { data, error } = await supabase.rpc("job_application_submit", {
+    p_job_id: jobId,
+    p_note: note ?? undefined,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+/** Withdraw the caller's own candidacy. Only the applicant may. */
+export async function withdrawApplication(
+  supabase: Client,
+  applicationId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("job_application_withdraw", {
+    p_application_id: applicationId,
+  });
+  if (error) throw error;
+}

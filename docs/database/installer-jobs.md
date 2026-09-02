@@ -620,6 +620,33 @@ retired trade and neither can editing a job that holds a current one. Without
 that option the select would have nothing matching its own value, submit blank,
 and the edit would be refused for a field the poster never touched.
 
+### 4.8 An application outlives its opening
+
+`open_job_opportunities` is correct for DISCOVERY and wrong as the only way an
+applicant can read a job: the moment it is awarded to somebody else, closed,
+cancelled, or its poster's verification lapses, the row disappears — and with it
+every detail of the thing this person applied to. `my_job_applications` exists so
+that does not happen (it deliberately does not filter on verification), and
+Increment 8 widened it from the LIST half of a job to the whole readable half:
+`job_description`, `expected_duration_days`, `starts_on`, `ends_by`,
+`published_at`.
+
+Every one of those columns is already projected by `open_job_opportunities` to
+any authenticated caller. Here they are narrower: only on the caller's own
+application, resolved from `auth.uid()` inside the definer with no parameter to
+point elsewhere. Still never `site_address` (§11 — the applicant is not the
+assignee), never a competing application, never a poster-side management column.
+
+**It needs no counterpart to `job_trade_labels`.** The definer joins
+`public.trades` without `trades_select_active` in the way, so a trade retired
+after the fact keeps its historical label on the applicant's own record for the
+same reason §4.7's seam gives the poster theirs.
+
+The installer's job-detail route reads discovery first and falls back to this
+projection, so a job the caller applied to never 404s on them; a caller who never
+applied to a job that has left discovery gets an ordinary not-found, which is the
+honest answer.
+
 ## 5. Compensation disclosure (D9)
 
 ### 5.1 What the columns mean
@@ -1002,7 +1029,7 @@ buried. **`open_job_opportunities` and `job_application_submit` must read the li
 | `job_progress_updates` | the parties of the parent assignment; platform staff |
 | `job_reviews` | the reviewee; poster-org members; platform staff — plus the **public projection** in §6.4 |
 | `open_job_opportunities` (view) | `authenticated`; open jobs from CURRENTLY verified posters, display columns only, never `site_address` |
-| `my_job_applications` (view) | the caller's own candidacies joined to the display half of each job (§3.6, departure 7) |
+| `my_job_applications` (view) | the caller's own candidacies joined to the display half of each job (§3.6, departure 7). **Widened by Increment 8** with the job's description, expected duration, start/finish dates and publication time — every one already public in `open_job_opportunities`, and here restricted to the caller's own application, so the record survives the opening leaving discovery (§4.8) |
 | `job_applicants` (view) | the POSTER side: applications for jobs the caller's organization posted, with the applicant's identity and self-declared practice (§3.6, departure 10). Added by Increment 7. |
 | `job_trade_labels` (view) | the POSTER side: for jobs the caller's organization posted, the key of the trade it was posted in — **retired trades included** — plus whether that trade is still active (§4.7). Added by Increment 7. |
 | `trades` | `authenticated`, ACTIVE rows only; platform staff also read retired ones; **no write grant in any role** |
@@ -1197,7 +1224,9 @@ amount** (a monetary value in an audit payload invites exactly the payment readi
 | Route | Reference | Surface |
 |---|---|---|
 | `/home` | 01 | Installer home — real counts from this domain |
-| `/home/jobs` · `/home/jobs/[jobId]` | 02 | Discovery over `open_job_opportunities`; detail + apply |
+| **`/home/jobs`** | 02 | **Installer side.** Discovery over `open_job_opportunities`; search, trade, governorate and applied-state filters. **Shipped (Increment 8).** |
+| **`/home/jobs/[jobId]`** | 02 | **Installer side.** The decision surface: full opening, apply, withdraw, re-apply. Falls back to the caller's own application record once the opening leaves discovery. **Shipped.** |
+| **`/home/jobs/applications`** | 02 | **Installer side.** Application tracking over `my_job_applications`, with the four candidacy states. **Shipped.** |
 | `/home/work` · `/home/work/[assignmentId]` | 03 | Assignments by status; detail + progress |
 | `/home/profile` · `/home/profile/edit` | 04 | Profile hub + standalone editor (trades, availability, service areas) |
 | `/home/reviews` | 05 | Received reviews + summary (§6.4) |
@@ -1222,6 +1251,50 @@ two capabilities deliberately: either one alone is a reason to reach the module,
 and gating on `job.post` would hide the applicants queue from the person whose
 whole job is working it. Progress, completion and review controls are **absent by
 design** — they belong to Increment 9 and Increment 12.
+
+**Personal navigation (Increment 8).** The installer side is `PersonalNavKey`
+`jobs` at `/home/jobs`, in its own **work** group between `account` and
+`business` — the other personal destinations are the caller's own record, and
+this is the one that is about the outside world. It is where Increment 9's My
+Work joins. The gate is the persona, `variant === "professional"`, which is the
+same test `app.is_professional_persona` applies inside
+`job_application_submit`: discovery itself is open to any authenticated caller,
+so this is about not advertising a door that does not open. `job.post` and
+`job.manage` are membership capabilities and mean nothing here — the personal
+rail takes no capability input at all. Application tracking is a route inside the
+same Jobs area rather than a second rail entry, and `activePersonalNavKey` keeps
+the parent entry lit on every nested route.
+
+**One entry point on `/home`** — a single `ActionCard` at the head of the
+existing "Start here" grid. No opportunity count: a number there would cost every
+professional home render an extra read of a board most of them are not about to
+open, and a stale or zero count is worse than none.
+
+---
+
+### 16.1 Notification events (Increment 8)
+
+| Event | Recipient | Emitted by | Deep link |
+|---|---|---|---|
+| `job.application.accepted` | the awarded applicant, exactly | `job_application_accept` | `/home/jobs/applications` |
+| `job.application.rejected` | the declined applicant, exactly — including **each** candidacy the award auto-closes | `job_application_reject`, `job_application_accept` | `/home/jobs/applications` |
+
+Both use `app.notify` rather than `app.notify_org`: every recipient is named by
+`job_applications.applicant_user_id`, so there is no fan-out, no capability
+lookup and no owner fallback. Both are ordinary statements in the same
+transaction as the decision, so a decision that commits without its notice is not
+a reachable state. `ck_notifications_event_type_known` gained both values in
+`20260904090002`, and the title/body keys mirror the event type exactly
+(`notifications.job.application.accepted.title`), which is the convention
+`view-model.test.ts` enforces for every event.
+
+**`job.application.submitted` → the posting organization stays RESERVED.**
+`app.notify_org` delivers against a capability, and this domain has two plausible
+answers — `job.post` (whoever authored the opening) and `job.manage` (whoever
+decides its applications) — with nothing in the approved contract choosing
+between them. Guessing would install a recipient rule by accident. Test 42
+asserts that no Jobs notification ever reaches anyone but the applicant it is
+about.
 
 ---
 

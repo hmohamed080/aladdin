@@ -1,5 +1,11 @@
 import { Card } from "@/components/ui/primitives";
-import { BadgeCheckIcon, BuildingIcon, TargetIcon, UserIcon } from "@/components/ui/icons";
+import {
+  BadgeCheckIcon,
+  BriefcaseIcon,
+  BuildingIcon,
+  TargetIcon,
+  UserIcon,
+} from "@/components/ui/icons";
 import type { PersonalHomeData } from "@/server/queries/personal-home";
 import type { CompletenessItemKey } from "@/lib/profile/completeness";
 import type { TranslateFn } from "@/lib/i18n/translate";
@@ -187,6 +193,19 @@ export function ProfessionalHome({
         description={t("personalHome.professional.doNextBody")}
       >
         <ActionGrid>
+          {/* THE ONE new entry point Increment 8 adds to this page (§18), and it
+              leads because it is now the most valuable thing a professional can
+              do here: the other three are about their own record, this is work.
+              It is a link and nothing more — no opportunity count, because a
+              number on this card would cost every professional home render an
+              extra read of a board most of them are not about to open, and a
+              stale or zero count would be worse than none. */}
+          <ActionCard
+            href="/home/jobs"
+            icon={<BriefcaseIcon size={20} />}
+            label={t("jobs.opportunities.title")}
+            body={t("jobs.opportunities.subtitle")}
+          />
           <ActionCard
             href="/home/profile"
             icon={<UserIcon size={20} />}

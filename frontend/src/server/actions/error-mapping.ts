@@ -117,3 +117,35 @@ export function isStaleVersion(error: unknown): boolean {
   const e = (error ?? {}) as PgLikeError;
   return e.code === "40001" || (e.message ?? "").toLowerCase().includes("modified concurrently");
 }
+
+/**
+ * The INSTALLER side of Jobs — applying, and withdrawing.
+ *
+ * Separate from `mapJobError` because the vocabulary is genuinely different: the
+ * same SQLSTATE means something else on this side of the transaction, and the
+ * sentence a professional needs is about their own candidacy rather than about a
+ * job they manage. Folding both into one function would have meant a mapping
+ * whose branches only make sense once you know which surface asked.
+ *
+ * The lifecycle fragments are tested BEFORE the generic 42501 branch, for the
+ * same reason they are in `mapJobError`: `job_application_submit` raises the
+ * persona refusal with 42501, and falling through would tell an installer they
+ * lack a permission when what they lack is a professional account.
+ */
+export function mapApplicationError(error: unknown): string {
+  const e = (error ?? {}) as PgLikeError;
+  const code = e.code ?? "";
+  const msg = (e.message ?? "").toLowerCase();
+
+  if (msg.includes("professional account is required"))
+    return "jobs.installerErrors.notProfessional";
+  if (msg.includes("not accepting applications") || msg.includes("not currently open"))
+    return "jobs.installerErrors.notOpenNow";
+  if (msg.includes("cannot be withdrawn")) return "jobs.installerErrors.notWithdrawable";
+  if (msg.includes("only the applicant")) return "jobs.installerErrors.notYours";
+  if (msg.includes("cannot be accepted") || msg.includes("cannot be rejected"))
+    return "jobs.installerErrors.alreadyDecided";
+  if (code === "40001" || msg.includes("modified concurrently")) return "jobs.errors.conflict";
+  if (code === "42501") return "jobs.errors.denied";
+  return "states.genericRetry";
+}

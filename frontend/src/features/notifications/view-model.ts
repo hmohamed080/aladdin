@@ -21,7 +21,7 @@ import { formatMoney, formatRelativeTime } from "@/lib/ui/format";
  */
 
 /**
- * The sixteen event types `ck_notifications_event_type_known` permits.
+ * The eighteen event types `ck_notifications_event_type_known` permits.
  *
  * Duplicated from the CHECK constraint deliberately: the constraint keeps bad
  * rows OUT of the table, and this list decides which rows the UI has real copy
@@ -29,9 +29,14 @@ import { formatMoney, formatRelativeTime } from "@/lib/ui/format";
  * migration adds a seventeenth event and ships before the translations do — is
  * exactly the day this list has to earn its keep.
  *
- * `message.sent` is the newest and the only one whose subject type varies per
- * row (a conversation inherits its transaction's subject), which changes nothing
- * here: the view model reads keys and params, never the subject.
+ * `message.sent` is the only one whose subject type varies per row (a
+ * conversation inherits its transaction's subject), which changes nothing here:
+ * the view model reads keys and params, never the subject.
+ *
+ * The two `job.application.*` events are the newest, and the first whose
+ * recipient is a PERSON rather than a capability-holding membership — an
+ * individual installer, named by `job_applications.applicant_user_id`. That also
+ * changes nothing here, for the same reason.
  */
 export const KNOWN_NOTIFICATION_EVENTS = [
   "rfq.submitted",
@@ -50,6 +55,8 @@ export const KNOWN_NOTIFICATION_EVENTS = [
   "verification.rejected",
   "verification.changes_requested",
   "message.sent",
+  "job.application.accepted",
+  "job.application.rejected",
 ] as const;
 
 export type KnownNotificationEvent = (typeof KNOWN_NOTIFICATION_EVENTS)[number];

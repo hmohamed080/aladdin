@@ -16,7 +16,14 @@ import {
   type PersonalNavKey,
   type PersonalNavInput,
 } from "@/lib/nav/personal-modules";
-import { HomeIcon, UserIcon, GaugeIcon, StorefrontIcon, BuildingIcon } from "@/components/ui/icons";
+import {
+  HomeIcon,
+  UserIcon,
+  GaugeIcon,
+  BriefcaseIcon,
+  StorefrontIcon,
+  BuildingIcon,
+} from "@/components/ui/icons";
 
 /**
  * PERSONAL navigation — the same navigation FAMILY as the workspace rail, a
@@ -38,12 +45,14 @@ import { HomeIcon, UserIcon, GaugeIcon, StorefrontIcon, BuildingIcon } from "@/c
  * panel the workspace stands in.
  *
  * NO DEAD LINKS. The list is exactly what `personalNavSections` derives from the
- * account, and nothing more. Jobs, My Work, Reviews and Network are real future
- * Installer destinations, and they slot into this same model when their routes
- * exist — a nav that advertises a route that 404s is worse than a short nav.
+ * account, and nothing more. Jobs arrived in Increment 8, when `/home/jobs`
+ * became a real route; My Work, Reviews and Network are still future Installer
+ * destinations and slot into this same model when their routes exist — a nav
+ * that advertises a route that 404s is worse than a short nav.
  *
  * SHORT LISTS DO NOT GET SECTION HEADINGS HERE. `personalNavSections` groups into
- * `account` and `business`, which the workspace would render as labelled bands.
+ * `account`, `work` and `business`, which the workspace would render as labelled
+ * bands.
  * At three-to-five rows a heading costs more vertical space than the group it
  * introduces, so the grouping is carried by a rule between the bands — the same
  * device the collapsed workspace rail uses when its headings have no room.
@@ -54,6 +63,7 @@ const ICONS: Record<PersonalNavKey, ComponentType<{ size?: number }>> = {
   profile: UserIcon,
   // The same glyph the workspace Points module uses — one feature, one mark.
   points: GaugeIcon,
+  jobs: BriefcaseIcon,
   connectShowroom: StorefrontIcon,
   addBusiness: BuildingIcon,
 };

@@ -345,6 +345,7 @@ export const ar: Messages = {
     home: "الرئيسية",
     profile: "ملفي",
     points: "النقاط",
+    jobs: "فرص العمل",
     connectShowroom: "ربط معرض",
     addBusiness: "إضافة نشاط",
   },
@@ -1037,6 +1038,18 @@ export const ar: Messages = {
       sent: {
         title: "رسالة جديدة",
         body: "أرسل {counterparty_name} رسالة جديدة بخصوص هذه المعاملة.",
+      },
+    },
+    job: {
+      application: {
+        accepted: {
+          title: "تم قبول طلبك",
+          body: "أسندت إليك {org_name} فرصة “{job_title}”.",
+        },
+        rejected: {
+          title: "قرار بشأن طلبك",
+          body: "أصدرت {org_name} قرارها بشأن طلبك على “{job_title}”.",
+        },
       },
     },
   },
@@ -2480,11 +2493,18 @@ export const ar: Messages = {
       closed: "أُغلق التقديم",
       cancelled: "ملغاة",
     },
+    /* NEUTRAL VOICE, deliberately. These four labels are the one status layer
+       (§22) and they now appear on BOTH sides: on the poster's applicant card,
+       where they describe somebody else, and on the applicant's own tracking
+       page, where they describe the reader. The previous wording was written
+       for the first case only — "سحب طلبه" ("he withdrew his application")
+       reads as a sentence about a third party when it is the reader's own row.
+       The state, named as a state, is correct from either side. */
     applicationStatus: {
-      submitted: "تقدّم للعمل",
-      accepted: "تم اختياره",
-      rejected: "لم يقع الاختيار عليه",
-      withdrawn: "سحب طلبه",
+      submitted: "تم التقديم",
+      accepted: "مقبول",
+      rejected: "لم يقع الاختيار",
+      withdrawn: "مسحوب",
     },
     assignmentStatus: {
       scheduled: "في انتظار البدء",
@@ -2650,6 +2670,117 @@ export const ar: Messages = {
       offerPositive: "يجب أن يكون المبلغ أكبر من صفر.",
       dateOrder: "لا يمكن أن يسبق تاريخ الانتهاء تاريخ البدء.",
       reasonRequired: "اكتب السبب.",
+      noteTooLong: "الرسالة طويلة أكثر من اللازم — اجعلها أقل من ١٠٠٠ حرف.",
+    },
+
+    /* ===== الجانب الخاص بالصنايعي (الدفعة 8) ===== */
+    opportunities: {
+      title: "فرص العمل",
+      subtitle: "أعمال تبحث فيها المنشآت عن مهنيين أفراد.",
+      searchPlaceholder: "ابحث بالعنوان أو الوصف أو اسم المنشأة",
+      allTrades: "كل المهن",
+      allLocations: "كل المناطق",
+      allApplications: "المقدَّم عليه وغيره",
+      notApplied: "لم أتقدّم له",
+      appliedOnly: "تقدّمت له",
+      postedBy: "من نشرها",
+      published: "نُشرت {when}",
+      duration: "{n} يوم عمل",
+      startsOn: "تبدأ {date}",
+      view: "التفاصيل",
+      appliedBadge: "تقدّمت لها",
+      emptyTitle: "لا توجد فرص متاحة الآن",
+      emptyBody:
+        "تظهر هنا الفرص التي تنشرها المنشآت الموثّقة. لا يُخفى عنك شيء بسبب المهن المسجّلة في ملفك.",
+      noResultsTitle: "لا توجد فرص مطابقة لهذه التصفية",
+      noResultsBody: "جرّب مهنة أو منطقة أخرى، أو امسح التصفية لعرض كل الفرص.",
+      clear: "مسح التصفية",
+      myApplications: "طلباتي",
+      offTradeNote: "يمكنك التقدّم لأي فرصة هنا، حتى في مهن غير المسجّلة في ملفك.",
+    },
+
+    detail: {
+      about: "عن هذا العمل",
+      whereAndWhen: "المكان والتوقيت",
+      compensation: "المقابل المعروض",
+      trade: "المهنة",
+      location: "الموقع",
+      duration: "المدة المتوقعة",
+      schedule: "الجدول",
+      posted: "تاريخ النشر",
+      addressWithheld: "يُشارَك العنوان التفصيلي للموقع مع المهني الذي تُسند إليه الفرصة.",
+      gone: "هذه الفرصة لم تعد تستقبل طلبات.",
+      goneBody: "ربما أُسندت أو أُغلقت أو سُحبت من القوائم. طلبك محفوظ في سجلك على أي حال.",
+      notFound: "هذه الفرصة غير متاحة",
+      notFoundBody: "ربما أُغلقت أو سُحبت منذ آخر مرة رأيتها فيها.",
+      yourApplication: "طلبك",
+    },
+
+    apply: {
+      action: "تقدّم لهذه الفرصة",
+      title: "التقدّم لهذه الفرصة",
+      body: "ترى المنشأة ملفك المهني وما تكتبه بالأسفل.",
+      noteLabel: "رسالة إلى المنشأة",
+      notePlaceholder: "ما يساعدهم على القرار — أعمال مشابهة نفّذتها، وموعد استعدادك للبدء.",
+      noteHint: "اختياري. حتى ١٠٠٠ حرف.",
+      confirm: "إرسال الطلب",
+      summary: "أنت تتقدّم إلى",
+      compensationNote: "هذا ما تعرضه المنشأة مقابل العمل. علاء الدين لا يتولى الدفع.",
+      againAction: "تقدّم مرة أخرى",
+      againTitle: "تتقدّم لهذه الفرصة مرة أخرى؟",
+      againBody: "يعود طلبك المسحوب إلى المنشأة كطلب جديد.",
+      deniedTitle: "التقديم متاح للحسابات المهنية فقط",
+      deniedBody: "فرص العمل متاحة للمهنيين الأفراد على علاء الدين.",
+    },
+
+    applications: {
+      title: "طلباتي",
+      subtitle: "ما تقدّمت له، وماذا حدث فيه.",
+      caption: "طلبات العمل الخاصة بك",
+      allStates: "كل الطلبات",
+      appliedOn: "تقدّمت في {date}",
+      decidedOn: "الرد في {date}",
+      yourNote: "ما كتبته",
+      reason: "ما قالته المنشأة",
+      awardedElsewhere: "أُسندت الفرصة إلى مهني آخر.",
+      jobState: "حالة الفرصة الآن: {state}",
+      emptyTitle: "لم تتقدّم لأي فرصة بعد",
+      emptyBody: "تظهر هنا الطلبات التي ترسلها مع ما تقرّره المنشأة بشأنها.",
+      noneInState: "لا شيء في هذه الحالة",
+      noneInStateBody: "جرّب حالة أخرى، أو اعرض كل طلباتك.",
+      browse: "تصفّح الفرص",
+      viewJob: "عرض الفرصة",
+      accepted: {
+        title: "تم قبول طلبك",
+        body: "أسندت إليك المنشأة هذه الفرصة، وستتواصل معك بخصوص بدء العمل.",
+      },
+      rejected: {
+        title: "لم يقع الاختيار على طلبك",
+      },
+      withdrawn: {
+        title: "سحبت هذا الطلب",
+        closed: "لم تعد هذه الفرصة تستقبل طلبات، فلا يمكن إرساله مرة أخرى.",
+      },
+    },
+
+    withdraw: {
+      action: "سحب الطلب",
+      title: "تسحب طلبك؟",
+      body: "تتوقف المنشأة عن اعتبارك لهذه الفرصة. يمكنك التقدّم مرة أخرى ما دامت مفتوحة.",
+      confirm: "سحب",
+    },
+
+    installerFlash: {
+      applied: "تم إرسال الطلب.",
+      withdrawn: "تم سحب الطلب.",
+    },
+
+    installerErrors: {
+      notProfessional: "فرص العمل متاحة للمهنيين الأفراد.",
+      notOpenNow: "هذه الفرصة لم تعد تستقبل طلبات.",
+      alreadyDecided: "تم الرد على هذا الطلب ولا يمكن تغييره.",
+      notWithdrawable: "لم يعد بالإمكان سحب هذا الطلب.",
+      notYours: "هذا الطلب ليس طلبك.",
     },
   },
   execution: {

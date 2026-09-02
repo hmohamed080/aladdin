@@ -42,7 +42,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(162);
+select plan(163);
 
 update auth.users set email_confirmed_at = now() where email_confirmed_at is null;
 
@@ -955,10 +955,26 @@ select cmp_ok(
   (select count(*) from public.audit_log where action like 'job.%')::int, '>', 0,
   'the Jobs lifecycle emits audit events in the same transaction as the change');
 
--- Notifications are deliberately untouched by this increment.
+-- Notifications were untouched by Increment 6 and this file used to assert a
+-- blanket zero. Increment 8 wired the two APPLICANT-facing decisions and left
+-- the poster-facing one reserved, so the blanket claim is superseded by the two
+-- specific ones it was standing in for — which are the claims that actually
+-- matter, and are stronger than the count it replaced.
 select is(
-  (select count(*) from public.notifications where event_type like 'job%')::int,
-  0, 'this increment emits NO notification — the event seam is reserved, not wired');
+  (select count(*) from public.notifications
+    where event_type like 'job%'
+      and event_type not in ('job.application.accepted', 'job.application.rejected'))::int,
+  0, 'the only Jobs notifications are the two applicant-facing decisions');
+
+-- 'job.application.submitted' -> the posting organization stays UNWIRED: there
+-- is no canonical recipient rule for it in the approved contract, and guessing
+-- between job.post and job.manage would install one by accident.
+select is(
+  (select count(*) from public.notifications n
+     join public.job_applications a on a.id = n.subject_id
+    where n.event_type like 'job.application.%'
+      and n.recipient_user_id <> a.applicant_user_id)::int,
+  0, 'and every one went to the applicant it is about, never to the poster');
 
 -- ===========================================================================
 -- K. An awarded job cannot be called off in one step

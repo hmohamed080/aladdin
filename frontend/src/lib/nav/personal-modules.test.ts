@@ -26,9 +26,9 @@ describe("personalNavKeys", () => {
     expect(keys).not.toContain("profile");
   });
 
-  it("gives a professional the profile hub", () => {
+  it("gives a professional the profile hub and Job Opportunities", () => {
     const keys = personalNavKeys({ variant: "professional", isSalesPersona: false });
-    expect(keys).toEqual(["home", "profile", "points", "addBusiness"]);
+    expect(keys).toEqual(["home", "profile", "points", "jobs", "addBusiness"]);
   });
 
   it("NEVER offers the showroom entry to a non-Sales professional", () => {
@@ -41,7 +41,7 @@ describe("personalNavKeys", () => {
     // The caller resolves canonical-or-declared before this point, so both kinds
     // of salesperson arrive here as the same `true`.
     const keys = personalNavKeys({ variant: "professional", isSalesPersona: true });
-    expect(keys).toEqual(["home", "profile", "points", "connectShowroom", "addBusiness"]);
+    expect(keys).toEqual(["home", "profile", "points", "jobs", "connectShowroom", "addBusiness"]);
   });
 
   it("gives an org-less professional a route to their OWN Points", () => {
@@ -82,7 +82,7 @@ describe("personalNavKeys", () => {
     }
     // And the union covers the whole key space — a key nothing can reach would be
     // an entry that exists only in the map.
-    expect(emitted.size).toBe(5);
+    expect(emitted.size).toBe(6);
   });
 });
 
@@ -127,5 +127,67 @@ describe("activePersonalNavKey", () => {
 
   it("does not match a route that merely starts with the same characters", () => {
     expect(activePersonalNavKey("/homework")).toBeNull();
+  });
+});
+
+/**
+ * Increment 8's destination. The gate is the SAME test `job_application_submit`
+ * applies (`app.is_professional_persona`), because the one action the page
+ * exists for is refused to anybody else — discovery itself is open to any
+ * authenticated caller, so this is about not advertising a door that does not
+ * open rather than about withholding a secret.
+ */
+describe("Job Opportunities in the personal rail", () => {
+  it("offers Jobs to a professional", () => {
+    expect(personalNavKeys({ variant: "professional", isSalesPersona: false })).toContain("jobs");
+  });
+
+  it("does NOT offer it to a consumer, whom the database would refuse", () => {
+    expect(personalNavKeys({ variant: "consumer", isSalesPersona: false })).not.toContain("jobs");
+  });
+
+  it("resolves to /home/jobs and its own label key", () => {
+    expect(personalNavItem("jobs")).toEqual({
+      key: "jobs",
+      href: "/home/jobs",
+      labelKey: "personalNav.jobs",
+    });
+  });
+
+  /**
+   * §1: the parent entry stays active on every nested route. `/home/jobs/
+   * applications` is a static segment that would otherwise have no rail entry,
+   * and a job detail page is a uuid that never will.
+   */
+  it("keeps every nested Jobs route on the Jobs entry", () => {
+    expect(activePersonalNavKey("/home/jobs")).toBe("jobs");
+    expect(activePersonalNavKey("/home/jobs/applications")).toBe("jobs");
+    expect(activePersonalNavKey("/home/jobs/f1000001-0000-4000-8000-000000000001")).toBe("jobs");
+  });
+
+  it("does not claim a route that merely starts with the same characters", () => {
+    expect(activePersonalNavKey("/home")).toBe("home");
+    // It falls back to `home` like any other unclaimed /home/* route — the point
+    // is that Jobs does not claim it on a bare prefix match.
+    expect(activePersonalNavKey("/home/jobsearch")).toBe("home");
+  });
+
+  /**
+   * THE B2B AUTHORITY MUST NOT LEAK. `job.post` and `job.manage` are membership
+   * capabilities and mean nothing to a person: the personal rail has no
+   * capability input at all, and it must stay that way — a personal account that
+   * happened to hold an org capability must not gain or lose this entry for it.
+   */
+  it("derives Jobs from the persona alone, never from a B2B capability", () => {
+    const withSales = personalNavKeys({ variant: "professional", isSalesPersona: true });
+    const without = personalNavKeys({ variant: "professional", isSalesPersona: false });
+    expect(withSales.includes("jobs")).toBe(true);
+    expect(without.includes("jobs")).toBe(true);
+  });
+
+  it("puts Jobs in its own group, so Increment 9 has somewhere to land", () => {
+    const sections = personalNavSections({ variant: "professional", isSalesPersona: false });
+    expect(sections.map((s) => s.section)).toEqual(["account", "work", "business"]);
+    expect(sections.find((s) => s.section === "work")?.keys).toEqual(["jobs"]);
   });
 });

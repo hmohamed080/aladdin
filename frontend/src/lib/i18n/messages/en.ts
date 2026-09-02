@@ -352,6 +352,7 @@ export const en = {
     home: "Home",
     profile: "My profile",
     points: "Points",
+    jobs: "Job opportunities",
     connectShowroom: "Connect showroom",
     addBusiness: "Add business",
   },
@@ -1068,6 +1069,27 @@ export const en = {
       sent: {
         title: "New message",
         body: "{counterparty_name} sent a new message about this transaction.",
+      },
+    },
+    /* Increment 8. Written from the APPLICANT's side, because they are the only
+       recipient either event has — `job_application_accept` / `_reject` name one
+       user id each, so there is no fan-out to be vague for. */
+    /* Increment 8, and the key path mirrors the event type exactly
+       (`job.application.accepted` -> `notifications.job.application.accepted`),
+       which is the convention `view-model.test.ts` enforces for every event.
+       Written from the APPLICANT's side, because they are the only recipient
+       either event has — the two RPCs name one user id each, so there is no
+       fan-out to be vague for. */
+    job: {
+      application: {
+        accepted: {
+          title: "Your application was accepted",
+          body: "{org_name} awarded you the job “{job_title}”.",
+        },
+        rejected: {
+          title: "A decision on your application",
+          body: "{org_name} has decided on your application for “{job_title}”.",
+        },
       },
     },
   },
@@ -2732,6 +2754,131 @@ export const en = {
       offerPositive: "The amount has to be more than zero.",
       dateOrder: "The finish date cannot be before the start date.",
       reasonRequired: "Give a reason.",
+      noteTooLong: "That message is too long — keep it under 1000 characters.",
+    },
+
+    /* ===== THE INSTALLER SIDE (Increment 8) =============================
+       Deliberately inside `jobs` rather than a block of its own: the status
+       vocabulary above (`status`, `applicationStatus`) is SHARED with the
+       poster's surfaces, and §22 asks for one status-label layer, not two that
+       agree today. Only the copy that is written from the professional's side
+       of the transaction lives down here. */
+    opportunities: {
+      title: "Job opportunities",
+      subtitle: "Work that organizations are hiring individual professionals for.",
+      searchPlaceholder: "Search by title, description or organization",
+      allTrades: "Any trade",
+      allLocations: "Anywhere",
+      allApplications: "Applied or not",
+      notApplied: "Not applied yet",
+      appliedOnly: "Already applied",
+      postedBy: "Posted by",
+      published: "Posted {when}",
+      duration: "{n} working days",
+      startsOn: "Starts {date}",
+      view: "View details",
+      appliedBadge: "You applied",
+      emptyTitle: "No opportunities right now",
+      emptyBody:
+        "Openings appear here as verified organizations publish them. Nothing is hidden from you because of the trades you have declared.",
+      noResultsTitle: "No opportunities match those filters",
+      noResultsBody: "Try a different trade or location, or clear the filters to see everything.",
+      clear: "Clear filters",
+      myApplications: "My applications",
+      /* O5 said in the reader's own words. It is stated on the surface where the
+         trade filter lives, because that control is the one thing on this page a
+         professional could reasonably mistake for a rule about eligibility. */
+      offTradeNote: "You can apply for any job here, including trades outside the ones on your profile.",
+    },
+
+    detail: {
+      about: "About this job",
+      whereAndWhen: "Where and when",
+      compensation: "Offered compensation",
+      trade: "Trade",
+      location: "Location",
+      duration: "Expected duration",
+      schedule: "Schedule",
+      posted: "Posted",
+      addressWithheld: "The exact site address is shared with the professional who is awarded the job.",
+      gone: "This opening is no longer accepting applications.",
+      goneBody:
+        "It may have been awarded, closed, or withdrawn from listings. Your own application is still on your record.",
+      notFound: "This job is not available",
+      notFoundBody: "It may have been closed or withdrawn since you last saw it.",
+      yourApplication: "Your application",
+    },
+
+    apply: {
+      action: "Apply for this job",
+      title: "Apply for this job",
+      body: "The organization sees your professional profile and anything you write below.",
+      noteLabel: "Message to the organization",
+      notePlaceholder: "Anything that helps them decide — relevant work you have done, when you could start.",
+      noteHint: "Optional. Up to 1000 characters.",
+      confirm: "Send application",
+      summary: "You are applying to",
+      /* Named because an applicant should know the amount is the poster's stated
+         figure and not something Aladdin handles or guarantees. */
+      compensationNote: "This is what the organization is offering. Aladdin does not handle the payment.",
+      againAction: "Apply again",
+      againTitle: "Apply again for this job?",
+      againBody: "Your withdrawn application goes back to the organization as a new submission.",
+      deniedTitle: "Only professional accounts can apply",
+      deniedBody: "Job opportunities are open to individual professionals on Aladdin.",
+    },
+
+    applications: {
+      title: "My applications",
+      subtitle: "What you have applied to, and what happened.",
+      caption: "Your job applications",
+      allStates: "All applications",
+      appliedOn: "Applied {date}",
+      decidedOn: "Answered {date}",
+      yourNote: "What you wrote",
+      reason: "What the organization said",
+      /* The one system-written reason. `job_application_accept` closes every
+         other live candidacy with a fixed English sentence, which an Arabic
+         reader must not be shown; the shared status layer swaps it for this. */
+      awardedElsewhere: "The job was awarded to another professional.",
+      jobState: "Job is now {state}",
+      emptyTitle: "You have not applied to anything yet",
+      emptyBody: "Applications you send appear here with whatever the organization decides.",
+      noneInState: "Nothing in this state",
+      noneInStateBody: "Try another state, or see all of your applications.",
+      browse: "Browse opportunities",
+      viewJob: "View job",
+      accepted: {
+        title: "Your application was accepted",
+        body: "The organization awarded you this job. They will be in touch about starting the work.",
+      },
+      rejected: {
+        title: "Your application was not selected",
+      },
+      withdrawn: {
+        title: "You withdrew this application",
+        closed: "This job is no longer accepting applications, so it cannot be sent again.",
+      },
+    },
+
+    withdraw: {
+      action: "Withdraw application",
+      title: "Withdraw your application?",
+      body: "The organization stops considering you for this job. You can apply again while it is still open.",
+      confirm: "Withdraw",
+    },
+
+    installerFlash: {
+      applied: "Application sent.",
+      withdrawn: "Application withdrawn.",
+    },
+
+    installerErrors: {
+      notProfessional: "Job opportunities are open to individual professionals.",
+      notOpenNow: "This job is no longer accepting applications.",
+      alreadyDecided: "This application has already been answered and cannot be changed.",
+      notWithdrawable: "This application can no longer be withdrawn.",
+      notYours: "That application is not yours.",
     },
   },
   execution: {

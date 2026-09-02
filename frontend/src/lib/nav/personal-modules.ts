@@ -34,17 +34,24 @@
  * Pure module: no server imports, so the derivation is unit-testable.
  */
 
-export type PersonalNavKey = "home" | "profile" | "points" | "connectShowroom" | "addBusiness";
+export type PersonalNavKey =
+  | "home"
+  | "profile"
+  | "points"
+  | "jobs"
+  | "connectShowroom"
+  | "addBusiness";
 
 /**
- * Two groups, not four. The reference pack shows a richer rail — learning,
+ * Three groups, not six. The reference pack shows a richer rail — learning,
  * points, network, reviews — and Points has since arrived under "account", where
  * it belongs: the ledger is the caller's own standing, not a separate programme.
- * The rest are later increments or unapproved elements, and a heading with
- * nothing under it is worse than no heading. Sections are dropped when empty, so
- * this grows without being edited.
+ * "work" arrived with Increment 8, when Job Opportunities became a real
+ * destination rather than a picture. The rest are later increments or unapproved
+ * elements, and a heading with nothing under it is worse than no heading.
+ * Sections are dropped when empty, so this grows without being edited.
  */
-export type PersonalNavSection = "account" | "business";
+export type PersonalNavSection = "account" | "work" | "business";
 
 export type PersonalNavItem = {
   key: PersonalNavKey;
@@ -57,6 +64,7 @@ const ITEMS: Record<PersonalNavKey, PersonalNavItem> = {
   home: { key: "home", href: "/home", labelKey: "personalNav.home" },
   profile: { key: "profile", href: "/home/profile", labelKey: "personalNav.profile" },
   points: { key: "points", href: "/home/points", labelKey: "personalNav.points" },
+  jobs: { key: "jobs", href: "/home/jobs", labelKey: "personalNav.jobs" },
   connectShowroom: {
     key: "connectShowroom",
     href: "/home/showroom",
@@ -67,6 +75,12 @@ const ITEMS: Record<PersonalNavKey, PersonalNavItem> = {
 
 const SECTIONS: { section: PersonalNavSection; keys: PersonalNavKey[] }[] = [
   { section: "account", keys: ["home", "profile", "points"] },
+  /* Work is its own group rather than a fourth entry under "account", because it
+     is the only destination here that is about the OUTSIDE world: the other
+     three are the caller's own record. It is also where Increment 9's My Work
+     joins, and a group of one that is about to be a group of two is better than
+     an "account" heading that quietly starts meaning "everything". */
+  { section: "work", keys: ["jobs"] },
   { section: "business", keys: ["connectShowroom", "addBusiness"] },
 ];
 
@@ -86,6 +100,13 @@ function isReachable(key: PersonalNavKey, input: PersonalNavInput): boolean {
   switch (key) {
     case "profile":
     case "points":
+      return input.variant === "professional";
+    /* THE SAME TEST THE DATABASE APPLIES. `job_application_submit` refuses
+       anyone who is not `app.is_professional_persona`, so a consumer offered
+       this rail entry could browse openings and then be refused at the one
+       action the page exists for. Discovery itself is open to any authenticated
+       caller — this is about not advertising a door that does not open. */
+    case "jobs":
       return input.variant === "professional";
     case "connectShowroom":
       return input.isSalesPersona;

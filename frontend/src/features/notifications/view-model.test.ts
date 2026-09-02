@@ -126,6 +126,9 @@ describe("every approved event type has real bilingual copy", () => {
       "verification.rejected": {},
       "verification.changes_requested": {},
       "message.sent": { counterparty_name: "A" },
+      // Increment 8: job_application_accept / _reject, both to the applicant.
+      "job.application.accepted": { org_name: "C", job_title: "T" },
+      "job.application.rejected": { org_name: "C", job_title: "T" },
     };
 
     const unfilled: string[] = [];

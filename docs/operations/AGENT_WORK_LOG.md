@@ -4,6 +4,169 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — An application outlives the opening it was for
+
+**Date:** 2026-09-03 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `db1d983` (Increment 7)
+
+Installer Increment 8: the other side of Jobs. Three routes — discovery, one
+opening, and the caller's own candidacies — plus apply, withdraw, re-apply, the
+two applicant-facing decision notices, and one entry point on `/home`. Two
+migrations, both additive, and no lifecycle rule changed anywhere.
+
+### What the read model already answered, and what it did not
+
+Increment 6 shipped both installer-facing seams, and they were better than
+expected. `open_job_opportunities` already carries `poster_org_name`, so §19's
+"safe posting identity" needed no new projection at all. Both seams join
+`public.trades` **inside** a definer, so `trades_select_active` never sees them
+and a retired trade keeps its historical label on this side for free — §20 was
+satisfied before the increment started.
+
+What was missing was smaller and sharper. `my_job_applications` carried the LIST
+half of a job: title, trade, amount, city, status, poster. Not the description,
+the duration, the dates or the publication time. Those are exactly what somebody
+re-reading their own candidacy needs — *what did I say I would do, and by when* —
+and without them the installer's detail route would have had to render two
+different pages depending on whether the opening happened to still be
+discoverable today.
+
+So the projection gained five columns, every one of them ALREADY public in
+`open_job_opportunities` to any authenticated caller, and here narrower still:
+only on the caller's own application, resolved from `auth.uid()` inside the
+definer with no parameter to point elsewhere. Still no `site_address`, no
+competing application, no poster-side management column. DROP + CREATE rather
+than CREATE OR REPLACE, because the reader's `RETURNS TABLE` signature changed —
+which destroys the ACL, so every grant is reasserted verbatim and test 45 asserts
+that no client role can write through the view.
+
+### The two ways a job stops being readable, and only one of them is right
+
+An opening leaves discovery five ways: awarded elsewhere, closed, cancelled,
+completed, or its poster's verification lapsing. The last of those rewrites no
+row at all — the live join simply stops matching — which is why it is the one the
+test uses. In every case the OPENING should disappear from the board and the
+APPLICATION should not, and the detail route makes that structural: it reads
+discovery first and falls back to the caller's own record, so a job somebody
+applied to never 404s on them, while a job they never applied to and which has
+left discovery is an ordinary not-found. Which of the two seams answers IS the
+state.
+
+### O5, on the side where it would have been easiest to lose
+
+The reference board leads with "96% matched to your skills" on every card. The
+temptation on this surface is not a policy — it is a default: show me jobs in my
+trades first, and the restriction the database refuses to make arrives as a
+convenience.
+
+So the trade filter is unset by default, nothing on the route reads
+`user_trades`, and the note under the toolbar says so in the reader's own words —
+placed there because the trade dropdown is the one control a professional could
+reasonably mistake for a rule about who is allowed to apply. Asserted three ways:
+structurally (neither installer-facing projection mentions `user_trades`), at the
+query layer (no trade filter unless the reader picked one), and behaviourally —
+Mahmoud, whose only declared trade is `electrical`, sees a `marble_granite` job
+and applies to it successfully. The browser pass ran the mirror image: Sayed,
+marble only, applied to an electrical villa job and was accepted into it.
+
+### Re-applying is the same call, not a second one
+
+`job_application_submit` returns a caller's own `withdrawn` row to `submitted` on
+the SAME id. So there is one wrapper, one action and one dialog for both, and a
+test asserts the second call is the first one. A separate "reapply" path would
+have been a second writer of one row, kept in step by hand.
+
+The UI offers it only where the RPC would allow it, which needs a fact the
+application row does not hold: `job_status = 'open'` is visible there, the
+poster's CURRENT verification is not. So the tracking page asks discovery which
+of its jobs are still live — one small read for the whole page — and the
+withdrawn-and-no-longer-reapplicable case gets its own sentence rather than
+sharing a grey badge with rejection. "You withdrew this" and "you were not
+selected" are different facts about the same person.
+
+### Telling somebody a decision was made about them
+
+Two events, `job.application.accepted` and `job.application.rejected`, through
+`app.notify` rather than `app.notify_org` — every recipient is named by
+`job_applications.applicant_user_id`, so there is no fan-out, no capability
+lookup and no owner fallback, because there is no set to choose from.
+
+**The award notifies the losers too.** `job_application_accept` auto-rejects
+every other live candidacy in the same statement; those people were rejected as
+surely as one rejected by hand. The bare `UPDATE` became a `FOR ... RETURNING`
+loop so the recipients come from the write itself rather than from a second query
+that could disagree with it. Telling the winner and silently closing four other
+applications is the partial state this architecture exists to prevent.
+
+**`job.application.submitted` → the poster stays RESERVED.** `app.notify_org`
+delivers against a capability and this domain has two plausible answers —
+`job.post`, whoever authored the opening, and `job.manage`, whoever decides its
+applications — with nothing in the approved contract choosing between them.
+Guessing would install a recipient rule by accident. Test 42's old blanket "this
+increment emits NO notification" was superseded by two stronger claims: the only
+Jobs notifications are the two applicant-facing decisions, and every one of them
+reached the applicant it was about.
+
+### One English sentence that had to stop being one
+
+The auto-rejection writes `decision_reason = 'the job was awarded to another
+applicant'` — our sentence, not the poster's, stored in a column the applicant
+reads. Rendering it raw shows an Arabic reader English, and makes it look like
+the organization typed it. The status layer now swaps that one constant for a
+translated line, as a named export rather than a literal buried in a component,
+so the day the database sentence changes there is one place to change with it.
+Storing a key instead would be better and is an Increment 6 authority change, not
+this increment's.
+
+### An Arabic label that was right on one surface and wrong on the other
+
+The four `applicationStatus` labels are the single status layer §22 asks for, and
+Increment 8 is the first time they appear on both sides. The Arabic ones had been
+written for the poster's queue, describing somebody else: `سحب طلبه` — *he
+withdrew his application* — read as a sentence about a third party the moment it
+sat on the reader's own row. Found in the browser, in Arabic, not by a test. They
+are now states named as states, which is correct from either side.
+
+### Foundation
+
+No gap. `ButtonLink`, `BriefcaseIcon` and the shared status badges arrived in
+Increment 7; `FilterBar` was already the canonical list toolbar and took search
+plus the three selects unchanged; `ConfirmDialog`'s `formAction` render-prop
+carried both the apply dialog with its note field and the withdrawal. The one
+composition decision worth recording is that the trade filter offers the ACTIVE
+catalog while the governorate filter offers the values that actually exist —
+`jobs.governorate` is free text a poster typed, not a key from the onboarding
+location catalog, so labelling it through `t()` would have printed the message
+path.
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 46 files, 1591 tests, PASS** — new
+`45_installer_job_experience_test.sql` is 33/33, and 1591 − 1557 is that file
+plus the one assertion test 42 gained. The full-suite run is what caught both
+regressions this increment produced: test 29's Advisor rule, failing because I
+had recreated pgTAP in `public` rather than `extensions` while regenerating
+types, and test 42's superseded notification claim. Neither was reachable from
+the three files the increment added.
+
+`db lint public,app` reports three warnings, all pre-existing. Generated types
+**+5 lines, 0 deletions**. `tsc --noEmit` clean · `eslint src` 0 errors (1
+pre-existing warning) · `vitest` **898/78** (was 809/73) · `next build` clean ·
+`check_doc_links` 950 links, 0 broken.
+
+Browser UAT as Sayed, every state through a real RPC: apply off-trade with a
+note → withdraw → re-apply, verified against the database as the SAME row id and
+the SAME `created_at` → declined with a reason on one job → awarded on another,
+with the auto-closed rival notified in the same transaction. Arabic RTL with no
+raw enum, key or message path; 390px with no overflow and the parent Jobs entry
+lit on a nested route in the bottom rail; dark with zero inline colours in
+`main`. Every fixture the run created was deleted afterwards — two jobs, three
+applications, one assignment and three notifications — and the append-only audit
+rows were left where they are.
+
+`RUNTIME_STATE.md` is untouched and now nine increments behind.
+
+---
+
 ## Session — Whoever applied has already told you who they are
 
 **Date:** 2026-09-03 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `f5f2878` (Increment 6)
