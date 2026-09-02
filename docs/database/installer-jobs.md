@@ -287,10 +287,11 @@ are NOT implemented** — they remain Increment 12; the seam is
 `job_reviews.assignment_id → job_assignments.id`, and nothing about it required a
 column or a placeholder here.
 
-Nine places where the implementation is deliberately **not** what this document
-says. Seven are narrowings for security, atomicity or internal consistency; the
-last two are approved lifecycle corrections made during review. None was a
-discovery made while typing.
+Ten places where the implementation is deliberately **not** what this document
+says. Seven are narrowings for security, atomicity or internal consistency; two
+are approved lifecycle corrections made during review; the tenth was found while
+building the poster UI in Increment 7 and is the only one that WIDENS anything.
+None was a discovery made while typing.
 
 **1. No client write grant on any of the four tables** (narrows §10.4's "a user
 reads and writes their own rows", already reconciled for `user_trades` in §4.3).
@@ -383,6 +384,31 @@ edge out of a non-`submitted` state, `withdrawn → submitted`, so no future wri
 path can widen this by accident.
 
 ---
+
+**10. `job_applicants` returns identity for EVERY applicant, not only publicly
+listed ones** (widens §11's "application views join `profile_public_directory`
+and read nothing else"). Added by Increment 7 in
+`20260903090001_job_applicants_projection.sql`.
+
+Increment 6 shipped both installer-facing read seams and no poster-facing one,
+and the poster is the party that has to decide. The literal instruction could not
+be implemented: `profile_public_directory` exposes `profiles.id` and deliberately
+never `user_id`, so there is **no key** to join an application to it — and the
+join it describes is an INNER one against `public_profile_status = 'listed'`,
+whose column default is `hidden`. A poster-side list built that way would render
+most of its applicants anonymous, and the poster would be choosing who to hand
+work to from a list of blanks.
+
+So the projection returns **identity** (`display_name`, `headline`, avatar) for
+every applicant, listed or not — somebody who applies to your job has, by that
+act, told you who they are — plus the same self-declared **practice** columns the
+public directory carries, and `public_profile_id` **only** when the person is
+genuinely listed, so the UI links exactly where `/p/[id]` renders something.
+
+It still returns **no contact channel, no address, no travel radius, no private
+lead-time preference, no `consumer_*` column and no `applicant_user_id`**. Those
+are what §11 protects, and every one of them remains unreachable through this
+domain. Covered by `43_job_applicants_projection_test.sql`.
 
 ## 4. Canonical trade taxonomy (D8)
 
@@ -525,6 +551,74 @@ tiler who has done gypsum work before is the platform's problem to inform, not t
   authorization, filter and join reads the table.
 
 ---
+
+### 4.7 Retirement keeps history, and the seam that keeps it READABLE
+
+`jobs.trade_id` is `not null references public.trades on delete restrict`, so
+retiring a trade leaves every job that was posted in it intact — that FK is the
+whole mechanism. What retirement does NOT leave intact is the poster's ability to
+**read** the label: `trades_select_active` withholds inactive rows, so the plain
+`jobs -> trades(key)` join the management list uses returns null, and the poster
+loses the name of a trade they themselves chose on a job they themselves posted.
+
+`public.job_trade_labels` (Increment 7,
+`20260903090002_job_trade_labels.sql`) answers exactly that question and no
+other: for jobs the caller's organization posted, which trade were they posted
+in, and is it still active. `security_invoker = true` over a `security definer`
+reader scoped by `app.is_org_member(poster_org_id)` — the same pattern as
+`job_applicants`, and with no parameter to point elsewhere.
+
+**Deliberately not a policy on `public.trades`.** A permissive policy would have
+been one line, and it would have widened the TABLE rather than answering the
+question: every `from("trades")` in the product would start returning the retired
+row, including the vocabulary the create and edit forms offer. The retired trade
+would reappear as a selectable option in the "post a job" dropdown — the exact
+outcome `trades_select_active` exists to prevent.
+
+**Reading a retired label never becomes posting in one.** `job_create` and
+`job_update` still resolve `p_trade_key` against `is_active` and raise `22023`;
+`job_publish` still re-checks that a draft's trade is active before the opening
+becomes visible. `44_job_trade_labels_test.sql` asserts all three **after** the
+retirement, in the same session that successfully reads the historical label, and
+asserts that the same caller still cannot see the retired row in `public.trades`.
+
+### 4.7a Editing a job whose trade was retired
+
+Reading the label back was half the problem. The other half was that
+`job_update` resolved `p_trade_key` against `is_active` and refused anything
+else — so a poster whose job sat under a retired trade could not fix a typo in
+the title, correct the site address or extend the schedule. The whole edit was
+refused because of the value it was *retaining*.
+`20260903090003_job_update_historical_trade.sql` draws the distinction:
+
+| | `job_create` | `job_update` | `job_publish` |
+|---|---|---|---|
+| retired trade, newly chosen | refused `22023` | refused `22023` | — |
+| retired trade, already held by this job | n/a — nothing to retain | **allowed** | still refused `22023` |
+| active trade | allowed | allowed | allowed |
+
+Resolution happens in two steps: resolve the key at all (an unknown key is
+`22023`, unchanged), then accept an inactive one **only when it is the id this
+job already holds**. Another job's retired trade — even one the same caller can
+read a label for through §4.7 — is still refused.
+
+**Publishing still refuses.** Editing a job is private housekeeping; publishing
+is the moment it enters the installer pool, and the platform's decision to
+withdraw a trade has to bite somewhere. It bites there.
+
+**The post-application freeze is untouched.** The `v_has_apps` check compares the
+*resolved id* against the *stored* one, so retaining a retired trade is not a
+change and passes, while switching to an active trade on a job with applications
+is refused exactly as before — with
+`app.jobs_offer_immutable_after_application()` enforcing it underneath either
+way. `44_job_trade_labels_test.sql` §C3 asserts both halves.
+
+**In the form.** The edit form adds **one** option outside the catalog: the trade
+*this job* holds, when it is retired, labelled as no longer offered.
+`loadTradeCatalog()` stays active-only, so creating a job still cannot reach a
+retired trade and neither can editing a job that holds a current one. Without
+that option the select would have nothing matching its own value, submit blank,
+and the edit would be refused for a field the poster never touched.
 
 ## 5. Compensation disclosure (D9)
 
@@ -909,6 +1003,8 @@ buried. **`open_job_opportunities` and `job_application_submit` must read the li
 | `job_reviews` | the reviewee; poster-org members; platform staff — plus the **public projection** in §6.4 |
 | `open_job_opportunities` (view) | `authenticated`; open jobs from CURRENTLY verified posters, display columns only, never `site_address` |
 | `my_job_applications` (view) | the caller's own candidacies joined to the display half of each job (§3.6, departure 7) |
+| `job_applicants` (view) | the POSTER side: applications for jobs the caller's organization posted, with the applicant's identity and self-declared practice (§3.6, departure 10). Added by Increment 7. |
+| `job_trade_labels` (view) | the POSTER side: for jobs the caller's organization posted, the key of the trade it was posted in — **retired trades included** — plus whether that trade is still active (§4.7). Added by Increment 7. |
 | `trades` | `authenticated`, ACTIVE rows only; platform staff also read retired ones; **no write grant in any role** |
 | `user_trades` | own rows (read); platform staff; plus the public directory projection. **No client write grant** — `user_trades_set` is the only writer (§4.3a) |
 
@@ -1109,10 +1205,23 @@ amount** (a monetary value in an audit payload invites exactly the payment readi
 | `/home/points` | 01, 04 | Personal Points — reuses `/b2b/points` components verbatim |
 | `/home/settings` | 04 | Composition route (§9) |
 | `/p/[profileId]` | 04 | Public professional profile — trades, availability, rating summary, reviews |
-| **`/b2b/jobs`** | — | **Poster side.** Job list + create/publish. |
-| **`/b2b/jobs/[jobId]`** | — | **Poster side.** Applicants, accept, monitor progress, complete, review. |
+| **`/b2b/jobs`** | — | **Poster side.** Job list, state filter, real counts. **Shipped (Increment 7).** |
+| **`/b2b/jobs/new`** | — | **Poster side.** Create — always a DRAFT. **Shipped.** |
+| **`/b2b/jobs/[jobId]`** | — | **Poster side.** Detail, publish, close/cancel, awarded summary. **Shipped.** |
+| **`/b2b/jobs/[jobId]/edit`** | — | **Poster side.** Content edit while `draft`/`open`. **Shipped.** |
+| **`/b2b/jobs/[jobId]/applicants`** | — | **Poster side.** The queue, accept and reject, over `job_applicants`. **Shipped.** |
 
 The poster-side routes are **required** (§1), not an extra.
+
+**Navigation.** The module is `NavKey` `jobs` at `/b2b/jobs`, gated on
+`job.post` OR `job.manage` (with the usual `org.manage` blanket unlock), placed
+in the **Network** section immediately after `technicians` in both the buyer and
+seller layouts. That directory is who this business could hire; this module is
+the work it is hiring for — same subject, two verbs. The gate is the UNION of the
+two capabilities deliberately: either one alone is a reason to reach the module,
+and gating on `job.post` would hide the applicants queue from the person whose
+whole job is working it. Progress, completion and review controls are **absent by
+design** — they belong to Increment 9 and Increment 12.
 
 ---
 

@@ -2956,6 +2956,34 @@ export type Database = {
           },
         ]
       }
+      job_applicants: {
+        Row: {
+          application_id: string | null
+          applied_at: string | null
+          avatar_media_id: string | null
+          decided_at: string | null
+          decision_reason: string | null
+          display_name: string | null
+          headline: string | null
+          job_id: string | null
+          note: string | null
+          primary_trade_key: string | null
+          public_profile_id: string | null
+          service_areas: string[] | null
+          status: Database["public"]["Enums"]["job_application_status"] | null
+          trade_keys: string[] | null
+          years_experience: number | null
+        }
+        Relationships: []
+      }
+      job_trade_labels: {
+        Row: {
+          job_id: string | null
+          trade_is_active: boolean | null
+          trade_key: string | null
+        }
+        Relationships: []
+      }
       my_job_applications: {
         Row: {
           city: string | null

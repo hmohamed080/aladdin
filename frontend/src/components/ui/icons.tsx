@@ -290,6 +290,21 @@ export const WrenchIcon = (p: IconProps) => (
   </Svg>
 );
 
+/**
+ * Jobs — an opening an organization posts for an individual professional.
+ *
+ * A briefcase rather than the wrench that marks the Technicians DIRECTORY: on a
+ * collapsed rail the glyph IS the label, and two wrenches would make "the people
+ * we could hire" and "the work we are hiring for" the same word.
+ */
+export const BriefcaseIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2.5" y="7" width="19" height="13" rx="2" />
+    <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7" />
+    <path d="M2.5 12.5h19" />
+  </Svg>
+);
+
 export const LandmarkIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 21h18" />

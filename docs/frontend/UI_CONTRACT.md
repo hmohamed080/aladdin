@@ -84,6 +84,16 @@ so a missing key is a type error). Direction and theme parity are review rules
 plus the component tests listed below.
 
 ### R6 — Report the gap before building a local replacement · *review*
+
+This rule has a worked example too. The workspace had no canonical way to render
+a LINK that looks like a button — every navigational affordance was an accent
+text link — because until the Jobs module no surface had a primary "go and do
+this" destination. `Button` renders a `<button>`, and a
+`<button onClick={router.push}>` would have taken a real anchor away from the
+reader: no middle-click, no open-in-new-tab, no href in the status bar, and a
+control announced as a button when it is a link. The answer was `ButtonLink` in
+`controls.tsx`, sharing one `controlClass` with `Button` so the two cannot drift
+— not a styled anchor in a feature folder.
 If a canonical component cannot express a required design, **say so and stop**.
 A foundation gap reported is one fix; a local replacement is a permanent second
 implementation that the next author will copy.
@@ -131,7 +141,7 @@ guessed at that would be worse than none.
 | Concern | File |
 |---|---|
 | Tokens | `src/styles/tokens.css`, `tailwind.config.ts` |
-| Button, Input, Select, Textarea, Checkbox | `src/components/ui/controls.tsx` |
+| Button, **ButtonLink**, Input, Select, Textarea, Checkbox | `src/components/ui/controls.tsx` |
 | Card, Badge, StatePanel, Field, Skeleton | `src/components/ui/primitives.tsx` |
 | Panel, PageHead, PageHeader | `src/components/ui/workspace-layout.tsx` |
 | Page bands (IdentityBand, Section) | `src/components/ui/page-band.tsx` |

@@ -4,6 +4,172 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Whoever applied has already told you who they are
+
+**Date:** 2026-09-03 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `f5f2878` (Increment 6)
+
+Installer Increment 7: the organization's side of Jobs, end to end — list,
+create, edit, publish, applicants, award, decline, close, cancel. Five routes on
+the Increment 6 authority, and three migrations that exist because building the
+screens found three things the database could not answer.
+
+### The read model had no poster in it
+
+Increment 6 shipped `open_job_opportunities` and `my_job_applications` — both
+installer-facing — and nothing for the party who actually has to decide.
+`installer-jobs.md` §11 already named the fix: *"application views join
+`profile_public_directory` and read nothing else."* That instruction cannot be
+implemented. The projection exposes `profiles.id` and deliberately never
+`user_id`, so there is **no key** to join an application to it; and the join it
+describes is an INNER one against `public_profile_status = 'listed'`, a column
+whose default is `hidden` — 17 of 26 profiles today. A poster-side queue built
+that way renders most applicants anonymous, and the poster chooses who to hand
+work to from a list of blanks.
+
+`job_applicants` returns identity for **every** applicant instead. The argument
+is not convenience: somebody who applies to your job has, by that act, told you
+who they are, which is a party-to-a-transaction fact rather than a directory
+lookup. It still returns no contact channel, no address, no travel radius, no
+private lead-time preference, no `consumer_*` column and no `applicant_user_id`
+— those are what §11 protects, and each remains unreachable. Recorded as §3.6
+departure 10, and it is the milestone's **only widening**; the other nine narrow.
+
+### Retirement kept the row and lost the word
+
+`jobs.trade_id` is `not null references public.trades on delete restrict`, so
+retiring a trade is designed to leave every historical job intact. It does — in
+the table. What it did not leave intact was the poster's ability to **read** the
+label: `trades_select_active` withholds inactive rows, so the embed the list page
+uses returns null and a job the organization posted itself, in a trade it chose
+itself, shows a dash.
+
+The one-line fix would have been another permissive policy on `public.trades`,
+and it is the wrong line. **A policy widens the table; it does not answer the
+question.** Every `from("trades")` in the product would start returning that row,
+`loadTradeCatalog()` included — which is the vocabulary the "post a job" dropdown
+renders. The retired trade would come back as a *selectable option*, the exact
+outcome `trades_select_active` exists to prevent, leaving only the RPC's refusal
+between a poster and picking it.
+
+So `job_trade_labels` answers one question and no other: for jobs the caller's
+organization posted, which trade were they posted in, and is it still active.
+`44_job_trade_labels_test.sql` asserts the non-widening **in the same session
+that successfully reads the historical label** — the same caller still sees zero
+retired rows in `public.trades`, and `job_create` still refuses one.
+
+### Reading a retired label is not permission to post in one
+
+Restoring the label exposed the second half: `job_update` resolved `p_trade_key`
+against `is_active` and refused anything else, so a poster whose job sat under a
+retired trade could not fix a typo in the title. The whole edit was refused
+because of the value it was *retaining*.
+
+Retirement must stop a trade being **chosen**, not freeze the job that already
+holds one. Resolution now happens in two steps — resolve the key at all, then
+accept an inactive one **only when it is the id this job already holds**. Another
+job's retired trade, even one the same caller can read a label for, is still
+refused. `job_create` gets no exception because there is nothing to retain, and
+`job_publish` keeps refusing: editing is private housekeeping, publishing is the
+moment the job enters the installer pool, and the platform's decision to withdraw
+a trade has to bite somewhere.
+
+The post-application freeze survives untouched, and by construction rather than
+by care: its check compares the **resolved id** against the **stored** one, so
+retaining a retired trade is not a change and passes, while switching off one on
+a job with applications is refused exactly as before. §C3 asserts both halves.
+
+In the form this is one option outside the catalog — the trade *this* job holds,
+when retired, labelled as no longer offered. The catalog stays active-only, so
+creating still cannot reach a retired trade. Without the option the select had
+nothing matching its own value, submitted blank, and the edit was refused for a
+field the poster never touched.
+
+### Where affordance stops and authority starts
+
+Three places the UI declines to offer something the server would refuse: the
+offer and trade freeze on the form once applications exist; the edit route
+renders a notice rather than a form past `open`; and **an awarded job has no
+Cancel button at all**, because Increment 6's review removed `awarded → cancelled`
+and the two-step rule is stated instead. None of the three is a check. The server
+decides all of them, and a test asserts the button's absence rather than the
+refusal's presence.
+
+Capabilities are honoured separately even though the nav gate is their union:
+`job.post OR job.manage` is what makes the module reachable — either alone is a
+reason to be there, and gating on `job.post` would hide the queue from the person
+whose whole job is working it — but a `job.post` holder sees Publish and Edit and
+no Award, and a `job.manage` holder the reverse. Verified live as Laila, who
+holds `job.post` and not `job.manage`.
+
+Nothing invents data. No fit score, no ranking, no recommendation, no match
+count, no contact detail — none has any backing in this repository, and a number
+the product invented is one the poster would then trust. A test asserts their
+absence.
+
+### Two Foundation gaps, closed in the Foundation
+
+No briefcase glyph existed; reusing the wrench would have made "people we could
+hire" and "work we are hiring for" the same icon on a collapsed rail. And there
+was no canonical link-styled-as-button, because until now no surface had a
+primary *go and do this* destination — `<button onClick={router.push}>` would
+have cost middle-click, open-in-new-tab and the correct role. `ButtonLink` shares
+one `controlClass` with `Button` so the two cannot drift, and is written up as
+`UI_CONTRACT.md`'s R6 worked example.
+
+### Three things found by running something other than the unit tests
+
+**The browser found `EGP 22,500.00 EGP`.** `formatMoney` already emits the
+currency and the code appended it again, at three sites. No test looked at the
+rendered money string. There is one now.
+
+**Raw `psql` found that `43` never ran to completion.** Its `results_eq` compares
+`column_name` — collation `C` — against a bare literal under this database's ICU
+default, which raises *"could not determine which collation to use"* and **aborts
+the transaction** rather than failing one assertion. It had been validated by
+grepping for `not ok`, which an aborted run never prints. Two real defects were
+hiding behind that: `plan(21)` for a file with 22 assertions, and a grant
+assertion counting the view *owner's* privileges, which could never have passed.
+The same discovery caught ~147 lines of pgTAP function/view pollution baked into
+`database.types.ts`, because `create extension` commits outside the test
+transaction — regenerated with it dropped, and the diff is now the two views and
+nothing else.
+
+**The full suite found an O5 guard the three new files could not.**
+`41_trade_taxonomy_test.sql` asserts that the only functions mentioning
+`user_trades` are its writer and the public projection — and `app._job_applicants`
+reads it to put trades on an applicant card. The allow-list gained that one name,
+with the reason: it projects trades for **display** and filters nothing by them,
+and `43` §C asserts the absence of a trade filter separately. The guard still
+bites — writing a name into that list is a deliberate act someone has to defend
+in review, which is exactly what it is for.
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 45 files, 1557 tests, PASS** — new
+`43_job_applicants_projection_test.sql` 22/22 and `44_job_trade_labels_test.sql`
+30/30, and 1557 − 1505 is exactly those two files, so no existing count moved.
+`db lint public,app` reports three warnings, all pre-existing and none from these
+migrations. Generated types **+28 lines, 0 deletions** — the two views, nothing
+else. `tsc --noEmit` clean · `eslint src` 0 errors (1 pre-existing warning) ·
+`vitest` **809/73** (was 713/67) · `next build` clean · `check_doc_links` 950
+links, 0 broken.
+
+Browser UAT against the real RPCs, twice. The lifecycle: draft → publish → two
+real applications → decline with a required reason → award, with the DB
+confirming the job awarded, one scheduled assignment at the frozen amount, and
+the declined applicant's own reason preserved. Then retirement: the label
+surviving on list and detail, the create dropdown excluding it, an edit saving
+while retaining it, and Publish still refusing with *"That trade is not
+available."* Arabic RTL clean with no raw enum, key or message path; 390px with
+no overflow; dark with zero inline colours in `main`. Every fixture the runs
+created was removed afterwards — the database is back to two seeded jobs and no
+applications, because a state that arrives by INSERT proves nothing about the
+authority meant to produce it.
+
+`RUNTIME_STATE.md` is untouched and now eight increments behind.
+
+---
+
 ## Session — One organization, one person, and no client allowed to write it
 
 **Date:** 2026-09-02 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `4df3e64` (Increment 5)

@@ -96,6 +96,7 @@ export const en = {
     suppliers: "Distributors",
     buyers: "Customers & showrooms",
     technicians: "Technicians",
+    jobs: "Jobs",
     institutions: "Institutions",
     team: "Team",
     reports: "Reports",
@@ -200,6 +201,7 @@ export const en = {
       suppliers: "The distributor, manufacturer and importer directory.",
       buyers: "The businesses that buy from you.",
       technicians: "Installers and technicians on Aladdin.",
+      jobs: "Openings you post for individual professionals.",
       institutions: "Showrooms, contractors and design offices.",
       customers: "Your own customer records.",
       leads: "Opportunities moving through your pipeline.",
@@ -2519,6 +2521,217 @@ export const en = {
       notDraft: "Only a draft can be edited.",
       notSubmitted: "Only a submitted record can be decided.",
       denied: "You don't have permission to do this.",
+    },
+  },
+  /**
+   * Organization-side Jobs — openings this business posts for INDIVIDUAL
+   * professionals, and the applications that arrive against them.
+   *
+   * ONE STATUS LAYER. `status`, `applicationStatus` and `assignmentStatus` below
+   * are the only places a lifecycle enum becomes a word, and every surface reads
+   * them through `features/jobs/badges`. A page that wrote its own label would be
+   * a second vocabulary for the same value, and the two would drift.
+   *
+   * The words are deliberately the poster's, not the database's. `rejected` reads
+   * as "Not selected" because that is what the poster is doing and what the
+   * applicant will be told; `submitted` reads as "Applied" because the person
+   * applied, they did not submit a form.
+   */
+  jobs: {
+    title: "Jobs",
+    subtitle: "Work you are hiring individual professionals for.",
+    listCaption: "Jobs posted by this organization",
+    new: "Post a job",
+    newTitle: "New job",
+    newSubtitle: "This creates a draft. Nothing is visible to professionals until you publish it.",
+    editTitle: "Edit job",
+    editSubtitle: "Changes apply to the opening professionals see.",
+    detailTitle: "Job",
+
+    status: {
+      draft: "Draft",
+      open: "Open",
+      awarded: "Awarded",
+      completed: "Completed",
+      closed: "Closed",
+      cancelled: "Cancelled",
+    },
+    applicationStatus: {
+      submitted: "Applied",
+      accepted: "Accepted",
+      rejected: "Not selected",
+      withdrawn: "Withdrawn",
+    },
+    assignmentStatus: {
+      scheduled: "Scheduled",
+      in_progress: "In progress",
+      completed: "Completed",
+      cancelled: "Cancelled",
+    },
+
+    filter: { all: "All", label: "State" },
+    stat: { drafts: "Drafts", open: "Open", awarded: "Awarded", applications: "Applications" },
+
+    field: {
+      title: "Job title",
+      description: "What the work involves",
+      trade: "Trade",
+      governorate: "Governorate",
+      city: "City",
+      siteAddress: "Site address",
+      offer: "Offered compensation",
+      duration: "Expected duration",
+      startsOn: "Starts on",
+      endsBy: "Finish by",
+      published: "Published",
+      created: "Created",
+      applications: "Applications",
+      status: "Status",
+      location: "Location",
+      schedule: "Schedule",
+      note: "Their note",
+      appliedOn: "Applied",
+    },
+
+    hint: {
+      siteAddress: "Only the professional you award the job to will see this.",
+      offer: "In EGP. This is what you are offering for the work — Aladdin does not handle payment.",
+      duration: "Working days, if you know.",
+      offerLocked: "The trade and the offered amount cannot change, because someone has already applied.",
+      tradeRetired: "This trade is no longer offered",
+    },
+
+    placeholder: {
+      title: "e.g. Marble staircase cladding",
+      description: "Scope, materials, access — anything a professional needs in order to judge the work.",
+      chooseTrade: "Choose a trade",
+    },
+
+    days: "{count} days",
+    create: "Create draft",
+    save: "Save changes",
+    edit: "Edit",
+    viewApplications: "View applications",
+
+    publish: {
+      action: "Publish",
+      title: "Publish this job?",
+      body: "It becomes visible to professionals on Aladdin, who can then apply.",
+      offerWarning:
+        "Once the first application arrives, the trade and the offered amount can no longer change.",
+      confirm: "Publish",
+      unverifiedTitle: "Your organization needs to be verified first",
+      unverifiedBody:
+        "Verification is what lets your jobs be shown to professionals. You can keep editing this draft in the meantime.",
+      unverifiedLink: "Organization verification",
+    },
+
+    close: {
+      action: "Stop recruiting",
+      title: "Stop recruiting for this job?",
+      body: "It stops being shown to professionals and accepts no new applications. Applications you already received stay on the record. Reposting means creating a new job.",
+      confirm: "Stop recruiting",
+    },
+    cancelJob: {
+      action: "Cancel job",
+      title: "Cancel this job?",
+      body: "The opening is called off. Applications you already received stay on the record.",
+      reason: "Reason",
+      confirm: "Cancel job",
+    },
+
+    awarded: {
+      assignedTo: "Assigned to",
+      agreed: "Agreed compensation",
+      workStatus: "Work status",
+      readOnly: "This job has been awarded, so its details can no longer change.",
+      progressNote: "Progress and completion are managed from the assignment.",
+      cancelBlocked:
+        "An awarded job cannot be cancelled on its own. The assignment has to be ended first, which returns the job to open.",
+    },
+
+    applicants: {
+      title: "Applications",
+      subtitle: "Professionals who applied for this job.",
+      caption: "Applications for this job",
+      emptyTitle: "No applications yet",
+      emptyBody: "Applications will appear here when professionals apply.",
+      notPublishedTitle: "This job has not been published",
+      notPublishedBody: "Publish it and professionals will be able to apply.",
+      viewProfile: "View profile",
+      mainTrade: "Main trade",
+      alsoWorksIn: "Also works in",
+      experience: "{years} years of experience",
+      decidedNote: "This job has been awarded, so no further decisions can be made.",
+      deniedTitle: "You cannot decide applications",
+      deniedBody:
+        "Choosing who gets a job needs the job management capability. You can still see who applied.",
+    },
+
+    accept: {
+      action: "Award",
+      title: "Award this job to {name}?",
+      body: "They become the assigned professional and the job moves to Awarded. Everyone else who applied is told they were not selected. This cannot be undone.",
+      confirm: "Award the job",
+    },
+    reject: {
+      action: "Decline",
+      title: "Decline {name}?",
+      body: "They will see that they were not selected, and the reason you give.",
+      reason: "Reason",
+      reasonHint: "The applicant reads this. Keep it short and factual.",
+      confirm: "Send decision",
+    },
+
+    empty: {
+      title: "No jobs yet",
+      body: "Post a job when you need an installer, technician or other professional for a piece of work.",
+      filteredTitle: "No jobs in this state",
+      filteredBody: "Try another state, or clear the filter.",
+    },
+
+    denied: {
+      title: "You do not have access to Jobs",
+      body: "Posting and managing jobs needs a job capability on your membership. Ask an owner or manager in your organization.",
+    },
+    postDenied: {
+      title: "You cannot post jobs",
+      body: "Posting a job needs the job posting capability. You can still see the jobs your organization has posted.",
+    },
+
+    flash: {
+      created: "Draft created.",
+      updated: "Job saved.",
+      published: "Job published.",
+      awarded: "Job awarded.",
+      rejected: "Application declined.",
+      closed: "Recruiting stopped.",
+      cancelled: "Job cancelled.",
+    },
+
+    errors: {
+      denied: "You do not have permission to do that.",
+      conflict: "This job changed while you were working on it. Reload the page and try again.",
+      notDraft: "Only a draft job can be published.",
+      notOpen: "This job is not open for applications.",
+      notEditable: "This job can no longer be edited.",
+      offerLocked:
+        "The offer and trade cannot change once someone has applied. Stop recruiting and post a new job instead.",
+      unverified: "Your organization has to be verified before a job can be published.",
+      tradeUnavailable: "That trade is not available.",
+      awardedCancel:
+        "An awarded job cannot be cancelled on its own — the assignment has to be ended first.",
+      alreadyDecided: "That application has already been decided.",
+      inactiveOrg: "This organization cannot post work.",
+    },
+
+    validation: {
+      titleRequired: "Give the job a title.",
+      tradeRequired: "Choose a trade.",
+      offerRequired: "Enter the amount you are offering.",
+      offerPositive: "The amount has to be more than zero.",
+      dateOrder: "The finish date cannot be before the start date.",
+      reasonRequired: "Give a reason.",
     },
   },
   execution: {

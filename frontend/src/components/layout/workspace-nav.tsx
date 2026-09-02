@@ -24,6 +24,7 @@ import {
   BookmarkIcon,
   TruckIcon,
   WrenchIcon,
+  BriefcaseIcon,
   LandmarkIcon,
   BarChartIcon,
   GaugeIcon,
@@ -65,6 +66,7 @@ const ITEMS: Record<NavKey, Item> = {
   suppliers: { href: "/b2b/suppliers", key: "nav.suppliers", exact: false, Icon: TruckIcon },
   buyers: { href: "/b2b/buyers", key: "nav.buyers", exact: false, Icon: StorefrontIcon },
   technicians: { href: "/b2b/technicians", key: "nav.technicians", exact: false, Icon: WrenchIcon },
+  jobs: { href: "/b2b/jobs", key: "nav.jobs", exact: false, Icon: BriefcaseIcon },
   institutions: { href: "/b2b/institutions", key: "nav.institutions", exact: false, Icon: LandmarkIcon },
 
   customers: { href: "/b2b/customers", key: "nav.customers", exact: false, Icon: UsersIcon },

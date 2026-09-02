@@ -161,4 +161,47 @@ describe("seller stance", () => {
       "nav.purchaseRequests",
     );
   });
+
+  /**
+   * Jobs is the first NETWORK-section module with a capability gate, and the
+   * first whose gate is the UNION of two different authorities. Both facts are
+   * easy to lose in a later refactor, so both are pinned.
+   */
+  describe("jobs", () => {
+    it("stays hidden from a member who can neither post nor decide", () => {
+      // The directories beside it are ungated because they are read-only. Jobs is
+      // a write surface, so an ungated entry would be a dead end — which is the
+      // one thing this map exists to prevent.
+      expect(allowedNavKeys([])).not.toContain("jobs");
+      expect(allowedNavKeys(ROLE_PRESETS.sales_rep)).not.toContain("jobs");
+    });
+
+    it("appears for job.post alone", () => {
+      expect(allowedNavKeys(["job.post"])).toContain("jobs");
+    });
+
+    it("appears for job.manage alone", () => {
+      // The person whose whole job is working the applicants queue holds only
+      // this one. Gating the module on job.post would hide the queue from them.
+      expect(allowedNavKeys(["job.manage"])).toContain("jobs");
+    });
+
+    it("appears under the org.manage blanket unlock", () => {
+      expect(allowedNavKeys(["org.manage"])).toContain("jobs");
+    });
+
+    it("sits beside the professionals directory in both seats", () => {
+      // Same subject, two verbs: that list is who we could hire, this module is
+      // the work we are hiring for.
+      for (const stance of ["buyer", "seller"] as const) {
+        const keys = allowedNavKeys(["org.manage"], stance);
+        expect(keys.indexOf("jobs")).toBe(keys.indexOf("technicians") + 1);
+      }
+    });
+
+    it("is reachable from both layouts, so neither seat loses the module", () => {
+      expect(navOrder("seller")).toContain("jobs");
+      expect(navOrder("buyer")).toContain("jobs");
+    });
+  });
 });

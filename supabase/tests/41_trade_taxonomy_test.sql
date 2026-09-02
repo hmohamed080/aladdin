@@ -336,13 +336,24 @@ select is(
     where coalesce(qual, '') || coalesce(with_check, '') like '%user_trades%'),
   0::bigint, 'NO RLS POLICY ANYWHERE references user_trades (O5)');
 
+-- The allow-list is every function permitted to READ the relation, and each entry
+-- has to earn its place by projecting trades for DISPLAY and filtering nothing by
+-- them. `app._job_applicants` (Increment 7) joined it for the same reason
+-- `_profile_public_directory` is here: the poster sees an applicant's trades on
+-- the card, and `43_job_applicants_projection_test.sql` §C asserts separately
+-- that the projection applies no trade filter of its own.
+--
+-- Adding a name here is the ONLY way to make this test pass, which is the point:
+-- a capability helper or a can_* predicate that started reading `user_trades`
+-- would have to be written into this list by someone, in a review, on purpose.
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('app', 'public')
       and p.prosrc like '%user_trades%'
-      and p.proname not in ('user_trades_set', '_profile_public_directory')),
+      and p.proname not in ('user_trades_set', '_profile_public_directory',
+                            '_job_applicants')),
   0::bigint,
-  'and the ONLY functions that mention it are its writer and the public projection — no capability, no can_* predicate');
+  'and the ONLY functions that mention it are its writer and two DISPLAY projections — no capability, no can_* predicate');
 
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
