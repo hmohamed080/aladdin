@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapSalesError, isStaleVersion } from "./error-mapping";
+import { mapSalesError, mapAssetError, isStaleVersion } from "./error-mapping";
 
 describe("mapSalesError", () => {
   it("maps a duplicate-phone unique violation", () => {
@@ -57,5 +57,43 @@ describe("isStaleVersion", () => {
     expect(isStaleVersion({ code: "40001" })).toBe(true);
     expect(isStaleVersion({ message: "modified concurrently" })).toBe(true);
     expect(isStaleVersion({ code: "42501" })).toBe(false);
+  });
+});
+
+/**
+ * Storage speaks a different dialect from the RPCs above it: no SQLSTATE, and an
+ * HTTP 400 for every kind of refusal. These assertions use the exact bodies the
+ * local Storage service returned during Increment 10, captured in
+ * `supabase/tests/professional_asset_storage_api_test.mjs` — not the shapes the
+ * documentation suggests, which differ.
+ */
+describe("mapAssetError", () => {
+  it("maps a policy refusal — the one that covers persona, ownership and anon alike", () => {
+    expect(mapAssetError({ code: "AccessDenied", message: "new row violates row-level security policy" }))
+      .toBe("assets.errors.notAllowed");
+    expect(mapAssetError({ message: "Access denied" })).toBe("assets.errors.notAllowed");
+  });
+
+  it("maps a rejected content type and an oversized body to their own sentences", () => {
+    expect(mapAssetError({ code: "InvalidMimeType", message: "mime type image/svg+xml is not supported" }))
+      .toBe("assets.errors.unsupportedType");
+    expect(mapAssetError({ code: "EntityTooLarge", message: "The object exceeded the maximum allowed size" }))
+      .toBe("assets.errors.tooLarge");
+  });
+
+  it("maps a hidden or missing object to `gone`, which is what a reader can act on", () => {
+    expect(mapAssetError({ code: "NoSuchKey", message: "Object not found" })).toBe("assets.errors.gone");
+  });
+
+  it("maps a duplicate key to a retryable failure rather than to a denial", () => {
+    // The caller cannot fix a key collision; a fresh ticket produces a new one.
+    expect(mapAssetError({ code: "KeyAlreadyExists", message: "The resource already exists" }))
+      .toBe("assets.errors.uploadFailed");
+  });
+
+  it("never returns a raw storage string, even for something it has never seen", () => {
+    expect(mapAssetError({ message: "socket hang up" })).toBe("assets.errors.uploadFailed");
+    expect(mapAssetError(null)).toBe("assets.errors.uploadFailed");
+    expect(mapAssetError(undefined)).toBe("assets.errors.uploadFailed");
   });
 });

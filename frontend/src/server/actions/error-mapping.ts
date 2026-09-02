@@ -1,3 +1,5 @@
+import type { AssetErrorCode } from "@/lib/storage/professional-assets";
+
 /**
  * Maps a Postgres/RPC error to a stable translation KEY (never a raw DB string).
  * Authorization lives in the database (ADR-0008); the UI only translates the
@@ -191,4 +193,45 @@ export function mapAssignmentError(error: unknown): string {
   if (msg.includes("assignment not found")) return "work.errors.notFound";
   if (code === "42501") return "jobs.errors.denied";
   return "states.genericRetry";
+}
+
+/**
+ * Maps a Supabase Storage failure to a stable translation KEY.
+ *
+ * Different in shape from every mapper above it, because Storage is a different
+ * system. There is no SQLSTATE: refusals arrive as HTTP 400 carrying a typed
+ * body — `{"statusCode":"403","code":"AccessDenied"}` — so the HTTP status is
+ * the same for a policy denial, a rejected content type, an oversized body and a
+ * duplicate key alike. `code` is what distinguishes them, and the message
+ * fragments are the fallback for client versions that surface only a string.
+ *
+ * THE ONE JUDGEMENT CALL. `AccessDenied` and `NoSuchKey` both mean "you are not
+ * getting this object", and on the READ path they are genuinely the same event:
+ * the SELECT policy hides the row, so Storage cannot find someone else's file
+ * and says so. They are still mapped to DIFFERENT keys, because the two
+ * sentences a person needs are different — "this file is no longer here" after a
+ * delete elsewhere, versus "you cannot do that". Neither key confirms that
+ * anyone else's object exists.
+ */
+export function mapAssetError(error: unknown): AssetErrorCode {
+  const e = (error ?? {}) as PgLikeError & { code?: string; statusCode?: string };
+  const code = e.code ?? "";
+  const msg = (e.message ?? "").toLowerCase();
+
+  if (code === "EntityTooLarge" || msg.includes("exceeded the maximum allowed size"))
+    return "assets.errors.tooLarge";
+  if (code === "InvalidMimeType" || msg.includes("is not supported"))
+    return "assets.errors.unsupportedType";
+  if (code === "NoSuchKey" || msg.includes("object not found") || msg.includes("not_found"))
+    return "assets.errors.gone";
+  if (code === "KeyAlreadyExists" || msg.includes("resource already exists"))
+    return "assets.errors.uploadFailed";
+  if (
+    code === "AccessDenied" ||
+    msg.includes("row-level security") ||
+    msg.includes("access denied") ||
+    msg.includes("unauthorized")
+  )
+    return "assets.errors.notAllowed";
+  return "assets.errors.uploadFailed";
 }

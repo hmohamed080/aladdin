@@ -4,6 +4,182 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Two processes guard one file, and only one of them is Postgres
+
+**Date:** 2026-09-06 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `09a52e4` (Increment 9)
+
+Installer Increment 10: the storage foundation `installer-jobs.md` D5 required
+before any Portfolio or Certificate UI. One migration, two private buckets, six
+policies, three server helpers, and **no product surface at all** — deliberately.
+It answers one question: may this person put this object here, read it back, and
+remove it. What an object *means* is Increment 11.
+
+### What was there before: nothing, and one dangerous default
+
+`storage.buckets` held zero rows and `storage.objects` had RLS enabled with zero
+policies. So there was no second architecture to avoid building. But the audit
+turned up the condition that shaped everything after it: **`anon` and
+`authenticated` hold full INSERT/SELECT/UPDATE/DELETE table grants on
+`storage.objects`** — Supabase's own default, unchanged here.
+
+That means RLS is the *entire* boundary. There is no narrow column grant behind
+it the way `profiles_update_self` has one; every policy added to that table IS
+the permission, in full. Which is why the pgTAP file asserts the exact policy set
+and the two absences by name, rather than only asserting that the right things
+work.
+
+### Two buckets, because the limits are enforced somewhere RLS cannot see
+
+Portfolio and certificates want different rules — 5 MiB of image versus 10 MiB
+of PDF. Supabase enforces `allowed_mime_types` and `file_size_limit` **per
+bucket, in the Storage service, before Postgres is consulted**, and that point is
+unreachable from a policy: `storage.objects.metadata` is NULL at INSERT time
+because the row is created before the bytes land.
+
+So in one shared bucket, "certificates may be PDFs and portfolio may not" could
+only ever be stated by the application — a rule a caller can skip. Two buckets
+put it where the caller cannot reach it. The six policies are also written out
+one bucket at a time rather than as three policies matching `bucket_id in (...)`:
+widening portfolio reads should take a second edit, in a diff that says the word
+certificates.
+
+### A key with no caller-controlled bytes in it
+
+`<owner-uuid>/<object-uuid>.<ext>`. Both middle segments from the specified
+sketch are gone — the namespace because the bucket already is one, and the
+filename because a name that only ever gets displayed has no business being
+load-bearing in a security check.
+
+What is left contains nothing the caller chose. That is what turns the attack
+list from things to sanitize into things that cannot be expressed: `../`,
+`%2e%2e`, an empty name, an extra segment, `.jpg.html`, uppercase hex, a trailing
+newline, and `<uid>9/…` are each refused by the shape or by the equality, never
+by a filter someone has to remember to run. The predicate is mirrored in
+TypeScript for pre-flight only, and both sides run the same table of attacks so a
+divergence surfaces as a confusing failure rather than a dangerous one.
+
+### The gate was wrapped, not widened
+
+`app.is_professional_persona(uuid)` is revoked from every client role, and a
+policy expression evaluates as the querying role — so the obvious move was to
+grant it to `authenticated`. That would have handed the whole signed-in
+population a persona oracle to walk over arbitrary user ids.
+
+`app.can_create_professional_asset()` takes no argument and reads `auth.uid()`
+itself, so the only question it can answer is "may I", which the caller already
+knows. The predicate stays revoked, and test 47 asserts that it stayed revoked —
+the assertion exists because the shortcut is the kind that looks harmless in a
+diff.
+
+### The downgrade contract, copied from availability on purpose
+
+INSERT consults the gate. SELECT and DELETE never do. Someone who stops being a
+professional keeps every file and keeps the ability to remove it — the same
+asymmetry `trg_stamp_availability` already has, where claiming needs the persona
+and withdrawing never does. Personal data is not held hostage to a persona value.
+
+It is asserted structurally as well as observed: no read or delete policy
+mentions the gate, so there is no expression that *could* refuse them.
+
+And the converse: possession is not identity. A consumer handed an object
+directly, bypassing every policy, is still not a professional and is still
+refused the next upload. Pinned now because the inference is tempting later.
+
+### No UPDATE policy, and that absence is the overwrite rule
+
+Upsert needs UPDATE on `storage.objects`. Not granting it makes `upsert: true`
+fail structurally rather than depending on every future caller remembering to
+pass `false` — and the refusal comes back as `AccessDenied` rather than
+`KeyAlreadyExists`, which is the proof that it is the missing policy doing it.
+The signed upload token carries `upsert:false` inside its own signature as well.
+
+### What the HTTP harness caught that SQL introspection would have got wrong
+
+§23 asked for real Storage API checks rather than policy introspection, and it
+was right twice:
+
+**Every Storage refusal is HTTP 400.** The meaning is in the body —
+`{"statusCode":"403","code":"AccessDenied"}` — so the status is identical for a
+policy denial, a rejected MIME type, an oversized body and a duplicate key. The
+first draft of the harness asserted 403/415/413/409 and "failed" eleven times
+against a system that was refusing every single attempt correctly. A suite
+written from the documentation would have recorded the opposite mistake just as
+easily.
+
+**`storage.objects` refuses ALL direct SQL deletion**, for every role including
+superuser, via `protect_objects_delete`. The pgTAP delete section was passing for
+the wrong reason: it "proved" that another professional's delete removed nothing,
+and it was right by accident, because nobody's delete removes anything through
+SQL. That section now asserts the trigger and says where the real proof lives;
+deletion authority is established over HTTP, which is the only path that exists.
+
+Two smaller findings worth keeping. A refused *read* is indistinguishable from a
+key that never existed — the SELECT policy hides the row so completely that
+Storage answers `NoSuchKey` — so there is no existence oracle on that path. The
+*delete* path does distinguish the two, which is recorded rather than glossed
+over: reaching the distinction requires already knowing a full random object id.
+
+### No metadata table, and a test that keeps it that way
+
+Ownership is the key, namespace is the bucket, lookup is the immutable path,
+lifecycle is Increment 11's. A registry would duplicate all four and then need
+its own consistency rules to keep the duplicate honest. A test asserts the server
+module exports exactly three helpers, so a title, caption, issuer or visibility
+field cannot quietly arrive here first.
+
+Nothing was added to `public`: the generated types diff is **zero lines**.
+
+### Decisions closed at approval, recorded in §12.1
+
+Four Increment 11 product decisions were taken when this was approved, and they
+are written into the contract rather than left in a conversation:
+
+* **S1** portfolio items are private by default and become public only through
+  explicit metadata visibility — **the bucket stays private either way**, so
+  "public" means a server mints a representation, never that a guessed URL works;
+* **S2** certificates stay owner-private self-declared evidence for the Pilot,
+  with no invented verification authority and no public read path;
+* **S3** metadata is the product authority and deletion **converges** — Postgres
+  and Storage are two systems, no transaction spans them, and the idempotent
+  delete helper is what lets a retry finish instead of jam;
+* **S4** public portfolio is JPEG/PNG/WebP only, and deeper byte/malware scanning
+  is deferred as separate server hardening.
+
+S1 and S2 required no change to anything built here, which was the point of
+refusing to widen anything: the public path S1 wants is a new server helper over
+an unchanged private bucket, and S2's rule is an absence that already exists.
+
+The signature check in `lib/storage/professional-assets.ts` is described
+consistently everywhere as what it is — a correctness net running in the caller's
+own process, catching a script named `.png` that the bucket's type list cannot.
+It is never called a boundary. S4 is what makes that honest rather than a gap.
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 48 files, 1724 tests, PASS** — new
+`47_professional_asset_storage_test.sql` is 67/67. Storage API harness **43/43,
+0 objects left behind** (it fails if any survive). `db lint public,app` three
+warnings, all pre-existing. Generated types **0 lines changed**. `tsc --noEmit`
+clean · `eslint src` 0 errors (1 pre-existing warning) · `vitest` **1061/86** (was
+1004/84) · `next build` clean with no new routes · `check_doc_links` 955 links,
+0 broken.
+
+No binary fixture is committed: the PNG and PDF the harness uploads are generated
+in memory, and the one persona it changes is restored in a `finally`. Nothing was
+seeded — there are no fake portfolio items and no fake certificates, because
+there is nothing yet for them to mean.
+
+`docs/database/media-storage.md` **will not exist**. What shipped is deliberately
+narrower than the name that section promised: chat attachments and job-progress
+photos have different relationship semantics — a chat attachment is readable by a
+conversation, not by an owner — and designing their authorization alongside this
+one would have meant guessing at it. The three references that named that file
+now say so.
+
+`RUNTIME_STATE.md` is untouched and now eleven increments behind.
+
+---
+
 ## Session — A hundred percent is a claim, and somebody else answers it
 
 **Date:** 2026-09-05 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `4e5690b` (Increment 8)

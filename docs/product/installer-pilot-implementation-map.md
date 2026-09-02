@@ -93,8 +93,8 @@ bucket is declared and no code calls `.storage.from(...)`.
 |---|---|---|
 | 3.1–3.4 | Jobs · applications · assignments · progress | **Specified** (`installer-jobs.md` §3) — build |
 | 3.5 | **Ratings & reviews** | **Specified in full** (§6): one review per completed assignment, poster-org authored, score 1–5, derived aggregates |
-| 3.6–3.7 | Portfolio · certificates | Blocked on the storage foundation (D5) |
-| 3.8 | **Media / file storage** | **Required prerequisite.** Needs its own spec, `docs/database/media-storage.md` |
+| 3.6–3.7 | Portfolio · certificates | Foundation **delivered** (Increment 10); product surfaces are Increment 11 |
+| 3.8 | **Media / file storage** | **Delivered as [`professional-asset-storage.md`](../database/professional-asset-storage.md)** — scoped to professional assets, not general media |
 | 3.9 | **Availability** | **Specified** (§8): two columns on `profiles`, user-controlled |
 | 3.10 | Messaging for an org-less person | **Next milestone.** Installer surfaces ship with **no** messaging entry point |
 | 3.11 | Installer↔business relationship | **Resolved:** derived from completed work (§13). Sales path hardened separately (§7) |
@@ -265,7 +265,7 @@ Increments **1, 2 and 10** have no dependency on the Jobs domain and may run in 
 
 | | |
 |---|---|
-| **Database** | **Spec first:** `docs/database/media-storage.md` (private bucket, `public.media`, object-level RLS, upload/download paths, MIME + size limits, deletion story) — **approved before SQL.** Then the migration. |
+| **Database** | **Delivered** as [`professional-asset-storage.md`](../database/professional-asset-storage.md): two private buckets, object-level RLS, server-derived paths, per-namespace MIME + size limits, deletion story. **No `public.media` table** — ownership is carried by the object key and namespace by the bucket, so a registry would duplicate both and then need its own consistency rules; product metadata belongs to Increment 11. |
 | **Backend** | Signed upload/download paths. No public URLs. |
 | **Frontend** | **None.** A foundation increment with no UI, deliberately. |
 | **Tests** | pgTAP + integration: a user reads only their own objects; no anonymous read path; MIME and size limits hold; deletion removes the object and the row. |

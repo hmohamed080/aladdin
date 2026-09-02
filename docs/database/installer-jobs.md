@@ -201,9 +201,12 @@ Append-only, mirroring `audit_log` and `points_ledger` (`app.forbid_mutation()`;
 | `note` | `text` | ≤ 1000 chars. |
 | `created_at` | `timestamptz` **not null** | |
 
-**No media column, and none may be added before the storage foundation exists (D5).** A
-`photo_url text` here would be exactly the "temporary public URL field" D5 forbids. Job-progress
-photos are an additive increment **after** `media-storage.md` lands.
+**No media column, and none may be added (D5).** A `photo_url text` here would be exactly the
+"temporary public URL field" D5 forbids. The storage foundation now exists
+([`professional-asset-storage.md`](professional-asset-storage.md), Increment 10) but is scoped to
+professional Portfolio and Certificates; job-progress photos would attach to an ASSIGNMENT and be
+readable by both parties, which is a different ownership question and remains an additive increment
+with its own authorization design.
 
 ### 3.5 Lifecycle states
 
@@ -1243,17 +1246,23 @@ none exists for them. Personal↔organization chat is the **next** milestone.
 `ck_notifications_event_type_known` is unchanged. The audit event names in §15 are **reserved** so the
 next milestone adds call sites without renaming. No Installer surface may assume a notification exists.
 
-### 14.3 Media/Storage is a separate, prior foundation (D5)
-There is no media or storage capability in the repository today. Portfolio and certificates are
-required for the completed persona, therefore:
+### 14.3 Media/Storage is a separate, prior foundation (D5) — **delivered, Increment 10**
+D5 required a real storage foundation before any Portfolio/Certificate upload UI, with no temporary
+public-URL fields, no fake media records and no placeholder columns. It exists:
 
-> **A real Media/Storage foundation must be specified (`docs/database/media-storage.md`) and
-> implemented BEFORE any Portfolio/Certificate upload UI.** No temporary public-URL fields. No fake
-> media records. No placeholder columns.
+> **[`professional-asset-storage.md`](professional-asset-storage.md)** — two private buckets, a
+> server-derived object-path contract, a professional persona gate on creation only, and signed
+> short-lived reads. Increment 10, migration `20260906090001_professional_asset_storage.sql`.
 
-**Jobs, applications and assignments have no dependency on it** and may be implemented first. The same
-foundation will later support job-progress photos and Chat attachments — **designed for, not
-integrated now**; neither integration is in this milestone.
+**It is deliberately narrower than the `media-storage.md` this section originally named**, and that
+file does not exist. What shipped covers professional Portfolio and Certificates and nothing else.
+Job-progress photos and Chat attachments have **different relationship semantics** — a chat attachment
+is readable by a conversation rather than by an owner — so designing their authorization alongside
+this one would have meant guessing at it. They may reuse the lower-level primitives when their own
+milestone arrives; nothing in the storage contract covers them today, and it does not claim to.
+
+**Jobs, applications and assignments have no dependency on it**, which is why Increments 6-9 shipped
+first. Portfolio and Certificate product surfaces are Increment 11.
 
 ---
 

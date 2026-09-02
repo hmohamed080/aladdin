@@ -2914,6 +2914,25 @@ export const en = {
    * installer must never read a sentence implying they finished the engagement,
    * because they cannot: they reported, and somebody else confirms.
    */
+  assets: {
+    /**
+     * Storage-foundation errors (Increment 10). No screen renders these yet —
+     * Increment 11's Portfolio and Certificates surfaces are their first
+     * readers. They exist now because `mapAssetError` returns keys, and a mapper
+     * whose keys do not resolve is a mapper nobody can test.
+     */
+    errors: {
+      unsupportedType: "That file type is not accepted here.",
+      tooLarge: "That file is too large.",
+      empty: "That file is empty.",
+      contentMismatch: "That file does not look like the type it claims to be.",
+      invalidPath: "That file could not be identified.",
+      notAllowed: "You cannot do that.",
+      uploadFailed: "The file could not be saved. Please try again.",
+      gone: "That file is no longer here.",
+    },
+  },
+
   work: {
     title: "My work",
     subtitle: "Everything you have been assigned — current, finished and cancelled — in one place.",
