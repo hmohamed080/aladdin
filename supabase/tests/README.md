@@ -44,3 +44,22 @@ admits anon`) which no amount of HTTP probing could establish. But
 from the bucket row **before Postgres is consulted**, so a suite that introspected
 policies alone could show a green board while an oversized, mislabelled upload
 sailed through. See [`docs/database/professional-asset-storage.md`](../../docs/database/professional-asset-storage.md) §10.
+
+### `public_media_exposure_test.mjs`
+
+```bash
+node supabase/tests/public_media_exposure_test.mjs
+```
+
+Needs the local stack **and** the Next dev server on `:3000`, because three of its
+four questions are about HTTP surfaces that do not exist in SQL: is the storage
+key derivable from the public item id, where does the key actually appear (HTML,
+RSC payload, response headers, API, errors), what can an anonymous caller do at
+Storage directly, and does withdrawal take effect on the next request.
+
+It has been wrong twice, and both corrections are recorded in
+[`professional-asset-storage.md`](../../docs/database/professional-asset-storage.md) §7.2.
+First it claimed an anonymous caller could reach nothing; it found that listing,
+direct GET and HEAD were all permitted. Then it concluded that could not be
+narrowed; `storage.allow_only_operation` proved otherwise, and the public door is
+now one operation wide. Run it after any change to a storage policy.

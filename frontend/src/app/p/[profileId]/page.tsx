@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { loadPublicProfile } from "@/server/queries/professional-profile";
+import { loadPublicPortfolio } from "@/server/queries/portfolio";
 import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { contentColumnClass } from "@/components/layout/content-column";
 import { PublicProfileView } from "@/features/profile/public-profile";
+import { PublicPortfolio } from "@/features/profile/public-portfolio";
 import { cn } from "@/lib/ui/cn";
 
 export const dynamic = "force-dynamic";
@@ -54,9 +56,18 @@ export default async function PublicProfilePage({
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const t = createTranslator(locale);
 
+  // Only ever the published items of a currently listed profile: the projection
+  // itself carries that test, so this page adds no filter of its own and cannot
+  // disagree with the media route about what is public.
+  const portfolio = await loadPublicPortfolio(profileId);
+
   return (
-    <main className={cn(contentColumnClass, "py-xl")} id="main">
+    <main className={cn(contentColumnClass, "flex flex-col gap-xl py-xl")} id="main">
       <PublicProfileView profile={profile} t={t} locale={locale} />
+      {/* Rendered only when there is something published. An empty section would
+          tell a visitor that work exists and is being withheld, which is exactly
+          the distinction the whole surface refuses to draw. */}
+      <PublicPortfolio items={portfolio} t={t} />
     </main>
   );
 }

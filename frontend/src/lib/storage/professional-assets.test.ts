@@ -3,9 +3,10 @@ import {
   ASSET_NAMESPACES,
   ASSET_POLICY,
   ASSET_READ_URL_SECONDS,
-  buildAssetKey,
   bytesMatchType,
-  isAssetKeyOwnedBy,
+  isAssetKeyForCaller,
+  isCertificatePathOwnedBy,
+  isPortfolioObjectKey,
   validateAssetContent,
   validateAssetFile,
 } from "./professional-assets";
@@ -15,48 +16,102 @@ const OTHER = "71000006-0000-4000-8000-000000000006";
 const OBJECT = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
 
 /**
- * These assertions have a twin. `app.is_professional_asset_key` runs the same
- * attack table in `supabase/tests/47_professional_asset_storage_test.sql`, and it
- * is the one with authority — this module never decides anything, it only lets a
- * browser answer quickly. The two are kept identical deliberately: a divergence
- * would show up as a file that passes here and is refused by the policy, which
- * is the confusing failure rather than the dangerous one.
+ * TWO key contracts, because Increment 11 split them.
+ *
+ * These assertions have a twin in `48_portfolio_certificates_test.sql`, and the
+ * SQL side is the one with authority: this module never decides anything, it only
+ * lets a browser answer quickly. They are kept identical deliberately, so a
+ * divergence shows up as a file that passes here and is refused by the policy —
+ * the confusing failure rather than the dangerous one.
  */
-describe("the object key contract", () => {
-  it("builds `<owner>/<object-id>.<ext>` with the extension taken from the TYPE", () => {
-    expect(buildAssetKey(OWNER, OBJECT, "image/jpeg")).toBe(`${OWNER}/${OBJECT}.jpg`);
-    expect(buildAssetKey(OWNER, OBJECT, "application/pdf")).toBe(`${OWNER}/${OBJECT}.pdf`);
-  });
-
-  it("refuses to build a key for a type it has no extension for", () => {
-    expect(() => buildAssetKey(OWNER, OBJECT, "image/svg+xml")).toThrow();
-  });
-
-  it("accepts a well-formed key belonging to the caller", () => {
-    expect(isAssetKeyOwnedBy(`${OWNER}/${OBJECT}.jpg`, OWNER)).toBe(true);
-    expect(isAssetKeyOwnedBy(`${OWNER}/${OBJECT}.pdf`, OWNER)).toBe(true);
+describe("the certificate path contract", () => {
+  it("accepts a well-formed path belonging to the caller", () => {
+    expect(isCertificatePathOwnedBy(`${OWNER}/${OBJECT}.pdf`, OWNER)).toBe(true);
+    expect(isCertificatePathOwnedBy(`${OWNER}/${OBJECT}.jpg`, OWNER)).toBe(true);
   });
 
   it.each([
-    ["another user's folder", `${OTHER}/${OBJECT}.jpg`],
-    ["a traversal", `${OWNER}/../${OTHER}/${OBJECT}.jpg`],
+    ["another user's folder", `${OTHER}/${OBJECT}.pdf`],
+    ["a traversal", `${OWNER}/../${OTHER}/${OBJECT}.pdf`],
     ["a bare parent segment", `${OWNER}/..`],
-    ["percent-encoded traversal", `${OWNER}/%2e%2e/${OTHER}/x.jpg`],
+    ["percent-encoded traversal", `${OWNER}/%2e%2e/${OTHER}/x.pdf`],
     ["an empty name", ""],
     ["the folder itself", OWNER],
-    ["an extra namespace segment", `${OWNER}/portfolio/${OBJECT}.jpg`],
-    ["a display filename", `${OWNER}/${OBJECT}/site-photo.jpg`],
+    ["an extra namespace segment", `${OWNER}/certificates/${OBJECT}.pdf`],
+    ["a display filename", `${OWNER}/${OBJECT}/scan.pdf`],
     ["an unsupported extension", `${OWNER}/${OBJECT}.svg`],
-    ["a double extension", `${OWNER}/${OBJECT}.jpg.html`],
-    ["uppercase hex", `${OWNER}/${OBJECT.toUpperCase()}.jpg`],
-    ["a prefix of the owner id", `${OWNER}9/${OBJECT}.jpg`],
-    ["a smuggled second line", `${OWNER}/${OBJECT}.jpg\n${OTHER}/${OBJECT}.jpg`],
+    ["a double extension", `${OWNER}/${OBJECT}.pdf.html`],
+    ["uppercase hex", `${OWNER}/${OBJECT.toUpperCase()}.pdf`],
+    ["a prefix of the owner id", `${OWNER}9/${OBJECT}.pdf`],
+    ["a smuggled second line", `${OWNER}/${OBJECT}.pdf\n${OTHER}/${OBJECT}.pdf`],
   ])("refuses %s", (_label, key) => {
-    expect(isAssetKeyOwnedBy(key, OWNER)).toBe(false);
+    expect(isCertificatePathOwnedBy(key, OWNER)).toBe(false);
   });
 
   it("refuses everything when there is no owner — an unauthenticated caller has no folder", () => {
-    expect(isAssetKeyOwnedBy(`${OWNER}/${OBJECT}.jpg`, "")).toBe(false);
+    expect(isCertificatePathOwnedBy(`${OWNER}/${OBJECT}.pdf`, "")).toBe(false);
+  });
+});
+
+/**
+ * The portfolio key is opaque, and the assertions below are mostly about what it
+ * CANNOT contain. A published photo has to be resolvable for a signed-out
+ * visitor, and the Next server shares the browser's anon identity, so anything
+ * the key carries is effectively published — which is why it carries nothing.
+ */
+describe("the portfolio key contract", () => {
+  it("accepts one opaque uuid and an image extension", () => {
+    expect(isPortfolioObjectKey(`${OBJECT}.jpg`)).toBe(true);
+    expect(isPortfolioObjectKey(`${OBJECT}.png`)).toBe(true);
+    expect(isPortfolioObjectKey(`${OBJECT}.webp`)).toBe(true);
+  });
+
+  it("refuses a PDF, because a portfolio piece is an image (S4)", () => {
+    expect(isPortfolioObjectKey(`${OBJECT}.pdf`)).toBe(false);
+  });
+
+  it.each([
+    ["an owner prefix — the Increment 10 shape", `${OWNER}/${OBJECT}.jpg`],
+    ["any separator at all", `a/${OBJECT}.jpg`],
+    ["a traversal", `../${OBJECT}.jpg`],
+    ["an empty key", ""],
+    ["a filename", "site-photo.jpg"],
+    ["an unsupported extension", `${OBJECT}.svg`],
+    ["a double extension", `${OBJECT}.jpg.html`],
+    ["uppercase hex", `${OBJECT.toUpperCase()}.jpg`],
+    ["a smuggled second line", `${OBJECT}.jpg\n${OBJECT}.jpg`],
+  ])("refuses %s", (_label, key) => {
+    expect(isPortfolioObjectKey(key)).toBe(false);
+  });
+
+  it("contains no owner id by construction, which is the point of the redesign", () => {
+    const key = `${OBJECT}.jpg`;
+    expect(isPortfolioObjectKey(key)).toBe(true);
+    expect(key).not.toContain(OWNER);
+    expect(key).not.toContain("/");
+  });
+});
+
+/**
+ * The asymmetry, stated once. A certificate path proves its own ownership; a
+ * portfolio key deliberately cannot, so the pre-flight only checks its shape and
+ * `app.owns_portfolio_object` answers ownership inside the storage policy.
+ */
+describe("isAssetKeyForCaller", () => {
+  it("checks ownership for a certificate", () => {
+    expect(isAssetKeyForCaller("certificate", `${OWNER}/${OBJECT}.pdf`, OWNER)).toBe(true);
+    expect(isAssetKeyForCaller("certificate", `${OTHER}/${OBJECT}.pdf`, OWNER)).toBe(false);
+  });
+
+  it("checks only the SHAPE for portfolio, and says so by accepting any owner", () => {
+    expect(isAssetKeyForCaller("portfolio", `${OBJECT}.jpg`, OWNER)).toBe(true);
+    expect(isAssetKeyForCaller("portfolio", `${OBJECT}.jpg`, OTHER)).toBe(true);
+    // Which is safe only because it is not the boundary: RLS refuses a key whose
+    // metadata row belongs to somebody else, and that check cannot be skipped.
+  });
+
+  it("still refuses a malformed portfolio key outright", () => {
+    expect(isAssetKeyForCaller("portfolio", `${OWNER}/${OBJECT}.jpg`, OWNER)).toBe(false);
   });
 });
 

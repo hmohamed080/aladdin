@@ -104,6 +104,7 @@ export function SubmitButton({
   size = "md",
   className,
   disabled = false,
+  "aria-label": ariaLabel,
 }: {
   children: ReactNode;
   pendingLabel?: string;
@@ -112,6 +113,14 @@ export function SubmitButton({
   className?: string;
   /** Extra gate (e.g. required consent) ORed with the form's pending state. */
   disabled?: boolean;
+  /**
+   * REQUIRED when `children` is an icon rather than words. A submit control whose
+   * only content is a glyph announces itself as "button" and nothing else, so the
+   * prop exists here rather than in each caller — the Portfolio reorder controls
+   * were the first to need it, and the next icon-only submit should not have to
+   * rediscover that a local replacement is the wrong answer (R6).
+   */
+  "aria-label"?: string;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -121,6 +130,7 @@ export function SubmitButton({
       size={size}
       disabled={pending || disabled}
       aria-busy={pending}
+      aria-label={ariaLabel}
       className={className}
     >
       {pending ? (

@@ -1,15 +1,12 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { mapAssetError } from "@/server/actions/error-mapping";
 import {
   ASSET_NAMESPACES,
   ASSET_POLICY,
   ASSET_READ_URL_SECONDS,
-  buildAssetKey,
-  isAssetKeyOwnedBy,
-  validateAssetFile,
+  isAssetKeyForCaller,
   type AssetErrorCode,
   type AssetNamespace,
 } from "@/lib/storage/professional-assets";
@@ -17,43 +14,27 @@ import {
 /**
  * The three ways a professional's file moves: in, out, and away.
  *
- * THESE ARE `"use server"` EXPORTS, so every argument below arrives from a
- * browser and none of it is trusted. In particular no function here takes an
- * owner id. The owner is always `auth.getUser()`, re-derived on every call, and
- * the object key is BUILT from it rather than checked against it — a caller
- * cannot name a folder, only be in one.
+ * WHAT CHANGED IN INCREMENT 11. These used to DERIVE the object path from
+ * `auth.getUser()`. They no longer do — the path arrives from
+ * `portfolio_item_create` / `certificate_create`, which mint it inside the same
+ * transaction that creates the metadata row. That is S3 applied to identity as
+ * well as to state: the row is the product authority, so the object it names has
+ * to be decided where the row is, not in a separate call that could succeed while
+ * the row does not.
  *
- * WHY A SERVER SEAM AT ALL, when RLS would refuse a rogue browser anyway.
- * Three things it does that a direct client upload could not:
+ * It also means these helpers no longer decide anything about ownership for
+ * portfolio. They cannot: an opaque key states nothing about who owns it, which is
+ * exactly why it is opaque. Ownership is answered by `app.owns_portfolio_object`
+ * inside the storage policy, against the metadata row. The shape check below is a
+ * fast, specific refusal and NOT the boundary.
  *
- *   1. The PATH IS SERVER-DERIVED. `createAssetUploadTicket` mints a token bound
- *      to one bucket, one key and `upsert: false` — all three inside the signed
- *      token, so the browser holds an authorization to write exactly one object
- *      and cannot repoint it.
- *   2. ONE PLACE TO CHANGE. §11 asks that `createSignedUrl` not end up scattered
- *      through page components later. Increment 11 imports these three and adds
- *      none of its own.
- *   3. FAILURES BECOME SENTENCES. Storage answers `AccessDenied` / `NoSuchKey` /
- *      `EntityTooLarge`; `mapAssetError` turns those into keys a person can read,
- *      so no raw storage text reaches a screen (§18).
- *
- * WHAT IT DELIBERATELY IS NOT is the enforcement point. Everything here is
- * checked again by the database and the Storage service — service-role is never
- * used, and every call runs as the caller's own identity, so a bug in this file
- * widens nothing. That is the property worth keeping: the seam is for ergonomics
- * and error quality, and the boundary is somewhere a caller cannot reach.
+ * THESE ARE `"use server"` EXPORTS, so every argument arrives from a browser and
+ * none of it is trusted. Service-role is still never used: every call runs as the
+ * caller's own identity, so a bug here widens nothing.
  */
 
 export type AssetTicket =
-  | {
-      readonly ok: true;
-      /** Storage bucket the token is bound to. */
-      readonly bucket: string;
-      /** `<owner>/<object-id>.<ext>` — derived here, never supplied. */
-      readonly path: string;
-      /** Single-use, single-path signed upload token. */
-      readonly token: string;
-    }
+  | { readonly ok: true; readonly token: string }
   | { readonly ok: false; readonly code: AssetErrorCode };
 
 export type AssetUrl =
@@ -69,116 +50,99 @@ function readNamespace(value: string): AssetNamespace | null {
     : null;
 }
 
+async function callerFor(namespace: AssetNamespace, objectPath: string) {
+  const supabase = await getServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { supabase, error: "assets.errors.notAllowed" as const };
+  if (!isAssetKeyForCaller(namespace, objectPath, user.id)) {
+    return { supabase, error: "assets.errors.invalidPath" as const };
+  }
+  return { supabase, error: null };
+}
+
 /**
- * Upload authority.
+ * Upload authority: a single-use token bound to one bucket, one key and
+ * `upsert: false`, all three inside the signature.
  *
- * The persona gate is NOT re-implemented here. Minting the token is itself an
- * authorized write — Storage evaluates the INSERT policy before it will sign
- * anything — so a consumer, a business-only identity or a downgraded
- * professional is refused at this call, by `app.can_create_professional_asset`,
- * with no code in this file consulting a persona at all. Verified over HTTP in
- * `supabase/tests/professional_asset_storage_api_test.mjs`.
- *
- * Type and size are checked first, only so the refusal is immediate and specific.
- * The bucket refuses both again regardless.
+ * The persona gate is not re-implemented here and never was. For a certificate
+ * the INSERT policy consults `app.can_create_professional_asset` directly; for
+ * portfolio it consults `app.can_upload_portfolio_object`, which requires a
+ * PENDING row the caller owns — and only `portfolio_item_create` can produce one,
+ * which is where the persona is checked. Either way the refusal comes from the
+ * database and this file only translates it.
  */
 export async function createAssetUploadTicket(
   namespace: string,
-  file: { type: string; size: number },
+  objectPath: string,
 ): Promise<AssetTicket> {
   const ns = readNamespace(namespace);
   if (!ns) return { ok: false, code: "assets.errors.invalidPath" };
 
-  const valid = validateAssetFile(ns, file);
-  if (!valid.ok) return { ok: false, code: valid.code };
+  const { supabase, error } = await callerFor(ns, objectPath);
+  if (error) return { ok: false, code: error };
 
-  const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, code: "assets.errors.notAllowed" };
-
-  // The only place an object identity is created. A fresh uuid per ticket is
-  // what makes keys immutable in practice as well as in policy: nothing a caller
-  // sends can steer this at an existing object.
-  const path = buildAssetKey(user.id, randomUUID(), file.type);
-
-  const { data, error } = await supabase.storage
+  const { data, error: signError } = await supabase.storage
     .from(ASSET_POLICY[ns].bucket)
-    .createSignedUploadUrl(path);
+    .createSignedUploadUrl(objectPath);
 
-  if (error || !data) return { ok: false, code: mapAssetError(error) };
-  return { ok: true, bucket: ASSET_POLICY[ns].bucket, path, token: data.token };
+  if (signError || !data) return { ok: false, code: mapAssetError(signError) };
+  return { ok: true, token: data.token };
 }
 
 /**
- * Read authority (§11).
+ * Read authority (§11): short-lived, minted per object, never stored.
  *
- * Short-lived, minted per object, and refused for anything the caller does not
- * own — twice. The ownership check below is a fast, specific refusal; the
- * SELECT policy is the one that counts, and it hides the row so completely that
- * Storage answers `NoSuchKey` rather than "denied". A caller therefore cannot
- * learn whether someone else's object exists by asking for it.
+ * There is no variant that takes a bucket — the namespace is a closed set of two
+ * and the bucket is looked up — so no caller can name `professional-certificates`
+ * while a portfolio surface believes it asked for a photo.
  *
- * There is no variant that takes a bucket. §11 warns against a helper that
- * accepts an arbitrary bucket/object pair, so the namespace is a closed set of
- * two and the bucket is looked up rather than passed.
+ * A refusal comes back as `gone` rather than `notAllowed`, because that is what
+ * Storage actually says: the SELECT policy hides the row so completely that a
+ * foreign object is indistinguishable from one that never existed.
  */
-export async function createAssetReadUrl(namespace: string, path: string): Promise<AssetUrl> {
+export async function createAssetReadUrl(namespace: string, objectPath: string): Promise<AssetUrl> {
   const ns = readNamespace(namespace);
   if (!ns) return { ok: false, code: "assets.errors.invalidPath" };
 
-  const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, code: "assets.errors.notAllowed" };
+  const { supabase, error } = await callerFor(ns, objectPath);
+  if (error) return { ok: false, code: error };
 
-  if (!isAssetKeyOwnedBy(path, user.id)) return { ok: false, code: "assets.errors.invalidPath" };
-
-  const { data, error } = await supabase.storage
+  const { data, error: signError } = await supabase.storage
     .from(ASSET_POLICY[ns].bucket)
-    .createSignedUrl(path, ASSET_READ_URL_SECONDS);
+    .createSignedUrl(objectPath, ASSET_READ_URL_SECONDS);
 
-  if (error || !data?.signedUrl) return { ok: false, code: mapAssetError(error) };
+  if (signError || !data?.signedUrl) return { ok: false, code: mapAssetError(signError) };
   return { ok: true, url: data.signedUrl, expiresIn: ASSET_READ_URL_SECONDS };
 }
 
 /**
- * Delete authority (§12).
- *
- * One object, named in full, belonging to the caller. There is no folder form
- * and no wildcard, because the argument that would enable a bulk delete is the
- * same argument that would enable someone else's.
+ * Delete authority (§12): one object, named in full, belonging to the caller.
+ * No folder form and no wildcard, because the argument that would enable a bulk
+ * delete is the same one that would enable someone else's.
  *
  * IDEMPOTENT BY DESIGN. `NoSuchKey` is folded into success: the caller asked for
- * the object to be gone and it is gone, and a second click on a delete button
- * should not produce an error about a file that is already removed. It matters
- * for Increment 11 specifically — when a metadata row and an object have to be
- * cleaned up together, a retry after a partial failure has to be able to
- * converge instead of jamming on the half that already succeeded.
- *
- * The persona gate is absent here, and that absence is the downgrade contract:
- * someone who stops being a professional can always remove their own data.
+ * the object to be gone and it is gone. Increment 11 depends on this — deleting an
+ * item is `mark deleted → remove object → purge row`, and a retry after a partial
+ * failure has to converge rather than jam on the half that already succeeded.
  */
 export async function deleteProfessionalAsset(
   namespace: string,
-  path: string,
+  objectPath: string,
 ): Promise<AssetResult> {
   const ns = readNamespace(namespace);
   if (!ns) return { ok: false, code: "assets.errors.invalidPath" };
 
-  const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, code: "assets.errors.notAllowed" };
+  const { supabase, error } = await callerFor(ns, objectPath);
+  if (error) return { ok: false, code: error };
 
-  if (!isAssetKeyOwnedBy(path, user.id)) return { ok: false, code: "assets.errors.invalidPath" };
+  const { error: removeError } = await supabase.storage
+    .from(ASSET_POLICY[ns].bucket)
+    .remove([objectPath]);
 
-  const { error } = await supabase.storage.from(ASSET_POLICY[ns].bucket).remove([path]);
-  if (error) {
-    const code = mapAssetError(error);
+  if (removeError) {
+    const code = mapAssetError(removeError);
     return code === "assets.errors.gone" ? { ok: true } : { ok: false, code };
   }
   return { ok: true };

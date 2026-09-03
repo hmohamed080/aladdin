@@ -4,6 +4,184 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — A photograph a stranger may see, and everything else that must stay shut
+
+**Date:** 2026-09-06 → 2026-09-08 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `af08e9f` (Increment 10)
+
+Installer Increment 11: Portfolio and Certificates. Two metadata domains over
+Increment 10's private buckets, two owner routes, one public section, one media
+route, and three migrations — the third of which exists because the tests kept
+finding that the boundary was wider than the design said.
+
+### The decision that reshaped the increment
+
+The blocking question was how a signed-out visitor reads a published photograph.
+Increment 10 had fixed the object key as `<user_id>/<uuid>.<ext>`, and
+`profiles.id` is deliberately NOT `users.id` — the public route is keyed on the
+former, and `17_public_directory_hardening_test` asserts by name that `user_id`
+stays out of every public projection.
+
+In this stack the Next server IS the anonymous visitor: with no session it holds
+the anon key, the same credential the browser has. So any function that turns a
+public item id into a storage key is callable by the browser too, and an
+owner-prefixed key publishes `users.id`.
+
+Two options were put up — accept the leak, or introduce a service-role client —
+and **both were rejected in favour of a third that dissolves the problem**:
+change the Portfolio key itself. Portfolio keys became **opaque** (`<uuid>.<ext>`,
+no owner segment, no filename, no separator at all), and ownership moved to where
+it can be asked privately — `public.portfolio_items`, read by narrow
+`security definer` booleans. Certificates keep Increment 10's owner-prefixed
+contract unchanged, because nothing public ever resolves one.
+
+That turned out to be **strictly stronger** than the check it replaced. Under
+Increment 10 a well-formed key was sufficient to write; now a `pending` metadata
+row owned by the caller must already exist, so bytes are unreachable until the
+product has authorized that exact object. Both an invented key and the old
+owner-prefixed shape are refused.
+
+### Two systems, and the orders that make them converge
+
+Postgres and Storage share no transaction, so every sequence is ordered so that a
+failure at any step leaves a state that is safe and finishable:
+
+* **ADD** `row(pending) → upload → row(ready)`. The row is the authority (S3), so
+  the object identity is decided and recorded before any bytes exist. A pending
+  row is invisible to the public, cannot be published (the table refuses it), and
+  shows the owner an "unfinished upload" card with Finish and Discard. Finalize
+  is idempotent, which is what makes a lost response recoverable rather than
+  ambiguous.
+* **REMOVE** `row(deleted) → remove object → purge row`. Visibility stops FIRST,
+  atomically, before Storage is asked anything — the owner's own RLS policy
+  excludes `deleted`, so the item leaves their list and the public projection in
+  the same instant. Cleanup failure is deliberately NOT reported as a failed
+  delete: telling somebody "could not delete" about an item they can no longer
+  see is the one genuinely confusing outcome. Re-running the sequence finishes it.
+
+No scheduler. Nothing pretends the two systems commit together.
+
+### Three findings, each caught by a test rather than by reading the diff
+
+**1. `anon` held TRUNCATE on both new tables.** Supabase's default privileges
+grant `arwdDxtm` on every new public table, and **TRUNCATE is not restricted by
+RLS**. Enabling row-level security without stripping the defaults first would
+have left an anonymous caller able to empty both tables. Every other table in the
+repo revokes it; mine didn't. The Jobs migration even documents the reason. Now
+asserted by an assertion that names the hazard.
+
+**2. The media route cached for 60 seconds.** The reasoning was that an
+unpublished item vanishes from the page anyway, so only a saved media URL could
+exploit the gap — which describes the exploit rather than removing it. A saved
+`/p/media/<id>` is exactly what somebody keeps, and for a minute after a person
+withdrew a photograph, or after the platform delisted their profile, a cache
+would still be serving it. **Withdrawal that is "immediate except for a minute"
+is not immediate.** Every response is now `no-store`, refusals included — a
+cached 404 is the same bug pointing the other way.
+
+**3. The public door was far wider than one signed URL.** This one took two
+corrections, and both are recorded in the contract because the second reverses
+the first.
+
+The exposure probe was written asserting that an anonymous caller could enumerate
+nothing and read nothing directly. **Both assertions failed.** A SELECT policy in
+Supabase Storage is consulted by every read-shaped operation, so the policy
+intended to let the media route mint one signed URL also permitted bucket
+LISTING, a direct unsigned GET, and a HEAD disclosing size and type.
+
+The first conclusion was that this could not be narrowed — "may sign object X"
+and "may list objects" looked like one permission. **That was also wrong.**
+Storage publishes the operation being performed. A temporary logging predicate
+was added to the live policy and each request shape driven against the real API:
+
+```
+sign → storage.object.sign          list → storage.object.list
+GET  → storage.object.get_authenticated
+HEAD → object.head_authenticated_info
+GET /object/sign/…?token=… → THE POLICY IS NOT EVALUATED AT ALL
+```
+
+That last line is what made the fix possible: fetching a signed URL consults no
+policy, because the token is the authorization. So `20260908090001` adds one
+clause — `storage.allow_only_operation('storage.object.sign')` — and the door is
+now one operation wide. Listing returns empty while published objects exist,
+direct GET and HEAD are refused, signing still works, and byte delivery is
+untouched.
+
+It **fails closed**: `storage.operation()` reads a GUC with the missing-ok flag,
+so outside a Storage request the predicate is false. A direct SQL caller matches
+nothing, and a future Storage rename would make published images go missing —
+visible, and caught by the probe — never silently readable. pgTAP asserts the
+false-outside-a-request behaviour directly.
+
+### What is public, and what the public test actually is
+
+An item is public when it is **explicitly public AND ready AND its owner's
+profile is currently listed** — the third read by joining
+`profile_public_directory`, the same projection the profile page itself is built
+on, so publication cannot mean one thing to a page and another to a photo.
+Unlisting withdraws a whole portfolio instantly without rewriting a single saved
+visibility, and relisting restores exactly what the owner chose.
+
+The browser-facing contract is `/p/media/<itemId>` and nothing else. The route
+proxies bytes, so no key, no signed URL, no token and no owner id reaches the
+page. The key is a **separate random uuid** — measured at chance-level hex
+agreement with the item id, which matters because item ids are public by
+necessity: they are the `<img src>`.
+
+Certificates are the mirror image, and the important assertions are about things
+that do not exist: no verification column, no approval state, no reviewer, no
+public projection, no anon grant, no publish control in the UI. The platform
+stores what a person says they hold and vouches for none of it (S2).
+
+### Composition
+
+`04-account-overview.jpeg` supplied the module shape — icon, title, one line of
+explanation, a large number, a supporting line, one enter action — and the two
+hub cards adopt it with real data: a real published photograph, and the person's
+own certificate names in the place the reference puts a label row. Its stat rail,
+learning card, rewards card and network card remain later increments. This is not
+the Account Overview redesign; that is Increment 14.
+
+Two visual defects were found in the browser and both fixes landed where the
+cause was. The status badge fills at 15% alpha, which is right on a card and
+unreadable on a photograph — it now sits on the product's own surface. And the
+reorder chevrons did not mirror in RTL, because an SVG does not flip with `dir`;
+`rtl:-scale-x-100` is the pattern `supply-boards` already documents as "logical,
+not physical".
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 49 files, 1825 tests, PASS** — new
+`48_portfolio_certificates_test.sql` 91/91, `47_` rewritten to 77 as the boundary
+moved. **Storage harness 59/59** and **exposure probe 53/53**, both with zero
+objects and zero rows left behind — both fail if anything survives. `db lint`
+three warnings, all pre-existing. Generated types **+173, no pgTAP pollution**.
+`tsc` clean · `eslint` 0 errors (1 pre-existing) · `vitest` **1154/93** (was
+1004/84 at Increment 9) · `next build` clean · `check_doc_links` 955 links, 0
+broken.
+
+Browser UAT as a real installer through the whole lifecycle: upload → private by
+default → public profile hides it and the media route 404s → publish → public
+shows it and an anonymous caller fetches the exact bytes → second item → reorder,
+public order follows → edit → unpublish, immediate disappearance → delete,
+converged with no orphan row and no orphan object. Certificates uploaded, opened
+through a real signed read, isolated on four paths, edited, deleted. Persona
+downgrade: creation refused, unpublish and delete still work, files still
+readable. EN and AR, 1440px and 390px, light and dark.
+
+Every fixture was removed through the product's own convergent sequence rather
+than by deleting rows — the teardown was itself a test — leaving 0 rows and 0
+objects. No binary fixture is committed anywhere: the probe images are generated
+in the page, and the harnesses build their PNG and PDF in memory.
+
+One environment note worth carrying: raw `psql` runs reinstall pgTAP into
+`public`, which fails test 29's Advisor rule. Same trap as Increment 9, same fix —
+`drop extension pgtap cascade; create extension pgtap with schema extensions;`.
+
+`RUNTIME_STATE.md` is untouched and now twelve increments behind.
+
+---
+
 ## Session — Two processes guard one file, and only one of them is Postgres
 
 **Date:** 2026-09-06 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `09a52e4` (Increment 9)

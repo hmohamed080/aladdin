@@ -2006,6 +2006,56 @@ export type Database = {
           },
         ]
       }
+      portfolio_items: {
+        Row: {
+          content_type: string
+          created_at: string
+          description: string | null
+          id: string
+          object_key: string
+          owner_user_id: string
+          sort_order: number
+          state: Database["public"]["Enums"]["professional_asset_state"]
+          title: string
+          updated_at: string
+          visibility: Database["public"]["Enums"]["portfolio_visibility"]
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          object_key: string
+          owner_user_id: string
+          sort_order?: number
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          title: string
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["portfolio_visibility"]
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          object_key?: string
+          owner_user_id?: string
+          sort_order?: number
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          title?: string
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["portfolio_visibility"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_items_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           brand: string | null
@@ -2074,6 +2124,59 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      professional_certificates: {
+        Row: {
+          content_type: string
+          created_at: string
+          expires_on: string | null
+          id: string
+          issued_on: string | null
+          issuer: string | null
+          object_path: string
+          original_filename: string | null
+          owner_user_id: string
+          state: Database["public"]["Enums"]["professional_asset_state"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          expires_on?: string | null
+          id?: string
+          issued_on?: string | null
+          issuer?: string | null
+          object_path: string
+          original_filename?: string | null
+          owner_user_id: string
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          expires_on?: string | null
+          id?: string
+          issued_on?: string | null
+          issuer?: string | null
+          object_path?: string
+          original_filename?: string | null
+          owner_user_id?: string
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_certificates_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -3352,6 +3455,16 @@ export type Database = {
           },
         ]
       }
+      public_portfolio_items: {
+        Row: {
+          description: string | null
+          id: string | null
+          profile_id: string | null
+          sort_order: number | null
+          title: string | null
+        }
+        Relationships: []
+      }
       quotation_list: {
         Row: {
           created_at: string | null
@@ -4076,6 +4189,33 @@ export type Database = {
       cancel_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
       cancel_order: { Args: { p_order_id: string }; Returns: undefined }
       cancel_rfq: { Args: { p_rfq_id: string }; Returns: undefined }
+      certificate_create: {
+        Args: {
+          p_content_type: string
+          p_expires_on: string
+          p_issued_on: string
+          p_issuer: string
+          p_original_filename: string
+          p_title: string
+        }
+        Returns: {
+          item_id: string
+          object_path: string
+        }[]
+      }
+      certificate_delete: { Args: { p_item_id: string }; Returns: undefined }
+      certificate_finalize: { Args: { p_item_id: string }; Returns: undefined }
+      certificate_purge: { Args: { p_item_id: string }; Returns: undefined }
+      certificate_update: {
+        Args: {
+          p_expires_on: string
+          p_issued_on: string
+          p_issuer: string
+          p_item_id: string
+          p_title: string
+        }
+        Returns: undefined
+      }
       complete_follow_up: {
         Args: { p_follow_up_id: string }
         Returns: undefined
@@ -4455,6 +4595,35 @@ export type Database = {
         }[]
       }
       points_balance: { Args: { p_user_id?: string }; Returns: number }
+      portfolio_item_create: {
+        Args: { p_content_type: string; p_description: string; p_title: string }
+        Returns: {
+          item_id: string
+          object_key: string
+        }[]
+      }
+      portfolio_item_delete: { Args: { p_item_id: string }; Returns: undefined }
+      portfolio_item_finalize: {
+        Args: { p_item_id: string }
+        Returns: undefined
+      }
+      portfolio_item_move: {
+        Args: { p_direction: string; p_item_id: string }
+        Returns: undefined
+      }
+      portfolio_item_purge: { Args: { p_item_id: string }; Returns: undefined }
+      portfolio_item_set_visibility: {
+        Args: { p_item_id: string; p_public: boolean }
+        Returns: undefined
+      }
+      portfolio_item_update: {
+        Args: { p_description: string; p_item_id: string; p_title: string }
+        Returns: undefined
+      }
+      public_portfolio_media_key: {
+        Args: { p_item_id: string }
+        Returns: string
+      }
       reassign_follow_up: {
         Args: {
           p_assignee_membership_id: string
@@ -4776,6 +4945,7 @@ export type Database = {
         | "trainer"
         | "trainee"
       platform_role: "support" | "moderator" | "administrator"
+      portfolio_visibility: "private" | "public"
       product_category:
         | "finishing"
         | "construction"
@@ -4798,6 +4968,7 @@ export type Database = {
         | "roll"
         | "bag"
         | "pack"
+      professional_asset_state: "pending" | "ready" | "deleted"
       project_status: "planned" | "active" | "completed"
       public_profile_status: "hidden" | "listed"
       quotation_status: "draft" | "submitted" | "accepted" | "rejected"
@@ -5034,6 +5205,7 @@ export const Constants = {
         "trainee",
       ],
       platform_role: ["support", "moderator", "administrator"],
+      portfolio_visibility: ["private", "public"],
       product_category: [
         "finishing",
         "construction",
@@ -5058,6 +5230,7 @@ export const Constants = {
         "bag",
         "pack",
       ],
+      professional_asset_state: ["pending", "ready", "deleted"],
       project_status: ["planned", "active", "completed"],
       public_profile_status: ["hidden", "listed"],
       quotation_status: ["draft", "submitted", "accepted", "rejected"],

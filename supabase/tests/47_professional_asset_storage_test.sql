@@ -21,6 +21,19 @@
 -- permission, in full, which is why section D asserts the exact set and section
 -- H asserts what stayed shut.
 --
+-- SUPERSEDED IN PART BY INCREMENT 11. Increment 10 gave BOTH buckets the same
+-- owner-prefixed key contract, and `20260907090001_portfolio_and_certificates`
+-- replaced the three PORTFOLIO policies with metadata-backed ones: a published
+-- photo has to be resolvable for a signed-out visitor, and in this stack the Next
+-- server shares the browser's anon identity, so an owner-prefixed key would have
+-- published `users.id`. Portfolio keys are now opaque and ownership is read from
+-- `public.portfolio_items`.
+--
+-- What that means for this file: everything below still governs CERTIFICATES,
+-- unchanged, and the bucket / persona / absence assertions still govern both.
+-- Portfolio storage authority is asserted in `48_portfolio_certificates_test`,
+-- and section D below pins the exact boundary between the two.
+--
 -- Fixtures, all from seed-pilot:
 --   70000009 — canonical installer_technician (the owner throughout)
 --   71000006 — canonical installer_technician (the OTHER professional)
@@ -29,7 +42,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(67);
+select plan(77);
 
 -- A stable key per actor. `<owner>/<object-uuid>.<ext>`, built the way the
 -- server builds it, so every assertion below is about the real contract.
@@ -191,13 +204,13 @@ select ok(
 );
 
 -- ===========================================================================
--- D. The policies — the exact set, and the two absences that are the design
+-- D. The policies -- the exact set, and the absences that are the design
 -- ===========================================================================
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects'),
-  6,
-  'Exactly six policies on storage.objects: three per bucket and nothing else'
+  7,
+  'Seven policies on storage.objects: three for certificates, three for portfolio, and ONE public door'
 );
 
 select is(
@@ -208,33 +221,111 @@ select is(
     'professional_certificates_insert_own',
     'professional_certificates_select_own',
     'professional_portfolio_delete_own',
-    'professional_portfolio_insert_own',
-    'professional_portfolio_select_own'
+    'professional_portfolio_insert_authorized',
+    'professional_portfolio_select_own',
+    'professional_portfolio_select_published'
   ],
-  'Each policy names ONE bucket in its own name, so widening portfolio reads cannot silently widen certificates'
+  'Each policy still names ONE bucket in its own name, so widening portfolio reads cannot silently widen certificates'
 );
 
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects' and cmd = 'UPDATE'),
   0,
-  'NO UPDATE POLICY EXISTS. That is the overwrite rule (§13): upsert has nothing to ask for, so object keys are immutable'
+  'NO UPDATE POLICY EXISTS, in either bucket. Still the overwrite rule: upsert has nothing to ask for, so object keys are immutable'
 );
 
+-- The one anon policy in the product. The assertion names WHICH one rather than
+-- counting, because a second is the change worth catching and naming this one
+-- means adding another cannot pass quietly.
 select is(
-  (select count(*)::int from pg_policies
-    where schemaname = 'storage' and tablename = 'objects'
+  (select array_agg(policyname::text order by policyname::text collate "C")
+     from pg_policies where schemaname = 'storage' and tablename = 'objects'
       and ('anon' = any(roles) or 'public' = any(roles))),
-  0,
-  'No policy admits anon or public — and with anon holding full table grants, a policy is the ONLY thing that could'
+  array['professional_portfolio_select_published'],
+  'EXACTLY ONE policy admits anon, it is a SELECT, and it is the published-portfolio door'
 );
 
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects'
-      and roles = array['authenticated']::name[]),
-  6,
-  'Every policy is scoped to authenticated and to nothing else'
+      and ('anon' = any(roles) or 'public' = any(roles))
+      and coalesce(qual, '') like '%professional-certificates%'),
+  0,
+  'No anon policy mentions the certificates bucket -- a certificate has no public read path of any kind (S2)'
+);
+
+-- Narrow, not broad. The public door consults the full publication test rather
+-- than the bucket alone, so it cannot serve a private, pending or deleted object,
+-- nor anything belonging to a profile that is not currently listed.
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname = 'professional_portfolio_select_published'
+      and qual like '%is_published_portfolio_object%'),
+  1,
+  'The public door is gated on is_published_portfolio_object -- ready AND public AND listed, never on the bucket alone'
+);
+
+-- ---------------------------------------------------------------------------
+-- AND IT IS ONE OPERATION WIDE (20260908090001)
+-- ---------------------------------------------------------------------------
+-- A SELECT policy in Supabase Storage is consulted by every read-shaped
+-- operation, so the policy that lets the media route mint a signed URL also
+-- permitted bucket LISTING, a direct unsigned GET, and a HEAD disclosing size
+-- and type. `public_media_exposure_test.mjs` found that by driving the real API;
+-- these assertions are what stop it coming back.
+--
+-- The operation strings below were MEASURED, not guessed — a temporary logging
+-- predicate in this policy recorded `storage.operation()` for each request shape:
+--   sign -> storage.object.sign            list -> storage.object.list
+--   GET  -> storage.object.get_authenticated
+--   HEAD -> object.head_authenticated_info
+--   fetching a signed URL -> the policy is not evaluated at all
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname = 'professional_portfolio_select_published'
+      and qual like '%allow_only_operation%'),
+  1,
+  'The public door additionally requires ONE operation, so listing, direct GET and HEAD are refused while signing is not'
+);
+
+select has_function('storage'::name, 'allow_only_operation'::name, array['text'],
+  'storage.allow_only_operation exists in this Storage version -- probed before the policy was written to depend on it');
+
+select ok(
+  has_function_privilege('anon', 'storage.allow_only_operation(text)', 'execute'),
+  'and anon may evaluate it, which a policy expression running as anon requires');
+
+-- FAIL-CLOSED, and this is the assertion that makes the whole approach safe to
+-- depend on. `storage.operation()` reads a GUC with the missing-ok flag, so
+-- outside a Storage request it is null and the helper coalesces to FALSE. A
+-- direct SQL caller therefore matches nothing, and a future Storage release that
+-- renamed the operation would make published images go missing -- visible, and
+-- caught by the exposure probe -- rather than silently widening anything.
+select is(
+  storage.allow_only_operation('storage.object.sign'),
+  false,
+  'Outside a Storage request there is no operation, so the predicate is FALSE: the policy fails closed rather than open'
+);
+
+select is(
+  storage.operation(),
+  null,
+  'because storage.operation() itself is null when no Storage request set it'
+);
+
+-- The OWNER's policies must NOT be operation-restricted: the portfolio manager
+-- lists and previews their own objects, including private ones.
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname in ('professional_portfolio_select_own', 'professional_portfolio_delete_own',
+                         'professional_certificates_select_own', 'professional_certificates_delete_own')
+      and coalesce(qual, '') like '%allow_only_operation%'),
+  0,
+  'No OWNER policy is operation-restricted -- an owner still lists and reads their own objects, private ones included'
 );
 
 -- The persona gate belongs to creation and to creation only. If it ever appears
@@ -242,27 +333,50 @@ select is(
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects'
-      and cmd = 'INSERT'
-      and with_check like '%can_create_professional_asset%'),
-  2,
-  'Both INSERT policies consult the persona gate'
+      and cmd in ('SELECT', 'DELETE')
+      and qual like '%can_create_professional_asset%'),
+  0,
+  'NO read or delete policy consults the persona gate -- this is the downgrade contract, stated as a structural fact'
+);
+
+-- Certificates still carry it directly. Portfolio moved it one step earlier:
+-- can_upload_portfolio_object requires a PENDING row the caller owns, and only
+-- portfolio_item_create can produce one, which is where the persona is checked.
+-- So bytes remain unreachable without having passed the same gate.
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and cmd = 'INSERT' and with_check like '%can_create_professional_asset%'),
+  1,
+  'The certificates INSERT policy consults the persona gate directly'
 );
 
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects'
-      and cmd in ('SELECT', 'DELETE')
-      and qual like '%can_create_professional_asset%'),
-  0,
-  'NO read or delete policy consults it — this is the downgrade contract, stated as a structural fact'
+      and cmd = 'INSERT' and with_check like '%can_upload_portfolio_object%'),
+  1,
+  'and the portfolio one requires an owned PENDING metadata row instead -- strictly stricter, since a well-formed key is no longer sufficient to write'
 );
 
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects'
       and coalesce(qual, with_check) like '%is_professional_asset_key%'),
-  6,
-  'All six derive ownership from the key contract rather than from storage.objects.owner, which is provider-managed'
+  3,
+  'The key contract now governs the three CERTIFICATE policies; portfolio ownership moved to metadata, where it can be asked without disclosing an owner'
+);
+
+-- The property the whole redesign exists for.
+select ok(
+  has_function_privilege('anon', 'app.is_published_portfolio_object(text)', 'execute'),
+  'anon may evaluate the publication test -- it takes a key and returns a boolean, so it discloses nothing'
+);
+
+select ok(
+  not has_function_privilege('anon', 'app.owns_portfolio_object(text)', 'execute')
+  and not has_function_privilege('anon', 'app.can_upload_portfolio_object(text)', 'execute'),
+  'but anon may NOT evaluate either ownership helper: no anon-reachable function in this domain touches an owner id'
 );
 
 -- ===========================================================================
@@ -271,10 +385,12 @@ select is(
 set local role authenticated;
 set local request.jwt.claims to '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
 
-select lives_ok(
+select throws_ok(
   $$insert into storage.objects (bucket_id, name)
     values ('professional-portfolio', '70000009-0000-4000-8000-000000000009/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa.jpg')$$,
-  'A professional writes their own well-formed portfolio key'
+  '42501',
+  null,
+  'A well-formed OWNER-PREFIXED key no longer buys a portfolio write: from Increment 11 the policy requires an owned PENDING metadata row, and this key has none'
 );
 
 select lives_ok(
@@ -285,15 +401,15 @@ select lives_ok(
 
 select throws_ok(
   $$insert into storage.objects (bucket_id, name)
-    values ('professional-portfolio', '71000006-0000-4000-8000-000000000006/bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb.jpg')$$,
+    values ('professional-certificates', '71000006-0000-4000-8000-000000000006/bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb.pdf')$$,
   '42501',
   null,
-  'A professional cannot write into ANOTHER professional''s folder'
+  'A professional cannot write into ANOTHER professional''s certificate folder'
 );
 
 select throws_ok(
   $$insert into storage.objects (bucket_id, name)
-    values ('professional-portfolio', '70000009-0000-4000-8000-000000000009/../71000006-0000-4000-8000-000000000006/x.jpg')$$,
+    values ('professional-certificates', '70000009-0000-4000-8000-000000000009/../71000006-0000-4000-8000-000000000006/x.pdf')$$,
   '42501',
   null,
   'A traversal key is refused at the policy, not merely at the API'
@@ -301,7 +417,7 @@ select throws_ok(
 
 select throws_ok(
   $$insert into storage.objects (bucket_id, name)
-    values ('professional-portfolio', '70000009-0000-4000-8000-000000000009/aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa/photo.jpg')$$,
+    values ('professional-certificates', '70000009-0000-4000-8000-000000000009/aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa/photo.pdf')$$,
   '42501',
   null,
   'A key carrying a display filename is refused'
@@ -327,7 +443,7 @@ set local request.jwt.claims to '{"sub":"44444444-4444-4444-8444-444444444444","
 
 select throws_ok(
   $$insert into storage.objects (bucket_id, name)
-    values ('professional-portfolio', '44444444-4444-4444-8444-444444444444/cccccccc-1111-4111-8111-cccccccccccc.jpg')$$,
+    values ('professional-certificates', '44444444-4444-4444-8444-444444444444/cccccccc-1111-4111-8111-cccccccccccc.pdf')$$,
   '42501',
   null,
   'A CONSUMER is refused even though the key is theirs and perfectly formed — the persona gate, not the path, is what stops them'
@@ -350,7 +466,7 @@ set local request.jwt.claims to '{"sub":"11111111-1111-4111-8111-111111111111","
 
 select throws_ok(
   $$insert into storage.objects (bucket_id, name)
-    values ('professional-portfolio', '11111111-1111-4111-8111-111111111111/dddddddd-1111-4111-8111-dddddddddddd.jpg')$$,
+    values ('professional-certificates', '11111111-1111-4111-8111-111111111111/dddddddd-1111-4111-8111-dddddddddddd.pdf')$$,
   '42501',
   null,
   'A BUSINESS-ONLY identity is refused: organization membership is not a professional persona and never stands in for one'
@@ -372,10 +488,9 @@ set local role authenticated;
 set local request.jwt.claims to '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
 
 select is(
-  (select count(*)::int from storage.objects
-    where name = '70000009-0000-4000-8000-000000000009/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa.jpg'),
-  1,
-  'The owner reads back their own portfolio object'
+  (select count(*)::int from storage.objects where bucket_id = 'professional-portfolio'),
+  0,
+  'and nothing landed in the portfolio bucket, because the refusal above was real'
 );
 
 select is(
@@ -395,7 +510,7 @@ set local request.jwt.claims to '{"sub":"71000006-0000-4000-8000-000000000006","
 select is(
   (select count(*)::int from storage.objects where bucket_id = 'professional-portfolio'),
   0,
-  'Another professional sees NO portfolio object of anyone else''s — "authenticated" is not "may read every professional file"'
+  'Another professional sees NO portfolio object of anyone else''s: "authenticated" is not "may read every professional file"'
 );
 
 select is(
@@ -454,15 +569,15 @@ select has_trigger('storage'::name, 'objects'::name, 'protect_objects_delete'::n
 
 select throws_ok(
   $$delete from storage.objects
-     where name = '70000009-0000-4000-8000-000000000009/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa.jpg'$$,
+     where name = '70000009-0000-4000-8000-000000000009/aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa.pdf'$$,
   '42501',
   null,
-  'Even here, as superuser, a direct delete is refused — which is why deletion authority is proved over HTTP instead'
+  'Even here, as superuser, a direct delete is refused, which is why deletion authority is proved over HTTP instead'
 );
 
 select is(
   (select count(*)::int from storage.objects
-    where name = '70000009-0000-4000-8000-000000000009/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa.jpg'),
+    where name = '70000009-0000-4000-8000-000000000009/aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa.pdf'),
   1,
   'and the object is untouched by the attempt'
 );
@@ -485,7 +600,7 @@ set local request.jwt.claims to '{"sub":"70000009-0000-4000-8000-000000000009","
 
 select throws_ok(
   $$insert into storage.objects (bucket_id, name)
-    values ('professional-portfolio', '70000009-0000-4000-8000-000000000009/aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa.jpg')$$,
+    values ('professional-certificates', '70000009-0000-4000-8000-000000000009/aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa.pdf')$$,
   '42501',
   null,
   'DOWNGRADE: no NEW professional asset may be created'
@@ -521,8 +636,8 @@ set local request.jwt.claims = '';
 -- professional? §5 requires that it does not, and the temptation to infer it
 -- later is exactly why this is pinned now.
 insert into storage.objects (bucket_id, name)
-values ('professional-portfolio',
-        '44444444-4444-4444-8444-444444444444/cccccccc-9999-4999-8999-cccccccccccc.jpg');
+values ('professional-certificates',
+        '44444444-4444-4444-8444-444444444444/cccccccc-9999-4999-8999-cccccccccccc.pdf');
 
 select ok(
   not app.is_professional_persona('44444444-4444-4444-8444-444444444444'),
@@ -539,7 +654,7 @@ select ok(
 
 select is(
   (select count(*)::int from storage.objects
-    where name = '44444444-4444-4444-8444-444444444444/cccccccc-9999-4999-8999-cccccccccccc.jpg'),
+    where name = '44444444-4444-4444-8444-444444444444/cccccccc-9999-4999-8999-cccccccccccc.pdf'),
   1,
   'though they can read and remove what is under their own id, which is the same rule everyone else gets'
 );
@@ -559,12 +674,18 @@ select is(
   'No policy outside the storage schema consults storage.objects: a stored file is never an input to any product authorization'
 );
 
+-- Increment 11 attached MEANING to these objects, and this assertion survived it
+-- unchanged, which is the interesting part. `portfolio_items` and
+-- `professional_certificates` hold an object KEY and never join storage.objects;
+-- the traffic runs the other way, with storage policies consulting the metadata.
+-- So the product still cannot ask a question of the byte store, and a file still
+-- cannot be an input to any authorization decision.
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('app', 'public')
       and p.prosrc like '%storage.objects%'),
   0,
-  'And no app/public function reads it either — Increment 11 will attach MEANING to these objects, and this asserts none is attached yet'
+  'No app/public function reads storage.objects: metadata points AT objects, and nothing in the product reads back from them'
 );
 
 select * from finish();

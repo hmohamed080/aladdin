@@ -1,39 +1,35 @@
 #!/usr/bin/env node
 /**
- * Installer Pilot Increment 10 — the Storage API half of the storage proof.
+ * The Storage API half of the professional-asset proof (Increments 10 + 11).
  *
- * WHY THIS EXISTS ALONGSIDE pgTAP 47.
+ * WHY THIS EXISTS ALONGSIDE pgTAP 47 AND 48.
  *
- * The rules protecting a professional's files live in TWO different processes,
- * and only one of them is Postgres:
+ * The rules protecting a professional's files live in three places and only one
+ * of them is reachable from SQL:
  *
- *   * WHO may write/read/delete an object — `storage.objects` RLS. pgTAP proves
- *     this, because a direct insert under a JWT claim exercises the exact policy
- *     expression the Storage service will hit.
- *   * WHAT may be stored — `allowed_mime_types` and `file_size_limit`. The
- *     Storage service enforces these BEFORE it ever asks Postgres, by reading
- *     the bucket row itself. No SQL test can observe that, and a bucket row that
- *     merely *says* `5242880` proves only that a number is stored.
+ *   * WHO may write/read/delete — `storage.objects` RLS. pgTAP proves this,
+ *     including the absences ("there is no UPDATE policy", "exactly one policy
+ *     admits anon") that no amount of HTTP probing could establish.
+ *   * WHAT may be stored — `allowed_mime_types` and `file_size_limit`, enforced
+ *     by the Storage service from the bucket row BEFORE Postgres is consulted.
+ *     No SQL test can observe that; a bucket row that merely *says* `5242880`
+ *     proves only that a number is stored.
+ *   * WHETHER THE TWO AGREE — the Increment 11 question. Portfolio ownership now
+ *     lives in `public.portfolio_items` and Storage consults it through
+ *     `security definer` helpers, so "published" has to mean the same thing to a
+ *     projection and to a signed URL. Sections F and G are that check, run over
+ *     real HTTP as a real anonymous visitor.
  *
- * So a suite that introspected policies alone could report a green board while
- * an oversized executable-typed upload sailed through. This script drives the
- * real HTTP API with real bearer tokens and asserts the response codes, which is
- * what §23 means by "do not claim security based only on SQL policy
- * introspection".
- *
- * It is a LOCAL harness, not part of `supabase test db`:
+ * Run against a running local stack with the standard seeds:
  *
  *   node supabase/tests/professional_asset_storage_api_test.mjs
  *
- * It needs a running local stack (`supabase start`) with the standard seeds. It
- * mints its own HS256 tokens from the well-known local JWT secret rather than
- * driving the OTP flow, because the identities under test are fixtures and an
- * email round-trip would make a security assertion depend on a mail catcher.
- *
- * NOTHING IT WRITES SURVIVES IT. Every object key it creates is recorded and
- * deleted in a `finally`, and the one persona it changes is restored the same
- * way. No binary fixture is committed: the PNG and PDF below are generated in
- * memory (§20).
+ * It mints its own HS256 tokens for seeded fixtures rather than driving the OTP
+ * flow, because these identities are fixtures and a security assertion should not
+ * depend on a mail catcher. NOTHING IT WRITES SURVIVES IT: every object and every
+ * metadata row is torn down in a `finally`, the one persona it changes is
+ * restored there too, and it FAILS if anything is left behind. No binary fixture
+ * is committed — the PNG and PDF are generated in memory.
  */
 
 import { createHmac, randomUUID } from "node:crypto";
@@ -50,20 +46,18 @@ const ANON_KEY =
 const PORTFOLIO = "professional-portfolio";
 const CERTIFICATES = "professional-certificates";
 
-/** Seed fixtures. Personas are asserted below rather than assumed. */
 const INSTALLER_A = "70000009-0000-4000-8000-000000000009";
 const INSTALLER_B = "71000006-0000-4000-8000-000000000006";
 const CONSUMER = "44444444-4444-4444-8444-444444444444";
-/** Business-only identity: null personal persona, belongs to an organization. */
+/** Business-only identity: null personal persona, holds a membership. */
 const BUSINESS_ONLY = "11111111-1111-4111-8111-111111111111";
 
 // ---------------------------------------------------------------------------
-// Tiny harness
-// ---------------------------------------------------------------------------
 let passed = 0;
 const failures = [];
-/** Keys created during the run, torn down in `finally` whatever happens. */
-const created = [];
+/** Everything created during the run, torn down in `finally`. */
+const objects = [];
+const items = [];
 
 function check(label, condition, detail = "") {
   if (condition) {
@@ -75,31 +69,18 @@ function check(label, condition, detail = "") {
   }
 }
 
-function b64url(input) {
-  return Buffer.from(input).toString("base64url");
-}
+const b64url = (input) => Buffer.from(input).toString("base64url");
 
-/**
- * A local access token for a fixture user. Same shape GoTrue issues: the Storage
- * service only verifies the signature and reads `sub`/`role`, and `auth.uid()`
- * in a policy reads `sub` out of `request.jwt.claims`.
- */
 function token(sub) {
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const payload = b64url(
     JSON.stringify({
-      sub,
-      aud: "authenticated",
-      role: "authenticated",
-      iss: "supabase-demo",
-      iat: now,
-      exp: now + 3600,
+      sub, aud: "authenticated", role: "authenticated",
+      iss: "supabase-demo", iat: now, exp: now + 3600,
     }),
   );
-  const sig = createHmac("sha256", JWT_SECRET)
-    .update(`${header}.${payload}`)
-    .digest("base64url");
+  const sig = createHmac("sha256", JWT_SECRET).update(`${header}.${payload}`).digest("base64url");
   return `${header}.${payload}.${sig}`;
 }
 
@@ -112,59 +93,44 @@ function sql(statement) {
   ).trim();
 }
 
-/** `<owner>/<object-id>.<ext>` — the contract, built the way the server builds it. */
-function key(owner, ext) {
-  return `${owner}/${randomUUID()}.${ext}`;
-}
-
 /**
- * Every Storage refusal below arrives as HTTP 400 carrying a TYPED body —
- * `{"statusCode":"403","code":"AccessDenied"}` and friends. The HTTP status is
- * therefore worthless as an assertion: it is 400 for a policy denial, a rejected
- * MIME type, an oversized body and a duplicate key alike. `code` is the signal
- * that distinguishes them, so that is what these tests read.
+ * Every Storage refusal arrives as HTTP 400 carrying a typed body —
+ * `{"statusCode":"403","code":"AccessDenied"}`. The HTTP status is therefore
+ * worthless as an assertion: it is 400 for a policy denial, a rejected MIME type,
+ * an oversized body and a duplicate key alike. `code` is the signal.
  *
- * This is the whole reason the harness exists. An earlier draft asserted 403 /
- * 415 / 413 / 409 and "failed" eleven times against a system that was refusing
- * every single attempt correctly — a suite written from the documentation rather
- * than from the wire would have recorded the opposite mistake just as easily.
+ * Not a detail. An earlier draft asserted 403 / 415 / 413 / 409 and "failed"
+ * eleven times against a system that was refusing every attempt correctly — a
+ * suite written from the documentation rather than from the wire.
  */
 async function parse(res) {
   const text = await res.text();
   let body = {};
-  try {
-    body = JSON.parse(text);
-  } catch {
-    body = { raw: text };
-  }
-  return { status: res.status, code: body.code ?? null, inner: body.statusCode ?? null, text };
+  // `?? {}` matters: a resolver that correctly finds nothing answers with the
+  // literal JSON `null`, and that is a SUCCESS worth distinguishing from a
+  // parse failure. Reading `.code` off it directly is how this first crashed.
+  try { body = JSON.parse(text) ?? {}; } catch { body = { raw: text }; }
+  return { status: res.status, code: body.code ?? null, text };
 }
+
+const refusedAs = (result, code) => result.status !== 200 && result.code === code;
 
 async function upload(bucket, path, bytes, contentType, bearer, { upsert = false } = {}) {
   const headers = { apikey: ANON_KEY, "content-type": contentType };
   if (bearer) headers.authorization = `Bearer ${bearer}`;
   if (upsert) headers["x-upsert"] = "true";
   const res = await fetch(`${API}/storage/v1/object/${bucket}/${path}`, {
-    method: "POST",
-    headers,
-    body: bytes,
+    method: "POST", headers, body: bytes,
   });
-  if (res.status === 200) created.push([bucket, path]);
+  if (res.status === 200) objects.push([bucket, path]);
   return parse(res);
-}
-
-/** A refusal, named by the reason Storage gave rather than by its HTTP status. */
-function refusedAs(result, code) {
-  return result.status !== 200 && result.code === code;
 }
 
 async function sign(bucket, path, bearer, expiresIn = 60) {
   const headers = { apikey: ANON_KEY, "content-type": "application/json" };
   if (bearer) headers.authorization = `Bearer ${bearer}`;
   const res = await fetch(`${API}/storage/v1/object/sign/${bucket}/${path}`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ expiresIn }),
+    method: "POST", headers, body: JSON.stringify({ expiresIn }),
   });
   return parse(res);
 }
@@ -172,36 +138,52 @@ async function sign(bucket, path, bearer, expiresIn = 60) {
 async function remove(bucket, path, bearer) {
   const headers = { apikey: ANON_KEY };
   if (bearer) headers.authorization = `Bearer ${bearer}`;
-  const res = await fetch(`${API}/storage/v1/object/${bucket}/${path}`, {
-    method: "DELETE",
-    headers,
+  const res = await fetch(`${API}/storage/v1/object/${bucket}/${path}`, { method: "DELETE", headers });
+  return parse(res);
+}
+
+async function rpc(fn, body, bearer) {
+  const headers = { apikey: ANON_KEY, "content-type": "application/json" };
+  if (bearer) headers.authorization = `Bearer ${bearer}`;
+  const res = await fetch(`${API}/rest/v1/rpc/${fn}`, {
+    method: "POST", headers, body: JSON.stringify(body),
   });
   return parse(res);
 }
 
-async function objectExists(bucket, path, bearer) {
-  const res = await fetch(`${API}/storage/v1/object/${bucket}/${path}`, {
-    headers: { apikey: ANON_KEY, authorization: `Bearer ${bearer}` },
-  });
-  return res.status === 200;
+/**
+ * A pending portfolio row plus the opaque key it authorizes. This IS the
+ * Increment 11 write model: bytes are unreachable until the product has created
+ * the row that names them, so the harness cannot invent a key any more than a
+ * browser can.
+ */
+async function newPortfolioItem(bearer, contentType = "image/png") {
+  const r = await rpc("portfolio_item_create",
+    { p_title: "harness", p_description: null, p_content_type: contentType }, bearer);
+  if (r.status !== 200) return null;
+  const row = JSON.parse(r.text)[0];
+  items.push(["portfolio_items", row.item_id]);
+  return row;
 }
 
-// ---------------------------------------------------------------------------
-// Generated bytes — no binary fixture is committed (§20)
-// ---------------------------------------------------------------------------
-/** Smallest valid PNG: 1x1, correct 8-byte signature. */
+async function newCertificate(bearer) {
+  const r = await rpc("certificate_create",
+    { p_title: "harness cert", p_issuer: null, p_issued_on: null,
+      p_expires_on: null, p_content_type: "application/pdf", p_original_filename: null }, bearer);
+  if (r.status !== 200) return null;
+  const row = JSON.parse(r.text)[0];
+  items.push(["professional_certificates", row.item_id]);
+  return row;
+}
+
+// --- generated bytes; no binary fixture is committed -----------------------
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
   "base64",
 );
-/** Smallest structurally valid PDF, starting with the %PDF- signature. */
 const PDF = Buffer.from(
-  "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n" +
-    "2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\n" +
-    "trailer<</Root 1 0 R>>\n%%EOF\n",
-  "utf8",
-);
-/** 6 MiB of zeroes: over portfolio's 5 MiB limit, under certificates' 10 MiB. */
+  "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n", "utf8");
+/** 6 MiB: over portfolio's 5 MiB limit, under certificates' 10 MiB. */
 const OVERSIZED = Buffer.alloc(6 * 1024 * 1024);
 
 // ---------------------------------------------------------------------------
@@ -211,326 +193,213 @@ async function main() {
   const consumer = token(CONSUMER);
   const business = token(BUSINESS_ONLY);
 
-  // -- Fixture sanity. A green board built on a mis-assumed persona proves
-  // -- nothing, so the personas are read out of the database first.
-  check(
-    "fixture: installer A is a professional persona",
-    sql(`select app.is_professional_persona('${INSTALLER_A}')`) === "t",
-  );
-  check(
-    "fixture: consumer is NOT a professional persona",
-    sql(`select app.is_professional_persona('${CONSUMER}')`) === "f",
-  );
-  check(
-    "fixture: business-only identity is NOT a professional persona",
-    sql(`select app.is_professional_persona('${BUSINESS_ONLY}')`) === "f",
-  );
-  check(
-    "fixture: business-only identity really is an organization member",
-    Number(sql(`select count(*) from public.memberships where user_id='${BUSINESS_ONLY}'`)) > 0,
-  );
+  // === A. Fixtures ========================================================
+  check("fixture: installer A is a professional persona",
+    sql(`select app.is_professional_persona('${INSTALLER_A}')`) === "t");
+  check("fixture: the consumer is not",
+    sql(`select app.is_professional_persona('${CONSUMER}')`) === "f");
+  check("fixture: the business-only identity is not, though it holds a membership",
+    sql(`select app.is_professional_persona('${BUSINESS_ONLY}')`) === "f"
+    && Number(sql(`select count(*) from public.memberships where user_id='${BUSINESS_ONLY}'`)) > 0);
+  check("fixture: installer A's profile is listed, which every public section depends on",
+    sql(`select public_profile_status from public.profiles where user_id='${INSTALLER_A}'`) === "listed");
 
-  // =========================================================================
-  // BUCKET
-  // =========================================================================
+  // === B. Buckets =========================================================
   const buckets = sql(
     `select id || '|' || public || '|' || file_size_limit || '|' || array_to_string(allowed_mime_types, ',')
        from storage.buckets where id in ('${PORTFOLIO}','${CERTIFICATES}') order by id`,
   ).split("\n");
-  check("bucket: both buckets exist after reset", buckets.length === 2, buckets.join(" / "));
-  check(
-    "bucket: certificates is private, 10 MiB, pdf + three image types",
+  check("bucket: both exist after reset", buckets.length === 2, buckets.join(" / "));
+  check("bucket: certificates is private, 10 MiB, pdf + three image types",
     buckets[0] === `${CERTIFICATES}|false|10485760|application/pdf,image/jpeg,image/png,image/webp`,
-    buckets[0],
-  );
-  check(
-    "bucket: portfolio is private, 5 MiB, three image types and no pdf",
-    buckets[1] === `${PORTFOLIO}|false|5242880|image/jpeg,image/png,image/webp`,
-    buckets[1],
-  );
+    buckets[0]);
+  check("bucket: portfolio is private, 5 MiB, three image types and no pdf",
+    buckets[1] === `${PORTFOLIO}|false|5242880|image/jpeg,image/png,image/webp`, buckets[1]);
+  check("bucket: BOTH stay private even though one is publicly readable — publication is a metadata fact, never a bucket setting (S1)",
+    buckets.every((b) => b.includes("|false|")));
 
-  // =========================================================================
-  // WRITE
-  // =========================================================================
-  const aPortfolio = key(INSTALLER_A, "png");
-  const aCertificate = key(INSTALLER_A, "pdf");
+  // === C. Portfolio writes, now gated on metadata =========================
+  const item = await newPortfolioItem(A);
+  check("write: a professional creates a portfolio item and receives an opaque key", item !== null);
+  check("write: the key carries NO owner id and no separator — the whole reason it changed",
+    item !== null && !item.object_key.includes("/") && !item.object_key.includes(INSTALLER_A),
+    item?.object_key);
+  check("write: the authorized bytes are accepted",
+    (await upload(PORTFOLIO, item.object_key, PNG, "image/png", A)).status === 200);
 
-  check(
-    "write: an eligible professional creates an object at their own valid key",
-    (await upload(PORTFOLIO, aPortfolio, PNG, "image/png", A)).status === 200,
-  );
-  check(
-    "write: the same professional creates a certificate",
-    (await upload(CERTIFICATES, aCertificate, PDF, "application/pdf", A)).status === 200,
-  );
+  // A well-formed key with no row behind it. Under Increment 10 the shape alone
+  // was sufficient; now the product must have authorized this exact object.
+  const unauthorized = await upload(PORTFOLIO, `${randomUUID()}.png`, PNG, "image/png", A);
+  check("write: an invented key is refused even from the same professional — no pending row authorizes it",
+    refusedAs(unauthorized, "AccessDenied"), unauthorized.text);
+  const oldShape = await upload(PORTFOLIO, `${INSTALLER_A}/${randomUUID()}.png`, PNG, "image/png", A);
+  check("write: the Increment 10 owner-prefixed shape is refused too, so the old contract cannot creep back",
+    refusedAs(oldShape, "AccessDenied"), oldShape.text);
 
-  // Refused by the POLICY, not by a missing-token check at the gateway: with only
-  // the anon key the caller is the `anon` role, and no policy on storage.objects
-  // admits it. Default-deny is doing the work, which is the stronger result.
-  const anon = await upload(PORTFOLIO, key(INSTALLER_A, "png"), PNG, "image/png", null);
-  check("write: anonymous caller is refused by row-level security itself",
-    refusedAs(anon, "AccessDenied"), anon.text);
+  const otherItem = await newPortfolioItem(B);
+  const crossUser = await upload(PORTFOLIO, otherItem.object_key, PNG, "image/png", A);
+  check("write: A cannot upload into the object B's row authorizes",
+    refusedAs(crossUser, "AccessDenied"), crossUser.text);
 
-  const byConsumer = await upload(PORTFOLIO, key(CONSUMER, "png"), PNG, "image/png", consumer);
-  check(
-    "write: a consumer is refused at their OWN structurally valid key",
-    refusedAs(byConsumer, "AccessDenied"),
-    byConsumer.text,
-  );
+  const consumerItem = await rpc("portfolio_item_create",
+    { p_title: "x", p_description: null, p_content_type: "image/png" }, consumer);
+  check("write: a consumer cannot even create the row, so there is no key to upload to",
+    consumerItem.status !== 200, consumerItem.text);
+  const businessItem = await rpc("portfolio_item_create",
+    { p_title: "x", p_description: null, p_content_type: "image/png" }, business);
+  check("write: nor a business-only identity — organization membership is not a persona",
+    businessItem.status !== 200, businessItem.text);
+  const anonItem = await rpc("portfolio_item_create",
+    { p_title: "x", p_description: null, p_content_type: "image/png" }, null);
+  check("write: nor an anonymous caller", anonItem.status !== 200, anonItem.text);
 
-  const byBusiness = await upload(PORTFOLIO, key(BUSINESS_ONLY, "png"), PNG, "image/png", business);
-  check(
-    "write: a business-only identity is refused — org membership is not a persona",
-    refusedAs(byBusiness, "AccessDenied"),
-    byBusiness.text,
-  );
+  // Bucket-level rules, exercised through a genuinely authorized row so RLS is
+  // not what refuses them. This is the layer only HTTP can reach.
+  const spare = await newPortfolioItem(A);
+  const svg = await upload(PORTFOLIO, spare.object_key, PNG, "image/svg+xml", A);
+  check("write: an SVG content type is refused by the BUCKET, on a key RLS would have allowed",
+    refusedAs(svg, "InvalidMimeType"), svg.text);
+  const pdfIn = await upload(PORTFOLIO, spare.object_key, PDF, "application/pdf", A);
+  check("write: a PDF is refused by the portfolio bucket though certificates take one (S4)",
+    refusedAs(pdfIn, "InvalidMimeType"), pdfIn.text);
+  const oversized = await upload(PORTFOLIO, spare.object_key, OVERSIZED, "image/png", A);
+  check("write: 6 MiB is refused by portfolio's 5 MiB limit",
+    refusedAs(oversized, "EntityTooLarge"), oversized.text);
 
-  const crossUser = await upload(PORTFOLIO, key(INSTALLER_A, "png"), PNG, "image/png", B);
-  check(
-    "write: professional B cannot write into professional A's folder",
-    refusedAs(crossUser, "AccessDenied"),
-    crossUser.text,
-  );
+  const duplicate = await upload(PORTFOLIO, item.object_key, PNG, "image/png", A);
+  check("write: re-posting an existing key is a conflict, not a silent overwrite",
+    refusedAs(duplicate, "KeyAlreadyExists"), duplicate.text);
+  const upsert = await upload(PORTFOLIO, item.object_key, PNG, "image/png", A, { upsert: true });
+  check("write: explicit upsert is refused by the still-absent UPDATE policy",
+    refusedAs(upsert, "AccessDenied"), upsert.text);
 
-  const traversal = await upload(
-    PORTFOLIO,
-    `${INSTALLER_A}/../${INSTALLER_B}/${randomUUID()}.png`,
-    PNG, "image/png", A,
-  );
-  check(
-    "write: a traversal key is refused",
-    traversal.status !== 200,
-    traversal.text,
-  );
+  // === D. Certificates keep Increment 10's contract, unchanged ============
+  const cert = await newCertificate(A);
+  check("certificate: a professional creates one and receives an OWNER-PREFIXED path — this contract did not change",
+    cert !== null && cert.object_path.startsWith(`${INSTALLER_A}/`), cert?.object_path);
+  check("certificate: its bytes are accepted",
+    (await upload(CERTIFICATES, cert.object_path, PDF, "application/pdf", A)).status === 200);
+  const bigCert = await newCertificate(A);
+  const certSize = await upload(CERTIFICATES, bigCert.object_path, OVERSIZED, "application/pdf", A);
+  check("certificate: 6 MiB is accepted here — limits are per namespace, which is why there are two buckets",
+    certSize.status === 200, certSize.text);
 
-  const named = await upload(
-    PORTFOLIO,
-    `${INSTALLER_A}/${randomUUID()}/photo.png`,
-    PNG, "image/png", A,
-  );
-  check(
-    "write: a key carrying a display filename is refused",
-    refusedAs(named, "AccessDenied"),
-    named.text,
-  );
-
-  const namespaced = await upload(
-    PORTFOLIO,
-    `${INSTALLER_A}/portfolio/${randomUUID()}.png`,
-    PNG, "image/png", A,
-  );
-  check(
-    "write: an extra path segment is refused — the bucket is the namespace",
-    refusedAs(namespaced, "AccessDenied"),
-    namespaced.text,
-  );
-
-  const svg = await upload(PORTFOLIO, key(INSTALLER_A, "png"), PNG, "image/svg+xml", A);
-  check(
-    "write: an SVG content type is refused by the bucket",
-    refusedAs(svg, "InvalidMimeType"),
-    svg.text,
-  );
-
-  const pdfIntoPortfolio = await upload(PORTFOLIO, key(INSTALLER_A, "pdf"), PDF, "application/pdf", A);
-  check(
-    "write: a PDF is refused by the PORTFOLIO bucket though certificates accept one",
-    refusedAs(pdfIntoPortfolio, "InvalidMimeType"),
-    pdfIntoPortfolio.text,
-  );
-
-  const oversized = await upload(PORTFOLIO, key(INSTALLER_A, "png"), OVERSIZED, "image/png", A);
-  check(
-    "write: 6 MiB is refused by portfolio's 5 MiB limit",
-    refusedAs(oversized, "EntityTooLarge"),
-    oversized.text,
-  );
-  const sizeIsPerBucket = await upload(CERTIFICATES, key(INSTALLER_A, "pdf"), OVERSIZED, "application/pdf", A);
-  check(
-    "write: the same 6 MiB is accepted by certificates' 10 MiB limit — limits are per namespace",
-    sizeIsPerBucket.status === 200,
-    sizeIsPerBucket.text,
-  );
-
-  const duplicate = await upload(PORTFOLIO, aPortfolio, PNG, "image/png", A);
-  check(
-    "write: re-posting an existing key is a conflict, not a silent overwrite",
-    refusedAs(duplicate, "KeyAlreadyExists"),
-    duplicate.text,
-  );
-
-  const upsert = await upload(PORTFOLIO, aPortfolio, PNG, "image/png", A, { upsert: true });
-  // The refusal is AccessDenied rather than KeyAlreadyExists, which is the proof
-  // that it is the ABSENT UPDATE POLICY doing it: upsert asked for permission to
-  // replace the row and there was none to give.
-  check(
-    "write: explicit upsert is refused by the absent UPDATE policy",
-    refusedAs(upsert, "AccessDenied"),
-    upsert.text,
-  );
-
-  // =========================================================================
-  // READ
-  // =========================================================================
-  const ownSigned = await sign(PORTFOLIO, aPortfolio, A);
-  check("read: the owner can mint a signed URL for their own object",
-    ownSigned.status === 200, ownSigned.text);
-
+  // === E. Owner reads =====================================================
+  const ownSigned = await sign(PORTFOLIO, item.object_key, A);
+  check("read: the owner signs their own private portfolio object", ownSigned.status === 200, ownSigned.text);
   if (ownSigned.status === 200) {
-    const signedUrl = JSON.parse(ownSigned.text).signedURL;
-    const fetched = await fetch(`${API}/storage/v1${signedUrl}`);
-    check("read: the signed URL returns the bytes, with no credential attached", fetched.status === 200);
-    const bytes = Buffer.from(await fetched.arrayBuffer());
-    check("read: the bytes round-trip unchanged", bytes.equals(PNG));
-
-    // The token is bound to ONE object. Point a valid signature at a different
-    // key and it must not resolve — otherwise a portfolio URL would be a skeleton
-    // key for the certificate bucket.
-    const swapped = await fetch(
-      `${API}/storage/v1${signedUrl.replace(aPortfolio, aCertificate)}`,
-    );
-    check(
-      "read: a valid signed URL repointed at another object does not fetch it",
-      swapped.status !== 200,
-      `status ${swapped.status}`,
-    );
+    const url = JSON.parse(ownSigned.text).signedURL;
+    const fetched = await fetch(`${API}/storage/v1${url}`);
+    check("read: and the bytes round-trip unchanged",
+      fetched.status === 200 && Buffer.from(await fetched.arrayBuffer()).equals(PNG));
   }
+  const otherSigned = await sign(PORTFOLIO, item.object_key, B);
+  check("read: another professional cannot sign it, and gets NoSuchKey — a refusal is indistinguishable from a key that never existed",
+    refusedAs(otherSigned, "NoSuchKey"), otherSigned.text);
+  check("read: nor reach A's CERTIFICATE",
+    refusedAs(await sign(CERTIFICATES, cert.object_path, B), "NoSuchKey"));
+  check("read: nor can an organization identity reach it through membership",
+    refusedAs(await sign(CERTIFICATES, cert.object_path, business), "NoSuchKey"));
 
-  // NoSuchKey, not AccessDenied — and that is the good answer. The SELECT policy
-  // hides the row, so the Storage service genuinely cannot find it and a refused
-  // read is INDISTINGUISHABLE from a key that was never used. There is no
-  // existence oracle on the read path.
-  const otherSigned = await sign(PORTFOLIO, aPortfolio, B);
-  check(
-    "read: another professional cannot mint a URL for A's portfolio object",
-    refusedAs(otherSigned, "NoSuchKey"),
-    otherSigned.text,
-  );
-  const neverExisted = await sign(PORTFOLIO, key(INSTALLER_A, "png"), B);
-  check(
-    "read: a refused read and a key that never existed give the same answer",
-    otherSigned.code === neverExisted.code,
-    `${otherSigned.code} vs ${neverExisted.code}`,
-  );
-
-  const certByOther = await sign(CERTIFICATES, aCertificate, B);
-  check(
-    "read: another professional cannot mint a URL for A's CERTIFICATE",
-    certByOther.status !== 200,
-    certByOther.text,
-  );
-
-  const certByOrg = await sign(CERTIFICATES, aCertificate, business);
-  check(
-    "read: an organization identity cannot reach a certificate through membership",
-    certByOrg.status !== 200,
-    certByOrg.text,
-  );
-
-  const anonSign = await sign(CERTIFICATES, aCertificate, null);
-  check(
-    "read: an anonymous caller cannot mint a certificate URL",
-    anonSign.status !== 200,
-    anonSign.text,
-  );
+  // === F. The public door: private stays private ==========================
+  check("public: an anonymous caller cannot sign a PRIVATE portfolio object",
+    refusedAs(await sign(PORTFOLIO, item.object_key, null), "NoSuchKey"));
+  check("public: nor a certificate, ever",
+    refusedAs(await sign(CERTIFICATES, cert.object_path, null), "NoSuchKey"));
 
   for (const [label, bucket, path] of [
-    ["portfolio", PORTFOLIO, aPortfolio],
-    ["certificate", CERTIFICATES, aCertificate],
+    ["portfolio", PORTFOLIO, item.object_key],
+    ["certificate", CERTIFICATES, cert.object_path],
   ]) {
     const pub = await fetch(`${API}/storage/v1/object/public/${bucket}/${path}`);
-    check(
-      `read: the public object route does not serve a ${label} — the bucket is private`,
-      pub.status !== 200,
-      `status ${pub.status}`,
-    );
+    check(`public: the public object route serves no ${label} — both buckets are private`,
+      pub.status !== 200, `status ${pub.status}`);
   }
 
-  const guessed = await fetch(`${API}/storage/v1/object/${CERTIFICATES}/${aCertificate}`, {
-    headers: { apikey: ANON_KEY },
-  });
-  check(
-    "read: guessing the object URL without a token returns nothing",
-    guessed.status !== 200,
-    `status ${guessed.status}`,
-  );
+  check("public: finalize succeeds",
+    (await rpc("portfolio_item_finalize", { p_item_id: item.item_id }, A)).status === 204);
+  check("public: a READY but private object is still unreachable — bytes existing is not a decision to show them",
+    refusedAs(await sign(PORTFOLIO, item.object_key, null), "NoSuchKey"));
 
-  // =========================================================================
-  // DELETE
-  // =========================================================================
-  const deleteByOther = await remove(PORTFOLIO, aPortfolio, B);
-  check(
-    "delete: another professional cannot delete A's object",
-    refusedAs(deleteByOther, "AccessDenied"),
-    deleteByOther.text,
-  );
-  // The delete path is the one place the two answers differ: AccessDenied means
-  // "exists, not yours" while NoSuchKey means "no such object". Recorded rather
-  // than glossed over — it is a real distinction, and it is only reachable by a
-  // caller who already knows a full random object id, so it discloses nothing
-  // they did not already have.
-  const deleteUnknown = await remove(PORTFOLIO, key(INSTALLER_A, "png"), B);
-  check(
-    "delete: the refusal distinguishes an existing object from an absent one",
-    refusedAs(deleteUnknown, "NoSuchKey") && deleteByOther.code === "AccessDenied",
-    deleteUnknown.text,
-  );
-  check(
-    "delete: and the object is still there afterwards",
-    await objectExists(PORTFOLIO, aPortfolio, A),
-  );
+  // === G. The public door: published means published ======================
+  check("public: publish succeeds",
+    (await rpc("portfolio_item_set_visibility",
+      { p_item_id: item.item_id, p_public: true }, A)).status === 204);
 
-  // =========================================================================
-  // DOWNGRADE — the contract copied from availability (§5)
-  // =========================================================================
-  // Installer A stops being a professional. Their files must not become
-  // unreachable, and they must still be able to remove their own data.
+  const resolved = await rpc("public_portfolio_media_key", { p_item_id: item.item_id }, null);
+  check("public: an ANONYMOUS caller resolves the published item to its opaque key",
+    resolved.status === 200 && JSON.parse(resolved.text) === item.object_key, resolved.text);
+  check("public: and that key discloses no owner — the property the whole redesign bought",
+    !String(JSON.parse(resolved.text || '""')).includes(INSTALLER_A));
+
+  const anonPublished = await sign(PORTFOLIO, item.object_key, null);
+  check("public: the anonymous caller signs it", anonPublished.status === 200, anonPublished.text);
+  if (anonPublished.status === 200) {
+    const url = JSON.parse(anonPublished.text).signedURL;
+    const got = await fetch(`${API}/storage/v1${url}`);
+    check("public: and receives the real bytes, with no credential and no session",
+      got.status === 200 && Buffer.from(await got.arrayBuffer()).equals(PNG));
+  }
+
+  const certViaPortfolio = await rpc("public_portfolio_media_key", { p_item_id: cert.item_id }, null);
+  check("public: A CERTIFICATE ID RESOLVES TO NOTHING through the portfolio media path — it is not in that table at all",
+    certViaPortfolio.status === 200 && JSON.parse(certViaPortfolio.text) === null, certViaPortfolio.text);
+
+  check("public: B's unpublished item stays unreachable to anon even after finalize",
+    (await rpc("portfolio_item_finalize", { p_item_id: otherItem.item_id }, B)).status === 204
+    && refusedAs(await sign(PORTFOLIO, otherItem.object_key, null), "NoSuchKey"));
+
+  // Delisting withdraws the photo without touching what the owner chose.
+  sql(`update public.profiles set public_profile_status='hidden' where user_id='${INSTALLER_A}'`);
+  check("public: DELISTING the profile withdraws the object immediately",
+    refusedAs(await sign(PORTFOLIO, item.object_key, null), "NoSuchKey"));
+  check("public: while the owner's saved visibility is untouched",
+    sql(`select visibility from public.portfolio_items where id='${item.item_id}'`) === "public");
+  sql(`update public.profiles set public_profile_status='listed' where user_id='${INSTALLER_A}'`);
+  check("public: relisting restores exactly what they had chosen",
+    (await sign(PORTFOLIO, item.object_key, null)).status === 200);
+
+  // === H. Deletion converges ==============================================
+  check("delete: another professional cannot delete it",
+    refusedAs(await remove(PORTFOLIO, item.object_key, B), "AccessDenied"));
+  check("delete: the owner withdraws it, which stops visibility in Postgres first",
+    (await rpc("portfolio_item_delete", { p_item_id: item.item_id }, A)).status === 204);
+  check("delete: and the public door shuts in the same instant, before Storage is asked anything",
+    refusedAs(await sign(PORTFOLIO, item.object_key, null), "NoSuchKey"));
+  check("delete: but the owner can still remove the object, because the ownership helper ignores state",
+    (await remove(PORTFOLIO, item.object_key, A)).status === 200);
+  check("delete: purge then removes the row",
+    (await rpc("portfolio_item_purge", { p_item_id: item.item_id }, A)).status === 204);
+  check("delete: and purge is silent on a second run — the last step of a convergent sequence must repeat safely",
+    (await rpc("portfolio_item_purge", { p_item_id: item.item_id }, A)).status === 204);
+  check("delete: nothing of that item survives in either system",
+    sql(`select count(*) from public.portfolio_items where id='${item.item_id}'`) === "0");
+  check("delete: removing an already-removed object answers NoSuchKey, which the helper folds into success",
+    refusedAs(await remove(PORTFOLIO, item.object_key, A), "NoSuchKey"));
+
+  // === I. Downgrade =======================================================
   const restore = sql(
-    `select coalesce(primary_account_type::text, 'NULL') from public.users where id='${INSTALLER_A}'`,
-  );
+    `select coalesce(primary_account_type::text,'NULL') from public.users where id='${INSTALLER_A}'`);
   try {
     sql(`update public.users set primary_account_type='end_consumer' where id='${INSTALLER_A}'`);
     sql(`delete from public.individual_onboarding where user_id='${INSTALLER_A}'`);
-    check(
-      "downgrade: the identity is no longer a professional persona",
-      sql(`select app.is_professional_persona('${INSTALLER_A}')`) === "f",
-    );
-
-    const blocked = await upload(PORTFOLIO, key(INSTALLER_A, "png"), PNG, "image/png", A);
-    check(
-      "downgrade: no NEW professional upload is accepted",
-      refusedAs(blocked, "AccessDenied"),
-      blocked.text,
-    );
-    check(
-      "downgrade: existing files are still readable by their owner",
-      (await sign(PORTFOLIO, aPortfolio, A)).status === 200,
-    );
-    check(
-      "downgrade: and the owner can still delete their own data",
-      (await remove(PORTFOLIO, aPortfolio, A)).status === 200,
-    );
+    check("downgrade: the identity is no longer a professional persona",
+      sql(`select app.is_professional_persona('${INSTALLER_A}')`) === "f");
+    check("downgrade: no NEW portfolio work may be created",
+      (await rpc("portfolio_item_create",
+        { p_title: "x", p_description: null, p_content_type: "image/png" }, A)).status !== 200);
+    check("downgrade: and no new certificate",
+      (await rpc("certificate_create", { p_title: "x", p_issuer: null, p_issued_on: null,
+        p_expires_on: null, p_content_type: "application/pdf", p_original_filename: null }, A)).status !== 200);
+    check("downgrade: but the certificate they already hold is still readable by them",
+      (await sign(CERTIFICATES, cert.object_path, A)).status === 200);
+    check("downgrade: and still deletable — personal data is never held hostage to a persona value",
+      (await remove(CERTIFICATES, cert.object_path, A)).status === 200);
   } finally {
-    if (restore === "NULL") {
-      sql(`update public.users set primary_account_type=null where id='${INSTALLER_A}'`);
-    } else {
-      sql(`update public.users set primary_account_type='${restore}' where id='${INSTALLER_A}'`);
-    }
+    sql(restore === "NULL"
+      ? `update public.users set primary_account_type=null where id='${INSTALLER_A}'`
+      : `update public.users set primary_account_type='${restore}' where id='${INSTALLER_A}'`);
   }
-
-  check(
-    "delete: the owner's delete actually removed the object",
-    !(await objectExists(PORTFOLIO, aPortfolio, A)),
-  );
-  // NoSuchKey is what `deleteProfessionalAsset` folds into success: the caller
-  // asked for the object to be gone and it is gone. Pinned here because that
-  // helper's idempotence is only correct while this is the code Storage returns.
-  const deleteAgain = await remove(PORTFOLIO, aPortfolio, A);
-  check(
-    "delete: deleting an already-deleted object answers NoSuchKey, deterministically",
-    refusedAs(deleteAgain, "NoSuchKey"),
-    deleteAgain.text,
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -540,17 +409,21 @@ try {
   const admin =
     process.env.SUPABASE_SERVICE_ROLE_KEY ??
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
-  for (const [bucket, path] of created) {
+  for (const [bucket, path] of objects) {
     await fetch(`${API}/storage/v1/object/${bucket}/${path}`, {
-      method: "DELETE",
-      headers: { apikey: admin, authorization: `Bearer ${admin}` },
+      method: "DELETE", headers: { apikey: admin, authorization: `Bearer ${admin}` },
     }).catch(() => {});
   }
-  const leftover = sql(
-    `select count(*) from storage.objects where bucket_id in ('${PORTFOLIO}','${CERTIFICATES}')`,
-  );
-  console.log(`\n--- teardown: ${created.length} keys created, ${leftover} objects left behind`);
+  for (const [table, id] of items) sql(`delete from public.${table} where id='${id}'`);
+
+  const leftObjects = sql(
+    `select count(*) from storage.objects where bucket_id in ('${PORTFOLIO}','${CERTIFICATES}')`);
+  const leftRows = sql(
+    `select (select count(*) from public.portfolio_items) + (select count(*) from public.professional_certificates)`);
+  console.log(`\n--- teardown: ${objects.length} objects and ${items.length} rows created; ` +
+    `${leftObjects} objects and ${leftRows} rows left behind`);
   console.log(`--- ${passed} passed, ${failures.length} failed`);
   for (const f of failures) console.log(`    FAIL ${f}`);
-  process.exitCode = failures.length === 0 && leftover === "0" ? 0 : 1;
+  process.exitCode =
+    failures.length === 0 && leftObjects === "0" && leftRows === "0" ? 0 : 1;
 }

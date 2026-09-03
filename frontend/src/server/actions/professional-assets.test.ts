@@ -28,6 +28,8 @@ import {
 const OWNER = "70000009-0000-4000-8000-000000000009";
 const OTHER = "71000006-0000-4000-8000-000000000006";
 const OBJECT = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+const PORTFOLIO_KEY = `${OBJECT}.png`;
+const CERTIFICATE_PATH = `${OWNER}/${OBJECT}.pdf`;
 
 beforeEach(() => {
   for (const m of [getUser, createSignedUploadUrl, createSignedUrl, remove, storageFrom, from, rpc]) {
@@ -41,101 +43,102 @@ beforeEach(() => {
 });
 
 /**
- * The server seam.
+ * The server seam, after Increment 11 moved key generation into the database.
  *
- * The tests that matter here are the ones about what the CALLER cannot influence.
- * These are `"use server"` exports, so every argument arrives from a browser, and
- * the single most important property of the file is that none of them names an
- * owner. A test that only checked the happy path would pass just as well against
- * a version that took `ownerId` as a parameter.
+ * These helpers no longer DERIVE a path — the RPC that creates the metadata row
+ * does, in the same transaction (S3). So the tests that matter here are about
+ * what the helper refuses to pass through, and about the one asymmetry the
+ * redesign introduced: a certificate path proves its own ownership and a
+ * portfolio key deliberately cannot.
  */
 describe("createAssetUploadTicket", () => {
-  it("derives the path from the SESSION, never from anything the caller sent", async () => {
-    const r = await createAssetUploadTicket("portfolio", { type: "image/png", size: 1000 });
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.path.startsWith(`${OWNER}/`)).toBe(true);
-    expect(r.path).toMatch(/\.png$/);
-    expect(r.bucket).toBe("professional-portfolio");
-    expect(createSignedUploadUrl).toHaveBeenCalledWith(r.path);
+  it("mints a ticket for the exact key the database handed back", async () => {
+    const r = await createAssetUploadTicket("portfolio", PORTFOLIO_KEY);
+    expect(r).toEqual({ ok: true, token: "t0k3n" });
+    expect(storageFrom).toHaveBeenCalledWith("professional-portfolio");
+    expect(createSignedUploadUrl).toHaveBeenCalledWith(PORTFOLIO_KEY);
   });
 
-  it("gives every ticket a fresh object identity, so no two can collide or overwrite", async () => {
-    const a = await createAssetUploadTicket("portfolio", { type: "image/png", size: 10 });
-    const b = await createAssetUploadTicket("portfolio", { type: "image/png", size: 10 });
-    expect(a.ok && b.ok && a.path).not.toBe(b.ok && b.path);
-  });
-
-  it("takes the extension from the content type, not from any filename", async () => {
-    const r = await createAssetUploadTicket("certificate", {
-      type: "application/pdf",
-      size: 1000,
-    });
-    expect(r.ok && r.path).toMatch(/\.pdf$/);
-    expect(r.ok && r.bucket).toBe("professional-certificates");
+  it("resolves the bucket from the namespace and never takes one as an argument", async () => {
+    await createAssetUploadTicket("certificate", CERTIFICATE_PATH);
+    expect(storageFrom).toHaveBeenCalledWith("professional-certificates");
+    expect(createAssetUploadTicket.length).toBe(2);
   });
 
   it("refuses an unknown namespace without asking Storage anything", async () => {
-    expect(await createAssetUploadTicket("chat-attachments", { type: "image/png", size: 10 }))
-      .toEqual({ ok: false, code: "assets.errors.invalidPath" });
+    expect(await createAssetUploadTicket("chat-attachments", PORTFOLIO_KEY)).toEqual({
+      ok: false,
+      code: "assets.errors.invalidPath",
+    });
     expect(storageFrom).not.toHaveBeenCalled();
   });
 
-  it("refuses a type or size the namespace does not take, before any request", async () => {
-    expect(await createAssetUploadTicket("portfolio", { type: "application/pdf", size: 10 }))
-      .toEqual({ ok: false, code: "assets.errors.unsupportedType" });
-    expect(await createAssetUploadTicket("portfolio", { type: "image/png", size: 9_000_000 }))
-      .toEqual({ ok: false, code: "assets.errors.tooLarge" });
+  it("refuses a certificate path belonging to someone else, before any request", async () => {
+    expect(await createAssetUploadTicket("certificate", `${OTHER}/${OBJECT}.pdf`)).toEqual({
+      ok: false,
+      code: "assets.errors.invalidPath",
+    });
     expect(storageFrom).not.toHaveBeenCalled();
+  });
+
+  it("refuses a portfolio key that still carries an owner prefix — the superseded shape", async () => {
+    expect(await createAssetUploadTicket("portfolio", `${OWNER}/${OBJECT}.png`)).toEqual({
+      ok: false,
+      code: "assets.errors.invalidPath",
+    });
   });
 
   it("refuses an unauthenticated caller", async () => {
     getUser.mockResolvedValue({ data: { user: null } });
-    expect(await createAssetUploadTicket("portfolio", { type: "image/png", size: 10 }))
-      .toEqual({ ok: false, code: "assets.errors.notAllowed" });
+    expect(await createAssetUploadTicket("portfolio", PORTFOLIO_KEY)).toEqual({
+      ok: false,
+      code: "assets.errors.notAllowed",
+    });
     expect(storageFrom).not.toHaveBeenCalled();
   });
 
   /**
-   * The persona gate is NOT in this file, and this is the test that says so. A
-   * consumer is refused because minting the token is an authorized write and the
-   * INSERT policy evaluates `app.can_create_professional_asset` — so the action
-   * reaches Storage, is told no, and translates it. If the gate were ever
-   * reimplemented here, this test would still pass while quietly becoming a lie,
-   * which is why the assertion is that the call HAPPENED.
+   * The persona gate is NOT in this file, and this is the test that says so. The
+   * refusal comes from the INSERT policy — `can_create_professional_asset` for a
+   * certificate, `can_upload_portfolio_object` for a photo — so the action reaches
+   * Storage, is told no, and translates it. The assertion is that the call
+   * HAPPENED, because a version that reimplemented the gate here would still pass
+   * an assertion about the return value alone.
    */
-  it("lets the database refuse a non-professional, and translates that refusal", async () => {
+  it("lets the database refuse, and translates that refusal", async () => {
     createSignedUploadUrl.mockResolvedValue({
       data: null,
       error: { code: "AccessDenied", message: "new row violates row-level security policy" },
     });
-    const r = await createAssetUploadTicket("portfolio", { type: "image/png", size: 10 });
+    const r = await createAssetUploadTicket("portfolio", PORTFOLIO_KEY);
     expect(createSignedUploadUrl).toHaveBeenCalled();
     expect(r).toEqual({ ok: false, code: "assets.errors.notAllowed" });
   });
 
-  it("never touches a table: storage is not a product record here", async () => {
-    await createAssetUploadTicket("portfolio", { type: "image/png", size: 10 });
+  it("never touches a table: this seam knows nothing about product records", async () => {
+    await createAssetUploadTicket("portfolio", PORTFOLIO_KEY);
     expect(from).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
   });
 });
 
 describe("createAssetReadUrl", () => {
-  it("mints a short-lived URL for the caller's own object", async () => {
-    const r = await createAssetReadUrl("portfolio", `${OWNER}/${OBJECT}.png`);
+  it("mints a short-lived URL for a portfolio object", async () => {
+    const r = await createAssetReadUrl("portfolio", PORTFOLIO_KEY);
     expect(r).toEqual({ ok: true, url: "/object/sign/x?token=y", expiresIn: 300 });
-    expect(createSignedUrl).toHaveBeenCalledWith(`${OWNER}/${OBJECT}.png`, 300);
+    expect(createSignedUrl).toHaveBeenCalledWith(PORTFOLIO_KEY, 300);
   });
 
-  it("refuses another user's object without asking Storage — no existence probe", async () => {
-    const r = await createAssetReadUrl("portfolio", `${OTHER}/${OBJECT}.png`);
-    expect(r).toEqual({ ok: false, code: "assets.errors.invalidPath" });
+  it("refuses another owner's certificate without asking Storage — no existence probe", async () => {
+    expect(await createAssetReadUrl("certificate", `${OTHER}/${OBJECT}.pdf`)).toEqual({
+      ok: false,
+      code: "assets.errors.invalidPath",
+    });
     expect(createSignedUrl).not.toHaveBeenCalled();
   });
 
   it("refuses a traversal path the same way", async () => {
-    expect(await createAssetReadUrl("portfolio", `${OWNER}/../${OTHER}/x.png`)).toEqual({
+    expect(await createAssetReadUrl("certificate", `${OWNER}/../${OTHER}/x.pdf`)).toEqual({
       ok: false,
       code: "assets.errors.invalidPath",
     });
@@ -143,49 +146,35 @@ describe("createAssetReadUrl", () => {
   });
 
   /**
-   * §11: the helper must not accept an arbitrary bucket/object pair. It takes a
-   * namespace from a closed set of two and looks the bucket up itself, so there
-   * is no argument through which a caller could name `professional-certificates`
-   * while a portfolio surface believes it asked for a photo.
+   * For portfolio the shape check passes for ANY well-formed key, which is only
+   * safe because it is not the boundary: `app.owns_portfolio_object` refuses a key
+   * whose metadata row belongs to somebody else, and Storage answers NoSuchKey.
    */
-  it("resolves the bucket from the namespace and takes no bucket argument", async () => {
-    await createAssetReadUrl("certificate", `${OWNER}/${OBJECT}.pdf`);
-    expect(storageFrom).toHaveBeenCalledWith("professional-certificates");
-    expect(createAssetReadUrl.length).toBe(2);
-  });
-
-  it("translates a hidden object into a readable sentence rather than a storage string", async () => {
+  it("passes a well-formed portfolio key through and lets the policy decide", async () => {
     createSignedUrl.mockResolvedValue({
       data: null,
       error: { code: "NoSuchKey", message: "Object not found" },
     });
-    expect(await createAssetReadUrl("portfolio", `${OWNER}/${OBJECT}.png`)).toEqual({
+    expect(await createAssetReadUrl("portfolio", PORTFOLIO_KEY)).toEqual({
       ok: false,
       code: "assets.errors.gone",
     });
+    expect(createSignedUrl).toHaveBeenCalled();
   });
 });
 
 describe("deleteProfessionalAsset", () => {
-  it("removes exactly one named object of the caller's", async () => {
-    expect(await deleteProfessionalAsset("portfolio", `${OWNER}/${OBJECT}.png`)).toEqual({ ok: true });
-    expect(remove).toHaveBeenCalledWith([`${OWNER}/${OBJECT}.png`]);
-  });
-
-  it("refuses another user's object before it reaches Storage", async () => {
-    expect(await deleteProfessionalAsset("portfolio", `${OTHER}/${OBJECT}.png`)).toEqual({
-      ok: false,
-      code: "assets.errors.invalidPath",
-    });
-    expect(remove).not.toHaveBeenCalled();
+  it("removes exactly one named object", async () => {
+    expect(await deleteProfessionalAsset("portfolio", PORTFOLIO_KEY)).toEqual({ ok: true });
+    expect(remove).toHaveBeenCalledWith([PORTFOLIO_KEY]);
   });
 
   it("has no folder form: a bare owner segment is not an object", async () => {
-    expect(await deleteProfessionalAsset("portfolio", OWNER)).toEqual({
+    expect(await deleteProfessionalAsset("certificate", OWNER)).toEqual({
       ok: false,
       code: "assets.errors.invalidPath",
     });
-    expect(await deleteProfessionalAsset("portfolio", `${OWNER}/`)).toEqual({
+    expect(await deleteProfessionalAsset("certificate", `${OWNER}/`)).toEqual({
       ok: false,
       code: "assets.errors.invalidPath",
     });
@@ -193,18 +182,18 @@ describe("deleteProfessionalAsset", () => {
   });
 
   /**
-   * Idempotence, which Increment 11 depends on: cleaning up a metadata row and
-   * its object is two steps, and a retry after a partial failure has to be able
-   * to converge rather than jam on the half that already succeeded.
+   * Idempotence, which the delete sequence depends on: marking the row deleted,
+   * removing the object and purging the row are three steps in two systems, and a
+   * retry after a partial failure has to converge rather than jam.
    */
-  it("treats an already-deleted object as success — the caller wanted it gone and it is", async () => {
+  it("treats an already-deleted object as success", async () => {
     remove.mockResolvedValue({ data: null, error: { code: "NoSuchKey", message: "Object not found" } });
-    expect(await deleteProfessionalAsset("portfolio", `${OWNER}/${OBJECT}.png`)).toEqual({ ok: true });
+    expect(await deleteProfessionalAsset("portfolio", PORTFOLIO_KEY)).toEqual({ ok: true });
   });
 
   it("does not swallow a real refusal", async () => {
     remove.mockResolvedValue({ data: null, error: { code: "AccessDenied", message: "Access denied" } });
-    expect(await deleteProfessionalAsset("portfolio", `${OWNER}/${OBJECT}.png`)).toEqual({
+    expect(await deleteProfessionalAsset("portfolio", PORTFOLIO_KEY)).toEqual({
       ok: false,
       code: "assets.errors.notAllowed",
     });
@@ -212,7 +201,7 @@ describe("deleteProfessionalAsset", () => {
 
   it("refuses an unauthenticated caller", async () => {
     getUser.mockResolvedValue({ data: { user: null } });
-    expect(await deleteProfessionalAsset("portfolio", `${OWNER}/${OBJECT}.png`)).toEqual({
+    expect(await deleteProfessionalAsset("portfolio", PORTFOLIO_KEY)).toEqual({
       ok: false,
       code: "assets.errors.notAllowed",
     });
@@ -221,10 +210,9 @@ describe("deleteProfessionalAsset", () => {
 });
 
 /**
- * §17 draws the line at infrastructure, and this asserts where it fell. Three
- * helpers, and in particular NO action that records what an object means — no
- * title, no caption, no issuer, no visibility. Increment 11 adds those; if one
- * appears here first, this test is the thing that notices.
+ * The surface stayed at three even as the domain grew around it. In particular
+ * there is still nothing here that records what an object MEANS — that belongs to
+ * `server/actions/portfolio.ts`, which owns the metadata and calls these.
  */
 describe("the surface of this module", () => {
   it("exports exactly three helpers: in, out, away", async () => {

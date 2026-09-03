@@ -11,6 +11,8 @@ import { TradeSummary } from "@/features/profile/trade-summary";
 import type { MyTrades } from "@/server/queries/trades";
 import { specializationLabel } from "@/lib/i18n/trade-label";
 import { ChipList, DetailCard, HomeHeader, HomeSection, VerificationBadge } from "@/features/home/parts";
+import type { ProfessionalAssetSummary } from "@/server/queries/portfolio";
+import { CertificatesModule, PortfolioModule } from "@/features/portfolio/hub-modules";
 
 /**
  * The profile hub.
@@ -32,12 +34,15 @@ export function ProfileHub({
   data,
   publication,
   trades,
+  assets,
   t,
 }: {
   data: PersonalHomeData;
   publication: ProfilePublication;
   /** The canonical selection (Increment 5). Read-only here; the editor owns it. */
   trades: MyTrades;
+  /** Real Portfolio and Certificate counts (Increment 11). */
+  assets: ProfessionalAssetSummary;
   t: TranslateFn;
 }) {
   const { professional: p, verification } = data;
@@ -139,6 +144,25 @@ export function ProfileHub({
         description={t("profile.availability.body")}
       >
         <AvailabilityControl availability={data.availability} />
+      </HomeSection>
+
+      {/* PORTFOLIO AND CERTIFICATES sit here, between the things a professional
+          keeps up to date (availability) and the things the editor owns
+          (practice, location, services). They belong to the first group: work is
+          added week to week, and a certificate expires on its own schedule.
+
+          This is NOT the final Account Overview redesign — that is Increment 14.
+          The reference's module shape is adopted; its stat rail, learning card,
+          rewards card and network card are still later increments, and a card
+          that leads nowhere remains worse than an absent one. */}
+      <HomeSection
+        title={t("profile.work.title")}
+        description={t("profile.work.body")}
+      >
+        <div className="grid gap-md desktop:grid-cols-2">
+          <PortfolioModule summary={assets} publicItemId={assets.previewItemId} t={t} />
+          <CertificatesModule summary={assets} t={t} />
+        </div>
       </HomeSection>
 
       <HomeSection

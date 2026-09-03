@@ -235,3 +235,40 @@ export function mapAssetError(error: unknown): AssetErrorCode {
     return "assets.errors.notAllowed";
   return "assets.errors.uploadFailed";
 }
+
+/**
+ * Maps a Portfolio / Certificates RPC error to a stable translation KEY.
+ *
+ * One mapper for both domains, because they share every failure mode they have:
+ * the same persona gate, the same ownership check, the same lifecycle guard. What
+ * they do NOT share is a public surface, and that difference produces no error —
+ * a certificate has no publish path to refuse, so there is nothing here to say
+ * about one.
+ *
+ * `42501` covers three genuinely different refusals and each is named before the
+ * generic branch can swallow it: not a professional, not yours, and not signed in.
+ * A professional told "this is not yours" when the real answer is "your account is
+ * no longer a professional one" would go looking for the wrong fix.
+ */
+export function mapPortfolioError(error: unknown): string {
+  const e = (error ?? {}) as PgLikeError;
+  const code = e.code ?? "";
+  const msg = (e.message ?? "").toLowerCase();
+
+  if (msg.includes("professional persona is required"))
+    return "portfolio.errors.notProfessional";
+  if (msg.includes("unfinished item cannot be published"))
+    return "portfolio.errors.notReady";
+  if (msg.includes("unsupported content type")) return "assets.errors.unsupportedType";
+  if (msg.includes("portfolio item not found")) return "portfolio.errors.notFound";
+  if (msg.includes("certificate not found")) return "certificates.errors.notFound";
+  if (msg.includes("cannot be finalized")) return "portfolio.errors.notReady";
+  if (msg.includes("unknown direction")) return "states.genericRetry";
+  // The one validation performed on the claim itself: an expiry before its issue.
+  if (code === "23514" && msg.includes("ck_certificate_dates"))
+    return "certificates.errors.dateOrder";
+  if (code === "23514") return "assets.errors.unsupportedType";
+  if (msg.includes("authentication required") || code === "42501")
+    return "portfolio.errors.denied";
+  return "states.genericRetry";
+}

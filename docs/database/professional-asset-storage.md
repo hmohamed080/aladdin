@@ -1,9 +1,18 @@
 # Professional Asset Storage — Security Contract
 
-**Status:** **Implemented** · Installer Pilot Increment 10 · `feature/installer-pilot`
-**Migration:** `supabase/migrations/20260906090001_professional_asset_storage.sql`
-**Tests:** `supabase/tests/47_professional_asset_storage_test.sql` (67) ·
-`supabase/tests/professional_asset_storage_api_test.mjs` (43)
+**Status:** **Implemented** · Installer Pilot Increments 10 + 11 · `feature/installer-pilot`
+**Migrations:** `20260906090001_professional_asset_storage.sql` (the buckets) ·
+`20260907090001_portfolio_and_certificates.sql` (metadata, and the Portfolio key change) ·
+`20260908090001_portfolio_public_read_sign_only.sql` (the public door, one operation wide)
+**Tests:** `47_professional_asset_storage_test.sql` (77) ·
+`48_portfolio_certificates_test.sql` (91) ·
+`professional_asset_storage_api_test.mjs` (59) ·
+`public_media_exposure_test.mjs` (53)
+
+> **Increment 11 superseded one thing here.** Increment 10 gave both buckets the
+> same owner-prefixed key. Portfolio needed to be readable by a signed-out
+> stranger, and that turned out to be incompatible with putting the owner's id in
+> the key — see **§2.2**. Certificates are unchanged in every respect.
 
 This is the storage foundation [`installer-jobs.md` §14.3](installer-jobs.md) required before any
 Portfolio or Certificate UI (**D5**). It stores bytes and answers one question:
@@ -65,6 +74,15 @@ bound rather than a policy.
 
 ## 2. The object path contract
 
+There are now **two**, one per namespace, and the difference is entirely about who
+is allowed to read the object.
+
+### 2.0 Certificates — `<owner-user-id>/<object-id>.<ext>`
+
+Unchanged since Increment 10, and correct precisely because a certificate is read
+by its owner and by nobody else, ever. Ownership in the key costs nothing when
+nothing public resolves it.
+
 ```
 <owner-user-id>/<object-id>.<ext>
 ```
@@ -108,6 +126,53 @@ things to sanitize into things that cannot be expressed:
 | trailing newline | refused | `$` matches end of string, not end of line |
 
 The display name a person chose belongs to **Increment 11 metadata**, where being wrong is cosmetic.
+
+---
+
+### 2.2 Portfolio — `<object-id>.<ext>`, opaque (Increment 11)
+
+```
+<object-id>.<ext>          e.g. e364f70e-879b-467d-a35a-4bb7b8127578.png
+```
+
+No owner segment. No filename. One lowercase uuid and one extension, anchored, so
+the key contains **no separator at all** — which is a stronger statement than
+"traversal is filtered": a portfolio key cannot express a folder.
+
+**Why it had to change.** A published item must be readable by a signed-out
+visitor. In this stack the Next server *is* that visitor — with no session it
+holds the anon key, the same credential the browser has — so anything the server
+can resolve, a browser can resolve too. An owner-prefixed key would therefore have
+published `users.id` to anyone who could read a public profile.
+
+That is not a small leak. `profiles.id` and `users.id` are deliberately different
+values (the public route is keyed on the former), and
+`17_public_directory_hardening_test` asserts by name that `user_id` stays out of
+every public projection. Publishing a photo must not be the one act that undoes
+it.
+
+**Where ownership went instead.** Into `public.portfolio_items`, and the storage
+policies ask it through two `security definer` booleans:
+
+| Helper | Answers | Granted to |
+|---|---|---|
+| `app.can_upload_portfolio_object(key)` | "do I own a **pending** row for this key?" | `authenticated` |
+| `app.owns_portfolio_object(key)` | "do I own the row for this key?" (any state) | `authenticated` |
+| `app.is_published_portfolio_object(key)` | "is this ready **and** public **and** on a listed profile?" | `anon`, `authenticated` |
+
+Each takes a key and returns a boolean. **None returns an owner id, and no
+anon-reachable function in this domain touches one** — which is what makes the
+third safe to evaluate inside a policy for a signed-out caller.
+
+**It is strictly stronger than the check it replaced.** Under Increment 10 a
+well-formed key was sufficient to write. Now a metadata row must already exist,
+owned by the caller, in `pending` state — so bytes cannot be uploaded until the
+product has authorized that exact object. `48_portfolio_certificates_test`
+asserts both the invented key and the old owner-prefixed shape are refused.
+
+`app.owns_portfolio_object` deliberately **ignores state**, which is what lets
+deletion converge: the row is marked `deleted` first, and the owner must still be
+able to remove the object afterwards.
 
 ---
 
@@ -206,6 +271,125 @@ bucket.
 **A refused read is indistinguishable from a key that never existed.** The SELECT policy hides the row
 so completely that Storage answers `NoSuchKey` rather than "denied" — so no caller can learn whether
 someone else's object exists by asking for it.
+
+### 7.1 The one public door (Increment 11)
+
+`professional_portfolio_select_published` is the **only** policy in the product
+that admits `anon`, it is a SELECT, and it names one bucket. It is gated on
+`app.is_published_portfolio_object`, never on the bucket alone, so it serves an
+object only while **all three** of these hold:
+
+1. the item's `visibility` is `public` — the owner said so;
+2. its `state` is `ready` — the bytes actually arrived;
+3. its owner's profile is **currently listed** — checked by joining
+   `profile_public_directory`, the same projection the public page itself is built
+   on, so publication cannot mean one thing to a page and another to a photo.
+
+Unlisting a profile therefore withdraws its whole public portfolio **in the same
+instant**, without rewriting a single saved visibility — and relisting restores
+exactly what the owner had chosen. The certificates bucket gains nothing from any
+of this: no anon policy mentions it, and a certificate id resolves to `null`
+through the portfolio media path because it is not in that table at all.
+
+The browser-facing contract is `/p/media/<portfolioItemId>` and nothing else. The
+route handler resolves the item to its opaque key server-side, mints a 30-second
+signed URL with the caller's own identity, and streams the bytes — so no storage
+key, no signed URL and no owner id ever reaches the page.
+
+**Every response is `no-store`, including the 404s.** An earlier version allowed
+`max-age=60` on the reasoning that an unpublished item vanishes from the page
+anyway, so only a saved media URL could exploit the gap. That names the exploit
+rather than removing it: a saved `/p/media/<id>` is exactly what somebody keeps.
+Withdrawal that is "immediate except for a minute" is not immediate, so the full
+publication test now runs on every request. The refusals are uncacheable for the
+mirror-image reason — a stored 404 would keep a newly published photograph
+invisible.
+
+### 7.2 What an anonymous caller can actually do — measured, not inferred
+
+`public_media_exposure_test.mjs` drives these against the running app. **This
+section has been wrong twice**, and both corrections are why it now states a
+measured boundary rather than a plausible one.
+
+**First** it claimed anon could reach nothing. False: a SELECT policy in Supabase
+Storage is consulted by *every read-shaped operation*, so the policy that let the
+media route mint one signed URL also permitted bucket listing, a direct unsigned
+GET, and a HEAD disclosing size and type.
+
+**Then** it concluded that could not be narrowed, on the reasoning that "may sign
+object X" and "may list objects" are the same permission. Also false. Storage
+publishes the operation being performed through `storage.operation()`, and a
+policy can require a specific one. Driving each request shape through a temporary
+logging predicate produced the exact strings:
+
+| Request | `storage.operation()` |
+|---|---|
+| `POST /object/sign/<bucket>/<key>` | `storage.object.sign` |
+| `POST /object/list/<bucket>` | `storage.object.list` |
+| `GET /object/<bucket>/<key>` | `storage.object.get_authenticated` |
+| `HEAD /object/<bucket>/<key>` | `object.head_authenticated_info` |
+| `GET /object/sign/<bucket>/<key>?token=…` | **the policy is not evaluated at all** |
+
+That last row is what makes the narrowing possible: fetching a signed URL
+consults no policy, because the token *is* the authorization. So the door can be
+restricted to signing without touching byte delivery — the route signs
+(policy-checked) and then fetches (token-checked), and only the first half passes
+through the policy.
+
+`20260908090001` therefore adds one clause:
+
+```sql
+and storage.allow_only_operation('storage.object.sign')
+```
+
+**The resulting anon capability, measured:**
+
+| Path | Result |
+|---|---|
+| Sign a published object | **Yes — the only thing anon may do at Storage** |
+| Fetch that signed URL | Yes — no policy consulted, real bytes |
+| List the portfolio bucket | **No — empty, while published objects exist** |
+| Direct unsigned GET of a published object | **No** |
+| HEAD of a published object | **No** |
+| Sign or read a private object, with its exact key | No |
+| Anything at all in the certificates bucket | No |
+| Enumerate the buckets | No |
+| `/object/public/…` | No — both buckets are private |
+
+**The owner is unaffected.** `professional_portfolio_select_own` carries no
+operation clause and is a separate permissive policy, so an owner still lists and
+signs their own objects — including private ones, which the portfolio manager's
+previews need. Asserted in both the probe and pgTAP 47.
+
+**It fails closed.** `storage.operation()` reads a GUC with the missing-ok flag,
+so outside a Storage request it is null and `allow_only_operation` coalesces to
+`false`. A direct SQL caller matches nothing. If a future Storage release renamed
+the operation, published images would go *missing* — visible immediately, and
+caught by the exposure probe — never silently readable. pgTAP 47 asserts the
+false-outside-a-request behaviour directly.
+
+The residual is now bounded to this: **a signed URL, once minted, remains valid
+for its lifetime regardless of what happens afterwards.** That is inherent to
+signed URLs. The route mints for 30 seconds and never hands the URL to a browser,
+so the exposure is a half-minute window on a URL that exists only inside one
+server-side fetch.
+
+### 7.3 The one place the key is reachable
+
+`public_portfolio_media_key` is granted to `anon` and returns the key for a
+**published** item, because the media route runs as `anon` and needs it. Stated
+plainly rather than buried, because it is the only surface that hands the key
+out, and it is safe for reasons that are each independently tested:
+
+* the key is a **separate random uuid**, not derivable from the public item id
+  (measured at chance-level agreement across every hex position, and asserted
+  structurally in pgTAP 48);
+* it carries no owner and no filename;
+* it cannot be used to reach a private item, a pending one, or a certificate;
+* it stops working the instant the item is withdrawn.
+
+Knowing a key buys exactly one thing: the bytes the media route already serves to
+anybody who asks. It is not a capability.
 
 > **Known and accepted:** the *delete* path does distinguish them — `AccessDenied` for an existing
 > object that is not yours, `NoSuchKey` for one that does not exist. Reaching that distinction requires

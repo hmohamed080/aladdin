@@ -31,16 +31,14 @@ export const ASSET_NAMESPACES = ["portfolio", "certificate"] as const;
 export type AssetNamespace = (typeof ASSET_NAMESPACES)[number];
 
 /**
- * Extension per content type. The extension is DERIVED from the validated type,
- * never read off the uploaded filename — §4's rule that a display name is not
- * authority, applied at the one place a filename could otherwise leak into a key.
+ * NOTHING HERE BUILDS A KEY ANY MORE. Increment 10 derived the object path in the
+ * server action; Increment 11 moved that into `portfolio_item_create` and
+ * `certificate_create`, because the metadata row is the product authority (S3)
+ * and the object identity has to be decided and recorded in the same transaction
+ * that decides the object exists at all. The extension is still derived from the
+ * validated content type rather than from any filename — it just happens in SQL
+ * now, where a caller cannot reach it.
  */
-const EXTENSION_BY_TYPE: Readonly<Record<string, string>> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "application/pdf": "pdf",
-};
 
 type NamespacePolicy = {
   readonly bucket: string;
@@ -88,32 +86,65 @@ export type AssetErrorCode =
   | "assets.errors.uploadFailed"
   | "assets.errors.gone";
 
-const KEY_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|pdf)$/;
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
 /**
- * The object key: `<owner-uuid>/<object-uuid>.<ext>` and nothing else.
+ * TWO key shapes, one per namespace, and the difference is entirely about who is
+ * allowed to read the object.
  *
- * The person's chosen filename is deliberately absent. §4 sketches it as a final
- * segment; dropping it means the key contains no caller-controlled bytes at all,
- * so traversal, encoding tricks, length limits and case collisions stop being
- * things to defend against and become things that cannot be expressed. The
- * display name is Increment 11 metadata, where being wrong is cosmetic.
+ * CERTIFICATES keep Increment 10's `<owner-uuid>/<object-uuid>.<ext>`. It is
+ * correct there precisely because a certificate is read by its owner and by
+ * nobody else, so ownership in the key discloses nothing.
  *
- * Mirrors `app.is_professional_asset_key` exactly; 47_professional_asset_storage
- * asserts the SQL side against the same table of attacks this module's test uses.
+ * PORTFOLIO is `<object-uuid>.<ext>` — opaque, no owner segment, no separator at
+ * all. A published item has to be resolvable for a signed-out visitor, and in
+ * this stack the Next server IS that visitor: with no session it holds the anon
+ * key, the same credential the browser has. An owner-prefixed key would
+ * therefore have published `users.id` to anyone who could read a public profile,
+ * which `17_public_directory_hardening_test` keeps out of every public
+ * projection by name.
+ *
+ * Neither pattern admits a filename or a second separator, so traversal,
+ * encoding tricks and case collisions remain unrepresentable rather than
+ * filtered. Both mirror a CHECK constraint on the owning table, and
+ * `48_portfolio_certificates_test` asserts the SQL side of each.
  */
-export function buildAssetKey(ownerId: string, objectId: string, contentType: string): string {
-  const ext = EXTENSION_BY_TYPE[contentType];
-  if (!ext) throw new Error(`No extension is defined for content type ${contentType}`);
-  return `${ownerId}/${objectId}.${ext}`;
+const CERTIFICATE_KEY_PATTERN = new RegExp(`^${UUID}/${UUID}\\.(jpg|png|webp|pdf)$`);
+const PORTFOLIO_KEY_PATTERN = new RegExp(`^${UUID}\\.(jpg|png|webp)$`);
+
+/** True when `key` is a well-formed portfolio key. Shape only — see below. */
+export function isPortfolioObjectKey(key: string): boolean {
+  return Boolean(key) && PORTFOLIO_KEY_PATTERN.test(key);
 }
 
-/** True when `key` is a well-formed key owned by `ownerId`. Shape AND value. */
-export function isAssetKeyOwnedBy(key: string, ownerId: string): boolean {
+/** True when `key` is a well-formed certificate path owned by `ownerId`. */
+export function isCertificatePathOwnedBy(key: string, ownerId: string): boolean {
   if (!key || !ownerId) return false;
-  if (!KEY_PATTERN.test(key)) return false;
+  if (!CERTIFICATE_KEY_PATTERN.test(key)) return false;
   return key.slice(0, key.indexOf("/")) === ownerId;
+}
+
+/**
+ * The namespace-aware pre-flight the server helpers run before touching Storage.
+ *
+ * ASYMMETRIC ON PURPOSE, and the asymmetry is the whole Increment 11 design. A
+ * certificate path states its owner, so this can check ownership outright. A
+ * portfolio key states nothing — that is the point — so all this can check is the
+ * SHAPE, and ownership is answered by `app.owns_portfolio_object` inside the
+ * storage policy, against the metadata row.
+ *
+ * So for portfolio this is a fast, specific refusal and NOT the boundary. The
+ * boundary is RLS, which the caller cannot skip; a `true` from here still gets
+ * refused by Postgres if the row is not theirs.
+ */
+export function isAssetKeyForCaller(
+  namespace: AssetNamespace,
+  key: string,
+  ownerId: string,
+): boolean {
+  return namespace === "portfolio"
+    ? isPortfolioObjectKey(key)
+    : isCertificatePathOwnedBy(key, ownerId);
 }
 
 export type AssetValidation =

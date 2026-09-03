@@ -358,6 +358,27 @@ export const en = {
     addBusiness: "Add business",
   },
   profile: {
+    work: {
+      title: "Your work and certificates",
+      body: "What you show the public, and what you keep to yourself.",
+    },
+    portfolio: {
+      title: "My work",
+      body: "Photographs of finished jobs. You choose which ones the public can see.",
+      none: "nothing added yet",
+      split: "{published} published · {privateCount} private",
+      unfinished: "{n} upload did not finish",
+      manage: "Manage my work",
+    },
+    certificates: {
+      title: "My certificates",
+      body: "Certificates and documents you hold.",
+      none: "nothing added yet",
+      held: "on your account",
+      expired: "{n} has expired",
+      privateNote: "Private to you. Never shown on your public profile.",
+      manage: "Manage certificates",
+    },
     hub: {
       title: "Your professional profile",
       body: "What Aladdin knows about the work you do. Keep it accurate — it is what businesses read when they are choosing who to work with.",
@@ -421,6 +442,7 @@ export const en = {
       saveFailed: "We could not save your changes. Please check the fields and try again.",
     },
     publicPage: {
+      portfolio: "Recent work",
       unnamed: "Aladdin professional",
       practice: "Work and specialties",
       about: "About",
@@ -2915,6 +2937,9 @@ export const en = {
    * because they cannot: they reported, and somebody else confirms.
    */
   assets: {
+    form: {
+      limits: "{types} · up to {mb} MB",
+    },
     /**
      * Storage-foundation errors (Increment 10). No screen renders these yet —
      * Increment 11's Portfolio and Certificates surfaces are their first
@@ -2930,6 +2955,115 @@ export const en = {
       notAllowed: "You cannot do that.",
       uploadFailed: "The file could not be saved. Please try again.",
       gone: "That file is no longer here.",
+    },
+  },
+
+  portfolio: {
+    title: "My work",
+    subtitle: "Photographs of work you have finished. You choose which ones appear on your public profile.",
+    add: "Add work",
+    privateByDefault:
+      "New work starts private. Nobody else can see a piece until you publish it, and unpublishing hides it again straight away.",
+    status: {
+      private: "Private",
+      published: "Published",
+    },
+    actions: {
+      publish: "Publish",
+      unpublish: "Unpublish",
+      edit: "Edit",
+      delete: "Delete",
+      moveEarlier: "Move earlier",
+      moveLater: "Move later",
+    },
+    empty: {
+      title: "No work added yet",
+      body: "Add a photograph of a job you have finished. It stays private until you decide to publish it.",
+    },
+    unfinished: {
+      title: "Unfinished uploads",
+      body: "These did not finish uploading. Nobody else can see them.",
+      hint: "The upload did not complete.",
+      finish: "Finish upload",
+      discard: "Discard",
+      discardTitle: "Discard this upload?",
+      discardBody: "The unfinished item and anything already uploaded for it will be removed.",
+    },
+    form: {
+      heading: "Add work",
+      title: "Title",
+      description: "Description",
+      file: "Photograph",
+      upload: "Add work",
+      uploading: "Uploading…",
+      save: "Save",
+      cancel: "Cancel",
+    },
+    delete: {
+      title: "Delete this work?",
+      body: "It will disappear from your profile immediately, and the photograph will be removed.",
+      confirm: "Delete",
+    },
+    errors: {
+      titleRequired: "Give this work a title.",
+      fileRequired: "Choose a photograph to upload.",
+      notProfessional: "Only a professional account can add work.",
+      notReady: "This item has not finished uploading yet.",
+      notFound: "That work is no longer here.",
+      denied: "You cannot do that.",
+    },
+  },
+
+  certificates: {
+    title: "My certificates",
+    subtitle: "Certificates and documents you hold. These are private to you.",
+    add: "Add certificate",
+    privateEvidence:
+      "Certificates are private. Only you can see them — they never appear on your public profile, and Aladdin does not check or approve them.",
+    expired: "Expired",
+    issuedOn: "Issued {date}",
+    expiresOn: "Expires {date}",
+    fileType: {
+      pdf: "PDF document",
+      image: "Image",
+    },
+    actions: {
+      view: "View",
+      edit: "Edit",
+      delete: "Delete",
+    },
+    empty: {
+      title: "No certificates added yet",
+      body: "Add a certificate or a training document. Only you will be able to see it.",
+    },
+    unfinished: {
+      title: "Unfinished uploads",
+      hint: "The upload did not complete.",
+      finish: "Finish upload",
+      discard: "Discard",
+    },
+    form: {
+      heading: "Add certificate",
+      title: "Certificate name",
+      issuer: "Issued by",
+      issuedOn: "Issue date",
+      expiresOn: "Expiry date",
+      file: "File",
+      upload: "Add certificate",
+      uploading: "Uploading…",
+      save: "Save",
+      cancel: "Cancel",
+    },
+    delete: {
+      title: "Delete this certificate?",
+      body: "It will be removed from your account, along with the file.",
+      confirm: "Delete",
+    },
+    errors: {
+      titleRequired: "Give this certificate a name.",
+      fileRequired: "Choose a file to upload.",
+      dateOrder: "The expiry date cannot be before the issue date.",
+      notFound: "That certificate is no longer here.",
     },
   },
 

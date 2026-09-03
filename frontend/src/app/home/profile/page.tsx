@@ -7,6 +7,7 @@ import { personalEntry } from "@/lib/workspace/model";
 import { loadPersonalHome } from "@/server/queries/personal-home";
 import { loadProfilePublication } from "@/server/queries/professional-profile";
 import { loadMyTrades } from "@/server/queries/trades";
+import { loadProfessionalAssetSummary } from "@/server/queries/portfolio";
 import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { ProfileHub } from "@/features/profile/profile-hub";
@@ -45,7 +46,13 @@ export default async function ProfileHubPage() {
 
   if (data.variant !== "professional") return <NoProfessionalProfile />;
 
-  const [publication, trades] = await Promise.all([loadProfilePublication(), loadMyTrades()]);
+  const [publication, trades, assets] = await Promise.all([
+    loadProfilePublication(),
+    loadMyTrades(),
+    loadProfessionalAssetSummary(),
+  ]);
 
-  return <ProfileHub data={data} publication={publication} trades={trades} t={t} />;
+  return (
+    <ProfileHub data={data} publication={publication} trades={trades} assets={assets} t={t} />
+  );
 }
