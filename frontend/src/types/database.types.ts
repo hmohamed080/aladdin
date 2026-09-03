@@ -903,6 +903,113 @@ export type Database = {
           },
         ]
       }
+      job_review_moderations: {
+        Row: {
+          acted_by: string
+          action: string
+          created_at: string
+          id: string
+          reason: string
+          review_id: string
+          seq: number
+        }
+        Insert: {
+          acted_by: string
+          action: string
+          created_at?: string
+          id?: string
+          reason: string
+          review_id: string
+          seq?: never
+        }
+        Update: {
+          acted_by?: string
+          action?: string
+          created_at?: string
+          id?: string
+          reason?: string
+          review_id?: string
+          seq?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_review_moderations_acted_by_fkey"
+            columns: ["acted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_review_moderations_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "job_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_reviews: {
+        Row: {
+          assignment_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          installer_user_id: string
+          poster_org_id: string
+          rating: number
+          submitted_by: string
+        }
+        Insert: {
+          assignment_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          installer_user_id: string
+          poster_org_id: string
+          rating: number
+          submitted_by: string
+        }
+        Update: {
+          assignment_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          installer_user_id?: string
+          poster_org_id?: string
+          rating?: number
+          submitted_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_reviews_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: true
+            referencedRelation: "job_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_reviews_installer_user_id_fkey"
+            columns: ["installer_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_reviews_poster_org_id_fkey"
+            columns: ["poster_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_reviews_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           city: string | null
@@ -3144,6 +3251,18 @@ export type Database = {
         }
         Relationships: []
       }
+      my_job_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string | null
+          job_title: string | null
+          org_name: string | null
+          rating: number | null
+          trade_key: string | null
+        }
+        Relationships: []
+      }
       open_job_opportunities: {
         Row: {
           city: string | null
@@ -3462,6 +3581,19 @@ export type Database = {
           profile_id: string | null
           sort_order: number | null
           title: string | null
+        }
+        Relationships: []
+      }
+      public_profile_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string | null
+          job_title: string | null
+          org_name: string | null
+          profile_id: string | null
+          rating: number | null
+          trade_key: string | null
         }
         Relationships: []
       }
@@ -4440,6 +4572,14 @@ export type Database = {
       job_publish: {
         Args: { p_expected_version: number; p_job_id: string }
         Returns: number
+      }
+      job_review_moderate: {
+        Args: { p_action: string; p_reason: string; p_review_id: string }
+        Returns: undefined
+      }
+      job_review_submit: {
+        Args: { p_assignment_id: string; p_comment?: string; p_rating: number }
+        Returns: string
       }
       job_update: {
         Args: {

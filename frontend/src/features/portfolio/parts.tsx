@@ -116,7 +116,7 @@ export function AssetFileField({
         required
         accept={policy.types.join(",")}
         onChange={(e) => onPick(e.currentTarget.files?.[0] ?? null)}
-        className="block w-full rounded-md border border-line bg-surface px-3 py-2 text-body text-fg file:me-3 file:rounded-sm file:border-0 file:bg-surface-sunken file:px-3 file:py-1 file:text-label file:text-fg-secondary"
+        className="block w-full rounded-md border bg-surface px-3 py-2 text-body text-fg file:me-3 file:rounded-sm file:border-0 file:bg-surface-2 file:px-3 file:py-1 file:text-label file:text-fg-secondary"
       />
       <p className="text-label text-fg-muted">
         {t("assets.form.limits", {

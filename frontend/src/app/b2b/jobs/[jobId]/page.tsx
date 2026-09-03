@@ -8,6 +8,7 @@ import {
   isPosterVerified,
 } from "@/server/queries/jobs";
 import { listProgressUpdates } from "@/server/queries/job-assignments";
+import { loadAssignmentReview } from "@/server/queries/reviews";
 import { BackLink, FlashSuccess } from "@/features/sales/page-parts";
 import { JobDetail } from "@/features/jobs/job-detail";
 
@@ -58,6 +59,12 @@ export default async function JobDetailPage({
   // on this side.
   let assignee: string | null = null;
   let progress: Awaited<ReturnType<typeof listProgressUpdates>> = [];
+  // Only completed work can be reviewed, so only completed work asks. A read for
+  // an assignment still in progress would always answer null.
+  const review =
+    assignment && assignment.status === "completed"
+      ? await loadAssignmentReview(assignment.id)
+      : null;
   if (assignment) {
     const [applicants, updates] = await Promise.all([
       listJobApplicants(supabase, jobId),
@@ -83,6 +90,7 @@ export default async function JobDetailPage({
         assignee={assignee}
         assignment={assignment}
         progress={progress}
+        review={review}
         role={{ canPost, canManage, orgVerified }}
         locale={locale}
       />

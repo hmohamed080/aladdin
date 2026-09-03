@@ -59,6 +59,9 @@ const noTrades = { keys: [], primaryKey: null };
  * An account with nothing stored yet — the state every professional starts in,
  * and the one these tests care about, since none of them is about Portfolio.
  */
+/** A professional with no reviews yet — the state these tests are not about. */
+const noReviews = { average: null, total: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+
 const noAssets = {
   portfolioTotal: 0,
   portfolioPublished: 0,
@@ -73,7 +76,7 @@ const noAssets = {
 describe("ProfileHub", () => {
   it("gives the professional a control for their own availability", () => {
     renderWithI18n(
-      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} t={createTranslator("en")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews} t={createTranslator("en")} />,
       "en",
     );
     expect(screen.getByRole("button", { name: "Mark me available" })).toBeTruthy();
@@ -81,7 +84,7 @@ describe("ProfileHub", () => {
 
   it("keeps the live flag and the onboarding LEAD TIME as two different things", () => {
     renderWithI18n(
-      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} t={createTranslator("en")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews} t={createTranslator("en")} />,
       "en",
     );
     // The lead-time row is no longer called "Availability"…
@@ -104,6 +107,7 @@ describe("ProfileHub", () => {
         publication={publication}
         trades={noTrades}
         assets={noAssets}
+        reviews={noReviews}
         t={createTranslator("en")}
       />,
       "en",
@@ -115,7 +119,7 @@ describe("ProfileHub", () => {
 
   it("renders in Arabic with no key leak", () => {
     const { container } = renderWithI18n(
-      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} t={createTranslator("ar")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews} t={createTranslator("ar")} />,
       "ar",
     );
     expect(screen.getByText("لا أقبل أعمالًا حاليًا")).toBeTruthy();
@@ -139,6 +143,7 @@ describe("ProfileHub", () => {
         publication={publication}
         trades={{ keys: ["marble_granite", "tiling"], primaryKey: "marble_granite" }}
         assets={noAssets}
+        reviews={noReviews}
         t={createTranslator("en")}
       />,
       "en",
@@ -155,6 +160,7 @@ describe("ProfileHub", () => {
         publication={publication}
         trades={{ keys: ["marble_granite"], primaryKey: "marble_granite" }}
         assets={noAssets}
+        reviews={noReviews}
         t={createTranslator("en")}
       />,
       "en",
@@ -165,7 +171,7 @@ describe("ProfileHub", () => {
 
   it("keeps the legacy free text where there is no canonical trade to replace it", () => {
     renderWithI18n(
-      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} t={createTranslator("en")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews} t={createTranslator("en")} />,
       "en",
     );
     // …and still the only answer there is without one. This increment deletes
@@ -175,7 +181,7 @@ describe("ProfileHub", () => {
 
   it("tells a professional with no trades what to do about it", () => {
     renderWithI18n(
-      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} t={createTranslator("en")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews} t={createTranslator("en")} />,
       "en",
     );
     expect(screen.getByTestId("trade-summary-empty")).toBeTruthy();

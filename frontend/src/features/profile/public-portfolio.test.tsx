@@ -60,11 +60,27 @@ describe("PublicPortfolio", () => {
     expect(container.querySelectorAll("p.line-clamp-3")).toHaveLength(1);
   });
 
-  it("lets a visitor-facing title resolve its own direction on an Arabic profile", () => {
+  /**
+   * The visitor-facing half of the same fix. A stranger reading an Arabic
+   * profile must see a Latin work title rendered correctly AND positioned with
+   * everything else — `dir="auto"` on the heading gave the first and broke the
+   * second.
+   */
+  it("isolates visitor-facing titles with <bdi> rather than turning the block", () => {
     const { container } = renderWithI18n(<PublicPortfolio items={items} t={t} />, "ar");
-    for (const heading of container.querySelectorAll("h3")) {
-      expect(heading.getAttribute("dir")).toBe("auto");
+    const headings = [...container.querySelectorAll("h3")];
+    expect(headings.length).toBeGreaterThan(0);
+    for (const heading of headings) {
+      expect(heading.getAttribute("dir")).toBeNull();
+      expect(heading.querySelector("bdi")?.getAttribute("dir")).toBe("auto");
     }
+  });
+
+  it("isolates the description the same way", () => {
+    const { container } = renderWithI18n(<PublicPortfolio items={items} t={t} />, "ar");
+    const description = container.querySelector("p.line-clamp-3")!;
+    expect(description.getAttribute("dir")).toBeNull();
+    expect(description.querySelector("bdi")?.getAttribute("dir")).toBe("auto");
   });
 
   it("gives every image its title as alt text", () => {

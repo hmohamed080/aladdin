@@ -54,15 +54,18 @@ export function PublicPortfolio({
                 />
               </MediaFrame>
               <div className="flex min-w-0 flex-col gap-1">
-                {/* Both lines are user-entered, so both resolve their own
-                    direction. An English title on an Arabic profile would
-                    otherwise be clipped from its front. */}
-                <h3 dir="auto" className="text-label font-medium text-fg">
-                  {item.title}
+                {/* `<bdi>`, not `dir="auto"` on the block. Both lines are
+                    user-entered, so both must resolve their own direction — but
+                    setting it on the paragraph flips the paragraph, and an
+                    English title then aligns left on an Arabic profile while
+                    everything around it aligns right. `<bdi>` isolates the text
+                    run and leaves the block alone. */}
+                <h3 className="text-label font-medium text-fg">
+                  <bdi dir="auto">{item.title}</bdi>
                 </h3>
                 {item.description ? (
-                  <p dir="auto" className="line-clamp-3 text-label text-fg-secondary">
-                    {item.description}
+                  <p className="line-clamp-3 text-label text-fg-secondary">
+                    <bdi dir="auto">{item.description}</bdi>
                   </p>
                 ) : null}
               </div>

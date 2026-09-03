@@ -24,6 +24,7 @@ import {
   ClipboardIcon,
   StorefrontIcon,
   BuildingIcon,
+  StarIcon,
 } from "@/components/ui/icons";
 
 /**
@@ -68,6 +69,8 @@ const ICONS: Record<PersonalNavKey, ComponentType<{ size?: number }>> = {
   // Distinct from the Jobs briefcase on purpose: they sit adjacent in the same
   // group, and two identical glyphs would make the two destinations read as one.
   myWork: ClipboardIcon,
+  // The mark the whole domain uses — a rating is a star everywhere it appears.
+  reviews: StarIcon,
   connectShowroom: StorefrontIcon,
   addBusiness: BuildingIcon,
 };

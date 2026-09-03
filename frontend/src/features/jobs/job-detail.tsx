@@ -15,6 +15,7 @@ import { ButtonLink, Input, LabeledField, SubmitButton } from "@/components/ui/c
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { JobStatusBadge } from "@/features/jobs/badges";
 import { PosterAssignmentPanel } from "@/features/work/poster-panel";
+import { LeaveReview } from "@/features/reviews/leave-review";
 import { formatDate, formatMoney } from "@/lib/ui/format";
 import { useActionState } from "react";
 import type { JobListRow, JobAssignmentRow } from "@/server/queries/jobs";
@@ -52,6 +53,7 @@ export function JobDetail({
   assignee,
   assignment,
   progress,
+  review,
   role,
   locale,
 }: {
@@ -60,6 +62,8 @@ export function JobDetail({
   assignment: JobAssignmentRow | null;
   /** The professional's own reports. Read-only on this side (§16). */
   progress: readonly ProgressUpdateRow[];
+  /** The review of this assignment, if one was already submitted (Increment 12). */
+  review: { rating: number; comment: string | null; createdAt: string } | null;
   role: JobRole;
   locale: Locale;
 }) {
@@ -140,6 +144,24 @@ export function JobDetail({
           assignee={assignee}
           updates={progress}
           canManage={role.canManage}
+          locale={locale}
+        />
+      ) : null}
+
+      {/* 2b. The review. Extends the completed-job surface by exactly one panel
+             (§10) rather than growing a B2B Reviews product: the work and the
+             opinion of it belong on the same page, and the opinion is only
+             available once the work is finished.
+
+             `canReview` is decided here from the two facts this page already
+             holds — the assignment is completed and the caller can manage the
+             job — so a colleague without the capability sees a submitted review
+             but is never offered a control the RPC would refuse. */}
+      {assignment && assignment.status === "completed" ? (
+        <LeaveReview
+          assignmentId={assignment.id}
+          canReview={role.canManage}
+          existing={review}
           locale={locale}
         />
       ) : null}

@@ -44,7 +44,7 @@ export function PortfolioManager({ items }: { items: PortfolioCard[] }) {
     <div className="flex flex-col gap-xl" data-testid="portfolio-manager">
       <div className="flex flex-wrap items-start justify-between gap-md">
         <div className="flex min-w-0 flex-col gap-1">
-          <h1 className="text-heading text-fg">{t("portfolio.title")}</h1>
+          <h1 className="text-headline text-fg">{t("portfolio.title")}</h1>
           <p className="max-w-prose text-body text-fg-secondary">{t("portfolio.subtitle")}</p>
         </div>
         <AddWork />
@@ -53,7 +53,7 @@ export function PortfolioManager({ items }: { items: PortfolioCard[] }) {
       {/* The one rule a person needs before they upload anything, said once and
           kept short. It is not a warning — private is the good default — so it
           reads as information rather than as a caution strip. */}
-      <p className="rounded-md border border-line bg-surface-sunken px-4 py-3 text-label text-fg-secondary">
+      <p className="rounded-md border bg-surface-2 px-4 py-3 text-label text-fg-secondary">
         {t("portfolio.privateByDefault")}
       </p>
 
@@ -94,10 +94,17 @@ export function PortfolioManager({ items }: { items: PortfolioCard[] }) {
 /**
  * A finished item.
  *
- * `dir="auto"` on the title and the description because both are user-entered and
- * an English title in the Arabic workspace would otherwise be clipped from its
- * front — the same defect the Jobs list carried until Increment 9, and the same
- * fix, applied where the text is rather than where the locale is.
+ * `<bdi dir="auto">` around the title and the description, because both are
+ * user-entered and neither can be assumed to match the workspace's direction.
+ *
+ * NOT `dir="auto"` ON THE BLOCK, which is what this shipped with in Increment 11
+ * and what Increment 12 found wrong on the review card: `dir="auto"` sets the
+ * direction of the PARAGRAPH, so an English title flips the whole block to LTR
+ * and `text-align: start` then resolves to LEFT — stranding the title at the far
+ * edge of an otherwise right-aligned card. `<bdi>` isolates the RUN instead: the
+ * block keeps the page's direction, and the text still renders correctly inside
+ * it. Both problems the Jobs list had in Increment 9 — clipping from the wrong
+ * end and now alignment — are solved by the same element.
  */
 function WorkCard({
   item,
@@ -145,12 +152,12 @@ function WorkCard({
         ) : (
           <>
             <div className="flex min-w-0 flex-col gap-1">
-              <h3 dir="auto" className="truncate text-title text-fg">
-                {item.title}
+              <h3 className="truncate text-title text-fg">
+                <bdi dir="auto">{item.title}</bdi>
               </h3>
               {item.description ? (
-                <p dir="auto" className="line-clamp-2 text-label text-fg-secondary">
-                  {item.description}
+                <p className="line-clamp-2 text-label text-fg-secondary">
+                  <bdi dir="auto">{item.description}</bdi>
                 </p>
               ) : null}
             </div>
@@ -232,8 +239,8 @@ function UnfinishedCard({ item }: { item: PortfolioCard }) {
   return (
     <Card pad="sm" className="flex flex-wrap items-center justify-between gap-md">
       <div className="flex min-w-0 flex-col gap-1">
-        <p dir="auto" className="truncate text-title text-fg">
-          {item.title}
+        <p className="truncate text-title text-fg">
+          <bdi dir="auto">{item.title}</bdi>
         </p>
         <p className="text-label text-fg-muted">{t("portfolio.unfinished.hint")}</p>
         {state.ok ? null : <InlineError>{t(state.code ?? "states.genericRetry")}</InlineError>}

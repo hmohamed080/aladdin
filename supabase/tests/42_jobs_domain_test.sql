@@ -967,8 +967,11 @@ select is(
     where event_type like 'job%'
       and event_type not in (
         'job.application.accepted', 'job.application.rejected',
-        'job.assignment.ready', 'job.assignment.completed', 'job.assignment.cancelled'))::int,
-  0, 'the Jobs domain emits only the five decided events, and no sixth');
+        'job.assignment.ready', 'job.assignment.completed', 'job.assignment.cancelled',
+        -- Increment 12. The sixth arrived because somebody decided it should:
+        -- one review, one unambiguous recipient, the professional it is about.
+        'job.review.received'))::int,
+  0, 'the Jobs domain emits only the six decided events, and no seventh');
 
 -- 'job.application.submitted' -> the posting organization is the one seam this
 -- domain deliberately leaves unwired, and it is asserted by name rather than

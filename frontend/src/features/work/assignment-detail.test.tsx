@@ -54,7 +54,7 @@ const update = (over: Partial<ProgressUpdateRow> = {}): ProgressUpdateRow => ({
   ...over,
 });
 
-const base = { locale: "en" as const, updates: [] as ProgressUpdateRow[] };
+const base = { locale: "en" as const, updates: [] as ProgressUpdateRow[] , review: null};
 
 describe("AssignmentDetail", () => {
   // ---- §10, the hierarchy -------------------------------------------------

@@ -15,6 +15,10 @@ vi.mock("@/server/actions/assignment-forms", () => ({
   cancelAssignmentAction: async () => ({ ok: true }),
   completeAssignmentAction: async () => ({ ok: true }),
 }));
+// And the completed-job panel binds the review action (Increment 12).
+vi.mock("@/server/actions/reviews", () => ({
+  submitReviewAction: async () => ({ ok: true }),
+}));
 
 import { JobDetail } from "./job-detail";
 import type { JobListRow, JobAssignmentRow } from "@/server/queries/jobs";
@@ -71,7 +75,7 @@ const assignment = (over: Partial<JobAssignmentRow> = {}): JobAssignmentRow =>
   }) as JobAssignmentRow;
 
 const poster = { canPost: true, canManage: true, orgVerified: true };
-const base = { assignee: null, assignment: null, progress: [], locale: "en" as const };
+const base = { assignee: null, assignment: null, progress: [], review: null, locale: "en" as const };
 
 describe("JobDetail", () => {
   /**

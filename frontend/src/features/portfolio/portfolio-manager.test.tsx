@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
 
 vi.mock("server-only", () => ({}));
@@ -103,19 +103,74 @@ describe("PortfolioManager", () => {
   });
 
   /**
-   * Mixed direction, the Increment 9 lesson applied to a new surface: an English
-   * title in the Arabic workspace must resolve its own direction, or `truncate`
-   * clips the words that identify the work.
+   * MIXED DIRECTION, and the shape of the fix is the assertion.
+   *
+   * Increment 11 put `dir="auto"` on the h3 and the p. That solved clipping —
+   * the Increment 9 lesson — but introduced a second defect Increment 12 found
+   * on the review card: `dir="auto"` sets the direction of the PARAGRAPH, so an
+   * English title flips the whole block to LTR and `text-align: start` then
+   * resolves to LEFT, stranding the title at the far edge of an otherwise
+   * right-aligned card.
+   *
+   * `<bdi>` isolates the RUN instead. These assertions therefore pin BOTH halves
+   * — the block carries no direction of its own, and the text is isolated inside
+   * it — because an assertion that only read `dir` off the element would keep
+   * passing after a revert to the thing that was wrong.
    */
-  it("lets user-entered text resolve its own direction in both workspaces", () => {
+  it("isolates user-entered text with <bdi> rather than turning the block", () => {
     for (const locale of ["en", "ar"] as const) {
       const { container, unmount } = renderWithI18n(<PortfolioManager items={[item()]} />, locale);
-      const title = container.querySelector("h3");
-      expect(title?.getAttribute("dir")).toBe("auto");
-      const description = container.querySelector("p.line-clamp-2");
-      expect(description?.getAttribute("dir")).toBe("auto");
+
+      const title = container.querySelector("h3")!;
+      expect(title.getAttribute("dir")).toBeNull();
+      expect(title.querySelector("bdi")?.getAttribute("dir")).toBe("auto");
+
+      const description = container.querySelector("p.line-clamp-2")!;
+      expect(description.getAttribute("dir")).toBeNull();
+      expect(description.querySelector("bdi")?.getAttribute("dir")).toBe("auto");
+
       unmount();
     }
+  });
+
+  /**
+   * The case the defect was found on: a Latin title in the Arabic workspace,
+   * beside an Arabic one. Both must be isolated, and neither may set a direction
+   * on the element that holds it.
+   */
+  it("handles a Latin and an Arabic title side by side in the Arabic workspace", () => {
+    const { container } = renderWithI18n(
+      <PortfolioManager
+        items={[
+          item({ id: "en", title: "Marble staircase - Fifth Settlement" }),
+          item({ id: "ar", title: "تكسية مطبخ - الشيخ زايد" }),
+        ]}
+      />,
+      "ar",
+    );
+    const headings = [...container.querySelectorAll("h3")];
+    expect(headings).toHaveLength(2);
+    for (const heading of headings) {
+      expect(heading.getAttribute("dir")).toBeNull();
+      expect(heading.querySelector("bdi")?.getAttribute("dir")).toBe("auto");
+    }
+    // The text itself is untouched — isolation is about direction, not content.
+    expect(headings[0]!.textContent).toBe("Marble staircase - Fifth Settlement");
+    expect(headings[1]!.textContent).toBe("تكسية مطبخ - الشيخ زايد");
+  });
+
+  /**
+   * A FORM CONTROL KEEPS `dir="auto"`. There it sets the typing direction, which
+   * is what the attribute is for, and `<bdi>` does not apply to an input. The
+   * distinction is easy to lose in a sweep, so it is pinned.
+   */
+  it("leaves dir=auto on the inputs, where it is the right answer", () => {
+    const { container } = renderWithI18n(<PortfolioManager items={[]} />, "ar");
+    fireEvent.click(screen.getByRole("button", { name: "إضافة عمل" }));
+    const title = container.querySelector('input[name="title"]');
+    const description = container.querySelector('textarea[name="description"]');
+    expect(title?.getAttribute("dir")).toBe("auto");
+    expect(description?.getAttribute("dir")).toBe("auto");
   });
 
   it("never renders a storage key or an item id", () => {

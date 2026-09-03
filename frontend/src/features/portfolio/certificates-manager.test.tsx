@@ -104,9 +104,34 @@ describe("CertificatesManager", () => {
     expect(container.textContent).not.toContain("70000009-0000");
   });
 
-  it("lets user-entered text resolve its own direction in the Arabic workspace", () => {
-    const { container } = renderWithI18n(<CertificatesManager items={[cert()]} />, "ar");
-    expect(container.querySelector("h3")?.getAttribute("dir")).toBe("auto");
+  /**
+   * Same fix as the portfolio card, same reason. The block must not carry a
+   * direction of its own — that is what stranded a Latin certificate name at the
+   * far edge of an Arabic row — and the text must be isolated inside it.
+   */
+  it("isolates a certificate name with <bdi> rather than turning the block", () => {
+    const { container } = renderWithI18n(
+      <CertificatesManager items={[cert({ title: "Occupational Safety Level 2" })]} />,
+      "ar",
+    );
+    const heading = container.querySelector("h3")!;
+    expect(heading.getAttribute("dir")).toBeNull();
+    expect(heading.querySelector("bdi")?.getAttribute("dir")).toBe("auto");
+    expect(heading.textContent).toBe("Occupational Safety Level 2");
+  });
+
+  it("isolates the issuer and date line too, which mixes scripts by nature", () => {
+    const { container } = renderWithI18n(
+      <CertificatesManager items={[cert({ issuer: "Ministry of Manpower" })]} />,
+      "ar",
+    );
+    // Found by its content, not by class: the page-level privacy strip carries
+    // the same utilities and would match a class selector first.
+    const facts = [...container.querySelectorAll("p")].find((n) =>
+      n.textContent?.includes("Ministry of Manpower"),
+    )!;
+    expect(facts.getAttribute("dir")).toBeNull();
+    expect(facts.querySelector("bdi")?.getAttribute("dir")).toBe("auto");
   });
 
   it("keeps an unfinished upload out of the list and offers to finish or discard it", () => {

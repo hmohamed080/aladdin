@@ -40,6 +40,7 @@ export type PersonalNavKey =
   | "points"
   | "jobs"
   | "myWork"
+  | "reviews"
   | "connectShowroom"
   | "addBusiness";
 
@@ -67,6 +68,7 @@ const ITEMS: Record<PersonalNavKey, PersonalNavItem> = {
   points: { key: "points", href: "/home/points", labelKey: "personalNav.points" },
   jobs: { key: "jobs", href: "/home/jobs", labelKey: "personalNav.jobs" },
   myWork: { key: "myWork", href: "/home/work", labelKey: "personalNav.myWork" },
+  reviews: { key: "reviews", href: "/home/reviews", labelKey: "personalNav.reviews" },
   connectShowroom: {
     key: "connectShowroom",
     href: "/home/showroom",
@@ -84,7 +86,12 @@ const SECTIONS: { section: PersonalNavSection; keys: PersonalNavKey[] }[] = [
      "Jobs" with tabs: an opening you might take and an engagement you already
      hold are different states of the world, and merging them would make
      "accepted" mean both "you won" and "you are working". */
-  { section: "work", keys: ["jobs", "myWork"] },
+  /* Reviews joins "work" rather than "account", and the distinction is the one
+     this group was drawn on: the other three destinations under "account" are
+     the caller's own record, and these three are the outside world's. A review
+     is written BY somebody else ABOUT work — it is the outcome of the two
+     destinations beside it, not a fact the professional maintains. */
+  { section: "work", keys: ["jobs", "myWork", "reviews"] },
   { section: "business", keys: ["connectShowroom", "addBusiness"] },
 ];
 
@@ -117,6 +124,10 @@ function isReachable(key: PersonalNavKey, input: PersonalNavInput): boolean {
        — the destination would be permanently empty rather than merely
        unusable. */
     case "myWork":
+    /* THE SAME TEST ONCE MORE. A review can only exist against an assignment,
+       and only a professional persona can hold one — so for a consumer this
+       destination is not merely unusable, it is permanently empty. */
+    case "reviews":
       return input.variant === "professional";
     case "connectShowroom":
       return input.isSalesPersona;

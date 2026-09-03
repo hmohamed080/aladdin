@@ -4,6 +4,136 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — A sentence that cannot be edited, and a correction that leaves a record
+
+**Date:** 2026-09-08 → 2026-09-09 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `7be2267` (Increment 11)
+
+Installer Increment 12: Completed-Work Reviews. One migration, two tables, two
+RPCs, two read models, one owner page, one public section, and three integration
+points on surfaces that already existed. The domain is small; almost all of the
+work was in deciding what a review is NOT allowed to be.
+
+### The four shapes that make it a record rather than an opinion box
+
+**Its identity is the work.** `assignment_id` is `unique`, so "one review per
+completed assignment" is a shape rather than a rule somebody has to enforce, and
+a review can only exist against work the platform watched reach 100% and be
+marked complete. Both foreign keys are `RESTRICT`: a review must outlive the
+ordinary lifecycle, and removing an assignment out from under one should be a
+conscious act, not a cascade.
+
+**It cannot change.** `app.forbid_mutation` — the same guard the append-only
+progress history uses — fires on UPDATE and DELETE. A trigger rather than a
+withheld grant, because a grant only stops clients: this also stops every
+`security definer` function in the file, which is what makes "immutable" a
+property instead of a convention. There is no `updated_at`, because a column
+recording when the row changed would be a permanent lie about a table whose whole
+point is that it does not move.
+
+**The reviewer is the organization.** `submitted_by` is stored for audit and
+authority and is projected nowhere — not publicly, not to the installer. Naming
+the employee who typed it would turn a business record into a personal one, on a
+surface the reviewed professional cannot answer back on. §16 asserts its absence
+from both read models by column list, so widening a projection breaks a test
+rather than quietly publishing a name.
+
+**A correction is a new fact.** There is no `suppressed` column. State is derived
+from the latest row in `job_review_moderations`, which is itself append-only, so
+the history cannot contradict the flag — there is no flag to contradict.
+Restoring is another row rather than an undo, `reason` is required, and the
+moderation table is readable by nobody: a reader learning that a review was
+suppressed, or why, would be reading the moderation decision itself.
+
+### The finding pgTAP made, which reading the file would not have
+
+Ordering the moderation history by `created_at` is wrong, and wrong in a way that
+only shows up under a test that does two things at once. `now()` is the
+TRANSACTION timestamp — a suppression and a restore performed in one transaction
+share it *exactly*, and "the latest act" then fell back to comparing two random
+uuids. Roughly half the time the restore lost to the suppression that preceded
+it. A `bigint generated always as identity` column is the only tiebreaker that
+means what it says, and the assertion that caught it is now the one that keeps it.
+
+The TRUNCATE hazard Increment 11 shipped and caught did not recur: the strip
+precedes the grant in this migration by construction, with the reason written
+above it.
+
+### What the public sees, and the number that is absent
+
+`public_profile_reviews` is keyed on `profiles.id` and joins
+`profile_public_directory` — the same listing test the profile page itself is
+built on — so publication cannot mean one thing to a profile and another to its
+reviews, and delisting withdraws every review at once without rewriting a row.
+It exposes the reviewing organization's display name, the rating, the comment,
+the job and trade context and the date. No user id, no `submitted_by`, no
+assignment id, no moderation state, and **no count of what is hidden** — a
+"3 reviews not shown" line would publish the moderation decision by subtraction.
+
+The rating summary has exactly one derivation (`lib/reviews/summary.ts`) shared
+by the hub module, the owner page and the public section, and its empty case
+returns `null` rather than `0`. A fresh professional leading with **0.0** reads as
+a terrible score rather than an empty one, so the numeral does not appear until
+there is one review to justify it.
+
+### The bidi defect, and the four utilities that were never real
+
+Building the review card turned up something wrong in Increment 11. Increment 9's
+lesson had been that user-entered text needs `dir="auto"` or `truncate` clips it;
+Increment 11 applied that to the portfolio card's `h3` and `p`. It fixes
+clipping and introduces a second defect: `dir="auto"` sets the direction of the
+**paragraph**, so a Latin title flips its whole block to LTR, `text-align: start`
+then resolves to LEFT, and the title strands itself at the far edge of an
+otherwise right-aligned card. `<bdi dir="auto">` isolates the *run* instead and
+gives both. Eight display blocks across Portfolio, Certificates and the public
+section were back-ported to it, measured at `gapFromStartEdge: 0` in both
+directions for both scripts. Form controls deliberately keep `dir="auto"`, where
+it sets the typing direction and is the right answer; a test pins that
+distinction so a future sweep does not flatten it.
+
+Confirming that fix turned up a second, quieter class of defect: **four semantic
+utility names that do not exist and emit no CSS at all** — `bg-surface-sunken`,
+`bg-warning-fg`/`text-warning-fg`, `border-line`, `text-heading`. Every use was
+from Increments 11 and 12. Page titles had been rendering at inherited size and
+information strips with no border, and nothing said so: `eslint`'s
+`aladdin/ui-foundation` rule catches raw hex, arbitrary values and default-palette
+colours, but a *misspelt semantic token is indistinguishable from a valid one* to
+it. The fix was mechanical; the method matters more — every colour and type
+utility in the increment's files was extracted and checked against the generated
+stylesheet, 19 checked, 0 missing. **A rule validating utility names against the
+Tailwind theme would have caught all four at write time, and is worth a Foundation
+follow-up.**
+
+### Composition and integration
+
+`05-reviews.jpeg` supplied the owner page: summary rail, distribution bars, a
+rating filter, and a card per review carrying the organization, the job and the
+date. Three existing surfaces gained one thing each and nothing more — the poster
+sees a submit action on a completed assignment, the installer's own assignment
+detail states that a review may arrive, and `/home` gains a Reviews destination
+under **work** rather than **account**, because a review is written by somebody
+else about work, not a fact the professional maintains. `job.review.received`
+joins the known notification events.
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 50 files, 1890 tests, PASS** — new
+`49_job_reviews_test.sql` at 65 assertions, its fixture built through the real
+RPCs end to end (create → publish → apply → accept → start → 100% → complete)
+rather than by inserting rows, so the preconditions are the product's own.
+`tsc` clean · `eslint` 0 errors (1 pre-existing) · `vitest` **1207/97** (was
+1154/93) · `next build` clean.
+
+Browser UAT in both locales at 1440px and 390px, light and dark: submit as the
+poster, appearance on the installer's page and on the public profile, the filter,
+suppression removing it from both public and owner views while the poster's
+"already reviewed" state stands, restore returning it, and the empty state on a
+professional with none. Teardown left 0 reviews, 0 portfolio items, 0
+certificates and 0 storage objects.
+
+`RUNTIME_STATE.md` is untouched and now thirteen increments behind.
+
+---
+
 ## Session — A photograph a stranger may see, and everything else that must stay shut
 
 **Date:** 2026-09-06 → 2026-09-08 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `af08e9f` (Increment 10)

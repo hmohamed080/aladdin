@@ -43,13 +43,13 @@ export function CertificatesManager({ items }: { items: Certificate[] }) {
     <div className="flex flex-col gap-xl" data-testid="certificates-manager">
       <div className="flex flex-wrap items-start justify-between gap-md">
         <div className="flex min-w-0 flex-col gap-1">
-          <h1 className="text-heading text-fg">{t("certificates.title")}</h1>
+          <h1 className="text-headline text-fg">{t("certificates.title")}</h1>
           <p className="max-w-prose text-body text-fg-secondary">{t("certificates.subtitle")}</p>
         </div>
         <AddCertificate />
       </div>
 
-      <p className="rounded-md border border-line bg-surface-sunken px-4 py-3 text-label text-fg-secondary">
+      <p className="rounded-md border bg-surface-2 px-4 py-3 text-label text-fg-secondary">
         {t("certificates.privateEvidence")}
       </p>
 
@@ -103,16 +103,16 @@ function CertificateRow({ item }: { item: Certificate }) {
               </span>
               <div className="flex min-w-0 flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 dir="auto" className="text-title text-fg">
-                    {item.title}
+                  <h3 className="text-title text-fg">
+                    <bdi dir="auto">{item.title}</bdi>
                   </h3>
                   {/* The only badge in this domain, and it states a date that has
                       passed — never an opinion about the document. */}
                   {expired ? <Badge tone="warning">{t("certificates.expired")}</Badge> : null}
                 </div>
                 {facts.length > 0 ? (
-                  <p dir="auto" className="text-label text-fg-secondary">
-                    {facts.join(" · ")}
+                  <p className="text-label text-fg-secondary">
+                    <bdi dir="auto">{facts.join(" · ")}</bdi>
                   </p>
                 ) : null}
                 <p className="text-label text-fg-muted">
@@ -196,8 +196,8 @@ function UnfinishedRow({ item }: { item: Certificate }) {
   return (
     <Card pad="sm" className="flex flex-wrap items-center justify-between gap-md">
       <div className="flex min-w-0 flex-col gap-1">
-        <p dir="auto" className="truncate text-title text-fg">
-          {item.title}
+        <p className="truncate text-title text-fg">
+          <bdi dir="auto">{item.title}</bdi>
         </p>
         <p className="text-label text-fg-muted">{t("certificates.unfinished.hint")}</p>
         {state.ok ? null : <InlineError>{t(state.code ?? "states.genericRetry")}</InlineError>}

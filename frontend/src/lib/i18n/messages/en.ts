@@ -348,6 +348,7 @@ export const en = {
     },
   },
   personalNav: {
+    reviews: "Reviews",
     label: "Personal navigation",
     home: "Home",
     profile: "My profile",
@@ -358,6 +359,12 @@ export const en = {
     addBusiness: "Add business",
   },
   profile: {
+    reviews: {
+      title: "My reviews",
+      body: "What the businesses you worked for said about your work.",
+      none: "no reviews yet",
+      manage: "View reviews",
+    },
     work: {
       title: "Your work and certificates",
       body: "What you show the public, and what you keep to yourself.",
@@ -442,6 +449,7 @@ export const en = {
       saveFailed: "We could not save your changes. Please check the fields and try again.",
     },
     publicPage: {
+      reviews: "Client reviews",
       portfolio: "Recent work",
       unnamed: "Aladdin professional",
       practice: "Work and specialties",
@@ -1117,6 +1125,14 @@ export const en = {
       /* Increment 9. `ready` is the only one addressed to an organization, and
          it deliberately does not say "completed" — the work has been REPORTED
          as finished and the reader is the person who decides whether it was. */
+      /* Increment 12. Addressed to the reviewed professional and to nobody
+         else: the organization is the party that just acted. */
+      review: {
+        received: {
+          title: "You received a review",
+          body: "{org_name} reviewed your work on “{job_title}”.",
+        },
+      },
       assignment: {
         ready: {
           title: "Work reported as finished",
@@ -3067,6 +3083,46 @@ export const en = {
     },
   },
 
+  reviews: {
+    title: "My reviews",
+    subtitle: "What the businesses you worked for said about your finished work.",
+    listTitle: "All reviews",
+    basedOn: "Based on {n} reviews",
+    starsLabel: "{n} out of 5",
+    starsRow: "{n} stars",
+    filterLabel: "Filter by rating",
+    filterAll: "All ratings",
+    noneMatch: "No reviews with that rating.",
+    empty: {
+      title: "No reviews yet",
+      body: "When a business confirms work you finished, they can leave a review. It appears here and on your public profile.",
+    },
+    assignment: {
+      title: "Client review",
+    },
+    poster: {
+      title: "Review this work",
+      body: "The work is complete. Tell other businesses how it went.",
+      leave: "Leave review",
+      authored:
+        "Your review is published under your organisation's name. The person writing it is never shown.",
+      ratingLabel: "Rating",
+      commentLabel: "Comment",
+      optional: "optional",
+      finalWarning: "Reviews cannot be changed or removed once submitted.",
+      submit: "Submit review",
+      cancel: "Cancel",
+      submittedTitle: "Your review",
+      immutable: "Submitted {date}. Reviews cannot be changed once submitted.",
+    },
+    errors: {
+      ratingRequired: "Choose a rating from 1 to 5.",
+      notCompleted: "Only completed work can be reviewed.",
+      denied: "You cannot review this work.",
+      notFound: "That work is no longer here.",
+      commentTooLong: "That comment is too long.",
+    },
+  },
   work: {
     title: "My work",
     subtitle: "Everything you have been assigned — current, finished and cancelled — in one place.",

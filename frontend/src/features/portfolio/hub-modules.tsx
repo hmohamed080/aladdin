@@ -62,7 +62,7 @@ export function PortfolioModule({
       ) : null}
 
       <div className="flex items-end gap-3">
-        <span className="text-heading text-fg">{summary.portfolioTotal}</span>
+        <span className="text-headline text-fg">{summary.portfolioTotal}</span>
         <span className="pb-1 text-label text-fg-secondary">
           {summary.portfolioTotal === 0
             ? t("profile.portfolio.none")
@@ -74,7 +74,7 @@ export function PortfolioModule({
       </div>
 
       {summary.portfolioUnfinished > 0 ? (
-        <p className="text-label text-warning-fg">
+        <p className="text-label text-warning">
           {t("profile.portfolio.unfinished", { n: summary.portfolioUnfinished })}
         </p>
       ) : null}
@@ -112,7 +112,7 @@ export function CertificatesModule({
       <p className="text-label text-fg-secondary">{t("profile.certificates.body")}</p>
 
       <div className="flex items-end gap-3">
-        <span className="text-heading text-fg">{summary.certificateTotal}</span>
+        <span className="text-headline text-fg">{summary.certificateTotal}</span>
         <span className="pb-1 text-label text-fg-secondary">
           {summary.certificateTotal === 0
             ? t("profile.certificates.none")
@@ -128,7 +128,7 @@ export function CertificatesModule({
       ) : null}
 
       {summary.certificatesExpired > 0 ? (
-        <p className="text-label text-warning-fg">
+        <p className="text-label text-warning">
           {t("profile.certificates.expired", { n: summary.certificatesExpired })}
         </p>
       ) : null}

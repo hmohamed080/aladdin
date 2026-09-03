@@ -9,6 +9,7 @@ import type { MyAssignmentRow, ProgressUpdateRow } from "@/server/queries/job-as
 import { canCancel, canReportProgress, canStart, readyForCompletion } from "@/lib/work/assignment-state";
 import { JobIdentity, ReadyForConfirmation, WorkProgress } from "./parts";
 import { CancelAssignmentDialog, ReportProgressDialog, StartWorkDialog } from "./lifecycle";
+import { AssignmentReview } from "@/features/reviews/assignment-review";
 
 /**
  * The installer's operational record for ONE assignment.
@@ -35,10 +36,21 @@ import { CancelAssignmentDialog, ReportProgressDialog, StartWorkDialog } from ".
 export function AssignmentDetail({
   assignment,
   updates,
+  review,
   locale,
 }: {
   assignment: MyAssignmentRow;
   updates: readonly ProgressUpdateRow[];
+  /**
+   * The organization's review of this work, if they have written one.
+   *
+   * NULL IS SILENT (§11). When no review exists this page says nothing at all —
+   * no "not reviewed yet", no prompt, no request button. The professional cannot
+   * make a client write one, and a line telling them it is missing would be a
+   * standing reminder of something outside their control on the record of work
+   * they already finished.
+   */
+  review: { rating: number; comment: string | null; createdAt: string } | null;
   locale: Locale;
 }) {
   const { t } = useI18n();
@@ -51,6 +63,8 @@ export function AssignmentDetail({
 
   return (
     <div className="flex flex-col gap-md">
+      {review ? <AssignmentReview review={review} locale={locale} /> : null}
+
       {/* ---- 1. Identity and state ---- */}
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-md">

@@ -11,6 +11,7 @@ import { BackLink } from "@/features/sales/page-parts";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
 import { AssignmentDetail } from "@/features/work/assignment-detail";
 import { getMyAssignment, listProgressUpdates } from "@/server/queries/job-assignments";
+import { loadAssignmentReview } from "@/server/queries/reviews";
 
 export const dynamic = "force-dynamic";
 
@@ -60,11 +61,14 @@ export default async function AssignmentDetailPage({
   // the poster's surface makes, because `job_progress_select_parties` admits
   // both of them.
   const updates = await listProgressUpdates(supabase, assignmentId);
+  // Only completed work can carry one, so only completed work asks.
+  const review =
+    assignment.status === "completed" ? await loadAssignmentReview(assignmentId) : null;
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0" data-testid="assignment-detail">
       <BackLink href="/home/work">{m.work.back}</BackLink>
-      <AssignmentDetail assignment={assignment} updates={updates} locale={locale} />
+      <AssignmentDetail assignment={assignment} updates={updates} review={review} locale={locale} />
     </div>
   );
 }

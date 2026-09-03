@@ -68,6 +68,7 @@ export const KNOWN_NOTIFICATION_EVENTS = [
   "job.assignment.ready",
   "job.assignment.completed",
   "job.assignment.cancelled",
+  "job.review.received",
 ] as const;
 
 export type KnownNotificationEvent = (typeof KNOWN_NOTIFICATION_EVENTS)[number];

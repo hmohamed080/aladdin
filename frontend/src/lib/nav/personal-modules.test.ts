@@ -28,7 +28,7 @@ describe("personalNavKeys", () => {
 
   it("gives a professional the profile hub and Job Opportunities", () => {
     const keys = personalNavKeys({ variant: "professional", isSalesPersona: false });
-    expect(keys).toEqual(["home", "profile", "points", "jobs", "myWork", "addBusiness"]);
+    expect(keys).toEqual(["home", "profile", "points", "jobs", "myWork", "reviews", "addBusiness"]);
   });
 
   it("NEVER offers the showroom entry to a non-Sales professional", () => {
@@ -47,6 +47,7 @@ describe("personalNavKeys", () => {
       "points",
       "jobs",
       "myWork",
+      "reviews",
       "connectShowroom",
       "addBusiness",
     ]);
@@ -90,7 +91,7 @@ describe("personalNavKeys", () => {
     }
     // And the union covers the whole key space — a key nothing can reach would be
     // an entry that exists only in the map.
-    expect(emitted.size).toBe(7);
+    expect(emitted.size).toBe(8);
   });
 });
 
@@ -193,10 +194,17 @@ describe("Job Opportunities in the personal rail", () => {
     expect(without.includes("jobs")).toBe(true);
   });
 
-  it("puts Jobs and My Work together in the work group", () => {
+  it("puts Jobs, My Work and Reviews together in the work group", () => {
     const sections = personalNavSections({ variant: "professional", isSalesPersona: false });
     expect(sections.map((s) => s.section)).toEqual(["account", "work", "business"]);
-    expect(sections.find((s) => s.section === "work")?.keys).toEqual(["jobs", "myWork"]);
+    /* Reviews joins the two rather than sitting under "account": the account
+       group holds the caller's own record, and all three of these are the
+       outside world — an opening, an engagement, and what came of it. */
+    expect(sections.find((s) => s.section === "work")?.keys).toEqual([
+      "jobs",
+      "myWork",
+      "reviews",
+    ]);
   });
 });
 

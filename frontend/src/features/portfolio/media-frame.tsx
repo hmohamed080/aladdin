@@ -26,7 +26,7 @@ export function MediaFrame({
   return (
     <div
       className={cn(
-        "relative aspect-[4/3] w-full overflow-hidden rounded-md bg-surface-sunken",
+        "relative aspect-[4/3] w-full overflow-hidden rounded-md bg-surface-2",
         className,
       )}
     >

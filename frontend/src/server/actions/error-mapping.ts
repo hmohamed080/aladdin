@@ -272,3 +272,30 @@ export function mapPortfolioError(error: unknown): string {
     return "portfolio.errors.denied";
   return "states.genericRetry";
 }
+
+/**
+ * Maps a review RPC error to a stable translation KEY.
+ *
+ * `42501` covers three genuinely different refusals and each is named before the
+ * generic branch swallows it: not signed in, no authority on the posting
+ * organization, and no such assignment. The middle one is the interesting case —
+ * an installer reaching this gets "you cannot review this work", which is true
+ * and is also what a stranger gets, because the domain deliberately does not
+ * distinguish "not yours" from "not allowed" for a caller with no capability.
+ *
+ * There is no branch for an edit or a delete failure, because no such call
+ * exists to fail.
+ */
+export function mapReviewError(error: unknown): string {
+  const e = (error ?? {}) as PgLikeError;
+  const code = e.code ?? "";
+  const msg = (e.message ?? "").toLowerCase();
+
+  if (msg.includes("only completed work can be reviewed")) return "reviews.errors.notCompleted";
+  if (msg.includes("job.manage required to review")) return "reviews.errors.denied";
+  if (msg.includes("assignment not found")) return "reviews.errors.notFound";
+  if (code === "23514" && msg.includes("ck_job_reviews_rating")) return "reviews.errors.ratingRequired";
+  if (code === "23514" && msg.includes("ck_job_reviews_comment")) return "reviews.errors.commentTooLong";
+  if (msg.includes("authentication required") || code === "42501") return "reviews.errors.denied";
+  return "states.genericRetry";
+}

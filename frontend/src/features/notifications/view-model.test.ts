@@ -134,6 +134,8 @@ describe("every approved event type has real bilingual copy", () => {
       "job.assignment.ready": { job_title: "T" },
       "job.assignment.completed": { org_name: "C", job_title: "T" },
       "job.assignment.cancelled": { job_title: "T", reason: "R" },
+      // Increment 12: one review, one recipient — the professional it is about.
+      "job.review.received": { org_name: "C", job_title: "T" },
     };
 
     const unfilled: string[] = [];

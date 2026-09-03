@@ -10,7 +10,7 @@
 | **D2** | **Organization posts → individual `installer_technician` user applies**, as a **new domain**. Commerce spine unchanged. |
 | **D3** | Installer↔Showroom network is **not** a Sales membership; it is **derived from completed work**. |
 | **D3-residual** | `showroom_join_request_create` gets a **minimal persona gate** (§7). No redesign of Sales affiliation. |
-| **D4** | **One review per completed assignment**, poster-org authored, installer targeted, score 1–5 (§6). |
+| **D4** | **One review per completed assignment**, poster-org authored, installer targeted, score 1–5 (§6). **Delivered in Increment 12** — see [`job-reviews.md`](job-reviews.md). |
 | **D5** | **Storage first.** A real Media/Storage foundation precedes any Portfolio/Certificate upload UI. No temporary URL fields, no fake media rows. |
 | **D6** | **Availability** is persisted, user-controlled profile state (§8). Not presence, not realtime, not a calendar. |
 | **D7** | **Settings composes existing capabilities** (§9). No new settings domain. Notification preferences deferred. |
