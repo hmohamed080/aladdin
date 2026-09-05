@@ -742,6 +742,36 @@ a model, and this Core does not supply one. A leaderboard in particular is a
 one requires reopening [Privacy and multi-tenancy](#privacy-and-multi-tenancy),
 not merely adding a query.
 
+### Presentation-level bands (Pilot, approved 2026-09-03)
+
+The Installer Pilot's Network Points card shows a "Level" and a "Points
+remaining to next level". This is **not** the tier/badge/level model refused
+above — that refusal is about the **ledger**: no stored level column, no
+threshold table, nothing that could gate an earning rule or be written by
+anything other than `points_delta`. What is approved here is strictly a
+**read-side presentation band** over the one real number the ledger already
+produces (`points_balance`), computed fresh on every render and written
+nowhere:
+
+| Level | Balance range |
+|---|---|
+| 1 | 0–99 |
+| 2 | 100–249 |
+| 3 | 250–499 |
+| 4 | 500–999 |
+| 5 | 1000+ (highest — no Level 6 is defined) |
+
+Implemented as one pure function, `frontend/src/lib/network/points-level.ts`
+(`derivePointsLevel`), consumed only by the Network Points card
+(`frontend/src/features/network/points-panel.tsx`). It cannot drift from the
+ledger because it reads nothing but the balance and persists nothing back —
+there is no column for it to drift from. It gates no earning rule, no
+capability and no eligibility; it is caption text and a progress ring, in the
+same spirit as `PanelRow`'s `share` bar elsewhere in the workspace. A future
+consumer that wants an *authoritative*, stored level — one an earning rule or
+an access decision could depend on — is still the case this document refuses,
+and still needs its own approved specification.
+
 ## Realtime
 
 **Explicitly deferred. Nothing is mandated and nothing is added.**
@@ -778,7 +808,10 @@ approved specification:
 - **Challenges engine** — no challenge, mission, quest, streak or progress
   model.
 - **Leaderboard** — no ranking, no cross-user read, no team totals.
-- **Badges** and **tiers** — no achievement or level model of any kind.
+- **Badges** and **tiers** — no achievement or level model of any kind **in
+  the ledger**. A read-only, unstored presentation band derived from the real
+  balance is a narrow, separately approved exception — see
+  [Presentation-level bands](#presentation-level-bands-pilot-approved-2026-09-03).
 - **Sales Score calculation** — undefined in the repository; not designed
   against.
 - **AI recommendations** — no scoring, ranking or suggestion driven by points.

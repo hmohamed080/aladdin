@@ -3,6 +3,7 @@ import { screen } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
 import { createTranslator } from "@/lib/i18n/translate";
 import type { PersonalHomeData } from "@/server/queries/personal-home";
+import type { NetworkOrganization } from "@/server/queries/network";
 
 vi.mock("@/server/actions/availability", () => ({
   setAvailabilityAction: async () => ({ ok: true }),
@@ -61,6 +62,8 @@ const noTrades = { keys: [], primaryKey: null };
  */
 /** A professional with no reviews yet — the state these tests are not about. */
 const noReviews = { average: null, total: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+/** A professional with no network yet — the state these tests are not about. */
+const noNetwork: NetworkOrganization[] = [];
 
 const noAssets = {
   portfolioTotal: 0,
@@ -76,7 +79,8 @@ const noAssets = {
 describe("ProfileHub", () => {
   it("gives the professional a control for their own availability", () => {
     renderWithI18n(
-      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews} t={createTranslator("en")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews}
+        network={noNetwork} t={createTranslator("en")} />,
       "en",
     );
     expect(screen.getByRole("button", { name: "Mark me available" })).toBeTruthy();
@@ -84,7 +88,8 @@ describe("ProfileHub", () => {
 
   it("keeps the live flag and the onboarding LEAD TIME as two different things", () => {
     renderWithI18n(
-      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews} t={createTranslator("en")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews}
+        network={noNetwork} t={createTranslator("en")} />,
       "en",
     );
     // The lead-time row is no longer called "Availability"…
@@ -108,6 +113,7 @@ describe("ProfileHub", () => {
         trades={noTrades}
         assets={noAssets}
         reviews={noReviews}
+        network={noNetwork}
         t={createTranslator("en")}
       />,
       "en",
@@ -119,7 +125,8 @@ describe("ProfileHub", () => {
 
   it("renders in Arabic with no key leak", () => {
     const { container } = renderWithI18n(
-      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews} t={createTranslator("ar")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews}
+        network={noNetwork} t={createTranslator("ar")} />,
       "ar",
     );
     expect(screen.getByText("لا أقبل أعمالًا حاليًا")).toBeTruthy();
@@ -144,6 +151,7 @@ describe("ProfileHub", () => {
         trades={{ keys: ["marble_granite", "tiling"], primaryKey: "marble_granite" }}
         assets={noAssets}
         reviews={noReviews}
+        network={noNetwork}
         t={createTranslator("en")}
       />,
       "en",
@@ -161,6 +169,7 @@ describe("ProfileHub", () => {
         trades={{ keys: ["marble_granite"], primaryKey: "marble_granite" }}
         assets={noAssets}
         reviews={noReviews}
+        network={noNetwork}
         t={createTranslator("en")}
       />,
       "en",
@@ -171,7 +180,8 @@ describe("ProfileHub", () => {
 
   it("keeps the legacy free text where there is no canonical trade to replace it", () => {
     renderWithI18n(
-      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews} t={createTranslator("en")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews}
+        network={noNetwork} t={createTranslator("en")} />,
       "en",
     );
     // …and still the only answer there is without one. This increment deletes
@@ -181,9 +191,47 @@ describe("ProfileHub", () => {
 
   it("tells a professional with no trades what to do about it", () => {
     renderWithI18n(
-      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews} t={createTranslator("en")} />,
+      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews}
+        network={noNetwork} t={createTranslator("en")} />,
       "en",
     );
     expect(screen.getByTestId("trade-summary-empty")).toBeTruthy();
+  });
+
+  /**
+   * The Network module (Increment 13, §10). Real data only: the module has no
+   * input but the organization array itself, so a populated network can only
+   * render from real completed-work rows.
+   */
+  it("tells a professional with no network yet that nothing has arrived", () => {
+    renderWithI18n(
+      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews}
+        network={noNetwork} t={createTranslator("en")} />,
+      "en",
+    );
+    expect(screen.getByText("no organizations yet")).toBeTruthy();
+  });
+
+  it("shows a real organization count once completed work exists", () => {
+    const network: NetworkOrganization[] = [
+      {
+        orgId: "9a000000-aaaa-4aaa-8aaa-000000000005",
+        orgName: "Horizon Contracting",
+        completedCount: 2,
+        firstCompletedAt: "2026-06-01T00:00:00Z",
+        lastCompletedAt: "2026-08-01T00:00:00Z",
+        tradeKeys: ["marble_granite", "tiling"],
+        latestJobTitle: "Tiling entrance hall - Zamalek",
+        latestAssignmentId: "a0000000-0000-4000-8000-000000000001",
+        reviewCount: 1,
+      },
+    ];
+    renderWithI18n(
+      <ProfileHub data={data()} publication={publication} trades={noTrades} assets={noAssets} reviews={noReviews}
+        network={network} t={createTranslator("en")} />,
+      "en",
+    );
+    expect(screen.getByText("My network")).toBeTruthy();
+    expect(screen.getByText("2 completed")).toBeTruthy();
   });
 });

@@ -348,6 +348,7 @@ export const ar: Messages = {
     points: "النقاط",
     jobs: "فرص العمل",
     myWork: "شغلي",
+    network: "الشبكة",
     connectShowroom: "ربط معرض",
     addBusiness: "إضافة نشاط",
   },
@@ -361,6 +362,12 @@ export const ar: Messages = {
     work: {
       title: "أعمالك وشهاداتك",
       body: "ما تعرضه للجمهور، وما تحتفظ به لنفسك.",
+    },
+    network: {
+      title: "شبكتي",
+      body: "المؤسسات التي لديك معها عمل حقيقي ومكتمل.",
+      none: "لا توجد مؤسسات بعد",
+      manage: "عرض الشبكة",
     },
     portfolio: {
       title: "أعمالي",
@@ -3012,6 +3019,139 @@ export const ar: Messages = {
       denied: "لا يمكنك تقييم هذا العمل.",
       notFound: "هذا العمل لم يعد موجودًا.",
       commentTooLong: "هذا التعليق طويل جدًا.",
+    },
+  },
+  network: {
+    title: "شبكتي",
+    subtitle: "المؤسسات التي أنجزت لها عملًا حقيقيًا. مبنية من الإسنادات المكتملة فقط.",
+    back: "الشبكة",
+
+    summary: {
+      organizations: "المؤسسات التي عملت معها",
+      completed: "الإسنادات المكتملة",
+      repeat: "مؤسسات تكرر العمل معها",
+      trades: "الحرف الممثَّلة",
+      latest: "أحدث علاقة",
+    },
+
+    searchPlaceholder: "ابحث عن مؤسسة",
+    tradeLabel: "الحرفة",
+    allTrades: "كل الحرف",
+    clear: "مسح التصفية",
+
+    list: {
+      title: "المؤسسات",
+      completedCount: "{n} مكتمل",
+      latestWork: "الأحدث: {title}",
+      firstWorked: "أول عمل معًا",
+      latestWorked: "آخر عمل مكتمل",
+      view: "عرض العلاقة",
+      showing: "المؤسسات التي أنجزت معها عملًا، الأحدث أولًا.",
+      showMore: "عرض المزيد",
+    },
+
+    directory: {
+      title: "دليل الشبكة",
+    },
+
+    empty: {
+      title: "لا توجد شبكة بعد",
+      body: "حين تؤكد مؤسسة عملًا أنجزته، تظهر هنا كجزء من شبكتك المهنية.",
+    },
+    noneMatch: "لا توجد مؤسسات مطابقة لتصفيتك.",
+
+    tabs: {
+      label: "تصفية شبكتك",
+      all: "الكل",
+      workedWith: "عملت معها",
+      referred: "انضمت بدعوتك",
+      pending: "دعوات معلَّقة",
+    },
+
+    badge: {
+      verified: "علاقة عمل موثقة",
+      referred: "انضم بدعوتك",
+      referredToo: "انضم أيضًا بدعوتك",
+      pending: "دعوة معلَّقة",
+    },
+
+    actions: {
+      call: "اتصال",
+      messageSoon: "رسالة · قريبًا",
+    },
+
+    hero: {
+      title: "أضف معرضًا تعرفه",
+      body: "تُنشأ علاقات العمل تلقائيًا من الأعمال المكتملة — ويمكنك أيضًا دعوة معارض جديدة تعرفها.",
+      cta: "أضف معرضًا أعرفه",
+    },
+
+    rail: {
+      pointsTitle: "نقاط الشبكة",
+      referredOrgs: "انضمت بدعوتك",
+      showroomsAdded: "معارض أضفتها",
+      viewPoints: "عرض النقاط",
+      howBody: "100 نقطة حين يُعتمد معرض جديد دعوته وينضم إلى علاء الدين.",
+      levelLabel: "المستوى",
+      levelValue: "المستوى {n}",
+      remainingToNext: "باقي {n} نقطة للوصول إلى المستوى التالي",
+      maxLevel: "بلغت أعلى مستوى",
+      pendingTitle: "دعوات معلَّقة",
+      pendingEmpty: "لا توجد دعوات معلَّقة.",
+      viewAllPendingCount: "عرض كل الدعوات ({n})",
+    },
+
+    pending: {
+      submitted: "أُرسلت في {date}",
+      withdraw: "سحب الدعوة",
+      menuLabel: "إجراءات إضافية",
+      resend: "إعادة الإرسال",
+      resendCopied: "تم نسخ الدعوة",
+      shareMessage: "{name}، تمت دعوتك للانضمام إلى علاء الدين — منصة محترفي التشطيبات والإنشاءات في مصر. سجّل من هنا: {url}",
+    },
+
+    refer: {
+      title: "أضف معرضًا أعرفه",
+      subtitle: "ادعُ مؤسسة موجودة بالفعل على علاء الدين، أو مؤسسة غير موجودة — في الحالتين لن تحصل على عضوية أو صلاحية.",
+      error: "لم تكتمل العملية. حاول مرة أخرى.",
+      knownTitle: "موجودة بالفعل على علاء الدين",
+      knownBody: "ابحث عن المؤسسة بالاسم.",
+      searchLabel: "اسم المؤسسة",
+      searchHint: "حرفان على الأقل.",
+      searchPlaceholder: "ابحث عن مؤسسة",
+      searchAction: "بحث",
+      verified: "موثقة",
+      referThis: "ادعُ هذه",
+      empty: "لا توجد نتائج",
+      emptyBody: "جرّب إملاءً مختلفًا، أو ادعُها كمعرض جديد أدناه.",
+      newTitle: "غير موجودة بعد على علاء الدين",
+      newBody: "أخبرنا عن المعرض. يراجعه المسؤول قبل أن يصبح مؤسسة حقيقية.",
+      nameLabel: "اسم المعرض",
+      governorateLabel: "المحافظة",
+      cityLabel: "المدينة / المنطقة",
+      phoneLabel: "رقم التواصل",
+      phoneHint: "رقمك الخاص لهذه الدعوة — لا يُعرض للعامة أبدًا.",
+      noteLabel: "ملاحظة",
+      submitAction: "إرسال الدعوة",
+      reviewNote: "يراجعها المسؤول قبل أن تصبح مؤسسة حقيقية.",
+    },
+
+    detail: {
+      back: "الشبكة",
+      eyebrow: "العلاقة",
+      summaryTitle: "ملخص العلاقة",
+      completedCount: "الإسنادات المكتملة",
+      firstWorked: "أول عمل معًا",
+      latestWorked: "آخر عمل مكتمل",
+      trades: "الحرف التي عملتما بها معًا",
+      reviewsTitle: "تقييمات من هذه المؤسسة",
+      reviewsCount: "{n} تقييم من هذه المؤسسة",
+      historyTitle: "سجل الأعمال المكتملة",
+      viewAssignment: "عرض في شغلي",
+      notFound: "هذه المؤسسة ليست جزءًا من شبكتك.",
+      referralTitle: "كيف بدأت هذه العلاقة",
+      referralBody: "دعوت هذه المؤسسة في {date}.",
+      referralNoWorkYet: "لا يوجد عمل مكتمل بعد.",
     },
   },
   work: {

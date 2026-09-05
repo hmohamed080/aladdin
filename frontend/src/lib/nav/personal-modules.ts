@@ -41,6 +41,7 @@ export type PersonalNavKey =
   | "jobs"
   | "myWork"
   | "reviews"
+  | "network"
   | "connectShowroom"
   | "addBusiness";
 
@@ -69,6 +70,7 @@ const ITEMS: Record<PersonalNavKey, PersonalNavItem> = {
   jobs: { key: "jobs", href: "/home/jobs", labelKey: "personalNav.jobs" },
   myWork: { key: "myWork", href: "/home/work", labelKey: "personalNav.myWork" },
   reviews: { key: "reviews", href: "/home/reviews", labelKey: "personalNav.reviews" },
+  network: { key: "network", href: "/home/network", labelKey: "personalNav.network" },
   connectShowroom: {
     key: "connectShowroom",
     href: "/home/showroom",
@@ -91,7 +93,11 @@ const SECTIONS: { section: PersonalNavSection; keys: PersonalNavKey[] }[] = [
      the caller's own record, and these three are the outside world's. A review
      is written BY somebody else ABOUT work — it is the outcome of the two
      destinations beside it, not a fact the professional maintains. */
-  { section: "work", keys: ["jobs", "myWork", "reviews"] },
+  /* Network joins the same group, last: it is derived from the OUTCOME of the
+     two destinations before it — completed engagements become the real
+     professional relationships this entry summarises — never a fourth
+     independent thing a professional maintains. */
+  { section: "work", keys: ["jobs", "myWork", "reviews", "network"] },
   { section: "business", keys: ["connectShowroom", "addBusiness"] },
 ];
 
@@ -128,6 +134,11 @@ function isReachable(key: PersonalNavKey, input: PersonalNavInput): boolean {
        and only a professional persona can hold one — so for a consumer this
        destination is not merely unusable, it is permanently empty. */
     case "reviews":
+    /* AND ONCE MORE. Network is derived exclusively from completed
+       job_assignments (Increment 13), which only a professional persona can
+       ever hold — a consumer's Network is not merely empty, it is
+       unreachable by construction. */
+    case "network":
       return input.variant === "professional";
     case "connectShowroom":
       return input.isSalesPersona;

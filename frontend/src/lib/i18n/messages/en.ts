@@ -355,6 +355,7 @@ export const en = {
     points: "Points",
     jobs: "Job opportunities",
     myWork: "My work",
+    network: "Network",
     connectShowroom: "Connect showroom",
     addBusiness: "Add business",
   },
@@ -368,6 +369,12 @@ export const en = {
     work: {
       title: "Your work and certificates",
       body: "What you show the public, and what you keep to yourself.",
+    },
+    network: {
+      title: "My network",
+      body: "Organizations you have real, completed work with.",
+      none: "no organizations yet",
+      manage: "View network",
     },
     portfolio: {
       title: "My work",
@@ -3121,6 +3128,139 @@ export const en = {
       denied: "You cannot review this work.",
       notFound: "That work is no longer here.",
       commentTooLong: "That comment is too long.",
+    },
+  },
+  network: {
+    title: "My network",
+    subtitle: "Organizations you have completed real work for. Built from finished assignments only.",
+    back: "Network",
+
+    summary: {
+      organizations: "Organizations worked with",
+      completed: "Completed assignments",
+      repeat: "Repeat organizations",
+      trades: "Trades represented",
+      latest: "Latest relationship",
+    },
+
+    searchPlaceholder: "Search organizations",
+    tradeLabel: "Trade",
+    allTrades: "All trades",
+    clear: "Clear filters",
+
+    list: {
+      title: "Organizations",
+      completedCount: "{n} completed",
+      latestWork: "Latest: {title}",
+      firstWorked: "First worked together",
+      latestWorked: "Latest completed work",
+      view: "View relationship",
+      showing: "Organizations you have completed work with, most recent first.",
+      showMore: "Show more",
+    },
+
+    directory: {
+      title: "Network Directory",
+    },
+
+    empty: {
+      title: "No network yet",
+      body: "When an organization confirms work you have finished, it appears here as part of your professional network.",
+    },
+    noneMatch: "No organizations match your filters.",
+
+    tabs: {
+      label: "Filter your network",
+      all: "All",
+      workedWith: "Worked with",
+      referred: "Joined through my referral",
+      pending: "Pending invitations",
+    },
+
+    badge: {
+      verified: "Verified work relationship",
+      referred: "Joined through your referral",
+      referredToo: "Also joined through your referral",
+      pending: "Pending invitation",
+    },
+
+    actions: {
+      call: "Call",
+      messageSoon: "Message · Coming soon",
+    },
+
+    hero: {
+      title: "Add a showroom you know",
+      body: "Work relationships are created automatically from completed work — you can also refer new showrooms you know.",
+      cta: "Add showroom I know",
+    },
+
+    rail: {
+      pointsTitle: "Network Points",
+      referredOrgs: "Joined via you",
+      showroomsAdded: "Showrooms added",
+      viewPoints: "View Points",
+      howBody: "+100 Points when a new showroom you refer is approved and joins Aladdin.",
+      levelLabel: "Level",
+      levelValue: "Level {n}",
+      remainingToNext: "{n} Points remaining to next level",
+      maxLevel: "Highest level reached",
+      pendingTitle: "Pending invitations",
+      pendingEmpty: "No pending invitations.",
+      viewAllPendingCount: "View all invitations ({n})",
+    },
+
+    pending: {
+      submitted: "Submitted {date}",
+      withdraw: "Withdraw",
+      menuLabel: "More actions",
+      resend: "Resend",
+      resendCopied: "Invitation copied",
+      shareMessage: "{name}, you were referred to join Aladdin — the platform for Egypt's finishing & construction professionals. Register here: {url}",
+    },
+
+    refer: {
+      title: "Add a showroom I know",
+      subtitle: "Refer an organization already on Aladdin, or one that is not — either way, you never take on membership or access.",
+      error: "That did not go through. Please try again.",
+      knownTitle: "Already on Aladdin",
+      knownBody: "Search for the organization by name.",
+      searchLabel: "Organization name",
+      searchHint: "At least 2 characters.",
+      searchPlaceholder: "Search organizations",
+      searchAction: "Search",
+      verified: "Verified",
+      referThis: "Refer this one",
+      empty: "No matches",
+      emptyBody: "Try a different spelling, or refer it as a new showroom below.",
+      newTitle: "Not yet on Aladdin",
+      newBody: "Tell us about the showroom. An Admin reviews it before it becomes a real organization.",
+      nameLabel: "Showroom name",
+      governorateLabel: "Governorate",
+      cityLabel: "City / area",
+      phoneLabel: "Contact phone",
+      phoneHint: "Your own number for this referral — never shared publicly.",
+      noteLabel: "Note",
+      submitAction: "Submit referral",
+      reviewNote: "An Admin reviews this before it becomes a real organization.",
+    },
+
+    detail: {
+      back: "Network",
+      eyebrow: "Relationship",
+      summaryTitle: "Relationship summary",
+      completedCount: "Completed assignments",
+      firstWorked: "First worked together",
+      latestWorked: "Latest completed work",
+      trades: "Trades worked together",
+      reviewsTitle: "Reviews from this organization",
+      reviewsCount: "{n} reviews from this organization",
+      historyTitle: "Completed work history",
+      viewAssignment: "View in My work",
+      notFound: "This organization is not part of your network.",
+      referralTitle: "How this relationship started",
+      referralBody: "You referred this organization on {date}.",
+      referralNoWorkYet: "No completed work yet.",
     },
   },
   work: {

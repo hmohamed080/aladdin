@@ -28,7 +28,16 @@ describe("personalNavKeys", () => {
 
   it("gives a professional the profile hub and Job Opportunities", () => {
     const keys = personalNavKeys({ variant: "professional", isSalesPersona: false });
-    expect(keys).toEqual(["home", "profile", "points", "jobs", "myWork", "reviews", "addBusiness"]);
+    expect(keys).toEqual([
+      "home",
+      "profile",
+      "points",
+      "jobs",
+      "myWork",
+      "reviews",
+      "network",
+      "addBusiness",
+    ]);
   });
 
   it("NEVER offers the showroom entry to a non-Sales professional", () => {
@@ -48,6 +57,7 @@ describe("personalNavKeys", () => {
       "jobs",
       "myWork",
       "reviews",
+      "network",
       "connectShowroom",
       "addBusiness",
     ]);
@@ -91,7 +101,7 @@ describe("personalNavKeys", () => {
     }
     // And the union covers the whole key space — a key nothing can reach would be
     // an entry that exists only in the map.
-    expect(emitted.size).toBe(8);
+    expect(emitted.size).toBe(9);
   });
 });
 
@@ -204,7 +214,44 @@ describe("Job Opportunities in the personal rail", () => {
       "jobs",
       "myWork",
       "reviews",
+      "network",
     ]);
+  });
+});
+
+/**
+ * Network (Increment 13). Derived from completed job_assignments alone, so it
+ * shares the SAME professional-only gate as Jobs, My Work and Reviews — a
+ * consumer's Network is not merely unusable, it is permanently empty.
+ */
+describe("Network in the personal rail", () => {
+  it("resolves to /home/network and its own label key", () => {
+    expect(personalNavItem("network")).toEqual({
+      key: "network",
+      href: "/home/network",
+      labelKey: "personalNav.network",
+    });
+  });
+
+  it("is a destination for a professional and not for a consumer", () => {
+    expect(personalNavKeys({ variant: "professional", isSalesPersona: false })).toContain("network");
+    expect(personalNavKeys({ variant: "consumer", isSalesPersona: false })).not.toContain("network");
+  });
+
+  it("stays active on a nested organization-detail route", () => {
+    expect(activePersonalNavKey("/home/network")).toBe("network");
+    expect(activePersonalNavKey("/home/network/9a000000-0000-4000-8000-000000000005")).toBe("network");
+  });
+
+  it("does not swallow a sibling route that merely starts with the same letters", () => {
+    expect(activePersonalNavKey("/home/networking")).toBe("home");
+  });
+
+  it("is never derived from Sales affiliation or B2B org capabilities — the personal rail has no such input", () => {
+    const withSales = personalNavKeys({ variant: "professional", isSalesPersona: true });
+    const without = personalNavKeys({ variant: "professional", isSalesPersona: false });
+    expect(withSales.includes("network")).toBe(true);
+    expect(without.includes("network")).toBe(true);
   });
 });
 

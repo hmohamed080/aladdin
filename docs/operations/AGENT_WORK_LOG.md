@@ -4,6 +4,128 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — A network nobody built, and a level that was never stored
+
+**Date:** 2026-09-03 → 2026-09-05 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `32f7a81` (Increment 12)
+
+Installer Increment 13: Showroom Network. Two migrations, one derived read model
+and one small attribution domain beside it, a Points earning event wired to the
+second, and a page that went through three real composition passes before its
+geometry actually matched the reference — the last of which was a single missing
+CSS property.
+
+### Two authorities, never merged into a third
+
+The Network is not a feature an installer maintains; it is what
+`job_assignments.status = 'completed'` already says, read back
+(`my_network_organizations`/`my_network_work_history`, both SECURITY DEFINER,
+both scoped to `auth.uid()`). A showroom referral
+(`network_referrals`, `20260911090001_network_referrals.sql`) is a second, real,
+but *separate* fact: an organization may be both a completed-work partner and one
+the installer referred, and the merge that lets a reader see one row for that
+organization (`lib/network/rows.ts`, `buildNetworkRows`) is careful to keep both
+facts distinct on that row rather than inventing a third, blended state. A
+pending referral — one the platform has not reviewed yet — is never allowed to
+look like an organization: it has no `organization_id`, and no view renders it
+with one.
+
+The existing Sales affiliation/referral system
+(`organization_referrals`/`organization_join_requests`) was investigated and
+deliberately **not** reused: it is persona-gated to `app.is_sales_persona` and
+grants `sales.*` membership, which would have handed an installer referring a
+showroom actual organizational access. `network_referrals` is a parallel,
+narrower table for exactly that reason — attribution, never membership, and
+`app.organizations_provenance_immutable()`'s write-once
+`source`/`referred_by_user_id` columns are the only thing it ever writes back
+to an approved organization.
+
+### The one earning event, and the level that reads it without existing
+
+Approving a case-B (not-yet-registered) referral fires the Pilot's one wired
+Points event, `referral.organization_approved` (+100), through the same
+`points_ledger` idempotency the Points Core spec already governs — a referral to
+an organization already on Aladdin resolves instantly and earns nothing, because
+it was not brought here by anyone.
+
+The Network Points card shows a Level and a "Points remaining to next level".
+Both were requested twice: refused the first pass, for want of authority — there
+is no level column and Points Core explicitly excludes tiers "without a further
+approved specification" — and approved the second time as a **presentation-only**
+band, never a stored one. `lib/network/points-level.ts`'s `derivePointsLevel` is
+a pure function over the one real `points_balance`, recomputed on every render,
+persisted nowhere, gating nothing. `docs/database/points-core.md` now carries
+both halves of that distinction as a named exception (`Presentation-level
+bands`) rather than leaving the refusal looking overturned.
+
+### Three passes to the reference's actual geometry
+
+The first working version was functionally correct and visually generic: four
+floating summary cards, an "Add showroom" block that read as a settings panel,
+and one organization per large white card. Two composition passes rebuilt it
+toward `06-showroom-network.jpeg` as a geometry target rather than only an
+information-hierarchy one: the summary collapsed into one compact `KpiStrip`
+instrument; the hero and search became one bounded surface with an illustrated
+storefront mark (`StorefrontAddIcon`, decoration only); the organization list
+became one continuous "Network Directory" panel with dividing rows instead of
+a card per organization; and the page settled into a 2×2 grid — hero+search and
+Network Points in the top row, Directory and Pending Invitations in the bottom
+row, both rows sharing one column template so the two columns read as aligned
+across the whole page.
+
+The bottom row's equal height comes from the grid's own default
+`align-items: stretch`, not a fixed number — which is also where the session's
+one real rendering bug turned up rather than in review: the Discovery panel's
+grid wrapper was missing `desktop:order-none`, so its leftover mobile `order: 1`
+placed it *after* the other three panels once the desktop grid-cols kicked in,
+landing the hero in the wrong cell. Invisible to `tsc` and to Vitest/jsdom (which
+never lays out `order`), and only visible once actually rendered — caught in
+browser verification, not by a test.
+
+**Resend is a real share action, not a disabled placeholder.** Aladdin has no
+outbound invitation-delivery backend for a referral at all — it is a database
+record the platform never sends anywhere — so "Resend" cannot mean "sent again".
+What it means instead: the Web Share API where the browser supports it,
+otherwise a clipboard copy with honest "Invitation copied" wording, built from
+the real `/auth/sign-up` route resolved to an absolute URL at click time — the
+same technique the existing WhatsApp/copy invite flow already uses for a link
+that was never dispatched either. Cancelling the native share sheet is left
+alone rather than silently falling back to a clipboard copy nobody asked for.
+
+### The last correction: a cap that was either too tight or not there
+
+The Network Directory's "Show more" reveals every fetched row into one bounded,
+scrollable region — except for one interim state where it had no cap at all
+(the shared row height with Pending Invitations grew to match, which looked
+correct at five rows and would not have at twenty) and one attempt at a cap
+(`30rem`) that was tight enough to clip the ordinary four-row default view, which
+the brief had explicitly forbidden. The value that satisfies both —
+`desktop:max-h-[44rem]`, `desktop:`-only so mobile keeps stacking and growing
+naturally — was reached by measuring the real four-row height in the browser
+rather than guessing twice more. Verified against a 23-row browser fixture
+(built through `network_referral_create_new` in a loop, the real RPC, not a raw
+insert): the region scrolls internally, the tabs and the "Show more"/"View all
+invitations" footers stay outside it, and the Directory and Pending panels
+measured the identical height and bottom edge both before and after expansion.
+
+### Validation
+
+Two migrations (`20260910090001_installer_network.sql`,
+`20260911090001_network_referrals.sql`). Clean `supabase db reset`. **pgTAP 52
+files, 2016 tests, PASS** — `50_installer_network_test.sql` and
+`51_network_referrals_test.sql`, 65 assertions each, fixtures built through the
+real RPCs end to end. `tsc` clean · `eslint` 0 errors (1 pre-existing) ·
+`vitest` **1290/102** · `next build` clean.
+
+Browser UAT across four composition passes, both locales, light and dark, at
+1440px and ~390px: populated Network/Directory/Points/Pending states, the
+Add-showroom flow (both known-organization and new-showroom cases), Resend's
+share and clipboard paths, the pending-referral overflow menu, and the 23-row
+internal-scroll fixture. Teardown left `network_referrals` at 0 each time.
+
+`RUNTIME_STATE.md` is untouched and now fourteen increments behind.
+
+---
+
 ## Session — A sentence that cannot be edited, and a correction that leaves a record
 
 **Date:** 2026-09-08 → 2026-09-09 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `7be2267` (Increment 11)

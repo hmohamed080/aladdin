@@ -14,7 +14,9 @@ import { ChipList, DetailCard, HomeHeader, HomeSection, VerificationBadge } from
 import type { ProfessionalAssetSummary } from "@/server/queries/portfolio";
 import { CertificatesModule, PortfolioModule } from "@/features/portfolio/hub-modules";
 import { ReviewsModule } from "@/features/reviews/hub-module";
+import { NetworkModule } from "@/features/network/hub-module";
 import type { RatingSummary } from "@/lib/reviews/summary";
+import type { NetworkOrganization } from "@/server/queries/network";
 
 /**
  * The profile hub.
@@ -38,6 +40,7 @@ export function ProfileHub({
   trades,
   assets,
   reviews,
+  network,
   t,
 }: {
   data: PersonalHomeData;
@@ -48,6 +51,8 @@ export function ProfileHub({
   assets: ProfessionalAssetSummary;
   /** The caller's real rating, from the same rows /home/reviews lists. */
   reviews: RatingSummary;
+  /** The caller's real network, from the same rows /home/network lists. */
+  network: readonly NetworkOrganization[];
   t: TranslateFn;
 }) {
   const { professional: p, verification } = data;
@@ -167,11 +172,14 @@ export function ProfileHub({
         <div className="grid gap-md desktop:grid-cols-2">
           <PortfolioModule summary={assets} publicItemId={assets.previewItemId} t={t} />
           <CertificatesModule summary={assets} t={t} />
-          {/* Reviews joins the same grid rather than opening a section of its
-              own. It belongs with work and certificates for the same reason
-              they belong together: all three are what a client sees, and the
+          {/* Reviews and Network join the same grid rather than opening a
+              section of their own. All four belong together for the same
+              reason: this is what completed work leaves behind — what a
+              client sees (portfolio, certificates, reviews) and who the
+              professional has actually worked for (network) — and the
               reference account overview keeps them at one level. */}
           <ReviewsModule summary={reviews} t={t} />
+          <NetworkModule organizations={network} t={t} />
         </div>
       </HomeSection>
 

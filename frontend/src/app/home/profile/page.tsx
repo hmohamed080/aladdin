@@ -9,6 +9,7 @@ import { loadProfilePublication } from "@/server/queries/professional-profile";
 import { loadMyTrades } from "@/server/queries/trades";
 import { loadProfessionalAssetSummary } from "@/server/queries/portfolio";
 import { loadMyReviewSummary } from "@/server/queries/reviews";
+import { listMyNetworkOrganizations } from "@/server/queries/network";
 import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { ProfileHub } from "@/features/profile/profile-hub";
@@ -47,11 +48,12 @@ export default async function ProfileHubPage() {
 
   if (data.variant !== "professional") return <NoProfessionalProfile />;
 
-  const [publication, trades, assets, reviews] = await Promise.all([
+  const [publication, trades, assets, reviews, network] = await Promise.all([
     loadProfilePublication(),
     loadMyTrades(),
     loadProfessionalAssetSummary(),
     loadMyReviewSummary(),
+    listMyNetworkOrganizations(supabase),
   ]);
 
   return (
@@ -61,6 +63,7 @@ export default async function ProfileHubPage() {
       trades={trades}
       assets={assets}
       reviews={reviews}
+      network={network}
       t={t}
     />
   );

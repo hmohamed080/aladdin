@@ -25,6 +25,7 @@ import {
   StorefrontIcon,
   BuildingIcon,
   StarIcon,
+  UsersIcon,
 } from "@/components/ui/icons";
 
 /**
@@ -71,6 +72,7 @@ const ICONS: Record<PersonalNavKey, ComponentType<{ size?: number }>> = {
   myWork: ClipboardIcon,
   // The mark the whole domain uses — a rating is a star everywhere it appears.
   reviews: StarIcon,
+  network: UsersIcon,
   connectShowroom: StorefrontIcon,
   addBusiness: BuildingIcon,
 };

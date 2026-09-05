@@ -1386,6 +1386,82 @@ export type Database = {
           },
         ]
       }
+      network_referrals: {
+        Row: {
+          city: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          display_name: string | null
+          governorate: string | null
+          id: string
+          note: string | null
+          organization_id: string | null
+          origin: Database["public"]["Enums"]["network_referral_origin"]
+          phone: string | null
+          referred_by: string
+          status: Database["public"]["Enums"]["network_referral_status"]
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          display_name?: string | null
+          governorate?: string | null
+          id?: string
+          note?: string | null
+          organization_id?: string | null
+          origin: Database["public"]["Enums"]["network_referral_origin"]
+          phone?: string | null
+          referred_by: string
+          status?: Database["public"]["Enums"]["network_referral_status"]
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          display_name?: string | null
+          governorate?: string | null
+          id?: string
+          note?: string | null
+          organization_id?: string | null
+          origin?: Database["public"]["Enums"]["network_referral_origin"]
+          phone?: string | null
+          referred_by?: string
+          status?: Database["public"]["Enums"]["network_referral_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "network_referrals_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "network_referrals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "network_referrals_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body_key: string | null
@@ -3263,6 +3339,51 @@ export type Database = {
         }
         Relationships: []
       }
+      my_network_organizations: {
+        Row: {
+          completed_count: number | null
+          first_completed_at: string | null
+          last_completed_at: string | null
+          latest_assignment_id: string | null
+          latest_job_title: string | null
+          org_id: string | null
+          org_name: string | null
+          review_count: number | null
+          trade_keys: string[] | null
+        }
+        Relationships: []
+      }
+      my_network_referrals: {
+        Row: {
+          city: string | null
+          created_at: string | null
+          decided_at: string | null
+          decision_reason: string | null
+          display_name: string | null
+          governorate: string | null
+          id: string | null
+          note: string | null
+          organization_id: string | null
+          organization_name: string | null
+          origin: Database["public"]["Enums"]["network_referral_origin"] | null
+          phone: string | null
+          status: Database["public"]["Enums"]["network_referral_status"] | null
+        }
+        Relationships: []
+      }
+      my_network_work_history: {
+        Row: {
+          agreed_amount: number | null
+          agreed_currency: string | null
+          assignment_id: string | null
+          completed_at: string | null
+          job_title: string | null
+          org_id: string | null
+          org_name: string | null
+          trade_key: string | null
+        }
+        Relationships: []
+      }
       open_job_opportunities: {
         Row: {
           city: string | null
@@ -4677,6 +4798,32 @@ export type Database = {
           relationship: string
         }[]
       }
+      network_referral_approve: {
+        Args: { p_link_organization_id?: string; p_referral_id: string }
+        Returns: string
+      }
+      network_referral_cancel: {
+        Args: { p_referral_id: string }
+        Returns: undefined
+      }
+      network_referral_create_existing: {
+        Args: { p_note?: string; p_organization_id: string }
+        Returns: string
+      }
+      network_referral_create_new: {
+        Args: {
+          p_city: string
+          p_display_name: string
+          p_governorate: string
+          p_note?: string
+          p_phone?: string
+        }
+        Returns: string
+      }
+      network_referral_reject: {
+        Args: { p_reason: string; p_referral_id: string }
+        Returns: undefined
+      }
       onboarding_save_contact: { Args: { p_phone: string }; Returns: undefined }
       onboarding_save_profile: {
         Args: { p_display_name: string; p_locale: string }
@@ -5059,6 +5206,8 @@ export type Database = {
         | "decision_pending"
       lead_status: "active" | "won" | "lost" | "archived"
       membership_status: "invited" | "active" | "suspended" | "revoked"
+      network_referral_origin: "known_organization" | "new_showroom"
+      network_referral_status: "pending" | "joined" | "cancelled"
       onboarding_track: "consumer" | "professional" | "business"
       order_status: "confirmed" | "in_progress" | "completed" | "cancelled"
       org_status:
@@ -5316,6 +5465,8 @@ export const Constants = {
       ],
       lead_status: ["active", "won", "lost", "archived"],
       membership_status: ["invited", "active", "suspended", "revoked"],
+      network_referral_origin: ["known_organization", "new_showroom"],
+      network_referral_status: ["pending", "joined", "cancelled"],
       onboarding_track: ["consumer", "professional", "business"],
       order_status: ["confirmed", "in_progress", "completed", "cancelled"],
       org_status: [
