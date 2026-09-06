@@ -708,6 +708,409 @@ export type Database = {
           },
         ]
       }
+      job_applications: {
+        Row: {
+          applicant_user_id: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          id: string
+          job_id: string
+          note: string | null
+          status: Database["public"]["Enums"]["job_application_status"]
+          updated_at: string
+        }
+        Insert: {
+          applicant_user_id: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          id?: string
+          job_id: string
+          note?: string | null
+          status?: Database["public"]["Enums"]["job_application_status"]
+          updated_at?: string
+        }
+        Update: {
+          applicant_user_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          id?: string
+          job_id?: string
+          note?: string | null
+          status?: Database["public"]["Enums"]["job_application_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_applications_applicant_user_id_fkey"
+            columns: ["applicant_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_applications_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_applications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_assignments: {
+        Row: {
+          agreed_amount: number
+          agreed_currency: string
+          application_id: string
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          installer_user_id: string
+          job_id: string
+          last_progress_at: string | null
+          latest_progress_percent: number
+          poster_org_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_assignment_status"]
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          agreed_amount: number
+          agreed_currency?: string
+          application_id: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          installer_user_id: string
+          job_id: string
+          last_progress_at?: string | null
+          latest_progress_percent?: number
+          poster_org_id: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_assignment_status"]
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          agreed_amount?: number
+          agreed_currency?: string
+          application_id?: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          installer_user_id?: string
+          job_id?: string
+          last_progress_at?: string | null
+          latest_progress_percent?: number
+          poster_org_id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_assignment_status"]
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_assignments_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "job_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_installer_user_id_fkey"
+            columns: ["installer_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_poster_org_id_fkey"
+            columns: ["poster_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_progress_updates: {
+        Row: {
+          assignment_id: string
+          author_user_id: string
+          created_at: string
+          id: string
+          note: string | null
+          progress_percent: number
+          stage: string | null
+        }
+        Insert: {
+          assignment_id: string
+          author_user_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          progress_percent: number
+          stage?: string | null
+        }
+        Update: {
+          assignment_id?: string
+          author_user_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          progress_percent?: number
+          stage?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_progress_updates_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "job_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_progress_updates_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_review_moderations: {
+        Row: {
+          acted_by: string
+          action: string
+          created_at: string
+          id: string
+          reason: string
+          review_id: string
+          seq: number
+        }
+        Insert: {
+          acted_by: string
+          action: string
+          created_at?: string
+          id?: string
+          reason: string
+          review_id: string
+          seq?: never
+        }
+        Update: {
+          acted_by?: string
+          action?: string
+          created_at?: string
+          id?: string
+          reason?: string
+          review_id?: string
+          seq?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_review_moderations_acted_by_fkey"
+            columns: ["acted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_review_moderations_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "job_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_reviews: {
+        Row: {
+          assignment_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          installer_user_id: string
+          poster_org_id: string
+          rating: number
+          submitted_by: string
+        }
+        Insert: {
+          assignment_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          installer_user_id: string
+          poster_org_id: string
+          rating: number
+          submitted_by: string
+        }
+        Update: {
+          assignment_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          installer_user_id?: string
+          poster_org_id?: string
+          rating?: number
+          submitted_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_reviews_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: true
+            referencedRelation: "job_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_reviews_installer_user_id_fkey"
+            columns: ["installer_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_reviews_poster_org_id_fkey"
+            columns: ["poster_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_reviews_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          city: string | null
+          closed_at: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          ends_by: string | null
+          expected_duration_days: number | null
+          governorate: string | null
+          id: string
+          offered_amount: number
+          offered_currency: string
+          poster_branch_id: string | null
+          poster_org_id: string
+          published_at: string | null
+          site_address: string | null
+          starts_on: string | null
+          status: Database["public"]["Enums"]["job_status"]
+          title: string
+          trade_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          city?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          ends_by?: string | null
+          expected_duration_days?: number | null
+          governorate?: string | null
+          id?: string
+          offered_amount: number
+          offered_currency?: string
+          poster_branch_id?: string | null
+          poster_org_id: string
+          published_at?: string | null
+          site_address?: string | null
+          starts_on?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          title: string
+          trade_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          city?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          ends_by?: string | null
+          expected_duration_days?: number | null
+          governorate?: string | null
+          id?: string
+          offered_amount?: number
+          offered_currency?: string
+          poster_branch_id?: string | null
+          poster_org_id?: string
+          published_at?: string | null
+          site_address?: string | null
+          starts_on?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          title?: string
+          trade_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_jobs_poster_branch"
+            columns: ["poster_org_id", "poster_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "jobs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_poster_org_id_fkey"
+            columns: ["poster_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           assigned_membership_id: string | null
@@ -977,6 +1380,82 @@ export type Database = {
           {
             foreignKeyName: "messages_sender_user_id_fkey"
             columns: ["sender_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      network_referrals: {
+        Row: {
+          city: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          display_name: string | null
+          governorate: string | null
+          id: string
+          note: string | null
+          organization_id: string | null
+          origin: Database["public"]["Enums"]["network_referral_origin"]
+          phone: string | null
+          referred_by: string
+          status: Database["public"]["Enums"]["network_referral_status"]
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          display_name?: string | null
+          governorate?: string | null
+          id?: string
+          note?: string | null
+          organization_id?: string | null
+          origin: Database["public"]["Enums"]["network_referral_origin"]
+          phone?: string | null
+          referred_by: string
+          status?: Database["public"]["Enums"]["network_referral_status"]
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          display_name?: string | null
+          governorate?: string | null
+          id?: string
+          note?: string | null
+          organization_id?: string | null
+          origin?: Database["public"]["Enums"]["network_referral_origin"]
+          phone?: string | null
+          referred_by?: string
+          status?: Database["public"]["Enums"]["network_referral_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "network_referrals_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "network_referrals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "network_referrals_referred_by_fkey"
+            columns: ["referred_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -1710,6 +2189,56 @@ export type Database = {
           },
         ]
       }
+      portfolio_items: {
+        Row: {
+          content_type: string
+          created_at: string
+          description: string | null
+          id: string
+          object_key: string
+          owner_user_id: string
+          sort_order: number
+          state: Database["public"]["Enums"]["professional_asset_state"]
+          title: string
+          updated_at: string
+          visibility: Database["public"]["Enums"]["portfolio_visibility"]
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          object_key: string
+          owner_user_id: string
+          sort_order?: number
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          title: string
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["portfolio_visibility"]
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          object_key?: string
+          owner_user_id?: string
+          sort_order?: number
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          title?: string
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["portfolio_visibility"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_items_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           brand: string | null
@@ -1782,8 +2311,63 @@ export type Database = {
           },
         ]
       }
+      professional_certificates: {
+        Row: {
+          content_type: string
+          created_at: string
+          expires_on: string | null
+          id: string
+          issued_on: string | null
+          issuer: string | null
+          object_path: string
+          original_filename: string | null
+          owner_user_id: string
+          state: Database["public"]["Enums"]["professional_asset_state"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          expires_on?: string | null
+          id?: string
+          issued_on?: string | null
+          issuer?: string | null
+          object_path: string
+          original_filename?: string | null
+          owner_user_id: string
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          expires_on?: string | null
+          id?: string
+          issued_on?: string | null
+          issuer?: string | null
+          object_path?: string
+          original_filename?: string | null
+          owner_user_id?: string
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_certificates_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          availability_updated_at: string | null
+          available_for_work: boolean
           avatar_media_id: string | null
           bio: string | null
           created_at: string
@@ -1798,6 +2382,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          availability_updated_at?: string | null
+          available_for_work?: boolean
           avatar_media_id?: string | null
           bio?: string | null
           created_at?: string
@@ -1812,6 +2398,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          availability_updated_at?: string | null
+          available_for_work?: boolean
           avatar_media_id?: string | null
           bio?: string | null
           created_at?: string
@@ -2407,6 +2995,69 @@ export type Database = {
           },
         ]
       }
+      trades: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_trades: {
+        Row: {
+          created_at: string
+          is_primary: boolean
+          trade_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          is_primary?: boolean
+          trade_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          is_primary?: boolean
+          trade_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_trades_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_trades_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string
@@ -2591,6 +3242,168 @@ export type Database = {
           },
         ]
       }
+      job_applicants: {
+        Row: {
+          application_id: string | null
+          applied_at: string | null
+          avatar_media_id: string | null
+          decided_at: string | null
+          decision_reason: string | null
+          display_name: string | null
+          headline: string | null
+          job_id: string | null
+          note: string | null
+          primary_trade_key: string | null
+          public_profile_id: string | null
+          service_areas: string[] | null
+          status: Database["public"]["Enums"]["job_application_status"] | null
+          trade_keys: string[] | null
+          years_experience: number | null
+        }
+        Relationships: []
+      }
+      job_trade_labels: {
+        Row: {
+          job_id: string | null
+          trade_is_active: boolean | null
+          trade_key: string | null
+        }
+        Relationships: []
+      }
+      my_job_applications: {
+        Row: {
+          city: string | null
+          created_at: string | null
+          decided_at: string | null
+          decision_reason: string | null
+          ends_by: string | null
+          expected_duration_days: number | null
+          governorate: string | null
+          id: string | null
+          job_description: string | null
+          job_id: string | null
+          job_status: Database["public"]["Enums"]["job_status"] | null
+          job_title: string | null
+          note: string | null
+          offered_amount: number | null
+          offered_currency: string | null
+          poster_org_name: string | null
+          published_at: string | null
+          starts_on: string | null
+          status: Database["public"]["Enums"]["job_application_status"] | null
+          trade_key: string | null
+        }
+        Relationships: []
+      }
+      my_job_assignments: {
+        Row: {
+          agreed_amount: number | null
+          agreed_currency: string | null
+          application_id: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          city: string | null
+          completed_at: string | null
+          created_at: string | null
+          ends_by: string | null
+          expected_duration_days: number | null
+          governorate: string | null
+          id: string | null
+          job_description: string | null
+          job_id: string | null
+          job_status: Database["public"]["Enums"]["job_status"] | null
+          job_title: string | null
+          last_progress_at: string | null
+          latest_progress_percent: number | null
+          poster_org_name: string | null
+          published_at: string | null
+          site_address: string | null
+          started_at: string | null
+          starts_on: string | null
+          status: Database["public"]["Enums"]["job_assignment_status"] | null
+          trade_is_active: boolean | null
+          trade_key: string | null
+          version: number | null
+        }
+        Relationships: []
+      }
+      my_job_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string | null
+          job_title: string | null
+          org_name: string | null
+          rating: number | null
+          trade_key: string | null
+        }
+        Relationships: []
+      }
+      my_network_organizations: {
+        Row: {
+          completed_count: number | null
+          first_completed_at: string | null
+          last_completed_at: string | null
+          latest_assignment_id: string | null
+          latest_job_title: string | null
+          org_id: string | null
+          org_name: string | null
+          review_count: number | null
+          trade_keys: string[] | null
+        }
+        Relationships: []
+      }
+      my_network_referrals: {
+        Row: {
+          city: string | null
+          created_at: string | null
+          decided_at: string | null
+          decision_reason: string | null
+          display_name: string | null
+          governorate: string | null
+          id: string | null
+          note: string | null
+          organization_id: string | null
+          organization_name: string | null
+          origin: Database["public"]["Enums"]["network_referral_origin"] | null
+          phone: string | null
+          status: Database["public"]["Enums"]["network_referral_status"] | null
+        }
+        Relationships: []
+      }
+      my_network_work_history: {
+        Row: {
+          agreed_amount: number | null
+          agreed_currency: string | null
+          assignment_id: string | null
+          completed_at: string | null
+          job_title: string | null
+          org_id: string | null
+          org_name: string | null
+          trade_key: string | null
+        }
+        Relationships: []
+      }
+      open_job_opportunities: {
+        Row: {
+          city: string | null
+          description: string | null
+          ends_by: string | null
+          expected_duration_days: number | null
+          governorate: string | null
+          has_applied: boolean | null
+          id: string | null
+          offered_amount: number | null
+          offered_currency: string | null
+          poster_org_id: string | null
+          poster_org_name: string | null
+          published_at: string | null
+          starts_on: string | null
+          title: string | null
+          trade_key: string | null
+        }
+        Relationships: []
+      }
       order_category_spend: {
         Row: {
           amount: number | null
@@ -2757,6 +3570,8 @@ export type Database = {
       }
       profile_public_directory: {
         Row: {
+          availability_updated_at: string | null
+          available_for_work: boolean | null
           avatar_media_id: string | null
           bio: string | null
           display_name: string | null
@@ -2765,6 +3580,12 @@ export type Database = {
           languages: string[] | null
           locality_id: string | null
           persona: Database["public"]["Enums"]["persona_type"] | null
+          primary_trade_key: string | null
+          service_areas: string[] | null
+          services: string[] | null
+          specialization: string | null
+          trade_keys: string[] | null
+          years_experience: number | null
         }
         Relationships: []
       }
@@ -2873,6 +3694,29 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      public_portfolio_items: {
+        Row: {
+          description: string | null
+          id: string | null
+          profile_id: string | null
+          sort_order: number | null
+          title: string | null
+        }
+        Relationships: []
+      }
+      public_profile_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string | null
+          job_title: string | null
+          org_name: string | null
+          profile_id: string | null
+          rating: number | null
+          trade_key: string | null
+        }
+        Relationships: []
       }
       quotation_list: {
         Row: {
@@ -3598,6 +4442,33 @@ export type Database = {
       cancel_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
       cancel_order: { Args: { p_order_id: string }; Returns: undefined }
       cancel_rfq: { Args: { p_rfq_id: string }; Returns: undefined }
+      certificate_create: {
+        Args: {
+          p_content_type: string
+          p_expires_on: string
+          p_issued_on: string
+          p_issuer: string
+          p_original_filename: string
+          p_title: string
+        }
+        Returns: {
+          item_id: string
+          object_path: string
+        }[]
+      }
+      certificate_delete: { Args: { p_item_id: string }; Returns: undefined }
+      certificate_finalize: { Args: { p_item_id: string }; Returns: undefined }
+      certificate_purge: { Args: { p_item_id: string }; Returns: undefined }
+      certificate_update: {
+        Args: {
+          p_expires_on: string
+          p_issued_on: string
+          p_issuer: string
+          p_item_id: string
+          p_title: string
+        }
+        Returns: undefined
+      }
       complete_follow_up: {
         Args: { p_follow_up_id: string }
         Returns: undefined
@@ -3749,6 +4620,105 @@ export type Database = {
           status: string
         }[]
       }
+      job_application_accept: {
+        Args: { p_application_id: string }
+        Returns: string
+      }
+      job_application_reject: {
+        Args: { p_application_id: string; p_reason: string }
+        Returns: undefined
+      }
+      job_application_submit: {
+        Args: { p_job_id: string; p_note?: string }
+        Returns: string
+      }
+      job_application_withdraw: {
+        Args: { p_application_id: string }
+        Returns: undefined
+      }
+      job_assignment_cancel: {
+        Args: {
+          p_assignment_id: string
+          p_expected_version: number
+          p_reason: string
+        }
+        Returns: number
+      }
+      job_assignment_complete: {
+        Args: { p_assignment_id: string; p_expected_version: number }
+        Returns: number
+      }
+      job_assignment_start: {
+        Args: { p_assignment_id: string; p_expected_version: number }
+        Returns: number
+      }
+      job_cancel: {
+        Args: {
+          p_expected_version: number
+          p_job_id: string
+          p_reason?: string
+        }
+        Returns: number
+      }
+      job_close: {
+        Args: { p_expected_version: number; p_job_id: string }
+        Returns: number
+      }
+      job_create: {
+        Args: {
+          p_branch_id?: string
+          p_city?: string
+          p_description?: string
+          p_ends_by?: string
+          p_expected_duration_days?: number
+          p_governorate?: string
+          p_offered_amount: number
+          p_org_id: string
+          p_site_address?: string
+          p_starts_on?: string
+          p_title: string
+          p_trade_key: string
+        }
+        Returns: string
+      }
+      job_progress_add: {
+        Args: {
+          p_assignment_id: string
+          p_note?: string
+          p_progress_percent: number
+          p_stage?: string
+        }
+        Returns: string
+      }
+      job_publish: {
+        Args: { p_expected_version: number; p_job_id: string }
+        Returns: number
+      }
+      job_review_moderate: {
+        Args: { p_action: string; p_reason: string; p_review_id: string }
+        Returns: undefined
+      }
+      job_review_submit: {
+        Args: { p_assignment_id: string; p_comment?: string; p_rating: number }
+        Returns: string
+      }
+      job_update: {
+        Args: {
+          p_city?: string
+          p_description?: string
+          p_ends_by?: string
+          p_expected_duration_days?: number
+          p_expected_version: number
+          p_governorate?: string
+          p_job_id: string
+          p_offered_amount: number
+          p_site_address?: string
+          p_starts_on?: string
+          p_title: string
+          p_trade_key: string
+        }
+        Returns: number
+      }
       mark_all_notifications_read: {
         Args: { p_org_id?: string }
         Returns: number
@@ -3828,6 +4798,32 @@ export type Database = {
           relationship: string
         }[]
       }
+      network_referral_approve: {
+        Args: { p_link_organization_id?: string; p_referral_id: string }
+        Returns: string
+      }
+      network_referral_cancel: {
+        Args: { p_referral_id: string }
+        Returns: undefined
+      }
+      network_referral_create_existing: {
+        Args: { p_note?: string; p_organization_id: string }
+        Returns: string
+      }
+      network_referral_create_new: {
+        Args: {
+          p_city: string
+          p_display_name: string
+          p_governorate: string
+          p_note?: string
+          p_phone?: string
+        }
+        Returns: string
+      }
+      network_referral_reject: {
+        Args: { p_reason: string; p_referral_id: string }
+        Returns: undefined
+      }
       onboarding_save_contact: { Args: { p_phone: string }; Returns: undefined }
       onboarding_save_profile: {
         Args: { p_display_name: string; p_locale: string }
@@ -3886,6 +4882,35 @@ export type Database = {
         }[]
       }
       points_balance: { Args: { p_user_id?: string }; Returns: number }
+      portfolio_item_create: {
+        Args: { p_content_type: string; p_description: string; p_title: string }
+        Returns: {
+          item_id: string
+          object_key: string
+        }[]
+      }
+      portfolio_item_delete: { Args: { p_item_id: string }; Returns: undefined }
+      portfolio_item_finalize: {
+        Args: { p_item_id: string }
+        Returns: undefined
+      }
+      portfolio_item_move: {
+        Args: { p_direction: string; p_item_id: string }
+        Returns: undefined
+      }
+      portfolio_item_purge: { Args: { p_item_id: string }; Returns: undefined }
+      portfolio_item_set_visibility: {
+        Args: { p_item_id: string; p_public: boolean }
+        Returns: undefined
+      }
+      portfolio_item_update: {
+        Args: { p_description: string; p_item_id: string; p_title: string }
+        Returns: undefined
+      }
+      public_portfolio_media_key: {
+        Args: { p_item_id: string }
+        Returns: string
+      }
       reassign_follow_up: {
         Args: {
           p_assignee_membership_id: string
@@ -4139,6 +5164,10 @@ export type Database = {
         }
         Returns: number
       }
+      user_trades_set: {
+        Args: { p_primary_key?: string; p_trade_keys: string[] }
+        Returns: undefined
+      }
     }
     Enums: {
       affiliation_request_status:
@@ -4152,6 +5181,23 @@ export type Database = {
       customer_type: "individual" | "company"
       follow_up_status: "open" | "completed" | "cancelled"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
+      job_application_status:
+        | "submitted"
+        | "accepted"
+        | "rejected"
+        | "withdrawn"
+      job_assignment_status:
+        | "scheduled"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
+      job_status:
+        | "draft"
+        | "open"
+        | "awarded"
+        | "completed"
+        | "closed"
+        | "cancelled"
       lead_stage:
         | "new"
         | "contacted"
@@ -4160,6 +5206,8 @@ export type Database = {
         | "decision_pending"
       lead_status: "active" | "won" | "lost" | "archived"
       membership_status: "invited" | "active" | "suspended" | "revoked"
+      network_referral_origin: "known_organization" | "new_showroom"
+      network_referral_status: "pending" | "joined" | "cancelled"
       onboarding_track: "consumer" | "professional" | "business"
       order_status: "confirmed" | "in_progress" | "completed" | "cancelled"
       org_status:
@@ -4186,6 +5234,7 @@ export type Database = {
         | "trainer"
         | "trainee"
       platform_role: "support" | "moderator" | "administrator"
+      portfolio_visibility: "private" | "public"
       product_category:
         | "finishing"
         | "construction"
@@ -4208,6 +5257,7 @@ export type Database = {
         | "roll"
         | "bag"
         | "pack"
+      professional_asset_state: "pending" | "ready" | "deleted"
       project_status: "planned" | "active" | "completed"
       public_profile_status: "hidden" | "listed"
       quotation_status: "draft" | "submitted" | "accepted" | "rejected"
@@ -4386,6 +5436,26 @@ export const Constants = {
       customer_type: ["individual", "company"],
       follow_up_status: ["open", "completed", "cancelled"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
+      job_application_status: [
+        "submitted",
+        "accepted",
+        "rejected",
+        "withdrawn",
+      ],
+      job_assignment_status: [
+        "scheduled",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ],
+      job_status: [
+        "draft",
+        "open",
+        "awarded",
+        "completed",
+        "closed",
+        "cancelled",
+      ],
       lead_stage: [
         "new",
         "contacted",
@@ -4395,6 +5465,8 @@ export const Constants = {
       ],
       lead_status: ["active", "won", "lost", "archived"],
       membership_status: ["invited", "active", "suspended", "revoked"],
+      network_referral_origin: ["known_organization", "new_showroom"],
+      network_referral_status: ["pending", "joined", "cancelled"],
       onboarding_track: ["consumer", "professional", "business"],
       order_status: ["confirmed", "in_progress", "completed", "cancelled"],
       org_status: [
@@ -4424,6 +5496,7 @@ export const Constants = {
         "trainee",
       ],
       platform_role: ["support", "moderator", "administrator"],
+      portfolio_visibility: ["private", "public"],
       product_category: [
         "finishing",
         "construction",
@@ -4448,6 +5521,7 @@ export const Constants = {
         "bag",
         "pack",
       ],
+      professional_asset_state: ["pending", "ready", "deleted"],
       project_status: ["planned", "active", "completed"],
       public_profile_status: ["hidden", "listed"],
       quotation_status: ["draft", "submitted", "accepted", "rejected"],

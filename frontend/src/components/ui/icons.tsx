@@ -254,6 +254,21 @@ export const BookmarkIcon = (p: IconProps) => (
   </Svg>
 );
 
+/**
+ * The PRIMARY-trade mark. Filled rather than outlined, because it appears beside
+ * an outlined trade chip and has to read as "this one" at a glance rather than as
+ * one more item in the row.
+ */
+export const StarIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path
+      d="m12 3.6 2.6 5.27 5.82.85-4.21 4.1.99 5.79L12 16.88l-5.2 2.73.99-5.79-4.21-4.1 5.82-.85z"
+      fill="currentColor"
+      stroke="none"
+    />
+  </Svg>
+);
+
 export const BookmarkFilledIcon = (p: IconProps) => (
   <Svg {...p} fill="currentColor">
     <path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z" />
@@ -272,6 +287,21 @@ export const WrenchIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M14.7 6.3a4 4 0 0 0 5 5l-9 9a2.8 2.8 0 0 1-4-4l9-9a4 4 0 0 0-1 -1Z" />
     <path d="M14.7 6.3 18 3l3 3-3.3 3.3" />
+  </Svg>
+);
+
+/**
+ * Jobs — an opening an organization posts for an individual professional.
+ *
+ * A briefcase rather than the wrench that marks the Technicians DIRECTORY: on a
+ * collapsed rail the glyph IS the label, and two wrenches would make "the people
+ * we could hire" and "the work we are hiring for" the same word.
+ */
+export const BriefcaseIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2.5" y="7" width="19" height="13" rx="2" />
+    <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7" />
+    <path d="M2.5 12.5h19" />
   </Svg>
 );
 

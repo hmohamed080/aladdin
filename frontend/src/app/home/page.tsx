@@ -11,8 +11,26 @@ import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { ConsumerHome } from "@/features/home/consumer-home";
 import { ProfessionalHome } from "@/features/home/professional-home";
+import {
+  listMyAssignments,
+  featuredAssignment,
+  countAssignmentsByStatus,
+} from "@/server/queries/job-assignments";
+import { listJobOpportunities } from "@/server/queries/job-opportunities";
+import { getPointsBalance } from "@/server/queries/points";
+import { loadMyReviewSummary } from "@/server/queries/reviews";
+import { listMyNetworkOrganizations } from "@/server/queries/network";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * How many real open opportunities the Home preview shows — a bounded read,
+ * never the full board. Three, not four (Increment 14 composition
+ * correction): the reference leads with a compact three-up row, and a fourth
+ * card only forced an awkward half-row at the width the preview panel
+ * actually gets beside the Quick Access rail.
+ */
+const HOME_OPPORTUNITIES_PREVIEW = 3;
 
 /**
  * The ONE personal-account surface. A signed-in caller with no organization —
@@ -34,6 +52,14 @@ export const dynamic = "force-dynamic";
  *
  * Reaching this page never depends on a verification decision — completing
  * onboarding activates the account, and trust state is shown, not enforced.
+ *
+ * FIVE REAL READS, IN PARALLEL (Increment 14). `loadMyTrades` dropped out of
+ * this page's own `Promise.all` — the professional's practice detail moved to
+ * the Account Overview, so Home no longer pays for a trades round trip it does
+ * not render. What replaced it are the same functions `/home/points`,
+ * `/home/reviews`, `/home/network` and `/home/jobs` already call, so the
+ * summary strip and the opportunities preview cannot disagree with those
+ * pages' own numbers.
  */
 export default async function PersonalHomePage() {
   const state = await getRegistrationState();
@@ -53,11 +79,35 @@ export default async function PersonalHomePage() {
   if (!data) redirect("/auth/sign-in");
 
   const store = await cookies();
-  const t = createTranslator(resolveLocale(store.get(LOCALE_COOKIE)?.value));
+  const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
+  const t = createTranslator(locale);
 
-  return data.variant === "professional" ? (
-    <ProfessionalHome data={data} t={t} />
-  ) : (
-    <ConsumerHome data={data} t={t} />
+  // Only a professional has any of this to read — a consumer holds none of it
+  // by construction, since every one of these descends from an assignment,
+  // review or referral only a professional persona could have.
+  if (data.variant !== "professional") return <ConsumerHome data={data} t={t} />;
+
+  const [assignments, opportunities, pointsBalance, reviews, network] = await Promise.all([
+    listMyAssignments(supabase),
+    listJobOpportunities(supabase, { limit: HOME_OPPORTUNITIES_PREVIEW }),
+    getPointsBalance(supabase),
+    loadMyReviewSummary(),
+    listMyNetworkOrganizations(supabase),
+  ]);
+  const completedJobsCount = countAssignmentsByStatus(assignments).completed;
+
+  return (
+    <ProfessionalHome
+      data={data}
+      currentWork={featuredAssignment(assignments)}
+      opportunities={opportunities}
+      pointsBalance={pointsBalance}
+      reviewsAverage={reviews.average}
+      reviewsTotal={reviews.total}
+      networkCount={network.length}
+      completedJobsCount={completedJobsCount}
+      locale={locale}
+      t={t}
+    />
   );
 }

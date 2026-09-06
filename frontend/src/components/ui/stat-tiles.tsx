@@ -214,7 +214,7 @@ export function TabLinks({
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-canvas",
                   active
                     ? "border-accent-solid text-fg"
-                    : "border-transparent text-fg-secondary hover:border-border-strong hover:text-fg",
+                    : "border-transparent text-fg-secondary hover:border-strong hover:text-fg",
                 )}
               >
                 {tab.label}

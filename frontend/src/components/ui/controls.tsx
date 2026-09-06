@@ -11,7 +11,7 @@ import { cn } from "@/lib/ui/cn";
  */
 const variants = {
   primary: "bg-primary text-primary-foreground shadow-sm hover:opacity-90 active:opacity-100",
-  accent: "bg-accent-solid text-brand-basalt shadow-sm hover:brightness-105 active:brightness-100",
+  accent: "bg-accent-solid text-on-accent shadow-sm hover:brightness-105 active:brightness-100",
   outline: "border border-strong bg-transparent text-fg hover:bg-surface-2",
   ghost: "bg-transparent text-fg-secondary hover:bg-surface-2 hover:text-fg",
   danger: "border border-danger/50 bg-transparent text-danger hover:bg-danger/10",
@@ -30,6 +30,21 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 const focusRing =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
 
+/**
+ * The shared geometry every button-shaped control uses, extracted so a LINK can
+ * wear it without a second implementation.
+ */
+function controlClass(variant: keyof typeof variants, size: keyof typeof sizes, className?: string) {
+  return cn(
+    "inline-flex select-none items-center justify-center rounded-sm font-medium transition-[background-color,color,opacity,filter,box-shadow] duration-fast",
+    focusRing,
+    "disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none",
+    sizes[size],
+    variants[variant],
+    className,
+  );
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { variant = "primary", size = "md", className, children, type = "button", ...rest },
   ref,
@@ -38,20 +53,48 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       type={type}
-      className={cn(
-        "inline-flex select-none items-center justify-center rounded-sm font-medium transition-[background-color,color,opacity,filter,box-shadow] duration-fast",
-        focusRing,
-        "disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none",
-        sizes[size],
-        variants[variant],
-        className,
-      )}
+      className={controlClass(variant, size, className)}
       {...rest}
     >
       {children}
     </button>
   );
 });
+
+/**
+ * A LINK that wears the button geometry.
+ *
+ * Added to the canonical set rather than written per page (R3/R6). Until the
+ * Jobs module there was no primary "go and do this" destination in the
+ * workspace — every navigational affordance was an accent text link — so
+ * `Button` only ever needed to render a `<button>`. "Post a job" and "View
+ * applications" are genuinely navigation, and a `<button onClick={router.push}>`
+ * would take a real anchor away from the reader: no middle-click, no open in a
+ * new tab, no href in the status bar, and a control announced as a button when
+ * it is a link.
+ *
+ * Identical geometry by construction — it shares `controlClass` with `Button`,
+ * so the two cannot drift.
+ */
+export function ButtonLink({
+  href,
+  variant = "primary",
+  size = "md",
+  className,
+  children,
+}: {
+  href: string;
+  variant?: keyof typeof variants;
+  size?: keyof typeof sizes;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <a href={href} className={controlClass(variant, size, className)}>
+      {children}
+    </a>
+  );
+}
 
 /** Submit button that reflects the enclosing form's pending state. */
 export function SubmitButton({
@@ -61,6 +104,7 @@ export function SubmitButton({
   size = "md",
   className,
   disabled = false,
+  "aria-label": ariaLabel,
 }: {
   children: ReactNode;
   pendingLabel?: string;
@@ -69,6 +113,14 @@ export function SubmitButton({
   className?: string;
   /** Extra gate (e.g. required consent) ORed with the form's pending state. */
   disabled?: boolean;
+  /**
+   * REQUIRED when `children` is an icon rather than words. A submit control whose
+   * only content is a glyph announces itself as "button" and nothing else, so the
+   * prop exists here rather than in each caller — the Portfolio reorder controls
+   * were the first to need it, and the next icon-only submit should not have to
+   * rediscover that a local replacement is the wrong answer (R6).
+   */
+  "aria-label"?: string;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -78,6 +130,7 @@ export function SubmitButton({
       size={size}
       disabled={pending || disabled}
       aria-busy={pending}
+      aria-label={ariaLabel}
       className={className}
     >
       {pending ? (

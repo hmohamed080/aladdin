@@ -3,15 +3,7 @@ import { getMessages, createTranslator } from "@/lib/i18n/translate";
 import { PageHeader, Panel } from "@/components/ui/workspace-layout";
 import { StatePanel } from "@/components/ui/primitives";
 import { GaugeIcon } from "@/components/ui/icons";
-import {
-  getPointsBalance,
-  listPointsEntries,
-  resolveEntryOrganizationNames,
-  resolveHistoryLimit,
-  POINTS_HISTORY_LIMIT,
-  POINTS_HISTORY_MAX,
-} from "@/server/queries/points";
-import { toPointsEntryViews } from "@/features/points/view-model";
+import { loadPointsPage } from "@/features/points/points-page";
 import { PointsBalance } from "@/features/points/points-balance";
 import { PointsHistory } from "@/features/points/points-history";
 
@@ -36,6 +28,12 @@ export const dynamic = "force-dynamic";
  *
  * The route, the nav entry and the section it belongs to are unchanged from the
  * shell this replaces — only the body is new, exactly as the shell predicted.
+ *
+ * The reads, the failure contract and the "more" rule moved to
+ * `features/points/points-page.ts` when the personal route was added, so the two
+ * surfaces cannot drift on what the ledger says. Nothing about THIS page's
+ * behaviour changed: same queries, same one-try-around-both, same cap arithmetic,
+ * same workspace chrome.
  */
 export default async function PointsPage({
   searchParams,
@@ -47,7 +45,6 @@ export default async function PointsPage({
   const m = getMessages(ctx.locale);
   const t = createTranslator(ctx.locale);
   const { show } = await searchParams;
-  const limit = resolveHistoryLimit(show);
 
   const header = (
     <PageHeader
@@ -58,20 +55,14 @@ export default async function PointsPage({
     />
   );
 
-  /* One try around both reads, deliberately. They answer one question between
-     them, and a page showing a confident balance above a silently empty history
-     — or an empty state that is really a failed query — would be a page that
-     lies about the ledger. If either read fails the page says so. */
-  let balance: number;
-  let entries: Awaited<ReturnType<typeof listPointsEntries>>;
-  let orgNames: Map<string, string>;
-  try {
-    [balance, entries] = await Promise.all([
-      getPointsBalance(ctx.supabase),
-      listPointsEntries(ctx.supabase, { limit }),
-    ]);
-    orgNames = await resolveEntryOrganizationNames(ctx.supabase, entries);
-  } catch {
+  const data = await loadPointsPage(ctx.supabase, {
+    show,
+    locale: ctx.locale,
+    t,
+    basePath: "/b2b/points",
+  });
+
+  if (!data.ok) {
     return (
       <div className="flex flex-col gap-lg">
         {header}
@@ -85,18 +76,10 @@ export default async function PointsPage({
     );
   }
 
-  const views = toPointsEntryViews(entries, t, ctx.locale, orgNames);
-  /* "More" appears only when the page is actually full AND the cap can still
-     rise. A link that loads the same rows again is worse than no link. */
-  const moreHref =
-    entries.length >= limit && limit < POINTS_HISTORY_MAX
-      ? `/b2b/points?show=${Math.min(limit + POINTS_HISTORY_LIMIT, POINTS_HISTORY_MAX)}`
-      : null;
-
   return (
     <div className="flex flex-col gap-lg">
       {header}
-      <PointsBalance balance={balance} locale={ctx.locale} t={t} />
+      <PointsBalance balance={data.balance} locale={ctx.locale} t={t} />
       <Panel title={m.points.earn.title} Icon={GaugeIcon}>
         <div className="flex flex-col gap-1">
           <span className="text-label text-fg">{m.points.earn.ruleTitle}</span>
@@ -109,7 +92,7 @@ export default async function PointsPage({
         </div>
       </Panel>
       <Panel title={m.points.history.title} Icon={GaugeIcon}>
-        <PointsHistory entries={views} t={t} moreHref={moreHref} />
+        <PointsHistory entries={data.views} t={t} moreHref={data.moreHref} />
       </Panel>
     </div>
   );

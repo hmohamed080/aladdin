@@ -17,3 +17,49 @@ Database tests run with **pgTAP** via `supabase test db` (or `supabase db test`)
 ## Foundation status
 
 No product tables exist yet, so there are no policy tests to write. This structure exists so the **first** table migration ships with its isolation tests here — a migration adding a tenant table without an RLS policy + isolation test fails review.
+
+## Tests that `supabase test db` does not run
+
+Two kinds of file here are **not** pgTAP and are invoked directly:
+
+- `*_concurrency_test.sh` — two real sessions racing for a lock, which a single
+  pgTAP transaction cannot express.
+- `professional_asset_storage_api_test.mjs` — the Storage **HTTP API**, which a
+  SQL test cannot reach at all.
+
+```bash
+node supabase/tests/professional_asset_storage_api_test.mjs
+```
+
+Needs a running local stack with the standard seeds. It mints its own local HS256
+tokens for seeded fixtures rather than driving the OTP flow, creates only
+deterministic temporary objects, and deletes every one of them in a `finally`
+(it fails if any is left behind).
+
+**Why it exists alongside `47_professional_asset_storage_test.sql`:** the rules
+protecting a stored file live in two processes. RLS decides *who*, and pgTAP
+proves that — including the absences (`there is no UPDATE policy`, `no policy
+admits anon`) which no amount of HTTP probing could establish. But
+`allowed_mime_types` and `file_size_limit` are enforced by the Storage service
+from the bucket row **before Postgres is consulted**, so a suite that introspected
+policies alone could show a green board while an oversized, mislabelled upload
+sailed through. See [`docs/database/professional-asset-storage.md`](../../docs/database/professional-asset-storage.md) §10.
+
+### `public_media_exposure_test.mjs`
+
+```bash
+node supabase/tests/public_media_exposure_test.mjs
+```
+
+Needs the local stack **and** the Next dev server on `:3000`, because three of its
+four questions are about HTTP surfaces that do not exist in SQL: is the storage
+key derivable from the public item id, where does the key actually appear (HTML,
+RSC payload, response headers, API, errors), what can an anonymous caller do at
+Storage directly, and does withdrawal take effect on the next request.
+
+It has been wrong twice, and both corrections are recorded in
+[`professional-asset-storage.md`](../../docs/database/professional-asset-storage.md) §7.2.
+First it claimed an anonymous caller could reach nothing; it found that listing,
+direct GET and HEAD were all permitted. Then it concluded that could not be
+narrowed; `storage.allow_only_operation` proved otherwise, and the public door is
+now one operation wide. Run it after any change to a storage policy.

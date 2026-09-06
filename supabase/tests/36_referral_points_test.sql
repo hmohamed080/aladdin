@@ -16,7 +16,7 @@
 -- Fixtures, all from seed-pilot (the same ones 28_persona_sales_affiliation
 -- uses, so the two suites describe one world):
 --   70000002 — a `sales` persona, our referring salesperson
---   70000009 — an installer persona, an unrelated third party who also refers
+--   70000007 — Laila, a second `sales` persona (referrer in the reject/link/coupling cases)
 --   70000001 — owner of Cairo Ceramics Showroom (business-only identity)
 --   55555555 — platform administrator (the approver)
 --   9c00…001 — Cairo Ceramics Showroom, which ALREADY EXISTS (the linking case)
@@ -28,7 +28,7 @@ select plan(52);
 update auth.users set email_confirmed_at = now()
   where id in ('70000001-0000-4000-8000-000000000001',
                '70000002-0000-4000-8000-000000000002',
-               '70000009-0000-4000-8000-000000000009',
+               '70000007-0000-4000-8000-000000000007',
                '55555555-5555-4555-8555-555555555555');
 
 -- The ledger starts empty: every entry this suite observes was written by the
@@ -54,7 +54,7 @@ select is((select count(*)::int from public.points_ledger), 0,
 -- 2. Rejection awards nothing
 -- ===========================================================================
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"70000007-0000-4000-8000-000000000007","role":"authenticated"}';
 select isnt(public.showroom_referral_save(
   null, 'Rejected Tiles LLC', 'Rejected Tiles', null,
   'cairo', 'nasr_city', 'Main'), null, 'a second salesperson drafts a referral');
@@ -64,7 +64,7 @@ set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","r
 select lives_ok(
   $$ select public.showroom_referral_reject(
        (select id from public.organization_referrals
-        where referred_by = '70000009-0000-4000-8000-000000000009' and status = 'submitted'),
+        where referred_by = '70000007-0000-4000-8000-000000000007' and status = 'submitted'),
        'Not a real business') $$,
   'the administrator rejects it');
 
@@ -73,7 +73,7 @@ select is((select count(*)::int from public.points_ledger), 0,
   'REJECTION awards nothing');
 select is(
   (select count(*)::int from public.points_ledger
-   where user_id = '70000009-0000-4000-8000-000000000009'),
+   where user_id = '70000007-0000-4000-8000-000000000007'),
   0, 'the rejected salesperson holds no points');
 
 -- ===========================================================================
@@ -140,7 +140,7 @@ select is((select public.points_balance('55555555-5555-4555-8555-555555555555'))
   'the APPROVER receives nothing merely for approving');
 select is((select public.points_balance('70000001-0000-4000-8000-000000000001')), 0::bigint,
   'an organization OWNER receives nothing merely for ownership');
-select is((select public.points_balance('70000009-0000-4000-8000-000000000009')), 0::bigint,
+select is((select public.points_balance('70000007-0000-4000-8000-000000000007')), 0::bigint,
   'an unrelated salesperson receives nothing');
 
 -- No notification was emitted for the award (deferred by the spec).
@@ -203,7 +203,7 @@ select is((select count(*)::int from public.points_ledger), 1,
 -- provenance and there is nobody to credit. Crediting the referral REQUEST here
 -- would pay for "referring" a business that was already on the platform.
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"70000007-0000-4000-8000-000000000007","role":"authenticated"}';
 select isnt(public.showroom_referral_save(
   null, null, '  cairo ceramics showroom ', null, 'cairo', 'nasr_city', 'Nasr City'),
   null, 'a salesperson refers a showroom that already exists');
@@ -213,7 +213,7 @@ set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","r
 select is(
   public.showroom_referral_approve(
     (select id from public.organization_referrals
-     where referred_by = '70000009-0000-4000-8000-000000000009' and status = 'submitted')),
+     where referred_by = '70000007-0000-4000-8000-000000000007' and status = 'submitted')),
   '9c000000-cccc-4ccc-8ccc-000000000001',
   'approval LINKS to the existing organization instead of creating one');
 
@@ -226,7 +226,7 @@ select is(
 select is((select count(*)::int from public.points_ledger), 1,
   'the LINKING approval awarded nothing — no attributed recipient exists');
 
-select is((select public.points_balance('70000009-0000-4000-8000-000000000009')), 0::bigint,
+select is((select public.points_balance('70000007-0000-4000-8000-000000000007')), 0::bigint,
   'no recipient was fabricated from the referral request');
 
 -- ===========================================================================
@@ -249,7 +249,7 @@ select is((select count(*)::int from public.points_ledger), 1,
 -- Proven by making the ledger reject the write (a savepoint-scoped constraint
 -- the award cannot satisfy) and observing that the referral stays 'submitted'.
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"70000007-0000-4000-8000-000000000007","role":"authenticated"}';
 select isnt(public.showroom_referral_save(
   null, 'Coupling Test Tiles LLC', 'Coupling Test Tiles', null,
   'giza', 'sheikh_zayed', 'Main'), null, 'a third referral is drafted');
@@ -268,7 +268,7 @@ set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","r
 select throws_ok(
   $$ select public.showroom_referral_approve(
        (select id from public.organization_referrals
-        where referred_by = '70000009-0000-4000-8000-000000000009' and status = 'submitted')) $$,
+        where referred_by = '70000007-0000-4000-8000-000000000007' and status = 'submitted')) $$,
   '23514', null, 'an award that cannot be written aborts the whole approval');
 
 reset role;
@@ -281,7 +281,7 @@ select is(
   0, 'the aborted approval created NO organization');
 select is(
   (select status from public.organization_referrals
-   where referred_by = '70000009-0000-4000-8000-000000000009'
+   where referred_by = '70000007-0000-4000-8000-000000000007'
      and display_name = 'Coupling Test Tiles'),
   'submitted', 'the referral is still submitted — the approval did not partially commit');
 -- Two approvals genuinely succeeded before this point (Zayed Tiles created,
@@ -305,7 +305,7 @@ select is(
   '70000002-0000-4000-8000-000000000002'::uuid,
   'referral attribution still survives approval');
 select throws_ok(
-  $$ update public.organizations set referred_by_user_id = '70000009-0000-4000-8000-000000000009'
+  $$ update public.organizations set referred_by_user_id = '70000007-0000-4000-8000-000000000007'
      where name = 'Zayed Tiles' $$,
   '23514', null, 'referral attribution is still IMMUTABLE — the award cannot be redirected');
 select is(

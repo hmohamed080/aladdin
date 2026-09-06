@@ -196,6 +196,10 @@ export function ProfessionalDirectoryTable({
           title={r.display_name ?? "—"}
           meta={r.persona ? m.directory.persona[r.persona] : undefined}
           avatar={<Monogram name={r.display_name ?? "?"} />}
+          // Every row here came from `profile_public_directory`, so the profile it
+          // names is by construction listed and public — the link cannot reach
+          // anything the reader was not already being shown.
+          href={r.id ? `/p/${r.id}` : undefined}
         />
       ),
     },

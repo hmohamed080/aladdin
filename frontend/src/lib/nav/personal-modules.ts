@@ -1,0 +1,218 @@
+/**
+ * PERSONAL navigation — the sibling of `modules.ts`, and deliberately not an
+ * extension of it.
+ *
+ * `modules.ts` answers a question this file cannot ask: *"which modules does this
+ * membership's capability set unlock inside an organization?"* A personal account
+ * has no membership and no capabilities, so every gate there is inapplicable here.
+ * Reusing that model would have meant inventing pseudo-capabilities for a person,
+ * which is precisely the conflation the account model exists to prevent — a person
+ * is not a tiny organization.
+ *
+ * What replaces capabilities is the PERSONA, and only in the narrow sense of "does
+ * this destination exist for this kind of account":
+ *
+ *   * every personal account has a home;
+ *   * a professional has a professional profile; a consumer does not, because
+ *     there is no professional profile to show — not because it is withheld;
+ *   * a professional has Points, for the same reason they have a profile: the
+ *     ledger is user-owned and the one approved earning rule credits a person,
+ *     not an organization. It is deliberately NOT gated on holding a balance —
+ *     a page that appears only once you have something is a page nobody can find
+ *     the first time;
+ *   * a salesperson has the showroom-affiliation route, which the database
+ *     refuses to anyone else (`app.is_sales_persona`);
+ *   * anyone may start a business, because owning one is a relationship, never an
+ *     account type.
+ *
+ * NOTHING HERE IS AN AUTHORITY DECISION. Each destination re-checks its own
+ * access server-side; this module decides only what to draw. A nav that shows a
+ * link the page then refuses is a worse failure than one that omits it, which is
+ * why `connectShowroom` takes the SAME resolved answer the page and the layout
+ * use rather than re-deriving a persona test of its own.
+ *
+ * Pure module: no server imports, so the derivation is unit-testable.
+ */
+
+export type PersonalNavKey =
+  | "home"
+  | "profile"
+  | "points"
+  | "settings"
+  | "jobs"
+  | "myWork"
+  | "reviews"
+  | "network"
+  | "connectShowroom"
+  | "addBusiness";
+
+/**
+ * Three groups, not six. The reference pack shows a richer rail — learning,
+ * points, network, reviews — and Points has since arrived under "account", where
+ * it belongs: the ledger is the caller's own standing, not a separate programme.
+ * "work" arrived with Increment 8, when Job Opportunities became a real
+ * destination rather than a picture. The rest are later increments or unapproved
+ * elements, and a heading with nothing under it is worse than no heading.
+ * Sections are dropped when empty, so this grows without being edited.
+ */
+export type PersonalNavSection = "account" | "work" | "business";
+
+export type PersonalNavItem = {
+  key: PersonalNavKey;
+  href: string;
+  /** Message key for the label — resolved by the caller's translator. */
+  labelKey: string;
+};
+
+const ITEMS: Record<PersonalNavKey, PersonalNavItem> = {
+  home: { key: "home", href: "/home", labelKey: "personalNav.home" },
+  profile: { key: "profile", href: "/home/profile", labelKey: "personalNav.profile" },
+  points: { key: "points", href: "/home/points", labelKey: "personalNav.points" },
+  jobs: { key: "jobs", href: "/home/jobs", labelKey: "personalNav.jobs" },
+  myWork: { key: "myWork", href: "/home/work", labelKey: "personalNav.myWork" },
+  reviews: { key: "reviews", href: "/home/reviews", labelKey: "personalNav.reviews" },
+  network: { key: "network", href: "/home/network", labelKey: "personalNav.network" },
+  /* Reachable by BOTH variants (default branch of `isReachable`) — locale,
+     appearance and sign-out are not a professional-only need, and Increment
+     14 is what finally builds the route `home/layout.tsx` used to note as
+     "specified but not built". */
+  settings: { key: "settings", href: "/home/settings", labelKey: "personalNav.settings" },
+  connectShowroom: {
+    key: "connectShowroom",
+    href: "/home/showroom",
+    labelKey: "personalNav.connectShowroom",
+  },
+  addBusiness: { key: "addBusiness", href: "/business/new", labelKey: "personalNav.addBusiness" },
+};
+
+const SECTIONS: { section: PersonalNavSection; keys: PersonalNavKey[] }[] = [
+  { section: "account", keys: ["home", "profile", "points", "settings"] },
+  /* Work is its own group rather than a fourth entry under "account", because it
+     is the only destination here that is about the OUTSIDE world: the other
+     three are the caller's own record. Increment 9 made it the group of two it
+     was shaped for, and the two stay SEPARATE destinations rather than one
+     "Jobs" with tabs: an opening you might take and an engagement you already
+     hold are different states of the world, and merging them would make
+     "accepted" mean both "you won" and "you are working". */
+  /* Reviews joins "work" rather than "account", and the distinction is the one
+     this group was drawn on: the other three destinations under "account" are
+     the caller's own record, and these three are the outside world's. A review
+     is written BY somebody else ABOUT work — it is the outcome of the two
+     destinations beside it, not a fact the professional maintains. */
+  /* Network joins the same group, last: it is derived from the OUTCOME of the
+     two destinations before it — completed engagements become the real
+     professional relationships this entry summarises — never a fourth
+     independent thing a professional maintains. */
+  { section: "work", keys: ["jobs", "myWork", "reviews", "network"] },
+  { section: "business", keys: ["connectShowroom", "addBusiness"] },
+];
+
+/**
+ * What the rail is derived FROM. Both fields are already resolved by the caller —
+ * `variant` by `loadPersonalHome` (track, then persona) and `isSalesPersona` by
+ * `loadIsSalesPersona` (canonical, then declared) — so this module never reads a
+ * raw column and cannot disagree with the pages it links to.
+ */
+export type PersonalNavInput = {
+  variant: "consumer" | "professional";
+  isSalesPersona: boolean;
+};
+
+/** Whether one destination exists for this account. */
+function isReachable(key: PersonalNavKey, input: PersonalNavInput): boolean {
+  switch (key) {
+    case "profile":
+    case "points":
+      return input.variant === "professional";
+    /* THE SAME TEST THE DATABASE APPLIES. `job_application_submit` refuses
+       anyone who is not `app.is_professional_persona`, so a consumer offered
+       this rail entry could browse openings and then be refused at the one
+       action the page exists for. Discovery itself is open to any authenticated
+       caller — this is about not advertising a door that does not open. */
+    case "jobs":
+    /* THE SAME TEST AGAIN, and for a sharper reason. Every assignment is
+       created by `job_application_accept` from an application only a
+       professional persona could have submitted, so a consumer cannot hold one
+       — the destination would be permanently empty rather than merely
+       unusable. */
+    case "myWork":
+    /* THE SAME TEST ONCE MORE. A review can only exist against an assignment,
+       and only a professional persona can hold one — so for a consumer this
+       destination is not merely unusable, it is permanently empty. */
+    case "reviews":
+    /* AND ONCE MORE. Network is derived exclusively from completed
+       job_assignments (Increment 13), which only a professional persona can
+       ever hold — a consumer's Network is not merely empty, it is
+       unreachable by construction. */
+    case "network":
+      return input.variant === "professional";
+    case "connectShowroom":
+      return input.isSalesPersona;
+    default:
+      return true;
+  }
+}
+
+/** The destinations this account has, in canonical order. */
+export function personalNavKeys(input: PersonalNavInput): PersonalNavKey[] {
+  return SECTIONS.flatMap((s) => s.keys).filter((key) => isReachable(key, input));
+}
+
+/**
+ * The bottom bar's OWN, smaller list (Increment 14, §8).
+ *
+ * `PersonalMobileNav` was built on "a personal account has at most five
+ * destinations, so they all fit" — true when it was written. It is no longer
+ * true: a professional now has up to nine (`personalNavKeys` above), and
+ * without a curated subset every label past the first one or two truncates to
+ * nothing legible. Points, Reviews, Settings and Add business are not gone —
+ * each is a real entry in Account Overview's own module grid (or, for
+ * Settings and Add business, in Home's Quick access) — they simply are not
+ * ALSO one of the five things worth a thumb's reach on every screen.
+ *
+ * Fixed priority order, filtered down to whatever this account actually has:
+ * the daily loop (find work, do work, see who you've built a relationship
+ * with) plus the one place everything else hangs off. A consumer's three
+ * reachable keys already fit and pass through unchanged.
+ */
+const MOBILE_PRIMARY: PersonalNavKey[] = ["home", "jobs", "myWork", "network", "profile"];
+
+export function personalMobileNavKeys(keys: readonly PersonalNavKey[]): PersonalNavKey[] {
+  // A consumer's three destinations already fit — curating them would only
+  // ever narrow, never help, and "home" alone would strand Settings and Add
+  // business off the bar for an account with room to spare.
+  if (keys.length <= 5) return [...keys];
+  const set = new Set(keys);
+  return MOBILE_PRIMARY.filter((key) => set.has(key));
+}
+
+/** The same destinations grouped for the rail; empty sections are dropped. */
+export function personalNavSections(
+  input: PersonalNavInput,
+): { section: PersonalNavSection; keys: PersonalNavKey[] }[] {
+  return SECTIONS.map(({ section, keys }) => ({
+    section,
+    keys: keys.filter((key) => isReachable(key, input)),
+  })).filter((s) => s.keys.length > 0);
+}
+
+/** The item definition for a key — href and label, never a permission. */
+export function personalNavItem(key: PersonalNavKey): PersonalNavItem {
+  return ITEMS[key];
+}
+
+/**
+ * Which rail entry a pathname belongs to, longest href first so `/home/profile`
+ * is not swallowed by `/home`. Returns null for a personal route with no rail
+ * entry of its own (`/home/showroom/refer` resolves to `connectShowroom`, but a
+ * future route need not resolve to anything).
+ */
+export function activePersonalNavKey(pathname: string): PersonalNavKey | null {
+  const candidates = (Object.keys(ITEMS) as PersonalNavKey[])
+    .map((key) => ITEMS[key])
+    .sort((a, b) => b.href.length - a.href.length);
+  const hit = candidates.find(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+  );
+  return hit?.key ?? null;
+}

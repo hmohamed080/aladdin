@@ -38,7 +38,7 @@ export function SavedGrid({
         action={
           <Link
             href="/b2b/catalog"
-            className="inline-flex min-h-9 items-center rounded-sm bg-accent-solid px-md py-1.5 text-label font-medium text-brand-basalt hover:opacity-90"
+            className="inline-flex min-h-9 items-center rounded-sm bg-accent-solid px-md py-1.5 text-label font-medium text-on-accent hover:opacity-90"
           >
             {m.saved.browse}
           </Link>

@@ -7,7 +7,7 @@ import { THEME_COOKIE } from "@/lib/theme/config";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadWorkspaceContext } from "@/server/queries/context";
 import { personalEntry } from "@/lib/workspace/model";
-import { AppShell } from "@/components/layout/app-shell";
+import { WorkspaceShell } from "@/components/layout/workspace-shell";
 import { NoOrgNotice } from "@/components/layout/no-org-notice";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ export default async function B2BLayout({ children }: { children: ReactNode }) {
   return (
     <I18nProvider locale={locale} dir={dir}>
       {workspace.active ? (
-        <AppShell workspace={workspace}>{children}</AppShell>
+        <WorkspaceShell workspace={workspace}>{children}</WorkspaceShell>
       ) : (
         <NoOrgNotice theme={theme} />
       )}

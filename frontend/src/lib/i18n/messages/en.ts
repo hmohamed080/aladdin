@@ -96,6 +96,7 @@ export const en = {
     suppliers: "Distributors",
     buyers: "Customers & showrooms",
     technicians: "Technicians",
+    jobs: "Jobs",
     institutions: "Institutions",
     team: "Team",
     reports: "Reports",
@@ -200,6 +201,7 @@ export const en = {
       suppliers: "The distributor, manufacturer and importer directory.",
       buyers: "The businesses that buy from you.",
       technicians: "Installers and technicians on Aladdin.",
+      jobs: "Openings you post for individual professionals.",
       institutions: "Showrooms, contractors and design offices.",
       customers: "Your own customer records.",
       leads: "Opportunities moving through your pipeline.",
@@ -318,6 +320,16 @@ export const en = {
         reviewBody: "Review what you sent and the status of your verification request.",
       },
     },
+    snapshot: {
+      points: "Points",
+      rating: "Rating",
+      ratingHint: "{n} reviews",
+      network: "Network",
+      completedJobs: "Completed jobs",
+    },
+    quickAccess: {
+      title: "Quick access",
+    },
     sales: {
       setup: "Your sales setup",
       setupBody: "Sales tools live inside the showroom you work with. Connect yours to open them.",
@@ -343,6 +355,175 @@ export const en = {
         rejected: "Connection declined",
         referralRejected: "Showroom not added",
       },
+    },
+  },
+  personalNav: {
+    reviews: "Reviews",
+    label: "Personal navigation",
+    home: "Home",
+    profile: "My profile",
+    points: "Points",
+    settings: "Settings",
+    jobs: "Job opportunities",
+    myWork: "My work",
+    network: "Network",
+    connectShowroom: "Connect showroom",
+    addBusiness: "Add business",
+  },
+  personalSettings: {
+    title: "Settings",
+    subtitle: "Your profile, availability, language and appearance, and how you sign in.",
+    profile: {
+      title: "Professional profile",
+      edit: "Edit profile",
+      note: "Trades and specialties, service areas, experience and bio all live in your profile editor.",
+    },
+    availability: {
+      title: "Availability",
+    },
+    preferences: {
+      title: "Language & appearance",
+      languageHint: "Applies everywhere you use Aladdin.",
+      themeHint: "Light or dark, saved on this device.",
+    },
+    account: {
+      title: "Sign-in & account",
+      signInContact: "Your sign-in contact",
+      signInBody: "Aladdin has no passwords. You sign in with a one-time code sent to your verified contact, so there is nothing to reset or leak.",
+      signInContactHint: "Change it from your professional profile.",
+      signOut: "Sign out",
+    },
+  },
+  profile: {
+    snapshot: {
+      reviews: "Reviews",
+      rating: "Rating",
+      completedJobs: "Completed jobs",
+      points: "Points",
+    },
+    reviews: {
+      title: "My reviews",
+      body: "What the businesses you worked for said about your work.",
+      none: "no reviews yet",
+      manage: "View reviews",
+    },
+    myWork: {
+      title: "My work",
+      body: "Assignments organizations have accepted you for.",
+      none: "no completed jobs yet",
+      completed: "completed",
+      manage: "View my work",
+    },
+    points: {
+      title: "My Points",
+      body: "Earned when a showroom you refer joins Aladdin.",
+      manage: "View Points",
+    },
+    work: {
+      title: "Your work and certificates",
+      body: "What you show the public, and what you keep to yourself.",
+    },
+    network: {
+      title: "My network",
+      body: "Organizations you have real, completed work with.",
+      none: "no organizations yet",
+      manage: "View network",
+    },
+    portfolio: {
+      // "Portfolio", not "My work" — the account grid's OTHER module (job
+      // assignments) already owns that name, and this card sits right next
+      // to it (Increment 14 found the collision when both were first shown
+      // on the same page).
+      title: "Portfolio",
+      body: "Photographs of finished jobs. You choose which ones the public can see.",
+      none: "nothing added yet",
+      split: "{published} published · {privateCount} private",
+      unfinished: "{n} upload did not finish",
+      manage: "Manage portfolio",
+    },
+    certificates: {
+      title: "My certificates",
+      body: "Certificates and documents you hold.",
+      none: "nothing added yet",
+      held: "on your account",
+      expired: "{n} has expired",
+      privateNote: "Private to you. Never shown on your public profile.",
+      manage: "Manage certificates",
+    },
+    hub: {
+      title: "Your professional profile",
+      body: "What Aladdin knows about the work you do. Keep it accurate — it is what businesses read when they are choosing who to work with.",
+      edit: "Edit profile",
+      leadTime: "How soon you can start",
+    },
+    trades: {
+      title: "The trades you work in",
+      body: "Pick every trade you take on. The one you mark as your main trade is what businesses see first, and what future job matching will start from.",
+      empty: "You have not chosen a trade yet.",
+      emptyHint: "Choosing your trades is how businesses looking for your line of work find you. You can change them whenever you like.",
+      primary: "Main trade",
+      makePrimary: "Make this the main trade",
+      mainLabel: "Main trade",
+      alsoLabel: "Also works in",
+      selectedCount: "{n} selected",
+      save: "Save trades",
+      saving: "Saving…",
+      saved: "Trades saved",
+      saveFailed: "We could not save your trades. Please try again.",
+      notProfessional: "Trades are part of a professional profile, and this account does not have one.",
+      unavailable: "That trade is no longer offered. Please choose another.",
+      note: "Choosing a trade does not restrict you. You can still take on work outside it.",
+    },
+    availability: {
+      title: "Are you taking work?",
+      body: "Tell businesses whether you are open to new work right now. You can change this whenever it changes.",
+      available: "Available for work",
+      unavailable: "Not taking work",
+      neverSet: "Not set yet",
+      updated: "Updated {when}",
+      markAvailable: "Mark me available",
+      markUnavailable: "Mark me unavailable",
+      explainer:
+        "This stays exactly as you set it until you change it — nothing switches it off for you. It is not a calendar and it does not affect anything else in your account.",
+      notProfessional: "Availability is part of a professional profile, and this account does not have one.",
+    },
+    public: {
+      title: "Your public profile",
+      body: "What people outside Aladdin can see about you.",
+      hiddenTitle: "Not published yet",
+      hiddenBody:
+        "Your profile is private while your professional details are being verified. Publishing is handled by the Aladdin team once that is done — there is nothing for you to switch on. Your account works normally in the meantime.",
+      listedTitle: "Your profile is published",
+      listedBody:
+        "Anyone with the link can see your name, headline, summary, languages, the work you do and whether you are taking work.",
+      view: "View public profile",
+    },
+    accountArea: {
+      title: "Account",
+      settingsBody: "Language, appearance, availability shortcuts, and how you sign in.",
+      support: "Help & support",
+    },
+    notProfessional: {
+      title: "This page is for professional accounts",
+      body: "Your account is set up as a personal one, so there is no professional profile to show here. Nothing is wrong with your account.",
+      back: "Back to your home",
+    },
+    edit: {
+      title: "Edit your profile",
+      body: "Change anything here and save once. Your profession is set when your account is reviewed and is not edited here.",
+      personaFixed: "Set during account review",
+      save: "Save changes",
+      saving: "Saving…",
+      cancel: "Cancel",
+      saveFailed: "We could not save your changes. Please check the fields and try again.",
+    },
+    publicPage: {
+      reviews: "Client reviews",
+      portfolio: "Recent work",
+      unnamed: "Aladdin professional",
+      practice: "Work and specialties",
+      about: "About",
+      footnote: "Profile details are provided by the professional and verified by Aladdin before publishing.",
     },
   },
   showroom: {
@@ -374,6 +555,11 @@ export const en = {
     addShowroom: "Add showroom",
     referralNote: "This tells us about your employer — it doesn't create a business you own.",
     error: "Something went wrong. Please try again.",
+    notSales: {
+      title: "Connecting a showroom is for sales accounts",
+      body: "Your account isn't set up for sales work, so there's no showroom to connect. Nothing is wrong with your account — this part of Aladdin just belongs to a different account type.",
+      back: "Back to your home",
+    },
     refer: {
       eyebrow: "Sales setup",
       title: "Add your showroom",
@@ -985,6 +1171,52 @@ export const en = {
         body: "{counterparty_name} sent a new message about this transaction.",
       },
     },
+    /* Increment 8. Written from the APPLICANT's side, because they are the only
+       recipient either event has — `job_application_accept` / `_reject` name one
+       user id each, so there is no fan-out to be vague for. */
+    /* Increment 8, and the key path mirrors the event type exactly
+       (`job.application.accepted` -> `notifications.job.application.accepted`),
+       which is the convention `view-model.test.ts` enforces for every event.
+       Written from the APPLICANT's side, because they are the only recipient
+       either event has — the two RPCs name one user id each, so there is no
+       fan-out to be vague for. */
+    job: {
+      application: {
+        accepted: {
+          title: "Your application was accepted",
+          body: "{org_name} awarded you the job “{job_title}”.",
+        },
+        rejected: {
+          title: "A decision on your application",
+          body: "{org_name} has decided on your application for “{job_title}”.",
+        },
+      },
+      /* Increment 9. `ready` is the only one addressed to an organization, and
+         it deliberately does not say "completed" — the work has been REPORTED
+         as finished and the reader is the person who decides whether it was. */
+      /* Increment 12. Addressed to the reviewed professional and to nobody
+         else: the organization is the party that just acted. */
+      review: {
+        received: {
+          title: "You received a review",
+          body: "{org_name} reviewed your work on “{job_title}”.",
+        },
+      },
+      assignment: {
+        ready: {
+          title: "Work reported as finished",
+          body: "The professional reported “{job_title}” as finished and is waiting for your confirmation.",
+        },
+        completed: {
+          title: "Your work was confirmed as complete",
+          body: "{org_name} confirmed “{job_title}” as complete.",
+        },
+        cancelled: {
+          title: "An assignment was cancelled",
+          body: "“{job_title}” was cancelled. Reason: {reason}",
+        },
+      },
+    },
   },
   /* The composer is the SHELL of a composer: it shows exactly the surface the
      next sprint will wire, and states plainly that sending is not open, rather
@@ -1301,6 +1533,12 @@ export const en = {
         electrical: "Electrical",
         hvac: "HVAC",
         gypsum_paint: "Gypsum & paint",
+        // Added with the canonical trade taxonomy (Increment 5). Not offered as
+        // an onboarding CHIP — `SPECIALIZATIONS.installer_technician` is
+        // unchanged — but both are seeded trades that the demo world already
+        // contains, and a trade with no label prints its own key.
+        tiling: "Tiling",
+        marble_granite: "Marble & granite",
         full_finishing: "Full finishing",
         renovation: "Renovation",
         turnkey: "Turnkey",
@@ -2430,6 +2668,863 @@ export const en = {
       notDraft: "Only a draft can be edited.",
       notSubmitted: "Only a submitted record can be decided.",
       denied: "You don't have permission to do this.",
+    },
+  },
+  /**
+   * Organization-side Jobs — openings this business posts for INDIVIDUAL
+   * professionals, and the applications that arrive against them.
+   *
+   * ONE STATUS LAYER. `status`, `applicationStatus` and `assignmentStatus` below
+   * are the only places a lifecycle enum becomes a word, and every surface reads
+   * them through `features/jobs/badges`. A page that wrote its own label would be
+   * a second vocabulary for the same value, and the two would drift.
+   *
+   * The words are deliberately the poster's, not the database's. `rejected` reads
+   * as "Not selected" because that is what the poster is doing and what the
+   * applicant will be told; `submitted` reads as "Applied" because the person
+   * applied, they did not submit a form.
+   */
+  jobs: {
+    title: "Jobs",
+    subtitle: "Work you are hiring individual professionals for.",
+    listCaption: "Jobs posted by this organization",
+    new: "Post a job",
+    newTitle: "New job",
+    newSubtitle: "This creates a draft. Nothing is visible to professionals until you publish it.",
+    editTitle: "Edit job",
+    editSubtitle: "Changes apply to the opening professionals see.",
+    detailTitle: "Job",
+
+    status: {
+      draft: "Draft",
+      open: "Open",
+      awarded: "Awarded",
+      completed: "Completed",
+      closed: "Closed",
+      cancelled: "Cancelled",
+    },
+    applicationStatus: {
+      submitted: "Applied",
+      accepted: "Accepted",
+      rejected: "Not selected",
+      withdrawn: "Withdrawn",
+    },
+    assignmentStatus: {
+      scheduled: "Scheduled",
+      in_progress: "In progress",
+      completed: "Completed",
+      cancelled: "Cancelled",
+    },
+
+    filter: { all: "All", label: "State" },
+    stat: { drafts: "Drafts", open: "Open", awarded: "Awarded", applications: "Applications" },
+
+    field: {
+      title: "Job title",
+      description: "What the work involves",
+      trade: "Trade",
+      governorate: "Governorate",
+      city: "City",
+      siteAddress: "Site address",
+      offer: "Offered compensation",
+      duration: "Expected duration",
+      startsOn: "Starts on",
+      endsBy: "Finish by",
+      published: "Published",
+      created: "Created",
+      applications: "Applications",
+      status: "Status",
+      location: "Location",
+      schedule: "Schedule",
+      note: "Their note",
+      appliedOn: "Applied",
+    },
+
+    hint: {
+      siteAddress: "Only the professional you award the job to will see this.",
+      offer: "In EGP. This is what you are offering for the work — Aladdin does not handle payment.",
+      duration: "Working days, if you know.",
+      offerLocked: "The trade and the offered amount cannot change, because someone has already applied.",
+      tradeRetired: "This trade is no longer offered",
+    },
+
+    placeholder: {
+      title: "e.g. Marble staircase cladding",
+      description: "Scope, materials, access — anything a professional needs in order to judge the work.",
+      chooseTrade: "Choose a trade",
+    },
+
+    days: "{count} days",
+    create: "Create draft",
+    save: "Save changes",
+    edit: "Edit",
+    viewApplications: "View applications",
+
+    publish: {
+      action: "Publish",
+      title: "Publish this job?",
+      body: "It becomes visible to professionals on Aladdin, who can then apply.",
+      offerWarning:
+        "Once the first application arrives, the trade and the offered amount can no longer change.",
+      confirm: "Publish",
+      unverifiedTitle: "Your organization needs to be verified first",
+      unverifiedBody:
+        "Verification is what lets your jobs be shown to professionals. You can keep editing this draft in the meantime.",
+      unverifiedLink: "Organization verification",
+    },
+
+    close: {
+      action: "Stop recruiting",
+      title: "Stop recruiting for this job?",
+      body: "It stops being shown to professionals and accepts no new applications. Applications you already received stay on the record. Reposting means creating a new job.",
+      confirm: "Stop recruiting",
+    },
+    cancelJob: {
+      action: "Cancel job",
+      title: "Cancel this job?",
+      body: "The opening is called off. Applications you already received stay on the record.",
+      reason: "Reason",
+      confirm: "Cancel job",
+    },
+
+    awarded: {
+      assignedTo: "Assigned to",
+      agreed: "Agreed compensation",
+      workStatus: "Work status",
+      readOnly: "This job has been awarded, so its details can no longer change.",
+      progressNote: "Progress and completion are managed from the assignment.",
+      cancelBlocked:
+        "An awarded job cannot be cancelled on its own. The assignment has to be ended first, which returns the job to open.",
+    },
+
+    applicants: {
+      title: "Applications",
+      subtitle: "Professionals who applied for this job.",
+      caption: "Applications for this job",
+      emptyTitle: "No applications yet",
+      emptyBody: "Applications will appear here when professionals apply.",
+      notPublishedTitle: "This job has not been published",
+      notPublishedBody: "Publish it and professionals will be able to apply.",
+      viewProfile: "View profile",
+      mainTrade: "Main trade",
+      alsoWorksIn: "Also works in",
+      experience: "{years} years of experience",
+      decidedNote: "This job has been awarded, so no further decisions can be made.",
+      deniedTitle: "You cannot decide applications",
+      deniedBody:
+        "Choosing who gets a job needs the job management capability. You can still see who applied.",
+    },
+
+    accept: {
+      action: "Award",
+      title: "Award this job to {name}?",
+      body: "They become the assigned professional and the job moves to Awarded. Everyone else who applied is told they were not selected. This cannot be undone.",
+      confirm: "Award the job",
+    },
+    reject: {
+      action: "Decline",
+      title: "Decline {name}?",
+      body: "They will see that they were not selected, and the reason you give.",
+      reason: "Reason",
+      reasonHint: "The applicant reads this. Keep it short and factual.",
+      confirm: "Send decision",
+    },
+
+    empty: {
+      title: "No jobs yet",
+      body: "Post a job when you need an installer, technician or other professional for a piece of work.",
+      filteredTitle: "No jobs in this state",
+      filteredBody: "Try another state, or clear the filter.",
+    },
+
+    denied: {
+      title: "You do not have access to Jobs",
+      body: "Posting and managing jobs needs a job capability on your membership. Ask an owner or manager in your organization.",
+    },
+    postDenied: {
+      title: "You cannot post jobs",
+      body: "Posting a job needs the job posting capability. You can still see the jobs your organization has posted.",
+    },
+
+    flash: {
+      created: "Draft created.",
+      updated: "Job saved.",
+      published: "Job published.",
+      awarded: "Job awarded.",
+      rejected: "Application declined.",
+      closed: "Recruiting stopped.",
+      cancelled: "Job cancelled.",
+    },
+
+    errors: {
+      denied: "You do not have permission to do that.",
+      conflict: "This job changed while you were working on it. Reload the page and try again.",
+      notDraft: "Only a draft job can be published.",
+      notOpen: "This job is not open for applications.",
+      notEditable: "This job can no longer be edited.",
+      offerLocked:
+        "The offer and trade cannot change once someone has applied. Stop recruiting and post a new job instead.",
+      unverified: "Your organization has to be verified before a job can be published.",
+      tradeUnavailable: "That trade is not available.",
+      awardedCancel:
+        "An awarded job cannot be cancelled on its own — the assignment has to be ended first.",
+      alreadyDecided: "That application has already been decided.",
+      inactiveOrg: "This organization cannot post work.",
+    },
+
+    validation: {
+      titleRequired: "Give the job a title.",
+      tradeRequired: "Choose a trade.",
+      offerRequired: "Enter the amount you are offering.",
+      offerPositive: "The amount has to be more than zero.",
+      dateOrder: "The finish date cannot be before the start date.",
+      reasonRequired: "Give a reason.",
+      noteTooLong: "That message is too long — keep it under 1000 characters.",
+    },
+
+    /* ===== THE INSTALLER SIDE (Increment 8) =============================
+       Deliberately inside `jobs` rather than a block of its own: the status
+       vocabulary above (`status`, `applicationStatus`) is SHARED with the
+       poster's surfaces, and §22 asks for one status-label layer, not two that
+       agree today. Only the copy that is written from the professional's side
+       of the transaction lives down here. */
+    opportunities: {
+      title: "Job opportunities",
+      subtitle: "Work that organizations are hiring individual professionals for.",
+      viewAll: "View all opportunities",
+      filtersTitle: "Filters",
+      searchPlaceholder: "Search by title, description or organization",
+      allTrades: "Any trade",
+      allLocations: "Anywhere",
+      allApplications: "Applied or not",
+      notApplied: "Not applied yet",
+      appliedOnly: "Already applied",
+      postedBy: "Posted by",
+      published: "Posted {when}",
+      duration: "{n} working days",
+      startsOn: "Starts {date}",
+      view: "View details",
+      appliedBadge: "You applied",
+      emptyTitle: "No opportunities right now",
+      emptyBody:
+        "Openings appear here as verified organizations publish them. Nothing is hidden from you because of the trades you have declared.",
+      noResultsTitle: "No opportunities match those filters",
+      noResultsBody: "Try a different trade or location, or clear the filters to see everything.",
+      clear: "Clear filters",
+      myApplications: "My applications",
+      /* O5 said in the reader's own words. It is stated on the surface where the
+         trade filter lives, because that control is the one thing on this page a
+         professional could reasonably mistake for a rule about eligibility. */
+      offTradeNote: "You can apply for any job here, including trades outside the ones on your profile.",
+    },
+
+    detail: {
+      about: "About this job",
+      whereAndWhen: "Where and when",
+      compensation: "Offered compensation",
+      trade: "Trade",
+      location: "Location",
+      duration: "Expected duration",
+      schedule: "Schedule",
+      posted: "Posted",
+      addressWithheld: "The exact site address is shared with the professional who is awarded the job.",
+      gone: "This opening is no longer accepting applications.",
+      goneBody:
+        "It may have been awarded, closed, or withdrawn from listings. Your own application is still on your record.",
+      notFound: "This job is not available",
+      notFoundBody: "It may have been closed or withdrawn since you last saw it.",
+      yourApplication: "Your application",
+    },
+
+    apply: {
+      action: "Apply for this job",
+      title: "Apply for this job",
+      body: "The organization sees your professional profile and anything you write below.",
+      noteLabel: "Message to the organization",
+      notePlaceholder: "Anything that helps them decide — relevant work you have done, when you could start.",
+      noteHint: "Optional. Up to 1000 characters.",
+      confirm: "Send application",
+      summary: "You are applying to",
+      /* Named because an applicant should know the amount is the poster's stated
+         figure and not something Aladdin handles or guarantees. */
+      compensationNote: "This is what the organization is offering. Aladdin does not handle the payment.",
+      againAction: "Apply again",
+      againTitle: "Apply again for this job?",
+      againBody: "Your withdrawn application goes back to the organization as a new submission.",
+      deniedTitle: "Only professional accounts can apply",
+      deniedBody: "Job opportunities are open to individual professionals on Aladdin.",
+    },
+
+    applications: {
+      title: "My applications",
+      subtitle: "What you have applied to, and what happened.",
+      caption: "Your job applications",
+      allStates: "All applications",
+      appliedOn: "Applied {date}",
+      decidedOn: "Answered {date}",
+      yourNote: "What you wrote",
+      reason: "What the organization said",
+      /* The one system-written reason. `job_application_accept` closes every
+         other live candidacy with a fixed English sentence, which an Arabic
+         reader must not be shown; the shared status layer swaps it for this. */
+      awardedElsewhere: "The job was awarded to another professional.",
+      jobState: "Job is now {state}",
+      emptyTitle: "You have not applied to anything yet",
+      emptyBody: "Applications you send appear here with whatever the organization decides.",
+      noneInState: "Nothing in this state",
+      noneInStateBody: "Try another state, or see all of your applications.",
+      browse: "Browse opportunities",
+      viewJob: "View job",
+      accepted: {
+        title: "Your application was accepted",
+        body: "The organization awarded you this job. They will be in touch about starting the work.",
+      },
+      rejected: {
+        title: "Your application was not selected",
+      },
+      withdrawn: {
+        title: "You withdrew this application",
+        closed: "This job is no longer accepting applications, so it cannot be sent again.",
+      },
+    },
+
+    withdraw: {
+      action: "Withdraw application",
+      title: "Withdraw your application?",
+      body: "The organization stops considering you for this job. You can apply again while it is still open.",
+      confirm: "Withdraw",
+    },
+
+    installerFlash: {
+      applied: "Application sent.",
+      withdrawn: "Application withdrawn.",
+    },
+
+    installerErrors: {
+      notProfessional: "Job opportunities are open to individual professionals.",
+      notOpenNow: "This job is no longer accepting applications.",
+      alreadyDecided: "This application has already been answered and cannot be changed.",
+      notWithdrawable: "This application can no longer be withdrawn.",
+      notYours: "That application is not yours.",
+    },
+  },
+
+  /**
+   * MY WORK — the assignment side, and a separate namespace from `jobs` on
+   * purpose.
+   *
+   * `jobs.*` is the language of an OPENING: offered, applied, decided. `work.*`
+   * is the language of an ENGAGEMENT that already exists: started, progressing,
+   * confirmed. The four status labels themselves stay in
+   * `jobs.assignmentStatus.*` because that is the one status layer every badge
+   * reads (§22) — nothing here renames a lifecycle value.
+   *
+   * The most carefully chosen words in this block are the readiness ones. The
+   * installer must never read a sentence implying they finished the engagement,
+   * because they cannot: they reported, and somebody else confirms.
+   */
+  assets: {
+    form: {
+      limits: "{types} · up to {mb} MB",
+    },
+    /**
+     * Storage-foundation errors (Increment 10). No screen renders these yet —
+     * Increment 11's Portfolio and Certificates surfaces are their first
+     * readers. They exist now because `mapAssetError` returns keys, and a mapper
+     * whose keys do not resolve is a mapper nobody can test.
+     */
+    errors: {
+      unsupportedType: "That file type is not accepted here.",
+      tooLarge: "That file is too large.",
+      empty: "That file is empty.",
+      contentMismatch: "That file does not look like the type it claims to be.",
+      invalidPath: "That file could not be identified.",
+      notAllowed: "You cannot do that.",
+      uploadFailed: "The file could not be saved. Please try again.",
+      gone: "That file is no longer here.",
+    },
+  },
+
+  portfolio: {
+    // Same rename as `profile.portfolio.title` above, and for the same
+    // reason: "My work" is the job-assignments page's name.
+    title: "Portfolio",
+    subtitle: "Photographs of work you have finished. You choose which ones appear on your public profile.",
+    add: "Add work",
+    privateByDefault:
+      "New work starts private. Nobody else can see a piece until you publish it, and unpublishing hides it again straight away.",
+    status: {
+      private: "Private",
+      published: "Published",
+    },
+    actions: {
+      publish: "Publish",
+      unpublish: "Unpublish",
+      edit: "Edit",
+      delete: "Delete",
+      moveEarlier: "Move earlier",
+      moveLater: "Move later",
+    },
+    empty: {
+      title: "No work added yet",
+      body: "Add a photograph of a job you have finished. It stays private until you decide to publish it.",
+    },
+    unfinished: {
+      title: "Unfinished uploads",
+      body: "These did not finish uploading. Nobody else can see them.",
+      hint: "The upload did not complete.",
+      finish: "Finish upload",
+      discard: "Discard",
+      discardTitle: "Discard this upload?",
+      discardBody: "The unfinished item and anything already uploaded for it will be removed.",
+    },
+    form: {
+      heading: "Add work",
+      title: "Title",
+      description: "Description",
+      file: "Photograph",
+      upload: "Add work",
+      uploading: "Uploading…",
+      save: "Save",
+      cancel: "Cancel",
+    },
+    delete: {
+      title: "Delete this work?",
+      body: "It will disappear from your profile immediately, and the photograph will be removed.",
+      confirm: "Delete",
+    },
+    errors: {
+      titleRequired: "Give this work a title.",
+      fileRequired: "Choose a photograph to upload.",
+      notProfessional: "Only a professional account can add work.",
+      notReady: "This item has not finished uploading yet.",
+      notFound: "That work is no longer here.",
+      denied: "You cannot do that.",
+    },
+  },
+
+  certificates: {
+    title: "My certificates",
+    subtitle: "Certificates and documents you hold. These are private to you.",
+    add: "Add certificate",
+    privateEvidence:
+      "Certificates are private. Only you can see them — they never appear on your public profile, and Aladdin does not check or approve them.",
+    expired: "Expired",
+    issuedOn: "Issued {date}",
+    expiresOn: "Expires {date}",
+    fileType: {
+      pdf: "PDF document",
+      image: "Image",
+    },
+    actions: {
+      view: "View",
+      edit: "Edit",
+      delete: "Delete",
+    },
+    empty: {
+      title: "No certificates added yet",
+      body: "Add a certificate or a training document. Only you will be able to see it.",
+    },
+    unfinished: {
+      title: "Unfinished uploads",
+      hint: "The upload did not complete.",
+      finish: "Finish upload",
+      discard: "Discard",
+    },
+    form: {
+      heading: "Add certificate",
+      title: "Certificate name",
+      issuer: "Issued by",
+      issuedOn: "Issue date",
+      expiresOn: "Expiry date",
+      file: "File",
+      upload: "Add certificate",
+      uploading: "Uploading…",
+      save: "Save",
+      cancel: "Cancel",
+    },
+    delete: {
+      title: "Delete this certificate?",
+      body: "It will be removed from your account, along with the file.",
+      confirm: "Delete",
+    },
+    errors: {
+      titleRequired: "Give this certificate a name.",
+      fileRequired: "Choose a file to upload.",
+      dateOrder: "The expiry date cannot be before the issue date.",
+      notFound: "That certificate is no longer here.",
+    },
+  },
+
+  reviews: {
+    title: "My reviews",
+    subtitle: "What the businesses you worked for said about your finished work.",
+    listTitle: "All reviews",
+    summaryTitle: "Rating summary",
+    basedOn: "Based on {n} reviews",
+    starsLabel: "{n} out of 5",
+    starsRow: "{n} stars",
+    filterLabel: "Filter by rating",
+    filterAll: "All ratings",
+    noneMatch: "No reviews with that rating.",
+    empty: {
+      title: "No reviews yet",
+      body: "When a business confirms work you finished, they can leave a review. It appears here and on your public profile.",
+    },
+    assignment: {
+      title: "Client review",
+    },
+    poster: {
+      title: "Review this work",
+      body: "The work is complete. Tell other businesses how it went.",
+      leave: "Leave review",
+      authored:
+        "Your review is published under your organisation's name. The person writing it is never shown.",
+      ratingLabel: "Rating",
+      commentLabel: "Comment",
+      optional: "optional",
+      finalWarning: "Reviews cannot be changed or removed once submitted.",
+      submit: "Submit review",
+      cancel: "Cancel",
+      submittedTitle: "Your review",
+      immutable: "Submitted {date}. Reviews cannot be changed once submitted.",
+    },
+    errors: {
+      ratingRequired: "Choose a rating from 1 to 5.",
+      notCompleted: "Only completed work can be reviewed.",
+      denied: "You cannot review this work.",
+      notFound: "That work is no longer here.",
+      commentTooLong: "That comment is too long.",
+    },
+  },
+  network: {
+    title: "My network",
+    subtitle: "Organizations you have completed real work for. Built from finished assignments only.",
+    back: "Network",
+
+    summary: {
+      organizations: "Organizations worked with",
+      completed: "Completed assignments",
+      repeat: "Repeat organizations",
+      trades: "Trades represented",
+      latest: "Latest relationship",
+    },
+
+    searchPlaceholder: "Search organizations",
+    tradeLabel: "Trade",
+    allTrades: "All trades",
+    clear: "Clear filters",
+
+    list: {
+      title: "Organizations",
+      completedCount: "{n} completed",
+      latestWork: "Latest: {title}",
+      firstWorked: "First worked together",
+      latestWorked: "Latest completed work",
+      view: "View relationship",
+      showing: "Organizations you have completed work with, most recent first.",
+      showMore: "Show more",
+    },
+
+    directory: {
+      title: "Network Directory",
+    },
+
+    empty: {
+      title: "No network yet",
+      body: "When an organization confirms work you have finished, it appears here as part of your professional network.",
+    },
+    noneMatch: "No organizations match your filters.",
+
+    tabs: {
+      label: "Filter your network",
+      all: "All",
+      workedWith: "Worked with",
+      referred: "Joined through my referral",
+      pending: "Pending invitations",
+    },
+
+    badge: {
+      verified: "Verified work relationship",
+      referred: "Joined through your referral",
+      referredToo: "Also joined through your referral",
+      pending: "Pending invitation",
+    },
+
+    actions: {
+      call: "Call",
+      messageSoon: "Message · Coming soon",
+    },
+
+    hero: {
+      title: "Add a showroom you know",
+      body: "Work relationships are created automatically from completed work — you can also refer new showrooms you know.",
+      cta: "Add showroom I know",
+    },
+
+    rail: {
+      pointsTitle: "Network Points",
+      referredOrgs: "Joined via you",
+      showroomsAdded: "Showrooms added",
+      viewPoints: "View Points",
+      howBody: "+100 Points when a new showroom you refer is approved and joins Aladdin.",
+      levelLabel: "Level",
+      levelValue: "Level {n}",
+      remainingToNext: "{n} Points remaining to next level",
+      maxLevel: "Highest level reached",
+      pendingTitle: "Pending invitations",
+      pendingEmpty: "No pending invitations.",
+      viewAllPendingCount: "View all invitations ({n})",
+    },
+
+    pending: {
+      submitted: "Submitted {date}",
+      withdraw: "Withdraw",
+      menuLabel: "More actions",
+      resend: "Resend",
+      resendCopied: "Invitation copied",
+      shareMessage: "{name}, you were referred to join Aladdin — the platform for Egypt's finishing & construction professionals. Register here: {url}",
+    },
+
+    refer: {
+      title: "Add a showroom I know",
+      subtitle: "Refer an organization already on Aladdin, or one that is not — either way, you never take on membership or access.",
+      error: "That did not go through. Please try again.",
+      knownTitle: "Already on Aladdin",
+      knownBody: "Search for the organization by name.",
+      searchLabel: "Organization name",
+      searchHint: "At least 2 characters.",
+      searchPlaceholder: "Search organizations",
+      searchAction: "Search",
+      verified: "Verified",
+      referThis: "Refer this one",
+      empty: "No matches",
+      emptyBody: "Try a different spelling, or refer it as a new showroom below.",
+      newTitle: "Not yet on Aladdin",
+      newBody: "Tell us about the showroom. An Admin reviews it before it becomes a real organization.",
+      nameLabel: "Showroom name",
+      governorateLabel: "Governorate",
+      cityLabel: "City / area",
+      phoneLabel: "Contact phone",
+      phoneHint: "Your own number for this referral — never shared publicly.",
+      noteLabel: "Note",
+      submitAction: "Submit referral",
+      reviewNote: "An Admin reviews this before it becomes a real organization.",
+    },
+
+    detail: {
+      back: "Network",
+      eyebrow: "Relationship",
+      summaryTitle: "Relationship summary",
+      completedCount: "Completed assignments",
+      firstWorked: "First worked together",
+      latestWorked: "Latest completed work",
+      trades: "Trades worked together",
+      reviewsTitle: "Reviews from this organization",
+      reviewsCount: "{n} reviews from this organization",
+      historyTitle: "Completed work history",
+      viewAssignment: "View in My work",
+      notFound: "This organization is not part of your network.",
+      referralTitle: "How this relationship started",
+      referralBody: "You referred this organization on {date}.",
+      referralNoWorkYet: "No completed work yet.",
+    },
+  },
+  work: {
+    title: "My work",
+    subtitle: "Everything you have been assigned — current, finished and cancelled — in one place.",
+    browse: "Find more work",
+    applications: "My applications",
+    viewInWork: "View in My work",
+    viewDetails: "View details",
+    back: "My work",
+
+    tab: {
+      all: "All",
+      current: "Current",
+    },
+
+    summary: {
+      title: "Your work summary",
+      current: "Current work",
+      scheduled: "Waiting to start",
+      in_progress: "Under way",
+      completed: "Completed",
+      cancelled: "Cancelled",
+      total: "All assignments",
+      /* Named as navigation, not as analytics: these are the same counts the
+         tabs carry, offered as a second way in. */
+      hint: "Counts your own assignments only.",
+    },
+
+    quick: {
+      title: "Elsewhere",
+      browse: "Browse job opportunities",
+      applications: "Track my applications",
+      profile: "My professional profile",
+    },
+
+    featured: {
+      eyebrow: "Current work",
+      progress: "Progress",
+      lastUpdate: "Last update",
+      noUpdate: "No progress reported yet",
+      agreed: "Agreed amount",
+      schedule: "Schedule",
+      startsOn: "Starts",
+      noneTitle: "No work under way",
+      noneBody:
+        "When an organization accepts one of your applications, the assignment appears here.",
+    },
+
+    list: {
+      title: "All work",
+      job: "Job",
+      status: "State",
+      amount: "Agreed",
+      date: "Assigned",
+      view: "View",
+      showing: "Your assignments, newest first.",
+    },
+
+    detail: {
+      eyebrow: "Assignment",
+      organization: "Posted by",
+      trade: "Trade",
+      agreed: "Agreed amount",
+      location: "Location",
+      site: "Site address",
+      siteWithheld: "The site address is available while the assignment is active.",
+      schedule: "Schedule",
+      duration: "Expected duration",
+      description: "What the work is",
+      assignedOn: "Assigned",
+      startedOn: "Started",
+      completedOn: "Completed",
+      cancelledOn: "Cancelled",
+      cancellationReason: "Reason given",
+      timeline: "Record",
+      retiredTrade:
+        "This trade is no longer offered for new jobs. It is kept here because it is what this work was agreed as.",
+    },
+
+    start: {
+      action: "Start work",
+      title: "Start this work?",
+      body: "This tells the organization you have begun. You can report progress afterwards.",
+      confirm: "Start work",
+      hint: "Start the work when you are actually on site — the organization sees the change immediately.",
+    },
+
+    progress: {
+      title: "Progress",
+      current: "Reported progress",
+      lastUpdate: "Last update",
+      action: "Update progress",
+      dialogTitle: "Report progress",
+      dialogBody:
+        "Report how far the work has got. Each report is added to the record and cannot be edited afterwards.",
+      confirm: "Send report",
+      percent: "Progress",
+      percentHint: "0 to 100.",
+      stage: "Current stage",
+      stageHint: "Optional — what you are working on now.",
+      note: "Note",
+      noteHint: "Optional — anything the organization should know.",
+      history: "Progress history",
+      historyEmpty: "No progress reported yet. Your first report will appear here.",
+      notStarted: "Progress reporting opens once you have started the work.",
+      appendOnly: "Reports are kept as a record and are not edited or removed.",
+      at: "Reported",
+    },
+
+    ready: {
+      badge: "Reported as finished",
+      title: "You reported this work as finished",
+      body: "The organization has been told. They confirm completion — the assignment stays open until they do.",
+      /* The line that has to be unambiguous: there is nothing else for the
+         installer to press, and that is correct rather than missing. */
+      noAction: "There is nothing further for you to do here.",
+    },
+
+    cancel: {
+      action: "Cancel assignment",
+      title: "Cancel this assignment?",
+      body: "The assignment ends and the organization is told. The job returns to the pool for other professionals. This cannot be undone.",
+      confirm: "Cancel assignment",
+      reason: "Reason",
+      reasonHint: "Required. The organization reads this.",
+    },
+
+    complete: {
+      action: "Confirm completion",
+      title: "Confirm this work is complete?",
+      body: "This completes the assignment and closes the job. It cannot be undone.",
+      confirm: "Confirm completion",
+      hint: "Only your organization can confirm completion — the professional reports progress.",
+    },
+
+    poster: {
+      /* Plain "Progress" — the figure below is already labelled "Reported
+         progress", and stacking the same two words read as a rendering fault. */
+      progressTitle: "Progress",
+      noProgress: "The professional has not reported progress yet.",
+      readyTitle: "Reported as finished",
+      readyBody:
+        "The professional has reported this work as finished and is waiting for your confirmation.",
+      notStarted: "The professional has not started this work yet.",
+      cancelAction: "End assignment",
+      cancelTitle: "End this assignment?",
+      cancelBody:
+        "The assignment is cancelled and kept as a record, and the job returns to open so you can award it again. Applications already declined stay declined.",
+      cancelConfirm: "End assignment",
+      cancelReason: "Reason",
+      cancelReasonHint: "Required. The professional reads this.",
+    },
+
+    empty: {
+      title: "No work yet",
+      body: "Apply to a job opportunity — when an organization accepts your application, the assignment appears here.",
+      filtered: "Nothing in this state",
+      filteredBody: "You have no assignments in this state.",
+    },
+
+    home: {
+      title: "Current work",
+      none: "No work under way",
+      noneBody: "Browse open jobs and apply — accepted applications become assignments here.",
+      view: "Open My work",
+    },
+
+    flash: {
+      started: "Work started.",
+      progressAdded: "Progress reported.",
+      completed: "Completion confirmed.",
+      cancelled: "Assignment cancelled.",
+    },
+
+    validation: {
+      progressRange: "Progress must be a whole number between 0 and 100.",
+      stageTooLong: "Keep the stage under 80 characters.",
+      noteTooLong: "Keep the note under 1000 characters.",
+      reasonRequired: "A reason is required.",
+      reasonTooLong: "Keep the reason under 500 characters.",
+    },
+
+    errors: {
+      conflict: "This assignment changed while you were reading it. Refresh and try again.",
+      notYoursToStart: "Only the assigned professional can start this work.",
+      notYoursToReport: "Only the assigned professional can report progress on this work.",
+      notAParty: "You are not a party to this assignment.",
+      notScheduled: "This work cannot be started from its current state.",
+      notInProgress: "Progress can only be reported on work that is under way.",
+      progressRange: "Progress must be between 0 and 100.",
+      notCompletable: "This assignment cannot be completed from its current state.",
+      notCancellable: "This assignment can no longer be cancelled.",
+      reasonRequired: "A reason is required to cancel an assignment.",
+      manageRequired: "You need job management permission to do this.",
+      notAMember: "You are not a member of the posting organization.",
+      notFound: "That assignment could not be found.",
     },
   },
   execution: {

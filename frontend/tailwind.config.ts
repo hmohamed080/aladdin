@@ -116,6 +116,10 @@ export default {
           DEFAULT: alpha("--accent"),
           solid: alpha("--accent-solid"),
         },
+        // The ONE ink for anything sitting on `accent-solid`. Not part of the
+        // `accent` object because `text-accent-on` would read as a third accent
+        // tone rather than as a foreground role. See tokens.css `--on-accent`.
+        "on-accent": alpha("--on-accent"),
         bronze: alpha("--bronze-sem"),
         lapis: alpha("--lapis-sem"),
         // The analytic accent. Same DEFAULT/solid contract as `accent`: the

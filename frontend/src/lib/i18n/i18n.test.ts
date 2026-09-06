@@ -33,6 +33,10 @@ const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   // A KEYCAP legend, not prose. The Enter key is engraved "Enter" on Arabic
   // keyboards too, so translating it would name a key the user cannot find.
   "search.enter",
+  // A FILE FORMAT NAME. "PDF" is written PDF in Arabic — it is the name of the
+  // format, not a word — and transliterating it would tell a reader less about
+  // the file they are looking at, not more.
+  "certificates.fileType.pdf",
 ]);
 
 describe("i18n catalogs", () => {

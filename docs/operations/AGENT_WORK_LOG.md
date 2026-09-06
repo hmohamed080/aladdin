@@ -4,6 +4,2371 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — A dashboard that had quietly become an editor, and the gate that came after
+
+**Date:** 2026-09-05 → 2026-09-06 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `7e2dd6c` (Increment 13) · **Not committed.**
+
+Installer Increment 14: Settings, four pages recomposed, a real screenshot
+comparison that found what the recomposition still got wrong, four corrections
+to answer it, and — before any of it may be committed — the full destructive
+milestone gate the Pilot protocol requires of a persona's last increment.
+
+### A real route, and the naming collision it exposed
+
+`/home/settings` is a composition route only: profile-edit entry, the live
+availability control (the same `AvailabilityControl` component the hub used to
+carry), language switch, theme switch, masked sign-in contact, sign-out. No
+password/2FA/notification-preference UI, because none of those has a backing
+model. Composing it put Portfolio's hub-module tile next to the new job-work
+module for the first time, and both had independently been named "My work" —
+renamed to "Portfolio" / "نماذج الأعمال" (reusing the onboarding flow's own
+existing phrase), display copy only, no authority touched.
+
+`aladdin/ui-foundation` gained a fourth `no-restricted-syntax` check for a
+semantic Tailwind utility that parses like a real token but was never declared
+in `tailwind.config.ts`, so Tailwind silently emits no rule for it
+(`bg-surface-sunken`-class defects). Run repo-wide, it caught four real,
+pre-existing, silently-broken instances — `border-border` (three files),
+`bg-border`, `border-border-strong`, `text-border-strong` (two files) — none in
+Installer code, all inherited Foundation-wide. `PersonalMobileNav`'s bottom bar,
+built on "a personal account has at most five destinations," had quietly grown
+to nine (Points/Reviews/Network/Settings all arrived since); fixed with a
+five-item priority subset, the other four reachable from Account Overview's own
+grid or Home's Quick Access.
+
+### The gate a screenshot review takes, and what it found
+
+A disposable, real-RPC-driven fixture populated all six reference pages for
+Ahmed (`ahmed@example.test`) — real jobs through the full apply→accept→work→
+review lifecycle, real portfolio/certificate bytes, a real approved referral —
+and the six populated pages were captured at 1440px, Arabic, light, and placed
+beside `UI-UX/references/Installer-Technician/`. Home, Jobs, My Work, Reviews
+and Network held up: every remaining difference traced to an already-forbidden
+fabrication (match %, distance, bookmark hearts, card photos) or a documented
+shell choice. **Account Overview did not.** It was carrying the full
+professional-profile editor inline — trades, lead time, languages, service
+area, core services, bio, the live availability card, and a two-paragraph
+public-profile explainer — stacked under the real summary strip and module
+grid, past 2000px of scroll on a 1440px viewport. Two products sharing one
+page, not one dashboard.
+
+### Four corrections, same authority, no new reads
+
+**Account Overview** (`profile-hub.tsx`) was cut to exactly what a dashboard
+needs: identity header → real summary strip → the six-module grid → a
+three-row account action area (Settings, Public Profile, Help). Everything
+removed already lived somewhere real — trades/lead-time/languages/services/bio
+at `/home/profile/edit` (confirmed field-for-field against
+`professional-profile-editor.tsx` before deleting anything), the availability
+toggle already duplicated at `/home/settings`. The Public Profile row replaced
+its own explanatory section: a real link when listed, a stated "not published
+yet" when not — no paragraph either way. Result: **1451px**, down from
+2000px+, at 1440px. **Reviews** moved onto `WorkPane` (the primitive Jobs
+already used) — a dense continuous `ReviewRow` list (no per-row card frame; the
+public profile's own `ReviewCard` is untouched, so the two surfaces did not
+have to become the same component) beside a narrow summary rail, with a new
+`WorkPane` `mobileOrder="aside-first"` prop (opt-in, every other caller
+unaffected) so the rail reads above the list on a phone. **Job Opportunities**
+tightened (`Card pad="sm"`, `wide:grid-cols-3`, filter rail `narrow` not
+`wide`) to fit three compact cards per row at 1440px — no photos, no match %,
+same authority. **Home**'s opportunity preview dropped from four cards to
+three, opened to three columns. One self-introduced regression caught in
+verification, not review: tightening the opportunity card's org-name line to
+`truncate` clipped the *wrong end* of an embedded LTR name inside an RTL line
+(`Delta Wholesale Supply` → `elta Wholesale Supply`) — fixed by dropping the
+truncate and keeping the `<bdi dir="auto">` wrap, verified in both directions.
+
+### The final milestone gate
+
+Everything above ran the frontend-only validation (`tsc`, `eslint`, `vitest`,
+`next build` — all clean) that a composition pass needs. Before this increment
+may be committed, the Pilot's protocol for a persona's *last* increment asks
+for more, run once as a single destructive session against a clean database:
+
+A from-clean `supabase db reset` (61 migrations, in order) · `supabase test
+db` **2016/2016, 52 files** · `db lint` (`public`: 3 pre-existing warnings,
+none new; `app`: clean) · `database.types.ts` regenerated after `drop
+extension pgtap` and found **byte-identical** to the committed file. The
+professional-asset Storage boundary was hit directly, not inferred from policy
+text: anon `list`/unsigned GET/HEAD/PUT/DELETE denied on both buckets (`200
+[]`, `NoSuchKey`, unchanged bytes after the write attempts); the real
+`/p/media/<itemId>` proxy served the one eligible published item and 404'd
+identically for a certificate id, a bogus id, that same item unpublished, and
+that same item — still flagged public — once its profile was delisted via
+`set_profile_hidden`.
+
+A disposable, real-RPC/real-actor-claim Installer journey then ran the
+complete persona: OTP sign-in through Mailpit → profile edit/trades/
+availability → a fresh job posted, applied to, withdrawn, **resubmitted onto
+the same application row** (verified same id), accepted → started, progressed
+to 100% (assignment stays `in_progress` — the installer cannot self-complete,
+confirmed by trying) → poster completes → poster's one immutable review →
+real portfolio/certificate bytes uploaded, published, unpublished (each
+transition re-checked live) → Network picked up the completed-work
+organization with no separate write → a case-B referral, pending → admin-
+approved → **+100 points once**, a second approval call idempotent (same org
+id, no second ledger row). Nine cross-user/negative-authority calls were all
+refused as designed, including the sharpest one: the *poster org's own
+member*, with genuine completed work on file, still could not read the
+installer's private certificate row (0 rows) — completed work is not asset
+ownership. A direct `INSERT` into `points_ledger` by an authenticated
+non-platform user hit `permission denied` — there is no client grant to reach,
+RLS is never even asked. Cleanup ran through the same real RPCs (portfolio/
+certificate purge, referral delete, `reverse_points_entry` compensating
+entry); two rows were structurally undeletable by the product's own
+append-only guards (the one job's real progress history; the one organization
+`network_referral_approve` created, blocked by `audit_log`'s own guard) —
+resolved for good, not merely reported, by the second `db reset` this entry's
+own session performed once the gate finished reading them.
+
+The full 7-page × {desktop 1440px, mobile 390px} × {en, ar} × {light, dark} =
+**56-state** matrix ran in full, not a sample: 0 flagged for overflow, `dir`
+mismatch, console error, or non-2xx response, plus an 8-state manual visual
+pass across every page/viewport/locale/theme combination. The foundation
+guard's own unit tests were re-run in isolation (11/11, still catching
+`surface-sunken`/`warning-fg`/`border-line`/`text-heading`, still passing the
+current vocabulary) before the repo-wide `eslint` pass.
+
+### Validation
+
+Frontend: `tsc --noEmit` clean · `eslint` 0 errors (1 pre-existing, unrelated)
+· `vitest` **105 files / 1324 tests** · production `next build` clean, 92
+routes. Database: clean `db reset` (×2 — once for the gate, once after it to
+clear the gate's own unavoidable residue) · pgTAP **2016/2016, 52 files** ·
+`db lint` clean (`app`) / 3 pre-existing (`public`) · `database.types.ts`
+byte-identical · Storage boundary and `/p/media` proxy verified directly · one
+full destructive Installer E2E journey and 9 cross-user negative checks, all
+as expected · 56/56 responsive/locale/theme states clean. `scripts/
+check_doc_links.py`: 956 links / 114 files / 0 broken. Final local reset
+confirmed the seeded baseline exactly (0 gate residue anywhere Ahmed's data
+was checked) and the working tree clean.
+
+`RUNTIME_STATE.md` reconciled with a new override carrying this account. **Not
+committed, not pushed. Full Chat is next, not started.**
+
+---
+
+## Session — A network nobody built, and a level that was never stored
+
+**Date:** 2026-09-03 → 2026-09-05 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `32f7a81` (Increment 12)
+
+Installer Increment 13: Showroom Network. Two migrations, one derived read model
+and one small attribution domain beside it, a Points earning event wired to the
+second, and a page that went through three real composition passes before its
+geometry actually matched the reference — the last of which was a single missing
+CSS property.
+
+### Two authorities, never merged into a third
+
+The Network is not a feature an installer maintains; it is what
+`job_assignments.status = 'completed'` already says, read back
+(`my_network_organizations`/`my_network_work_history`, both SECURITY DEFINER,
+both scoped to `auth.uid()`). A showroom referral
+(`network_referrals`, `20260911090001_network_referrals.sql`) is a second, real,
+but *separate* fact: an organization may be both a completed-work partner and one
+the installer referred, and the merge that lets a reader see one row for that
+organization (`lib/network/rows.ts`, `buildNetworkRows`) is careful to keep both
+facts distinct on that row rather than inventing a third, blended state. A
+pending referral — one the platform has not reviewed yet — is never allowed to
+look like an organization: it has no `organization_id`, and no view renders it
+with one.
+
+The existing Sales affiliation/referral system
+(`organization_referrals`/`organization_join_requests`) was investigated and
+deliberately **not** reused: it is persona-gated to `app.is_sales_persona` and
+grants `sales.*` membership, which would have handed an installer referring a
+showroom actual organizational access. `network_referrals` is a parallel,
+narrower table for exactly that reason — attribution, never membership, and
+`app.organizations_provenance_immutable()`'s write-once
+`source`/`referred_by_user_id` columns are the only thing it ever writes back
+to an approved organization.
+
+### The one earning event, and the level that reads it without existing
+
+Approving a case-B (not-yet-registered) referral fires the Pilot's one wired
+Points event, `referral.organization_approved` (+100), through the same
+`points_ledger` idempotency the Points Core spec already governs — a referral to
+an organization already on Aladdin resolves instantly and earns nothing, because
+it was not brought here by anyone.
+
+The Network Points card shows a Level and a "Points remaining to next level".
+Both were requested twice: refused the first pass, for want of authority — there
+is no level column and Points Core explicitly excludes tiers "without a further
+approved specification" — and approved the second time as a **presentation-only**
+band, never a stored one. `lib/network/points-level.ts`'s `derivePointsLevel` is
+a pure function over the one real `points_balance`, recomputed on every render,
+persisted nowhere, gating nothing. `docs/database/points-core.md` now carries
+both halves of that distinction as a named exception (`Presentation-level
+bands`) rather than leaving the refusal looking overturned.
+
+### Three passes to the reference's actual geometry
+
+The first working version was functionally correct and visually generic: four
+floating summary cards, an "Add showroom" block that read as a settings panel,
+and one organization per large white card. Two composition passes rebuilt it
+toward `06-showroom-network.jpeg` as a geometry target rather than only an
+information-hierarchy one: the summary collapsed into one compact `KpiStrip`
+instrument; the hero and search became one bounded surface with an illustrated
+storefront mark (`StorefrontAddIcon`, decoration only); the organization list
+became one continuous "Network Directory" panel with dividing rows instead of
+a card per organization; and the page settled into a 2×2 grid — hero+search and
+Network Points in the top row, Directory and Pending Invitations in the bottom
+row, both rows sharing one column template so the two columns read as aligned
+across the whole page.
+
+The bottom row's equal height comes from the grid's own default
+`align-items: stretch`, not a fixed number — which is also where the session's
+one real rendering bug turned up rather than in review: the Discovery panel's
+grid wrapper was missing `desktop:order-none`, so its leftover mobile `order: 1`
+placed it *after* the other three panels once the desktop grid-cols kicked in,
+landing the hero in the wrong cell. Invisible to `tsc` and to Vitest/jsdom (which
+never lays out `order`), and only visible once actually rendered — caught in
+browser verification, not by a test.
+
+**Resend is a real share action, not a disabled placeholder.** Aladdin has no
+outbound invitation-delivery backend for a referral at all — it is a database
+record the platform never sends anywhere — so "Resend" cannot mean "sent again".
+What it means instead: the Web Share API where the browser supports it,
+otherwise a clipboard copy with honest "Invitation copied" wording, built from
+the real `/auth/sign-up` route resolved to an absolute URL at click time — the
+same technique the existing WhatsApp/copy invite flow already uses for a link
+that was never dispatched either. Cancelling the native share sheet is left
+alone rather than silently falling back to a clipboard copy nobody asked for.
+
+### The last correction: a cap that was either too tight or not there
+
+The Network Directory's "Show more" reveals every fetched row into one bounded,
+scrollable region — except for one interim state where it had no cap at all
+(the shared row height with Pending Invitations grew to match, which looked
+correct at five rows and would not have at twenty) and one attempt at a cap
+(`30rem`) that was tight enough to clip the ordinary four-row default view, which
+the brief had explicitly forbidden. The value that satisfies both —
+`desktop:max-h-[44rem]`, `desktop:`-only so mobile keeps stacking and growing
+naturally — was reached by measuring the real four-row height in the browser
+rather than guessing twice more. Verified against a 23-row browser fixture
+(built through `network_referral_create_new` in a loop, the real RPC, not a raw
+insert): the region scrolls internally, the tabs and the "Show more"/"View all
+invitations" footers stay outside it, and the Directory and Pending panels
+measured the identical height and bottom edge both before and after expansion.
+
+### Validation
+
+Two migrations (`20260910090001_installer_network.sql`,
+`20260911090001_network_referrals.sql`). Clean `supabase db reset`. **pgTAP 52
+files, 2016 tests, PASS** — `50_installer_network_test.sql` and
+`51_network_referrals_test.sql`, 65 assertions each, fixtures built through the
+real RPCs end to end. `tsc` clean · `eslint` 0 errors (1 pre-existing) ·
+`vitest` **1290/102** · `next build` clean.
+
+Browser UAT across four composition passes, both locales, light and dark, at
+1440px and ~390px: populated Network/Directory/Points/Pending states, the
+Add-showroom flow (both known-organization and new-showroom cases), Resend's
+share and clipboard paths, the pending-referral overflow menu, and the 23-row
+internal-scroll fixture. Teardown left `network_referrals` at 0 each time.
+
+`RUNTIME_STATE.md` is untouched and now fourteen increments behind.
+
+---
+
+## Session — A sentence that cannot be edited, and a correction that leaves a record
+
+**Date:** 2026-09-08 → 2026-09-09 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `7be2267` (Increment 11)
+
+Installer Increment 12: Completed-Work Reviews. One migration, two tables, two
+RPCs, two read models, one owner page, one public section, and three integration
+points on surfaces that already existed. The domain is small; almost all of the
+work was in deciding what a review is NOT allowed to be.
+
+### The four shapes that make it a record rather than an opinion box
+
+**Its identity is the work.** `assignment_id` is `unique`, so "one review per
+completed assignment" is a shape rather than a rule somebody has to enforce, and
+a review can only exist against work the platform watched reach 100% and be
+marked complete. Both foreign keys are `RESTRICT`: a review must outlive the
+ordinary lifecycle, and removing an assignment out from under one should be a
+conscious act, not a cascade.
+
+**It cannot change.** `app.forbid_mutation` — the same guard the append-only
+progress history uses — fires on UPDATE and DELETE. A trigger rather than a
+withheld grant, because a grant only stops clients: this also stops every
+`security definer` function in the file, which is what makes "immutable" a
+property instead of a convention. There is no `updated_at`, because a column
+recording when the row changed would be a permanent lie about a table whose whole
+point is that it does not move.
+
+**The reviewer is the organization.** `submitted_by` is stored for audit and
+authority and is projected nowhere — not publicly, not to the installer. Naming
+the employee who typed it would turn a business record into a personal one, on a
+surface the reviewed professional cannot answer back on. §16 asserts its absence
+from both read models by column list, so widening a projection breaks a test
+rather than quietly publishing a name.
+
+**A correction is a new fact.** There is no `suppressed` column. State is derived
+from the latest row in `job_review_moderations`, which is itself append-only, so
+the history cannot contradict the flag — there is no flag to contradict.
+Restoring is another row rather than an undo, `reason` is required, and the
+moderation table is readable by nobody: a reader learning that a review was
+suppressed, or why, would be reading the moderation decision itself.
+
+### The finding pgTAP made, which reading the file would not have
+
+Ordering the moderation history by `created_at` is wrong, and wrong in a way that
+only shows up under a test that does two things at once. `now()` is the
+TRANSACTION timestamp — a suppression and a restore performed in one transaction
+share it *exactly*, and "the latest act" then fell back to comparing two random
+uuids. Roughly half the time the restore lost to the suppression that preceded
+it. A `bigint generated always as identity` column is the only tiebreaker that
+means what it says, and the assertion that caught it is now the one that keeps it.
+
+The TRUNCATE hazard Increment 11 shipped and caught did not recur: the strip
+precedes the grant in this migration by construction, with the reason written
+above it.
+
+### What the public sees, and the number that is absent
+
+`public_profile_reviews` is keyed on `profiles.id` and joins
+`profile_public_directory` — the same listing test the profile page itself is
+built on — so publication cannot mean one thing to a profile and another to its
+reviews, and delisting withdraws every review at once without rewriting a row.
+It exposes the reviewing organization's display name, the rating, the comment,
+the job and trade context and the date. No user id, no `submitted_by`, no
+assignment id, no moderation state, and **no count of what is hidden** — a
+"3 reviews not shown" line would publish the moderation decision by subtraction.
+
+The rating summary has exactly one derivation (`lib/reviews/summary.ts`) shared
+by the hub module, the owner page and the public section, and its empty case
+returns `null` rather than `0`. A fresh professional leading with **0.0** reads as
+a terrible score rather than an empty one, so the numeral does not appear until
+there is one review to justify it.
+
+### The bidi defect, and the four utilities that were never real
+
+Building the review card turned up something wrong in Increment 11. Increment 9's
+lesson had been that user-entered text needs `dir="auto"` or `truncate` clips it;
+Increment 11 applied that to the portfolio card's `h3` and `p`. It fixes
+clipping and introduces a second defect: `dir="auto"` sets the direction of the
+**paragraph**, so a Latin title flips its whole block to LTR, `text-align: start`
+then resolves to LEFT, and the title strands itself at the far edge of an
+otherwise right-aligned card. `<bdi dir="auto">` isolates the *run* instead and
+gives both. Eight display blocks across Portfolio, Certificates and the public
+section were back-ported to it, measured at `gapFromStartEdge: 0` in both
+directions for both scripts. Form controls deliberately keep `dir="auto"`, where
+it sets the typing direction and is the right answer; a test pins that
+distinction so a future sweep does not flatten it.
+
+Confirming that fix turned up a second, quieter class of defect: **four semantic
+utility names that do not exist and emit no CSS at all** — `bg-surface-sunken`,
+`bg-warning-fg`/`text-warning-fg`, `border-line`, `text-heading`. Every use was
+from Increments 11 and 12. Page titles had been rendering at inherited size and
+information strips with no border, and nothing said so: `eslint`'s
+`aladdin/ui-foundation` rule catches raw hex, arbitrary values and default-palette
+colours, but a *misspelt semantic token is indistinguishable from a valid one* to
+it. The fix was mechanical; the method matters more — every colour and type
+utility in the increment's files was extracted and checked against the generated
+stylesheet, 19 checked, 0 missing. **A rule validating utility names against the
+Tailwind theme would have caught all four at write time, and is worth a Foundation
+follow-up.**
+
+### Composition and integration
+
+`05-reviews.jpeg` supplied the owner page: summary rail, distribution bars, a
+rating filter, and a card per review carrying the organization, the job and the
+date. Three existing surfaces gained one thing each and nothing more — the poster
+sees a submit action on a completed assignment, the installer's own assignment
+detail states that a review may arrive, and `/home` gains a Reviews destination
+under **work** rather than **account**, because a review is written by somebody
+else about work, not a fact the professional maintains. `job.review.received`
+joins the known notification events.
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 50 files, 1890 tests, PASS** — new
+`49_job_reviews_test.sql` at 65 assertions, its fixture built through the real
+RPCs end to end (create → publish → apply → accept → start → 100% → complete)
+rather than by inserting rows, so the preconditions are the product's own.
+`tsc` clean · `eslint` 0 errors (1 pre-existing) · `vitest` **1207/97** (was
+1154/93) · `next build` clean.
+
+Browser UAT in both locales at 1440px and 390px, light and dark: submit as the
+poster, appearance on the installer's page and on the public profile, the filter,
+suppression removing it from both public and owner views while the poster's
+"already reviewed" state stands, restore returning it, and the empty state on a
+professional with none. Teardown left 0 reviews, 0 portfolio items, 0
+certificates and 0 storage objects.
+
+`RUNTIME_STATE.md` is untouched and now thirteen increments behind.
+
+---
+
+## Session — A photograph a stranger may see, and everything else that must stay shut
+
+**Date:** 2026-09-06 → 2026-09-08 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `af08e9f` (Increment 10)
+
+Installer Increment 11: Portfolio and Certificates. Two metadata domains over
+Increment 10's private buckets, two owner routes, one public section, one media
+route, and three migrations — the third of which exists because the tests kept
+finding that the boundary was wider than the design said.
+
+### The decision that reshaped the increment
+
+The blocking question was how a signed-out visitor reads a published photograph.
+Increment 10 had fixed the object key as `<user_id>/<uuid>.<ext>`, and
+`profiles.id` is deliberately NOT `users.id` — the public route is keyed on the
+former, and `17_public_directory_hardening_test` asserts by name that `user_id`
+stays out of every public projection.
+
+In this stack the Next server IS the anonymous visitor: with no session it holds
+the anon key, the same credential the browser has. So any function that turns a
+public item id into a storage key is callable by the browser too, and an
+owner-prefixed key publishes `users.id`.
+
+Two options were put up — accept the leak, or introduce a service-role client —
+and **both were rejected in favour of a third that dissolves the problem**:
+change the Portfolio key itself. Portfolio keys became **opaque** (`<uuid>.<ext>`,
+no owner segment, no filename, no separator at all), and ownership moved to where
+it can be asked privately — `public.portfolio_items`, read by narrow
+`security definer` booleans. Certificates keep Increment 10's owner-prefixed
+contract unchanged, because nothing public ever resolves one.
+
+That turned out to be **strictly stronger** than the check it replaced. Under
+Increment 10 a well-formed key was sufficient to write; now a `pending` metadata
+row owned by the caller must already exist, so bytes are unreachable until the
+product has authorized that exact object. Both an invented key and the old
+owner-prefixed shape are refused.
+
+### Two systems, and the orders that make them converge
+
+Postgres and Storage share no transaction, so every sequence is ordered so that a
+failure at any step leaves a state that is safe and finishable:
+
+* **ADD** `row(pending) → upload → row(ready)`. The row is the authority (S3), so
+  the object identity is decided and recorded before any bytes exist. A pending
+  row is invisible to the public, cannot be published (the table refuses it), and
+  shows the owner an "unfinished upload" card with Finish and Discard. Finalize
+  is idempotent, which is what makes a lost response recoverable rather than
+  ambiguous.
+* **REMOVE** `row(deleted) → remove object → purge row`. Visibility stops FIRST,
+  atomically, before Storage is asked anything — the owner's own RLS policy
+  excludes `deleted`, so the item leaves their list and the public projection in
+  the same instant. Cleanup failure is deliberately NOT reported as a failed
+  delete: telling somebody "could not delete" about an item they can no longer
+  see is the one genuinely confusing outcome. Re-running the sequence finishes it.
+
+No scheduler. Nothing pretends the two systems commit together.
+
+### Three findings, each caught by a test rather than by reading the diff
+
+**1. `anon` held TRUNCATE on both new tables.** Supabase's default privileges
+grant `arwdDxtm` on every new public table, and **TRUNCATE is not restricted by
+RLS**. Enabling row-level security without stripping the defaults first would
+have left an anonymous caller able to empty both tables. Every other table in the
+repo revokes it; mine didn't. The Jobs migration even documents the reason. Now
+asserted by an assertion that names the hazard.
+
+**2. The media route cached for 60 seconds.** The reasoning was that an
+unpublished item vanishes from the page anyway, so only a saved media URL could
+exploit the gap — which describes the exploit rather than removing it. A saved
+`/p/media/<id>` is exactly what somebody keeps, and for a minute after a person
+withdrew a photograph, or after the platform delisted their profile, a cache
+would still be serving it. **Withdrawal that is "immediate except for a minute"
+is not immediate.** Every response is now `no-store`, refusals included — a
+cached 404 is the same bug pointing the other way.
+
+**3. The public door was far wider than one signed URL.** This one took two
+corrections, and both are recorded in the contract because the second reverses
+the first.
+
+The exposure probe was written asserting that an anonymous caller could enumerate
+nothing and read nothing directly. **Both assertions failed.** A SELECT policy in
+Supabase Storage is consulted by every read-shaped operation, so the policy
+intended to let the media route mint one signed URL also permitted bucket
+LISTING, a direct unsigned GET, and a HEAD disclosing size and type.
+
+The first conclusion was that this could not be narrowed — "may sign object X"
+and "may list objects" looked like one permission. **That was also wrong.**
+Storage publishes the operation being performed. A temporary logging predicate
+was added to the live policy and each request shape driven against the real API:
+
+```
+sign → storage.object.sign          list → storage.object.list
+GET  → storage.object.get_authenticated
+HEAD → object.head_authenticated_info
+GET /object/sign/…?token=… → THE POLICY IS NOT EVALUATED AT ALL
+```
+
+That last line is what made the fix possible: fetching a signed URL consults no
+policy, because the token is the authorization. So `20260908090001` adds one
+clause — `storage.allow_only_operation('storage.object.sign')` — and the door is
+now one operation wide. Listing returns empty while published objects exist,
+direct GET and HEAD are refused, signing still works, and byte delivery is
+untouched.
+
+It **fails closed**: `storage.operation()` reads a GUC with the missing-ok flag,
+so outside a Storage request the predicate is false. A direct SQL caller matches
+nothing, and a future Storage rename would make published images go missing —
+visible, and caught by the probe — never silently readable. pgTAP asserts the
+false-outside-a-request behaviour directly.
+
+### What is public, and what the public test actually is
+
+An item is public when it is **explicitly public AND ready AND its owner's
+profile is currently listed** — the third read by joining
+`profile_public_directory`, the same projection the profile page itself is built
+on, so publication cannot mean one thing to a page and another to a photo.
+Unlisting withdraws a whole portfolio instantly without rewriting a single saved
+visibility, and relisting restores exactly what the owner chose.
+
+The browser-facing contract is `/p/media/<itemId>` and nothing else. The route
+proxies bytes, so no key, no signed URL, no token and no owner id reaches the
+page. The key is a **separate random uuid** — measured at chance-level hex
+agreement with the item id, which matters because item ids are public by
+necessity: they are the `<img src>`.
+
+Certificates are the mirror image, and the important assertions are about things
+that do not exist: no verification column, no approval state, no reviewer, no
+public projection, no anon grant, no publish control in the UI. The platform
+stores what a person says they hold and vouches for none of it (S2).
+
+### Composition
+
+`04-account-overview.jpeg` supplied the module shape — icon, title, one line of
+explanation, a large number, a supporting line, one enter action — and the two
+hub cards adopt it with real data: a real published photograph, and the person's
+own certificate names in the place the reference puts a label row. Its stat rail,
+learning card, rewards card and network card remain later increments. This is not
+the Account Overview redesign; that is Increment 14.
+
+Two visual defects were found in the browser and both fixes landed where the
+cause was. The status badge fills at 15% alpha, which is right on a card and
+unreadable on a photograph — it now sits on the product's own surface. And the
+reorder chevrons did not mirror in RTL, because an SVG does not flip with `dir`;
+`rtl:-scale-x-100` is the pattern `supply-boards` already documents as "logical,
+not physical".
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 49 files, 1825 tests, PASS** — new
+`48_portfolio_certificates_test.sql` 91/91, `47_` rewritten to 77 as the boundary
+moved. **Storage harness 59/59** and **exposure probe 53/53**, both with zero
+objects and zero rows left behind — both fail if anything survives. `db lint`
+three warnings, all pre-existing. Generated types **+173, no pgTAP pollution**.
+`tsc` clean · `eslint` 0 errors (1 pre-existing) · `vitest` **1154/93** (was
+1004/84 at Increment 9) · `next build` clean · `check_doc_links` 955 links, 0
+broken.
+
+Browser UAT as a real installer through the whole lifecycle: upload → private by
+default → public profile hides it and the media route 404s → publish → public
+shows it and an anonymous caller fetches the exact bytes → second item → reorder,
+public order follows → edit → unpublish, immediate disappearance → delete,
+converged with no orphan row and no orphan object. Certificates uploaded, opened
+through a real signed read, isolated on four paths, edited, deleted. Persona
+downgrade: creation refused, unpublish and delete still work, files still
+readable. EN and AR, 1440px and 390px, light and dark.
+
+Every fixture was removed through the product's own convergent sequence rather
+than by deleting rows — the teardown was itself a test — leaving 0 rows and 0
+objects. No binary fixture is committed anywhere: the probe images are generated
+in the page, and the harnesses build their PNG and PDF in memory.
+
+One environment note worth carrying: raw `psql` runs reinstall pgTAP into
+`public`, which fails test 29's Advisor rule. Same trap as Increment 9, same fix —
+`drop extension pgtap cascade; create extension pgtap with schema extensions;`.
+
+`RUNTIME_STATE.md` is untouched and now twelve increments behind.
+
+---
+
+## Session — Two processes guard one file, and only one of them is Postgres
+
+**Date:** 2026-09-06 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `09a52e4` (Increment 9)
+
+Installer Increment 10: the storage foundation `installer-jobs.md` D5 required
+before any Portfolio or Certificate UI. One migration, two private buckets, six
+policies, three server helpers, and **no product surface at all** — deliberately.
+It answers one question: may this person put this object here, read it back, and
+remove it. What an object *means* is Increment 11.
+
+### What was there before: nothing, and one dangerous default
+
+`storage.buckets` held zero rows and `storage.objects` had RLS enabled with zero
+policies. So there was no second architecture to avoid building. But the audit
+turned up the condition that shaped everything after it: **`anon` and
+`authenticated` hold full INSERT/SELECT/UPDATE/DELETE table grants on
+`storage.objects`** — Supabase's own default, unchanged here.
+
+That means RLS is the *entire* boundary. There is no narrow column grant behind
+it the way `profiles_update_self` has one; every policy added to that table IS
+the permission, in full. Which is why the pgTAP file asserts the exact policy set
+and the two absences by name, rather than only asserting that the right things
+work.
+
+### Two buckets, because the limits are enforced somewhere RLS cannot see
+
+Portfolio and certificates want different rules — 5 MiB of image versus 10 MiB
+of PDF. Supabase enforces `allowed_mime_types` and `file_size_limit` **per
+bucket, in the Storage service, before Postgres is consulted**, and that point is
+unreachable from a policy: `storage.objects.metadata` is NULL at INSERT time
+because the row is created before the bytes land.
+
+So in one shared bucket, "certificates may be PDFs and portfolio may not" could
+only ever be stated by the application — a rule a caller can skip. Two buckets
+put it where the caller cannot reach it. The six policies are also written out
+one bucket at a time rather than as three policies matching `bucket_id in (...)`:
+widening portfolio reads should take a second edit, in a diff that says the word
+certificates.
+
+### A key with no caller-controlled bytes in it
+
+`<owner-uuid>/<object-uuid>.<ext>`. Both middle segments from the specified
+sketch are gone — the namespace because the bucket already is one, and the
+filename because a name that only ever gets displayed has no business being
+load-bearing in a security check.
+
+What is left contains nothing the caller chose. That is what turns the attack
+list from things to sanitize into things that cannot be expressed: `../`,
+`%2e%2e`, an empty name, an extra segment, `.jpg.html`, uppercase hex, a trailing
+newline, and `<uid>9/…` are each refused by the shape or by the equality, never
+by a filter someone has to remember to run. The predicate is mirrored in
+TypeScript for pre-flight only, and both sides run the same table of attacks so a
+divergence surfaces as a confusing failure rather than a dangerous one.
+
+### The gate was wrapped, not widened
+
+`app.is_professional_persona(uuid)` is revoked from every client role, and a
+policy expression evaluates as the querying role — so the obvious move was to
+grant it to `authenticated`. That would have handed the whole signed-in
+population a persona oracle to walk over arbitrary user ids.
+
+`app.can_create_professional_asset()` takes no argument and reads `auth.uid()`
+itself, so the only question it can answer is "may I", which the caller already
+knows. The predicate stays revoked, and test 47 asserts that it stayed revoked —
+the assertion exists because the shortcut is the kind that looks harmless in a
+diff.
+
+### The downgrade contract, copied from availability on purpose
+
+INSERT consults the gate. SELECT and DELETE never do. Someone who stops being a
+professional keeps every file and keeps the ability to remove it — the same
+asymmetry `trg_stamp_availability` already has, where claiming needs the persona
+and withdrawing never does. Personal data is not held hostage to a persona value.
+
+It is asserted structurally as well as observed: no read or delete policy
+mentions the gate, so there is no expression that *could* refuse them.
+
+And the converse: possession is not identity. A consumer handed an object
+directly, bypassing every policy, is still not a professional and is still
+refused the next upload. Pinned now because the inference is tempting later.
+
+### No UPDATE policy, and that absence is the overwrite rule
+
+Upsert needs UPDATE on `storage.objects`. Not granting it makes `upsert: true`
+fail structurally rather than depending on every future caller remembering to
+pass `false` — and the refusal comes back as `AccessDenied` rather than
+`KeyAlreadyExists`, which is the proof that it is the missing policy doing it.
+The signed upload token carries `upsert:false` inside its own signature as well.
+
+### What the HTTP harness caught that SQL introspection would have got wrong
+
+§23 asked for real Storage API checks rather than policy introspection, and it
+was right twice:
+
+**Every Storage refusal is HTTP 400.** The meaning is in the body —
+`{"statusCode":"403","code":"AccessDenied"}` — so the status is identical for a
+policy denial, a rejected MIME type, an oversized body and a duplicate key. The
+first draft of the harness asserted 403/415/413/409 and "failed" eleven times
+against a system that was refusing every single attempt correctly. A suite
+written from the documentation would have recorded the opposite mistake just as
+easily.
+
+**`storage.objects` refuses ALL direct SQL deletion**, for every role including
+superuser, via `protect_objects_delete`. The pgTAP delete section was passing for
+the wrong reason: it "proved" that another professional's delete removed nothing,
+and it was right by accident, because nobody's delete removes anything through
+SQL. That section now asserts the trigger and says where the real proof lives;
+deletion authority is established over HTTP, which is the only path that exists.
+
+Two smaller findings worth keeping. A refused *read* is indistinguishable from a
+key that never existed — the SELECT policy hides the row so completely that
+Storage answers `NoSuchKey` — so there is no existence oracle on that path. The
+*delete* path does distinguish the two, which is recorded rather than glossed
+over: reaching the distinction requires already knowing a full random object id.
+
+### No metadata table, and a test that keeps it that way
+
+Ownership is the key, namespace is the bucket, lookup is the immutable path,
+lifecycle is Increment 11's. A registry would duplicate all four and then need
+its own consistency rules to keep the duplicate honest. A test asserts the server
+module exports exactly three helpers, so a title, caption, issuer or visibility
+field cannot quietly arrive here first.
+
+Nothing was added to `public`: the generated types diff is **zero lines**.
+
+### Decisions closed at approval, recorded in §12.1
+
+Four Increment 11 product decisions were taken when this was approved, and they
+are written into the contract rather than left in a conversation:
+
+* **S1** portfolio items are private by default and become public only through
+  explicit metadata visibility — **the bucket stays private either way**, so
+  "public" means a server mints a representation, never that a guessed URL works;
+* **S2** certificates stay owner-private self-declared evidence for the Pilot,
+  with no invented verification authority and no public read path;
+* **S3** metadata is the product authority and deletion **converges** — Postgres
+  and Storage are two systems, no transaction spans them, and the idempotent
+  delete helper is what lets a retry finish instead of jam;
+* **S4** public portfolio is JPEG/PNG/WebP only, and deeper byte/malware scanning
+  is deferred as separate server hardening.
+
+S1 and S2 required no change to anything built here, which was the point of
+refusing to widen anything: the public path S1 wants is a new server helper over
+an unchanged private bucket, and S2's rule is an absence that already exists.
+
+The signature check in `lib/storage/professional-assets.ts` is described
+consistently everywhere as what it is — a correctness net running in the caller's
+own process, catching a script named `.png` that the bucket's type list cannot.
+It is never called a boundary. S4 is what makes that honest rather than a gap.
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 48 files, 1724 tests, PASS** — new
+`47_professional_asset_storage_test.sql` is 67/67. Storage API harness **43/43,
+0 objects left behind** (it fails if any survive). `db lint public,app` three
+warnings, all pre-existing. Generated types **0 lines changed**. `tsc --noEmit`
+clean · `eslint src` 0 errors (1 pre-existing warning) · `vitest` **1061/86** (was
+1004/84) · `next build` clean with no new routes · `check_doc_links` 955 links,
+0 broken.
+
+No binary fixture is committed: the PNG and PDF the harness uploads are generated
+in memory, and the one persona it changes is restored in a `finally`. Nothing was
+seeded — there are no fake portfolio items and no fake certificates, because
+there is nothing yet for them to mean.
+
+`docs/database/media-storage.md` **will not exist**. What shipped is deliberately
+narrower than the name that section promised: chat attachments and job-progress
+photos have different relationship semantics — a chat attachment is readable by a
+conversation, not by an owner — and designing their authorization alongside this
+one would have meant guessing at it. The three references that named that file
+now say so.
+
+`RUNTIME_STATE.md` is untouched and now eleven increments behind.
+
+---
+
+## Session — A hundred percent is a claim, and somebody else answers it
+
+**Date:** 2026-09-05 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `4e5690b` (Increment 8)
+
+Installer Increment 9: the work itself. Two routes for the professional, one
+panel added to the poster's existing job detail, three notifications, and one
+migration. No status was added, no lifecycle rule moved, and the four Increment 6
+RPCs kept their signatures.
+
+### Three policies, one projection
+
+`job_assignments` was already readable: `job_assignments_select_installer` is a
+flat column check, `installer_user_id = auth.uid()`, with **no status
+predicate**. So was the progress history — `job_progress_select_parties` admits
+both parties, which is why this increment added no seam for it and both sides
+read the base table through one query function.
+
+What was not readable was everything that makes an assignment a RECORD rather
+than a pile of uuids, and three separate policies each withheld a different piece
+of it:
+
+* `organizations_select_member` — an installer is not a member of the
+  organization that hired them, so "who am I doing this work for" was
+  unanswerable on the very surface built to answer it;
+* `trades_select_active` — a retired trade vanishes, and §24 needs the label the
+  work was agreed under;
+* `jobs_select_assigned_installer` — carries `and a.status <> 'cancelled'`, so
+  the moment an engagement is cancelled the installer loses the job behind it,
+  while §19 needs exactly the opposite.
+
+Each of those is a rule worth keeping. Relaxing the trades one puts retired
+trades back in the "post a job" dropdown, which is the defect Increment 7 fixed;
+an installer policy on `organizations` would hand the whole pool every future
+column of the tenancy root. So `my_job_assignments` answers past all three
+without widening any, and a projection names its columns where a policy names
+none and grants every column added after it.
+
+`site_address` is the one column with a condition on it. §11 releases the address
+to the professional who holds the work, which is what
+`jobs_select_assigned_installer` already encodes, cancellation clause included.
+The projection **reproduces** that clause rather than relaxing it — live, the
+address is theirs; cancelled, it is withheld again and the rule is stated on
+screen instead of leaving a blank. The projection is never wider than the policy
+it reads past.
+
+### The line this increment exists to draw
+
+The installer reports; the organization confirms. Everything else is arrangement
+around that one fact.
+
+At 100 percent the assignment stays `in_progress`, the job stays `awarded`,
+`completed_at` stays null, and the installer's page says *"You reported this work
+as finished — there is nothing further for you to do here."* It is derived
+presentation, not a fifth `job_assignment_status` and not a persisted
+`waiting_review`: the moment a claim is stored as a state, it starts looking like
+a state its author had the authority to set.
+
+And the absence of a completion control is **structural rather than rendered**.
+`assignment-forms.ts` exports four actions and none of them completes for an
+installer; there is no RPC an installer surface could call if it tried. That is
+why the §16 test can pass — it asserts a capability that does not exist, not a
+button that is merely hidden. pgTAP asserts the other half: the installer is
+refused with 42501 at 100 percent, twice.
+
+### An organization recipient that is not a coin flip
+
+Increment 8 RESERVED `job.application.submitted` → the poster, because
+`app.notify_org` needs a capability and the domain offered two equally plausible
+ones. That reservation still stands, and test 42 now asserts it by name.
+
+The three events wired here are different, and the reason is structural rather
+than editorial: **`job.post` has no role anywhere in the assignment lifecycle.**
+`app.can_post_job` is consulted by `job_create`, `job_update`, `job_publish`,
+`job_close` and `job_cancel` — and by none of the four assignment RPCs. Every
+action a recipient could take in response to these notices requires `job.manage`
+and refuses `job.post`. So the capability is read off the action the notice asks
+somebody to take; a notice delivered anywhere else would be one its reader is
+refused permission to act on.
+
+`job.assignment.ready` fires on the **transition** to 100, not the value —
+`job_progress_add` compares against the row it read before its own update, so an
+installer correcting a note at 100 announces it once. `job.assignment.cancelled`
+carries the same two params on both of its paths, because the organization's copy
+cannot name the organization to itself and a body referencing `{org_name}` would
+render a hole on one branch.
+
+### What the guards found that review would not have
+
+**`server-only` caught a client component reaching into database code.**
+`readyForCompletion` and `featuredAssignment` had been filed under
+`server/queries` beside the reads, and the import threw the moment
+`/home` needed them. The guard was right and the fix was not to mock it away:
+none of that is server code. Every consumer is a client component, so the state
+model moved to `lib/work/assignment-state.ts` — the same split
+`lib/nav/personal-modules.ts` already makes, and for the same stated reason.
+
+**A browser found `1%` where the data said 100.** `formatPercent` already divides
+by 100; four call sites divided again. No test looked at the rendered string —
+they all asserted the aria value, which was correct. The regression tests now
+assert the string, which is the thing a person reads.
+
+**`table-layout: auto` meant `RecordCell` could never truncate.** The visual
+review found the history list clipping its own action column: the table wanted
+966px in a 785px container. `RecordCell` carries `truncate` by design, but a cell
+sized to its content has nothing to truncate against, so a long title silently
+pushed `Agreed`, `Assigned` and `View` into the horizontal scroller — the reader
+had to scroll sideways to discover an action existed. `DataTable` gained an
+opt-in `grow` column flag (`w-full max-w-0`), which is what makes that existing
+`truncate` fire. No existing table changes shape.
+
+The same review found an English job title rendering as `…aircase cladding -
+Fifth Settlement` in the Arabic workspace. An LTR string inside an RTL container
+inherits RTL, so `text-overflow` clips the front and the reader loses precisely
+the words that identify the record. `dir="auto"` on user-entered text resolves
+direction per value from its first strong character — verified in the browser as
+`englishTitle: ltr, arabicTitle: rtl, pageDir: rtl`, in the same node. It is
+deliberately not conditional on locale; a component branching on locale would be
+the Arabic-only rule the UI contract forbids.
+
+### Composition, and what the reference could not have
+
+`03-my-work.jpeg` supplied the skeleton and the weighting: header, status strip,
+one dominant current-work block, the historical list, a context column. What it
+also supplied — a project photograph, a documents-and-files panel, a quick-tools
+rail, client star ratings, "completed this month", and four tabs with no
+`job_assignment_status` behind them — has no authority anywhere in this product,
+so it is absent rather than postponed.
+
+The photo slot is not left empty, because an empty designed slot is worse than
+none: it carries `Monogram`, which is the answer this codebase already gives to
+"there is no image pipeline yet". The list shows **one** status chip per row like
+the reference does; the readiness marker lives on the featured block, the detail,
+the poster's panel and `/home`, and repeating it in the history list was what
+cost the row its action column. The organization folded into the identity cell
+because the monogram beside it was already the organization — a column naming the
+same thing twice.
+
+The page hierarchy survives empty data, which was the point of §22: with no
+assignments at all it still renders its header, its tabs, a designed featured
+empty state and a summary reading honest zeros. Content disappears; structure
+does not.
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 47 files, 1657 tests, PASS** — new
+`46_job_assignment_work_test.sql` is 65/65. The full-suite run earned its keep
+again: it caught test 29's Advisor rule (pgTAP recreated in `public` rather than
+`extensions` by raw psql runs) and test 42's notification claim, now an
+allow-list that fails the moment a sixth event appears without anybody deciding
+it should. Neither was reachable from the files this increment added.
+
+`db lint public,app` three warnings, all pre-existing. Generated types **+32
+lines, 0 deletions**. `tsc --noEmit` clean · `eslint src` 0 errors (1 pre-existing
+warning) · `vitest` **1004/84** (was 898/78) · `next build` clean ·
+`check_doc_links` 950 links, 0 broken.
+
+Browser UAT as both parties, every state through a real RPC: apply → award →
+bridge into My Work → start → 25 → 60 → 100 → verified against the database that
+the assignment was still `in_progress` with the job still `awarded` → poster
+confirmed, completing assignment and job in one transaction → a second engagement
+cancelled by the installer, returning the job to `open` and notifying the
+organization with the reason. Arabic RTL and 390px verified on every surface;
+light and dark on three. Two visual defects were found this way and fixed, and
+both fixes landed in the Foundation rather than on the page.
+
+Every fixture either run created was removed afterwards — five jobs, five
+applications, five assignments, seven progress reports and thirteen
+notifications — and the append-only audit rows were left where they are.
+`public.job_progress_updates`' delete guard was lifted explicitly for each
+teardown and restored immediately; `public.audit_log` was never touched, and
+**29 job audit rows remain**.
+
+`RUNTIME_STATE.md` is untouched and now ten increments behind.
+
+---
+
+## Session — An application outlives the opening it was for
+
+**Date:** 2026-09-03 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `db1d983` (Increment 7)
+
+Installer Increment 8: the other side of Jobs. Three routes — discovery, one
+opening, and the caller's own candidacies — plus apply, withdraw, re-apply, the
+two applicant-facing decision notices, and one entry point on `/home`. Two
+migrations, both additive, and no lifecycle rule changed anywhere.
+
+### What the read model already answered, and what it did not
+
+Increment 6 shipped both installer-facing seams, and they were better than
+expected. `open_job_opportunities` already carries `poster_org_name`, so §19's
+"safe posting identity" needed no new projection at all. Both seams join
+`public.trades` **inside** a definer, so `trades_select_active` never sees them
+and a retired trade keeps its historical label on this side for free — §20 was
+satisfied before the increment started.
+
+What was missing was smaller and sharper. `my_job_applications` carried the LIST
+half of a job: title, trade, amount, city, status, poster. Not the description,
+the duration, the dates or the publication time. Those are exactly what somebody
+re-reading their own candidacy needs — *what did I say I would do, and by when* —
+and without them the installer's detail route would have had to render two
+different pages depending on whether the opening happened to still be
+discoverable today.
+
+So the projection gained five columns, every one of them ALREADY public in
+`open_job_opportunities` to any authenticated caller, and here narrower still:
+only on the caller's own application, resolved from `auth.uid()` inside the
+definer with no parameter to point elsewhere. Still no `site_address`, no
+competing application, no poster-side management column. DROP + CREATE rather
+than CREATE OR REPLACE, because the reader's `RETURNS TABLE` signature changed —
+which destroys the ACL, so every grant is reasserted verbatim and test 45 asserts
+that no client role can write through the view.
+
+### The two ways a job stops being readable, and only one of them is right
+
+An opening leaves discovery five ways: awarded elsewhere, closed, cancelled,
+completed, or its poster's verification lapsing. The last of those rewrites no
+row at all — the live join simply stops matching — which is why it is the one the
+test uses. In every case the OPENING should disappear from the board and the
+APPLICATION should not, and the detail route makes that structural: it reads
+discovery first and falls back to the caller's own record, so a job somebody
+applied to never 404s on them, while a job they never applied to and which has
+left discovery is an ordinary not-found. Which of the two seams answers IS the
+state.
+
+### O5, on the side where it would have been easiest to lose
+
+The reference board leads with "96% matched to your skills" on every card. The
+temptation on this surface is not a policy — it is a default: show me jobs in my
+trades first, and the restriction the database refuses to make arrives as a
+convenience.
+
+So the trade filter is unset by default, nothing on the route reads
+`user_trades`, and the note under the toolbar says so in the reader's own words —
+placed there because the trade dropdown is the one control a professional could
+reasonably mistake for a rule about who is allowed to apply. Asserted three ways:
+structurally (neither installer-facing projection mentions `user_trades`), at the
+query layer (no trade filter unless the reader picked one), and behaviourally —
+Mahmoud, whose only declared trade is `electrical`, sees a `marble_granite` job
+and applies to it successfully. The browser pass ran the mirror image: Sayed,
+marble only, applied to an electrical villa job and was accepted into it.
+
+### Re-applying is the same call, not a second one
+
+`job_application_submit` returns a caller's own `withdrawn` row to `submitted` on
+the SAME id. So there is one wrapper, one action and one dialog for both, and a
+test asserts the second call is the first one. A separate "reapply" path would
+have been a second writer of one row, kept in step by hand.
+
+The UI offers it only where the RPC would allow it, which needs a fact the
+application row does not hold: `job_status = 'open'` is visible there, the
+poster's CURRENT verification is not. So the tracking page asks discovery which
+of its jobs are still live — one small read for the whole page — and the
+withdrawn-and-no-longer-reapplicable case gets its own sentence rather than
+sharing a grey badge with rejection. "You withdrew this" and "you were not
+selected" are different facts about the same person.
+
+### Telling somebody a decision was made about them
+
+Two events, `job.application.accepted` and `job.application.rejected`, through
+`app.notify` rather than `app.notify_org` — every recipient is named by
+`job_applications.applicant_user_id`, so there is no fan-out, no capability
+lookup and no owner fallback, because there is no set to choose from.
+
+**The award notifies the losers too.** `job_application_accept` auto-rejects
+every other live candidacy in the same statement; those people were rejected as
+surely as one rejected by hand. The bare `UPDATE` became a `FOR ... RETURNING`
+loop so the recipients come from the write itself rather than from a second query
+that could disagree with it. Telling the winner and silently closing four other
+applications is the partial state this architecture exists to prevent.
+
+**`job.application.submitted` → the poster stays RESERVED.** `app.notify_org`
+delivers against a capability and this domain has two plausible answers —
+`job.post`, whoever authored the opening, and `job.manage`, whoever decides its
+applications — with nothing in the approved contract choosing between them.
+Guessing would install a recipient rule by accident. Test 42's old blanket "this
+increment emits NO notification" was superseded by two stronger claims: the only
+Jobs notifications are the two applicant-facing decisions, and every one of them
+reached the applicant it was about.
+
+### One English sentence that had to stop being one
+
+The auto-rejection writes `decision_reason = 'the job was awarded to another
+applicant'` — our sentence, not the poster's, stored in a column the applicant
+reads. Rendering it raw shows an Arabic reader English, and makes it look like
+the organization typed it. The status layer now swaps that one constant for a
+translated line, as a named export rather than a literal buried in a component,
+so the day the database sentence changes there is one place to change with it.
+Storing a key instead would be better and is an Increment 6 authority change, not
+this increment's.
+
+### An Arabic label that was right on one surface and wrong on the other
+
+The four `applicationStatus` labels are the single status layer §22 asks for, and
+Increment 8 is the first time they appear on both sides. The Arabic ones had been
+written for the poster's queue, describing somebody else: `سحب طلبه` — *he
+withdrew his application* — read as a sentence about a third party the moment it
+sat on the reader's own row. Found in the browser, in Arabic, not by a test. They
+are now states named as states, which is correct from either side.
+
+### Foundation
+
+No gap. `ButtonLink`, `BriefcaseIcon` and the shared status badges arrived in
+Increment 7; `FilterBar` was already the canonical list toolbar and took search
+plus the three selects unchanged; `ConfirmDialog`'s `formAction` render-prop
+carried both the apply dialog with its note field and the withdrawal. The one
+composition decision worth recording is that the trade filter offers the ACTIVE
+catalog while the governorate filter offers the values that actually exist —
+`jobs.governorate` is free text a poster typed, not a key from the onboarding
+location catalog, so labelling it through `t()` would have printed the message
+path.
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 46 files, 1591 tests, PASS** — new
+`45_installer_job_experience_test.sql` is 33/33, and 1591 − 1557 is that file
+plus the one assertion test 42 gained. The full-suite run is what caught both
+regressions this increment produced: test 29's Advisor rule, failing because I
+had recreated pgTAP in `public` rather than `extensions` while regenerating
+types, and test 42's superseded notification claim. Neither was reachable from
+the three files the increment added.
+
+`db lint public,app` reports three warnings, all pre-existing. Generated types
+**+5 lines, 0 deletions**. `tsc --noEmit` clean · `eslint src` 0 errors (1
+pre-existing warning) · `vitest` **898/78** (was 809/73) · `next build` clean ·
+`check_doc_links` 950 links, 0 broken.
+
+Browser UAT as Sayed, every state through a real RPC: apply off-trade with a
+note → withdraw → re-apply, verified against the database as the SAME row id and
+the SAME `created_at` → declined with a reason on one job → awarded on another,
+with the auto-closed rival notified in the same transaction. Arabic RTL with no
+raw enum, key or message path; 390px with no overflow and the parent Jobs entry
+lit on a nested route in the bottom rail; dark with zero inline colours in
+`main`. Every fixture the run created was deleted afterwards — two jobs, three
+applications, one assignment and three notifications — and the append-only audit
+rows were left where they are.
+
+`RUNTIME_STATE.md` is untouched and now nine increments behind.
+
+---
+
+## Session — Whoever applied has already told you who they are
+
+**Date:** 2026-09-03 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `f5f2878` (Increment 6)
+
+Installer Increment 7: the organization's side of Jobs, end to end — list,
+create, edit, publish, applicants, award, decline, close, cancel. Five routes on
+the Increment 6 authority, and three migrations that exist because building the
+screens found three things the database could not answer.
+
+### The read model had no poster in it
+
+Increment 6 shipped `open_job_opportunities` and `my_job_applications` — both
+installer-facing — and nothing for the party who actually has to decide.
+`installer-jobs.md` §11 already named the fix: *"application views join
+`profile_public_directory` and read nothing else."* That instruction cannot be
+implemented. The projection exposes `profiles.id` and deliberately never
+`user_id`, so there is **no key** to join an application to it; and the join it
+describes is an INNER one against `public_profile_status = 'listed'`, a column
+whose default is `hidden` — 17 of 26 profiles today. A poster-side queue built
+that way renders most applicants anonymous, and the poster chooses who to hand
+work to from a list of blanks.
+
+`job_applicants` returns identity for **every** applicant instead. The argument
+is not convenience: somebody who applies to your job has, by that act, told you
+who they are, which is a party-to-a-transaction fact rather than a directory
+lookup. It still returns no contact channel, no address, no travel radius, no
+private lead-time preference, no `consumer_*` column and no `applicant_user_id`
+— those are what §11 protects, and each remains unreachable. Recorded as §3.6
+departure 10, and it is the milestone's **only widening**; the other nine narrow.
+
+### Retirement kept the row and lost the word
+
+`jobs.trade_id` is `not null references public.trades on delete restrict`, so
+retiring a trade is designed to leave every historical job intact. It does — in
+the table. What it did not leave intact was the poster's ability to **read** the
+label: `trades_select_active` withholds inactive rows, so the embed the list page
+uses returns null and a job the organization posted itself, in a trade it chose
+itself, shows a dash.
+
+The one-line fix would have been another permissive policy on `public.trades`,
+and it is the wrong line. **A policy widens the table; it does not answer the
+question.** Every `from("trades")` in the product would start returning that row,
+`loadTradeCatalog()` included — which is the vocabulary the "post a job" dropdown
+renders. The retired trade would come back as a *selectable option*, the exact
+outcome `trades_select_active` exists to prevent, leaving only the RPC's refusal
+between a poster and picking it.
+
+So `job_trade_labels` answers one question and no other: for jobs the caller's
+organization posted, which trade were they posted in, and is it still active.
+`44_job_trade_labels_test.sql` asserts the non-widening **in the same session
+that successfully reads the historical label** — the same caller still sees zero
+retired rows in `public.trades`, and `job_create` still refuses one.
+
+### Reading a retired label is not permission to post in one
+
+Restoring the label exposed the second half: `job_update` resolved `p_trade_key`
+against `is_active` and refused anything else, so a poster whose job sat under a
+retired trade could not fix a typo in the title. The whole edit was refused
+because of the value it was *retaining*.
+
+Retirement must stop a trade being **chosen**, not freeze the job that already
+holds one. Resolution now happens in two steps — resolve the key at all, then
+accept an inactive one **only when it is the id this job already holds**. Another
+job's retired trade, even one the same caller can read a label for, is still
+refused. `job_create` gets no exception because there is nothing to retain, and
+`job_publish` keeps refusing: editing is private housekeeping, publishing is the
+moment the job enters the installer pool, and the platform's decision to withdraw
+a trade has to bite somewhere.
+
+The post-application freeze survives untouched, and by construction rather than
+by care: its check compares the **resolved id** against the **stored** one, so
+retaining a retired trade is not a change and passes, while switching off one on
+a job with applications is refused exactly as before. §C3 asserts both halves.
+
+In the form this is one option outside the catalog — the trade *this* job holds,
+when retired, labelled as no longer offered. The catalog stays active-only, so
+creating still cannot reach a retired trade. Without the option the select had
+nothing matching its own value, submitted blank, and the edit was refused for a
+field the poster never touched.
+
+### Where affordance stops and authority starts
+
+Three places the UI declines to offer something the server would refuse: the
+offer and trade freeze on the form once applications exist; the edit route
+renders a notice rather than a form past `open`; and **an awarded job has no
+Cancel button at all**, because Increment 6's review removed `awarded → cancelled`
+and the two-step rule is stated instead. None of the three is a check. The server
+decides all of them, and a test asserts the button's absence rather than the
+refusal's presence.
+
+Capabilities are honoured separately even though the nav gate is their union:
+`job.post OR job.manage` is what makes the module reachable — either alone is a
+reason to be there, and gating on `job.post` would hide the queue from the person
+whose whole job is working it — but a `job.post` holder sees Publish and Edit and
+no Award, and a `job.manage` holder the reverse. Verified live as Laila, who
+holds `job.post` and not `job.manage`.
+
+Nothing invents data. No fit score, no ranking, no recommendation, no match
+count, no contact detail — none has any backing in this repository, and a number
+the product invented is one the poster would then trust. A test asserts their
+absence.
+
+### Two Foundation gaps, closed in the Foundation
+
+No briefcase glyph existed; reusing the wrench would have made "people we could
+hire" and "work we are hiring for" the same icon on a collapsed rail. And there
+was no canonical link-styled-as-button, because until now no surface had a
+primary *go and do this* destination — `<button onClick={router.push}>` would
+have cost middle-click, open-in-new-tab and the correct role. `ButtonLink` shares
+one `controlClass` with `Button` so the two cannot drift, and is written up as
+`UI_CONTRACT.md`'s R6 worked example.
+
+### Three things found by running something other than the unit tests
+
+**The browser found `EGP 22,500.00 EGP`.** `formatMoney` already emits the
+currency and the code appended it again, at three sites. No test looked at the
+rendered money string. There is one now.
+
+**Raw `psql` found that `43` never ran to completion.** Its `results_eq` compares
+`column_name` — collation `C` — against a bare literal under this database's ICU
+default, which raises *"could not determine which collation to use"* and **aborts
+the transaction** rather than failing one assertion. It had been validated by
+grepping for `not ok`, which an aborted run never prints. Two real defects were
+hiding behind that: `plan(21)` for a file with 22 assertions, and a grant
+assertion counting the view *owner's* privileges, which could never have passed.
+The same discovery caught ~147 lines of pgTAP function/view pollution baked into
+`database.types.ts`, because `create extension` commits outside the test
+transaction — regenerated with it dropped, and the diff is now the two views and
+nothing else.
+
+**The full suite found an O5 guard the three new files could not.**
+`41_trade_taxonomy_test.sql` asserts that the only functions mentioning
+`user_trades` are its writer and the public projection — and `app._job_applicants`
+reads it to put trades on an applicant card. The allow-list gained that one name,
+with the reason: it projects trades for **display** and filters nothing by them,
+and `43` §C asserts the absence of a trade filter separately. The guard still
+bites — writing a name into that list is a deliberate act someone has to defend
+in review, which is exactly what it is for.
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 45 files, 1557 tests, PASS** — new
+`43_job_applicants_projection_test.sql` 22/22 and `44_job_trade_labels_test.sql`
+30/30, and 1557 − 1505 is exactly those two files, so no existing count moved.
+`db lint public,app` reports three warnings, all pre-existing and none from these
+migrations. Generated types **+28 lines, 0 deletions** — the two views, nothing
+else. `tsc --noEmit` clean · `eslint src` 0 errors (1 pre-existing warning) ·
+`vitest` **809/73** (was 713/67) · `next build` clean · `check_doc_links` 950
+links, 0 broken.
+
+Browser UAT against the real RPCs, twice. The lifecycle: draft → publish → two
+real applications → decline with a required reason → award, with the DB
+confirming the job awarded, one scheduled assignment at the frozen amount, and
+the declined applicant's own reason preserved. Then retirement: the label
+surviving on list and detail, the create dropdown excluding it, an edit saving
+while retaining it, and Publish still refusing with *"That trade is not
+available."* Arabic RTL clean with no raw enum, key or message path; 390px with
+no overflow; dark with zero inline colours in `main`. Every fixture the runs
+created was removed afterwards — the database is back to two seeded jobs and no
+applications, because a state that arrives by INSERT proves nothing about the
+authority meant to produce it.
+
+`RUNTIME_STATE.md` is untouched and now eight increments behind.
+
+---
+
+## Session — One organization, one person, and no client allowed to write it
+
+**Date:** 2026-09-02 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `4df3e64` (Increment 5)
+
+Installer Increment 6: the Jobs domain, database only. Four tables, three enums,
+thirteen RPCs, two read projections, no UI. It is the authority Increments 7, 8
+and 9 will sit on, built ahead of them so the interfaces have nothing to decide.
+
+### Why it does not reuse the commerce domain next to it
+
+An RFQ, a quotation and an order are all **organization ↔ organization**: two
+tenants, two capability sets, and every policy is a pair of org predicates. A job
+is **organization → PERSON**, and the person's authority is `auth.uid()` and
+nothing else.
+
+Reusing `orders` would have given the installer an org-shaped seat at a table
+where they have no organization, and the first refactor that noticed the symmetry
+would have collapsed the installer's read of their own work onto an org-membership
+check — silently handing installers tenant reads. `job_assignments` carries
+`installer_user_id` and `poster_org_id` as flat denormalised columns for exactly
+that reason: every installer-side policy is a column check against `auth.uid()`,
+and none of them can be rewritten into an org predicate without the rewrite being
+obvious.
+
+### Four rules made structural rather than conventional
+
+**No client DML.** Not one `INSERT`/`UPDATE`/`DELETE` grant on any of the four
+tables in any role, `service_role` included, and no non-`SELECT` policy. RLS
+answers who may READ a row; the RPCs answer who may CHANGE it, and the two
+questions never share a predicate.
+
+**Verification suppression is derived.** Nothing caches `is_verified` onto a job.
+Discovery and new applications join the live organizations row, so a lapse hides
+a job with no row rewritten and a restore brings it back with no backfill. A
+denormalised copy freezes the wrong answer in *both* directions — a suppressed
+job staying visible, a re-verified org's jobs staying buried — and neither shows
+up until somebody complains. The test revokes verification and watches discovery
+change while `status` stays `open`.
+
+**One active assignment, at the storage layer.**
+`ux_job_assignments_active_job unique (job_id) where status <> 'cancelled'`. The
+accept path locks the job, but the *guarantee* is the index: two concurrent
+accepts collide on it and the second transaction rolls back whole. The test
+attacks it with a raw INSERT rather than through the RPC, because an RPC-level
+check is only as good as the next RPC.
+
+**Trade is never authority (O5).** Asserted three ways structurally — no policy in
+the domain mentions `user_trades`, no Jobs function reads it, no Jobs function
+writes `public.trades`. This is the most likely regression in the whole milestone
+*because it feels like a feature*: "only show matching jobs", then "only let
+matching installers apply", and O5 is gone without a line of it being discussed.
+By the time it fails behaviourally a real installer has already been refused work
+they were allowed to take. Behaviourally too: Mahmoud, whose only declared trade
+is `electrical`, applies to a `marble_granite` job and succeeds.
+
+### The authority line that matters most
+
+**The installer cannot complete their own work record.** They start, they report
+progress, they reach 100 — and the assignment is still `in_progress` and the job
+still `awarded`. 100% is a *claim of readiness*; the posting organization
+confirms it. A rating anchored to work the rated party declared finished about
+themselves is not evidence, and this is the increment where that becomes true
+rather than intended.
+
+### Nine departures from the approved spec, all deliberate
+
+Recorded in a new §3.6 of `installer-jobs.md`. Seven are narrowings; two are the
+review's own lifecycle corrections.
+
+The one worth arguing about is **"active org"**. §10.3's table says `job_create`
+requires an active organization, and read literally that means
+`status = 'active'` — which would lock an organization in `pending_verification`
+out of drafting, the exact line the same section says verification must never
+cross. Everywhere else in this repository `status = 'active'` is a
+DISCOVERABILITY condition; the public directory and the catalog projection both
+use it that way. So drafting is gated on *not suspended, not archived*, and
+publishing keeps `is_verified AND status = 'active'`, because that IS the
+discoverability gate. The document now says so.
+
+The others: no client write grant (narrows §10.4); the offer freeze extended to
+`trade_id`, because an applicant consented to an amount FOR A TRADE; three
+lifecycle guards as triggers, which catch us rather than a browser; the agreed
+compensation snapshotted onto the assignment; two extra audit actions; and a
+second read seam, `my_job_applications` — needed because the `jobs` policy
+deliberately excludes applicants (the base row carries `site_address`, withheld
+until assignment), which leaves an applicant's own candidacy as a `job_id` and a
+status rather than a record a person can read.
+
+### The two corrections review asked for
+
+**`awarded → cancelled` is gone.** An awarded job has somebody holding live work
+on it. Cancelling the opening in one step ended that engagement as an *unnamed
+side effect* — closed by a path the poster never aimed at the installer, and the
+reason left on the record was the one written about the job, not about the work.
+Now `job_cancel` takes `draft` and `open` only, the trigger refuses the edge, and
+the block inside `job_cancel` that used to cancel the live assignment is gone
+because it became unreachable. The poster ends the engagement first, with its own
+required reason, which returns the job to `open`; the opening is cancelled from
+there. Two acts, two reasons, in the order the installer experiences them.
+
+**A withdrawal is reversible; a decision is not.** `job_application_submit`
+returns a caller's own `withdrawn` row to `submitted` on the **same id**,
+atomically under the job lock — but only after passing the same two gates a
+first-time applicant passes, so withdrawing is never a door back in that a
+newcomer does not have. `created_at` survives, because it is the honest record of
+when this person first put their name forward. `accepted` and `rejected` return
+**unchanged**, not one column touched: both are the poster's decisions, and
+reversing either from the applicant's side would let someone re-enter a
+competition they had already been told they lost.
+`app.job_applications_status_guard()` permits exactly one edge out of a
+non-`submitted` state, so a future write path cannot widen it by accident.
+
+### A deadlock caught by reading rather than by testing
+
+`job_cancel` locked jobs → assignment; `job_assignment_cancel` locked assignment
+→ jobs. A cycle, and two concurrent cancels would have deadlocked. No test would
+have found it — pgTAP runs one transaction. Every write path that touches two
+rows now takes `jobs` first, and the ones that need the child's `job_id` read it
+unlocked, take the job lock, then re-read the child `for update`.
+
+### Validation
+
+Clean `supabase db reset`. **pgTAP 43 files, 1505 tests, PASS** — new
+`42_jobs_domain_test.sql` is **162/162**, and 1505 − 1343 is exactly the new file,
+so no existing count moved. Generated types **+464 lines, 0 deletions**, and
+byte-identical after the two corrections (no signature or enum drift).
+`tsc --noEmit` clean · `eslint src` 0 errors (1 pre-existing warning) ·
+`vitest` 713/67 unchanged · `check_doc_links` 950 links, 0 broken.
+
+Fixtures are two jobs and one capability grant, and deliberately no applications,
+assignments or progress: those are LIFECYCLE, and a state that arrives by INSERT
+proves nothing about the authority meant to produce it. Laila holds `job.post`
+and NOT `job.manage`, so the difference between the two keys is testable rather
+than assumed.
+
+### One trap worth knowing
+
+`create extension if not exists pgtap` sits **before** `begin;` in every test
+file, so it commits. Running a single test manually with `psql -f` therefore
+leaves pgTAP's own `tap_funky` and `pg_all_foreign_keys` views in `public` — and
+test 29's "no SECURITY DEFINER view in public" sweep then flags them. It cost a
+real investigation into a failure this increment had not caused. **The suite is
+only trustworthy from a clean reset.**
+
+### Unfinished work, explicitly
+
+- **`NAV_CAPS` does not yet list `job.post` / `job.manage`**
+  (`frontend/src/lib/nav/modules.ts`). Correct for a database-only increment, and
+  Increment 7 needs it or the poster module dead-ends.
+- **Reviews (§6) are not implemented** — Increment 12. The seam is
+  `job_reviews.assignment_id → job_assignments.id` and needed no column here.
+- **No notifications.** `ck_notifications_event_type_known` is untouched and a
+  test asserts zero `job%` notification rows. The seams a later increment would
+  wire are `job.application.submitted` to the poster and `accepted`/`rejected` to
+  the applicant.
+- **The Installer aftercare pass and the site-wide UI consistency audit remain
+  deferred**, unchanged from the previous entry. `UI_CONTRACT.md` stays in force
+  for new UI; this increment had none.
+- **`RUNTIME_STATE.md` is still not refreshed**, now seven increments behind.
+  Untouched here by instruction.
+
+### Two things worth knowing next time
+
+- **A lock cycle is invisible to a test suite that runs one transaction.** The
+  only way it was going to be found was by reading the four write paths together
+  and asking which order each took its locks in.
+- **A literal reading of a spec can contradict the spec.** `status = 'active'`
+  appears in §10.3 and would have broken the rule stated two paragraphs above it.
+  The fix was to look at what that literal means everywhere else in the
+  repository — discoverability, every time — rather than to implement the
+  sentence.
+
+---
+
+## Session — Two vocabularies for one claim, and only one of them was authority
+
+**Date:** 2026-09-01 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `143229f` (UI Foundation v1)
+
+Installer Increment 5: the trade taxonomy moves out of free text and into the
+database. Reference data, a join table, one atomic writer, and the three surfaces
+that already showed a specialty now show the canonical one. No Jobs.
+
+### The model
+
+`public.trades` is a vocabulary: `id` (the future `jobs.trade_id` target), a
+`key` shaped by a check constraint, `is_active`, `sort_order`. **No `name_en` /
+`name_ar`** — labels stay in the i18n catalogs keyed by `key`, so a translation
+fix is a frontend change and not a migration. `public.user_trades` is
+`(user_id, trade_id)` with `is_primary`, and no `organization_id`: a trade is a
+person's practice, and hanging it off a membership would delete it the day an
+employment ended.
+
+Seven seeded keys — `kitchens_doors`, `plumbing`, `electrical`, `hvac`,
+`gypsum_paint`, `tiling`, `marble_granite`. The first five are
+`SPECIALIZATIONS.installer_technician` verbatim. The last two exist because the
+demo world already contains them and the five cannot express them.
+
+### The write path is narrower than the approved spec, deliberately
+
+§4.3 of `installer-jobs.md` specified "a user reads and writes their own rows".
+What shipped grants **no client write at all**, in any role, with no write policy:
+`public.user_trades_set` is the only writer.
+
+A client able to write directly would perform one user gesture as three
+statements, and between any two of them the selection is a state nobody asked for
+— zero primaries mid-swap, or two if the calls landed out of order. Removing the
+grant makes that unreachable rather than merely unlikely.
+`ux_user_trades_one_primary unique (user_id) where is_primary` is the backstop
+underneath it. The doc is reconciled to what shipped, with the reasoning, rather
+than left describing a design that was reconsidered.
+
+The RPC takes **no user id**: acting on someone else is not a refused request,
+it is an unexpressible one. Authority is `app.is_professional_persona` —
+Increment 2's predicate, unchanged — which reads `users` and
+`individual_onboarding` and **never `user_trades`**, so holding a trade can never
+be what proves you were allowed to hold it.
+
+It is also narrower than `individual_save_professional`, which additionally admits
+a caller mid-onboarding on the strength of their selected TRACK. A track carries no
+concrete type, so there is no answer yet to which trades apply.
+
+### One primary, and a rule for every case
+
+Exactly one primary whenever the selection is non-empty, none when it is empty.
+A null `p_primary_key` means "you choose", and the choice is the FIRST submitted
+key — an order the caller controls and can therefore predict.
+
+| Case | Result |
+|---|---|
+| first trade selected | it becomes primary |
+| primary changed | named key is primary; the previous one stays selected |
+| primary removed | the first REMAINING key becomes primary |
+| non-primary removed | the primary is untouched |
+| duplicates submitted | deduplicated; converges rather than erroring |
+| empty or null set | every row deleted; no primary |
+| unknown key | `22023`, whole call refused |
+| inactive key, not held | `22023` — cannot be NEWLY selected |
+| inactive key, already held | **accepted** |
+
+The last row is the one worth arguing about. Refusing every inactive key reads as
+stricter and is worse: a trade retired under someone's feet would make every future
+save of their profile fail, for a choice they made before the retirement existed.
+
+Because the call is a complete DESCRIPTION rather than a delta, two submissions in
+flight converge on whichever lands last. The selector posts the same way, and
+applies the same promote-a-survivor rule on screen, so the page after a save is
+the page before it.
+
+**Stricter than the product contract in one place:** the contract says one of the
+selected trades *may* be primary. The implementation requires one whenever the
+selection is non-empty. Optional would have made four of the rows above ambiguous.
+
+### It does not guess
+
+`individual_onboarding.prof_specialization` holds two conventions: a vocabulary key
+where the onboarding chips wrote it, and free prose in every seeded and staging
+professional. The migration's backfill matches **by exact key equality only**. It
+parses nothing.
+
+Mapping "Plumbing and sanitary fitting" onto `plumbing` looks obvious and is a
+guess; the next sentence is "Plumbing and gypsum", and a guess that is right four
+times and wrong once has published a false claim on somebody's public profile.
+
+The demo world is resolved instead **explicitly, by user id**, in `seed-pilot.sql`
+§10.3b, where a human wrote each pair down and a reviewer can check them line by
+line. Heba Kamal (interior designer) and the site engineer are left **unmapped** —
+the Pilot vocabulary is installer trades, and covering them means modelling two
+more professions to decorate a demo.
+
+### A latent defect the taxonomy work surfaced
+
+Because `prof_specialization` holds prose, and all three surfaces rendered it
+through the message catalog, a stranger reading Sayed's public profile saw
+
+    onboarding.professional.specializations.Marble and granite fixing
+
+`t()` returns the KEY PATH when nothing resolves — the same failure mode as the
+stored-language defect fixed one increment ago, one column over.
+`specializationLabel()` translates a key and prints prose as prose. It never
+infers a trade. `tradeLabel()` does the same for canonical keys, falling back to
+the key rather than a path, because a path tells a visitor nothing except that
+something is broken and not whose fault it is.
+
+Where a canonical trade exists it **supersedes** the free text on `/home`, the hub
+and the public page; where none does, the free text is still the only answer.
+Nothing was deleted, and nothing is required.
+
+### UI, under the contract
+
+The first surfaces built entirely under `UI_CONTRACT.md`. No new primitive, no
+persona-local component, one icon added to the canonical set. `/home/profile/edit`
+gains a trade card above the form; `/home/profile` a read-only summary;
+`/home` reads the primary trade through the specialty row **that was already
+there** — a dashboard card announcing "you have declared trades" would be a card
+about the platform's data model rather than about the person's work. The public
+page still ships **143 B** of client JS.
+
+The trade card saves itself rather than riding the profile form's button. One
+button driving two RPCs is two transactions that can disagree, leaving the page to
+explain a half-saved profile; availability set this precedent on the hub.
+
+**`TradeSummary` had to be split into its own module.** It shared a file with
+`TradeSelector`, so a display-only consumer imported the server action and through
+it `server-only`, which fails at runtime rather than at build. Display and write
+now live apart.
+
+### The browser found what the tests could not, again
+
+`data-testid="trade-selector"` was placed on `<Card>`. `data-*` props typecheck on
+any React component and are silently dropped unless it forwards them, and `Card`
+takes `className`, `pad`, `children`. It compiled, it passed review, and it never
+reached the DOM — the **exact** Increment 4 trap, repeated. Moved to a real
+element, and the test that would have caught it is now in the file, with the
+reason written above it.
+
+### Validation
+
+Clean `supabase db reset`. pgTAP **42 files, 1343 tests, PASS**; new
+`41_trade_taxonomy_test.sql` is **73/73**; the three public-projection allow-lists
+(08, 17, 38) were widened **deliberately**, not weakened. Two of the new
+assertions are structural rather than behavioural — that no RLS policy anywhere
+references `user_trades`, and that the only functions mentioning it are its writer
+and the projection reader — because by the time O5 shows up in behaviour, an
+installer has already been refused a job they were allowed to apply for.
+
+`vitest` **713 passed / 67 files** · `tsc --noEmit` clean · `eslint src` 0 errors
+(1 pre-existing warning) · `next build` clean · `check_doc_links.py` 950 links, 0
+broken.
+
+Live UAT as Sayed, driving the real RPC: selected a second trade, promoted it,
+saved, verified in psql that exactly one primary existed; cleared everything and
+confirmed the empty state; read the public page as a visitor. AR RTL showed all
+seven trades in Arabic, and **zero raw keys and zero message paths** on any
+surface in either locale. Seeded state restored afterwards.
+
+### Unfinished work, explicitly
+
+- **The Installer aftercare pass is deferred to its own phase, by instruction.**
+  It was started and stopped after the read-only survey; no file was edited. Its
+  scope — information hierarchy across `/home`, the hub, the editor and Points;
+  the `/home/points` identity band; density and repeated "Not specified"; 390px
+  composition — is unchanged and unaddressed here.
+- **The site-wide UI consistency audit is likewise deferred**, together with the
+  §11 Global Consistency Milestone (Admin shell, Business/Onboarding headers,
+  card-vocabulary collapse, deleting `Band`). `UI_CONTRACT.md` remains in force
+  for all new UI in the meantime, which is what this increment was built under.
+- **`/home/points` still renders `HomeHeader`'s identity band** — "Points" as both
+  eyebrow and title, over a monogram derived from the page name. Pre-existing from
+  Increment 3, in scope for the aftercare pass, out of scope here.
+- Trade labels reuse the `onboarding.professional.specializations.*` namespace per
+  the approved spec. Inherited transitional debt; `tradeLabel()` is the one line
+  that moves when `prof_specialization` retires.
+- `kitchens_doors` and `hvac` are seeded but held by nobody. Correct for a
+  vocabulary, worth confirming.
+- **`RUNTIME_STATE.md` is still not refreshed**, now six increments behind.
+  Untouched here by instruction.
+- `.claude/launch.json` is still gitignored, so the next session writes it again.
+
+### Two things worth knowing next time
+
+- **A column that holds two conventions holds neither.** `prof_specialization` was
+  a key sometimes and a sentence otherwise, and every reader had to guess. The
+  canonical table exists so that the question "what does this person do" has one
+  kind of answer.
+- **Declared trades are a discovery signal, not a permission.** Asserted
+  structurally in pgTAP and stated on the selector itself, because a tester who
+  reads a trade list as a permission list will not take work outside it — and the
+  platform would have taught them a restriction it does not impose.
+
+---
+
+## Session — Five layouts wrote the same shell, and none of them named it
+
+**Date:** 2026-09-01 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `8be3cdd` (Increment 4)
+
+UI Foundation v1, from a read-only audit through implementation to a real-browser
+UAT. Not a redesign: the approved B2B workspace is the reference, and everything
+here is about giving the rest of the product access to it. No page composition
+changed except one label.
+
+### What the audit corrected about its own brief
+
+Three of the premises were wrong, and saying so is the useful part.
+
+**Token discipline was already clean** — zero raw hex, zero arbitrary colour
+values, zero palette escapes across the app. The one real gap was narrower and
+worse: `bg-accent-solid` was painted with `text-brand-basalt` in four places and
+`text-brand-lumen-ink` in two. Two inks on one fill, a visible difference nobody
+chose. That is the whole of the token work — `--on-accent`, defined once, shared
+by both themes because Lumen is a bright amber on either ground.
+
+**The Installer rail was not the worst offender.** Admin's bespoke aside and the
+byte-identical Business/Onboarding headers are older and further out. The rail was
+merely the newest, which is not the same thing.
+
+**Forms were not a drift area** — one visible raw `<input>` in the whole
+repository.
+
+The actual root cause was structural: **five layouts each wrote
+`flex min-h-dvh flex-col bg-canvas` by hand.** That string WAS the shell — an
+unnamed one nobody could change centrally — and the approved ground (frame,
+atmosphere, apertures) was welded inside `SidebarShell`, so reaching it required
+adopting the B2B navigation wholesale. A personal account and a workspace read as
+two products for that reason and no other.
+
+### The split, which is the whole architecture
+
+`AppShell` now owns the GROUND — frame, atmosphere, content measure, header
+placement, mobile slot — and knows nothing about navigation. `WorkspaceShell`
+(capabilities, commerce stance, branch scope, sales realtime) and `/home`'s layout
+are two FILLS of it. `NavLink` moved out of `workspace-nav.tsx` into
+`nav-item.tsx` so it stopped being structurally B2B property; `PersonalSidebar`
+and `Sidebar` are now two information architectures in one visual language rather
+than two navigations.
+
+The B2B workspace migrated FIRST, deliberately: it is the reference, so any
+regression there is a regression in the reference itself.
+
+The horizontal personal rail is deleted. Its reasoning — four destinations do not
+earn a 280px column — was sound and was about IA; answering it with a different
+visual language was the mistake. Route count does not authorize a new shell.
+
+`PageHeader`'s hand-styled primary action became the canonical `Button` **in the
+foundation component**, not at the call sites: the duplicate lived inside the
+foundation, so every workspace module inherited a second primary treatment and the
+divergence was invisible page by page.
+
+### The browser found a total outage that nothing else could
+
+`SidebarShell` briefly took `nav: (state) => ReactNode`. It reads better than a
+context and it is impossible: the shell is a Client Component, the layouts mounting
+it are Server Components, and React cannot serialize a function across that
+boundary. **Both `/home` and `/b2b` returned 500.**
+
+`tsc` accepted it. `next build` compiled it. All 33 shell tests passed — a
+client-side test render has no boundary to cross. The prior report's claim that
+"B2B behaviour is unchanged, all tests pass unmodified" was true in tests and false
+in the product.
+
+Replaced with `SidebarDisplayContext` + `useSidebarDisplay()`, so layouts pass
+plain elements (`<PersonalNavPanel/>`, `<WorkspaceNavPanel/>`) and the thin client
+wrappers read display state once mounted.
+
+### Two more the browser found on `/home`
+
+**No carve.** `carved: true` tells `NavLink` to suppress its own 2px marker
+BECAUSE a carve is drawing the active surface — and `PersonalSidebar` rendered
+none. Measured: active row `background: transparent`, `box-shadow: none`. The only
+cue was a marginally brighter glyph. Fixed with the callback-ref container and
+`ActiveCarve` as a sibling of `<nav>`, exactly as `Sidebar` arranges them.
+
+**Two `/b2b` links inside a personal sidebar.** The shell's fixed footer hardcoded
+Settings and "Upgrade your plan", both pointing at `/b2b/settings` — a route an
+org-less installer is redirected out of, plus a billing concept that does not apply
+to a person. `footer` is now a slot; `/home` passes `"none"`.
+
+### The rail geometry, and why it was never a carve bug
+
+Review then reported an oversized/offset carve blob on the collapsed personal rail
+and separator spacing that did not match. Both had **one cause**, and it was not in
+the carve.
+
+`PersonalSidebar`'s `<nav>` was missing `width: var(--shell-nav-w)`. The scrolling
+panel spans the sidebar INCLUDING its 14px gutter — deliberately, because
+`overflow-y: auto` clips both axes and a scroller sized to the navy alone would
+sever the carve at the edge it exists to cross. Every nav inside it must therefore
+clamp itself. The workspace one does; this one inherited the gutter.
+
+Fourteen pixels, all of it visible at rail width: the row became 54×40 instead of
+40×40, `navRowClass`'s `justify-center` centred the 36px tile in a 54px track
+instead of a 40px one, and the glyph landed at x=17 instead of x=10. The carve is
+pinned to `NAV_COLUMN_START` — a DERIVED number, correct for a 56px rail — so it
+drew its tile **seven pixels behind the icon it was under**. Rows also carried
+their hover surface and focus ring past the navy onto the frame. Expanded, rows
+were 230px wide against a 220px carve.
+
+One declaration fixes row height, hit area, vertical rhythm, icon centre line,
+focus geometry and carve alignment together, because all six were derived from the
+same width. **Nothing in `nav-carve.tsx` changed.**
+
+Separator: `mx-3 my-1.5 border-t` on a bare `<div>` was a second answer to a
+question the collapsed rail had already answered — different inset, different
+rhythm, a rule stopping short of the column at both ends. Both lists now use
+`NAV_GROUP_SEPARATOR_CLASS`, defined once in `nav-geometry` beside the padding it
+derives from. The workspace's own inline literal is gone; this is a shared
+constant, not persona-specific CSS.
+
+### The UAT, measured rather than eyeballed
+
+Signed into a real B2B workspace (`a-owner@example.test`) to measure the canonical
+rail rather than infer it, then back into the installer persona, same collapsed
+cookie, same viewport:
+
+| | B2B | Personal |
+|---|---|---|
+| nav / scroller | 56 / 70 | 56 / 70 |
+| row | 40×40 | 40×40 |
+| icon x | 1384 | 1384 |
+| carve | 36×36 @ 1384, y 74 | 36×36 @ 1384, y 74 |
+| pitch — plain / across rule | 42 / 61 | 42 / 61 |
+| separator | mt 8 · border 1 · pt 8 · ml 0 | identical |
+
+Every number, not "close". Expanded preserved: band 220×40 at x=10, radius 10px,
+0 fillets — matching B2B, and now correctly sized against a 216px row.
+
+**AR RTL light:** nav 1374–1430, carve mirrored to 10px from the trailing edge.
+**EN LTR dark:** nav x=0, icon x=10, exact mirror; body `rgb(17,26,36)`; separator
+flips to `rgba(255,255,255,.071)`; carve `srgb(.204 .245 .282)`. **Focus:**
+`:focus-visible` true, 1px shell offset + 2px `#855a15` ring, tile takes
+`bg-surface-2`, row fully inside the plate with symmetric 8px gaps. **Zero raw
+i18n keys** on any surface in either locale. Mobile bar at 375px pinned to the
+bottom with 64px clearance at full scroll.
+
+Pointer `:hover` could not be driven — the pane's screenshot frame is 800×500
+against a 1440×900 emulated viewport, and synthetic moves produced no `:hover`
+match at either scale. Hover paint is unchanged shared code; what this pass changed
+about it — that the surface no longer overruns the navy — is settled by the 40px
+row measurement.
+
+### The one label change
+
+`/home`'s dashboard called the onboarding LEAD TIME "Availability" while Increment
+4's live availability badge sat in the same page's header. Two different facts
+under one word, a few hundred pixels apart, one changeable and one not. Now
+`profile.hub.leadTime` — the same key the hub already carries. The onboarding
+label is left alone; in that flow there is nothing for it to collide with.
+
+The stored-language defect in `professional-home.tsx` is also fixed (it printed
+`onboarding.professional.languages.ar` verbatim to the account's own owner). The
+two onboarding CHOICE-chip sites keep the catalog and are pinned as correct —
+their keys come from the catalog itself and always resolve.
+
+### Governance
+
+`docs/frontend/UI_CONTRACT.md` states the rules and marks which are mechanically
+enforceable. `src/lib/ui/foundation.test.ts` is the enforcement, and the bar for
+an entry is deliberately high: **every check guards a failure that has already
+happened once here.** A rule nobody has broken is a comment; a rule that caught
+something is a test. Twelve currently — theme parity, single `--on-accent`, no
+brand primitive on the accent fill, the hand-written shell held to a shrinking
+legacy list, one frame painter, the foundation's primary action, stored-language
+surfaces, the RSC boundary (both directions), nav width, and the shared separator.
+
+The eslint additions are the smallest useful static guard, not a lint programme.
+
+### Validation
+
+`vitest` **658 passed / 62 files** · `tsc --noEmit` clean · `eslint src` 0 errors
+(1 pre-existing warning, `sidebar-shell.tsx:160`) · `next build` clean. No database
+work, no migrations, no `design.pen`.
+
+### A correction to the previous entry
+
+The Increment 4 entry records `40_professional_availability` as **38/38**. The
+actual plan is **35/35**. The suite passed; the number was wrong.
+
+### Three things worth knowing next time
+
+- **A Client Component prop that typechecks can still be unserializable.** The RSC
+  boundary is invisible to `tsc`, to `next build`, and to every client-side test
+  render. If a Server Component hands a Client Component anything but data, only a
+  browser will tell you.
+- **A derived constant is only correct for the geometry it was derived from.**
+  `NAV_COLUMN_START` is right for a 56px rail; the bug was 14px away, three levels
+  up, in a width the component never mentions.
+- **`carved` is a contract, not a flag.** Setting it tells the row to stop drawing
+  its own active state. If nothing else draws one, the active row silently has none
+  — and the tests still pass, because the rows are right.
+
+### Unfinished work, explicitly
+
+- **`RUNTIME_STATE.md` is still not refreshed** (checklist item 1), now five
+  increments behind. Untouched here by instruction.
+- **Admin, Business and Onboarding are deferred by design** and named in the
+  contract under MIGRATE WHEN TOUCHED, with `no-org-notice.tsx`. The
+  hand-written-shell test pins that list so it can only shrink.
+- **`/home/points` still renders `HomeHeader`'s identity band** — a monogram tile
+  of the first letter of the page title, and "Points" printed twice. Pre-existing
+  from Increment 3; a composition choice, not foundation.
+- The §11 Global Consistency Milestone (Admin shell, Business/Onboarding headers,
+  card-vocabulary collapse, deleting `Band`) is unstarted.
+- `.claude/launch.json` is now launchable rather than attach-only, which is what
+  made any of this verification possible. It is gitignored, so it is in no commit
+  and the next session will have to write it again.
+
+---
+
+## Session — A claim about yourself, and a date you are not allowed to write
+
+**Date:** 2026-08-31 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `206f4d3` (Increment 3)
+
+Increment 4: availability (D6/O3, §8). Two columns on `public.profiles`, one
+trigger, one narrow grant, and the surfaces that read them. The interesting part
+is not the boolean — it is the timestamp beside it, and who is allowed to write
+it.
+
+### The departure from §8.1, and why it is the same rule rather than a new one
+
+§8.1 says both columns join the existing narrow `grant update` on `profiles`.
+**Only `available_for_work` did.** `availability_updated_at` is stamped by
+`app.stamp_availability()` and is in no client grant.
+
+O3 forbids expiring the flag because that would be the platform asserting
+something the person never said, and it KEEPS the timestamp so a reader can weigh
+staleness themselves. A client-writable timestamp defeats exactly that: a
+professional could re-stamp `now()` indefinitely without ever revisiting whether
+the claim is still true, and the single signal a poster has for judging it becomes
+the thing most worth faking. That is the same failure O3 guards against, read from
+the other side — the platform would not be manufacturing state, but it would be
+publishing a freshness claim nobody made.
+
+So the value is derived from `now()` and any supplied value is discarded,
+**including from the table owner**. `40_` asserts that with the strongest writer
+there is. §8.1, the O3 invariant row and §8.3 were reconciled to say so; the model
+now reads the same in all three places instead of only one.
+
+### The guard is on claiming it, not on every change
+
+First draft refused any availability change from a non-professional. That traps a
+stale `true`: an identity that stops being a professional while marked available
+could never turn it off, and the platform would go on publishing a claim the
+person is no longer permitted to retract. **Withdrawing availability is always
+allowed** — there is no state in which "I am not taking work" is worth refusing.
+Claiming it still requires a professional identity, canonical or declared, through
+`app.is_professional_persona`.
+
+The check lives in the trigger rather than in the Server Action, for the reason
+Increment 1 put the Sales guard on `app.membership_grant_sales`: a rule at the
+chokepoint is structural, while a rule repeated at every entry point is a list
+somebody must remember to keep adding to. `profiles_update_self` already restricts
+the ROW to its owner; this restricts CLAIMING the column. A `WHEN` clause keeps it
+inert for every other write, so `individual_save_professional` and every existing
+writer are untouched.
+
+### Two facts had been sharing one word
+
+`individual_onboarding.prof_availability` already existed: a one-off LEAD TIME
+(`within_week`/`within_month`/`flexible`) chosen during onboarding, and the
+profile hub rendered it in a row labelled **"Availability"**. Adding a live
+availability control to the same page would have put two different facts under one
+word — and the failure is silent, because both render perfectly. The hub row is
+now "How soon you can start"; the onboarding label was left alone, because in that
+flow, in context, it is not ambiguous. `profile-hub.test.tsx` pins the pair.
+
+The lead-time column also stayed OUT of the public projection. Publishing a
+one-off onboarding answer as though it were a current claim is the same confusion
+in the other direction; `38_` asserts its absence under both possible names.
+
+### It gates nothing, and that is asserted rather than promised
+
+Nothing reads `available_for_work` to decide what anybody may do — no route, RPC,
+policy or capability. `40_` proves it structurally: no function in `app` or
+`public` mentions the column except the trigger and the projection reader. The
+listing predicate did not move either, so an **unavailable professional stays
+listed and stays findable**. Hiding them would be the platform deciding that "not
+right now" means "not at all".
+
+The same reasoning drives the one styling decision worth recording: unavailable is
+`neutral`, never `danger`. Nothing is wrong with a professional who is not taking
+work, and painting it red would push everyone toward leaving the flag on — which
+is how an availability signal stops meaning anything. "Never set" is a THIRD
+state, not a synonym for unavailable.
+
+### The control is a button, because it can be refused
+
+A switch reads as instantly applied; this is a server round trip the database can
+refuse, and a control that visibly moves and then snaps back explains nothing. The
+button names the destination state and the current state is stated beside it. It
+posts a VALUE rather than a flip, so a double-click converges instead of landing
+the person on the opposite of what they clicked. No optimistic update: the
+timestamp comes from the database, and inventing one client-side would be the same
+lie the write path is shaped to prevent.
+
+Placement: the control and the age on `/home/profile`; the state alone on `/home`,
+beside the verification badge; state AND age on `/p/[profileId]`, because a
+visitor deciding whether to make contact needs both. The public page still ships
+143 B of client JS — the status components are server-rendered.
+
+### Staging
+
+`supabase/staging/demo-enrichment.sql` marks **only** Sayed Abdel-Rahman
+(`sayed-marble-fixer`) available, so the reviewed installer persona exercises the
+state. The other listed professionals stay at "never set" on purpose: the contrast
+is the demo. The enrichment writes through the real trigger, guard included — it
+is not a privileged bypass, and a future enrichment marking a non-professional
+available will fail loudly at load. It cannot backdate the stamp either, which is
+itself the property on display.
+
+### Validation
+
+Database, on a clean `supabase db reset`:
+
+- `40_professional_availability` — **38/38** (new)
+- `08_public_discovery` · `17_public_directory_hardening` ·
+  `38_public_profile_professional_fields` — projection allow-lists updated in
+  **three** places, because three tests guard the same view
+- `01` · `09` · `10` · `11` · `14` · `21` · `25` · `28` · `39` — unchanged
+- **13 files, 435 assertions, PASS**
+
+Staging: `scripts/rehearse_staging_seed.py` — first apply loaded, 26 accounts
+verified, second apply refused with zero rows written. `verify-staging-seed.sql`
+predates availability, so the new state was checked separately in a rolled-back
+transaction: Sayed available with a stamped age, seven others still never-set, and
+the statement idempotent on re-run.
+
+Frontend: `vitest` **637 passed / 61 files**; `tsc --noEmit` clean; `eslint` clean
+on every changed path (the one warning in the tree is pre-existing, in
+`sidebar-shell.tsx`); `next build` clean. `database.types.ts` regenerated: **+8
+lines**, no unrelated churn. Docs: 947 internal links, 0 broken.
+
+### Three things worth knowing next time
+
+- **`data-*` props typecheck on any React component and are silently dropped**
+  unless the component forwards them. A `data-testid` on `Card` compiled fine and
+  never reached the DOM. Removed rather than left looking functional.
+- **The projection has three allow-list guards** (`08_`, `17_`, `38_`). Defence in
+  depth, but a projection change costs three edits and the first two passes will
+  look like unrelated failures.
+- **A test can pass for the wrong reason after a fixture reorder.** Adding the
+  withdrawal section left the flag at `false`, so a later "set false" was no longer
+  a change, the `WHEN` clause correctly skipped the trigger, and the bogus
+  timestamp survived. The product was right; the test's assumed state was stale.
+
+### Unfinished work, explicitly
+
+- **Still no browser verification.** Nothing serves on `:3000` and
+  `.claude/launch.json` remains attach-only. The hub's control row and the public
+  page's badge-plus-age pair at 390px are what a human should look at.
+- **`RUNTIME_STATE.md` is still not refreshed** (checklist item 1), now four
+  increments behind. It needs its own pass.
+- **`features/home/professional-home.tsx` still has the language-label defect.**
+  Pre-existing; this increment touched only its header `meta` slot.
+- Availability has no discovery FILTER yet. §8.4 says the projection enables one
+  and that it is specified when built — the columns are there, the filter is not.
+
+---
+
+## Session — A ledger with a balance in it and no door to reach it
+
+**Date:** 2026-08-31 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `ff859c0` (Increment 2)
+
+Increment 3 of the Installer Pilot, and the smallest one so far: no schema, no
+migration, no earning rule, no wallet, no tier, no redeem control. Points Core
+shipped in `b25e249` and worked. The defect was that nobody it was built for could
+get to it.
+
+### The whole increment is one missing route
+
+`/b2b/points` was the only Points destination, and `/b2b/layout.tsx` redirects an
+organization-less caller to `/home` before any navigation is drawn. So an
+`installer_technician` who earned the one approved award —
+`referral.organization_approved`, +100, credited to a **person** — held a real
+balance in a real ledger with no way to see it. The page was correct; it was
+simply behind a door that persona cannot open.
+
+`/home/points` is that route. It reuses the shipped queries, view model, history
+paging, negative-balance behaviour, localization and non-monetary contract as
+they are.
+
+### Read authority did not change, and structurally cannot
+
+`points_ledger` carries one owner policy (`user_id = auth.uid()`).
+`points_balance()` is called with **no argument**, so it defaults to the caller.
+The query layer accepts no user id at all. The personal route therefore gains no
+read the workspace route did not already have, and neither route can be pointed at
+someone else's ledger — not because a check refuses it, but because there is no
+parameter through which to ask.
+
+### One loader, two surfaces — the refactor was the point
+
+`features/points/points-page.ts` now owns what the two surfaces must never
+disagree about: which reads happen, the all-or-nothing failure contract, the view
+mapping, and the "more" rule. Both routes call it. `/b2b/points` was refactored
+onto it rather than left alone and copied from — a second copy of the failure
+contract is exactly the thing that drifts, and the drift would be two pages
+quoting different totals for the same ledger.
+
+What stays per-route is **chrome only**. `/b2b/points` keeps `PageHeader` /
+`Panel`; `/home/points` uses `HomeHeader` / `HomeSection` / `Card` so it sits with
+`/home/profile` instead of importing the cockpit's density onto a surface that has
+no sidebar to justify it. The one parameter that legitimately differs is
+`basePath`: the pagination link must return to the surface it was rendered from.
+Asserted in both directions.
+
+`/b2b/points` behaviour is unchanged — same queries, same single try around both
+reads, same cap arithmetic, same chrome.
+
+### Points is not gated on having any
+
+The rail entry appears for every professional personal account, on the same
+eligibility as the profile hub. It is deliberately **not** conditioned on holding
+a balance: a destination that appears only once you already have something is one
+nobody finds the first time, and the first thing this page has to explain is *how*
+the 100 points are earned. The guarantee is structural rather than remembered —
+`PersonalNavInput` carries no balance, so no amount of one can change the answer.
+
+### A comment that had gone stale
+
+`lib/nav/modules.ts` still described Points as *"a UI shell in this sprint"* that
+*"says plainly that there is nothing to show yet"*. Untrue since `b25e249`. It now
+records what the module actually is: `points: null` because Points is the caller's
+**own** standing and no capability could gate it, and — the part worth writing
+down — that the workspace entry is the *secondary* copy. The primary home for a
+user-owned ledger is the personal one, because that is the only surface an
+organization-less professional can reach.
+
+### Validation
+
+Frontend only, as instructed — no `supabase db reset`, no pgTAP, no Playwright,
+because nothing in this increment touches the database.
+
+- `vitest` **603 passed / 57 files** (from 584 / 55)
+- `tsc --noEmit` clean · `eslint` clean on every changed path
+- `next build` clean, with `/home/points` and `/b2b/points` both building
+
+New and extended coverage, 32 assertions:
+
+- `features/points/points-page.test.ts` (new, 9) — **zero, positive and negative**
+  balances; the balance is never summed from the capped rows; the more-link is
+  per-surface; the cap ceiling; both halves of the failure contract
+- `components/layout/personal-rail.test.tsx` (new, 4) — Points labelled and linked
+  in **EN and AR**, `aria-current` only on the current route, and that the rail
+  derives nothing itself
+- `lib/nav/personal-modules.test.ts` (11 → 15) — an org-less professional gets
+  Points, a consumer does not, and it is not gated on having a balance
+- `features/points/points-ui.test.tsx` (42 → 45) — **Arabic negative and Arabic
+  zero**
+
+That last one is worth naming. The suite already pinned EN zero/positive/negative
+and AR positive. Arabic is the **default** locale, so the Arabic negative
+rendering is the one a Pilot user is most likely to meet, and it was the one case
+nobody had asserted. It passes: the sign survives Arabic-Indic digits, and the
+correction explanation renders.
+
+### Unfinished work, explicitly
+
+- **Still no browser verification.** Nothing serves on `:3000` and
+  `.claude/launch.json` remains attach-only (a `url` with no command), so the
+  preview tooling can attach but cannot start a server. The rail now carries four
+  entries for a salesperson and three for an installer; how that row behaves at
+  390px is the thing most worth a human look.
+- **`RUNTIME_STATE.md` is still not refreshed** (checklist item 1) and now carries
+  three increments of drift. Untouched here by instruction; it needs its own pass.
+- **`features/home/professional-home.tsx` still has the language-label defect.**
+  Pre-existing, authenticated surface, excluded by instruction.
+- Points still has no Rewards, Wallet, tiers or redemption, and exactly one
+  earning rule. That is the approved contract, not an omission.
+
+---
+
+## Session — A profile the Pilot could publish but nobody could edit
+
+**Date:** 2026-08-31 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `52ed8dd` (Increment 1)
+
+Increment 2 of the Installer Pilot: the personal shell, navigation, professional
+profile hub, standalone editor and public profile route. It began as a no-schema
+increment and ended with two migrations, both of which exist because building the
+surfaces exposed rules that were asking the wrong question.
+
+### Correction to the previous entry
+
+The Increment 1 entry (`52ed8dd`) states *"Increment 2 (Storage) blocks portfolio
+and certificates"*. **That is wrong.** Storage is **Increment 10**; Increment 2 is
+this one — personal shell, nav and profile. The dependency claim itself holds —
+portfolio and certificates are blocked on the media/storage foundation — but it is
+Increment 10 that blocks them, not Increment 2. The work log is append-only, so
+that entry stands as written and this paragraph is the correction.
+
+### Navigation is derived from persona, not from capabilities
+
+`lib/nav/personal-modules.ts` is a SIBLING of `modules.ts`, not an extension of
+it. `modules.ts` answers a question a personal account cannot ask — *which modules
+does this membership's capability set unlock* — and a person has no membership.
+Reusing it would have meant inventing pseudo-capabilities for a human being, which
+is the exact conflation the account model exists to prevent. The personal rule is
+narrower and different in kind: a consumer has no professional profile because
+there is none to show, not because it is withheld; a salesperson has the showroom
+route because the database admits them to it; anyone may start a business, because
+owning one is a relationship and never an account type.
+
+The rail is HORIZONTAL, and deliberately. `SidebarShell` is a full-height panel
+because a workspace has twenty-odd capability-gated modules and an entire
+composition built around that panel being the outermost thing on its side. Four
+destinations do not earn that; reproducing its display modes, hover reveal and
+mobile sheet for four links is machinery with nothing to carry.
+
+### The editor needed no new write path, and the public page needed one column
+
+`individual_save_professional` was already re-entrant (`on conflict do update`) —
+built that way so it could back something other than a wizard. The standalone
+editor is the same data on one page with one Save, and every validation stayed in
+the database. `/home/profile/edit` also replaced the wizard as the target of every
+professional completeness item: sending an established professional back through a
+six-step onboarding flow to fix one line is why Pilot UAT read `/home` as a review
+queue.
+
+### Two rules that were asking the wrong question
+
+**The public projection was too thin to be honest.** `/p/[profileId]` could say a
+professional's name, trade label, headline and languages — and nothing about what
+they do. The `/b2b/technicians` directory that links to it showed more than the
+profile it opened. `20260831090002` widened `profile_public_directory` with four
+columns the professional had already written about their own practice in order to
+be found: specialization, core services, years of experience, service areas. The
+listing predicate did not move; the same rows return with more columns, and
+`individual_onboarding` stays private behind unchanged RLS.
+
+**The edit gate was asking how an identity was created, not what it is.**
+`individual_save_professional` required `onboarding_progress.selected_track =
+'professional'`. That was right while the wizard was its only caller. It is wrong
+for an editor: **no seeded Pilot identity has a selected_track at all**, so every
+professional the Pilot runs on — listed in the public directory, rendered a
+professional home, given a public profile page by this very increment — was
+refused their own edit. `20260831090003` made the gate ask about the professional
+IDENTITY, canonical or declared, via `app.is_professional_persona` — the sibling
+of Increment 1's `app.is_sales_persona`, same two sources, same reason. The track
+branch was KEPT: a first-time caller has only a track, because this call is what
+writes the declared type.
+
+The frontend had briefly carried a read-only fallback for exactly that case. It is
+gone. A frontend gate stricter than the write path is not caution, it is a second
+rule to keep in step.
+
+### Three defects the tests caught, not the review
+
+**The LEFT JOIN.** Every listed profile in the Pilot seed has no
+`individual_onboarding` row. An inner join in the widened projection would have
+emptied the technicians directory, the consultants directory and every public
+profile page at once — while every assertion *about the new columns* still passed
+on the rows that survived. Guarded three ways in `38_`.
+
+**Two conventions for one column.** `profiles.languages` holds `arabic`/`english`
+from the onboarding flow and ISO `ar`/`en` in every seeded row. The public page
+used the onboarding catalog and printed `onboarding.professional.languages.ar`
+verbatim — on a page whose audience cannot tell whether the profile or the
+platform is broken. `lib/i18n/language-label.ts` now resolves both conventions.
+
+**A test that passed for the wrong reason.** In an early draft of `38_`, three
+assertions ran under a role whose RLS hid the rows being compared, so an "is null"
+check passed on a missing row rather than on a null column. Moved to the right
+level.
+
+### Validation
+
+Database, on a clean `supabase db reset`:
+
+- `38_public_profile_professional_fields` — **39/39** (new)
+- `39_professional_profile_edit_authority` — **33/33** (new)
+- `08_public_discovery` **14/14** · `17_public_directory_hardening` **29/29** — the
+  projection allow-list guards, updated because the approved column set genuinely
+  changed (the same guards that were updated when `persona` was added in Sprint 14)
+- `01_identity_profiles` 9/9 · `10_account_type_eligibility` 12/12 ·
+  `11_account_upgrade` 26/26 · `11_individual_persona_onboarding` 18/18 ·
+  `21_shared_onboarding` 27/27 · `28_persona_sales_affiliation` 79/79 ·
+  `37_sales_affiliation_persona_hardening` 43/43 — all unchanged
+
+Frontend: `vitest` **584 passed / 55 files**; `tsc --noEmit` clean; `eslint` clean
+on every changed path; `next build` clean, with `/home/profile`,
+`/home/profile/edit` and `/p/[profileId]` all building.
+
+Docs: `scripts/check_doc_links.py` — 947 internal links, 0 broken.
+
+**AR/EN parity is compiler-enforced, not test-enforced**: `ar` is typed
+`Messages = DeepStringShape<typeof en>`, so a missing or misshapen Arabic key is a
+type error. `tsc` passing is the parity proof.
+
+### Unfinished work, explicitly
+
+- **No browser verification was possible in any session of this increment.**
+  Nothing serves on `:3000` and `.claude/launch.json` is attach-only (a `url` with
+  no command), so the preview tooling can attach but cannot start a server. Every
+  visual and RTL claim here rests on the type system, unit tests and the build —
+  **not** on a rendered page. The rail at 390px and the hub's two-column grid are
+  the two things most worth a human look.
+- **`features/home/professional-home.tsx` still has the language-label defect**
+  fixed everywhere else in this increment. Left deliberately: it is pre-existing,
+  on an authenticated surface, and outside the increment's scope.
+- **`RUNTIME_STATE.md` is still not refreshed** (checklist item 1), and now carries
+  two increments of drift on top of what it already had. It needs its own pass.
+- **An organization-less installer still cannot reach their own Points.** That is
+  Increment 3, unstarted.
+- The public profile shows no availability, and no portfolio or certificates.
+  Those are Increments 4, 10 and 11 — deferred by instruction, not overlooked.
+
+---
+
+## Session — An installer who knew a showroom could become its salesperson
+
+**Date:** 2026-08-31 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `9d5b2e0` (Installer Pilot specification)
+
+Increment 1 of the fourteen-increment Installer Pilot sequence, and deliberately
+the one that ships no feature. The specification committed in `9d5b2e0` closed a
+product decision (D3-residual) that only existed because the audit found a live
+authority defect: the Sales-affiliation flow checked that the target was a
+showroom and that the caller was verified, but never checked **who the caller
+was**. An `installer_technician` could create a showroom join request, and its
+approval granted the eleven `sales.*` capabilities. The referral path reached the
+same place and awarded 100 Points on the way.
+
+### The guard is on the grant, not on the doors
+
+The specification anticipated gating each entry point. Building it exposed a
+better shape: every route to `sales.*` — `org_join_request_approve`,
+`showroom_referral_approve`, and anything added later — passes through
+`app.membership_grant_sales`. Guarding the capability grant itself, before it
+takes a lock or writes a row, makes the property structural instead of a list of
+doors somebody must remember to keep adding to. The door-level checks stayed
+anyway, so a non-Sales caller is refused at the moment they ask rather than at
+the moment someone approves them; but the chokepoint is what makes the claim
+true, and §7.2 of the specification was reconciled to say so.
+
+`public.showroom_referral_approve` was deliberately **not** recreated. It carries
+the frozen `referral.organization_approved` = +100 Points wiring, and
+reproducing ~150 lines of it to insert one guard would risk an approved contract
+for no additional protection: its refusal already arrives from the chokepoint
+inside the same transaction, leaving no organization, membership, join request,
+audit row or Points entry behind. A test asserts exactly that.
+
+### Sales identity is canonical OR declared, in the database and in the UI
+
+`users.primary_account_type` is written only by the applied upgrade, so a genuine
+salesperson has null there for the whole review window while their account is
+active and usable — activation is not verification. `app.is_sales_persona`
+therefore accepts the canonical persona **or** the declared
+`individual_onboarding.prof_concrete_type`, which is the resolution
+`loadPersonalHome` already used. Reading the canonical column alone would have
+been a regression wearing a security fix's clothes.
+
+### Two existing test suites had encoded the vulnerability
+
+`28_persona_sales_affiliation_test` and `36_referral_points_test` both failed
+against the new guard, and both were right to. Each used fixture `70000009` — the
+installer — as a stand-in labelled *"a second salesperson"*, and 36 literally
+granted the installer a sales membership to produce a referral. The tests were
+asserting that the hole worked. Fixed by **actor substitution only** (28 →
+`70000005`, given a declared-sales row; 36 → `70000007`): every assertion,
+ordering and plan count is unchanged, and `70000009` was kept in the two places
+where being an unrelated third party is the point.
+
+### The frontend was refused nothing, because it never asked
+
+Increment 1 was database-only by contract, with a STOP condition for any
+Installer-reachable surface that invokes the affiliation RPC. `/home/showroom`
+and `/home/showroom/refer` were guarded on registration state and the existence
+of a personal workspace and nothing else — the page's own comment read *"reachable
+by any personal account, and reaching it grants nothing"*, which had been true
+before the capability grant made it false. Reported rather than fixed, and then
+fixed under separate approval: both routes now render a localized
+*not-for-your-account* state (EN + AR) instead of a form the database was always
+going to refuse with a bare `42501`.
+
+Then the navigation link disagreed with the pages it led to. `my_workspaces()`
+emits the Personal row on `app.has_personal_persona()` — three signals, including
+a reached onboarding terminal — but fills the `persona` column from
+`users.primary_account_type` alone. A salesperson mid-review therefore holds a
+personal workspace whose persona is **null**: admitted by the page and by the
+database, and silently never offered the link. The row-existence rule and the
+row-content rule disagreed, and any UI reading the column inherited a stricter
+test than the one that produced the row. The layout now uses the same shared
+resolution as the pages, still gated on having a personal workspace at all,
+because offering a link to a redirect is not navigation.
+
+### Validation
+
+Database (2026-08-31, clean local `supabase db reset` before each run, per the
+project's pgTAP requirement):
+
+- `37_sales_affiliation_persona_hardening_test` — **43/43** (new)
+- `28_persona_sales_affiliation_test` — **79/79** (plan unchanged)
+- `36_referral_points_test` — **52/52** (plan unchanged)
+
+Frontend (2026-08-31): `vitest` **536 passed / 50 files**; `tsc --noEmit` clean;
+`eslint` clean on every changed path; `next build` succeeds with `/home`,
+`/home/showroom` and `/home/showroom/refer` all dynamic.
+
+The database suites were run when the migration was written and were **not**
+re-run at commit time; every file under `supabase/` is byte-identical to the
+state that produced those results. No Playwright, E2E or backend suite was run —
+none is affected, and the increment's contract excluded them.
+
+### What this increment did NOT do
+
+No table, column, type, policy, index, view, trigger or grant changed —
+`create or replace` with identical signatures throughout, forward-only. No
+Installer domain exists yet: `jobs`, `job_applications`, `job_assignments`,
+`job_progress_updates`, `trades` and `job_reviews` are specified and unbuilt.
+Notifications, Transactional Chat, Points Core and supply-side behaviour are
+untouched, as is `UI-UX/design.pen`.
+
+### Unfinished work, explicitly
+
+- **Increments 2–14 are not started.** Increment 2 (Storage) blocks portfolio and
+  certificates; it is a hard prerequisite, not a nicety — the repository has no
+  `media` table, no bucket, and zero `.storage.from()` calls, while
+  `avatar_media_id` / `logo_media_id` are bare uuid columns with no foreign key.
+- **`RUNTIME_STATE.md` was not refreshed in this session** (checklist item 1). It
+  carries pre-existing drift from before this branch — its Current Branch row
+  still reads `chore/staging-demo-accounts` and its Sprint rows still read Sprint
+  14 — and correcting that is a snapshot rewrite well outside an approved
+  single-increment commit. It needs its own pass.
+- **An organization-less installer cannot reach their own Points.** `/b2b/points`
+  is the only Points surface and `/b2b/layout.tsx` redirects org-less callers to
+  `/home`. Found during the audit, unresolved, and it will bite as soon as an
+  installer earns anything.
+- The frontend Sales predicate mirrors `app.is_sales_persona` in two places by
+  hand. The unit tests deliberately assert the same cases as the pgTAP suite so
+  the pair cannot drift silently, but nothing enforces it mechanically.
+
+---
+
 ## Session — Points on screen: a balance that may be negative, and a history that never rewrites itself
 
 **Date:** 2026-08-30 · **Branch:** `feature/points-core` · **Base:** `main` @ `2f81682` · **Prior:** `5ec9356` (referral wiring)

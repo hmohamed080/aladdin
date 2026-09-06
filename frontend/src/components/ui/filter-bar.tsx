@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { Input, Select, Button } from "@/components/ui/controls";
 import { SearchIcon } from "@/components/ui/icons";
+import { cn } from "@/lib/ui/cn";
 
 /**
  * One canonical list toolbar: free-text search plus zero or more dropdown filters,
@@ -29,6 +30,7 @@ export function FilterBar({
   search,
   selects = [],
   clearLabel,
+  variant = "card",
 }: {
   basePath: string;
   search?: { name: string; value: string; placeholder: string };
@@ -36,6 +38,14 @@ export function FilterBar({
   /** Shown only while at least one filter is set — a permanently visible
    *  "clear" on an unfiltered toolbar is a control that does nothing. */
   clearLabel?: string;
+  /**
+   * `card` (default) is the free-standing toolbar every existing caller
+   * still gets: its own bordered, shadowed surface and bottom margin.
+   * `flush` drops all of that so the bar can be composed INSIDE a surface a
+   * caller already owns (a divider under a hero, say) without nesting one
+   * Card's border and shadow inside another's.
+   */
+  variant?: "card" | "flush";
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -56,7 +66,10 @@ export function FilterBar({
     <form
       role="search"
       data-no-dirty
-      className="mb-lg flex flex-wrap items-end gap-sm rounded-md border bg-surface p-sm shadow-card"
+      className={cn(
+        "flex flex-wrap items-end gap-sm",
+        variant === "card" && "mb-lg rounded-md border bg-surface p-sm shadow-card",
+      )}
       onSubmit={(e) => {
         e.preventDefault();
         if (search) push({ [search.name]: q });

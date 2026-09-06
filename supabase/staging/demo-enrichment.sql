@@ -278,6 +278,39 @@ where p.user_id = v.user_id;
 
 
 -- ---------------------------------------------------------------------------
+-- 3b. Availability — ONE professional says he is taking work
+-- ---------------------------------------------------------------------------
+-- Sayed Abdel-Rahman (`sayed-marble-fixer`) is the reviewed installer persona:
+-- publicly listed, verified, personal profile complete. He is the account a
+-- demo opens to show the supply side, so he is the one who should visibly
+-- exercise availability (§8) — otherwise the state ships with nobody in it and
+-- every public profile reads "Not set yet".
+--
+-- HE IS THE ONLY ONE, DELIBERATELY. The other four listed professionals are left
+-- untouched at their `false` default with a NULL timestamp, because the three
+-- states are the thing worth demonstrating and two of them are not "available":
+--
+--   Sayed      → available, with an age beside it
+--   the others → NEVER SET, which the UI states as such rather than as a claim
+--                they made — the distinction O3 exists to protect
+--
+-- THE TIMESTAMP IS NOT SET HERE AND CANNOT BE. `app.stamp_availability()`
+-- overwrites `availability_updated_at` with `now()` on every change and discards
+-- whatever the writer supplied — including from the table owner running this
+-- file. So the demo cannot fake an aged claim, which is itself the property being
+-- demonstrated: the age a visitor reads is real, and grows on its own from the
+-- moment staging is seeded.
+--
+-- The write goes through the same trigger a real professional's click does,
+-- including the professional-identity guard. Sayed is a canonical
+-- `installer_technician`, so it passes for the same reason his own click would.
+update public.profiles
+   set available_for_work = true
+ where user_id = '71000006-0000-4000-8000-000000000006'
+   and available_for_work is distinct from true;
+
+
+-- ---------------------------------------------------------------------------
 -- 4. Nile Finishing Supplies (Org A) — a supplier with something to sell
 -- ---------------------------------------------------------------------------
 -- Org A is the FIRST organization in the product's history and the one the pgTAP

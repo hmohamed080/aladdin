@@ -23,6 +23,7 @@ import {
   BookmarkIcon,
   TruckIcon,
   WrenchIcon,
+  BriefcaseIcon,
   LandmarkIcon,
   BarChartIcon,
   SettingsIcon,
@@ -77,6 +78,7 @@ const NAV_ICONS: Record<NavKey, ComponentType<{ size?: number }>> = {
   suppliers: TruckIcon,
   buyers: StorefrontIcon,
   technicians: WrenchIcon,
+  jobs: BriefcaseIcon,
   institutions: LandmarkIcon,
   customers: UsersIcon,
   leads: TargetIcon,
@@ -106,6 +108,7 @@ const NAV_HREFS: Record<NavKey, string> = {
   suppliers: "/b2b/suppliers",
   buyers: "/b2b/buyers",
   technicians: "/b2b/technicians",
+  jobs: "/b2b/jobs",
   institutions: "/b2b/institutions",
   customers: "/b2b/customers",
   leads: "/b2b/leads",
@@ -448,7 +451,7 @@ export function GlobalSearch({
         className={cn(
           "group flex items-center gap-2 border border-field-line bg-field text-field-placeholder",
           "transition-[background-color,border-color,box-shadow,color] duration-fast ease-standard motion-reduce:transition-none",
-          "hover:border-border hover:bg-surface-hover hover:text-field-fg",
+          "hover:border hover:bg-surface-hover hover:text-field-fg",
           "focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-field-focus",
           // Below `tablet` both sizes are the same icon-only button, because
           // there is one row and eight controls in it either way.

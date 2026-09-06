@@ -10,7 +10,7 @@ export function ActivityTimeline({ activities }: { activities: ActivityRow[] }) 
   return (
     <ol className="flex flex-col gap-md">
       {activities.map((a) => (
-        <li key={a.id} className="flex gap-md border-s-2 border-border ps-md">
+        <li key={a.id} className="flex gap-md border-s-2 ps-md">
           <div className="flex-1">
             <div className="flex items-center justify-between gap-md">
               <span className="text-label text-accent">{t(`activities.${a.activity_type}`)}</span>

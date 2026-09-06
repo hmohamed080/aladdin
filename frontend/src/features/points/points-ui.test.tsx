@@ -55,6 +55,36 @@ describe("the balance", () => {
     const { container } = renderWithI18n(<PointsBalance balance={100} locale="ar" t={ar} />, "ar");
     expect(container.textContent ?? "").toMatch(/[٠-٩]/);
   });
+
+  /* Arabic is the DEFAULT locale, so these are the renderings most Pilot users
+     actually get — and until the personal Points route made this component the
+     one an org-less installer reads, only the positive Arabic case was pinned. */
+  it("shows a NEGATIVE total in Arabic, signed, explained and unclamped", () => {
+    const { container } = renderWithI18n(<PointsBalance balance={-40} locale="ar" t={ar} />, "ar");
+    const text = container.textContent ?? "";
+    expect(text).toMatch(/[٠-٩]/);
+    // The sign survives Arabic-Indic digits: a minus that formatted away would
+    // turn a corrected balance into a credit on the reader's screen.
+    expect(text).toMatch(/[-−؜]/);
+    // The same explanation the English case gets, not a silent difference.
+    expect(text).toContain(ar("points.balance.negativeHint"));
+    expect(screen.queryByText("—")).toBeNull();
+  });
+
+  it("shows ZERO in Arabic with no negative explanation", () => {
+    const { container } = renderWithI18n(<PointsBalance balance={0} locale="ar" t={ar} />, "ar");
+    const text = container.textContent ?? "";
+    expect(text).toMatch(/[٠-٩]/);
+    expect(text).not.toContain(ar("points.balance.negativeHint"));
+  });
+
+  it("never calls Points money in Arabic either", () => {
+    const { container } = renderWithI18n(<PointsBalance balance={1250} locale="ar" t={ar} />, "ar");
+    const text = container.textContent ?? "";
+    // محفظة (wallet) · رصيد (balance-as-money) · جنيه (pound) · استبدال (redeem)
+    expect(text).not.toMatch(/محفظة|جنيه|استبدال|سحب/);
+    expect(text).not.toMatch(/EGP|\$|£|€/);
+  });
 });
 
 describe("the history", () => {

@@ -126,6 +126,16 @@ describe("every approved event type has real bilingual copy", () => {
       "verification.rejected": {},
       "verification.changes_requested": {},
       "message.sent": { counterparty_name: "A" },
+      // Increment 8: job_application_accept / _reject, both to the applicant.
+      "job.application.accepted": { org_name: "C", job_title: "T" },
+      "job.application.rejected": { org_name: "C", job_title: "T" },
+      // Increment 9: the assignment lifecycle. `cancelled` carries the SAME two
+      // params on both of its recipient paths, deliberately.
+      "job.assignment.ready": { job_title: "T" },
+      "job.assignment.completed": { org_name: "C", job_title: "T" },
+      "job.assignment.cancelled": { job_title: "T", reason: "R" },
+      // Increment 12: one review, one recipient — the professional it is about.
+      "job.review.received": { org_name: "C", job_title: "T" },
     };
 
     const unfilled: string[] = [];

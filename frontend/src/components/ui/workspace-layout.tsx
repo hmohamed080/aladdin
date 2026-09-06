@@ -4,6 +4,7 @@ import { cn } from "@/lib/ui/cn";
 import type { Locale } from "@/lib/i18n/locales";
 import { formatCount, formatNumber, formatPercent } from "@/lib/ui/format";
 import { PlusIcon } from "@/components/ui/icons";
+import { ButtonLink } from "@/components/ui/controls";
 
 /**
  * THE DENSE WORKSPACE LAYER — the shared composition primitives every
@@ -393,20 +394,31 @@ export function KpiStrip({
  * beside it that holds context about that list.
  *
  * The aside is not a sidebar and must not hold navigation or controls the main
- * column depends on — below `desktop` it stacks UNDER the main column, and
- * anything essential would disappear below the fold on a tablet. What belongs
- * there is what the reference puts there: a breakdown of what the list contains,
- * a short ranking, a recent-activity list. Read-only context.
+ * column depends on — below `desktop` it stacks UNDER the main column by
+ * default, and anything essential would disappear below the fold on a
+ * tablet. What belongs there is what the reference puts there: a breakdown
+ * of what the list contains, a short ranking, a recent-activity list.
+ * Read-only context.
  */
 export function WorkPane({
   children,
   aside,
   /** `wide` gives the aside more room — right for a breakdown with figures. */
   asideWidth = "narrow",
+  /**
+   * Stacking order below `desktop`. `content-first` (default) is every
+   * existing caller: the working list leads, the rail follows. `aside-first`
+   * puts the rail ABOVE the list instead — for a rail that is a SUMMARY of
+   * what follows (Reviews' average/total/distribution) rather than a
+   * breakdown alongside it, reading it after the list it summarizes would be
+   * backwards on a phone.
+   */
+  mobileOrder = "content-first",
 }: {
   children: ReactNode;
   aside?: ReactNode;
   asideWidth?: "narrow" | "wide";
+  mobileOrder?: "content-first" | "aside-first";
 }) {
   if (!aside) return <div className="flex min-w-0 flex-col gap-md">{children}</div>;
   return (
@@ -416,8 +428,22 @@ export function WorkPane({
         asideWidth === "wide" ? "desktop:grid-cols-[1fr_22rem]" : "desktop:grid-cols-[1fr_18rem]",
       )}
     >
-      <div className="flex min-w-0 flex-col gap-md">{children}</div>
-      <aside className="flex min-w-0 flex-col gap-md">{aside}</aside>
+      <div
+        className={cn(
+          "flex min-w-0 flex-col gap-md",
+          mobileOrder === "aside-first" && "order-2 desktop:order-none",
+        )}
+      >
+        {children}
+      </div>
+      <aside
+        className={cn(
+          "flex min-w-0 flex-col gap-md",
+          mobileOrder === "aside-first" && "order-1 desktop:order-none",
+        )}
+      >
+        {aside}
+      </aside>
     </div>
   );
 }
@@ -845,13 +871,23 @@ export function PageHeader({
       toolbar={toolbar}
       actions={
         action ? (
-          <Link
-            href={action.href}
-            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-sm bg-accent-solid px-md py-1.5 text-label font-medium text-brand-basalt shadow-sm transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-          >
+          /* THE CANONICAL LINK, NOT A HAND-STYLED BUTTON.
+             This used to carry its own fill, padding, radius, shadow, focus ring
+             and hover — a second primary-button treatment living inside the
+             FOUNDATION, which is the worst possible place for one: every module
+             inherits it, so the divergence was invisible page by page and total
+             across the app. It now renders the shared `ButtonLink` in its
+             `accent` variant — ONE anchor carrying the button geometry, not a
+             `<button>` nested inside an `<a>` (invalid HTML, and two focusable
+             controls acting as one for a keyboard/screen-reader user) — so the
+             primary action has exactly one definition and real link semantics
+             (middle-click, open in new tab, href in the status bar). No
+             consumer page changed; they all pass the same `{href,label}` they
+             did. */
+          <ButtonLink href={action.href} variant="accent" size="sm" className="shrink-0">
             <PlusIcon size={16} />
             {action.label}
-          </Link>
+          </ButtonLink>
         ) : undefined
       }
     />

@@ -53,6 +53,10 @@ export type NavKey =
   | "suppliers"
   | "buyers"
   | "technicians"
+  // Openings this organization posts for individual professionals. Sits beside
+  // the Technicians DIRECTORY deliberately: that list is who we could hire, this
+  // module is the work we are hiring for. Same subject, two verbs.
+  | "jobs"
   | "institutions"
   // The sales pipeline this business runs for its own customers
   | "customers"
@@ -86,6 +90,18 @@ const COMMERCE = ["rfq.create", "rfq.respond", "quote.submit", "quote.decide", "
 const BROWSE = ["catalog.read", "catalog.write", "catalog.publish", "rfq.create", "order.create"];
 
 /** null => always visible to any member with an active workspace. */
+/**
+ * The two Jobs capabilities, and why the module lists BOTH.
+ *
+ * They are genuinely different seats — `job.post` authors and publishes an
+ * opening, `job.manage` decides who gets it — and the pages honour that
+ * separately (a `job.post` holder sees no accept/reject control). But either one
+ * alone is a reason to reach the module, so the nav gate is the union. Gating on
+ * `job.post` only would hide the applicants queue from the person whose whole
+ * job is working it.
+ */
+const JOBS = ["job.post", "job.manage"];
+
 export const NAV_CAPS: Record<NavKey, string[] | null> = {
   home: null,
 
@@ -99,9 +115,15 @@ export const NAV_CAPS: Record<NavKey, string[] | null> = {
   // information, useful to every role in the workspace, so no capability gate —
   // there is no action behind them that could dead-end.
   suppliers: null,
-  buyers: null,
   technicians: null,
+  buyers: null,
   institutions: null,
+
+  // NOT null. The directories above are read-only public information with no
+  // action behind them, so no capability could gate them. Jobs is a write
+  // surface: every destination inside it needs an authority the caller may not
+  // hold, so an ungated entry would be the dead-end this map exists to prevent.
+  jobs: JOBS,
 
   customers: SALES,
   leads: SALES,
@@ -109,9 +131,14 @@ export const NAV_CAPS: Record<NavKey, string[] | null> = {
   products: ["catalog.write", "catalog.publish"],
 
   // Points is the caller's OWN standing on the platform, not an organization
-  // record, so no capability could gate it and none does. It is a UI shell in
-  // this sprint: the route exists and says plainly that there is nothing to show
-  // yet — see `app/b2b/points/page.tsx`.
+  // record, so no capability could gate it and none does. The page is SHIPPED —
+  // balance, the one earning rule, and history (`app/b2b/points/page.tsx`).
+  //
+  // Because it is user-owned, the same page also belongs on the personal home
+  // (`/home/points`, `lib/nav/personal-modules.ts`): this entry is the copy that
+  // exists for a caller who happens to be in a workspace, not the primary one. An
+  // organization-less professional reaches their Points there, since this layout
+  // redirects them away before any nav is drawn.
   points: null,
 
   projects: ["project.write", "project.read", "order.manage"],
@@ -134,7 +161,7 @@ export const NAV_CAPS: Record<NavKey, string[] | null> = {
 const BUYER_SECTIONS: { section: NavSection; keys: NavKey[] }[] = [
   { section: "overview", keys: ["home"] },
   { section: "buying", keys: ["purchaseRequests", "offers", "orders", "catalog", "saved"] },
-  { section: "network", keys: ["suppliers", "technicians", "institutions"] },
+  { section: "network", keys: ["suppliers", "technicians", "jobs", "institutions"] },
   { section: "selling", keys: ["customers", "leads", "followUps", "products"] },
   { section: "business", keys: ["points", "projects", "team", "reports", "settings"] },
 ];
@@ -142,7 +169,7 @@ const BUYER_SECTIONS: { section: NavSection; keys: NavKey[] }[] = [
 const SELLER_SECTIONS: { section: NavSection; keys: NavKey[] }[] = [
   { section: "overview", keys: ["home"] },
   { section: "supply", keys: ["purchaseRequests", "offers", "orders", "products"] },
-  { section: "network", keys: ["buyers", "suppliers", "technicians", "institutions"] },
+  { section: "network", keys: ["buyers", "suppliers", "technicians", "jobs", "institutions"] },
   { section: "selling", keys: ["customers", "leads", "followUps"] },
   // Still present, deliberately last: a distributor buys raw materials too.
   { section: "buying", keys: ["catalog", "saved"] },

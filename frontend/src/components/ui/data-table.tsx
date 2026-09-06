@@ -30,6 +30,24 @@ export type Column<T> = {
   desktopOnly?: boolean;
   /** Omit from the mobile card — detail that does not survive the squeeze. */
   secondary?: boolean;
+  /**
+   * This column absorbs whatever width the others leave, and TRUNCATES.
+   *
+   * Without it a table is `table-layout: auto`, which sizes every column to its
+   * content and lets the total exceed the container — so `RecordCell`'s
+   * `truncate` can never fire inside a table, and a long title silently pushes
+   * the trailing columns into the horizontal scroller. A reader then has to
+   * scroll sideways to discover that an action column exists at all.
+   *
+   * `w-full max-w-0` is the standard way to say that in an auto table: the cell
+   * asks for all the width, and a zero max-width makes the browser resolve it to
+   * whatever is actually left, at which point overflow rules apply normally.
+   *
+   * Opt-in, so no existing table changes shape. Set it on the ONE column that
+   * should give way — usually the identity column, which is the only one whose
+   * content is unbounded user input.
+   */
+  grow?: boolean;
 };
 
 export function DataTable<T>({
@@ -77,6 +95,7 @@ export function DataTable<T>({
                     "px-md py-2.5 text-label font-medium text-fg-muted",
                     c.numeric ? "text-end" : "text-start",
                     c.desktopOnly && "hidden desktop:table-cell",
+                    c.grow && "w-full max-w-0",
                   )}
                 >
                   {c.header}
@@ -97,6 +116,7 @@ export function DataTable<T>({
                       "px-md py-3 align-middle text-fg-secondary",
                       c.numeric ? "text-end tabular-nums" : "text-start",
                       c.desktopOnly && "hidden desktop:table-cell",
+                      c.grow && "w-full max-w-0",
                     )}
                   >
                     {c.cell(row)}
@@ -153,10 +173,18 @@ export function RecordCell({
   /** Optional leading square (logo initials / avatar placeholder). */
   avatar?: ReactNode;
 }) {
+  /* `dir="auto"` because BOTH lines carry user-entered text, and a truncated
+     string only loses the right end if the box agrees with the string about
+     which end that is. An English job title inside the Arabic workspace
+     resolves RTL from its container, so `text-overflow` clips the FRONT and
+     prints "…aircase cladding - Fifth Settlement" — the reader loses exactly
+     the words that identify the record and keeps the ones that do not. `auto`
+     resolves per value from its first strong character, so Arabic content is
+     unaffected and LTR content truncates at its own end in either workspace. */
   const body = (
     <span className="flex min-w-0 flex-col">
-      <span className="truncate font-medium text-fg">{title}</span>
-      {meta ? <span className="truncate text-label text-fg-muted">{meta}</span> : null}
+      <span dir="auto" className="truncate font-medium text-fg">{title}</span>
+      {meta ? <span dir="auto" className="truncate text-label text-fg-muted">{meta}</span> : null}
     </span>
   );
   return (

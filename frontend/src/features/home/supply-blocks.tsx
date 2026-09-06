@@ -373,7 +373,7 @@ export function WorkflowFlow({
           {i < stages.length - 1 ? (
             <span
               aria-hidden="true"
-              className="absolute start-[0.3125rem] top-2 h-full w-px bg-border"
+              className="absolute start-[0.3125rem] top-2 h-full w-px bg-[var(--border)]"
             />
           ) : null}
           <span

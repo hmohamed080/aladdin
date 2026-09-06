@@ -49,6 +49,8 @@ src/
 
 ## Design fidelity
 
+> **Read [`docs/frontend/UI_CONTRACT.md`](../docs/frontend/UI_CONTRACT.md) before adding a component, page, route or account type.** It is the canonical UI foundation contract: four layers, nine rules, and an explicit split between what lint enforces and what review does. The rule everything else serves — **composition may differ, visual language may not**. Route count never authorizes a new shell.
+
 Implement against approved screens in `UI-UX/design.pen`, following [`UI-UX/UI_UX_SYSTEM_GUIDE.md`](../UI-UX/UI_UX_SYSTEM_GUIDE.md) (tokens, components, UX rules — a core-memory file) and the operational rules in [`UI-UX/AGENTS.md`](../UI-UX/AGENTS.md). Never edit `.pen` files from a coding task. Internal session labels / design-agent notes must never appear in production UI.
 
 ### Consume the Design System (v1.0.0 — "The Aperture")

@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion, useMotionValue, animate } from "motion/react";
@@ -15,11 +23,9 @@ import {
   type SidebarMode,
 } from "@/lib/ui/sidebar-mode";
 import { navColumnClass, navIconClass, navRowClass, NAV_ICON_SIZE } from "@/lib/ui/nav-geometry";
-import { Sidebar } from "@/components/layout/workspace-nav";
 import { Brand } from "@/components/layout/brand";
 import { ShellAtmosphere } from "@/components/layout/shell-atmosphere";
 import { CheckIcon, PanelIcon, SettingsIcon, TrendingUpIcon } from "@/components/ui/icons";
-import type { CommerceStance } from "@/lib/workspace/supply-side";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 const MENU_HOVER_DELAY_MS = 350;
@@ -290,13 +296,59 @@ function SidebarModeControl({
  * Mobile is untouched — this whole subtree is `tablet:` only, and `MobileNav`
  * still owns the phone experience.
  */
+/**
+ * THE SHELL'S LIVE DISPLAY STATE, published to whatever navigation it holds.
+ *
+ * WHY A CONTEXT AND NOT A RENDER PROP. The first version of this took
+ * `nav: (state) => ReactNode`, which reads better and is wrong: `SidebarShell` is
+ * a Client Component and the layouts that mount it are Server Components, so the
+ * function had to cross the RSC boundary and React refused to serialize it —
+ * "Functions cannot be passed directly to Client Components". It failed at
+ * RUNTIME on both `/home` and `/b2b`, while `tsc` accepted it, `next build`
+ * compiled it and all 33 shell tests passed, because a client-side test render
+ * has no boundary to cross.
+ *
+ * A context moves the handoff to where both ends are already client code: the
+ * layout passes a plain ELEMENT (serializable), and the navigation inside reads
+ * the state it needs once it is mounted.
+ *
+ * `carved` is always true from the shell — every desktop mode carves — but it is
+ * published rather than assumed so the mobile sheet, which has no carve, can
+ * mount the same rows on a different ground.
+ */
+export type SidebarDisplay = { narrow: boolean; carved: boolean };
+
+const SidebarDisplayContext = createContext<SidebarDisplay>({ narrow: false, carved: true });
+
+/** The shell's current display state. Defaults suit a standalone render (tests). */
+export function useSidebarDisplay(): SidebarDisplay {
+  return useContext(SidebarDisplayContext);
+}
+
 export function SidebarShell({
-  allowed,
+  nav,
   mode: initialMode,
-  stance = "buyer",
   appName,
+  footer = "workspace",
 }: {
-  allowed: readonly string[];
+  /**
+   * THE NAVIGATION, SUPPLIED BY THE CALLER — the one change that makes this
+   * shell reusable.
+   *
+   * It used to mount `<Sidebar allowed stance/>` directly, which welded the
+   * approved GROUND (the navy plate, the gutter, the carve, the atmosphere seam,
+   * the display modes, the hover reveal) to ONE navigation data model. A second
+   * surface could not adopt the visual language without also adopting B2B
+   * capabilities and commerce stance, so `/home` grew a flat `bg-canvas` shell
+   * instead — which is the whole drift this pass exists to close.
+   *
+   * A plain node, NOT a render prop. The nav still needs the shell's live display
+   * state — `narrow` drives the icon-only rail, `carved` lets the active item's
+   * surface cross the trailing edge — but it reads them from
+   * `useSidebarDisplay()` once mounted, because a function prop cannot cross the
+   * Server/Client boundary the layouts sit on. See the context above.
+   */
+  nav: ReactNode;
   mode: SidebarMode;
   /**
    * The product name, for the lockup at the head of the panel.
@@ -315,13 +367,24 @@ export function SidebarShell({
    */
   appName: string;
   /**
-   * Which seat this workspace leads from. It reaches only as far as `Sidebar`,
-   * which uses it to order and label the modules. Every display mode, the hover
-   * reveal, the RTL geometry and the mode cookie are stance-independent — this is
-   * ONE sidebar serving every B2B organization, not a Showroom one and a
-   * Distributor one.
+   * WHICH FIXED BOTTOM BLOCK, IF ANY, THE PANEL CARRIES.
+   *
+   * `"workspace"` draws Settings and Upgrade, both pointing at `/b2b/settings`.
+   * `"none"` draws nothing, and that is what a personal account gets.
+   *
+   * This was hardcoded, and the browser UAT is what found it: an organization-
+   * less installer's sidebar offered "Settings" and "Upgrade your plan", both
+   * linking into `/b2b/settings` — a route `/b2b/layout.tsx` redirects them
+   * straight out of. Links to a redirect, which is the exact thing the personal
+   * layout refuses to do for its own nav, plus a billing concept that does not
+   * apply to a person at all.
+   *
+   * A personal SETTINGS destination is a real future route (§9 of the Installer
+   * specification, a composition over capabilities that already exist). It is not
+   * built, so nothing is drawn — a nav that advertises a route that does not
+   * exist is worse than a short one.
    */
-  stance?: CommerceStance;
+  footer?: "workspace" | "none";
 }) {
   const { t } = useI18n();
   const reduced = useReducedMotion();
@@ -643,16 +706,19 @@ export function SidebarShell({
             drawn 40px out in the gutter, detached from the list it scrolls and
             sitting on top of the frame between two cards. */}
         <div className="relative z-10 min-h-0 flex-1 shrink grow overflow-y-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <Sidebar
-            allowed={allowed}
-            narrow={narrow}
-            stance={stance}
-            /* EVERY desktop mode carves. It was `mode === "expanded"`, which is
-               the split this pass removed — see the prop's own note. The carve
-               reads `narrow` and changes shape; it does not need protecting from
-               a width. */
-            carved
-          />
+          {/* EVERY desktop mode carves. It was `mode === "expanded"`, which is
+              the split an earlier pass removed. The carve reads `narrow` and
+              changes shape; it does not need protecting from a width.
+
+              The shell no longer knows WHICH navigation this is — only that it
+              is narrow or wide and that it carves. `Sidebar` (B2B modules) and
+              `PersonalSidebar` (personal destinations) are both valid fills and
+              render through the same `NavItem` family, so they are two
+              information architectures in one visual language rather than two
+              shells. */}
+          <SidebarDisplayContext.Provider value={{ narrow, carved: true }}>
+            {nav}
+          </SidebarDisplayContext.Provider>
         </div>
 
         {
@@ -673,6 +739,7 @@ export function SidebarShell({
              org/branch card: that context already lives in the header's own
              workspace switcher, so repeating it here was the same fact
              twice rather than a second one worth the space. */
+          footer === "workspace" ? (
           <div
             /* NO BORDER, NO SEPARATE GROUND HERE. This used to be `border-t
                border-shell-line bg-shell` — a rule plus a fill that read as a
@@ -741,6 +808,7 @@ export function SidebarShell({
               {narrow ? null : <span className="truncate">{upgradeLabel}</span>}
             </Link>
           </div>
+          ) : null
         }
       </motion.div>
     </motion.div>

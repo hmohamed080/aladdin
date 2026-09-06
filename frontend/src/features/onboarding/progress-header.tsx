@@ -28,7 +28,7 @@ export function ProgressHeader({ current }: { current: OnboardingStep }) {
     <div className="flex flex-col gap-2.5">
       <p className="text-label font-medium text-fg-muted">
         {t("onboarding.stepLabel", { current: index + 1, total })}
-        <span className="mx-2 text-border-strong" aria-hidden="true">·</span>
+        <span className="mx-2 text-fg-muted" aria-hidden="true">·</span>
         <span className="text-fg-secondary">{t(STEP_LABEL_KEY[current])}</span>
       </p>
       <ol className="flex items-center gap-2" aria-label={t("onboarding.stepLabel", { current: index + 1, total })}>
