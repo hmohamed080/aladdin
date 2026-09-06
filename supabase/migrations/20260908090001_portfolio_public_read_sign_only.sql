@@ -58,6 +58,20 @@
 
 drop policy if exists professional_portfolio_select_published on storage.objects;
 
+-- The only anon-facing door in the product, and it opens for exactly one
+-- operation: minting a signed URL for an object that is public, ready, and on
+-- a currently listed profile. Listing, direct GET and HEAD are refused because
+-- they carry a different storage.operation() — verified against the live API,
+-- not inferred. Fetching the resulting signed URL consults no policy, so the
+-- byte delivery /p/media depends on is unaffected. Fails closed when the
+-- operation GUC is absent.
+--
+-- Recorded as a plain SQL comment rather than `comment on policy ... on
+-- storage.objects` — the latter fails on some Postgres builds (observed on
+-- the CI runner's freshly-pulled 17.6.1.143: `COMMENT ON POLICY` on a table
+-- owned by `supabase_storage_admin` errors for the migration role even though
+-- the preceding `CREATE POLICY` on the same table succeeds) and this
+-- migration asserts no privilege beyond what `CREATE POLICY` itself needs.
 create policy professional_portfolio_select_published on storage.objects
   for select to anon, authenticated
   using (
@@ -67,6 +81,3 @@ create policy professional_portfolio_select_published on storage.objects
     and storage.allow_only_operation('storage.object.sign')
     and app.is_published_portfolio_object(name)
   );
-
-comment on policy professional_portfolio_select_published on storage.objects is
-  'The only anon-facing door in the product, and it opens for exactly one operation: minting a signed URL for an object that is public, ready, and on a currently listed profile. Listing, direct GET and HEAD are refused because they carry a different storage.operation() — verified against the live API, not inferred. Fetching the resulting signed URL consults no policy, so the byte delivery /p/media depends on is unaffected. Fails closed when the operation GUC is absent.';
