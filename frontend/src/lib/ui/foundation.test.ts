@@ -153,16 +153,24 @@ describe("one app ground", () => {
 
 describe("primary action", () => {
   /**
-   * `PageHeader` renders the canonical Button rather than its own fill.
+   * `PageHeader` renders the canonical `ButtonLink` rather than its own fill.
    *
    * This one mattered more than a page-level duplicate would: the hand-styled
    * link lived INSIDE the foundation, so every workspace module inherited a
    * second primary-button treatment and the divergence was invisible page by
    * page.
+   *
+   * `ButtonLink`, not `<Link><Button></Link>` (a review finding on PR #40): a
+   * `<button>` nested inside an `<a>` is invalid HTML and leaves two focusable
+   * controls acting as one. `ButtonLink` shares `controlClass` with `Button`
+   * by construction, so the visual treatment this test guards is unchanged —
+   * only the element is now the one real anchor the action always was.
    */
   it("does not hand-style a primary action inside the foundation", () => {
     const layout = read("src/components/ui/workspace-layout.tsx");
-    expect(layout).toMatch(/<Button type="button" variant="accent"/);
+    expect(layout).toMatch(/<ButtonLink href=\{action\.href\} variant="accent"/);
+    // No button nested inside a Link anywhere in the file.
+    expect(layout).not.toMatch(/<Link[\s\S]{0,200}<Button/);
     // No inline accent fill on a Link anywhere in the file.
     expect(layout).not.toMatch(/<Link[\s\S]{0,200}bg-accent-solid/);
   });
