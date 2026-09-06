@@ -156,3 +156,23 @@ describe("mixed direction", () => {
     expect(container.querySelectorAll('[dir="auto"]').length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * Revisit §6 (consistency pass): the average and the distribution's
+ * percent/count both used to render through `.toFixed(1)` and hand-appended
+ * "%"/"()" — real Arabic-numeral leaks in the same class Sprint 15 had
+ * already closed at 88 other call sites, missed here. Both now go through
+ * `formatNumber`/`formatPercent`/`formatCount`.
+ */
+describe("Arabic numerals (revisit §6)", () => {
+  it("renders the average and the distribution counts in Arabic-Indic digits, never Latin", () => {
+    const { container } = render([review({ rating: 5 }), review({ rating: 5 }), review({ rating: 4 })], null, "ar");
+    const average = container.querySelector(".text-display");
+    expect(average?.textContent).toMatch(/[٠-٩]/);
+    expect(average?.textContent).not.toMatch(/[0-9]/);
+    // No stray Latin digit anywhere in the distribution block either.
+    const distribution = container.querySelector('[data-testid="rating-distribution"]');
+    expect(distribution?.textContent).toMatch(/[٠-٩]/);
+    expect(distribution?.textContent).not.toMatch(/[0-9]/);
+  });
+});

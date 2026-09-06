@@ -313,6 +313,16 @@ export const ar: Messages = {
         reviewBody: "راجع ما أرسلته وحالة طلب التوثيق الخاص بك.",
       },
     },
+    snapshot: {
+      points: "النقاط",
+      rating: "التقييم",
+      ratingHint: "{n} تقييم",
+      network: "الشبكة",
+      completedJobs: "الأعمال المكتملة",
+    },
+    quickAccess: {
+      title: "الوصول السريع",
+    },
     sales: {
       setup: "إعداد المبيعات",
       setupBody: "أدوات المبيعات تعمل داخل المعرض الذي تعمل معه. اربط معرضك لتفتحها.",
@@ -346,18 +356,61 @@ export const ar: Messages = {
     home: "الرئيسية",
     profile: "ملفي",
     points: "النقاط",
+    settings: "الإعدادات",
     jobs: "فرص العمل",
     myWork: "شغلي",
     network: "الشبكة",
     connectShowroom: "ربط معرض",
     addBusiness: "إضافة نشاط",
   },
+  personalSettings: {
+    title: "الإعدادات",
+    subtitle: "ملفك وإتاحتك، اللغة والمظهر، وطريقة تسجيل دخولك.",
+    profile: {
+      title: "الملف المهني",
+      edit: "تعديل الملف",
+      note: "الحرف والتخصصات ومناطق الخدمة والخبرة والنبذة كلها في محرر ملفك.",
+    },
+    availability: {
+      title: "الإتاحة",
+    },
+    preferences: {
+      title: "اللغة والمظهر",
+      languageHint: "تُطبَّق في كل مكان تستخدم فيه علاء الدين.",
+      themeHint: "فاتح أو داكن، يُحفظ على هذا الجهاز.",
+    },
+    account: {
+      title: "تسجيل الدخول والحساب",
+      signInContact: "وسيلة تسجيل دخولك",
+      signInBody: "لا توجد كلمات مرور في علاء الدين. تسجّل الدخول برمز لمرة واحدة يُرسل إلى وسيلة تواصلك الموثّقة، فلا شيء لإعادة تعيينه أو تسريبه.",
+      signInContactHint: "غيّرها من ملفك المهني.",
+      signOut: "تسجيل الخروج",
+    },
+  },
   profile: {
+    snapshot: {
+      reviews: "التقييمات",
+      rating: "التقييم",
+      completedJobs: "الأعمال المكتملة",
+      points: "النقاط",
+    },
     reviews: {
       title: "تقييماتي",
       body: "ما قالته الشركات التي عملت معها عن أعمالك.",
       none: "لا توجد تقييمات بعد",
       manage: "عرض التقييمات",
+    },
+    myWork: {
+      title: "شغلي",
+      body: "الإسنادات التي قبلتك فيها المؤسسات.",
+      none: "لا يوجد عمل مكتمل بعد",
+      completed: "مكتمل",
+      manage: "عرض شغلي",
+    },
+    points: {
+      title: "نقاطي",
+      body: "تُكتسب حين ينضم معرض دعوته إلى علاء الدين.",
+      manage: "عرض النقاط",
     },
     work: {
       title: "أعمالك وشهاداتك",
@@ -370,12 +423,14 @@ export const ar: Messages = {
       manage: "عرض الشبكة",
     },
     portfolio: {
-      title: "أعمالي",
+      // "نماذج الأعمال" (same phrase the onboarding flow already uses for
+      // this concept) — not "أعمالي", which the job-assignments module owns.
+      title: "نماذج الأعمال",
       body: "صور لأعمال أنجزتها. أنت تختار ما يراه الجمهور.",
       none: "لم تضف شيئًا بعد",
       split: "{published} منشور · {privateCount} خاص",
       unfinished: "{n} رفعة لم تكتمل",
-      manage: "إدارة أعمالي",
+      manage: "إدارة نماذج الأعمال",
     },
     certificates: {
       title: "شهاداتي",
@@ -433,6 +488,11 @@ export const ar: Messages = {
       listedBody:
         "يمكن لأي شخص لديه الرابط رؤية اسمك وعنوانك المهني ونبذتك ولغاتك والأعمال التي تقوم بها وما إذا كنت تقبل أعمالًا.",
       view: "عرض الملف العام",
+    },
+    accountArea: {
+      title: "الحساب",
+      settingsBody: "اللغة والمظهر واختصارات الإتاحة، وطريقة تسجيل دخولك.",
+      support: "المساعدة والدعم",
     },
     notProfessional: {
       title: "هذه الصفحة للحسابات المهنية",
@@ -2737,6 +2797,8 @@ export const ar: Messages = {
     opportunities: {
       title: "فرص العمل",
       subtitle: "أعمال تبحث فيها المنشآت عن مهنيين أفراد.",
+      viewAll: "عرض كل الفرص",
+      filtersTitle: "التصفية",
       searchPlaceholder: "ابحث بالعنوان أو الوصف أو اسم المنشأة",
       allTrades: "كل المهن",
       allLocations: "كل المناطق",
@@ -2874,7 +2936,7 @@ export const ar: Messages = {
   },
 
   portfolio: {
-    title: "أعمالي",
+    title: "نماذج الأعمال",
     subtitle: "صور لأعمال أنجزتها. أنت تختار ما يظهر منها في ملفك العام.",
     add: "إضافة عمل",
     privateByDefault:
@@ -2986,6 +3048,7 @@ export const ar: Messages = {
     title: "تقييماتي",
     subtitle: "ما قالته الشركات التي عملت معها عن أعمالك المنجزة.",
     listTitle: "كل التقييمات",
+    summaryTitle: "ملخص التقييم",
     basedOn: "بناءً على {n} تقييم",
     starsLabel: "{n} من 5",
     starsRow: "{n} نجوم",

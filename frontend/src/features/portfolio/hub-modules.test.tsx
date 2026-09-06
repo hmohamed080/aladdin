@@ -24,7 +24,7 @@ describe("PortfolioModule", () => {
     renderWithI18n(<PortfolioModule summary={summary()} publicItemId={null} t={t} />, "en");
     expect(screen.getByText("0")).toBeTruthy();
     expect(screen.getByText("nothing added yet")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Manage my work" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Manage portfolio" })).toBeTruthy();
   });
 
   it("splits the count into published and private, which is the fact the page is for", () => {

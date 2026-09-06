@@ -38,6 +38,7 @@ export type PersonalNavKey =
   | "home"
   | "profile"
   | "points"
+  | "settings"
   | "jobs"
   | "myWork"
   | "reviews"
@@ -71,6 +72,11 @@ const ITEMS: Record<PersonalNavKey, PersonalNavItem> = {
   myWork: { key: "myWork", href: "/home/work", labelKey: "personalNav.myWork" },
   reviews: { key: "reviews", href: "/home/reviews", labelKey: "personalNav.reviews" },
   network: { key: "network", href: "/home/network", labelKey: "personalNav.network" },
+  /* Reachable by BOTH variants (default branch of `isReachable`) — locale,
+     appearance and sign-out are not a professional-only need, and Increment
+     14 is what finally builds the route `home/layout.tsx` used to note as
+     "specified but not built". */
+  settings: { key: "settings", href: "/home/settings", labelKey: "personalNav.settings" },
   connectShowroom: {
     key: "connectShowroom",
     href: "/home/showroom",
@@ -80,7 +86,7 @@ const ITEMS: Record<PersonalNavKey, PersonalNavItem> = {
 };
 
 const SECTIONS: { section: PersonalNavSection; keys: PersonalNavKey[] }[] = [
-  { section: "account", keys: ["home", "profile", "points"] },
+  { section: "account", keys: ["home", "profile", "points", "settings"] },
   /* Work is its own group rather than a fourth entry under "account", because it
      is the only destination here that is about the OUTSIDE world: the other
      three are the caller's own record. Increment 9 made it the group of two it
@@ -150,6 +156,34 @@ function isReachable(key: PersonalNavKey, input: PersonalNavInput): boolean {
 /** The destinations this account has, in canonical order. */
 export function personalNavKeys(input: PersonalNavInput): PersonalNavKey[] {
   return SECTIONS.flatMap((s) => s.keys).filter((key) => isReachable(key, input));
+}
+
+/**
+ * The bottom bar's OWN, smaller list (Increment 14, §8).
+ *
+ * `PersonalMobileNav` was built on "a personal account has at most five
+ * destinations, so they all fit" — true when it was written. It is no longer
+ * true: a professional now has up to nine (`personalNavKeys` above), and
+ * without a curated subset every label past the first one or two truncates to
+ * nothing legible. Points, Reviews, Settings and Add business are not gone —
+ * each is a real entry in Account Overview's own module grid (or, for
+ * Settings and Add business, in Home's Quick access) — they simply are not
+ * ALSO one of the five things worth a thumb's reach on every screen.
+ *
+ * Fixed priority order, filtered down to whatever this account actually has:
+ * the daily loop (find work, do work, see who you've built a relationship
+ * with) plus the one place everything else hangs off. A consumer's three
+ * reachable keys already fit and pass through unchanged.
+ */
+const MOBILE_PRIMARY: PersonalNavKey[] = ["home", "jobs", "myWork", "network", "profile"];
+
+export function personalMobileNavKeys(keys: readonly PersonalNavKey[]): PersonalNavKey[] {
+  // A consumer's three destinations already fit — curating them would only
+  // ever narrow, never help, and "home" alone would strand Settings and Add
+  // business off the bar for an account with room to spare.
+  if (keys.length <= 5) return [...keys];
+  const set = new Set(keys);
+  return MOBILE_PRIMARY.filter((key) => set.has(key));
 }
 
 /** The same destinations grouped for the rail; empty sections are dropped. */

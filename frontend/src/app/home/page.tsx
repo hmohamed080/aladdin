@@ -5,7 +5,6 @@ import { loadPlatformRole } from "@/server/queries/platform";
 import { loadWorkspaces } from "@/server/queries/workspace";
 import { personalEntry, businessEntries } from "@/lib/workspace/model";
 import { loadPersonalHome } from "@/server/queries/personal-home";
-import { loadMyTrades } from "@/server/queries/trades";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { NoPersonalWorkspace } from "@/features/home/no-personal-workspace";
 import { createTranslator } from "@/lib/i18n/translate";
@@ -15,9 +14,23 @@ import { ProfessionalHome } from "@/features/home/professional-home";
 import {
   listMyAssignments,
   featuredAssignment,
+  countAssignmentsByStatus,
 } from "@/server/queries/job-assignments";
+import { listJobOpportunities } from "@/server/queries/job-opportunities";
+import { getPointsBalance } from "@/server/queries/points";
+import { loadMyReviewSummary } from "@/server/queries/reviews";
+import { listMyNetworkOrganizations } from "@/server/queries/network";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * How many real open opportunities the Home preview shows — a bounded read,
+ * never the full board. Three, not four (Increment 14 composition
+ * correction): the reference leads with a compact three-up row, and a fourth
+ * card only forced an awkward half-row at the width the preview panel
+ * actually gets beside the Quick Access rail.
+ */
+const HOME_OPPORTUNITIES_PREVIEW = 3;
 
 /**
  * The ONE personal-account surface. A signed-in caller with no organization —
@@ -39,6 +52,14 @@ export const dynamic = "force-dynamic";
  *
  * Reaching this page never depends on a verification decision — completing
  * onboarding activates the account, and trust state is shown, not enforced.
+ *
+ * FIVE REAL READS, IN PARALLEL (Increment 14). `loadMyTrades` dropped out of
+ * this page's own `Promise.all` — the professional's practice detail moved to
+ * the Account Overview, so Home no longer pays for a trades round trip it does
+ * not render. What replaced it are the same functions `/home/points`,
+ * `/home/reviews`, `/home/network` and `/home/jobs` already call, so the
+ * summary strip and the opportunities preview cannot disagree with those
+ * pages' own numbers.
  */
 export default async function PersonalHomePage() {
   const state = await getRegistrationState();
@@ -61,20 +82,30 @@ export default async function PersonalHomePage() {
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const t = createTranslator(locale);
 
-  // Only a professional has trades to read, so only a professional pays for the
-  // round trip — the same rule the salesperson's affiliation follows, and the
-  // same rule the assignment read follows: a consumer holds none by
-  // construction, because every assignment descends from an application only a
-  // professional persona could have submitted.
+  // Only a professional has any of this to read — a consumer holds none of it
+  // by construction, since every one of these descends from an assignment,
+  // review or referral only a professional persona could have.
   if (data.variant !== "professional") return <ConsumerHome data={data} t={t} />;
 
-  const [trades, assignments] = await Promise.all([loadMyTrades(), listMyAssignments(supabase)]);
+  const [assignments, opportunities, pointsBalance, reviews, network] = await Promise.all([
+    listMyAssignments(supabase),
+    listJobOpportunities(supabase, { limit: HOME_OPPORTUNITIES_PREVIEW }),
+    getPointsBalance(supabase),
+    loadMyReviewSummary(),
+    listMyNetworkOrganizations(supabase),
+  ]);
+  const completedJobsCount = countAssignmentsByStatus(assignments).completed;
 
   return (
     <ProfessionalHome
       data={data}
-      trades={trades}
       currentWork={featuredAssignment(assignments)}
+      opportunities={opportunities}
+      pointsBalance={pointsBalance}
+      reviewsAverage={reviews.average}
+      reviewsTotal={reviews.total}
+      networkCount={network.length}
+      completedJobsCount={completedJobsCount}
       locale={locale}
       t={t}
     />

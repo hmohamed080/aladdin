@@ -1,6 +1,8 @@
 import { StarIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/ui/cn";
 import { starFill } from "@/lib/reviews/summary";
+import { formatCount, formatPercent } from "@/lib/ui/format";
+import type { Locale } from "@/lib/i18n/locales";
 
 /**
  * Shared review pieces.
@@ -67,11 +69,13 @@ export function DistributionRow({
   count,
   percent,
   label,
+  locale,
 }: {
   stars: number;
   count: number;
   percent: number;
   label: string;
+  locale: Locale;
 }) {
   return (
     <div className="flex items-center gap-3">
@@ -83,8 +87,11 @@ export function DistributionRow({
           data-testid={`distribution-bar-${stars}`}
         />
       </span>
+      {/* `formatPercent`/`formatCount`, not hand-appended "%"/"()" — the exact
+          leak Sprint 15 closed at 88 other call sites: Arabic writes the sign
+          as ٪ on the other side of the digits, and this one had been missed. */}
       <span className="w-20 shrink-0 text-end text-label tabular-nums text-fg-muted">
-        {percent}% ({count})
+        {formatPercent(percent, locale)} ({formatCount(count, locale)})
       </span>
     </div>
   );

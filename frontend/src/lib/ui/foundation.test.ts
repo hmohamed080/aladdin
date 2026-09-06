@@ -185,8 +185,12 @@ describe("stored language values", () => {
    */
   it("renders stored languages through the normalizer on every display surface", () => {
     for (const f of [
-      "src/features/home/professional-home.tsx",
-      "src/features/profile/profile-hub.tsx",
+      // Home never rendered the practice/languages block, and the Account
+      // Overview composition correction (Increment 14) removed it from the
+      // hub too — the full professional-profile detail, languages included,
+      // now lives only on `/home/profile/edit` (a catalog CHOICE site, listed
+      // in the test below) and is read back on the public profile. So the
+      // public profile is the only remaining STORED-value display surface.
       "src/features/profile/public-profile.tsx",
     ]) {
       const src = read(f);

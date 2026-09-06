@@ -6,10 +6,11 @@ import { loadWorkspaces } from "@/server/queries/workspace";
 import { personalEntry } from "@/lib/workspace/model";
 import { loadPersonalHome } from "@/server/queries/personal-home";
 import { loadProfilePublication } from "@/server/queries/professional-profile";
-import { loadMyTrades } from "@/server/queries/trades";
 import { loadProfessionalAssetSummary } from "@/server/queries/portfolio";
 import { loadMyReviewSummary } from "@/server/queries/reviews";
 import { listMyNetworkOrganizations } from "@/server/queries/network";
+import { listMyAssignments, countAssignmentsByStatus } from "@/server/queries/job-assignments";
+import { getPointsBalance } from "@/server/queries/points";
 import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { ProfileHub } from "@/features/profile/profile-hub";
@@ -18,14 +19,25 @@ import { NoProfessionalProfile } from "@/features/profile/no-professional-profil
 export const dynamic = "force-dynamic";
 
 /**
- * The professional profile hub — "my account" in the reference pack's sense: one
- * place that holds the professional identity, says what the public can see of it,
- * and leads to the editor.
+ * The Account Overview — "my account" in the reference pack's sense: one
+ * place that holds the professional identity, a real summary of their
+ * standing, what the public can see, and leads to every real account
+ * surface (Portfolio, Certificates, Reviews, Points, Network, Work,
+ * Settings).
  *
- * IT IS NOT A SECOND `/home`. The dashboard greets, says what to do next, and
- * shows the two account signals. This page answers a different question — *what
- * does my profile actually say, and who can see it* — which is why publication
- * state leads here and appears nowhere on the dashboard.
+ * IT IS NOT A SECOND `/home`. The dashboard greets, says what to do right
+ * now, and shows a preview of open work. This page answers a different
+ * question — *what does my account actually say, in full* — which is why
+ * publication state and the complete module grid live here and only a
+ * compact snapshot strip lives on the dashboard.
+ *
+ * SIX REAL READS, IN PARALLEL. Points balance and completed-assignment
+ * count are new to this page (Increment 14) — the same `getPointsBalance`
+ * and `countAssignmentsByStatus` `/home/points` and `/home/work` themselves
+ * call, so the summary strip here cannot disagree with those pages' own
+ * numbers. `loadMyTrades` dropped out in the composition pass that followed:
+ * the canonical trade is now shown (and edited) only on `/home/profile/edit`,
+ * so this page no longer pays for a read it does not render.
  *
  * A CONSUMER HAS NO PROFESSIONAL PROFILE, and is told so rather than redirected:
  * there is nothing wrong with the account, the page simply belongs to a different
@@ -44,26 +56,31 @@ export default async function ProfileHubPage() {
   if (!data) redirect("/auth/sign-in");
 
   const store = await cookies();
-  const t = createTranslator(resolveLocale(store.get(LOCALE_COOKIE)?.value));
+  const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
+  const t = createTranslator(locale);
 
   if (data.variant !== "professional") return <NoProfessionalProfile />;
 
-  const [publication, trades, assets, reviews, network] = await Promise.all([
+  const [publication, assets, reviews, network, assignments, pointsBalance] = await Promise.all([
     loadProfilePublication(),
-    loadMyTrades(),
     loadProfessionalAssetSummary(),
     loadMyReviewSummary(),
     listMyNetworkOrganizations(supabase),
+    listMyAssignments(supabase),
+    getPointsBalance(supabase),
   ]);
+  const completedJobsCount = countAssignmentsByStatus(assignments).completed;
 
   return (
     <ProfileHub
       data={data}
       publication={publication}
-      trades={trades}
       assets={assets}
       reviews={reviews}
       network={network}
+      pointsBalance={pointsBalance}
+      completedJobsCount={completedJobsCount}
+      locale={locale}
       t={t}
     />
   );

@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/workspace-layout";
 import { Card, SectionTitle, Field, Badge } from "@/components/ui/primitives";
 import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import { formatCount } from "@/lib/ui/format";
+import { maskEmail } from "@/lib/ui/mask-email";
 import {
   BuildingIcon,
   SettingsIcon,
@@ -19,14 +20,6 @@ import {
 } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
-
-/** `name@example.com` → `n••••@example.com`. The caller knows their own address;
- *  masking keeps it off a screen that gets shown to a client or screenshared. */
-function maskEmail(email: string): string {
-  const [user, domain] = email.split("@");
-  if (!user || !domain) return email;
-  return `${user.slice(0, 1)}${"•".repeat(Math.max(user.length - 1, 1))}@${domain}`;
-}
 
 /**
  * Settings — the business record, the workspace's own behaviour, and the account

@@ -320,6 +320,16 @@ export const en = {
         reviewBody: "Review what you sent and the status of your verification request.",
       },
     },
+    snapshot: {
+      points: "Points",
+      rating: "Rating",
+      ratingHint: "{n} reviews",
+      network: "Network",
+      completedJobs: "Completed jobs",
+    },
+    quickAccess: {
+      title: "Quick access",
+    },
     sales: {
       setup: "Your sales setup",
       setupBody: "Sales tools live inside the showroom you work with. Connect yours to open them.",
@@ -353,18 +363,61 @@ export const en = {
     home: "Home",
     profile: "My profile",
     points: "Points",
+    settings: "Settings",
     jobs: "Job opportunities",
     myWork: "My work",
     network: "Network",
     connectShowroom: "Connect showroom",
     addBusiness: "Add business",
   },
+  personalSettings: {
+    title: "Settings",
+    subtitle: "Your profile, availability, language and appearance, and how you sign in.",
+    profile: {
+      title: "Professional profile",
+      edit: "Edit profile",
+      note: "Trades and specialties, service areas, experience and bio all live in your profile editor.",
+    },
+    availability: {
+      title: "Availability",
+    },
+    preferences: {
+      title: "Language & appearance",
+      languageHint: "Applies everywhere you use Aladdin.",
+      themeHint: "Light or dark, saved on this device.",
+    },
+    account: {
+      title: "Sign-in & account",
+      signInContact: "Your sign-in contact",
+      signInBody: "Aladdin has no passwords. You sign in with a one-time code sent to your verified contact, so there is nothing to reset or leak.",
+      signInContactHint: "Change it from your professional profile.",
+      signOut: "Sign out",
+    },
+  },
   profile: {
+    snapshot: {
+      reviews: "Reviews",
+      rating: "Rating",
+      completedJobs: "Completed jobs",
+      points: "Points",
+    },
     reviews: {
       title: "My reviews",
       body: "What the businesses you worked for said about your work.",
       none: "no reviews yet",
       manage: "View reviews",
+    },
+    myWork: {
+      title: "My work",
+      body: "Assignments organizations have accepted you for.",
+      none: "no completed jobs yet",
+      completed: "completed",
+      manage: "View my work",
+    },
+    points: {
+      title: "My Points",
+      body: "Earned when a showroom you refer joins Aladdin.",
+      manage: "View Points",
     },
     work: {
       title: "Your work and certificates",
@@ -377,12 +430,16 @@ export const en = {
       manage: "View network",
     },
     portfolio: {
-      title: "My work",
+      // "Portfolio", not "My work" — the account grid's OTHER module (job
+      // assignments) already owns that name, and this card sits right next
+      // to it (Increment 14 found the collision when both were first shown
+      // on the same page).
+      title: "Portfolio",
       body: "Photographs of finished jobs. You choose which ones the public can see.",
       none: "nothing added yet",
       split: "{published} published · {privateCount} private",
       unfinished: "{n} upload did not finish",
-      manage: "Manage my work",
+      manage: "Manage portfolio",
     },
     certificates: {
       title: "My certificates",
@@ -440,6 +497,11 @@ export const en = {
       listedBody:
         "Anyone with the link can see your name, headline, summary, languages, the work you do and whether you are taking work.",
       view: "View public profile",
+    },
+    accountArea: {
+      title: "Account",
+      settingsBody: "Language, appearance, availability shortcuts, and how you sign in.",
+      support: "Help & support",
     },
     notProfessional: {
       title: "This page is for professional accounts",
@@ -2829,6 +2891,8 @@ export const en = {
     opportunities: {
       title: "Job opportunities",
       subtitle: "Work that organizations are hiring individual professionals for.",
+      viewAll: "View all opportunities",
+      filtersTitle: "Filters",
       searchPlaceholder: "Search by title, description or organization",
       allTrades: "Any trade",
       allLocations: "Anywhere",
@@ -2982,7 +3046,9 @@ export const en = {
   },
 
   portfolio: {
-    title: "My work",
+    // Same rename as `profile.portfolio.title` above, and for the same
+    // reason: "My work" is the job-assignments page's name.
+    title: "Portfolio",
     subtitle: "Photographs of work you have finished. You choose which ones appear on your public profile.",
     add: "Add work",
     privateByDefault:
@@ -3094,6 +3160,7 @@ export const en = {
     title: "My reviews",
     subtitle: "What the businesses you worked for said about your finished work.",
     listTitle: "All reviews",
+    summaryTitle: "Rating summary",
     basedOn: "Based on {n} reviews",
     starsLabel: "{n} out of 5",
     starsRow: "{n} stars",

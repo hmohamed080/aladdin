@@ -86,7 +86,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 const stateTone = {
-  neutral: { ring: "border-border", chip: "bg-surface-2 text-fg-secondary" },
+  neutral: { ring: "border", chip: "bg-surface-2 text-fg-secondary" },
   danger: { ring: "border-danger/40", chip: "bg-danger/15 text-danger" },
   warning: { ring: "border-warning/40", chip: "bg-warning/15 text-warning" },
 } as const;

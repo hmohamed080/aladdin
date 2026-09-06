@@ -28,6 +28,14 @@ import type { OpportunityRow } from "@/server/queries/job-opportunities";
  * ONE PRIMARY ACTION. "View details" and not "Apply now": applying is a
  * deliberate act against a stated amount, and the place to take it is the page
  * that states the amount in full — not a card in a grid.
+ *
+ * DENSITY CORRECTION (Increment 14): the reference packs three of these per
+ * row with far less air around each fact than the original pass gave it, even
+ * with no photograph to fill. `pad="sm"` and `gap-sm` throughout, and the grid
+ * itself opens to three columns once the filter rail's own width is out of the
+ * way (from `wide`, 1440px and up) — narrower than that, two stays the honest
+ * answer rather than forcing a third column an Arabic label would wrap badly
+ * inside.
  */
 
 export function OpportunityList({
@@ -53,7 +61,7 @@ export function OpportunityList({
   }
 
   return (
-    <ul className="grid gap-md desktop:grid-cols-2">
+    <ul className="grid gap-sm tablet:grid-cols-2 wide:grid-cols-3">
       {opportunities.map((o) => (
         <li key={o.id} className="min-w-0">
           <OpportunityCard opportunity={o} locale={locale} />
@@ -74,13 +82,20 @@ export function OpportunityCard({
   const place = [o.city, o.governorate].filter(Boolean).join(", ");
 
   return (
-    <Card className="flex h-full flex-col gap-md">
+    <Card pad="sm" className="flex h-full flex-col gap-sm">
       <div className="flex flex-wrap items-start justify-between gap-sm">
         <div className="min-w-0">
           <h3 className="text-title text-fg">{o.title}</h3>
           {o.poster_org_name ? (
+            // NOT `truncate`: this line mixes the (Arabic) "posted by" prefix with
+            // the organization's own name, and clipping a single-direction ellipsis
+            // across a bidi boundary cuts into the WRONG end of an LTR name inside
+            // an RTL line (verified against the 1440px capture — "Delta Wholesale
+            // Supply" clipped to "elta Wholesale Supply"). `<bdi dir="auto">` still
+            // isolates the name's own shaping; wrapping onto a second line, not
+            // truncation, is what keeps it legible.
             <p className="mt-0.5 text-caption text-fg-secondary">
-              {t("jobs.opportunities.postedBy")} {o.poster_org_name}
+              {t("jobs.opportunities.postedBy")} <bdi dir="auto">{o.poster_org_name}</bdi>
             </p>
           ) : null}
         </div>
@@ -92,28 +107,28 @@ export function OpportunityCard({
       </div>
 
       {/* The facts, as chips, so they wrap rather than collide at 390px. */}
-      <ul className="flex flex-wrap gap-x-md gap-y-1.5 text-caption text-fg-secondary">
+      <ul className="flex flex-wrap gap-x-sm gap-y-1 text-caption text-fg-secondary">
         {o.trade_key ? (
-          <Chip icon={<BriefcaseIcon size={14} />}>{tradeLabel(t, o.trade_key)}</Chip>
+          <Chip icon={<BriefcaseIcon size={13} />}>{tradeLabel(t, o.trade_key)}</Chip>
         ) : null}
-        {place ? <Chip icon={<MapPinIcon size={14} />}>{place}</Chip> : null}
+        {place ? <Chip icon={<MapPinIcon size={13} />}>{place}</Chip> : null}
         {o.expected_duration_days ? (
-          <Chip icon={<CalendarIcon size={14} />}>
+          <Chip icon={<CalendarIcon size={13} />}>
             {t("jobs.opportunities.duration", { n: o.expected_duration_days })}
           </Chip>
         ) : null}
         {o.starts_on ? (
-          <Chip icon={<CalendarIcon size={14} />}>
+          <Chip icon={<CalendarIcon size={13} />}>
             {t("jobs.opportunities.startsOn", { date: formatDate(o.starts_on, locale) })}
           </Chip>
         ) : null}
       </ul>
 
-      <div className="mt-auto flex flex-wrap items-end justify-between gap-sm">
+      <div className="mt-auto flex flex-wrap items-end justify-between gap-sm border-t pt-sm">
         <div className="min-w-0">
           {/* `formatMoney` already emits the currency — appending "EGP" here is
               exactly the bug Increment 7's browser pass found on the poster side. */}
-          <p className="text-title font-semibold text-fg">
+          <p className="text-body-lg font-semibold text-fg">
             {formatMoney(o.offered_amount, locale)}
           </p>
           {o.published_at ? (
@@ -134,7 +149,7 @@ export function OpportunityCard({
 
 function Chip({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <li className="flex min-w-0 items-center gap-1.5">
+    <li className="flex min-w-0 items-center gap-1">
       <span aria-hidden="true" className="shrink-0 text-fg-muted">
         {icon}
       </span>

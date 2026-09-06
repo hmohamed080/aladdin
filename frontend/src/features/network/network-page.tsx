@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/primitives";
 import { StatTiles, type Tile } from "@/components/ui/stat-tiles";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { UsersIcon, ClipboardIcon, TrendingUpIcon, LayersIcon } from "@/components/ui/icons";
+import { HomeHeader } from "@/features/home/parts";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/locales";
 import type { NetworkSummary } from "@/lib/network/summary";
@@ -81,10 +82,10 @@ export function NetworkPage({
 
   return (
     <div className="flex flex-col gap-md" data-testid="network-page">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <h1 className="text-title text-fg">{t("network.title")}</h1>
-        <p className="max-w-prose text-label text-fg-secondary">{t("network.subtitle")}</p>
-      </div>
+      {/* The shared personal-surface header — same component Home, Jobs,
+          Settings and Reviews all open with (revisit, Increment 14, §9:
+          cross-page header geometry). */}
+      <HomeHeader eyebrow={t("personalNav.network")} title={t("network.title")} lead={t("network.subtitle")} />
 
       {/* ONE compact horizontal instrument, not four floating cards (§2). */}
       <StatTiles tiles={tiles} locale={locale} layout="strip" columns={4} />

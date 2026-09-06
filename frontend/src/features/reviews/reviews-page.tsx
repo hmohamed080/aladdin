@@ -1,21 +1,30 @@
 import { Card, StatePanel } from "@/components/ui/primitives";
 import { StarIcon } from "@/components/ui/icons";
+import { HomeHeader } from "@/features/home/parts";
+import { Panel, WorkPane } from "@/components/ui/workspace-layout";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/locales";
 import type { Review } from "@/server/queries/reviews";
+import { formatNumber } from "@/lib/ui/format";
 import { distributionRows, type RatingSummary } from "@/lib/reviews/summary";
 import { DistributionRow, Stars } from "./parts";
-import { ReviewCard } from "./review-card";
+import { ReviewRow } from "./review-card";
 import { RatingFilter } from "./rating-filter";
 
 /**
  * `/home/reviews`.
  *
- * COMPOSITION FROM `05-reviews.jpeg`: header and one-line explanation, then a
- * summary block carrying the average with stars, the total, and the 5→1
- * distribution as bars with percentages, then the list. That hierarchy is
- * adopted wholesale, because it is the right one — the number a professional is
- * judged by leads, the shape of it follows, and the evidence comes last.
+ * COMPOSITION FROM `05-reviews.jpeg`, REVISITED (Increment 14 correction): the
+ * reference is a two-column dashboard — a compact continuous list carrying the
+ * real work, a supporting rail stating the average, the total and the 5→1
+ * distribution beside it — not a full-width summary stacked on full-width
+ * cards. `WorkPane` gives it that shape for free: the same primitive Jobs
+ * Opportunities already uses for its results-plus-rail geometry, so the two
+ * pages read as the same product rather than two different layout systems.
+ * The list itself moved from "one bordered card per review with gaps between"
+ * to ONE continuous divided surface (`ReviewRow`, no card frame of its own) —
+ * the same treatment `PointsHistory` already gives the Points ledger — so five
+ * reviews read as a dense record rather than five loosely related panels.
  *
  * WHAT THE REFERENCE HAS THAT THIS DOES NOT, and why each is absent rather than
  * postponed:
@@ -38,8 +47,11 @@ import { RatingFilter } from "./rating-filter";
  *     yet to paginate, and no action a professional can take on a review — it is
  *     immutable and there is no reply.
  *
- * So the page is one column rather than two. That is the deliberate difference:
- * the reference's second column is entirely things this product cannot say.
+ * The reference's second column is not adopted wholesale, though — most of
+ * what it holds (per-category scores, a trend chart, tips) is exactly the
+ * list above. What IS real from that column — the average, the total and the
+ * distribution — is what the supporting rail below carries; nothing in it is
+ * a number nobody entered.
  */
 export function ReviewsPage({
   reviews,
@@ -57,10 +69,10 @@ export function ReviewsPage({
 }) {
   return (
     <div className="flex flex-col gap-xl" data-testid="reviews-page">
-      <div className="flex min-w-0 flex-col gap-1">
-        <h1 className="text-headline text-fg">{t("reviews.title")}</h1>
-        <p className="max-w-prose text-body text-fg-secondary">{t("reviews.subtitle")}</p>
-      </div>
+      {/* The shared personal-surface header — same component Home, Jobs,
+          Settings and the Account Overview all open with (cross-page
+          consistency, revisit §6). */}
+      <HomeHeader eyebrow={t("personalNav.reviews")} title={t("reviews.title")} lead={t("reviews.subtitle")} />
 
       {summary.total === 0 ? (
         /* ZERO IS NOT A RATING. A summary block reading 0.0 beside five empty
@@ -74,9 +86,10 @@ export function ReviewsPage({
           body={t("reviews.empty.body")}
         />
       ) : (
-        <>
-          <RatingSummaryBlock summary={summary} t={t} />
-
+        <WorkPane
+          mobileOrder="aside-first"
+          aside={<RatingSummaryBlock summary={summary} locale={locale} t={t} />}
+        >
           <div className="flex flex-wrap items-center justify-between gap-md">
             <h2 className="text-title text-fg">{t("reviews.listTitle")}</h2>
             <RatingFilter summary={summary} active={filter} />
@@ -89,58 +102,67 @@ export function ReviewsPage({
               <p className="text-body text-fg-secondary">{t("reviews.noneMatch")}</p>
             </Card>
           ) : (
-            <ul className="flex flex-col gap-md">
+            <ul className="divide-y rounded-md border bg-surface shadow-card">
               {reviews.map((review) => (
-                <li key={review.id}>
-                  <ReviewCard review={review} t={t} locale={locale} />
+                <li key={review.id} className="p-md">
+                  <ReviewRow review={review} t={t} locale={locale} />
                 </li>
               ))}
             </ul>
           )}
-        </>
+        </WorkPane>
       )}
     </div>
   );
 }
 
 /**
- * The summary block: average, total, and the five-row distribution.
+ * The supporting rail: average, total, and the five-row distribution.
  *
  * Every number here comes from `summarizeReviews` over the same array the list
- * renders, so the block and the rows below it cannot disagree (§9).
+ * renders, so the rail and the rows beside it cannot disagree (§9). Stacked
+ * top to bottom rather than side by side now that it lives in `WorkPane`'s
+ * narrow column, not a full-width card of its own.
  */
 export function RatingSummaryBlock({
   summary,
+  locale,
   t,
 }: {
   summary: RatingSummary;
+  locale: Locale;
   t: TranslateFn;
 }) {
   const average = summary.average ?? 0;
 
   return (
-    <Card className="flex flex-col gap-lg desktop:flex-row desktop:items-center desktop:gap-xl">
-      <div className="flex shrink-0 flex-col items-center gap-2 desktop:w-56">
-        <span className="text-display font-semibold tabular-nums text-fg">
-          {average.toFixed(1)}
-        </span>
-        <Stars value={average} size={20} label={t("reviews.starsLabel", { n: average })} />
-        <span className="text-label text-fg-secondary">
-          {t("reviews.basedOn", { n: summary.total })}
-        </span>
-      </div>
+    <Panel title={t("reviews.summaryTitle")} Icon={StarIcon}>
+      <div className="flex flex-col gap-lg">
+        <div className="flex flex-col items-center gap-2">
+          {/* `formatNumber`, not `.toFixed(1)` — the same Arabic-Indic-digit rule
+              every other headline figure in the product follows (revisit §6). */}
+          <span className="text-display font-semibold tabular-nums text-fg">
+            {formatNumber(average, locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+          </span>
+          <Stars value={average} size={20} label={t("reviews.starsLabel", { n: average })} />
+          <span className="text-label text-fg-secondary">
+            {t("reviews.basedOn", { n: summary.total })}
+          </span>
+        </div>
 
-      <div className="flex flex-1 flex-col gap-2" data-testid="rating-distribution">
-        {distributionRows(summary).map((row) => (
-          <DistributionRow
-            key={row.stars}
-            stars={row.stars}
-            count={row.count}
-            percent={row.percent}
-            label={t("reviews.starsRow", { n: row.stars })}
-          />
-        ))}
+        <div className="flex flex-col gap-2" data-testid="rating-distribution">
+          {distributionRows(summary).map((row) => (
+            <DistributionRow
+              key={row.stars}
+              stars={row.stars}
+              count={row.count}
+              percent={row.percent}
+              label={t("reviews.starsRow", { n: row.stars })}
+              locale={locale}
+            />
+          ))}
+        </div>
       </div>
-    </Card>
+    </Panel>
   );
 }

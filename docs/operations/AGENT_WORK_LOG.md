@@ -4,6 +4,150 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — A dashboard that had quietly become an editor, and the gate that came after
+
+**Date:** 2026-09-05 → 2026-09-06 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `7e2dd6c` (Increment 13) · **Not committed.**
+
+Installer Increment 14: Settings, four pages recomposed, a real screenshot
+comparison that found what the recomposition still got wrong, four corrections
+to answer it, and — before any of it may be committed — the full destructive
+milestone gate the Pilot protocol requires of a persona's last increment.
+
+### A real route, and the naming collision it exposed
+
+`/home/settings` is a composition route only: profile-edit entry, the live
+availability control (the same `AvailabilityControl` component the hub used to
+carry), language switch, theme switch, masked sign-in contact, sign-out. No
+password/2FA/notification-preference UI, because none of those has a backing
+model. Composing it put Portfolio's hub-module tile next to the new job-work
+module for the first time, and both had independently been named "My work" —
+renamed to "Portfolio" / "نماذج الأعمال" (reusing the onboarding flow's own
+existing phrase), display copy only, no authority touched.
+
+`aladdin/ui-foundation` gained a fourth `no-restricted-syntax` check for a
+semantic Tailwind utility that parses like a real token but was never declared
+in `tailwind.config.ts`, so Tailwind silently emits no rule for it
+(`bg-surface-sunken`-class defects). Run repo-wide, it caught four real,
+pre-existing, silently-broken instances — `border-border` (three files),
+`bg-border`, `border-border-strong`, `text-border-strong` (two files) — none in
+Installer code, all inherited Foundation-wide. `PersonalMobileNav`'s bottom bar,
+built on "a personal account has at most five destinations," had quietly grown
+to nine (Points/Reviews/Network/Settings all arrived since); fixed with a
+five-item priority subset, the other four reachable from Account Overview's own
+grid or Home's Quick Access.
+
+### The gate a screenshot review takes, and what it found
+
+A disposable, real-RPC-driven fixture populated all six reference pages for
+Ahmed (`ahmed@example.test`) — real jobs through the full apply→accept→work→
+review lifecycle, real portfolio/certificate bytes, a real approved referral —
+and the six populated pages were captured at 1440px, Arabic, light, and placed
+beside `UI-UX/references/Installer-Technician/`. Home, Jobs, My Work, Reviews
+and Network held up: every remaining difference traced to an already-forbidden
+fabrication (match %, distance, bookmark hearts, card photos) or a documented
+shell choice. **Account Overview did not.** It was carrying the full
+professional-profile editor inline — trades, lead time, languages, service
+area, core services, bio, the live availability card, and a two-paragraph
+public-profile explainer — stacked under the real summary strip and module
+grid, past 2000px of scroll on a 1440px viewport. Two products sharing one
+page, not one dashboard.
+
+### Four corrections, same authority, no new reads
+
+**Account Overview** (`profile-hub.tsx`) was cut to exactly what a dashboard
+needs: identity header → real summary strip → the six-module grid → a
+three-row account action area (Settings, Public Profile, Help). Everything
+removed already lived somewhere real — trades/lead-time/languages/services/bio
+at `/home/profile/edit` (confirmed field-for-field against
+`professional-profile-editor.tsx` before deleting anything), the availability
+toggle already duplicated at `/home/settings`. The Public Profile row replaced
+its own explanatory section: a real link when listed, a stated "not published
+yet" when not — no paragraph either way. Result: **1451px**, down from
+2000px+, at 1440px. **Reviews** moved onto `WorkPane` (the primitive Jobs
+already used) — a dense continuous `ReviewRow` list (no per-row card frame; the
+public profile's own `ReviewCard` is untouched, so the two surfaces did not
+have to become the same component) beside a narrow summary rail, with a new
+`WorkPane` `mobileOrder="aside-first"` prop (opt-in, every other caller
+unaffected) so the rail reads above the list on a phone. **Job Opportunities**
+tightened (`Card pad="sm"`, `wide:grid-cols-3`, filter rail `narrow` not
+`wide`) to fit three compact cards per row at 1440px — no photos, no match %,
+same authority. **Home**'s opportunity preview dropped from four cards to
+three, opened to three columns. One self-introduced regression caught in
+verification, not review: tightening the opportunity card's org-name line to
+`truncate` clipped the *wrong end* of an embedded LTR name inside an RTL line
+(`Delta Wholesale Supply` → `elta Wholesale Supply`) — fixed by dropping the
+truncate and keeping the `<bdi dir="auto">` wrap, verified in both directions.
+
+### The final milestone gate
+
+Everything above ran the frontend-only validation (`tsc`, `eslint`, `vitest`,
+`next build` — all clean) that a composition pass needs. Before this increment
+may be committed, the Pilot's protocol for a persona's *last* increment asks
+for more, run once as a single destructive session against a clean database:
+
+A from-clean `supabase db reset` (61 migrations, in order) · `supabase test
+db` **2016/2016, 52 files** · `db lint` (`public`: 3 pre-existing warnings,
+none new; `app`: clean) · `database.types.ts` regenerated after `drop
+extension pgtap` and found **byte-identical** to the committed file. The
+professional-asset Storage boundary was hit directly, not inferred from policy
+text: anon `list`/unsigned GET/HEAD/PUT/DELETE denied on both buckets (`200
+[]`, `NoSuchKey`, unchanged bytes after the write attempts); the real
+`/p/media/<itemId>` proxy served the one eligible published item and 404'd
+identically for a certificate id, a bogus id, that same item unpublished, and
+that same item — still flagged public — once its profile was delisted via
+`set_profile_hidden`.
+
+A disposable, real-RPC/real-actor-claim Installer journey then ran the
+complete persona: OTP sign-in through Mailpit → profile edit/trades/
+availability → a fresh job posted, applied to, withdrawn, **resubmitted onto
+the same application row** (verified same id), accepted → started, progressed
+to 100% (assignment stays `in_progress` — the installer cannot self-complete,
+confirmed by trying) → poster completes → poster's one immutable review →
+real portfolio/certificate bytes uploaded, published, unpublished (each
+transition re-checked live) → Network picked up the completed-work
+organization with no separate write → a case-B referral, pending → admin-
+approved → **+100 points once**, a second approval call idempotent (same org
+id, no second ledger row). Nine cross-user/negative-authority calls were all
+refused as designed, including the sharpest one: the *poster org's own
+member*, with genuine completed work on file, still could not read the
+installer's private certificate row (0 rows) — completed work is not asset
+ownership. A direct `INSERT` into `points_ledger` by an authenticated
+non-platform user hit `permission denied` — there is no client grant to reach,
+RLS is never even asked. Cleanup ran through the same real RPCs (portfolio/
+certificate purge, referral delete, `reverse_points_entry` compensating
+entry); two rows were structurally undeletable by the product's own
+append-only guards (the one job's real progress history; the one organization
+`network_referral_approve` created, blocked by `audit_log`'s own guard) —
+resolved for good, not merely reported, by the second `db reset` this entry's
+own session performed once the gate finished reading them.
+
+The full 7-page × {desktop 1440px, mobile 390px} × {en, ar} × {light, dark} =
+**56-state** matrix ran in full, not a sample: 0 flagged for overflow, `dir`
+mismatch, console error, or non-2xx response, plus an 8-state manual visual
+pass across every page/viewport/locale/theme combination. The foundation
+guard's own unit tests were re-run in isolation (11/11, still catching
+`surface-sunken`/`warning-fg`/`border-line`/`text-heading`, still passing the
+current vocabulary) before the repo-wide `eslint` pass.
+
+### Validation
+
+Frontend: `tsc --noEmit` clean · `eslint` 0 errors (1 pre-existing, unrelated)
+· `vitest` **105 files / 1324 tests** · production `next build` clean, 92
+routes. Database: clean `db reset` (×2 — once for the gate, once after it to
+clear the gate's own unavoidable residue) · pgTAP **2016/2016, 52 files** ·
+`db lint` clean (`app`) / 3 pre-existing (`public`) · `database.types.ts`
+byte-identical · Storage boundary and `/p/media` proxy verified directly · one
+full destructive Installer E2E journey and 9 cross-user negative checks, all
+as expected · 56/56 responsive/locale/theme states clean. `scripts/
+check_doc_links.py`: 956 links / 114 files / 0 broken. Final local reset
+confirmed the seeded baseline exactly (0 gate residue anywhere Ahmed's data
+was checked) and the working tree clean.
+
+`RUNTIME_STATE.md` reconciled with a new override carrying this account. **Not
+committed, not pushed. Full Chat is next, not started.**
+
+---
+
 ## Session — A network nobody built, and a level that was never stored
 
 **Date:** 2026-09-03 → 2026-09-05 · **Branch:** `feature/installer-pilot` · **Base:** `main` @ `7e45e28` · **Prior:** `32f7a81` (Increment 12)

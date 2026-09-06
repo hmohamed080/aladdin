@@ -21,7 +21,7 @@ export function WizardProgress({ current, total, label }: { current: number; tot
     <div className="flex flex-col gap-2.5">
       <p className="text-label font-medium text-fg-muted">
         {t("onboarding.stepLabel", { current: current + 1, total })}
-        <span className="mx-2 text-border-strong" aria-hidden="true">·</span>
+        <span className="mx-2 text-fg-muted" aria-hidden="true">·</span>
         <span className="text-fg-secondary">{label}</span>
       </p>
       <ol

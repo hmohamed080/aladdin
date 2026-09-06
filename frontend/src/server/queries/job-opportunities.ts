@@ -49,6 +49,10 @@ export type OpportunityFilters = {
   governorate?: string;
   /** "no" = not yet applied, "yes" = already applied, undefined = both. */
   applied?: "yes" | "no";
+  /** Row cap. Defaults to `LIST_LIMIT` — a caller previewing a handful on
+   *  `/home` (Increment 14) passes a small number rather than fetching the
+   *  full page and slicing client-side. */
+  limit?: number;
 };
 
 /**
@@ -68,7 +72,7 @@ export async function listJobOpportunities(
     .from("open_job_opportunities")
     .select("*")
     .order("published_at", { ascending: false })
-    .limit(LIST_LIMIT);
+    .limit(f.limit ?? LIST_LIMIT);
 
   const term = f.search ? sanitizeSearchTerm(f.search) : "";
   if (term) {

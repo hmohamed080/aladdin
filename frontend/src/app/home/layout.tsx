@@ -6,7 +6,7 @@ import { getMessages } from "@/lib/i18n/translate";
 import { getWorkspaces } from "@/server/queries/workspace";
 import { loadIsSalesPersona } from "@/server/queries/sales-persona";
 import { loadPersonalHome } from "@/server/queries/personal-home";
-import { personalNavKeys } from "@/lib/nav/personal-modules";
+import { personalNavKeys, personalMobileNavKeys } from "@/lib/nav/personal-modules";
 import { PersonalNavPanel, PersonalMobileNav } from "@/components/layout/personal-nav";
 import { PERSONAL_CONTEXT, personalEntry } from "@/lib/workspace/model";
 import { AppHeader } from "@/components/layout/app-header";
@@ -87,10 +87,11 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
               mode={sidebarMode}
               appName={m.common.appName}
               nav={<PersonalNavPanel keys={navKeys} />}
-              /* No Settings/Upgrade block. Both of the workspace's point at
-                 `/b2b/settings`, which this account is redirected out of, and
-                 "upgrade your plan" is a business concept. A personal settings
-                 route is specified but not built. */
+              /* No separate Settings/Upgrade footer block. Settings is a real
+                 route now (`/home/settings`, Increment 14), but it is a normal
+                 row inside `personalNavKeys`' own "account" group rather than
+                 pinned chrome — "upgrade your plan" is a business concept this
+                 surface has no equivalent of. */
               footer="none"
             />
           ) : undefined
@@ -109,6 +110,11 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
                no navigation at all (a caller mid-redirect) the header falls back
                to carrying it itself. */
             variant={navKeys.length > 0 ? "card" : "bar"}
+            /* The account menu's "Account preferences" link. Points at the
+               same route the nav's own Settings row does — one destination,
+               reached two ways, never two different pages for the same
+               concern. */
+            preferencesHref={navKeys.includes("settings") ? "/home/settings" : undefined}
             context={
               <WorkspaceSwitcher
                 entries={entries}
@@ -118,7 +124,9 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
             }
           />
         }
-        mobileNav={navKeys.length > 0 ? <PersonalMobileNav keys={navKeys} /> : undefined}
+        mobileNav={
+          navKeys.length > 0 ? <PersonalMobileNav keys={personalMobileNavKeys(navKeys)} /> : undefined
+        }
       >
         {children}
       </AppShell>

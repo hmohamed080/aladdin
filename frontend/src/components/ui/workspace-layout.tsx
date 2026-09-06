@@ -394,20 +394,31 @@ export function KpiStrip({
  * beside it that holds context about that list.
  *
  * The aside is not a sidebar and must not hold navigation or controls the main
- * column depends on — below `desktop` it stacks UNDER the main column, and
- * anything essential would disappear below the fold on a tablet. What belongs
- * there is what the reference puts there: a breakdown of what the list contains,
- * a short ranking, a recent-activity list. Read-only context.
+ * column depends on — below `desktop` it stacks UNDER the main column by
+ * default, and anything essential would disappear below the fold on a
+ * tablet. What belongs there is what the reference puts there: a breakdown
+ * of what the list contains, a short ranking, a recent-activity list.
+ * Read-only context.
  */
 export function WorkPane({
   children,
   aside,
   /** `wide` gives the aside more room — right for a breakdown with figures. */
   asideWidth = "narrow",
+  /**
+   * Stacking order below `desktop`. `content-first` (default) is every
+   * existing caller: the working list leads, the rail follows. `aside-first`
+   * puts the rail ABOVE the list instead — for a rail that is a SUMMARY of
+   * what follows (Reviews' average/total/distribution) rather than a
+   * breakdown alongside it, reading it after the list it summarizes would be
+   * backwards on a phone.
+   */
+  mobileOrder = "content-first",
 }: {
   children: ReactNode;
   aside?: ReactNode;
   asideWidth?: "narrow" | "wide";
+  mobileOrder?: "content-first" | "aside-first";
 }) {
   if (!aside) return <div className="flex min-w-0 flex-col gap-md">{children}</div>;
   return (
@@ -417,8 +428,22 @@ export function WorkPane({
         asideWidth === "wide" ? "desktop:grid-cols-[1fr_22rem]" : "desktop:grid-cols-[1fr_18rem]",
       )}
     >
-      <div className="flex min-w-0 flex-col gap-md">{children}</div>
-      <aside className="flex min-w-0 flex-col gap-md">{aside}</aside>
+      <div
+        className={cn(
+          "flex min-w-0 flex-col gap-md",
+          mobileOrder === "aside-first" && "order-2 desktop:order-none",
+        )}
+      >
+        {children}
+      </div>
+      <aside
+        className={cn(
+          "flex min-w-0 flex-col gap-md",
+          mobileOrder === "aside-first" && "order-1 desktop:order-none",
+        )}
+      >
+        {aside}
+      </aside>
     </div>
   );
 }

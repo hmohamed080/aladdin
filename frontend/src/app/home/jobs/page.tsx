@@ -11,8 +11,11 @@ import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { tradeLabel } from "@/lib/i18n/trade-label";
 import { createTranslator } from "@/lib/i18n/translate";
 import { HomeHeader } from "@/features/home/parts";
+import { Panel, WorkPane } from "@/components/ui/workspace-layout";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { ButtonLink } from "@/components/ui/controls";
+import { BriefcaseIcon, FilterIcon } from "@/components/ui/icons";
+import { formatCount } from "@/lib/ui/format";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
 import { OpportunityList } from "@/features/jobs/opportunity-list";
 import {
@@ -23,20 +26,34 @@ import {
 export const dynamic = "force-dynamic";
 
 /**
- * Job Opportunities — the professional's discovery surface.
+ * Job Opportunities — the professional's discovery surface (revisit,
+ * Increment 14, reference 02).
  *
- * The read seam decides what exists. `open_job_opportunities` returns open jobs
- * whose poster is CURRENTLY verified, active and not deleted, and it decides
- * that inside its own definer with a live join — so this page never asks about
- * verification, never filters on it, and cannot get it wrong. Filters here can
- * only narrow that set.
+ * COMPOSITION ONLY. The read seam and every filter dimension are Increment
+ * 8's, unchanged: `open_job_opportunities` decides what exists (open, poster
+ * currently verified) inside its own definer, so this page never asks about
+ * verification and filters can only narrow that set, never widen it. O5
+ * still holds — the trade filter is a convenience, unset by default, and
+ * nothing here reads the caller's declared trades.
  *
- * O5, ON THIS PAGE. The trade filter is a convenience and is unset by default.
- * Nothing on this route reads the caller's declared trades, and an opening in a
- * trade they have never claimed is listed, opened and applied for identically.
- * The note under the toolbar says so in the reader's own language, because the
- * trade dropdown is the one control here a professional could reasonably mistake
- * for a rule about who is allowed to apply.
+ * THE GEOMETRY CHANGE: filters move into their own rail beside the results,
+ * matching the reference's column balance, rather than a single inline bar
+ * above a full-width grid. `FilterBar variant="flush"` composes into the
+ * SAME `Panel` surface as the note under it, instead of nesting FilterBar's
+ * own card inside a second one (the same fix Increment 13 made for the
+ * Network hero+search block).
+ *
+ * DENSITY CORRECTION (Increment 14): the rail took `WorkPane`'s `wide`
+ * (22rem) width in the first pass, which read as an oversized empty panel
+ * beside three compact filters. It now takes the default `narrow` (18rem) —
+ * the same width Jobs' own filter fields already wrap onto their own line
+ * at either width, so nothing about the filters themselves changes — and the
+ * results column keeps the width the rail gave back, which is what lets the
+ * card grid open to three columns at `wide`.
+ *
+ * STILL NO: match percentage, distance/km, a map, bookmark hearts, ratings,
+ * the private site address, or a fabricated image — none of those have
+ * authority in this domain, and none were added here.
  */
 export default async function JobOpportunitiesPage({
   searchParams,
@@ -84,7 +101,7 @@ export default async function JobOpportunitiesPage({
   ]);
 
   return (
-    <div className="flex flex-col gap-xl" data-testid="job-opportunities">
+    <div className="flex flex-col gap-md" data-testid="job-opportunities">
       <HomeHeader
         eyebrow={m.jobs.opportunities.title}
         title={m.jobs.opportunities.title}
@@ -96,50 +113,67 @@ export default async function JobOpportunitiesPage({
         }
       />
 
-      <div>
-        <FilterBar
-          basePath="/home/jobs"
-          search={{
-            name: "q",
-            value: sp.q ?? "",
-            placeholder: m.jobs.opportunities.searchPlaceholder,
-          }}
-          selects={[
-            {
-              name: "trade",
-              label: m.jobs.field.trade,
-              value: sp.trade ?? "",
-              anyLabel: m.jobs.opportunities.allTrades,
-              options: trades.map((tr) => ({ value: tr.key, label: tradeLabel(t, tr.key) })),
-            },
-            {
-              name: "gov",
-              label: m.jobs.field.governorate,
-              value: sp.gov ?? "",
-              anyLabel: m.jobs.opportunities.allLocations,
-              // Free text the posters wrote, so the label IS the value — there
-              // is no catalog key here to translate through.
-              options: governorates.map((g) => ({ value: g, label: g })),
-            },
-            {
-              name: "applied",
-              label: m.jobs.applications.title,
-              value: applied ?? "",
-              anyLabel: m.jobs.opportunities.allApplications,
-              options: [
-                { value: "no", label: m.jobs.opportunities.notApplied },
-                { value: "yes", label: m.jobs.opportunities.appliedOnly },
-              ],
-            },
-          ]}
-          clearLabel={m.jobs.opportunities.clear}
-        />
-        <p className="-mt-md mb-lg text-caption text-fg-muted">
-          {m.jobs.opportunities.offTradeNote}
-        </p>
-      </div>
-
-      <OpportunityList opportunities={opportunities} locale={locale} filtered={filtered} />
+      <WorkPane
+        aside={
+          <Panel title={t("jobs.opportunities.filtersTitle")} Icon={FilterIcon}>
+            <div className="flex flex-col gap-sm">
+              <FilterBar
+                variant="flush"
+                basePath="/home/jobs"
+                search={{
+                  name: "q",
+                  value: sp.q ?? "",
+                  placeholder: m.jobs.opportunities.searchPlaceholder,
+                }}
+                selects={[
+                  {
+                    name: "trade",
+                    label: m.jobs.field.trade,
+                    value: sp.trade ?? "",
+                    anyLabel: m.jobs.opportunities.allTrades,
+                    options: trades.map((tr) => ({ value: tr.key, label: tradeLabel(t, tr.key) })),
+                  },
+                  {
+                    name: "gov",
+                    label: m.jobs.field.governorate,
+                    value: sp.gov ?? "",
+                    anyLabel: m.jobs.opportunities.allLocations,
+                    // Free text the posters wrote, so the label IS the value —
+                    // there is no catalog key here to translate through.
+                    options: governorates.map((g) => ({ value: g, label: g })),
+                  },
+                  {
+                    name: "applied",
+                    label: m.jobs.applications.title,
+                    value: applied ?? "",
+                    anyLabel: m.jobs.opportunities.allApplications,
+                    options: [
+                      { value: "no", label: m.jobs.opportunities.notApplied },
+                      { value: "yes", label: m.jobs.opportunities.appliedOnly },
+                    ],
+                  },
+                ]}
+                clearLabel={m.jobs.opportunities.clear}
+              />
+              <p className="border-t pt-sm text-caption text-fg-muted">
+                {m.jobs.opportunities.offTradeNote}
+              </p>
+            </div>
+          </Panel>
+        }
+      >
+        <Panel
+          title={m.jobs.opportunities.title}
+          Icon={BriefcaseIcon}
+          badge={
+            <span className="rounded-pill bg-surface-2 px-2 py-0.5 text-label font-medium text-fg-secondary tabular-nums">
+              {formatCount(opportunities.length, locale)}
+            </span>
+          }
+        >
+          <OpportunityList opportunities={opportunities} locale={locale} filtered={filtered} />
+        </Panel>
+      </WorkPane>
     </div>
   );
 }

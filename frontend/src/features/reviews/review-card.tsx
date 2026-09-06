@@ -32,11 +32,50 @@ export function ReviewCard({
   t: TranslateFn;
   locale: Locale;
 }) {
+  return (
+    <Card pad="sm" className="flex flex-col gap-3">
+      <ReviewCardContent review={review} t={t} locale={locale} />
+    </Card>
+  );
+}
+
+/**
+ * The same review, without its own card frame — for `/home/reviews`'s dense
+ * continuous list, where the surrounding `<ul>` already draws the border and
+ * each row is separated by a rule rather than by its own shadow. The public
+ * profile keeps `ReviewCard` itself (a card per review, unchanged) — this is
+ * an ADDITION for the account owner's own list, never a replacement.
+ */
+export function ReviewRow({
+  review,
+  t,
+  locale,
+}: {
+  review: Review;
+  t: TranslateFn;
+  locale: Locale;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <ReviewCardContent review={review} t={t} locale={locale} />
+    </div>
+  );
+}
+
+function ReviewCardContent({
+  review,
+  t,
+  locale,
+}: {
+  review: Review;
+  t: TranslateFn;
+  locale: Locale;
+}) {
   const trade = review.tradeKey ? tradeLabel(t, review.tradeKey) : null;
   const context = [review.jobTitle, trade].filter(Boolean).join(" · ");
 
   return (
-    <Card pad="sm" className="flex flex-col gap-3">
+    <>
       <div className="flex flex-wrap items-start justify-between gap-md">
         <div className="flex min-w-0 items-center gap-3">
           <Monogram name={review.orgName} size={36} />
@@ -80,6 +119,6 @@ export function ReviewCard({
           <bdi dir="auto">{review.comment}</bdi>
         </p>
       ) : null}
-    </Card>
+    </>
   );
 }

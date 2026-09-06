@@ -3,6 +3,7 @@ import {
   personalNavKeys,
   personalNavSections,
   personalNavItem,
+  personalMobileNavKeys,
   activePersonalNavKey,
   type PersonalNavKey,
 } from "./personal-modules";
@@ -18,9 +19,9 @@ import {
  * of the stack has stopped telling.
  */
 describe("personalNavKeys", () => {
-  it("gives a consumer a home and the option to start a business — and no profile", () => {
+  it("gives a consumer a home, Settings, and the option to start a business — and no profile", () => {
     const keys = personalNavKeys({ variant: "consumer", isSalesPersona: false });
-    expect(keys).toEqual(["home", "addBusiness"]);
+    expect(keys).toEqual(["home", "settings", "addBusiness"]);
     expect(keys).not.toContain("points");
     // Not withheld — a consumer has no professional profile to show.
     expect(keys).not.toContain("profile");
@@ -32,6 +33,7 @@ describe("personalNavKeys", () => {
       "home",
       "profile",
       "points",
+      "settings",
       "jobs",
       "myWork",
       "reviews",
@@ -54,6 +56,7 @@ describe("personalNavKeys", () => {
       "home",
       "profile",
       "points",
+      "settings",
       "jobs",
       "myWork",
       "reviews",
@@ -101,7 +104,7 @@ describe("personalNavKeys", () => {
     }
     // And the union covers the whole key space — a key nothing can reach would be
     // an entry that exists only in the map.
-    expect(emitted.size).toBe(9);
+    expect(emitted.size).toBe(10);
   });
 });
 
@@ -292,5 +295,69 @@ describe("My Work in the personal rail", () => {
     expect(personalNavItem("jobs").href).not.toBe(personalNavItem("myWork").href);
     expect(activePersonalNavKey("/home/jobs/applications")).toBe("jobs");
     expect(activePersonalNavKey("/home/work/a1")).toBe("myWork");
+  });
+});
+
+/**
+ * Settings (Increment 14, D7). Reachable by BOTH variants — unlike Points,
+ * Jobs, My Work, Reviews and Network, which are permanently empty or refused
+ * for a consumer, locale/appearance/sign-in-identity/sign-out are not a
+ * professional-only need.
+ */
+describe("Settings in the personal rail", () => {
+  it("resolves to /home/settings and its own label key", () => {
+    expect(personalNavItem("settings")).toEqual({
+      key: "settings",
+      href: "/home/settings",
+      labelKey: "personalNav.settings",
+    });
+  });
+
+  it("is a destination for BOTH a consumer and a professional", () => {
+    expect(personalNavKeys({ variant: "consumer", isSalesPersona: false })).toContain("settings");
+    expect(personalNavKeys({ variant: "professional", isSalesPersona: false })).toContain("settings");
+  });
+
+  it("joins the account group, not work or business", () => {
+    const sections = personalNavSections({ variant: "professional", isSalesPersona: false });
+    expect(sections.find((s) => s.section === "account")?.keys).toEqual([
+      "home",
+      "profile",
+      "points",
+      "settings",
+    ]);
+  });
+
+  it("stays active on its own route and does not swallow a similarly-named one", () => {
+    expect(activePersonalNavKey("/home/settings")).toBe("settings");
+    expect(activePersonalNavKey("/home")).toBe("home");
+  });
+});
+
+/**
+ * The mobile bottom bar's own curated list (Increment 14, §8).
+ *
+ * `PersonalMobileNav` has no "More" sheet — it was built assuming five
+ * destinations always fit, which a professional's real nine no longer do.
+ * This is the fix: a fixed five-item priority list, not the full rail.
+ */
+describe("personalMobileNavKeys", () => {
+  it("narrows a professional's nine destinations to five for the bottom bar", () => {
+    const full = personalNavKeys({ variant: "professional", isSalesPersona: false });
+    expect(full.length).toBe(9);
+    expect(personalMobileNavKeys(full)).toEqual(["home", "jobs", "myWork", "network", "profile"]);
+  });
+
+  it("drops Points, Reviews, Settings and Add business from the bar — each still reachable elsewhere", () => {
+    const full = personalNavKeys({ variant: "professional", isSalesPersona: false });
+    const mobile = personalMobileNavKeys(full);
+    for (const key of ["points", "reviews", "settings", "addBusiness"] as PersonalNavKey[]) {
+      expect(mobile).not.toContain(key);
+    }
+  });
+
+  it("keeps a consumer's short list unchanged, so a bar that already fits is not disturbed", () => {
+    const full = personalNavKeys({ variant: "consumer", isSalesPersona: false });
+    expect(personalMobileNavKeys(full)).toEqual(full);
   });
 });

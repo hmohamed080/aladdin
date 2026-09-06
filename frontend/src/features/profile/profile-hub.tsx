@@ -1,122 +1,94 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { Card, StatePanel } from "@/components/ui/primitives";
-import { Button } from "@/components/ui/controls";
-import { UserIcon, GlobeIcon, TargetIcon, MapPinIcon } from "@/components/ui/icons";
+import { Button, ButtonLink } from "@/components/ui/controls";
+import {
+  UserIcon,
+  GlobeIcon,
+  SettingsIcon,
+  HelpIcon,
+  GaugeIcon,
+  StarIcon,
+  ClipboardIcon,
+} from "@/components/ui/icons";
+import { StatTiles, type Tile } from "@/components/ui/stat-tiles";
 import type { PersonalHomeData } from "@/server/queries/personal-home";
 import type { ProfilePublication } from "@/server/queries/professional-profile";
 import type { TranslateFn } from "@/lib/i18n/translate";
-import { languageLabel } from "@/lib/i18n/language-label";
-import { AvailabilityControl } from "@/features/profile/availability-control";
-import { TradeSummary } from "@/features/profile/trade-summary";
-import type { MyTrades } from "@/server/queries/trades";
-import { specializationLabel } from "@/lib/i18n/trade-label";
-import { ChipList, DetailCard, HomeHeader, HomeSection, VerificationBadge } from "@/features/home/parts";
+import type { Locale } from "@/lib/i18n/locales";
+import { AvailabilityBadge } from "@/features/profile/availability-status";
+import { HomeHeader, HomeSection, VerificationBadge } from "@/features/home/parts";
 import type { ProfessionalAssetSummary } from "@/server/queries/portfolio";
 import { CertificatesModule, PortfolioModule } from "@/features/portfolio/hub-modules";
 import { ReviewsModule } from "@/features/reviews/hub-module";
 import { NetworkModule } from "@/features/network/hub-module";
+import { WorkModule } from "@/features/work/hub-module";
+import { PointsModule } from "@/features/points/hub-module";
 import type { RatingSummary } from "@/lib/reviews/summary";
 import type { NetworkOrganization } from "@/server/queries/network";
+import { formatNumber } from "@/lib/ui/format";
 
 /**
- * The profile hub.
+ * The Account Overview (revisit, Increment 14, reference 04) — a real
+ * account DASHBOARD, not a vertically-expanded profile editor.
  *
- * COMPOSITION follows the reference account overview — an identity header, then a
- * grid of grouped cards, then a quiet strip at the end. CONTENT does not: the
- * reference's stat rail (ratings, completed jobs, points), its learning and
- * rewards cards, and its network card are each either a later increment or an
- * unapproved element, and a card that leads nowhere is worse than an absent one.
- * So the grid holds what the model actually knows about this professional.
+ * WHAT THIS PAGE IS FOR, AND WHAT IT IS NOT. It answers "what does my
+ * account actually say, at a glance" — identity, a real summary strip, and a
+ * grid of every real module (Work, Portfolio, Certificates, Reviews, Points,
+ * Network). It is deliberately NOT the place the full professional-profile
+ * detail (trades, lead time, languages, service area, core services, bio)
+ * or the live availability toggle live — those already have owners
+ * (`/home/profile/edit` and `/home/settings`), and reproducing their full
+ * content here a second time is what turned the previous pass into a
+ * 2000px+ scroll mixing two different products. This page links to those
+ * destinations instead of restating them.
  *
- * THE ONE THING THIS PAGE ADDS to what `/home` already shows is the PUBLICATION
- * boundary — what of this profile is public, and what is not. It is stated as a
- * fact with no control beside it, because `public_profile_status` is written only
- * by the approved upgrade workflow: rendering a toggle a person cannot operate
- * would be a lie about who decides.
+ * STILL NOTHING FABRICATED. No completion percentage, no verification
+ * score, no invented rating, no fake count — the strip and every module
+ * render only what its own query returned; see each module's own comment
+ * for its specific zero-state (never a `0.0` or a `0` presented as though it
+ * were a meaningful reading).
  */
 export function ProfileHub({
   data,
   publication,
-  trades,
   assets,
   reviews,
   network,
+  pointsBalance,
+  completedJobsCount,
+  locale,
   t,
 }: {
   data: PersonalHomeData;
   publication: ProfilePublication;
-  /** The canonical selection (Increment 5). Read-only here; the editor owns it. */
-  trades: MyTrades;
   /** Real Portfolio and Certificate counts (Increment 11). */
   assets: ProfessionalAssetSummary;
   /** The caller's real rating, from the same rows /home/reviews lists. */
   reviews: RatingSummary;
   /** The caller's real network, from the same rows /home/network lists. */
   network: readonly NetworkOrganization[];
+  /** The same balance /home/points reads. */
+  pointsBalance: number;
+  /** Completed assignments — the same count /home/work's summary derives. */
+  completedJobsCount: number;
+  locale: Locale;
   t: TranslateFn;
 }) {
   const { professional: p, verification } = data;
   const persona = t(`accountType.${data.accountType}`);
   const name = data.displayName || t("personalHome.professional.friend");
 
-  const location = [
-    p.governorate ? t(`onboarding.consumer.governorates.${p.governorate}`) : null,
-    p.city ? t(`onboarding.consumer.cities.${p.city}`) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-  const practiceRows = [
+  const tiles: Tile[] = [
+    { label: t("profile.snapshot.reviews"), value: reviews.total, Icon: StarIcon, tone: "warning", href: "/home/reviews" },
     {
-      /* THE FREE-TEXT SPECIALIZATION IS NOT SHOWN WHEN A CANONICAL TRADE EXISTS.
-         They are the same claim in two vocabularies, and printing both would put
-         "Marble & granite" above "Marble and granite fixing" with nothing to say
-         which one the platform actually uses. The structured trade is authority
-         (§4.1), so it wins and this row disappears; with no trade declared, the
-         legacy text is still the only answer there is and is kept.
-
-         `specializationLabel`, not the raw catalog: this column holds a
-         vocabulary key in some rows and a sentence in every seeded one, and the
-         catalog lookup printed the message PATH for the second kind. */
-      label: t("onboarding.professional.identity.specializationLabel"),
-      value:
-        trades.keys.length > 0 || !p.specialization
-          ? null
-          : specializationLabel(t, p.specialization),
+      label: t("profile.snapshot.rating"),
+      value: reviews.average === null ? "—" : formatNumber(reviews.average, locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+      Icon: StarIcon,
+      tone: "warning",
+      href: "/home/reviews",
     },
-    {
-      label: t("onboarding.professional.identity.yearsLabel"),
-      value: p.yearsExperience === null ? null : t("personalHome.professional.years", { n: p.yearsExperience }),
-    },
-    {
-      // DELIBERATELY NOT "Availability". This row is the one-off LEAD TIME picked
-      // during onboarding (within a week / within a month / flexible). Increment 4
-      // added a live availability flag to this same page, and two rows sharing one
-      // word would make both meaningless. The onboarding label is left alone —
-      // in that flow, in context, it is not ambiguous.
-      label: t("profile.hub.leadTime"),
-      value: p.availability ? t(`onboarding.professional.availabilities.${p.availability}`) : null,
-    },
-    {
-      label: t("onboarding.professional.services.languagesLabel"),
-      value: p.languages.map((k) => languageLabel(t, k)).join(" · ") || null,
-    },
-  ];
-
-  const locationRows = [
-    { label: t("personalHome.professional.baseLocation"), value: location || null },
-    {
-      label: t("onboarding.professional.location.areasLabel"),
-      value: p.serviceAreas.map((k) => t(`onboarding.consumer.cities.${k}`)).join(" · ") || null,
-    },
-    {
-      label: t("personalHome.professional.travel"),
-      value: p.maxTravelKm === null ? null : t("personalHome.professional.travelValue", { n: p.maxTravelKm }),
-    },
-    {
-      label: t("onboarding.professional.location.remoteLabel"),
-      value: t(p.offersRemote ? "personalHome.yes" : "personalHome.no"),
-    },
+    { label: t("profile.snapshot.completedJobs"), value: completedJobsCount, Icon: ClipboardIcon, tone: "success", href: "/home/work" },
+    { label: t("profile.snapshot.points"), value: pointsBalance, Icon: GaugeIcon, tone: "accent", href: "/home/points" },
   ];
 
   return (
@@ -126,155 +98,105 @@ export function ProfileHub({
         title={name}
         name={data.displayName}
         lead={p.headline ?? t("personalHome.professional.noHeadline")}
-        meta={<VerificationBadge state={verification.state} t={t} />}
+        meta={
+          <>
+            <VerificationBadge state={verification.state} t={t} />
+            <AvailabilityBadge available={data.availability.available} t={t} />
+            <ButtonLink href="/home/profile/edit" variant="outline" size="sm">
+              {t("profile.hub.edit")}
+            </ButtonLink>
+          </>
+        }
       />
 
-      <HomeSection
-        title={t("profile.trades.title")}
-        description={t("profile.trades.body")}
-        action={
-          <Link href="/home/profile/edit">
-            <Button type="button" variant="outline">
-              {t("profile.hub.edit")}
-            </Button>
-          </Link>
-        }
-      >
-        {/* STATED HERE, CHOSEN IN THE EDITOR — the same division every other
-            practice fact on this page follows. The one control the hub does own
-            is availability, and it is here because it is the thing a professional
-            changes weekly rather than once. */}
-        <Card>
-          <TradeSummary trades={trades} />
-        </Card>
-      </HomeSection>
+      <StatTiles tiles={tiles} locale={locale} layout="strip" columns={4} />
 
-      <HomeSection
-        title={t("profile.availability.title")}
-        description={t("profile.availability.body")}
-      >
-        <AvailabilityControl availability={data.availability} />
-      </HomeSection>
-
-      {/* PORTFOLIO AND CERTIFICATES sit here, between the things a professional
-          keeps up to date (availability) and the things the editor owns
-          (practice, location, services). They belong to the first group: work is
-          added week to week, and a certificate expires on its own schedule.
-
-          This is NOT the final Account Overview redesign — that is Increment 14.
-          The reference's module shape is adopted; its stat rail, learning card,
-          rewards card and network card are still later increments, and a card
-          that leads nowhere remains worse than an absent one. */}
-      <HomeSection
-        title={t("profile.work.title")}
-        description={t("profile.work.body")}
-      >
-        <div className="grid gap-md desktop:grid-cols-2">
+      <HomeSection title={t("profile.work.title")} description={t("profile.work.body")}>
+        <div className="grid gap-md tablet:grid-cols-2 desktop:grid-cols-3">
+          <WorkModule completedCount={completedJobsCount} t={t} />
           <PortfolioModule summary={assets} publicItemId={assets.previewItemId} t={t} />
           <CertificatesModule summary={assets} t={t} />
-          {/* Reviews and Network join the same grid rather than opening a
-              section of their own. All four belong together for the same
-              reason: this is what completed work leaves behind — what a
-              client sees (portfolio, certificates, reviews) and who the
-              professional has actually worked for (network) — and the
-              reference account overview keeps them at one level. */}
           <ReviewsModule summary={reviews} t={t} />
+          <PointsModule balance={pointsBalance} locale={locale} t={t} />
           <NetworkModule organizations={network} t={t} />
         </div>
       </HomeSection>
 
-      <HomeSection
-        title={t("profile.hub.title")}
-        description={t("profile.hub.body")}
-        action={
-          <Link href="/home/profile/edit">
-            <Button type="button" variant="primary">
-              {t("profile.hub.edit")}
-            </Button>
-          </Link>
-        }
-      >
-        <div className="grid gap-md desktop:grid-cols-2">
-          <DetailCard title={t("personalHome.professional.profile")} rows={practiceRows} t={t} />
-          <DetailCard title={t("personalHome.professional.serviceLocation")} rows={locationRows} t={t} />
+      {/* THE ACCOUNT ACTION AREA — three real destinations, never their full
+          content restated here. Trades, lead time, languages, service area,
+          core services and bio all belong to `/home/profile/edit`; the live
+          availability toggle belongs to `/home/settings` (the identity
+          header above already carries the read-only badge for it); and the
+          public profile is a real link when listed, a real state when not —
+          never the two-paragraph explainer a prior pass duplicated here. */}
+      <HomeSection title={t("profile.accountArea.title")}>
+        <div className="flex flex-col divide-y rounded-md border bg-surface shadow-card">
+          <AccountActionRow
+            icon={<SettingsIcon size={20} />}
+            title={t("personalNav.settings")}
+            body={t("profile.accountArea.settingsBody")}
+          >
+            <Link href="/home/settings">
+              <Button type="button" variant="outline">
+                {t("personalNav.settings")}
+              </Button>
+            </Link>
+          </AccountActionRow>
+
+          <AccountActionRow
+            icon={<GlobeIcon size={20} />}
+            title={t("profile.public.title")}
+            body={publication.listed ? t("profile.public.listedTitle") : t("profile.public.hiddenTitle")}
+          >
+            {publication.listed && publication.profileId ? (
+              <Link href={`/p/${publication.profileId}`}>
+                <Button type="button" variant="outline">
+                  <span className="flex items-center gap-2">
+                    <UserIcon size={16} />
+                    {t("profile.public.view")}
+                  </span>
+                </Button>
+              </Link>
+            ) : null}
+          </AccountActionRow>
+
+          <AccountActionRow icon={<HelpIcon size={20} />} title={t("profile.accountArea.support")}>
+            <Link href="/auth/support">
+              <Button type="button" variant="ghost">
+                {t("profile.accountArea.support")}
+              </Button>
+            </Link>
+          </AccountActionRow>
         </div>
-
-        <Card className="flex flex-col gap-md">
-          <div className="flex items-center gap-2">
-            <TargetIcon size={18} className="shrink-0 text-fg-secondary" />
-            <h3 className="text-title text-fg">{t("onboarding.professional.services.coreLabel")}</h3>
-          </div>
-          <ChipList
-            items={p.services.map((k) => t(`onboarding.professional.serviceItems.${k}`))}
-            empty={t("personalHome.professional.noServices")}
-          />
-          {p.additionalServices.length > 0 ? (
-            <>
-              <h4 className="text-label font-medium text-fg-muted">
-                {t("onboarding.professional.services.additionalLabel")}
-              </h4>
-              <ChipList
-                items={p.additionalServices.map((k) => t(`onboarding.professional.serviceItems.${k}`))}
-                empty={t("personalHome.professional.noServices")}
-              />
-            </>
-          ) : null}
-          {p.bio ? <p className="max-w-prose text-body text-fg-secondary">{p.bio}</p> : null}
-        </Card>
-      </HomeSection>
-
-      <HomeSection title={t("profile.public.title")} description={t("profile.public.body")}>
-        <PublicProfileCard publication={publication} t={t} />
       </HomeSection>
     </div>
   );
 }
 
-/**
- * What the public can see, and whether they can see it yet.
- *
- * Two states, and neither is an error. LISTED offers the real link, so a
- * professional can read their own public page exactly as a stranger would.
- * NOT LISTED explains that listing follows verification — the same separation the
- * dashboard draws between trust and access — and offers no control, because there
- * is none to offer.
- */
-function PublicProfileCard({
-  publication,
-  t,
+/** One row of the account action area: an icon, a real destination's name and state, and its action. */
+function AccountActionRow({
+  icon,
+  title,
+  body,
+  children,
 }: {
-  publication: ProfilePublication;
-  t: TranslateFn;
+  icon: ReactNode;
+  title: string;
+  body?: string;
+  children?: ReactNode;
 }) {
-  if (!publication.listed || !publication.profileId) {
-    return (
-      <StatePanel
-        icon={<GlobeIcon size={22} />}
-        title={t("profile.public.hiddenTitle")}
-        body={t("profile.public.hiddenBody")}
-      />
-    );
-  }
-
   return (
-    <Card className="flex flex-wrap items-center justify-between gap-md">
+    <div className="flex flex-wrap items-center justify-between gap-md p-md">
       <div className="flex min-w-0 items-center gap-3">
         <span aria-hidden="true" className="shrink-0 text-fg-secondary">
-          <MapPinIcon size={20} />
+          {icon}
         </span>
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <p className="font-medium text-fg">{t("profile.public.listedTitle")}</p>
-          <p className="text-label text-fg-secondary">{t("profile.public.listedBody")}</p>
+        <div className="min-w-0">
+          <p className="font-medium text-fg">{title}</p>
+          {body ? <p className="text-label text-fg-secondary">{body}</p> : null}
         </div>
       </div>
-      <Link href={`/p/${publication.profileId}`} className="shrink-0">
-        <Button type="button" variant="outline">
-          <span className="flex items-center gap-2">
-            <UserIcon size={16} />
-            {t("profile.public.view")}
-          </span>
-        </Button>
-      </Link>
-    </Card>
+      {children ? <div className="shrink-0">{children}</div> : null}
+    </div>
   );
 }
