@@ -4,7 +4,7 @@ import { cn } from "@/lib/ui/cn";
 import type { Locale } from "@/lib/i18n/locales";
 import { formatCount, formatNumber, formatPercent } from "@/lib/ui/format";
 import { PlusIcon } from "@/components/ui/icons";
-import { Button } from "@/components/ui/controls";
+import { ButtonLink } from "@/components/ui/controls";
 
 /**
  * THE DENSE WORKSPACE LAYER — the shared composition primitives every
@@ -871,21 +871,23 @@ export function PageHeader({
       toolbar={toolbar}
       actions={
         action ? (
-          /* THE CANONICAL BUTTON, NOT A HAND-STYLED LINK.
+          /* THE CANONICAL LINK, NOT A HAND-STYLED BUTTON.
              This used to carry its own fill, padding, radius, shadow, focus ring
              and hover — a second primary-button treatment living inside the
              FOUNDATION, which is the worst possible place for one: every module
              inherits it, so the divergence was invisible page by page and total
-             across the app. It now renders the shared `Button` in its `accent`
-             variant wrapped in `Link` — the same pattern the profile hub already
-             uses — so the primary action has exactly one definition. No consumer
-             page changed; they all pass the same `{href,label}` they did. */
-          <Link href={action.href} className="shrink-0">
-            <Button type="button" variant="accent" size="sm">
-              <PlusIcon size={16} />
-              {action.label}
-            </Button>
-          </Link>
+             across the app. It now renders the shared `ButtonLink` in its
+             `accent` variant — ONE anchor carrying the button geometry, not a
+             `<button>` nested inside an `<a>` (invalid HTML, and two focusable
+             controls acting as one for a keyboard/screen-reader user) — so the
+             primary action has exactly one definition and real link semantics
+             (middle-click, open in new tab, href in the status bar). No
+             consumer page changed; they all pass the same `{href,label}` they
+             did. */
+          <ButtonLink href={action.href} variant="accent" size="sm" className="shrink-0">
+            <PlusIcon size={16} />
+            {action.label}
+          </ButtonLink>
         ) : undefined
       }
     />

@@ -48,11 +48,12 @@ export type MyTrades = {
  */
 export const loadTradeCatalog = cache(async function loadTradeCatalog(): Promise<Trade[]> {
   const supabase = await getServerSupabase();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("trades")
     .select("id, key")
     .order("sort_order", { ascending: true })
     .order("key", { ascending: true });
+  if (error) throw error;
 
   return (data ?? []).map((t) => ({ id: t.id, key: t.key }));
 });
@@ -73,10 +74,11 @@ export const loadMyTrades = cache(async function loadMyTrades(): Promise<MyTrade
   } = await supabase.auth.getUser();
   if (!user) return { keys: [], primaryKey: null };
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("user_trades")
     .select("is_primary, trades!inner(key, sort_order, is_active)")
     .eq("user_id", user.id);
+  if (error) throw error;
 
   const rows = (data ?? [])
     // An INACTIVE trade the person still holds is not shown as a current claim.

@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const getUser = vi.fn();
-const state: { rows: unknown[] } = { rows: [] };
+const state: { rows: unknown[]; error: { message: string } | null } = { rows: [], error: null };
 const asked = { from: [] as string[], select: [] as string[], eq: [] as [string, unknown][] };
 
 /**
@@ -17,8 +17,8 @@ vi.mock("@/lib/supabase/server", () => ({
   getServerSupabase: vi.fn(async () => {
     const rows: Record<string, unknown> = {
       order: () => rows,
-      then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
-        Promise.resolve({ data: state.rows, error: null }).then(resolve),
+      then: (resolve: (v: { data: unknown[] | null; error: { message: string } | null }) => unknown) =>
+        Promise.resolve({ data: state.error ? null : state.rows, error: state.error }).then(resolve),
     };
     const builder: Record<string, unknown> = {
       auth: { getUser },
@@ -46,6 +46,7 @@ const user = { id: "71000006-0000-4000-8000-000000000006" };
 
 beforeEach(() => {
   state.rows = [];
+  state.error = null;
   asked.from.length = 0;
   asked.select.length = 0;
   asked.eq.length = 0;
@@ -87,6 +88,16 @@ describe("loadTradeCatalog", () => {
   it("survives an empty vocabulary without throwing", async () => {
     state.rows = [];
     expect(await loadTradeCatalog()).toEqual([]);
+  });
+
+  /**
+   * An RLS/config/connectivity failure must not read as "no trades exist" — the
+   * editor would render an honest-looking empty catalog for a caller who was
+   * never actually told the truth. Same contract `listJobOpportunities` holds.
+   */
+  it("throws rather than swallowing a database error", async () => {
+    state.error = { message: "boom" };
+    await expect(loadTradeCatalog()).rejects.toBeTruthy();
   });
 });
 
@@ -150,5 +161,17 @@ describe("loadMyTrades", () => {
   it("reports a missing primary as null instead of guessing", async () => {
     state.rows = [row("plumbing", 20, false), row("tiling", 60, false)];
     expect(await loadMyTrades()).toEqual({ keys: ["plumbing", "tiling"], primaryKey: null });
+  });
+
+  /**
+   * `{ keys: [], primaryKey: null }` is also the real "chose no trades yet"
+   * state, so swallowing an error here would make a failed read indistinguishable
+   * from a professional who genuinely has none — the caller could never tell the
+   * two apart. A session DOES exist in this case (the no-session early return is
+   * covered separately above), so the query itself must be what fails.
+   */
+  it("throws rather than returning the empty-selection shape on a database error", async () => {
+    state.error = { message: "boom" };
+    await expect(loadMyTrades()).rejects.toBeTruthy();
   });
 });
