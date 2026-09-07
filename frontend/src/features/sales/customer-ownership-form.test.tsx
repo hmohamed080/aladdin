@@ -14,6 +14,11 @@ import { ar } from "@/lib/i18n/messages/ar";
  * assignee (the normal case for any caller who legitimately reaches this
  * form via canAssign()), their real name renders as the pre-selected option
  * — never a raw membership id, and never silently defaulted to "Unassigned".
+ *
+ * Round 2 (branch-scoping correction) — `members` became `membersByBranch`
+ * (keyed by branch id, `""` = org-wide): these tests exercise the branch the
+ * form starts on (`currentBranchId`), plus the branch-switch behavior that
+ * must never silently drop or submit a now-incompatible assignee.
  */
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/server/actions/sales-forms", () => ({ setCustomerOwnershipAction: vi.fn() }));
@@ -23,6 +28,7 @@ import { CustomerOwnershipForm } from "./customer-ownership-form";
 const YOUSSEF = "50000002-0000-4000-8000-000000000002";
 const HANA = "50000001-0000-4000-8000-000000000001";
 const CAIRO = "c1111111-cccc-4ccc-8ccc-cccccccccccc";
+const ZAYED = "c2222222-cccc-4ccc-8ccc-cccccccccccc";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -39,10 +45,12 @@ describe("CustomerOwnershipForm — assignee dropdown reflects resolved teammate
         currentBranchId={CAIRO}
         currentAssigneeId={YOUSSEF}
         branches={[{ id: CAIRO, name: "Cairo Branch" }]}
-        members={[
-          { membershipId: HANA, displayName: "Hana Mansour" },
-          { membershipId: YOUSSEF, displayName: "Youssef Amin" },
-        ]}
+        membersByBranch={{
+          [CAIRO]: [
+            { membershipId: HANA, displayName: "Hana Mansour" },
+            { membershipId: YOUSSEF, displayName: "Youssef Amin" },
+          ],
+        }}
         canOrgWide={false}
       />,
     );
@@ -63,10 +71,12 @@ describe("CustomerOwnershipForm — assignee dropdown reflects resolved teammate
         currentBranchId={CAIRO}
         currentAssigneeId={null}
         branches={[{ id: CAIRO, name: "Cairo Branch" }]}
-        members={[
-          { membershipId: HANA, displayName: "Hana Mansour" },
-          { membershipId: YOUSSEF, displayName: "Youssef Amin" },
-        ]}
+        membersByBranch={{
+          [CAIRO]: [
+            { membershipId: HANA, displayName: "Hana Mansour" },
+            { membershipId: YOUSSEF, displayName: "Youssef Amin" },
+          ],
+        }}
         canOrgWide={false}
       />,
     );
@@ -91,7 +101,7 @@ describe("CustomerOwnershipForm — assignee dropdown reflects resolved teammate
         currentBranchId={CAIRO}
         currentAssigneeId={null}
         branches={[{ id: CAIRO, name: "Cairo Branch" }]}
-        members={[]}
+        membersByBranch={{ [CAIRO]: [] }}
         canOrgWide={false}
       />,
     );
@@ -99,5 +109,68 @@ describe("CustomerOwnershipForm — assignee dropdown reflects resolved teammate
     const select = (await screen.findByLabelText(ar.customers.assignee)) as HTMLSelectElement;
     expect(within(select).getAllByRole("option")).toHaveLength(1);
     expect(select.value).toBe("");
+  });
+});
+
+describe("CustomerOwnershipForm — branch-reactive candidates never strand or silently drop an assignee", () => {
+  it("re-filters the assignee list when the branch changes", async () => {
+    renderWithI18n(
+      <CustomerOwnershipForm
+        customerId="d0000001-0000-4000-8000-000000000001"
+        expectedUpdatedAt="2026-08-05T10:00:00.123456+00:00"
+        currentBranchId={CAIRO}
+        currentAssigneeId={null}
+        branches={[
+          { id: CAIRO, name: "Cairo Branch" },
+          { id: ZAYED, name: "Sheikh Zayed Branch" },
+        ]}
+        membersByBranch={{
+          [CAIRO]: [{ membershipId: YOUSSEF, displayName: "Youssef Amin" }],
+          [ZAYED]: [{ membershipId: HANA, displayName: "Hana Mansour" }],
+        }}
+        canOrgWide={false}
+      />,
+    );
+    openDialog();
+    const branchSelect = (await screen.findByLabelText(ar.customers.branch)) as HTMLSelectElement;
+    const assigneeSelect = screen.getByLabelText(ar.customers.assignee) as HTMLSelectElement;
+    expect(within(assigneeSelect).queryByRole("option", { name: "Hana Mansour" })).not.toBeInTheDocument();
+
+    fireEvent.change(branchSelect, { target: { value: ZAYED } });
+
+    expect(within(assigneeSelect).getByRole("option", { name: "Hana Mansour" })).toBeInTheDocument();
+    expect(within(assigneeSelect).queryByRole("option", { name: "Youssef Amin" })).not.toBeInTheDocument();
+  });
+
+  it("moving to a branch that strands the current assignee keeps them selected (flagged), never silently clears or drops them", async () => {
+    renderWithI18n(
+      <CustomerOwnershipForm
+        customerId="d0000001-0000-4000-8000-000000000001"
+        expectedUpdatedAt="2026-08-05T10:00:00.123456+00:00"
+        currentBranchId={CAIRO}
+        currentAssigneeId={YOUSSEF}
+        branches={[
+          { id: CAIRO, name: "Cairo Branch" },
+          { id: ZAYED, name: "Sheikh Zayed Branch" },
+        ]}
+        membersByBranch={{
+          [CAIRO]: [{ membershipId: YOUSSEF, displayName: "Youssef Amin" }],
+          [ZAYED]: [{ membershipId: HANA, displayName: "Hana Mansour" }],
+        }}
+        canOrgWide={false}
+      />,
+    );
+    openDialog();
+    const branchSelect = (await screen.findByLabelText(ar.customers.branch)) as HTMLSelectElement;
+    const assigneeSelect = screen.getByLabelText(ar.customers.assignee) as HTMLSelectElement;
+
+    fireEvent.change(branchSelect, { target: { value: ZAYED } });
+
+    // Never silently falls back to the first option ("Unassigned") or to
+    // Sheikh Zayed's real candidate (Hana) — Youssef stays the actual value.
+    expect(assigneeSelect.value).toBe(YOUSSEF);
+    expect(screen.getByText(ar.states.assigneeBranch)).toBeInTheDocument();
+    // And the confirm button is blocked while the stale selection stands.
+    expect(screen.getByRole("button", { name: ar.common.saveChanges })).toBeDisabled();
   });
 });

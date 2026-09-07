@@ -37,6 +37,7 @@ export const ar: Messages = {
     confirm: "تأكيد",
     reassign: "إعادة إسناد",
     remove: "إزالة",
+    selectBranchFirst: "اختر فرعًا أولًا",
     languageName: { ar: "العربية", en: "الإنجليزية" },
   },
   confirm: {

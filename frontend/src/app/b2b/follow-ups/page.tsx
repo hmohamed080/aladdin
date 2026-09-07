@@ -36,7 +36,10 @@ export default async function FollowUpsPage({
   const [all, custNames, memberNames] = await Promise.all([
     listFollowUps(supabase, org.organizationId, branchId ?? undefined),
     customerNameMap(supabase, org.organizationId),
-    memberNameMap(supabase, org.organizationId),
+    memberNameMap(supabase, org.organizationId, [
+      ...org.branches.map((b) => b.id),
+      ...(org.canManageSales ? [null] : []),
+    ]),
   ]);
 
   const open = all.filter((f) => f.status === "open");

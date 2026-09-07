@@ -53,8 +53,8 @@ export default async function CustomerDetailPage({
     listActivitiesForCustomer(supabase, id),
     listFollowUpsForCustomer(supabase, id),
     branchNameMap(supabase, org.organizationId),
-    memberNameMap(supabase, org.organizationId),
-    assignable ? listOrgMembers(supabase, org.organizationId) : Promise.resolve([]),
+    memberNameMap(supabase, org.organizationId, [customer.branch_id]),
+    assignable ? listOrgMembers(supabase, org.organizationId, customer.branch_id) : Promise.resolve([]),
   ]);
   const bn = Object.fromEntries(branchNames);
   const mn = Object.fromEntries(memberNames);

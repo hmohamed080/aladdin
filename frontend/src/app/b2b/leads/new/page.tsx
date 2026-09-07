@@ -1,6 +1,6 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
-import { listOrgMembers } from "@/server/queries/sales";
+import { listOrgMembersByBranch, type OrgMember } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
 import { PageHeader } from "@/components/ui/workspace-layout";
 import { BackLink } from "@/features/sales/page-parts";
@@ -30,7 +30,7 @@ export default async function NewLeadPage({
   }
 
   // Customer picklist (active customers in scope) + members for assignment.
-  const [{ data: custData }, members] = await Promise.all([
+  const [{ data: custData }, membersByBranch] = await Promise.all([
     supabase
       .from("customers")
       .select("id, display_name")
@@ -38,7 +38,12 @@ export default async function NewLeadPage({
       .eq("status", "active")
       .order("display_name")
       .limit(500),
-    canAssign(org) ? listOrgMembers(supabase, org.organizationId) : Promise.resolve([]),
+    canAssign(org)
+      ? listOrgMembersByBranch(supabase, org.organizationId, [
+          ...org.branches.map((b) => b.id),
+          ...(org.canManageSales ? [null] : []),
+        ])
+      : Promise.resolve({} as Record<string, OrgMember[]>),
   ]);
   const customers = (custData ?? []).map((c) => ({ id: c.id, name: c.display_name }));
 
@@ -50,7 +55,7 @@ export default async function NewLeadPage({
         orgId={org.organizationId}
         branches={org.branches}
         customers={customers}
-        members={members}
+        membersByBranch={membersByBranch}
         canManageSales={org.canManageSales}
         canAssign={canAssign(org)}
         presetCustomerId={customer}

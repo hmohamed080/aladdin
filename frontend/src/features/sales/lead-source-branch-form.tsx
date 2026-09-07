@@ -6,6 +6,7 @@ import { setLeadSourceBranchAction } from "@/server/actions/sales-forms";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select, LabeledField } from "@/components/ui/controls";
 import { SALES_SOURCES } from "@/lib/ui/format";
+import { useBranchAssignees } from "@/features/sales/use-branch-assignees";
 import type { OrgMember } from "@/server/queries/sales";
 
 /**
@@ -16,6 +17,13 @@ import type { OrgMember } from "@/server/queries/sales";
  * assignee branch-compatibility (a stranding move is rejected). Controlled selects
  * so picked values survive an expected error. `assign` gates the branch/reassign
  * controls; without it only source is editable.
+ *
+ * The assignee list is branch-reactive (`membersByBranch`, keyed per branch —
+ * see `listOrgMembersByBranch`): picking a different branch re-filters to
+ * teammates who can actually reach it. If the branch move would strand the
+ * currently-selected assignee, that selection is never silently cleared or
+ * submitted — `useBranchAssignees` keeps it visibly selected (flagged stale)
+ * and `confirmDisabled` blocks Save until an explicit new choice is made.
  */
 export function LeadSourceBranchForm({
   leadId,
@@ -24,7 +32,7 @@ export function LeadSourceBranchForm({
   currentBranchId,
   currentAssigneeId,
   branches,
-  members,
+  membersByBranch,
   canAssign,
   canOrgWide,
 }: {
@@ -34,14 +42,13 @@ export function LeadSourceBranchForm({
   currentBranchId: string | null;
   currentAssigneeId: string | null;
   branches: { id: string; name: string }[];
-  members: OrgMember[];
+  membersByBranch: Record<string, OrgMember[]>;
   canAssign: boolean;
   canOrgWide: boolean;
 }) {
   const { t } = useI18n();
   const [source, setSource] = useState(currentSource ?? "");
-  const [branch, setBranch] = useState(currentBranchId ?? "");
-  const [assignee, setAssignee] = useState(currentAssigneeId ?? "");
+  const ba = useBranchAssignees(membersByBranch, currentBranchId ?? "", currentAssigneeId ?? "");
 
   return (
     <ConfirmDialog
@@ -52,6 +59,7 @@ export function LeadSourceBranchForm({
       confirmLabel={t("common.saveChanges")}
       confirmVariant="primary"
       formAction={setLeadSourceBranchAction}
+      confirmDisabled={canAssign && ba.isStale}
     >
       {() => (
         <>
@@ -75,7 +83,7 @@ export function LeadSourceBranchForm({
           {canAssign ? (
             <>
               <LabeledField label={t("leads.branch")} htmlFor="lsb-branch">
-                <Select id="lsb-branch" name="branchId" value={branch} onChange={(e) => setBranch(e.target.value)}>
+                <Select id="lsb-branch" name="branchId" value={ba.branch} onChange={(e) => ba.onBranchChange(e.target.value)}>
                   {canOrgWide ? <option value="">{t("common.none")}</option> : null}
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -85,14 +93,29 @@ export function LeadSourceBranchForm({
                 </Select>
               </LabeledField>
 
-              <LabeledField label={t("leads.assignee")} htmlFor="lsb-assignee">
-                <Select id="lsb-assignee" name="assigneeMembershipId" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+              <LabeledField
+                label={t("leads.assignee")}
+                htmlFor="lsb-assignee"
+                error={ba.isStale ? t("states.assigneeBranch") : undefined}
+                hint={!ba.branchKnown ? t("common.selectBranchFirst") : undefined}
+              >
+                <Select
+                  id="lsb-assignee"
+                  name="assigneeMembershipId"
+                  value={ba.assignee}
+                  onChange={(e) => ba.onAssigneeChange(e.target.value)}
+                  disabled={!ba.branchKnown}
+                  aria-invalid={ba.isStale ? true : undefined}
+                >
                   <option value="">{t("common.unassigned")}</option>
-                  {members.map((mem) => (
+                  {ba.candidates.map((mem) => (
                     <option key={mem.membershipId} value={mem.membershipId}>
                       {mem.displayName}
                     </option>
                   ))}
+                  {ba.isStale ? (
+                    <option value={ba.assignee}>{ba.staleLabel ?? t("states.assigneeBranch")}</option>
+                  ) : null}
                 </Select>
               </LabeledField>
             </>

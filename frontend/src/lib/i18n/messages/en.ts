@@ -36,6 +36,9 @@ export const en = {
     confirm: "Confirm",
     reassign: "Reassign",
     remove: "Remove",
+    /* Shown in place of the assignee control until a branch is chosen — a
+       candidate list can't be resolved without one. */
+    selectBranchFirst: "Select a branch first",
     /* Language names as a professional would write them on their own profile. */
     languageName: { ar: "Arabic", en: "English" },
   },

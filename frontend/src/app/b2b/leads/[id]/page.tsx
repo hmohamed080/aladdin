@@ -53,8 +53,8 @@ export default async function LeadDetailPage({
     listFollowUpsForLead(supabase, id),
     customerNameMap(supabase, org.organizationId),
     branchNameMap(supabase, org.organizationId),
-    memberNameMap(supabase, org.organizationId),
-    canAssign(org) ? listOrgMembers(supabase, org.organizationId) : Promise.resolve([]),
+    memberNameMap(supabase, org.organizationId, [lead.branch_id]),
+    canAssign(org) ? listOrgMembers(supabase, org.organizationId, lead.branch_id) : Promise.resolve([]),
   ]);
   const cn = Object.fromEntries(custNames);
   const bn = Object.fromEntries(branchNames);

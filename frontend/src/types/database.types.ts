@@ -4952,7 +4952,7 @@ export type Database = {
       }
       review_start: { Args: { p_verification_id: string }; Returns: undefined }
       sales_assignable_members: {
-        Args: { p_org_id: string }
+        Args: { p_branch_id?: string; p_org_id: string }
         Returns: {
           display_name: string
           membership_id: string
