@@ -28,9 +28,12 @@ assertions — not that anyone can receive an OTP, which only a real mailbox can
 from __future__ import annotations
 
 import argparse
+import os
+import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -212,8 +215,51 @@ def migrate_auth_schema() -> None:
     subprocess.run(["docker", "rm", "-f", ISO_AUTH], capture_output=True)
 
 
+# Storage-schema surface a migration can depend on. `--isolated` boots a bare
+# Postgres + real GoTrue (for `auth`) but never a Storage service, so any of
+# these silently do not exist there — the honest response is a fast, precise
+# refusal before touching Docker at all, never a fabricated storage schema
+# that would make a broken migration LOOK like it passed.
+_STORAGE_DEPENDENCY_PATTERN = re.compile(
+    r"\bstorage\.(buckets|objects|foldername|filename|extension)\b", re.IGNORECASE
+)
+
+
+def detect_storage_dependency(files: list[Path]) -> list[str]:
+    """Migration filenames (in order) that reference Supabase-managed Storage."""
+    hits: list[str] = []
+    for path in files:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if _STORAGE_DEPENDENCY_PATTERN.search(text):
+            hits.append(path.name)
+    return hits
+
+
 def start_isolated() -> None:
     """Boot a throwaway Postgres and replay every migration in order."""
+    storage_dependent = detect_storage_dependency(sorted(MIGRATIONS.glob("*.sql")))
+    if storage_dependent:
+        local_cli = REPO_ROOT / "node_modules" / ".bin" / ("supabase.cmd" if sys.platform == "win32" else "supabase")
+        full_stack_available = shutil.which("supabase") is not None or local_cli.exists()
+        route = (
+            "The full Supabase CLI is available on this machine — drop --isolated and run:\n"
+            "    python scripts/rehearse_staging_seed.py\n"
+            "instead, which uses `supabase start` (a real Storage service included)."
+            if full_stack_available else
+            "No Supabase CLI was found on this machine. Install it (`pnpm install` for the\n"
+            "pinned devDependency, or the standalone CLI), then run without --isolated:\n"
+            "    python scripts/rehearse_staging_seed.py"
+        )
+        raise SystemExit(
+            "isolated mode cannot rehearse this migration chain: "
+            f"{len(storage_dependent)} migration(s) reference Supabase-managed Storage\n"
+            f"({', '.join(storage_dependent)}), and isolated mode boots a bare Postgres +\n"
+            "GoTrue with no Storage service — storage.buckets/storage.objects genuinely do\n"
+            "not exist there. Rather than fabricate a fake/minimal Storage schema (which\n"
+            "could make a broken migration look like it passed), this refuses up front,\n"
+            "before any container starts, instead of failing deep into the migration\n"
+            f"replay with an unexplained missing relation.\n\n{route}"
+        )
     image = cached_postgres_image()
     print(f"    image: {image}")
     subprocess.run(["docker", "rm", "-f", ISO_CONTAINER], capture_output=True)
@@ -286,16 +332,28 @@ def stop_isolated() -> None:
 
 def psql(sql: str | None = None, file: Path | None = None, stop_on_error: bool = True,
          database: str = "postgres", container: str | None = None, user: str = "postgres",
-         variables: dict[str, str] | None = None):
+         mode: str | None = None):
+    """Run SQL against the rehearsal database.
+
+    `mode`, when given, is prepended as one real SQL statement —
+    `select set_config('aladdin.verify_mode', '<mode>', false);` — ahead of
+    `file`'s own content, in the SAME psql session/connection so the GUC is
+    visible when the file's checks run. This is how verify-staging-seed.sql's
+    single canonical body is told which mode to run in from here, without the
+    file itself depending on any psql-only variable-substitution mechanism
+    (which the hosted `supabase db query --linked --file` path cannot use —
+    see scripts/verify_staging_seed.py and the comment at the top of
+    supabase/staging/verify-staging-seed.sql).
+    """
     cmd = ["docker", "exec", "-i", container or CONTAINER, "psql", "-U", user, "-d", database]
     if stop_on_error:
         cmd += ["-v", "ON_ERROR_STOP=1"]
-    for key, value in (variables or {}).items():
-        cmd += ["-v", f"{key}={value}"]
     if sql is not None:
         cmd += ["-t", "-A", "-c", sql]
         return subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, encoding="utf-8")
     data = file.read_text(encoding="utf-8")
+    if mode is not None:
+        data = f"select set_config('aladdin.verify_mode', '{mode}', false);\n" + data
     return subprocess.run(
         cmd, cwd=REPO_ROOT, input=data, capture_output=True, text=True, encoding="utf-8"
     )
@@ -308,9 +366,53 @@ def counts() -> str:
     return result.stdout.strip()
 
 
-def main() -> int:
-    global CONTAINER
+# --- concurrency guard -------------------------------------------------
+# Two rehearsals (or a rehearsal and a manual `supabase`/Docker operation)
+# racing the same Docker daemon is exactly what produced the intermittent
+# pg-delta catalog-cache timeout and "storage container is not ready"
+# failures observed when this script was run back to back with itself. A
+# simple PID lock in the OS temp dir (never the repo) turns that into a
+# clear refusal instead of a flaky, hard-to-diagnose mid-run failure.
+LOCK_PATH = Path(tempfile.gettempdir()) / "aladdin-staging-rehearsal.lock"
 
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def acquire_lock() -> None:
+    if LOCK_PATH.exists():
+        try:
+            held_pid = int(LOCK_PATH.read_text(encoding="utf-8").strip())
+        except (ValueError, OSError):
+            held_pid = None
+        if held_pid is not None and _pid_alive(held_pid):
+            raise SystemExit(
+                f"another rehearsal appears to already be running (pid {held_pid}, "
+                f"lock file {LOCK_PATH}).\nWait for it to finish before starting another — "
+                "running two rehearsals (or a rehearsal alongside another Supabase/Docker\n"
+                "operation) against the same Docker daemon is what produces intermittent\n"
+                "container/catalog-cache failures, not a real bug in either run.\n"
+                "If you are certain that pid is not actually running a rehearsal, delete "
+                "the lock file yourself and retry."
+            )
+        # Stale lock left by a killed/crashed prior run — safe to reclaim.
+    LOCK_PATH.write_text(str(os.getpid()), encoding="utf-8")
+
+
+def release_lock() -> None:
+    try:
+        if LOCK_PATH.exists() and LOCK_PATH.read_text(encoding="utf-8").strip() == str(os.getpid()):
+            LOCK_PATH.unlink()
+    except OSError:
+        pass
+
+
+def main() -> int:
     parser = argparse.ArgumentParser(
         prog="rehearse_staging_seed.py",
         description="Rehearse the one-time staging load against a local database.",
@@ -322,6 +424,16 @@ def main() -> int:
              "(no CLI needed, leaves your stack untouched)",
     )
     args = parser.parse_args()
+
+    acquire_lock()
+    try:
+        return _run_rehearsal(args)
+    finally:
+        release_lock()
+
+
+def _run_rehearsal(args: argparse.Namespace) -> int:
+    global CONTAINER
 
     step(0, "Build the rehearsal bundle")
     if run([sys.executable, "scripts/build_staging_seed.py", "--rehearsal"]).returncode != 0:
@@ -363,7 +475,7 @@ def main() -> int:
     step(3, "Verify all 26 demo accounts")
     # The rehearsal bundle uses deliberately undeliverable addresses, so the
     # deliverability check is told to stand down. Every other check still runs.
-    verify = psql(file=VERIFY, variables={"rehearsal": "on"})
+    verify = psql(file=VERIFY, mode="rehearsal")
     print(verify.stdout)
     if verify.returncode != 0:
         print(verify.stderr, file=sys.stderr)
