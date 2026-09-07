@@ -100,10 +100,17 @@ export function ThemeSwitch({
   const { theme } = useThemeState(current, current);
   const next = theme === "dark" ? "light" : "dark";
 
-  // The name carries the ACTION, not the state: a screen-reader user has no
-  // glyph to look at, and "theme: dark" would leave them guessing whether that
-  // is a description or a promise.
-  const label = `${t("nav.theme")}: ${next === "dark" ? t("nav.themeDark") : t("nav.themeLight")}`;
+  // The name carries the ACTION, not the state — and says so as a sentence, not
+  // a "Theme: X" pair. "Theme: Dark" reads as a description of the CURRENT
+  // theme, which is exactly backwards while `next` names what pressing the
+  // control would GIVE you: read on an already-dark page, "Theme: Dark" is
+  // simply wrong, and read on a light one it is easy to mistake for confirming
+  // the theme you are already in. `themeSwitchToLight`/`themeSwitchToDark` are
+  // unambiguous verbs — resolved from the EFFECTIVE theme (`useThemeState`
+  // already collapses `system` to the theme actually applied), so this is
+  // correct under System mode too. Distinct from the plain `themeLight`/
+  // `themeDark` value names the account menu's Light/Dark/System group uses.
+  const label = next === "dark" ? t("nav.themeSwitchToDark") : t("nav.themeSwitchToLight");
   const toggle = () => {
     // The document is updated FIRST and unconditionally: the preference is
     // already true on screen before persistence is even attempted.

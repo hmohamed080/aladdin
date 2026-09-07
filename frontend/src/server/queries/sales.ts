@@ -290,22 +290,41 @@ export async function recentActivities(
 // ---- Assignable members (for assignment dropdowns) -------------------------
 export type OrgMember = { membershipId: string; displayName: string };
 
-/** Active members of the org the caller can see (org managers see all; scoped by RLS). */
+/**
+ * Active members of the org, name-only, for CRM assignment labels/dropdowns.
+ *
+ * `public.profiles` RLS only lets a user read their OWN row (see
+ * `profiles_select_self`, `20260802090001_identity_core.sql`) — there is no
+ * policy letting one org member read a teammate's identity by a direct join.
+ * A caller's own row resolves fine; every OTHER member's `profiles` embed
+ * comes back null. This used to fall back to `m.id.slice(0, 8)` — the caller's
+ * own membership id, truncated — which leaked a raw internal identifier into
+ * the Customers/Leads/Follow-ups screens for every teammate but the caller.
+ *
+ * `org_members_list` is the one trusted, security-definer read-model that CAN
+ * see a co-member's identity (masked email, resolved display name), gated on
+ * `org.members.manage` (`20260812090001_pilot_people_ops.sql`). Every owner —
+ * including every account this helper is exercised against — holds that
+ * capability. A caller who reaches this helper via a narrower grant (e.g.
+ * `sales.assign` without `org.members.manage`) gets an empty list rather than
+ * a permission error or a raw id: every call site already treats "no member
+ * data available" as a normal state (`memberNames[id] ?? "—"`, or an empty
+ * assignment dropdown), so this degrades gracefully instead of leaking
+ * anything.
+ */
 export async function listOrgMembers(supabase: DB, orgId: string): Promise<OrgMember[]> {
-  // Disambiguate the users embed — memberships has two FKs to users (user_id,
-  // invited_by), so PostgREST needs the explicit relationship.
-  const { data, error } = await supabase
-    .from("memberships")
-    .select("id, users!memberships_user_id_fkey(profiles(display_name))")
-    .eq("organization_id", orgId)
-    .eq("status", "active");
-  if (error) throw error;
-  return (data ?? []).map((m) => ({
-    membershipId: m.id,
-    displayName:
-      (m.users as { profiles?: { display_name?: string | null } | null } | null)?.profiles
-        ?.display_name ?? m.id.slice(0, 8),
-  }));
+  const { data, error } = await supabase.rpc("org_members_list", { p_org_id: orgId });
+  if (error) {
+    // 42501 = insufficient_privilege: the caller lacks org.members.manage, so
+    // the RPC's own gate refused before returning any row. Not a failure to
+    // surface — just no names this caller is trusted to resolve.
+    if (error.code === "42501") return [];
+    throw error;
+  }
+  return (data ?? [])
+    .filter((m) => m.status === "active")
+    .map((m) => ({ membershipId: m.membership_id, displayName: (m.display_name ?? "").trim() }))
+    .filter((m) => m.displayName.length > 0);
 }
 
 /** Small helper: map membership ids to display names for rendering rows. */

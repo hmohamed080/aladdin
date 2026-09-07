@@ -116,6 +116,12 @@ export const ar: Messages = {
     points: "النقاط",
     themeLight: "فاتح",
     themeDark: "داكن",
+    // نسخة فعلية (ماذا يفعل الضغط)، خاصة بزر التبديل الواحد في الشريط العلوي
+    // (ThemeSwitch) فقط — وليست وصفًا للمظهر الحالي؛ راجع en.ts لتفاصيل السبب.
+    // منفصلة عن themeLight/themeDark أعلاه، التي تبقى أسماء قيم بسيطة لاختيار
+    // فاتح/داكن/النظام في قائمة الحساب.
+    themeSwitchToLight: "التبديل إلى المظهر الفاتح",
+    themeSwitchToDark: "التبديل إلى المظهر الداكن",
     organization: "المؤسسة",
     branch: "الفرع",
     allBranches: "كل الفروع",

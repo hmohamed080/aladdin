@@ -5,6 +5,8 @@ vi.mock("server-only", () => ({}));
 import {
   sanitizeSearchTerm,
   listCustomers,
+  listOrgMembers,
+  memberNameMap,
   myOpenLeads,
   overdueFollowUps,
   followUpsDueToday,
@@ -137,6 +139,96 @@ describe("active org + branch narrow every cockpit query", () => {
     expect(hasEq(a.calls, "organization_id", ORG_A)).toBe(true);
     expect(hasEq(a.calls, "organization_id", ORG_B)).toBe(false);
     expect(hasEq(b.calls, "organization_id", ORG_B)).toBe(true);
+  });
+});
+
+/**
+ * A minimal stand-in for a Supabase client whose only method under test is
+ * `.rpc()` — `listOrgMembers` calls `org_members_list` directly rather than
+ * chaining `.from()`, so it needs its own mock shape from `makeClient` above.
+ */
+function makeRpcClient(result: { data: unknown[] | null; error: { code: string } | null }) {
+  const calls: { name: string; args: unknown }[] = [];
+  const client = {
+    rpc(name: string, args: unknown) {
+      calls.push({ name, args });
+      return Promise.resolve(result);
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any;
+  return { client, calls };
+}
+
+describe("listOrgMembers resolves teammate names through org_members_list, never a raw id", () => {
+  it("resolves Youssef's real name for the Customers/Leads assignment map", async () => {
+    const { client } = makeRpcClient({
+      data: [
+        { membership_id: "50000001-0000-4000-8000-000000000001", display_name: "Hana Mansour", status: "active" },
+        { membership_id: "50000002-0000-4000-8000-000000000002", display_name: "Youssef Amin", status: "active" },
+      ],
+      error: null,
+    });
+    const members = await listOrgMembers(client, ORG_A);
+    expect(members).toEqual([
+      { membershipId: "50000001-0000-4000-8000-000000000001", displayName: "Hana Mansour" },
+      { membershipId: "50000002-0000-4000-8000-000000000002", displayName: "Youssef Amin" },
+    ]);
+    // The regression this guards: no entry's displayName is ever the raw/
+    // truncated membership id.
+    for (const m of members) {
+      expect(m.displayName).not.toBe(m.membershipId);
+      expect(m.displayName).not.toBe(m.membershipId.slice(0, 8));
+    }
+  });
+
+  it("memberNameMap (Customers/Leads/Follow-ups) maps membership id -> resolved name", async () => {
+    const { client } = makeRpcClient({
+      data: [{ membership_id: "50000002-0000-4000-8000-000000000002", display_name: "Youssef Amin", status: "active" }],
+      error: null,
+    });
+    const map = await memberNameMap(client, ORG_A);
+    expect(map.get("50000002-0000-4000-8000-000000000002")).toBe("Youssef Amin");
+  });
+
+  it("omits (never id-fallback) a member with no resolvable display name", async () => {
+    const { client } = makeRpcClient({
+      data: [
+        { membership_id: "50000003-0000-4000-8000-000000000003", display_name: "", status: "active" },
+        { membership_id: "50000004-0000-4000-8000-000000000004", display_name: "   ", status: "active" },
+      ],
+      error: null,
+    });
+    const members = await listOrgMembers(client, ORG_A);
+    expect(members).toEqual([]);
+  });
+
+  it("drops inactive (invited/suspended) members from the name-resolution list", async () => {
+    const { client } = makeRpcClient({
+      data: [
+        { membership_id: "50000005-0000-4000-8000-000000000005", display_name: "Pending Invitee", status: "invited" },
+        { membership_id: "50000006-0000-4000-8000-000000000006", display_name: "Suspended Member", status: "suspended" },
+      ],
+      error: null,
+    });
+    const members = await listOrgMembers(client, ORG_A);
+    expect(members).toEqual([]);
+  });
+
+  it("returns an empty list (never a permission error or a raw id) when the caller lacks org.members.manage", async () => {
+    const { client } = makeRpcClient({ data: null, error: { code: "42501" } });
+    await expect(listOrgMembers(client, ORG_A)).resolves.toEqual([]);
+  });
+
+  it("still throws on a genuine, non-permission RPC error", async () => {
+    const { client } = makeRpcClient({ data: null, error: { code: "08000" } });
+    await expect(listOrgMembers(client, ORG_A)).rejects.toBeTruthy();
+  });
+
+  it("calls org_members_list scoped to the caller's own organization only (no cross-org member resolution)", async () => {
+    const { client, calls } = makeRpcClient({ data: [], error: null });
+    await listOrgMembers(client, ORG_A);
+    expect(calls).toEqual([{ name: "org_members_list", args: { p_org_id: ORG_A } }]);
+    expect(calls[0]!.args).not.toEqual({ p_org_id: ORG_B });
   });
 });
 
