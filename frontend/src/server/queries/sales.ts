@@ -301,28 +301,26 @@ export type OrgMember = { membershipId: string; displayName: string };
  * own membership id, truncated — which leaked a raw internal identifier into
  * the Customers/Leads/Follow-ups screens for every teammate but the caller.
  *
- * `org_members_list` is the one trusted, security-definer read-model that CAN
- * see a co-member's identity (masked email, resolved display name), gated on
- * `org.members.manage` (`20260812090001_pilot_people_ops.sql`). Every owner —
- * including every account this helper is exercised against — holds that
- * capability. A caller who reaches this helper via a narrower grant (e.g.
- * `sales.assign` without `org.members.manage`) gets an empty list rather than
- * a permission error or a raw id: every call site already treats "no member
- * data available" as a normal state (`memberNames[id] ?? "—"`, or an empty
- * assignment dropdown), so this degrades gracefully instead of leaking
- * anything.
+ * Calls `sales_assignable_members` (`20260912090001_sales_assignable_members.sql`)
+ * — a minimal, security-definer read-model authorized on the SAME predicate
+ * every assignment write path already requires (`sales.assign` OR org-wide
+ * sales authority, i.e. `sales.manage`/`org.manage` — never
+ * `org.members.manage`). Every one of this helper's five call sites already
+ * gates on that exact predicate via `canAssign()`
+ * (`server/queries/context.ts`) before calling it, so an authorization denial
+ * here is a genuine contract mismatch, not an expected "no access" case —
+ * unlike `org_members_list` (the broader, `org.members.manage`-gated
+ * People-screen read-model this helper deliberately does NOT call), every
+ * error is surfaced, never silently swallowed into an empty list. An empty
+ * list here means "this org genuinely has no other assignable member," not
+ * "this caller couldn't be checked" — a real RPC/auth failure throws instead,
+ * so a caller who already passed `canAssign()` never sees an editable
+ * assignment control silently rendered as if no teammates existed.
  */
 export async function listOrgMembers(supabase: DB, orgId: string): Promise<OrgMember[]> {
-  const { data, error } = await supabase.rpc("org_members_list", { p_org_id: orgId });
-  if (error) {
-    // 42501 = insufficient_privilege: the caller lacks org.members.manage, so
-    // the RPC's own gate refused before returning any row. Not a failure to
-    // surface — just no names this caller is trusted to resolve.
-    if (error.code === "42501") return [];
-    throw error;
-  }
+  const { data, error } = await supabase.rpc("sales_assignable_members", { p_org_id: orgId });
+  if (error) throw error;
   return (data ?? [])
-    .filter((m) => m.status === "active")
     .map((m) => ({ membershipId: m.membership_id, displayName: (m.display_name ?? "").trim() }))
     .filter((m) => m.displayName.length > 0);
 }

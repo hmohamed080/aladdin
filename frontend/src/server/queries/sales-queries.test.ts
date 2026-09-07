@@ -144,8 +144,9 @@ describe("active org + branch narrow every cockpit query", () => {
 
 /**
  * A minimal stand-in for a Supabase client whose only method under test is
- * `.rpc()` — `listOrgMembers` calls `org_members_list` directly rather than
- * chaining `.from()`, so it needs its own mock shape from `makeClient` above.
+ * `.rpc()` — `listOrgMembers` calls `sales_assignable_members` directly
+ * rather than chaining `.from()`, so it needs its own mock shape from
+ * `makeClient` above.
  */
 function makeRpcClient(result: { data: unknown[] | null; error: { code: string } | null }) {
   const calls: { name: string; args: unknown }[] = [];
@@ -159,12 +160,26 @@ function makeRpcClient(result: { data: unknown[] | null; error: { code: string }
   return { client, calls };
 }
 
-describe("listOrgMembers resolves teammate names through org_members_list, never a raw id", () => {
+/**
+ * F3's original fix (PR #43, first commit) called `org_members_list` — the
+ * broader, `org.members.manage`-gated People-screen read-model — which
+ * turned out to be a capability regression: `sales.assign` (the real
+ * predicate every assignment write path requires) does not imply
+ * `org.members.manage` (confirmed via the `sales_manager` preset,
+ * `frontend/src/lib/org/roles.ts`, and `membership_set_capabilities()`
+ * having no coupling rule between the two). This second fix swaps to
+ * `sales_assignable_members` — a new, minimal, security-definer RPC
+ * authorized on the SAME predicate the write paths already use (see
+ * `20260912090001_sales_assignable_members.sql`) — so these tests exercise
+ * the CORRECTED RPC name and its narrower result shape (membership_id +
+ * display_name only; status filtering now happens server-side, not here).
+ */
+describe("listOrgMembers resolves teammate names through sales_assignable_members, never a raw id", () => {
   it("resolves Youssef's real name for the Customers/Leads assignment map", async () => {
     const { client } = makeRpcClient({
       data: [
-        { membership_id: "50000001-0000-4000-8000-000000000001", display_name: "Hana Mansour", status: "active" },
-        { membership_id: "50000002-0000-4000-8000-000000000002", display_name: "Youssef Amin", status: "active" },
+        { membership_id: "50000001-0000-4000-8000-000000000001", display_name: "Hana Mansour" },
+        { membership_id: "50000002-0000-4000-8000-000000000002", display_name: "Youssef Amin" },
       ],
       error: null,
     });
@@ -183,7 +198,7 @@ describe("listOrgMembers resolves teammate names through org_members_list, never
 
   it("memberNameMap (Customers/Leads/Follow-ups) maps membership id -> resolved name", async () => {
     const { client } = makeRpcClient({
-      data: [{ membership_id: "50000002-0000-4000-8000-000000000002", display_name: "Youssef Amin", status: "active" }],
+      data: [{ membership_id: "50000002-0000-4000-8000-000000000002", display_name: "Youssef Amin" }],
       error: null,
     });
     const map = await memberNameMap(client, ORG_A);
@@ -193,8 +208,8 @@ describe("listOrgMembers resolves teammate names through org_members_list, never
   it("omits (never id-fallback) a member with no resolvable display name", async () => {
     const { client } = makeRpcClient({
       data: [
-        { membership_id: "50000003-0000-4000-8000-000000000003", display_name: "", status: "active" },
-        { membership_id: "50000004-0000-4000-8000-000000000004", display_name: "   ", status: "active" },
+        { membership_id: "50000003-0000-4000-8000-000000000003", display_name: "" },
+        { membership_id: "50000004-0000-4000-8000-000000000004", display_name: "   " },
       ],
       error: null,
     });
@@ -202,32 +217,34 @@ describe("listOrgMembers resolves teammate names through org_members_list, never
     expect(members).toEqual([]);
   });
 
-  it("drops inactive (invited/suspended) members from the name-resolution list", async () => {
-    const { client } = makeRpcClient({
-      data: [
-        { membership_id: "50000005-0000-4000-8000-000000000005", display_name: "Pending Invitee", status: "invited" },
-        { membership_id: "50000006-0000-4000-8000-000000000006", display_name: "Suspended Member", status: "suspended" },
-      ],
-      error: null,
-    });
-    const members = await listOrgMembers(client, ORG_A);
-    expect(members).toEqual([]);
-  });
+  // Invited/suspended/revoked exclusion and same-org-only scoping are now
+  // enforced INSIDE sales_assignable_members (status = 'active', organization_id
+  // = p_org_id) — proven against the real database in
+  // supabase/tests/47_sales_assignable_members_test.sql, not re-asserted here
+  // against a mock that can't express RLS/RPC-level filtering.
 
-  it("returns an empty list (never a permission error or a raw id) when the caller lacks org.members.manage", async () => {
+  it("throws — never silently returns an empty list — on a 42501 from sales_assignable_members", async () => {
+    // The regression this guards, precisely: every call site already gates on
+    // canAssign() (sales.assign OR sales.manage OR org.manage) — the exact
+    // predicate sales_assignable_members itself now enforces — so a 42501
+    // here means the two have drifted out of sync, not "no access as
+    // expected". Swallowing it into [] is what produced the F3 capability
+    // regression (an assignment dropdown with only "Unassigned", no error);
+    // surfacing it instead means a caller who already passed canAssign()
+    // never sees a silently-broken assignment control.
     const { client } = makeRpcClient({ data: null, error: { code: "42501" } });
-    await expect(listOrgMembers(client, ORG_A)).resolves.toEqual([]);
+    await expect(listOrgMembers(client, ORG_A)).rejects.toBeTruthy();
   });
 
-  it("still throws on a genuine, non-permission RPC error", async () => {
+  it("throws on any other RPC error too (connectivity, config, unexpected RLS)", async () => {
     const { client } = makeRpcClient({ data: null, error: { code: "08000" } });
     await expect(listOrgMembers(client, ORG_A)).rejects.toBeTruthy();
   });
 
-  it("calls org_members_list scoped to the caller's own organization only (no cross-org member resolution)", async () => {
+  it("calls sales_assignable_members scoped to the caller's own organization only (no cross-org member resolution)", async () => {
     const { client, calls } = makeRpcClient({ data: [], error: null });
     await listOrgMembers(client, ORG_A);
-    expect(calls).toEqual([{ name: "org_members_list", args: { p_org_id: ORG_A } }]);
+    expect(calls).toEqual([{ name: "sales_assignable_members", args: { p_org_id: ORG_A } }]);
     expect(calls[0]!.args).not.toEqual({ p_org_id: ORG_B });
   });
 });
