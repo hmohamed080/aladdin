@@ -32,6 +32,7 @@ export function ConfirmDialog({
   confirmVariant = "danger",
   action,
   formAction,
+  confirmDisabled = false,
   children,
 }: {
   trigger: string;
@@ -42,6 +43,13 @@ export function ConfirmDialog({
   confirmVariant?: "danger" | "accent" | "primary";
   action?: ((fd: FormData) => void | Promise<void>) | string;
   formAction?: (prev: FormState, fd: FormData) => Promise<FormState>;
+  /**
+   * Extra gate ORed with the form's own pending state (e.g. a field inside
+   * `children` is in a state that must not be submitted — a branch move that
+   * would strand the currently-selected assignee). The dialog itself carries
+   * no knowledge of what makes a submission unsafe; the caller decides.
+   */
+  confirmDisabled?: boolean;
   children?: ReactNode | ((state: FormState) => ReactNode);
 }) {
   const { t } = useI18n();
@@ -155,7 +163,7 @@ export function ConfirmDialog({
                 <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
                   {t("common.cancel")}
                 </Button>
-                <SubmitButton variant={confirmVariant} pendingLabel={t("common.saving")}>
+                <SubmitButton variant={confirmVariant} pendingLabel={t("common.saving")} disabled={confirmDisabled}>
                   {confirmLabel}
                 </SubmitButton>
               </div>

@@ -1,6 +1,6 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
-import { getLead, branchNameMap, listOrgMembers } from "@/server/queries/sales";
+import { getLead, branchNameMap, memberNameMap, listOrgMembersByBranch, type OrgMember } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
 import { PageHeader } from "@/components/ui/workspace-layout";
 import { BackLink } from "@/features/sales/page-parts";
@@ -36,12 +36,21 @@ export default async function LeadEditPage({ params }: { params: Promise<{ id: s
   }
 
   const canReassign = canAssign(org);
-  // One member fetch, reused for both the assignee label and the select (no dup).
-  const [branchNames, members] = await Promise.all([
+  // The label resolves for ANY viewer with sales.read (memberNameMap degrades
+  // safely if the caller can't call the assign-gated RPC); the reactive
+  // per-branch map for the source/branch form's picker is only ever fetched
+  // once canReassign is already confirmed — see server/queries/sales.
+  const [branchNames, memberNames, membersByBranch] = await Promise.all([
     branchNameMap(supabase, org.organizationId),
-    listOrgMembers(supabase, org.organizationId),
+    memberNameMap(supabase, org.organizationId, [lead.branch_id]),
+    canReassign
+      ? listOrgMembersByBranch(supabase, org.organizationId, [
+          ...org.branches.map((b) => b.id),
+          lead.branch_id,
+          ...(org.canManageSales ? [null] : []),
+        ])
+      : Promise.resolve({} as Record<string, OrgMember[]>),
   ]);
-  const memberNames = new Map(members.map((mm) => [mm.membershipId, mm.displayName]));
   const sourceLabel = lead.source ? m.source[lead.source] : m.common.none;
   const branchLabel = lead.branch_id ? branchNames.get(lead.branch_id) ?? "—" : m.common.none;
   const assigneeLabel = lead.assigned_membership_id
@@ -83,7 +92,7 @@ export default async function LeadEditPage({ params }: { params: Promise<{ id: s
             currentBranchId={lead.branch_id}
             currentAssigneeId={lead.assigned_membership_id}
             branches={org.branches}
-            members={members}
+            membersByBranch={membersByBranch}
             canAssign={canReassign}
             canOrgWide={org.canManageSales}
           />

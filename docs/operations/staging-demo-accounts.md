@@ -116,7 +116,7 @@ appears in this repository.**
 - **Organization:** Cairo Ceramics Showroom (`showroom_dealer`)
 - **Role:** owner
 - **Expected landing route:** `/b2b`
-- **Key visible data:** The richest account: 12 purchase requests over six months, 10 received offers, 7 supplier orders, 2 incoming delivery projects, an 8-item shortlist, its own 4-product shelf, 4 outgoing sales quotations, 5 customers, 6 leads, 6 follow-ups, and a 4-person team with a pending invitation.
+- **Key visible data:** The richest account, on two deliberately different totals: the local seed baseline (seed-pilot.sql) gives 12 purchase requests over six months, 10 received offers, 7 supplier orders and 2 incoming delivery projects; hosted staging permanently layers in the Sara Nabil / Nile Import & Trade enrichment chain on top, bringing those to 14, 12, 8 and 3. Unaffected either way: an 8-item shortlist, its own 4-product shelf, 4 outgoing sales quotations, 5 customers, 6 leads, 6 follow-ups, and 6 inbound RFQs received as supplier. The team is 2 active members (Hana, Youssef Amin) plus one pending EMPLOYEE-INITIATED JOIN REQUEST from Karim Adel — never a 4-person roster, and never an org-sent invitation. See Hosted verification notes below for the full reconciliation and the three quotations awaiting Hana's decision.
 - **What to demo:** THE primary demo account. Buying, selling and delivery in one workspace, with a six-month purchase-value trend and a spend ranking that are real aggregates of the rows behind them.
 
 ### 7. Youssef Amin
@@ -334,6 +334,32 @@ trusting these numbers indefinitely — they will drift as the demo world grows.
   an empty CRM — that assumption was wrong. `supabase/staging/demo-enrichment.sql`
   already carries the correct grant on hosted staging, and hosted verification
   confirms non-empty Cairo-scoped CRM data for this account.
+- **Hana Mansour's (`hana-showroom-owner`) commerce totals differ by design between
+  the local seed baseline and hosted staging — this is intentional, not drift to
+  reconcile away.** `supabase/seed-pilot.sql` alone (a plain local `supabase db reset`)
+  produces 12 purchase requests, 10 received offers, 7 supplier orders and 2 incoming
+  delivery projects for Cairo Ceramics Showroom. Hosted staging additionally and
+  PERMANENTLY layers in `supabase/staging/demo-enrichment.sql`'s Sara Nabil / Nile
+  Import & Trade chain, bringing the real hosted totals to 14, 12, 8 and 3 respectively.
+  Do not "fix" hosted to match 12/10/7/2 — the enrichment chain is approved, permanent
+  demo content, kept only out of the local reset path so the pgTAP suite and Playwright
+  fixtures stay unaffected.
+- **Hana's team is 2 active members (Hana Mansour, Youssef Amin) plus one pending
+  EMPLOYEE-INITIATED JOIN REQUEST from Karim Adel — never a "4-person team with a
+  pending invitation."** A join request (`public.organization_join_requests`, the row
+  behind Karim's request) is structurally distinct from an org-sent invitation
+  (`public.organization_invitations`, the row behind Nour Hegazy's pending invite to
+  Horizon Contracting): a join request has no `token`/`expires_at` and is raised by the
+  applicant, not the organization. Cairo Ceramics Showroom has zero pending
+  `organization_invitations` rows.
+- **Three quotations sit on Hana's desk awaiting her decision, all protected from
+  automated/demo mutation:** Fady Riad / Cairo Sanitary Ware Trading (EGP 132,000),
+  Mahmoud Ezzat / Alexandria Glass & Aluminium (EGP 74,800), and — hosted-only, via the
+  same enrichment chain — Sara Nabil / Nile Import & Trade (EGP 126,000).
+- **The 6 RFQs Cairo Ceramics receives as supplier** are 5 from the local seed baseline
+  (Horizon Contracting ×2, New Cairo Design Studio ×2, Zayed Home Showroom ×1) plus one
+  hosted-only enrichment row: Delta Interiors Studio's still-open "Wall tile — boutique
+  retail fit-out" request, submitted and awaiting Hana's price.
 - **Laila Shafik's (`laila-contractor-manager`) capabilities are an intentionally
   delegated subset**, not a fixed "Manager" role bundle and not a bug — see her
   entry above. There is no canonical Manager capability set to compare her against;

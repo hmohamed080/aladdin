@@ -1,6 +1,6 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
-import { listOrgMembers } from "@/server/queries/sales";
+import { listOrgMembersByBranch, type OrgMember } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
 import { PageHeader } from "@/components/ui/workspace-layout";
 import { BackLink } from "@/features/sales/page-parts";
@@ -24,7 +24,12 @@ export default async function NewCustomerPage() {
     );
   }
 
-  const members = canAssign(org) ? await listOrgMembers(supabase, org.organizationId) : [];
+  const membersByBranch: Record<string, OrgMember[]> = canAssign(org)
+    ? await listOrgMembersByBranch(supabase, org.organizationId, [
+        ...org.branches.map((b) => b.id),
+        ...(org.canManageSales ? [null] : []),
+      ])
+    : {};
 
   return (
     <div className="pb-16 tablet:pb-0">
@@ -33,7 +38,7 @@ export default async function NewCustomerPage() {
       <CustomerForm
         orgId={org.organizationId}
         branches={org.branches}
-        members={members}
+        membersByBranch={membersByBranch}
         canManageSales={org.canManageSales}
         canAssign={canAssign(org)}
       />

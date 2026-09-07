@@ -112,7 +112,7 @@ org      = "Cairo Ceramics Showroom"
 org_type = "showroom_dealer"
 role     = "owner"
 landing  = "/b2b"
-data     = "The richest account: 12 purchase requests over six months, 10 received offers, 7 supplier orders, 2 incoming delivery projects, an 8-item shortlist, its own 4-product shelf, 4 outgoing sales quotations, 5 customers, 6 leads, 6 follow-ups, and a 4-person team with a pending invitation."
+data     = "The richest account, on two deliberately different totals: the local seed baseline (seed-pilot.sql) gives 12 purchase requests over six months, 10 received offers, 7 supplier orders and 2 incoming delivery projects; hosted staging permanently layers in the Sara Nabil / Nile Import & Trade enrichment chain on top, bringing those to 14, 12, 8 and 3. Unaffected either way: an 8-item shortlist, its own 4-product shelf, 4 outgoing sales quotations, 5 customers, 6 leads, 6 follow-ups, and 6 inbound RFQs received as supplier. The team is 2 active members (Hana, Youssef Amin) plus one pending EMPLOYEE-INITIATED JOIN REQUEST from Karim Adel — never a 4-person roster, and never an org-sent invitation. See Hosted verification notes below for the full reconciliation and the three quotations awaiting Hana's decision."
 demo     = "THE primary demo account. Buying, selling and delivery in one workspace, with a six-month purchase-value trend and a spend ranking that are real aggregates of the rows behind them."
 
 [[account]]

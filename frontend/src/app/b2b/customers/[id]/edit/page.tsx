@@ -1,6 +1,6 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
-import { getCustomer, branchNameMap, listOrgMembers } from "@/server/queries/sales";
+import { getCustomer, branchNameMap, memberNameMap, listOrgMembersByBranch, type OrgMember } from "@/server/queries/sales";
 import { canWrite, canAssign } from "@/server/queries/context";
 import { PageHeader } from "@/components/ui/workspace-layout";
 import { BackLink } from "@/features/sales/page-parts";
@@ -36,12 +36,22 @@ export default async function CustomerEditPage({ params }: { params: Promise<{ i
   }
 
   const canReassign = canAssign(org);
-  // One member fetch, reused for both the assignee label and the select (no dup).
-  const [branchNames, members] = await Promise.all([
+  // The label resolves for ANY viewer with sales.read (memberNameMap degrades
+  // safely if the caller can't call the assign-gated RPC); the reactive
+  // per-branch map for the ownership form's picker is only ever fetched once
+  // canReassign is already confirmed, so a denial there is a real bug, not an
+  // expected outcome — see the two helpers' own docs in server/queries/sales.
+  const [branchNames, memberNames, membersByBranch] = await Promise.all([
     branchNameMap(supabase, org.organizationId),
-    listOrgMembers(supabase, org.organizationId),
+    memberNameMap(supabase, org.organizationId, [customer.branch_id]),
+    canReassign
+      ? listOrgMembersByBranch(supabase, org.organizationId, [
+          ...org.branches.map((b) => b.id),
+          customer.branch_id,
+          ...(org.canManageSales ? [null] : []),
+        ])
+      : Promise.resolve({} as Record<string, OrgMember[]>),
   ]);
-  const memberNames = new Map(members.map((mm) => [mm.membershipId, mm.displayName]));
   const branchName = customer.branch_id
     ? branchNames.get(customer.branch_id) ?? "—"
     : m.common.none;
@@ -80,7 +90,7 @@ export default async function CustomerEditPage({ params }: { params: Promise<{ i
               currentBranchId={customer.branch_id}
               currentAssigneeId={customer.assigned_membership_id}
               branches={org.branches}
-              members={members}
+              membersByBranch={membersByBranch}
               canOrgWide={org.canManageSales}
             />
           </div>

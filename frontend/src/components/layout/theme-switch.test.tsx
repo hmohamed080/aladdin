@@ -148,3 +148,87 @@ describe("ThemeSwitch", () => {
     await waitFor(() => expect(control().getAttribute("aria-label")).not.toBe(before));
   });
 });
+
+/**
+ * F4 — the label used to read "Theme: Dark" while the page was genuinely
+ * light (and vice versa): a bare "Theme: X" pair reads as a description of
+ * the CURRENT theme, which is backwards from what the code actually computes
+ * (`next`, the theme a press would apply). These pin the corrected,
+ * action-phrased wording in both directions and both locales, and that the
+ * accessible name and the visible tooltip never disagree.
+ *
+ * There is no separate "system" code path to test: `useThemeState` (see
+ * lib/theme/use-theme.ts) always hands the component an already-RESOLVED
+ * `Theme` ("light" | "dark"), collapsing `system` before ThemeSwitch ever
+ * sees it — so exercising `current="light"` / `current="dark"` here already
+ * covers the system-resolved case by construction.
+ */
+describe("ThemeSwitch action-phrased label (F4)", () => {
+  /**
+   * `current` only seeds the FIRST paint — `useThemeState`'s effect runs
+   * `readActiveTheme()` against the live DOM immediately on mount (see
+   * lib/theme/use-theme.ts) and that wins. So a "the page is dark" test has to
+   * make the DOM actually dark first, exactly as `applyThemePreference` would
+   * have left it; passing `current="dark"` alone is not enough (and was the
+   * gap the first draft of these tests missed — they failed against the real
+   * component instead of only asserting a fixture's opinion of itself).
+   */
+  const setDom = (theme: "light" | "dark") => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.setAttribute("data-theme-pref", theme);
+  };
+
+  it("on a dark page (EN), offers to switch to light — never a bare 'Theme: Dark' state label", async () => {
+    setDom("dark");
+    renderWithI18n(<ThemeSwitch current="dark" />, "en");
+    expect(control().getAttribute("aria-label")).toBe("Switch to light theme");
+  });
+
+  it("on a light page (EN), offers to switch to dark", async () => {
+    setDom("light");
+    renderWithI18n(<ThemeSwitch current="light" />, "en");
+    expect(control().getAttribute("aria-label")).toBe("Switch to dark theme");
+  });
+
+  it("on a dark page (AR), offers the Arabic 'switch to light' phrasing", async () => {
+    setDom("dark");
+    renderWithI18n(<ThemeSwitch current="dark" />, "ar");
+    expect(control().getAttribute("aria-label")).toBe("التبديل إلى المظهر الفاتح");
+  });
+
+  it("on a light page (AR), offers the Arabic 'switch to dark' phrasing", async () => {
+    setDom("light");
+    renderWithI18n(<ThemeSwitch current="light" />, "ar");
+    expect(control().getAttribute("aria-label")).toBe("التبديل إلى المظهر الداكن");
+  });
+
+  it("under System mode resolved to dark, offers to switch to light (no separate system code path)", async () => {
+    // `system` never reaches ThemeSwitch as a distinct value — useThemeState
+    // always hands it the theme the OS/preference already resolved to. Seed
+    // the DOM the way `applyThemePreference("system")` would when the OS is
+    // dark: a `dark` class, but the preference attribute stays "system".
+    document.documentElement.classList.add("dark");
+    document.documentElement.setAttribute("data-theme-pref", "system");
+    renderWithI18n(<ThemeSwitch current="dark" />, "en");
+    expect(control().getAttribute("aria-label")).toBe("Switch to light theme");
+  });
+
+  it("the compact (header) variant's visible title matches the accessible name exactly", async () => {
+    setDom("dark");
+    renderWithI18n(<ThemeSwitch current="dark" compact />, "en");
+    const el = control();
+    expect(el.getAttribute("title")).toBe(el.getAttribute("aria-label"));
+    expect(el.getAttribute("title")).toBe("Switch to light theme");
+  });
+
+  it("the label flips correctly after a live toggle, in both directions", async () => {
+    renderWithI18n(<ThemeSwitch current="light" />, "en");
+    expect(control().getAttribute("aria-label")).toBe("Switch to dark theme");
+
+    fireEvent.click(control());
+    await waitFor(() => expect(control().getAttribute("aria-label")).toBe("Switch to light theme"));
+
+    fireEvent.click(control());
+    await waitFor(() => expect(control().getAttribute("aria-label")).toBe("Switch to dark theme"));
+  });
+});

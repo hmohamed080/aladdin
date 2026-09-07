@@ -31,7 +31,10 @@ export default async function CustomersPage({
       search: sp.q,
     }),
     branchNameMap(supabase, org.organizationId),
-    memberNameMap(supabase, org.organizationId),
+    memberNameMap(supabase, org.organizationId, [
+      ...org.branches.map((b) => b.id),
+      ...(org.canManageSales ? [null] : []),
+    ]),
   ]);
 
   const canWrite = org.canManageSales || org.capabilities.includes("sales.write");

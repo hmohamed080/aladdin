@@ -36,6 +36,9 @@ export const en = {
     confirm: "Confirm",
     reassign: "Reassign",
     remove: "Remove",
+    /* Shown in place of the assignee control until a branch is chosen — a
+       candidate list can't be resolved without one. */
+    selectBranchFirst: "Select a branch first",
     /* Language names as a professional would write them on their own profile. */
     languageName: { ar: "Arabic", en: "English" },
   },
@@ -120,6 +123,13 @@ export const en = {
     points: "Points",
     themeLight: "Light",
     themeDark: "Dark",
+    // Action-phrased, for the single-icon header toggle only (ThemeSwitch):
+    // what pressing the control DOES, never what theme is currently applied —
+    // "Theme: Dark" read as a state description and was wrong exactly when the
+    // page was already dark. Distinct from themeLight/themeDark above, which
+    // stay as plain value names for the account-menu Light/Dark/System choice.
+    themeSwitchToLight: "Switch to light theme",
+    themeSwitchToDark: "Switch to dark theme",
     organization: "Organization",
     branch: "Branch",
     allBranches: "All branches",

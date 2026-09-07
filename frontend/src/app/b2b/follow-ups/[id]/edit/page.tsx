@@ -37,7 +37,9 @@ export default async function FollowUpEditPage({ params }: { params: Promise<{ i
   }
 
   const assignable = canAssign(org);
-  const members = assignable ? await listOrgMembers(supabase, org.organizationId) : [];
+  const members = assignable
+    ? await listOrgMembers(supabase, org.organizationId, followUp.branch_id)
+    : [];
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">

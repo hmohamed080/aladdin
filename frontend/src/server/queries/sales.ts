@@ -290,31 +290,132 @@ export async function recentActivities(
 // ---- Assignable members (for assignment dropdowns) -------------------------
 export type OrgMember = { membershipId: string; displayName: string };
 
-/** Active members of the org the caller can see (org managers see all; scoped by RLS). */
-export async function listOrgMembers(supabase: DB, orgId: string): Promise<OrgMember[]> {
-  // Disambiguate the users embed — memberships has two FKs to users (user_id,
-  // invited_by), so PostgREST needs the explicit relationship.
-  const { data, error } = await supabase
-    .from("memberships")
-    .select("id, users!memberships_user_id_fkey(profiles(display_name))")
-    .eq("organization_id", orgId)
-    .eq("status", "active");
-  if (error) throw error;
-  return (data ?? []).map((m) => ({
-    membershipId: m.id,
-    displayName:
-      (m.users as { profiles?: { display_name?: string | null } | null } | null)?.profiles
-        ?.display_name ?? m.id.slice(0, 8),
-  }));
+/**
+ * `null` on the wire is the org-wide bucket (a null `branch_id` record); the
+ * RPC's own uuid parameter is nullable, so this is only a naming convenience.
+ */
+type BranchId = string | null;
+
+function isPermissionDenied(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code?: unknown }).code === "42501"
+  );
 }
 
-/** Small helper: map membership ids to display names for rendering rows. */
+/**
+ * Members active, same-org, and branch-compatible with `branchId` (null =
+ * org-wide record), name-only, for ONE CRM assignment context.
+ *
+ * `public.profiles` RLS only lets a user read their OWN row (see
+ * `profiles_select_self`, `20260802090001_identity_core.sql`) — there is no
+ * policy letting one org member read a teammate's identity by a direct join.
+ * A caller's own row resolves fine; every OTHER member's `profiles` embed
+ * comes back null. This used to fall back to `m.id.slice(0, 8)` — the caller's
+ * own membership id, truncated — which leaked a raw internal identifier into
+ * the Customers/Leads/Follow-ups screens for every teammate but the caller.
+ *
+ * Calls `sales_assignable_members` (`20260912090001_sales_assignable_members.sql`)
+ * — a minimal, security-definer read-model authorized on the SAME predicate
+ * every assignment write path already requires (`sales.assign` OR org-wide
+ * sales authority, i.e. `sales.manage`/`org.manage` — never
+ * `org.members.manage`), filtered through the IDENTICAL branch-compatibility
+ * function (`app.membership_can_access_branch`) the write RPCs use to
+ * validate a chosen assignee. A name returned for `branchId` can never be
+ * rejected by the corresponding write RPC for that same branch.
+ *
+ * Call this ONLY after confirming the caller holds assignment authority
+ * (`canAssign()`, `server/queries/context.ts`) — every one of this helper's
+ * call sites does. An authorization denial here is then a genuine contract
+ * mismatch, not an expected "no access" case — unlike `org_members_list`
+ * (the broader, `org.members.manage`-gated People-screen read-model this
+ * helper deliberately does NOT call), every error is surfaced, never
+ * silently swallowed into an empty list. An empty list here means "this
+ * branch genuinely has no other assignable member," not "this caller
+ * couldn't be checked" — a real RPC/auth failure throws instead, so a caller
+ * who already passed `canAssign()` never sees an editable assignment control
+ * silently rendered as if no teammates existed. (For read-only label
+ * resolution by a viewer who may NOT hold assignment authority, use
+ * `memberNameMap` instead — there, the same denial is an expected outcome.)
+ */
+export async function listOrgMembers(
+  supabase: DB,
+  orgId: string,
+  branchId: BranchId,
+): Promise<OrgMember[]> {
+  // The generated RPC arg type follows the SQL parameter's `default null`
+  // (nullable-with-default => optional, never `| null` — see create_customer's
+  // p_branch_id for the same pattern) so a null branch is sent by OMITTING
+  // the key, exactly like every other optional RPC call in this codebase,
+  // never by assigning JS `null` to a `string`-typed key.
+  const { data, error } = await supabase.rpc("sales_assignable_members", {
+    p_org_id: orgId,
+    ...(branchId !== null ? { p_branch_id: branchId } : {}),
+  });
+  if (error) throw error;
+  return (data ?? [])
+    .map((m) => ({ membershipId: m.membership_id, displayName: (m.display_name ?? "").trim() }))
+    .filter((m) => m.displayName.length > 0);
+}
+
+/**
+ * `listOrgMembers`, for every branch context a form may need at once — one
+ * RPC call per distinct branch id (bounded by the org's own branch count, the
+ * same list already shown as `org.branches`), keyed by branch id with `""` as
+ * the org-wide bucket. Lets a branch-reactive assignee picker switch locally
+ * with no client round trip: `customers/new`, `customers/[id]/edit`,
+ * `leads/new`, and `leads/[id]/edit` all let the caller change the record's
+ * branch in the same form, so the compatible-assignee set must change with it
+ * rather than staying fixed to whatever branch the page first rendered.
+ */
+export async function listOrgMembersByBranch(
+  supabase: DB,
+  orgId: string,
+  branchIds: BranchId[],
+): Promise<Record<string, OrgMember[]>> {
+  const keys = [...new Set(branchIds.map((b) => b ?? ""))];
+  const entries = await Promise.all(
+    keys.map(
+      async (key): Promise<[string, OrgMember[]]> => [
+        key,
+        await listOrgMembers(supabase, orgId, key === "" ? null : key),
+      ],
+    ),
+  );
+  return Object.fromEntries(entries);
+}
+
+/**
+ * Name lookup for READ-ONLY labels (list/detail views), merged across every
+ * branch context given — a listing can show records assigned across several
+ * different branches at once, unlike a single assignment form which only
+ * ever needs one. Unlike `listOrgMembers`/`listOrgMembersByBranch`, a 42501
+ * here is an EXPECTED outcome (a viewer with `sales.read`/`sales.write` but
+ * none of `sales.assign`/`sales.manage`/`org.manage` legitimately can't call
+ * the underlying RPC) rather than a contract mismatch, so it degrades to an
+ * empty map — every id then falls through to the caller's own "—"/unassigned
+ * fallback, exactly like any other unresolvable historical assignee. Any
+ * OTHER error (connectivity, config, unexpected RLS) still throws.
+ */
 export async function memberNameMap(
   supabase: DB,
   orgId: string,
+  branchIds: BranchId[],
 ): Promise<Map<string, string>> {
-  const members = await listOrgMembers(supabase, orgId);
-  return new Map(members.map((m) => [m.membershipId, m.displayName]));
+  let byBranch: Record<string, OrgMember[]>;
+  try {
+    byBranch = await listOrgMembersByBranch(supabase, orgId, branchIds);
+  } catch (e) {
+    if (isPermissionDenied(e)) return new Map();
+    throw e;
+  }
+  const merged = new Map<string, string>();
+  for (const members of Object.values(byBranch)) {
+    for (const m of members) merged.set(m.membershipId, m.displayName);
+  }
+  return merged;
 }
 
 /** Small helper: map customer ids to names for lead rows. */

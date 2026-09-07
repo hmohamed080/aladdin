@@ -39,7 +39,10 @@ export default async function LeadsPage({
       assigneeMembershipId: sp.assignee,
     }),
     customerNameMap(supabase, org.organizationId),
-    memberNameMap(supabase, org.organizationId),
+    memberNameMap(supabase, org.organizationId, [
+      ...org.branches.map((b) => b.id),
+      ...(org.canManageSales ? [null] : []),
+    ]),
   ]);
 
   return (

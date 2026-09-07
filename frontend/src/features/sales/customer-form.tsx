@@ -6,6 +6,8 @@ import { createCustomerAction, type FormState } from "@/server/actions/sales-for
 import { Card } from "@/components/ui/primitives";
 import { Input, Select, LabeledField, SubmitButton } from "@/components/ui/controls";
 import { SALES_SOURCES } from "@/lib/ui/format";
+import { useBranchAssignees } from "@/features/sales/use-branch-assignees";
+import type { OrgMember } from "@/server/queries/sales";
 
 const initial: FormState = { ok: false };
 
@@ -13,23 +15,28 @@ const initial: FormState = { ok: false };
  * Create-customer form. Binds directly to the trusted create_customer RPC via a
  * Server Action. Branch selection is limited to the caller's own branches; an
  * org-wide (no-branch) customer is only offered to org-wide sales authority.
+ * The assignee list is branch-reactive (`membersByBranch`): switching branches
+ * re-filters to teammates the write RPC would actually accept for that branch,
+ * and a selection that falls out of scope is never silently kept selectable
+ * without warning nor silently cleared — see `useBranchAssignees`.
  */
 export function CustomerForm({
   orgId,
   branches,
-  members,
+  membersByBranch,
   canManageSales,
   canAssign,
 }: {
   orgId: string;
   branches: { id: string; name: string }[];
-  members: { membershipId: string; displayName: string }[];
+  membersByBranch: Record<string, OrgMember[]>;
   canManageSales: boolean;
   canAssign: boolean;
 }) {
   const { t } = useI18n();
   const [state, action] = useActionState(createCustomerAction, initial);
   const fe = state.fieldErrors ?? {};
+  const ba = useBranchAssignees(membersByBranch, branches[0]?.id ?? "", "");
 
   return (
     <Card className="max-w-2xl">
@@ -60,7 +67,7 @@ export function CustomerForm({
           htmlFor="branchId"
           optional={canManageSales ? t("common.optional") : undefined}
         >
-          <Select id="branchId" name="branchId" defaultValue={branches[0]?.id ?? ""}>
+          <Select id="branchId" name="branchId" value={ba.branch} onChange={(e) => ba.onBranchChange(e.target.value)}>
             {canManageSales ? <option value="">{t("common.none")}</option> : null}
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
@@ -97,15 +104,35 @@ export function CustomerForm({
           </Select>
         </LabeledField>
 
-        {canAssign && members.length > 0 ? (
-          <LabeledField label={t("customers.assignee")} htmlFor="assignedMembershipId" optional={t("common.optional")}>
-            <Select id="assignedMembershipId" name="assignedMembershipId" defaultValue="">
+        {canAssign && ba.branchKnown ? (
+          <LabeledField
+            label={t("customers.assignee")}
+            htmlFor="assignedMembershipId"
+            optional={t("common.optional")}
+            error={ba.isStale ? t("states.assigneeBranch") : undefined}
+          >
+            <Select
+              id="assignedMembershipId"
+              name="assignedMembershipId"
+              value={ba.assignee}
+              onChange={(e) => ba.onAssigneeChange(e.target.value)}
+              aria-invalid={ba.isStale ? true : undefined}
+            >
               <option value="">{t("common.unassigned")}</option>
-              {members.map((m) => (
-                <option key={m.membershipId} value={m.membershipId}>
-                  {m.displayName}
+              {ba.candidates.map((mem) => (
+                <option key={mem.membershipId} value={mem.membershipId}>
+                  {mem.displayName}
                 </option>
               ))}
+              {ba.isStale ? (
+                <option value={ba.assignee}>{ba.staleLabel ?? t("states.assigneeBranch")}</option>
+              ) : null}
+            </Select>
+          </LabeledField>
+        ) : canAssign ? (
+          <LabeledField label={t("customers.assignee")} htmlFor="assignedMembershipId" hint={t("common.selectBranchFirst")}>
+            <Select id="assignedMembershipId" name="assignedMembershipId" value="" disabled>
+              <option value="">{t("common.unassigned")}</option>
             </Select>
           </LabeledField>
         ) : null}
@@ -117,7 +144,9 @@ export function CustomerForm({
         </div>
 
         <div className="tablet:col-span-2">
-          <SubmitButton pendingLabel={t("common.saving")}>{t("common.create")}</SubmitButton>
+          <SubmitButton pendingLabel={t("common.saving")} disabled={ba.isStale}>
+            {t("common.create")}
+          </SubmitButton>
         </div>
       </form>
     </Card>
