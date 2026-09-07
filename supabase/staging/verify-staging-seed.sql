@@ -1,23 +1,51 @@
 -- ===========================================================================
 -- Verify the STAGING demo world. READ-ONLY: this script writes nothing.
 --
---   psql "<connection string>" -f supabase/staging/verify-staging-seed.sql
+-- ONE canonical file, TWO modes, no fork:
 --
--- Raises on the first failure and prints a per-account report on success. It is
--- safe to run as often as you like, against staging or a local rehearsal.
+--   REHEARSAL / FIXTURE mode (strict — the default when nothing sets the mode)
+--     Requires the database to hold EXACTLY the 26 demo accounts and nothing
+--     else. Used by scripts/rehearse_staging_seed.py against a local/isolated
+--     database that was just built from a clean seed load.
+--
+--   HOSTED mode (tolerant of unrelated non-demo registrations)
+--     Requires the 26 expected demo identities to exist, by UUID, but does
+--     NOT require them to be the only rows in auth.users — hosted staging may
+--     carry accounts this manifest never created. Used against the hosted
+--     Supabase project via scripts/verify_staging_seed.py.
+--
+-- This file intentionally contains NO psql meta-commands (`\set`, `\if`,
+-- `\gset`, `\timing`) — it must run unmodified through BOTH a real `psql`
+-- session (rehearsal) and Supabase's Management-API-backed
+-- `supabase db query --linked --file` (hosted), which does not implement
+-- meta-commands or `-v` variable substitution. The mode is instead read from
+-- a plain Postgres GUC, `aladdin.verify_mode`, which the CALLER sets with one
+-- prepended line of real SQL before this file's own content runs — see
+-- scripts/verify_staging_seed.py (hosted) and the `psql(..., mode=...)`
+-- helper in scripts/rehearse_staging_seed.py (rehearsal). If nothing set it,
+-- this file defaults to the strict 'rehearsal' mode itself, so a direct,
+-- unprefixed run stays safe rather than silently tolerant.
 --
 -- WHAT IT CHECKS, AND WHY EACH ONE EARNS ITS PLACE
 -- ------------------------------------------------
---   A. Population    — 26 accounts, each with the user/profile rows the app reads.
---   B. Addresses     — unique, deliverable, and in lockstep with public.contacts.
---                      Sign-in is Email OTP only, so a duplicate or reserved
---                      address is an account nobody can open.
+--   A. Population    — the 26 accounts exist. Exactly 26 total in rehearsal
+--                       mode; at least those 26 (by UUID) in hosted mode.
+--   B. Addresses     — unique, deliverable, and in lockstep with public.contacts,
+--                      scoped to the 26 expected accounts either way. Sign-in
+--                      is Email OTP only, so a duplicate or reserved address is
+--                      an account nobody can open.
 --   C. Linkage       — persona, membership, capability and branch rows all point
 --                      at things that exist and belong together.
 --   D. Consistency   — every quotation and order total equals the sum of its own
 --                      lines, and every commerce record joins organizations that
 --                      actually take part in it. A seeded total that disagrees
 --                      with its items makes Reports contradict the detail screen.
+--   G. Karim Adel    — named explicitly, not merely implied by F's non-emptiness
+--                      check: sales.read, sales.write, a real branch grant, no
+--                      org-wide capability, and non-empty branch-scoped CRM data.
+--                      This is the specific account a pre-hosted-verification
+--                      static-code read got wrong (see
+--                      docs/operations/staging-demo-accounts.md).
 --   E. Landing       — the route each account resolves to, computed the same way
 --                      frontend/src/lib/workspace/model.ts computes it.
 --   F. Non-emptiness — THE POINT OF THE FILE. Every account is impersonated under
@@ -27,23 +55,10 @@
 -- Deliberately keyed on UUIDs, never on email addresses: the addresses are
 -- composed from a mailbox that must never enter the repository, so this file
 -- checks their PROPERTIES and leaves their VALUES to the generated manifest.
+-- Never prints credentials, tokens, or the identity of any row outside the 26
+-- expected demo accounts — hosted mode's extra registrations are counted,
+-- never named.
 -- ===========================================================================
-
-\set ON_ERROR_STOP on
-\timing off
-
--- Rehearsal escape hatch for check B2 ONLY. `scripts/rehearse_staging_seed.py`
--- builds its bundle with deliberately undeliverable `@example.test` addresses —
--- it needs no mailbox and must never be mistaken for a cloud load — so B2 would
--- fail there by design. Every other check still runs, and a real staging run
--- passes no variable and therefore gets the full check.
---
---   psql … -f verify-staging-seed.sql              → deliverability ENFORCED
---   psql … -v rehearsal=on -f verify-staging-seed.sql → B2 skipped
-\if :{?rehearsal}
-\else
-  \set rehearsal off
-\endif
 
 -- Wrapped in a transaction that always ROLLS BACK. The checks below only read,
 -- but wrapping makes that structural rather than a promise: this script cannot
@@ -51,15 +66,23 @@
 -- temporary result tables alive for the report at the end.
 begin;
 
--- Carried into the block as a GUC, not as a psql variable: psql does not
--- interpolate `:vars` inside dollar-quoted bodies, so `:'rehearsal'` would reach
--- the server literally and fail to parse.
-select set_config('aladdin.rehearsal', :'rehearsal', true) as rehearsal_mode \gset
+-- Default to the strict mode if the caller set nothing, so a bare
+-- `psql ... -f verify-staging-seed.sql` (no prelude) stays safe rather than
+-- silently accepting unrelated rows.
+do $mode_default$
+begin
+  if current_setting('aladdin.verify_mode', true) is null
+     or btrim(current_setting('aladdin.verify_mode', true)) = '' then
+    perform set_config('aladdin.verify_mode', 'rehearsal', false);
+  end if;
+end
+$mode_default$;
 
 do $verify$
 declare
-  v_rehearsal constant boolean :=
-    lower(coalesce(current_setting('aladdin.rehearsal', true), 'off')) in ('on', 'true', '1', 'yes');
+  v_mode      constant text := lower(btrim(coalesce(current_setting('aladdin.verify_mode', true), 'rehearsal')));
+  v_hosted    constant boolean := v_mode = 'hosted';
+  v_rehearsal constant boolean := not v_hosted;
   v_role      text := coalesce(current_setting('role', true), 'none');
   v_claims    text := coalesce(current_setting('request.jwt.claims', true), '');
   v_n         int;
@@ -70,6 +93,12 @@ declare
   v_workspaces text;
   v_persona   text;
   v_failures  text[] := array[]::text[];
+
+  -- Karim Adel's identity, org and granted branches, resolved once for the G
+  -- section below.
+  v_karim_membership uuid;
+  v_karim_org         uuid;
+  v_karim_branches    uuid[];
 
   -- The 26 accounts, keyed by the deterministic UUIDs the seed files own.
   -- `expect_landing` mirrors landingFor(); `exempt_reason` is non-null for the
@@ -131,8 +160,14 @@ begin
   -- A. Population
   -- =========================================================================
   select count(*) into v_n from auth.users;
-  if v_n <> 26 then
-    raise exception 'A1 population: auth.users holds % rows, expected 26', v_n;
+  if v_hosted then
+    if v_n < 26 then
+      raise exception 'A1 population: auth.users holds % rows, expected at least 26 (hosted mode tolerates unrelated non-demo registrations)', v_n;
+    end if;
+  else
+    if v_n <> 26 then
+      raise exception 'A1 population: auth.users holds % rows, expected exactly 26 (rehearsal/fixture mode requires a clean 26-account world)', v_n;
+    end if;
   end if;
 
   select count(*) into v_n
@@ -165,42 +200,46 @@ begin
   end if;
 
   -- =========================================================================
-  -- B. Addresses — the credential path, since sign-in is Email OTP only
+  -- B. Addresses — the credential path, since sign-in is Email OTP only.
+  -- Scoped to the 26 expected demo accounts in BOTH modes: in rehearsal mode
+  -- that is identical to checking all of auth.users (A1 already pins the
+  -- total to exactly 26), and in hosted mode it is the whole point — a
+  -- pre-existing, unrelated registration must never fail this file.
   -- =========================================================================
   select count(*) into v_n from (
-    select lower(email) from auth.users group by 1 having count(*) > 1
+    select lower(u.email) from auth.users u join _expect e on e.user_id = u.id group by 1 having count(*) > 1
   ) d;
   if v_n > 0 then
-    raise exception 'B1 email: % duplicate address(es) in auth.users', v_n;
+    raise exception 'B1 email: % duplicate address(es) among the 26 demo accounts', v_n;
   end if;
 
   select string_agg(u.id::text, ', ') into v_txt
-    from auth.users u
+    from auth.users u join _expect e on e.user_id = u.id
    where split_part(lower(u.email), '@', 2) ~ '\.(test|example|invalid|localhost|local)$'
       or split_part(lower(u.email), '@', 2) ~ '(^|\.)example\.(com|net|org)$'
       or coalesce(btrim(u.email), '') = '';
-  if v_txt is not null and not v_rehearsal then
+  if v_txt is not null and v_hosted then
     raise exception
-      'B2 email: account(s) on a RESERVED, undeliverable domain: %', v_txt
+      'B2 email: demo account(s) on a RESERVED, undeliverable domain: %', v_txt
       using hint = 'Rebuild the seed with a configured demo mailbox; these accounts can never receive an OTP.';
   elsif v_txt is not null then
     raise notice 'B2 email: SKIPPED (rehearsal) — addresses are intentionally undeliverable.';
   end if;
 
-  select count(*) into v_n from auth.users where email_confirmed_at is null;
+  select count(*) into v_n from auth.users u join _expect e on e.user_id = u.id where u.email_confirmed_at is null;
   if v_n > 0 then
-    raise exception 'B3 email: % account(s) are not email-confirmed and cannot sign in', v_n;
+    raise exception 'B3 email: % demo account(s) are not email-confirmed and cannot sign in', v_n;
   end if;
 
   -- GoTrue scans these as text; a NULL breaks the lookup with "Database error
   -- finding user", which presents as a working address that never sends a code.
   select count(*) into v_n
-    from auth.users
-   where confirmation_token is null or recovery_token is null or email_change is null
-      or email_change_token_new is null or email_change_token_current is null
-      or reauthentication_token is null or phone_change is null or phone_change_token is null;
+    from auth.users u join _expect e on e.user_id = u.id
+   where u.confirmation_token is null or u.recovery_token is null or u.email_change is null
+      or u.email_change_token_new is null or u.email_change_token_current is null
+      or u.reauthentication_token is null or u.phone_change is null or u.phone_change_token is null;
   if v_n > 0 then
-    raise exception 'B4 email: % account(s) have NULL GoTrue token columns (OTP lookup would fail)', v_n;
+    raise exception 'B4 email: % demo account(s) have NULL GoTrue token columns (OTP lookup would fail)', v_n;
   end if;
 
   select count(*) into v_n
@@ -215,13 +254,16 @@ begin
   select count(*) into v_n
     from public.contacts c
     join auth.users u on u.id = c.user_id
+    join _expect e on e.user_id = u.id
    where c.channel = 'email' and c.is_primary and lower(c.value) <> lower(u.email);
   if v_n > 0 then
     raise exception 'B6 email: % primary contact row(s) disagree with auth.users.email', v_n;
   end if;
 
   select count(*) into v_n
-    from public.contacts where is_primary and not is_verified;
+    from public.contacts c
+    join _expect e on e.user_id = c.user_id
+   where c.is_primary and not c.is_verified;
   if v_n > 0 then
     raise exception 'B7 email: % primary contact(s) are unverified', v_n;
   end if;
@@ -415,7 +457,60 @@ begin
     raise exception 'D10 commerce: % published product(s) have no published_at', v_n;
   end if;
 
-  raise notice 'A-D structural checks passed.';
+  raise notice 'A-D structural checks passed (mode=%).', v_mode;
+
+  -- =========================================================================
+  -- G. Karim Adel — explicit capability and branch-scope check
+  -- =========================================================================
+  select m.id, m.organization_id
+    into v_karim_membership, v_karim_org
+    from public.memberships m
+   where m.user_id = '22222222-2222-4222-8222-222222222222'::uuid;
+
+  if v_karim_membership is null then
+    raise exception 'G1 karim: no membership row found for Karim Adel (22222222-2222-4222-8222-222222222222)';
+  end if;
+
+  select count(*) into v_n
+    from public.membership_capabilities c
+   where c.membership_id = v_karim_membership and c.capability_key = 'sales.read';
+  if v_n = 0 then
+    raise exception 'G2 karim: missing sales.read capability';
+  end if;
+
+  select count(*) into v_n
+    from public.membership_capabilities c
+   where c.membership_id = v_karim_membership and c.capability_key = 'sales.write';
+  if v_n = 0 then
+    raise exception 'G3 karim: missing sales.write capability';
+  end if;
+
+  select array_agg(a.branch_id) into v_karim_branches
+    from public.membership_branch_access a
+   where a.membership_id = v_karim_membership;
+  if v_karim_branches is null or cardinality(v_karim_branches) = 0 then
+    raise exception 'G4 karim: no branch grant found — expected Cairo-branch-limited access';
+  end if;
+
+  select count(*) into v_n
+    from public.membership_capabilities c
+   where c.membership_id = v_karim_membership
+     and c.capability_key in ('org.manage', 'branch.manage');
+  if v_n > 0 then
+    raise exception 'G5 karim: holds an org-wide capability (org.manage/branch.manage) — expected branch-limited access only';
+  end if;
+
+  select
+      (select count(*) from public.customers c
+        where c.organization_id = v_karim_org and c.branch_id = any(v_karim_branches))
+    + (select count(*) from public.leads l
+        where l.organization_id = v_karim_org and l.branch_id = any(v_karim_branches))
+    into v_n;
+  if v_n = 0 then
+    raise exception 'G6 karim: no branch-scoped customer/lead rows found — expected non-empty CRM data in his granted branch(es)';
+  end if;
+
+  raise notice 'G. Karim Adel capability/branch/CRM check passed.';
 
   -- =========================================================================
   -- E + F. Per-account landing and non-emptiness, under real RLS
@@ -542,6 +637,9 @@ $verify$;
 
 -- The report. Emails are shown MASKED: this script is safe to paste into a issue
 -- or a chat log, and the real addresses live only in the generated manifest.
+-- In hosted mode this SELECT never touches, names, or counts any row outside
+-- the 26 expected demo accounts — unrelated registrations are simply absent
+-- from it, not summarized.
 select
   row_number() over (order by s.user_id)                       as "#",
   s.name                                                       as "display name",

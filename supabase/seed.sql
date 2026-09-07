@@ -127,8 +127,8 @@ values
   ('e1111111-eeee-4eee-8eee-eeeeeeeeeee1', 'org.members.manage'),
   ('e1111111-eeee-4eee-8eee-eeeeeeeeeee1', 'branch.manage'),
   ('e1111111-eeee-4eee-8eee-eeeeeeeeeee1', 'catalog.write'),
-  ('e2222222-eeee-4eee-8eee-eeeeeeeeeee2', 'sales.opportunity.read'),
-  ('e2222222-eeee-4eee-8eee-eeeeeeeeeee2', 'sales.opportunity.write'),
+  ('e2222222-eeee-4eee-8eee-eeeeeeeeeee2', 'sales.read'),
+  ('e2222222-eeee-4eee-8eee-eeeeeeeeeee2', 'sales.write'),
   ('e3333333-eeee-4eee-8eee-eeeeeeeeeee3', 'org.manage'),
   ('e3333333-eeee-4eee-8eee-eeeeeeeeeee3', 'org.members.manage');
 

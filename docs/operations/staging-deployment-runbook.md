@@ -108,9 +108,53 @@ That leaves exactly one hosted setting that the code genuinely depends on, and i
 
 ## Supabase readiness
 
-- **28 migrations** in `supabase/migrations/`, verified to apply in order from an empty database (`supabase db reset` locally, which drops and recreates before replaying every migration). No migration was edited for deployment convenience.
-- Remote schema deployment is **`supabase db push`** only. **`supabase db reset` must never be run against a linked hosted project** — it drops the database.
+- **Migration count drifts as the repository grows — check it live rather than trusting a number written here:**
+  ```bash
+  find supabase/migrations -maxdepth 1 -name "*.sql" -type f | wc -l   # local, current total
+  supabase migration list --linked                                     # local vs. hosted, per-migration
+  ```
+  All migrations are verified to apply in order from an empty database (`supabase db reset` locally, which drops and recreates before replaying every migration). No migration is edited for deployment convenience.
+- Remote schema deployment is **`supabase db push`** only. **`supabase db reset` must never be run against a linked hosted project** — it drops the database, and it is not a rollback mechanism (see [Migration safety protocol](#migration-safety-protocol) below).
 - `[db] major_version = 17` in `config.toml`. Confirm the hosted project reports Postgres 17 (`select version();`) so local and staging stay on the same major.
+
+## Migration safety protocol
+
+Added after a real incident: hosted `aladdin-staging` was found 21 migrations behind `main`, requiring a full Phase 0 reconciliation (inspection, rehearsal, a manual pre-migration snapshot, the real push, then post-push verification) before interactive account QA could safely begin. This protocol exists so that gap does not recur silently.
+
+**Before any interactive staging QA session:**
+
+```bash
+supabase migration list --linked
+```
+
+Confirm every local migration shows a matching remote timestamp and nothing is pending. Treat a gap as a blocker, not a background task — do not start QA against a database that is not at the commit you think it is.
+
+**Before any real migration push:**
+
+1. Confirm the exact linked project ref: `cat supabase/.temp/project-ref` and/or `supabase projects list` — cross-check it against the project you intend to target. A wrong link pushes to the wrong project.
+2. Dry-run first, always: `supabase db push --linked --dry-run` — confirms the exact ordered list of migrations that would apply, with nothing applied. Compare it against what you expect before proceeding.
+3. **On the Free Plan** (no scheduled daily backups, no PITR): take a manual pre-migration snapshot before pushing. At minimum: `supabase db dump --linked -f roles.sql --role-only`, `supabase db dump --linked -f schema.sql`, `supabase db dump --linked -f data.sql --data-only --use-copy`, `supabase db dump --linked -f history_schema.sql --schema supabase_migrations`, `supabase db dump --linked -f history_data.sql --data-only --use-copy --schema supabase_migrations`, plus a limited read-only export of `auth.users` (id/email/timestamps only, never tokens/secrets) and a Storage bucket/object manifest (metadata only, never the objects). Store it **outside the Git worktree**, restricted to the current user, and never commit it.
+   - **The default `supabase db dump` (no flags) contains schema only — no data — and always excludes the managed `auth` and `storage` schemas.** Do not treat a bare `db dump` as a full backup; use the explicit flag set above.
+   - **`supabase db reset --linked` is not a rollback.** It drops and rebuilds the linked database from migrations + seed, discarding all real data — never describe or use it as a way to undo a bad push. A failed or unwanted migration is fixed with a new forward migration, restored from the snapshot above, or (where available) a managed backup/PITR checkpoint — never a reset.
+4. Execute the real push exactly once: `supabase db push --linked`.
+
+**After any real migration push, before declaring staging ready:**
+
+1. **Migration parity** — `supabase migration list --linked` shows 0 pending.
+2. **Hosted seed verification** — `python scripts/verify_staging_seed.py` (see [`staging-demo-accounts.md`](staging-demo-accounts.md) *Verifying*) passes for all 26 demo accounts, tolerating any unrelated non-demo registrations that may already exist on staging.
+3. **Before/after row-count comparison** — compare the pre-push snapshot's counts (auth users, organizations, memberships, RFQs, quotations, orders, projects, storage buckets/objects) against the same counts post-push. Anything that changed outside what the pushed migrations were expected to change is a stop condition, not a footnote.
+4. **Health endpoints** — `GET /api/health` and `GET /api/backend/health` both return `200`, against the **real** deployment domain (see the next point — never a guessed one).
+5. **Final dry-run** — `supabase db push --linked --dry-run` reports `"upToDate": true`, nothing proposed. If it still proposes something, the push did not fully land; do not proceed.
+
+**Resolve the actual Vercel deployment domain from project metadata — never guess `<project-name>.vercel.app`.** That pattern can collide with a completely unrelated third-party project that happens to use the same name, silently checking the wrong application's health instead of yours. Resolve it properly:
+
+```bash
+cat .vercel/project.json   # projectId + orgId, if this worktree has ever been linked
+```
+
+then look up the project's real domains via the Vercel MCP tools (`list_projects`/`get_project`) or the Vercel dashboard, and use one of the domains actually listed there (e.g. `<project>-<random>-<team>.vercel.app` or a configured alias) — not an assumed pattern.
+
+**Git commit authors must use a GitHub-verifiable identity, or Vercel will refuse to deploy the commit.** A commit authored under a local-only identity (e.g. a synthetic `name <user@some.local>` set only in repository-local Git config) resolves to no GitHub account at all — GitHub's commit API reports `author: null`, and Vercel's Git integration blocks the deployment with "GitHub couldn't verify an account for the commit." Before pushing a commit that will trigger a Vercel deployment, confirm the repository-local `user.name`/`user.email` (`git config --local --get user.name` / `user.email`) resolves to your actual GitHub account — the standard, always-correct choice is `<github-numeric-id>+<github-login>@users.noreply.github.com`, found via `gh api user --jq '{id, login}'`. If a bad commit has already been pushed, fix the identity, `git commit --amend --reset-author` (not a plain `--amend`, which only updates the committer, not the author), and `git push --force-with-lease` to the same branch.
 
 ### Staging seed decision
 
@@ -219,7 +263,7 @@ From the repository root, on the commit you intend to deploy:
 ```bash
 pnpm supabase login
 pnpm supabase link --project-ref <project-ref>     # prompts for the database password
-pnpm supabase db push                              # applies all 28 migrations in order
+pnpm supabase db push                              # applies every pending migration, in order
 ```
 
 Confirm with **Database → Migrations** in the dashboard, or `pnpm supabase migration list --linked`.
@@ -232,8 +276,8 @@ Confirm with **Database → Migrations** in the dashboard, or `pnpm supabase mig
 
 | Field | Value |
 |---|---|
-| Site URL | `https://aladdin-staging.vercel.app` — replace with the real Vercel URL from [step 5](#5-create-the-vercel-staging-project) |
-| Redirect URLs | `https://aladdin-staging.vercel.app/**` and `http://localhost:3000/**` |
+| Site URL | the **real** URL from [step 5](#5-create-the-vercel-staging-project)'s deployment — resolve it from Vercel project metadata (`cat .vercel/project.json`, then the project's actual domains), **never assume the pattern `<project-name>.vercel.app`**; that guess can collide with an unrelated third-party project of the same name |
+| Redirect URLs | the same real domain, `/**`, plus `http://localhost:3000/**` |
 
 Add `https://<project-name>-*-<team-slug>.vercel.app/**` only if you want per-PR preview deployments to authenticate. Sign-in does not depend on these values today (the app never sends a redirect), so they are forward-compatibility for a later custom domain.
 
@@ -414,4 +458,4 @@ The first cloud STAGING environment: which services exist, which variables they 
 
 ## Related files
 
-[`deployment-overview.md`](deployment-overview.md) · [`RUNTIME_STATE.md`](RUNTIME_STATE.md) · [`../security/secrets-and-environments.md`](../security/secrets-and-environments.md) · [`../decisions/ADR-0004-deployment-platforms.md`](../decisions/ADR-0004-deployment-platforms.md) · `scripts/build_staging_seed.py` · `frontend/src/lib/env/index.ts`
+[`deployment-overview.md`](deployment-overview.md) · [`RUNTIME_STATE.md`](RUNTIME_STATE.md) · [`staging-demo-accounts.md`](staging-demo-accounts.md) · [`../security/secrets-and-environments.md`](../security/secrets-and-environments.md) · [`../decisions/ADR-0004-deployment-platforms.md`](../decisions/ADR-0004-deployment-platforms.md) · `scripts/build_staging_seed.py` · `scripts/verify_staging_seed.py` · `scripts/rehearse_staging_seed.py` · `frontend/src/lib/env/index.ts`

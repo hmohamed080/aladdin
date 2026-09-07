@@ -438,7 +438,7 @@ select is(
   (select metadata->'before' from public.audit_log
    where action='membership.role_changed' and subject_id='e2222222-eeee-4eee-8eee-eeeeeeeeeee2'
    order by created_at desc limit 1),
-  '["sales.opportunity.read", "sales.opportunity.write"]'::jsonb,
+  '["sales.read", "sales.write"]'::jsonb,
   'capability audit metadata records the sorted before set');
 
 update public.branches set is_active=false where id='c2222222-cccc-4ccc-8ccc-cccccccccccc';
