@@ -15,7 +15,15 @@ What it proves, in the order staging will experience it:
      already written half a world is worse than no guard, so the counts are
      captured before and after and compared.
   5. `supabase db reset` — puts the local world back the way it was, seeds and
-     all, so this script costs a developer nothing but time.
+     all, so this script costs a developer nothing but time. Pass `--keep` to
+     skip this step and leave the enriched 26-account demo world loaded instead —
+     the precondition scripts/test_verify_staging_seed.py needs (that file
+     checks supabase/staging/verify-staging-seed.sql, which asserts against
+     the demo-enrichment.sql-enriched world, not the plain `supabase db reset`
+     seed — those two are NOT the same 26 accounts' data, even though both are
+     26 accounts by UUID; see scripts/test_build_staging_seed.py for the
+     static proof that demo-enrichment.sql is what gives 2 of the 26 — Karim
+     Adel and the platform admin — their only primary email contact row).
 
 It never touches a remote project: every step runs against the local Supabase
 container, and step 1 would refuse to run against a linked one anyway.
@@ -423,7 +431,20 @@ def main() -> int:
         help="use a throwaway container + replayed migrations instead of the local Supabase stack "
              "(no CLI needed, leaves your stack untouched)",
     )
+    parser.add_argument(
+        "--keep",
+        action="store_true",
+        help="skip the final `supabase db reset` and leave the demo world (base seeds plus "
+             "supabase/staging/demo-enrichment.sql) loaded in the local Supabase stack afterward, "
+             "instead of restoring the plain local dev seed. Use this to prepare the local stack "
+             "for scripts/test_verify_staging_seed.py, which asserts against that exact enriched "
+             "world (not the plain `supabase db reset` state, which never applies demo-enrichment.sql). "
+             "Not compatible with --isolated, whose throwaway container does not stay up.",
+    )
     args = parser.parse_args()
+    if args.keep and args.isolated:
+        raise SystemExit("--keep and --isolated cannot be combined: isolated mode's container is "
+                          "always torn down, so there is nothing to keep.")
 
     acquire_lock()
     try:
@@ -509,6 +530,11 @@ def _run_rehearsal(args: argparse.Namespace) -> int:
         step(5, "Remove the throwaway container")
         stop_isolated()
         print("    removed; your local Supabase stack was never touched")
+    elif args.keep:
+        step(5, "--keep: leaving the demo world loaded (skipping supabase db reset)")
+        print("    local stack now holds the enriched 26-account demo world — run "
+              "`python scripts/test_verify_staging_seed.py -v` (or the full suite) against it now.")
+        print("    run `supabase db reset` yourself afterward to restore the plain local dev seed.")
     else:
         step(5, "supabase db reset  (restore the normal local world)")
         if run([cli, "db", "reset"]).returncode != 0:
