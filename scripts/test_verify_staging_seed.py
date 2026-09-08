@@ -18,14 +18,32 @@ resets back to that same plain seed). Load the correct state with:
 
     python scripts/rehearse_staging_seed.py --keep
 
-The module-level readiness check below confirms not merely that the container
-answers, but that it actually holds that enriched world (every account in
-scripts/staging_demo.py's manifest has a primary email contact) — a reachable
-container in the WRONG state skips with an actionable message instead of
-failing 4 unrelated-looking tests on the same upstream B5 error before their
-own scenario-specific assertions ever run (the exact failure mode that
-motivated this check: see scripts/test_build_staging_seed.py for the static
-regression pin on the underlying seed-source gap).
+There are TWO module-level readiness checks below, deliberately different
+strength:
+
+  `_identities_loaded()` confirms only that the 26 expected demo IDENTITIES
+  exist (by user id) — genuinely independent of whether each one also has
+  its primary email contact. `PrimaryEmailContactInvariantTests` (the B5
+  invariant itself) is gated on THIS weaker check, so that a world where the
+  26 identities exist but one is missing its primary email contact — exactly
+  what B5 exists to catch — makes those tests FAIL, not skip. Gating them on
+  the stronger check below would mean the one condition this suite exists to
+  catch is also the one condition that hides it, which is exactly the defect
+  an earlier version of this file had (confirmed by reproduction: deleting
+  Karim Adel's primary email contact from an otherwise-correct loaded world
+  produced `OK (skipped=10)`, not a failure).
+
+  `_demo_world_ready()` confirms the container actually holds the FULLY
+  correct enriched world (every account has its primary email contact too).
+  `VerifyStagingSeedRegressionTests` — every test that needs the full
+  verifier script to reach a check AFTER B5 (Karim's G2/G3/C5, the
+  hosted-mode pass/fail scenarios) — stays gated on this stronger check: a
+  reachable container in the wrong state skips with an actionable message
+  instead of failing on the same upstream B5 error before their own
+  scenario-specific assertions ever run (the failure mode that originally
+  motivated adding a readiness check at all: see
+  scripts/test_build_staging_seed.py for the static regression pin on the
+  underlying seed-source gap).
 
 This keeps `python -m unittest discover -s scripts -p "test_*.py"` fast and
 Docker-independent for everyone whose container isn't running; run this file
@@ -64,12 +82,55 @@ def _container_ready() -> bool:
     return result.returncode == 0
 
 
+def _identities_loaded() -> tuple[bool, str]:
+    """Whether the container is up AND holds all 26 expected demo IDENTITIES
+    (by user id) — a genuinely WEAKER precondition than `_demo_world_ready`
+    below, deliberately independent of whether each one also has its primary
+    email contact. This is the "is *some* version of the demo world loaded at
+    all" gate: state 1 (nothing loaded) fails it and skips; state 2 (fully
+    correct) and state 3 (26 identities present, but one is missing its
+    primary email contact — exactly the regression this file exists to catch)
+    BOTH satisfy it, so tests gated on this one run — and can genuinely FAIL —
+    in either state. Only tests that need the FULL verifier script to reach a
+    check AFTER B5 (Karim's G2/G3/C5, the hosted-mode pass/fail scenarios) use
+    the stricter `_demo_world_ready` below instead."""
+    if not _container_ready():
+        return False, f"local Postgres container {CONTAINER!r} is not running"
+    accounts = sd.load_accounts()
+    ids_sql = ",".join(f"'{a.id}'::uuid" for a in accounts)
+    result = subprocess.run(
+        ["docker", "exec", CONTAINER, "psql", "-U", "postgres", "-d", "postgres", "-t", "-A", "-c",
+         f"select count(*) from auth.users where id in ({ids_sql});"],
+        capture_output=True, text=True, encoding="utf-8",
+    )
+    have = result.stdout.strip()
+    if result.returncode != 0 or have != str(len(accounts)):
+        return False, (
+            f"container {CONTAINER!r} is up but does not hold the 26 expected demo identities "
+            f"(only {have or '0'}/{len(accounts)} present). Run "
+            "`python scripts/rehearse_staging_seed.py --keep` to load it, then retry."
+        )
+    return True, ""
+
+
 def _demo_world_ready() -> tuple[bool, str]:
-    """Whether the container is up AND already holds the enriched 26-account
-    demo world these tests assert against — not merely that Postgres answers.
-    A container that is up but was reset to the plain local dev seed (missing
-    supabase/staging/demo-enrichment.sql) skips cleanly with a fix-it message
-    instead of failing 4 tests on the same opaque upstream B5 error."""
+    """Whether the container is up AND already holds the FULLY CORRECT
+    enriched 26-account demo world these tests assert against — not merely
+    that the 26 identities exist. A container that is up but was reset to the
+    plain local dev seed (missing supabase/staging/demo-enrichment.sql), OR
+    that holds the 26 identities but is missing a primary email contact for
+    one of them, skips cleanly with a fix-it message instead of failing on
+    the same opaque upstream B5 error before these tests' own
+    scenario-specific assertions ever run.
+
+    DELIBERATELY NOT used to gate the direct B5-invariant regression tests
+    below (`test_all_26_accounts_have_exactly_one_primary_email_contact` and
+    friends) — those are gated on the weaker `_identities_loaded` instead,
+    specifically so that state 3 (26 identities present, one missing its
+    primary email contact — i.e. this exact check returning False) makes
+    them FAIL rather than SKIP. Gating them on this stricter check would mean
+    the one condition this file exists to catch is also the one condition
+    that hides it — the defect an earlier version of this file had."""
     if not _container_ready():
         return False, f"local Postgres container {CONTAINER!r} is not running"
     accounts = sd.load_accounts()
@@ -91,6 +152,7 @@ def _demo_world_ready() -> tuple[bool, str]:
     return True, ""
 
 
+_IDENTITIES_READY, _IDENTITIES_READY_REASON = _identities_loaded()
 _READY, _READY_REASON = _demo_world_ready()
 
 
@@ -297,6 +359,33 @@ class VerifyStagingSeedRegressionTests(unittest.TestCase):
         after = _count("select count(*) from auth.users;")
         self.assertEqual(before, after, "hosted-mode runs must never change persisted row counts")
 
+
+@unittest.skipUnless(_IDENTITIES_READY, _IDENTITIES_READY_REASON)
+class PrimaryEmailContactInvariantTests(unittest.TestCase):
+    """The B5 invariant itself ("every expected demo account has EXACTLY ONE
+    primary email contact"), gated on `_identities_loaded` — the WEAK
+    precondition that only the 26 identities exist — rather than on
+    `_demo_world_ready`'s stronger "everything is already correct" check.
+
+    THIS SEPARATION IS THE FIX for the exact defect state 3 describes: when
+    one expected account is missing its primary email contact,
+    `_demo_world_ready()` legitimately returns False (that IS what it means
+    for the demo world to not be fully correct) — but that must never also
+    be the reason THESE tests, whose entire job is to catch that exact
+    condition, get skipped instead of failing. An earlier version of this
+    file put these tests in the same `@unittest.skipUnless(_READY, ...)`
+    class as everything else, so the one condition this suite exists to
+    catch was also the one condition that hid it — confirmed by deleting
+    Karim Adel's primary email contact from an otherwise-correct loaded
+    world and observing `OK (skipped=10)` instead of a failure.
+
+    Every test below is written to be self-contained where the underlying
+    invariant it exercises would otherwise depend on ambient state (see
+    `test_second_primary_contact_for_same_user_is_rejected`), so nothing
+    here silently passes or fails for the wrong reason depending on what
+    state the container happened to be in beforehand.
+    """
+
     def test_all_26_accounts_have_exactly_one_primary_email_contact(self) -> None:
         # Direct regression pin for the exact defect class this suite's own
         # readiness check (_demo_world_ready) already relies on: every account
@@ -328,17 +417,62 @@ class VerifyStagingSeedRegressionTests(unittest.TestCase):
             "every demo account must have EXACTLY ONE primary email contact:\n  " + "\n  ".join(wrong),
         )
 
+    def test_removing_one_primary_email_contact_fails_b5_not_a_skip(self) -> None:
+        # THE explicit proof state 3 asks for: starting from an otherwise
+        # correct 26-account world, force-remove exactly one expected
+        # account's primary email contact (Karim Adel's — this test does not
+        # trust ambient state to already have it; it inserts one first if
+        # absent, so the removal that follows is always real), run the
+        # CANONICAL verifier in hosted mode inside a rolled-back transaction,
+        # and assert it FAILS on B5 by name. This is the live-injection
+        # counterpart to test_all_26_accounts_have_exactly_one_primary_email_
+        # contact above (which only observes ambient state); together they
+        # prove both that today's world is correct AND that the mechanism
+        # itself still catches the regression when it is not.
+        prelude = f"""
+        insert into public.contacts (user_id, channel, value, is_primary, is_verified, verified_at)
+        select '{KARIM_USER_ID}'::uuid, 'email', 'karim.b5-regression-fixture@aladdin-hosted-test.dev', true, true, now()
+        where not exists (
+          select 1 from public.contacts
+           where user_id = '{KARIM_USER_ID}'::uuid and channel = 'email' and is_primary
+        );
+        delete from public.contacts
+         where user_id = '{KARIM_USER_ID}'::uuid and channel = 'email' and is_primary;
+        """
+        proc = _run("hosted", prelude)
+        self.assertNotEqual(
+            proc.returncode, 0,
+            "removing one expected account's primary email contact must FAIL the verifier "
+            f"(on B5), never pass or be skipped:\n{proc.stderr}",
+        )
+        self.assertIn("B5 email", proc.stderr)
+        # And the count in the message must be exactly the one account this
+        # test removed — not some pre-existing, unrelated gap the readiness
+        # check should have already caught (and, being self-contained, did).
+        self.assertIn("B5 email: 1 account(s)", proc.stderr)
+
     def test_second_primary_contact_for_same_user_is_rejected(self) -> None:
         # uq_contacts_primary_per_user (supabase/migrations/20260802090001_identity_core.sql)
         # is a partial unique index enforcing at most one primary contact per
         # user, across every channel. Proves the DATABASE itself — not merely
         # the verifier — refuses a duplicate, so demo-enrichment.sql's insert
         # (or any future one) can never silently double up a primary contact
-        # for an account the base seed files already cover. Rolled back — this
-        # asserts an INSERT is rejected, so nothing to roll back on success,
-        # but the transaction is aborted either way and never committed.
+        # for an account the base seed files already cover.
+        #
+        # SELF-CONTAINED: this test is gated on the weak `_identities_loaded`
+        # precondition, so it must not assume Karim already has a primary
+        # contact to collide with — in the exact state-3 scenario this file
+        # exists to catch, he might not. It guarantees one first (inside the
+        # same transaction, rolled back either way) so what it proves is
+        # always "a SECOND primary contact is rejected", never "a first one
+        # happened to succeed".
         sql = (
             "begin;\n"
+            "insert into public.contacts (user_id, channel, value, is_primary, is_verified, verified_at)\n"
+            f"select '{KARIM_USER_ID}'::uuid, 'email', 'karim.uniqueness-fixture@aladdin-hosted-test.dev', true, true, now()\n"
+            "where not exists (\n"
+            f"  select 1 from public.contacts where user_id = '{KARIM_USER_ID}'::uuid and is_primary\n"
+            ");\n"
             "insert into public.contacts (user_id, channel, value, is_primary, is_verified, verified_at)\n"
             f"values ('{KARIM_USER_ID}'::uuid, 'whatsapp', '+20-100-000-0000', true, true, now());\n"
             "rollback;\n"
