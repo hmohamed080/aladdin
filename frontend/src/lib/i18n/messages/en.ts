@@ -39,6 +39,12 @@ export const en = {
     /* Shown in place of the assignee control until a branch is chosen — a
        candidate list can't be resolved without one. */
     selectBranchFirst: "Select a branch first",
+    /* The show-more/show-less expand-collapse primitive — generic, reused
+       across whichever dashboard sections cap a list (KPIs, product
+       discovery, …). Distinct from `more` above, which is a one-way "see the
+       rest of this list" link, not a toggle that also collapses back. */
+    showMore: "Show more",
+    showLess: "Show less",
     /* Language names as a professional would write them on their own profile. */
     languageName: { ar: "Arabic", en: "English" },
   },
@@ -1717,6 +1723,35 @@ export const en = {
       openRequests: "Open purchase requests",
       activeOrders: "Orders in progress",
       saved: "Saved products",
+      /* The Showroom Owner dashboard's own six primary KPIs. Three of them
+         (overdue, dueToday, openRequests above) already existed under exactly
+         this vocabulary; these three did not exist with the approved exact
+         wording, so they are new rather than reusing the close-but-not-exact
+         newOffers/activeOrders. */
+      quotationsToReview: "Quotations to review",
+      ordersInProgress: "Orders in progress",
+      /* The one PERIOD-DEPENDENT primary KPI — the other five are
+         current-state and do not move when the period selector changes. */
+      totalPurchases: "Total purchases",
+    },
+    /**
+     * The Showroom Owner dashboard's own period scope — see
+     * lib/workspace/dashboard-period.ts. Deliberately a SEPARATE vocabulary
+     * from `supply.period` above: different option set (7d/30d/90d + two
+     * calendar windows + custom, vs. the supply side's 30d/90d/365d/all),
+     * different default, different control.
+     */
+    period: {
+      label: "Period",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "90d": "Last 90 days",
+      thisMonth: "This month",
+      thisQuarter: "This quarter",
+      custom: "Custom period",
+      from: "From",
+      to: "To",
+      apply: "Apply",
     },
     action: {
       browse: "Find a product",

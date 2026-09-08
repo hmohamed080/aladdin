@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { Select } from "@/components/ui/controls";
 import { selectBranch } from "@/server/actions/context";
+import { MapPinIcon } from "@/components/ui/icons";
 
 type Named = { id: string; name: string };
 
@@ -37,15 +38,20 @@ export function BranchSwitcher({
       // Header density: the label reads as the next crumb after the workspace,
       // so it carries the branch NAME and drops the "Branch:" prefix into the
       // accessible name — the row is 48px and a literal field label in it is
-      // the kind of chrome-in-the-chrome the reference does without.
-      <span className="flex h-7 min-w-0 items-center px-1 text-label text-fg-secondary">
+      // the kind of chrome-in-the-chrome the reference does without. The pin
+      // icon is what visually distinguishes a BRANCH from the organization
+      // crumb before it (its own building icon) — the two used to be told
+      // apart only by an sr-only label, which a sighted user never reads.
+      <span className="flex h-7 min-w-0 items-center gap-1.5 px-1 text-label text-fg-secondary">
+        <MapPinIcon size={14} className="shrink-0 text-fg-muted" aria-hidden="true" />
         <span className="sr-only">{t("nav.branch")}: </span>
         <span className="truncate">{branches[0]!.name}</span>
       </span>
     );
   }
   return (
-    <label className="flex min-w-0 items-center gap-2">
+    <label className="flex min-w-0 items-center gap-1.5">
+      <MapPinIcon size={14} className="shrink-0 text-fg-muted" aria-hidden="true" />
       <span className="sr-only">{t("nav.branch")}</span>
       <Select
         aria-label={t("nav.branch")}

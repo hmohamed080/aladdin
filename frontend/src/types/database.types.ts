@@ -87,32 +87,44 @@ export type Database = {
       }
       branches: {
         Row: {
+          address_ar: string | null
+          address_en: string | null
           created_at: string
           deleted_at: string | null
           id: string
           is_active: boolean
           locality_id: string | null
           name: string
+          name_ar: string | null
+          name_en: string | null
           organization_id: string
           updated_at: string
         }
         Insert: {
+          address_ar?: string | null
+          address_en?: string | null
           created_at?: string
           deleted_at?: string | null
           id?: string
           is_active?: boolean
           locality_id?: string | null
           name: string
+          name_ar?: string | null
+          name_en?: string | null
           organization_id: string
           updated_at?: string
         }
         Update: {
+          address_ar?: string | null
+          address_en?: string | null
           created_at?: string
           deleted_at?: string | null
           id?: string
           is_active?: boolean
           locality_id?: string | null
           name?: string
+          name_ar?: string | null
+          name_en?: string | null
           organization_id?: string
           updated_at?: string
         }
@@ -2017,6 +2029,8 @@ export type Database = {
           locality_id: string | null
           logo_media_id: string | null
           name: string
+          name_ar: string | null
+          name_en: string | null
           org_type: Database["public"]["Enums"]["organization_type"]
           primary_locale: string
           referred_by_user_id: string | null
@@ -2034,6 +2048,8 @@ export type Database = {
           locality_id?: string | null
           logo_media_id?: string | null
           name: string
+          name_ar?: string | null
+          name_en?: string | null
           org_type: Database["public"]["Enums"]["organization_type"]
           primary_locale?: string
           referred_by_user_id?: string | null
@@ -2051,6 +2067,8 @@ export type Database = {
           locality_id?: string | null
           logo_media_id?: string | null
           name?: string
+          name_ar?: string | null
+          name_en?: string | null
           org_type?: Database["public"]["Enums"]["organization_type"]
           primary_locale?: string
           referred_by_user_id?: string | null

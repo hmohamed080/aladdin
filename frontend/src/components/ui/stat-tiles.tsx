@@ -146,7 +146,8 @@ export function StatTiles({
   return (
     <div
       className={cn(
-        "grid grid-cols-2 gap-sm tablet:grid-cols-3 desktop:grid-cols-4 [&>*]:min-w-0",
+        "grid grid-cols-2 gap-sm [&>*]:min-w-0",
+        columns ? GRID_COLUMNS[columns] : "tablet:grid-cols-3 desktop:grid-cols-4",
         className,
       )}
     >
@@ -154,6 +155,19 @@ export function StatTiles({
     </div>
   );
 }
+
+/**
+ * Tailwind class names must appear as literal strings for the compiler to
+ * find them — `desktop:grid-cols-${columns}` would never ship the class it
+ * builds. A lookup table is the honest way to make `columns` configurable.
+ */
+const GRID_COLUMNS: Record<2 | 3 | 4 | 5 | 6, string> = {
+  2: "tablet:grid-cols-2 desktop:grid-cols-2",
+  3: "tablet:grid-cols-3 desktop:grid-cols-3",
+  4: "tablet:grid-cols-4 desktop:grid-cols-4",
+  5: "tablet:grid-cols-3 desktop:grid-cols-5",
+  6: "tablet:grid-cols-3 desktop:grid-cols-6",
+};
 
 /**
  * Status filter tabs expressed as links (`?status=…`), so the whole list stays a
