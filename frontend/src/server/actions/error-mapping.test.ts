@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapSalesError, mapAssetError, isStaleVersion } from "./error-mapping";
+import { mapSalesError, mapAssetError, mapOrgI18nError, isStaleVersion } from "./error-mapping";
 
 describe("mapSalesError", () => {
   it("maps a duplicate-phone unique violation", () => {
@@ -67,6 +67,34 @@ describe("isStaleVersion", () => {
  * `supabase/tests/professional_asset_storage_api_test.mjs` — not the shapes the
  * documentation suggests, which differ.
  */
+describe("mapOrgI18nError", () => {
+  it("maps an invalid IANA timezone before falling to the generic 22023 branch", () => {
+    expect(mapOrgI18nError({ code: "22023", message: "not a valid IANA timezone identifier: Mars/Phobos" })).toBe(
+      "settings.errors.invalidTimezone",
+    );
+  });
+
+  it("maps a not-found error distinctly from an invalid timezone", () => {
+    expect(mapOrgI18nError({ code: "22023", message: "organization not found" })).toBe("settings.errors.notFound");
+    expect(mapOrgI18nError({ code: "22023", message: "branch not found" })).toBe("settings.errors.notFound");
+  });
+
+  it("maps a length-constraint violation", () => {
+    expect(mapOrgI18nError({ code: "23514" })).toBe("settings.errors.tooLong");
+  });
+
+  it("maps a permission denial", () => {
+    expect(mapOrgI18nError({ code: "42501" })).toBe("settings.errors.denied");
+    expect(mapOrgI18nError({ message: "org.manage required" })).toBe("settings.errors.denied");
+    expect(mapOrgI18nError({ message: "not a member of this organization" })).toBe("settings.errors.denied");
+  });
+
+  it("falls back to a generic retry for anything else", () => {
+    expect(mapOrgI18nError({ code: "08006" })).toBe("states.genericRetry");
+    expect(mapOrgI18nError(null)).toBe("states.genericRetry");
+  });
+});
+
 describe("mapAssetError", () => {
   it("maps a policy refusal — the one that covers persona, ownership and anon alike", () => {
     expect(mapAssetError({ code: "AccessDenied", message: "new row violates row-level security policy" }))

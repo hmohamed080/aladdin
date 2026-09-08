@@ -9,6 +9,8 @@ import {
   resolveDashboardPeriod,
 } from "./dashboard-period";
 
+const CAIRO = "Africa/Cairo";
+
 describe("resolveDashboardPeriod treats the URL as untrusted input", () => {
   it("accepts every rolling/calendar period it offers", () => {
     for (const key of ["7d", "30d", "90d", "thisMonth", "thisQuarter"] as const) {
@@ -55,16 +57,16 @@ describe("the offered option set", () => {
 const NOW = new Date("2026-03-15T12:00:00Z");
 
 describe("dashboardPeriodRange — rolling windows", () => {
-  it("7d/30d/90d are inclusive windows of exactly that many Cairo-calendar days, ending today", () => {
-    expect(dashboardPeriodRange("7d", NOW)).toEqual({ key: "7d", from: "2026-03-09", to: "2026-03-15" });
-    expect(dashboardPeriodRange("30d", NOW)).toEqual({ key: "30d", from: "2026-02-14", to: "2026-03-15" });
-    expect(dashboardPeriodRange("90d", NOW)).toEqual({ key: "90d", from: "2025-12-16", to: "2026-03-15" });
+  it("7d/30d/90d are inclusive windows of exactly that many calendar days, ending today", () => {
+    expect(dashboardPeriodRange("7d", NOW, CAIRO)).toEqual({ key: "7d", from: "2026-03-09", to: "2026-03-15" });
+    expect(dashboardPeriodRange("30d", NOW, CAIRO)).toEqual({ key: "30d", from: "2026-02-14", to: "2026-03-15" });
+    expect(dashboardPeriodRange("90d", NOW, CAIRO)).toEqual({ key: "90d", from: "2025-12-16", to: "2026-03-15" });
   });
 });
 
 describe("dashboardPeriodRange — calendar windows", () => {
-  it("thisMonth starts on the 1st of the current Cairo-calendar month", () => {
-    expect(dashboardPeriodRange("thisMonth", NOW)).toEqual({
+  it("thisMonth starts on the 1st of the current calendar month", () => {
+    expect(dashboardPeriodRange("thisMonth", NOW, CAIRO)).toEqual({
       key: "thisMonth",
       from: "2026-03-01",
       to: "2026-03-15",
@@ -73,14 +75,14 @@ describe("dashboardPeriodRange — calendar windows", () => {
 
   it("thisQuarter starts on the 1st of the current quarter's first month", () => {
     // March is in Q1 (Jan-Mar).
-    expect(dashboardPeriodRange("thisQuarter", NOW)).toEqual({
+    expect(dashboardPeriodRange("thisQuarter", NOW, CAIRO)).toEqual({
       key: "thisQuarter",
       from: "2026-01-01",
       to: "2026-03-15",
     });
     // A date in Q2 (Apr-Jun) starts from April.
     const juneNow = new Date("2026-06-10T12:00:00Z");
-    expect(dashboardPeriodRange("thisQuarter", juneNow)).toEqual({
+    expect(dashboardPeriodRange("thisQuarter", juneNow, CAIRO)).toEqual({
       key: "thisQuarter",
       from: "2026-04-01",
       to: "2026-06-10",
@@ -90,7 +92,7 @@ describe("dashboardPeriodRange — calendar windows", () => {
 
 describe("dashboardPeriodRange — custom", () => {
   it("uses the given range verbatim when valid", () => {
-    expect(dashboardPeriodRange("custom", NOW, { from: "2026-01-05", to: "2026-01-20" })).toEqual({
+    expect(dashboardPeriodRange("custom", NOW, CAIRO, { from: "2026-01-05", to: "2026-01-20" })).toEqual({
       key: "custom",
       from: "2026-01-05",
       to: "2026-01-20",
@@ -98,10 +100,20 @@ describe("dashboardPeriodRange — custom", () => {
   });
 
   it("degrades to the default window rather than throwing on a missing/invalid pair", () => {
-    expect(dashboardPeriodRange("custom", NOW)).toEqual(dashboardPeriodRange("30d", NOW));
-    expect(dashboardPeriodRange("custom", NOW, { from: "2026-02-01", to: "2026-01-01" })).toEqual(
-      dashboardPeriodRange("30d", NOW),
+    expect(dashboardPeriodRange("custom", NOW, CAIRO)).toEqual(dashboardPeriodRange("30d", NOW, CAIRO));
+    expect(dashboardPeriodRange("custom", NOW, CAIRO, { from: "2026-02-01", to: "2026-01-01" })).toEqual(
+      dashboardPeriodRange("30d", NOW, CAIRO),
     );
+  });
+});
+
+describe("dashboardPeriodRange — timezone actually changes the answer", () => {
+  it("a UTC-11 zone can still be 'yesterday' when Cairo has already turned over", () => {
+    // 2026-03-15T00:30:00Z is 2026-03-15 02:30 in Cairo (UTC+2, already the
+    // 15th) but 2026-03-14 13:30 in Pago Pago (UTC-11, still the 14th).
+    const boundary = new Date("2026-03-15T00:30:00Z");
+    expect(dashboardPeriodRange("thisMonth", boundary, "Africa/Cairo").to).toBe("2026-03-15");
+    expect(dashboardPeriodRange("thisMonth", boundary, "Pacific/Pago_Pago").to).toBe("2026-03-14");
   });
 });
 
@@ -117,34 +129,34 @@ describe("isValidCustomRange", () => {
 
 describe("previousDashboardPeriodRange", () => {
   it("shifts a rolling window back by its own length, with no gap or overlap", () => {
-    const current = dashboardPeriodRange("7d", NOW); // 2026-03-09..15
-    const previous = previousDashboardPeriodRange(current);
+    const current = dashboardPeriodRange("7d", NOW, CAIRO); // 2026-03-09..15
+    const previous = previousDashboardPeriodRange(current, CAIRO);
     expect(previous).toEqual({ key: "7d", from: "2026-03-02", to: "2026-03-08" });
   });
 
   it("compares thisMonth against the same number of days into the previous calendar month", () => {
-    const current = dashboardPeriodRange("thisMonth", NOW); // 2026-03-01..15 (15 days in)
-    const previous = previousDashboardPeriodRange(current);
+    const current = dashboardPeriodRange("thisMonth", NOW, CAIRO); // 2026-03-01..15 (15 days in)
+    const previous = previousDashboardPeriodRange(current, CAIRO);
     expect(previous).toEqual({ key: "thisMonth", from: "2026-02-01", to: "2026-02-15" });
   });
 
   it("crosses a year boundary correctly for January", () => {
     const januaryNow = new Date("2026-01-10T12:00:00Z");
-    const current = dashboardPeriodRange("thisMonth", januaryNow);
-    const previous = previousDashboardPeriodRange(current);
+    const current = dashboardPeriodRange("thisMonth", januaryNow, CAIRO);
+    const previous = previousDashboardPeriodRange(current, CAIRO);
     expect(previous).toEqual({ key: "thisMonth", from: "2025-12-01", to: "2025-12-10" });
   });
 
   it("compares thisQuarter against the previous quarter, same depth into it", () => {
-    const current = dashboardPeriodRange("thisQuarter", NOW); // Q1: 2026-01-01..03-15
-    const previous = previousDashboardPeriodRange(current);
+    const current = dashboardPeriodRange("thisQuarter", NOW, CAIRO); // Q1: 2026-01-01..03-15
+    const previous = previousDashboardPeriodRange(current, CAIRO);
     expect(previous.key).toBe("thisQuarter");
     expect(previous.from).toBe("2025-10-01");
   });
 
   it("shifts a custom window back by its own length", () => {
-    const current = dashboardPeriodRange("custom", NOW, { from: "2026-01-11", to: "2026-01-20" }); // 10 days
-    const previous = previousDashboardPeriodRange(current);
+    const current = dashboardPeriodRange("custom", NOW, CAIRO, { from: "2026-01-11", to: "2026-01-20" }); // 10 days
+    const previous = previousDashboardPeriodRange(current, CAIRO);
     expect(previous).toEqual({ key: "custom", from: "2026-01-01", to: "2026-01-10" });
   });
 });

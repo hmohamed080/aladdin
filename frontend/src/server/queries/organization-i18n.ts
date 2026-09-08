@@ -8,11 +8,24 @@ type DB = SupabaseClient<Database>;
 export type OrgBilingualNames = {
   orgNameAr: string | null;
   orgNameEn: string | null;
+  orgTimezone: string | null;
   branchNameAr: string | null;
   branchNameEn: string | null;
+  branchAddressAr: string | null;
+  branchAddressEn: string | null;
+  branchTimezone: string | null;
 };
 
-const EMPTY: OrgBilingualNames = { orgNameAr: null, orgNameEn: null, branchNameAr: null, branchNameEn: null };
+const EMPTY: OrgBilingualNames = {
+  orgNameAr: null,
+  orgNameEn: null,
+  orgTimezone: null,
+  branchNameAr: null,
+  branchNameEn: null,
+  branchAddressAr: null,
+  branchAddressEn: null,
+  branchTimezone: null,
+};
 
 /**
  * The Arabic/English trading-name overrides for the header's org/branch
@@ -29,9 +42,13 @@ export async function orgBilingualNames(
   branchId: string | null,
 ): Promise<OrgBilingualNames> {
   const [org, branch] = await Promise.all([
-    supabase.from("organizations").select("name_ar, name_en").eq("id", orgId).maybeSingle(),
+    supabase.from("organizations").select("name_ar, name_en, timezone").eq("id", orgId).maybeSingle(),
     branchId
-      ? supabase.from("branches").select("name_ar, name_en").eq("id", branchId).maybeSingle()
+      ? supabase
+          .from("branches")
+          .select("name_ar, name_en, address_ar, address_en, timezone")
+          .eq("id", branchId)
+          .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ]);
   if (org.error) throw org.error;
@@ -40,8 +57,12 @@ export async function orgBilingualNames(
   return {
     orgNameAr: org.data?.name_ar ?? null,
     orgNameEn: org.data?.name_en ?? null,
+    orgTimezone: org.data?.timezone ?? null,
     branchNameAr: branch.data?.name_ar ?? null,
     branchNameEn: branch.data?.name_en ?? null,
+    branchAddressAr: branch.data?.address_ar ?? null,
+    branchAddressEn: branch.data?.address_en ?? null,
+    branchTimezone: branch.data?.timezone ?? null,
   };
 }
 

@@ -98,6 +98,7 @@ export type Database = {
           name_ar: string | null
           name_en: string | null
           organization_id: string
+          timezone: string | null
           updated_at: string
         }
         Insert: {
@@ -112,6 +113,7 @@ export type Database = {
           name_ar?: string | null
           name_en?: string | null
           organization_id: string
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
@@ -126,6 +128,7 @@ export type Database = {
           name_ar?: string | null
           name_en?: string | null
           organization_id?: string
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2037,6 +2040,7 @@ export type Database = {
           slug: string | null
           source: string
           status: Database["public"]["Enums"]["org_status"]
+          timezone: string | null
           updated_at: string
         }
         Insert: {
@@ -2056,6 +2060,7 @@ export type Database = {
           slug?: string | null
           source?: string
           status?: Database["public"]["Enums"]["org_status"]
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
@@ -2075,6 +2080,7 @@ export type Database = {
           slug?: string | null
           source?: string
           status?: Database["public"]["Enums"]["org_status"]
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4429,6 +4435,17 @@ export type Database = {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: undefined
       }
+      branch_update_i18n: {
+        Args: {
+          p_address_ar: string
+          p_address_en: string
+          p_branch_id: string
+          p_name_ar: string
+          p_name_en: string
+          p_timezone: string
+        }
+        Returns: undefined
+      }
       business_draft_save: {
         Args: {
           p_city?: string
@@ -4898,6 +4915,15 @@ export type Database = {
           status: Database["public"]["Enums"]["membership_status"]
           user_id: string
         }[]
+      }
+      organization_update_i18n: {
+        Args: {
+          p_name_ar: string
+          p_name_en: string
+          p_org_id: string
+          p_timezone: string
+        }
+        Returns: undefined
       }
       points_balance: { Args: { p_user_id?: string }; Returns: number }
       portfolio_item_create: {

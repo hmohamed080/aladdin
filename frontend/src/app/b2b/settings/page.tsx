@@ -9,6 +9,9 @@ import { Card, SectionTitle, Field, Badge } from "@/components/ui/primitives";
 import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import { formatCount } from "@/lib/ui/format";
 import { maskEmail } from "@/lib/ui/mask-email";
+import { resolveBilingualText } from "@/lib/i18n/bilingual";
+import { OrganizationIdentityDialog } from "@/features/organization/organization-identity-dialog";
+import { BranchIdentityDialog } from "@/features/organization/branch-identity-dialog";
 import {
   BuildingIcon,
   SettingsIcon,
@@ -49,20 +52,32 @@ export default async function SettingsPage() {
   const store = await cookies();
   const theme = store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light";
 
-  const [{ data: record }, { data: auth }] = await Promise.all([
+  const [{ data: record }, { data: auth }, { data: branchRows }] = await Promise.all([
     supabase
       .from("organizations")
-      .select("name, slug, org_type, status, is_verified, primary_locale")
+      .select("name, slug, org_type, status, is_verified, primary_locale, name_ar, name_en, timezone")
       .eq("id", org.organizationId)
       .maybeSingle(),
     supabase.auth.getUser(),
+    org.branches.length > 0
+      ? supabase
+          .from("branches")
+          .select("id, name, name_ar, name_en, address_ar, address_en, timezone")
+          .in(
+            "id",
+            org.branches.map((b) => b.id),
+          )
+      : Promise.resolve({ data: [] as never[] }),
   ]);
 
   const canManagePeople = org.capabilities.includes("org.members.manage");
+  const canManageOrg = org.capabilities.includes("org.manage");
+  const canManageBranches = canManageOrg || org.capabilities.includes("branch.manage");
   const reachable = allowedNavKeys(org.capabilities).filter((k) => k !== "home" && k !== "settings");
   const verified = record?.is_verified ?? false;
   const pending = record?.status === "pending_verification";
   const signInEmail = auth?.user?.email ? maskEmail(auth.user.email) : null;
+  const branchDetails = new Map((branchRows ?? []).map((b) => [b.id, b]));
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
@@ -73,9 +88,26 @@ export default async function SettingsPage() {
 
       <div className="grid gap-lg desktop:grid-cols-2 [&>*]:min-w-0">
         <Card>
-          <SectionTitle icon={<BuildingIcon size={18} />}>{m.settings.business}</SectionTitle>
+          <SectionTitle
+            icon={<BuildingIcon size={18} />}
+            action={
+              canManageOrg ? (
+                <OrganizationIdentityDialog
+                  m={m}
+                  orgId={org.organizationId}
+                  nameAr={record?.name_ar ?? null}
+                  nameEn={record?.name_en ?? null}
+                  timezone={record?.timezone ?? null}
+                />
+              ) : undefined
+            }
+          >
+            {m.settings.business}
+          </SectionTitle>
           <dl className="mt-md grid gap-md tablet:grid-cols-2">
-            <Field label={m.settings.field.name}>{record?.name ?? org.organizationName}</Field>
+            <Field label={m.settings.field.name}>
+              {resolveBilingualText(locale, record?.name ?? org.organizationName, record?.name_ar ?? null, record?.name_en ?? null)}
+            </Field>
             <Field label={m.settings.field.type}>
               {record?.org_type ? m.directory.orgType[record.org_type] : "—"}
             </Field>
@@ -86,6 +118,7 @@ export default async function SettingsPage() {
             <Field label={m.settings.field.language}>
               {record?.primary_locale === "ar" ? m.common.languageName.ar : m.common.languageName.en}
             </Field>
+            <Field label={m.settings.field.timezone}>{record?.timezone ?? m.settings.timezoneUnset}</Field>
           </dl>
           <p className="mt-md border-t pt-sm text-label text-fg-muted">{m.settings.businessNote}</p>
         </Card>
@@ -128,17 +161,35 @@ export default async function SettingsPage() {
               <p className="text-body text-fg-muted">{m.settings.noBranches}</p>
             ) : (
               <ul className="grid gap-1.5 tablet:grid-cols-2 desktop:grid-cols-3">
-                {org.branches.map((b) => (
-                  <li
-                    key={b.id}
-                    className="flex items-center gap-2 rounded-sm bg-surface-2/50 px-3 py-2 text-body text-fg-secondary"
-                  >
-                    <span className="text-fg-muted" aria-hidden="true">
-                      <MapPinIcon size={15} />
-                    </span>
-                    <span className="min-w-0 truncate">{b.name}</span>
-                  </li>
-                ))}
+                {org.branches.map((b) => {
+                  const detail = branchDetails.get(b.id);
+                  const displayName = resolveBilingualText(locale, b.name, detail?.name_ar ?? null, detail?.name_en ?? null);
+                  return (
+                    <li
+                      key={b.id}
+                      className="flex items-center justify-between gap-2 rounded-sm bg-surface-2/50 px-3 py-2 text-body text-fg-secondary"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="shrink-0 text-fg-muted" aria-hidden="true">
+                          <MapPinIcon size={15} />
+                        </span>
+                        <span className="min-w-0 truncate">{displayName}</span>
+                      </span>
+                      {canManageBranches ? (
+                        <BranchIdentityDialog
+                          m={m}
+                          branchId={b.id}
+                          branchName={displayName}
+                          nameAr={detail?.name_ar ?? null}
+                          nameEn={detail?.name_en ?? null}
+                          addressAr={detail?.address_ar ?? null}
+                          addressEn={detail?.address_en ?? null}
+                          timezone={detail?.timezone ?? null}
+                        />
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             )}
             <p className="mt-md border-t pt-sm text-label text-fg-muted">{m.settings.branchNote}</p>

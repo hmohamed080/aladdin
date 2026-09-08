@@ -9,15 +9,14 @@
  * it. Two small, honest vocabularies beat one that has to serve two different
  * option lists.
  *
- * WHY CAIRO IS HARDCODED
- * No organization/branch timezone concept exists anywhere in this schema, and
- * the product is Egypt-only today (see AGENTS.md). Building a general
- * per-organization timezone system for one dashboard's "this month"/"this
- * quarter" boundaries would be speculative infrastructure ahead of a real
- * second market. `DASHBOARD_TIMEZONE` is the single point that assumption
- * lives, so it is also the single point to change if that ever stops being true.
+ * TIMEZONE IS A CALLER-SUPPLIED PARAMETER, NOT A CONSTANT HERE
+ * Every function below takes an IANA `timezone` string rather than assuming
+ * one. The RESOLUTION of that string (active branch → organization →
+ * `Africa/Cairo`) is a separate concern — see `lib/workspace/timezone.ts` —
+ * because this module only needs to know how to bucket a period once a zone
+ * has already been decided, not where that zone came from.
  */
-export const DASHBOARD_TIMEZONE = "Africa/Cairo";
+export const DASHBOARD_TIMEZONE_FALLBACK = "Africa/Cairo";
 
 export type DashboardPeriodKey = "7d" | "30d" | "90d" | "thisMonth" | "thisQuarter" | "custom";
 
@@ -35,7 +34,7 @@ export const DEFAULT_DASHBOARD_PERIOD: DashboardPeriodKey = "30d";
 
 const ROLLING_DAYS: Record<"7d" | "30d" | "90d", number> = { "7d": 7, "30d": 30, "90d": 90 };
 
-/** Inclusive `yyyy-mm-dd` window, in the Cairo calendar, ready to hand to `ReportFilters`. */
+/** Inclusive `yyyy-mm-dd` window, in the resolved calendar, ready to hand to `ReportFilters`. */
 export type DashboardPeriodRange = { key: DashboardPeriodKey; from: string; to: string };
 
 /**
@@ -63,10 +62,10 @@ export function isValidCustomRange(from: string | undefined, to: string | undefi
   return !!from && !!to && ISO_DATE.test(from) && ISO_DATE.test(to) && from <= to;
 }
 
-/** `y/m/d` in the Cairo calendar for an instant — correct across any DST history that zone has had or will have, via ICU's tz database rather than a hardcoded offset. */
-function cairoParts(date: Date): { y: number; m: number; d: number } {
+/** `y/m/d` in `timezone` for an instant — correct across any DST history that zone has had or will have, via ICU's tz database rather than a hardcoded offset. */
+function zonedParts(date: Date, timezone: string): { y: number; m: number; d: number } {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: DASHBOARD_TIMEZONE,
+    timeZone: timezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -76,17 +75,18 @@ function cairoParts(date: Date): { y: number; m: number; d: number } {
 }
 
 /**
- * The UTC instant of Cairo-local midnight on `y-m-d`.
+ * The UTC instant of local midnight on `y-m-d` in `timezone`.
  *
- * Standard "round-trip through Intl" technique: guess the instant as if Cairo
- * had no offset, read back what that instant actually reads as in Cairo, then
- * correct by the difference. Avoids hardcoding a UTC+2/+3 offset, which would
- * silently go wrong the moment Egypt's DST policy changes again.
+ * Standard "round-trip through Intl" technique: guess the instant as if the
+ * zone had no offset, read back what that instant actually reads as in the
+ * zone, then correct by the difference. Avoids hardcoding a fixed UTC offset,
+ * which would silently go wrong the moment a zone's DST policy changes (as
+ * Egypt's has, more than once).
  */
-function cairoMidnightUTC(y: number, m: number, d: number): Date {
+function zonedMidnightUTC(y: number, m: number, d: number, timezone: string): Date {
   const guess = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
   const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: DASHBOARD_TIMEZONE,
+    timeZone: timezone,
     hourCycle: "h23",
     year: "numeric",
     month: "2-digit",
@@ -112,28 +112,31 @@ function toISODate(y: number, m: number, d: number): string {
   return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-function addDaysISO(y: number, m: number, d: number, days: number): { y: number; m: number; d: number } {
-  const t = cairoMidnightUTC(y, m, d);
+function addDaysISO(y: number, m: number, d: number, days: number, timezone: string): { y: number; m: number; d: number } {
+  const t = zonedMidnightUTC(y, m, d, timezone);
   const shifted = new Date(t.getTime() + days * 86_400_000);
-  return cairoParts(shifted);
+  return zonedParts(shifted, timezone);
 }
 
 /**
- * Resolve a period key into an inclusive Cairo-calendar `[from, to]` window,
+ * Resolve a period key into an inclusive `[from, to]` window in `timezone`,
  * as `yyyy-mm-dd` strings — the exact shape `ReportFilters` already accepts.
  *
  * `now` is a parameter (not read internally) so callers — and tests — control
- * "today" rather than every call being pinned to the real clock.
+ * "today" rather than every call being pinned to the real clock. `timezone`
+ * is the caller's already-RESOLVED zone (branch → org → Africa/Cairo — see
+ * `lib/workspace/timezone.ts`), not re-resolved here.
  */
 export function dashboardPeriodRange(
   key: DashboardPeriodKey,
   now: Date,
+  timezone: string,
   custom?: { from: string; to: string },
 ): DashboardPeriodRange {
-  const today = cairoParts(now);
+  const today = zonedParts(now, timezone);
 
   if (key === "7d" || key === "30d" || key === "90d") {
-    const start = addDaysISO(today.y, today.m, today.d, -(ROLLING_DAYS[key] - 1));
+    const start = addDaysISO(today.y, today.m, today.d, -(ROLLING_DAYS[key] - 1), timezone);
     return { key, from: toISODate(start.y, start.m, start.d), to: toISODate(today.y, today.m, today.d) };
   }
 
@@ -157,7 +160,7 @@ export function dashboardPeriodRange(
   if (custom && isValidCustomRange(custom.from, custom.to)) {
     return { key: "custom", from: custom.from, to: custom.to };
   }
-  return dashboardPeriodRange(DEFAULT_DASHBOARD_PERIOD, now);
+  return dashboardPeriodRange(DEFAULT_DASHBOARD_PERIOD, now, timezone);
 }
 
 /**
@@ -167,13 +170,13 @@ export function dashboardPeriodRange(
  * unit, not a naive day-count shift, so "this month" vs "last month" holds
  * even though months are not equal length.
  */
-export function previousDashboardPeriodRange(range: DashboardPeriodRange): DashboardPeriodRange {
+export function previousDashboardPeriodRange(range: DashboardPeriodRange, timezone: string): DashboardPeriodRange {
   if (range.key === "thisMonth") {
     const [y, m] = range.from.split("-").map(Number) as [number, number];
     const prevMonth = m === 1 ? 12 : m - 1;
     const prevYear = m === 1 ? y - 1 : y;
     const daysInto = Number(range.to.slice(8, 10));
-    const prevEnd = addDaysISO(prevYear, prevMonth, 1, daysInto - 1);
+    const prevEnd = addDaysISO(prevYear, prevMonth, 1, daysInto - 1, timezone);
     return {
       key: "thisMonth",
       from: toISODate(prevYear, prevMonth, 1),
@@ -184,9 +187,9 @@ export function previousDashboardPeriodRange(range: DashboardPeriodRange): Dashb
     const [y, m] = range.from.split("-").map(Number) as [number, number];
     const prevQuarterStartMonth = m === 1 ? 10 : m - 3;
     const prevYear = m === 1 ? y - 1 : y;
-    const daysInto = daysBetweenISO(range.from, range.to);
-    const prevStart = addDaysISO(prevYear, prevQuarterStartMonth, 1, 0);
-    const prevEnd = addDaysISO(prevStart.y, prevStart.m, prevStart.d, daysInto);
+    const daysInto = daysBetweenISO(range.from, range.to, timezone);
+    const prevStart = addDaysISO(prevYear, prevQuarterStartMonth, 1, 0, timezone);
+    const prevEnd = addDaysISO(prevStart.y, prevStart.m, prevStart.d, daysInto, timezone);
     return {
       key: "thisQuarter",
       from: toISODate(prevStart.y, prevStart.m, prevStart.d),
@@ -194,10 +197,10 @@ export function previousDashboardPeriodRange(range: DashboardPeriodRange): Dashb
     };
   }
   // Rolling and custom windows: shift the whole window back by its own length.
-  const lengthDays = daysBetweenISO(range.from, range.to) + 1;
+  const lengthDays = daysBetweenISO(range.from, range.to, timezone) + 1;
   const [fy, fm, fd] = range.from.split("-").map(Number) as [number, number, number];
-  const prevEnd = addDaysISO(fy, fm, fd, -1);
-  const prevStart = addDaysISO(prevEnd.y, prevEnd.m, prevEnd.d, -(lengthDays - 1));
+  const prevEnd = addDaysISO(fy, fm, fd, -1, timezone);
+  const prevStart = addDaysISO(prevEnd.y, prevEnd.m, prevEnd.d, -(lengthDays - 1), timezone);
   return {
     key: range.key,
     from: toISODate(prevStart.y, prevStart.m, prevStart.d),
@@ -205,10 +208,10 @@ export function previousDashboardPeriodRange(range: DashboardPeriodRange): Dashb
   };
 }
 
-function daysBetweenISO(fromISO: string, toISO: string): number {
+function daysBetweenISO(fromISO: string, toISO: string, timezone: string): number {
   const [fy, fm, fd] = fromISO.split("-").map(Number) as [number, number, number];
   const [ty, tm, td] = toISO.split("-").map(Number) as [number, number, number];
-  const from = cairoMidnightUTC(fy, fm, fd);
-  const to = cairoMidnightUTC(ty, tm, td);
+  const from = zonedMidnightUTC(fy, fm, fd, timezone);
+  const to = zonedMidnightUTC(ty, tm, td, timezone);
   return Math.round((to.getTime() - from.getTime()) / 86_400_000);
 }

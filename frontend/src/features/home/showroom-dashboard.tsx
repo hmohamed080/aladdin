@@ -10,6 +10,7 @@ import {
 } from "@/server/queries/reports";
 import { orgBilingualNames } from "@/server/queries/organization-i18n";
 import { resolveBilingualText } from "@/lib/i18n/bilingual";
+import { resolveTimezone } from "@/lib/workspace/timezone";
 import {
   resolveDashboardPeriod,
   dashboardPeriodRange,
@@ -89,15 +90,24 @@ export async function ShowroomDashboard({
   const buys = has("rfq.create", "order.create", "catalog.read", "quote.decide");
   const sells = has("sales.read", "sales.write", "sales.manage");
 
+  // Fetched FIRST and awaited on its own, rather than folded into the
+  // Promise.all below: the resolved timezone (branch → org → Africa/Cairo)
+  // is a genuine dependency of `range` below, and `range` in turn gates the
+  // one period-scoped read further down. There is no way to parallelize a
+  // read the next step needs the answer to.
+  const names = await orgBilingualNames(supabase, org.organizationId, branchId);
+  const timezone = resolveTimezone(names.branchTimezone, names.orgTimezone);
+
   const periodKey: DashboardPeriodKey = resolveDashboardPeriod(rawPeriod, rawFrom, rawTo);
   const now = new Date();
   const range = dashboardPeriodRange(
     periodKey,
     now,
+    timezone,
     periodKey === "custom" && rawFrom && rawTo ? { from: rawFrom, to: rawTo } : undefined,
   );
 
-  const [currentState, periodScoped, saved, projects, overdue, dueToday, names] = await Promise.all([
+  const [currentState, periodScoped, saved, projects, overdue, dueToday] = await Promise.all([
     buys ? purchaseSummary(supabase, org.organizationId, {}) : Promise.resolve(NO_PURCHASE),
     buys
       ? purchaseSummary(supabase, org.organizationId, { from: range.from, to: range.to })
@@ -106,7 +116,6 @@ export async function ShowroomDashboard({
     buys ? projectSummary(supabase, org.organizationId) : Promise.resolve(NO_PROJECTS),
     sells ? overdueFollowUps(supabase, org.organizationId, branchId) : Promise.resolve([]),
     sells ? followUpsDueToday(supabase, org.organizationId, branchId) : Promise.resolve([]),
-    orgBilingualNames(supabase, org.organizationId, branchId),
   ]);
 
   const savedCount = Object.values(saved).reduce((a, b) => a + b, 0);
