@@ -6,24 +6,47 @@ transaction that is always rolled back afterward, alongside whatever the
 verifier's own `rollback;` already discards. Nothing here is committed.
 
 Requires the local Supabase Postgres container (`supabase_db_aladdin`) to
-already be running and migrated (`supabase start`, then a `supabase db reset`
-or an equivalent full-stack rehearsal) with the standard 26-account seed
-loaded — exactly the state `scripts/rehearse_staging_seed.py` produces. Skips
-cleanly, rather than failing, when that container is not reachable — this
-keeps `python -m unittest discover -s scripts -p "test_*.py"` fast and
-Docker-independent for everyone else; run this file directly (or via the
-`supabase:test:verify` convention below) when validating a change to the
-verifier itself.
+already be running with the enriched 26-account STAGING demo world loaded —
+base seeds (seed.sql/seed-pilot.sql/seed-showroom-sales.sql) PLUS
+supabase/staging/demo-enrichment.sql, exactly what
+`supabase/staging/verify-staging-seed.sql` itself checks against. Note this is
+NOT the same as a plain `supabase db reset` (which never applies
+demo-enrichment.sql, so e.g. Karim Adel and the platform admin are missing
+their primary email contact row and B5 fails), nor is it what a *completed*
+`python scripts/rehearse_staging_seed.py` run leaves behind (its own last step
+resets back to that same plain seed). Load the correct state with:
+
+    python scripts/rehearse_staging_seed.py --keep
+
+The module-level readiness check below confirms not merely that the container
+answers, but that it actually holds that enriched world (every account in
+scripts/staging_demo.py's manifest has a primary email contact) — a reachable
+container in the WRONG state skips with an actionable message instead of
+failing 4 unrelated-looking tests on the same upstream B5 error before their
+own scenario-specific assertions ever run (the exact failure mode that
+motivated this check: see scripts/test_build_staging_seed.py for the static
+regression pin on the underlying seed-source gap).
+
+This keeps `python -m unittest discover -s scripts -p "test_*.py"` fast and
+Docker-independent for everyone whose container isn't running; run this file
+directly (or via `pnpm staging:seed:test`, which runs the whole
+`scripts/test_*.py` suite) when validating a change to the verifier itself.
 
     docker exec -i supabase_db_aladdin pg_isready -U postgres   # sanity check
+    python scripts/rehearse_staging_seed.py --keep              # load the right state
     python scripts/test_verify_staging_seed.py -v
 """
 
 from __future__ import annotations
 
 import subprocess
+import sys
 import unittest
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import staging_demo as sd  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 VERIFY = REPO_ROOT / "supabase" / "staging" / "verify-staging-seed.sql"
@@ -39,6 +62,36 @@ def _container_ready() -> bool:
         capture_output=True,
     )
     return result.returncode == 0
+
+
+def _demo_world_ready() -> tuple[bool, str]:
+    """Whether the container is up AND already holds the enriched 26-account
+    demo world these tests assert against — not merely that Postgres answers.
+    A container that is up but was reset to the plain local dev seed (missing
+    supabase/staging/demo-enrichment.sql) skips cleanly with a fix-it message
+    instead of failing 4 tests on the same opaque upstream B5 error."""
+    if not _container_ready():
+        return False, f"local Postgres container {CONTAINER!r} is not running"
+    accounts = sd.load_accounts()
+    ids_sql = ",".join(f"'{a.id}'::uuid" for a in accounts)
+    result = subprocess.run(
+        ["docker", "exec", CONTAINER, "psql", "-U", "postgres", "-d", "postgres", "-t", "-A", "-c",
+         "select count(*) from public.contacts "
+         f"where channel = 'email' and is_primary and user_id in ({ids_sql});"],
+        capture_output=True, text=True, encoding="utf-8",
+    )
+    have = result.stdout.strip()
+    if result.returncode != 0 or have != str(len(accounts)):
+        return False, (
+            f"container {CONTAINER!r} is up but does not hold the enriched {len(accounts)}-account "
+            f"demo world (only {have or '0'}/{len(accounts)} expected accounts have a primary email "
+            "contact — see this file's own docstring). Run "
+            "`python scripts/rehearse_staging_seed.py --keep` to load it, then retry."
+        )
+    return True, ""
+
+
+_READY, _READY_REASON = _demo_world_ready()
 
 
 def _verifier_body_without_own_begin() -> str:
@@ -101,7 +154,7 @@ def _count(sql: str) -> str:
     return result.stdout.strip()
 
 
-@unittest.skipUnless(_container_ready(), f"local Postgres container {CONTAINER!r} is not running")
+@unittest.skipUnless(_READY, _READY_REASON)
 class VerifyStagingSeedRegressionTests(unittest.TestCase):
     def test_extra_unrelated_user_does_not_fail_hosted_mode(self) -> None:
         prelude = """
@@ -243,6 +296,63 @@ class VerifyStagingSeedRegressionTests(unittest.TestCase):
         _run("hosted", f"delete from auth.users where id = '{NADIA_USER_ID}'::uuid;\n")
         after = _count("select count(*) from auth.users;")
         self.assertEqual(before, after, "hosted-mode runs must never change persisted row counts")
+
+    def test_all_26_accounts_have_exactly_one_primary_email_contact(self) -> None:
+        # Direct regression pin for the exact defect class this suite's own
+        # readiness check (_demo_world_ready) already relies on: every account
+        # scripts/staging_demo.py's manifest lists must have EXACTLY ONE
+        # public.contacts row with channel='email' and is_primary=true — the
+        # invariant B5 enforces. Checked independently, against the live
+        # database, rather than trusting the verifier to grade its own homework.
+        accounts = sd.load_accounts()
+        ids_array = ",".join(f"'{a.id}'::uuid" for a in accounts)
+        sql = (
+            f"select a.id, coalesce(c.n, 0) from unnest(array[{ids_array}]) as a(id) "
+            "left join (select user_id, count(*) n from public.contacts "
+            "where channel = 'email' and is_primary group by user_id) c on c.user_id = a.id "
+            "order by a.id;"
+        )
+        result = subprocess.run(
+            ["docker", "exec", CONTAINER, "psql", "-U", "postgres", "-d", "postgres", "-t", "-A", "-c", sql],
+            capture_output=True, text=True, encoding="utf-8",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        slug_by_id = {a.id: a.slug for a in accounts}
+        wrong = []
+        for line in result.stdout.strip().splitlines():
+            uid, _, n = line.partition("|")
+            if n.strip() != "1":
+                wrong.append(f"{slug_by_id.get(uid, uid)} ({uid}): {n.strip()} primary email contact(s)")
+        self.assertEqual(
+            wrong, [],
+            "every demo account must have EXACTLY ONE primary email contact:\n  " + "\n  ".join(wrong),
+        )
+
+    def test_second_primary_contact_for_same_user_is_rejected(self) -> None:
+        # uq_contacts_primary_per_user (supabase/migrations/20260802090001_identity_core.sql)
+        # is a partial unique index enforcing at most one primary contact per
+        # user, across every channel. Proves the DATABASE itself — not merely
+        # the verifier — refuses a duplicate, so demo-enrichment.sql's insert
+        # (or any future one) can never silently double up a primary contact
+        # for an account the base seed files already cover. Rolled back — this
+        # asserts an INSERT is rejected, so nothing to roll back on success,
+        # but the transaction is aborted either way and never committed.
+        sql = (
+            "begin;\n"
+            "insert into public.contacts (user_id, channel, value, is_primary, is_verified, verified_at)\n"
+            f"values ('{KARIM_USER_ID}'::uuid, 'whatsapp', '+20-100-000-0000', true, true, now());\n"
+            "rollback;\n"
+        )
+        result = subprocess.run(
+            ["docker", "exec", "-i", CONTAINER, "psql", "-U", "postgres", "-d", "postgres",
+             "-v", "ON_ERROR_STOP=1"],
+            input=sql, capture_output=True, text=True, encoding="utf-8",
+        )
+        self.assertNotEqual(
+            result.returncode, 0,
+            "a second primary contact for an already-covered demo account must be rejected",
+        )
+        self.assertIn("uq_contacts_primary_per_user", result.stderr)
 
 
 if __name__ == "__main__":
