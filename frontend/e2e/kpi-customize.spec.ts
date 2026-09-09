@@ -107,11 +107,55 @@ test.describe("KPI card personalization (#53)", () => {
     await expect(dialog.getByRole("button", { name: "Reset to system default" })).toBeVisible();
   });
 
+  test("a saved personal reorder survives a page reload", async ({ page }) => {
+    await page.getByTestId("kpi-customize-trigger").click();
+    const dialog = page.getByTestId("kpi-customize-dialog");
+    const rows = dialog.locator("ol > li");
+    const firstBefore = (await rows.nth(0).locator("span.truncate").first().textContent()) ?? "";
+    const secondBefore = (await rows.nth(1).locator("span.truncate").first().textContent()) ?? "";
+
+    await rows.nth(1).getByRole("button", { name: "Move up" }).click();
+    await dialog.getByTestId("kpi-customize-save-personal").click();
+    await expect(page.getByText("Your layout was saved.")).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    // A fresh navigation, not just closing the dialog — proves the order was
+    // actually persisted server-side (dashboard_kpi_layout_set_personal),
+    // not merely held in this component's own React state.
+    await page.reload({ waitUntil: "networkidle" });
+    const primaryCards = page.locator('[class*="desktop:grid-cols-6"]').first().locator("> *");
+    // `.first()`: each tile also renders an (empty, in this case) hint span
+    // sharing the same `.text-label` class — see stat-tiles.tsx's unconditional
+    // hint slot, kept for height-reservation even when a tile has no hint text.
+    await expect(primaryCards.nth(0).locator(".text-label").first()).toHaveText(secondBefore);
+    await expect(primaryCards.nth(1).locator(".text-label").first()).toHaveText(firstBefore);
+  });
+
+  test("mobile: no horizontal scroll, pencil stays reachable", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload({ waitUntil: "networkidle" });
+    const trigger = page.getByTestId("kpi-customize-trigger");
+    await expect(trigger).toBeVisible();
+    const scrollsHorizontally = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    );
+    expect(scrollsHorizontally).toBe(false);
+    await trigger.click();
+    await expect(page.getByTestId("kpi-customize-dialog")).toBeVisible();
+  });
+
   test("screenshots — pencil button, dialog, and mobile", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.getByTestId("kpi-customize-trigger").click();
-    await expect(page.getByTestId("kpi-customize-dialog")).toBeVisible();
+    const dialog = page.getByTestId("kpi-customize-dialog");
+    await expect(dialog).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/10-en-kpi-customize-dialog.png`, fullPage: true });
+
+    // A hidden card, available to add back — proof the show/hide catalog
+    // round-trips, not just that hiding removes a row.
+    await dialog.locator("ol > li").first().getByRole("button", { name: "Hide" }).click();
+    await expect(dialog.locator("ul > li").first().getByRole("button", { name: "Show" })).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/10b-en-kpi-hidden-card-available.png`, fullPage: true });
     await page.keyboard.press("Escape");
 
     await page.context().addCookies([{ name: "NEXT_LOCALE", value: "ar", url: "http://127.0.0.1:3100" }]);

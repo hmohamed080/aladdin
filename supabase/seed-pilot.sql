@@ -101,6 +101,14 @@ update public.users set primary_account_type = 'installer_technician', status = 
 -- so my_registration_state resolves to the invitation path, not active_personal.
 update public.users set primary_account_type = 'engineer' where id = '70000010-0000-4000-8000-000000000010';
 
+-- Hana's real bilingual display name (20260916090001) — additive to the
+-- profile row `app.handle_new_user()` already created from her
+-- raw_user_meta_data display_name above; only the Showroom milestone's pilot
+-- account gets a real Arabic value here, matching the same narrow scope as
+-- the organization/branch bilingual names below.
+update public.profiles set display_name_ar = 'هناء منصور', display_name_en = 'Hana Mansour'
+  where user_id = '70000001-0000-4000-8000-000000000001';
+
 -- ---------------------------------------------------------------------------
 -- 2. Organizations (all is_verified = false; two of them pending review)
 -- ---------------------------------------------------------------------------

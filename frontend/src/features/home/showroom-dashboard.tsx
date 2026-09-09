@@ -9,6 +9,7 @@ import {
   type ProjectSummary,
 } from "@/server/queries/reports";
 import { orgBilingualNames } from "@/server/queries/organization-i18n";
+import { resolveBilingualText } from "@/lib/i18n/bilingual";
 import { resolveTimezone } from "@/lib/workspace/timezone";
 import { loadAccountIdentity } from "@/server/queries/identity";
 import { createTranslator } from "@/lib/i18n/translate";
@@ -122,9 +123,16 @@ export async function ShowroomDashboard({
   // is already visible in the workspace header and repeating it here was the
   // "duplicated organization name" bug. `loadAccountIdentity()` returns a safe
   // null when no display name was ever set, and the fallback is the existing
-  // nameless greeting rather than a hardcoded person.
+  // nameless greeting rather than a hardcoded person. The name itself is
+  // resolved through the SAME bilingual-fallback rule the org/branch names
+  // use (20260916090001) — Arabic prefers the person's own real Arabic name,
+  // never a transliteration of their Latin one, and falls back to whatever
+  // single name they did enter when no Arabic override exists.
   const t = createTranslator(locale);
-  const greeting = identity?.displayName ? t("home.greetingNamed", { name: identity.displayName }) : m.home.greeting;
+  const personName = identity?.displayName
+    ? resolveBilingualText(locale, identity.displayName, identity.displayNameAr, identity.displayNameEn)
+    : null;
+  const greeting = personName ? t("home.greetingNamed", { name: personName }) : m.home.greeting;
 
   // Capability-aware first: a card whose underlying data this caller cannot
   // see must never be offered or rendered, REGARDLESS of what a stale saved
@@ -233,20 +241,29 @@ export async function ShowroomDashboard({
         />
       </div>
 
-      <StatTiles locale={locale} tiles={primaryTiles} layout="grid" columns={6} />
+      {/* `gap-md` (16px) — the standard grid-to-grid rhythm, not the
+          dashboard's own outer `gap-lg` (24px, meant for header-to-KPI-area
+          and future SIBLING sections, not for the two grids inside this one
+          KPI area). Grouping the primary row and the collapsible secondary
+          row into their own `gap-md` block is what keeps the primary→
+          secondary gap the same 16px regardless of what the outer section
+          rhythm is elsewhere on the page. */}
+      <div className="flex flex-col gap-md">
+        <StatTiles locale={locale} tiles={primaryTiles} layout="grid" columns={6} />
 
-      {secondaryTiles.length > 0 ? (
-        <ExpandCollapse moreLabel={m.common.showMore} lessLabel={m.common.showLess}>
-          {/* Same `columns={6}` template as the primary row, on purpose: the two
-              additional cards must be the identical size as the six primary ones
-              (never stretched into two oversized cards), and sharing one grid
-              definition is what makes them start from the correct leading edge —
-              column 1 of a 6-column grid — in both RTL and LTR for free. The four
-              empty tracks on this row are accepted: two cards do not need to fake
-              a full row to look intentional. */}
-          <StatTiles locale={locale} tiles={secondaryTiles} layout="grid" columns={6} />
-        </ExpandCollapse>
-      ) : null}
+        {secondaryTiles.length > 0 ? (
+          <ExpandCollapse moreLabel={m.common.showMore} lessLabel={m.common.showLess}>
+            {/* Same `columns={6}` template as the primary row, on purpose: the two
+                additional cards must be the identical size as the six primary ones
+                (never stretched into two oversized cards), and sharing one grid
+                definition is what makes them start from the correct leading edge —
+                column 1 of a 6-column grid — in both RTL and LTR for free. The four
+                empty tracks on this row are accepted: two cards do not need to fake
+                a full row to look intentional. */}
+            <StatTiles locale={locale} tiles={secondaryTiles} layout="grid" columns={6} />
+          </ExpandCollapse>
+        ) : null}
+      </div>
     </div>
   );
 }

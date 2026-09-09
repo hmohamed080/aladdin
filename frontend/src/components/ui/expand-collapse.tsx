@@ -39,7 +39,18 @@ export function ExpandCollapse({
   const regionId = useId();
 
   return (
-    <div className={className}>
+    <div className={cn("flex flex-col gap-md", className)}>
+      {/* A single `gap-md` on this flex root is the ONLY space between the
+          collapsible region and the trigger row — not a `pt-md` inside the
+          region ALSO stacked with a `gap`/`mt-md` around it. Two sources of
+          spacing around the same seam is exactly what made the KPI section's
+          primary-to-secondary gap (a `gap-lg` from the dashboard's own outer
+          flex, PLUS this component's old internal `pt-md`) read as an
+          oversized, unintentional dead band once real cards sat on both
+          sides of it instead of empty space. Flex `gap` applies between
+          these two children whether the region above is 0-height
+          (collapsed) or full of content (expanded), so the trigger sits the
+          same 16px below either way. */}
       <div
         id={regionId}
         style={{
@@ -55,13 +66,11 @@ export function ExpandCollapse({
           animate={{ opacity: open ? 1 : 0 }}
           transition={{ duration: reduced ? 0 : 0.18, ease: "easeOut" }}
         >
-          {/* A top gap on the revealed content, not a bottom gap on the
-              trigger row above — so nothing shifts when collapsed. */}
-          <div className="pt-md">{children}</div>
+          {children}
         </motion.div>
       </div>
 
-      <div className="mt-md flex justify-center">
+      <div className="flex justify-center">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}

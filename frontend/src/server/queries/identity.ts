@@ -27,6 +27,16 @@ export type AccountIdentity = {
   userId: string;
   /** The profile display name, when one has been set. */
   displayName: string | null;
+  /**
+   * Real, owner-entered Arabic/English display-name overrides
+   * (20260916090001) — never a translation of `displayName`, just like the
+   * organization/branch bilingual names. `null` when the person never set
+   * one; a caller resolves the pair through `resolveBilingualText` (never
+   * assume `displayName` alone still reflects every surface's locale).
+   * Added additively — every existing caller of `displayName` is unaffected.
+   */
+  displayNameAr: string | null;
+  displayNameEn: string | null;
   /** The verified primary contact — an email address or a phone number. */
   contact: string | null;
   contactKind: "email" | "phone" | null;
@@ -41,7 +51,7 @@ export const loadAccountIdentity = cache(async function loadAccountIdentity(): P
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name")
+    .select("display_name, display_name_ar, display_name_en")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -51,6 +61,8 @@ export const loadAccountIdentity = cache(async function loadAccountIdentity(): P
   return {
     userId: user.id,
     displayName: profile?.display_name?.trim() || null,
+    displayNameAr: profile?.display_name_ar?.trim() || null,
+    displayNameEn: profile?.display_name_en?.trim() || null,
     contact: email ?? phone,
     contactKind: email ? "email" : phone ? "phone" : null,
   };

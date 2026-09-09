@@ -2446,6 +2446,8 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           display_name: string
+          display_name_ar: string | null
+          display_name_en: string | null
           headline: string | null
           id: string
           languages: string[] | null
@@ -2462,6 +2464,8 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           display_name: string
+          display_name_ar?: string | null
+          display_name_en?: string | null
           headline?: string | null
           id?: string
           languages?: string[] | null
@@ -2478,6 +2482,8 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           display_name?: string
+          display_name_ar?: string | null
+          display_name_en?: string | null
           headline?: string | null
           id?: string
           languages?: string[] | null

@@ -36,10 +36,14 @@ test.describe("Hana Showroom dashboard — Foundation completion pass", () => {
     await setLocale(page, "ar");
     await page.reload({ waitUntil: "networkidle" });
 
-    // A. Greeting: the signed-in profile's name, never a hardcoded "Hana" and
-    // never the organization repeated (the org already lives in the header).
+    // A. Greeting: the signed-in profile's REAL Arabic name (20260916090001),
+    // never a hardcoded "Hana", never the Latin transliteration mixed into
+    // an Arabic sentence, and never the organization repeated (the org
+    // already lives in the header).
     const greeting = page.getByText(/أهلًا بعودتك/);
     await expect(greeting).toBeVisible();
+    await expect(greeting).toContainText("هناء منصور");
+    await expect(greeting).not.toContainText("Hana");
     await expect(greeting).not.toContainText("سيراميك"); // org name not repeated here
 
     // B. Desktop header: org (building icon) and branch (pin icon) both
@@ -109,6 +113,22 @@ test.describe("Hana Showroom dashboard — Foundation completion pass", () => {
       expect(Math.abs(box!.height - primaryBox!.height)).toBeLessThanOrEqual(1);
     }
 
+    // The actual bounding-box gap between the bottom of the primary row and
+    // the top of the secondary row — the standard `gap-md` (16px) spacing
+    // token, not the dashboard's own larger inter-section `gap-lg` (24px)
+    // stacked on top of a second internal padding (the original defect).
+    const primaryRowBottom = Math.max(
+      ...(await Promise.all(
+        Array.from({ length: 6 }, (_, i) => primaryCards.nth(i).boundingBox().then((b) => b!.y + b!.height)),
+      )),
+    );
+    const secondaryRowTop = Math.min(
+      ...(await Promise.all([0, 1].map((i) => secondaryCards.nth(i).boundingBox().then((b) => b!.y)))),
+    );
+    const rowGap = secondaryRowTop - primaryRowBottom;
+    expect(rowGap).toBeGreaterThanOrEqual(14);
+    expect(rowGap).toBeLessThanOrEqual(18);
+
     await page.screenshot({ path: `${SHOTS}/02-ar-desktop-light-expanded.png`, fullPage: true });
   });
 
@@ -118,12 +138,27 @@ test.describe("Hana Showroom dashboard — Foundation completion pass", () => {
     await setTheme(page, "dark");
     await page.reload({ waitUntil: "networkidle" });
     await page.getByRole("button", { name: /عرض المزيد|Show more/ }).click();
+    const primaryCards = page.locator('[class*="desktop:grid-cols-6"]').first().locator("> *");
     const secondaryCards = page.locator('[class*="desktop:grid-cols-6"]').last().locator("> *");
     await expect(secondaryCards).toHaveCount(2);
     await expect(secondaryCards.first()).toBeVisible();
     await expect
       .poll(async () => secondaryCards.first().evaluate((n) => getComputedStyle(n).opacity))
       .toBe("1");
+
+    // Same 16px row-gap requirement, verified in dark mode too — the
+    // spacing tokens are theme-independent, so this must hold identically.
+    const primaryRowBottom = Math.max(
+      ...(await Promise.all(
+        Array.from({ length: 6 }, (_, i) => primaryCards.nth(i).boundingBox().then((b) => b!.y + b!.height)),
+      )),
+    );
+    const secondaryRowTop = Math.min(
+      ...(await Promise.all([0, 1].map((i) => secondaryCards.nth(i).boundingBox().then((b) => b!.y)))),
+    );
+    const rowGap = secondaryRowTop - primaryRowBottom;
+    expect(rowGap).toBeGreaterThanOrEqual(14);
+    expect(rowGap).toBeLessThanOrEqual(18);
 
     await page.screenshot({ path: `${SHOTS}/03-ar-desktop-dark-expanded.png`, fullPage: true });
   });
