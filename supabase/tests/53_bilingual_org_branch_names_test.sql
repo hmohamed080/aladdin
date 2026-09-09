@@ -26,6 +26,10 @@ update auth.users set email_confirmed_at = now() where email_confirmed_at is nul
 \set tarek   '70000003-0000-4000-8000-000000000003'
 \set orgC    '9c000000-cccc-4ccc-8ccc-000000000001'
 \set branchC 'b0000001-0000-4000-8000-000000000001'
+-- Tarek's own org (Egypt Marble Manufacturing) — used below as an org the
+-- Foundation completion pass's demo-data seeding deliberately left untouched,
+-- now that Cairo Ceramics Showroom (orgC) carries a real seeded Arabic name.
+\set orgD    '9d000000-dddd-4ddd-8ddd-000000000002'
 
 -- ===========================================================================
 -- A. Columns exist, nullable, no default forced value
@@ -39,7 +43,13 @@ select has_column('public', 'branches', 'address_en', 'branches.address_en exist
 
 select col_is_null('public', 'organizations', 'name_ar', 'name_ar has no NOT NULL constraint');
 select is(
-  (select name_ar from public.organizations where id = :'orgC'::uuid),
+  -- orgD, not orgC: the migration itself is purely additive and populates
+  -- nothing, but orgC (Cairo Ceramics Showroom) now legitimately carries a
+  -- real seeded Arabic name from the Hana Showroom Foundation completion
+  -- pass's demo-data work — a DIFFERENT concern than this migration's own
+  -- shape. orgD is a seeded org that pass deliberately left untouched, so it
+  -- still proves the migration itself forces no value.
+  (select name_ar from public.organizations where id = :'orgD'::uuid),
   null, 'an existing seeded org has no name_ar populated by this migration — purely additive'
 );
 

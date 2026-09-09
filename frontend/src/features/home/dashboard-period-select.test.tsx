@@ -82,6 +82,15 @@ describe("DashboardPeriodSelect — rolling/calendar options", () => {
 });
 
 describe("DashboardPeriodSelect — custom range", () => {
+  it("hides the From/To fields until 'Custom period' is chosen", () => {
+    renderSelect("30d");
+    open();
+    // A committed rolling preset has no use for the custom sub-form — it must
+    // not be visible just because the menu is open.
+    expect(screen.queryByTestId("dashboard-period-custom-from")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-period-custom-apply")).not.toBeInTheDocument();
+  });
+
   it("choosing 'custom' does not navigate — it stays open for the date inputs", () => {
     renderSelect(DEFAULT_DASHBOARD_PERIOD);
     open();
@@ -90,9 +99,33 @@ describe("DashboardPeriodSelect — custom range", () => {
     expect(screen.getByTestId("dashboard-period-custom-from")).toBeInTheDocument();
   });
 
+  it("hides the fields again after reopening on a non-custom committed period", () => {
+    // Regression: picking "custom" used to leave the sub-form visible even
+    // after the menu was dismissed and reopened without applying.
+    renderSelect("30d");
+    open();
+    fireEvent.click(screen.getByTestId("dashboard-period-option-custom"));
+    expect(screen.getByTestId("dashboard-period-custom-from")).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    open();
+    expect(screen.queryByTestId("dashboard-period-custom-from")).not.toBeInTheDocument();
+  });
+
+  it("anchors the popover to its own trailing edge, not the leading one, so it grows back into the viewport", () => {
+    // Regression for the popover clipping past the right edge of an LTR
+    // desktop viewport: the trigger sits at the far end of the header row, so
+    // the panel must hug its OWN end edge (`end-0`) and grow inward.
+    renderSelect(DEFAULT_DASHBOARD_PERIOD);
+    open();
+    const menu = screen.getByTestId("dashboard-period-menu");
+    expect(menu.className).toContain("end-0");
+    expect(menu.className).not.toMatch(/(?<!-)start-0/);
+  });
+
   it("Apply is disabled until both dates are present and ordered", () => {
     renderSelect(DEFAULT_DASHBOARD_PERIOD);
     open();
+    fireEvent.click(screen.getByTestId("dashboard-period-option-custom"));
     const apply = screen.getByTestId("dashboard-period-custom-apply");
     expect(apply).toBeDisabled();
 
@@ -109,6 +142,7 @@ describe("DashboardPeriodSelect — custom range", () => {
   it("Apply navigates with period=custom and the chosen from/to", () => {
     renderSelect(DEFAULT_DASHBOARD_PERIOD);
     open();
+    fireEvent.click(screen.getByTestId("dashboard-period-option-custom"));
     fireEvent.change(screen.getByTestId("dashboard-period-custom-from"), { target: { value: "2026-02-01" } });
     fireEvent.change(screen.getByTestId("dashboard-period-custom-to"), { target: { value: "2026-02-15" } });
     fireEvent.click(screen.getByTestId("dashboard-period-custom-apply"));

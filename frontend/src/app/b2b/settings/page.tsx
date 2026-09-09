@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { getPageContext } from "@/server/queries/page-context";
-import { getMessages } from "@/lib/i18n/translate";
+import { getMessages, createTranslator } from "@/lib/i18n/translate";
+import { resolveTimezone } from "@/lib/workspace/timezone";
+import { DASHBOARD_TIMEZONE_FALLBACK } from "@/lib/workspace/dashboard-period";
 import { THEME_COOKIE } from "@/lib/theme/config";
 import { allowedNavKeys } from "@/lib/nav/modules";
 import { PageHeader } from "@/components/ui/workspace-layout";
@@ -49,6 +51,7 @@ export default async function SettingsPage() {
   if (!ctx) return null;
   const { supabase, org, locale } = ctx;
   const m = getMessages(locale);
+  const t = createTranslator(locale);
   const store = await cookies();
   const theme = store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light";
 
@@ -118,7 +121,13 @@ export default async function SettingsPage() {
             <Field label={m.settings.field.language}>
               {record?.primary_locale === "ar" ? m.common.languageName.ar : m.common.languageName.en}
             </Field>
-            <Field label={m.settings.field.timezone}>{record?.timezone ?? m.settings.timezoneUnset}</Field>
+            <Field label={m.settings.field.timezone}>
+              {/* An organization with no override is NOT running on "nothing" —
+                  every dashboard period boundary for this business is being
+                  computed against the platform default right now, so that is
+                  what gets said, truthfully, instead of a bare "Not set". */}
+              {record?.timezone ?? t("settings.timezoneDefault", { tz: DASHBOARD_TIMEZONE_FALLBACK })}
+            </Field>
           </dl>
           <p className="mt-md border-t pt-sm text-label text-fg-muted">{m.settings.businessNote}</p>
         </Card>
@@ -164,29 +173,42 @@ export default async function SettingsPage() {
                 {org.branches.map((b) => {
                   const detail = branchDetails.get(b.id);
                   const displayName = resolveBilingualText(locale, b.name, detail?.name_ar ?? null, detail?.name_en ?? null);
+                  // Truthful, not just present: a branch with no override of its
+                  // own is actually governed by the ORGANIZATION's timezone
+                  // (resolveTimezone's own branch→org→fallback order), so that is
+                  // what this line names — never a bare "Not set" while a real
+                  // effective zone is in force.
+                  const branchTimezoneText =
+                    detail?.timezone ??
+                    t("settings.timezoneInherited", {
+                      tz: resolveTimezone(null, record?.timezone),
+                    });
                   return (
                     <li
                       key={b.id}
-                      className="flex items-center justify-between gap-2 rounded-sm bg-surface-2/50 px-3 py-2 text-body text-fg-secondary"
+                      className="flex flex-col gap-1 rounded-sm bg-surface-2/50 px-3 py-2 text-body text-fg-secondary"
                     >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="shrink-0 text-fg-muted" aria-hidden="true">
-                          <MapPinIcon size={15} />
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="shrink-0 text-fg-muted" aria-hidden="true">
+                            <MapPinIcon size={15} />
+                          </span>
+                          <span className="min-w-0 truncate">{displayName}</span>
                         </span>
-                        <span className="min-w-0 truncate">{displayName}</span>
+                        {canManageBranches ? (
+                          <BranchIdentityDialog
+                            m={m}
+                            branchId={b.id}
+                            branchName={displayName}
+                            nameAr={detail?.name_ar ?? null}
+                            nameEn={detail?.name_en ?? null}
+                            addressAr={detail?.address_ar ?? null}
+                            addressEn={detail?.address_en ?? null}
+                            timezone={detail?.timezone ?? null}
+                          />
+                        ) : null}
                       </span>
-                      {canManageBranches ? (
-                        <BranchIdentityDialog
-                          m={m}
-                          branchId={b.id}
-                          branchName={displayName}
-                          nameAr={detail?.name_ar ?? null}
-                          nameEn={detail?.name_en ?? null}
-                          addressAr={detail?.address_ar ?? null}
-                          addressEn={detail?.address_en ?? null}
-                          timezone={detail?.timezone ?? null}
-                        />
-                      ) : null}
+                      <span className="ms-6 text-label text-fg-muted">{branchTimezoneText}</span>
                     </li>
                   );
                 })}

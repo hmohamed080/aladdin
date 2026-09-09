@@ -9,8 +9,9 @@ import {
   type ProjectSummary,
 } from "@/server/queries/reports";
 import { orgBilingualNames } from "@/server/queries/organization-i18n";
-import { resolveBilingualText } from "@/lib/i18n/bilingual";
 import { resolveTimezone } from "@/lib/workspace/timezone";
+import { loadAccountIdentity } from "@/server/queries/identity";
+import { createTranslator } from "@/lib/i18n/translate";
 import {
   resolveDashboardPeriod,
   dashboardPeriodRange,
@@ -95,7 +96,10 @@ export async function ShowroomDashboard({
   // is a genuine dependency of `range` below, and `range` in turn gates the
   // one period-scoped read further down. There is no way to parallelize a
   // read the next step needs the answer to.
-  const names = await orgBilingualNames(supabase, org.organizationId, branchId);
+  const [names, identity] = await Promise.all([
+    orgBilingualNames(supabase, org.organizationId, branchId),
+    loadAccountIdentity(),
+  ]);
   const timezone = resolveTimezone(names.branchTimezone, names.orgTimezone);
 
   const periodKey: DashboardPeriodKey = resolveDashboardPeriod(rawPeriod, rawFrom, rawTo);
@@ -120,7 +124,13 @@ export async function ShowroomDashboard({
 
   const savedCount = Object.values(saved).reduce((a, b) => a + b, 0);
   const runningProjects = (projects.executing.active ?? 0) + (projects.incoming.active ?? 0);
-  const orgDisplayName = resolveBilingualText(locale, org.organizationName, names.orgNameAr, names.orgNameEn);
+  // The greeting names the signed-in PERSON, never the organization — the org
+  // is already visible in the workspace header and repeating it here was the
+  // "duplicated organization name" bug. `loadAccountIdentity()` returns a safe
+  // null when no display name was ever set, and the fallback is the existing
+  // nameless greeting rather than a hardcoded person.
+  const t = createTranslator(locale);
+  const greeting = identity?.displayName ? t("home.greetingNamed", { name: identity.displayName }) : m.home.greeting;
 
   const primaryTiles: Tile[] = [
     {
@@ -187,9 +197,7 @@ export async function ShowroomDashboard({
     <div className="flex flex-col gap-lg">
       <div className="flex flex-wrap items-start justify-between gap-md">
         <div className="min-w-0">
-          <p className="truncate text-label text-fg-muted">
-            {m.home.greeting} · {orgDisplayName}
-          </p>
+          <p className="truncate text-label text-fg-muted">{greeting}</p>
           <h1 className="text-headline text-fg">{m.home.title}</h1>
         </div>
         <DashboardPeriodSelect
@@ -209,7 +217,14 @@ export async function ShowroomDashboard({
 
       {secondaryTiles.length > 0 ? (
         <ExpandCollapse moreLabel={m.common.showMore} lessLabel={m.common.showLess}>
-          <StatTiles locale={locale} tiles={secondaryTiles} layout="grid" columns={4} />
+          {/* Same `columns={6}` template as the primary row, on purpose: the two
+              additional cards must be the identical size as the six primary ones
+              (never stretched into two oversized cards), and sharing one grid
+              definition is what makes them start from the correct leading edge —
+              column 1 of a 6-column grid — in both RTL and LTR for free. The four
+              empty tracks on this row are accepted: two cards do not need to fake
+              a full row to look intentional. */}
+          <StatTiles locale={locale} tiles={secondaryTiles} layout="grid" columns={6} />
         </ExpandCollapse>
       ) : null}
     </div>

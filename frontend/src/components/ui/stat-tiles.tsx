@@ -39,6 +39,23 @@ const chip: Record<Tone, string> = {
   info: "bg-info/15 text-info",
 };
 
+/**
+ * ONE surface, not a card inside a card. `.workspace-body .bg-surface`
+ * (globals.css) already applies this shell's whole elevation grammar — a
+ * low-contrast border-color plus a soft two-layer shadow — to every
+ * `bg-surface` element via `!important`, unconditionally. Also requesting
+ * Tailwind's own `border` (a solid 1px edge) and `shadow-card` (a second,
+ * heavier shadow token) on top of that stacked a visible border ring *and* a
+ * near-edge shadow layer around a tile barely 90px tall, which read as a
+ * picture frame rather than a single lifted surface — the "card inside a
+ * card" defect. Dropping both Tailwind utilities here removes the border
+ * entirely (its color has no width left to draw) and leaves the shell's own
+ * soft shadow as the tile's only separation cue. The icon chip above is the
+ * one deliberately contrasting surface left inside the tile.
+ */
+const tileSurfaceClass =
+  "flex items-center gap-3 rounded-md bg-surface p-md transition-colors hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
+
 function TileBody({ tile, locale }: { tile: Tile; locale: Locale }) {
   return (
     <>
@@ -49,17 +66,22 @@ function TileBody({ tile, locale }: { tile: Tile; locale: Locale }) {
         <tile.Icon size={20} />
       </span>
       <span className="min-w-0">
-        {/* `truncate` is a GUARD, not the plan. A tile is ~180px wide in the
-            two-column mobile grid, and a long value (a money figure, say) has no
-            natural break point — without this it overflowed the tile and pushed
-            the whole page sideways. Callers should still pass a value that fits:
-            use the compact money format on tiles, and keep the exact figure on
-            the record the tile links to. */}
-        <span className="block truncate font-display text-title leading-none text-fg tabular-nums">
+        {/* `break-words`, not `truncate`. A clipped KPI label or an ellipsized
+            money figure is a defect, not a guard — the requirement is to WRAP a
+            long label onto a second line rather than hide part of it. `min-w-0`
+            on the wrapping span (above) is what actually stops the tile from
+            being pushed wide by an unbroken token; wrapping is the presentation
+            once that space constraint is real. Callers should still pass a
+            value that fits comfortably (the compact money format on tiles, the
+            exact figure on the record the tile links to) — this is the safety
+            net for the rare label that doesn't. */}
+        <span className="block break-words font-display text-title leading-tight text-fg tabular-nums">
           {typeof tile.value === "number" ? formatNumber(tile.value, locale) : tile.value}
         </span>
-        <span className="mt-1 block truncate text-label text-fg-secondary">{tile.label}</span>
-        {tile.hint ? <span className="mt-0.5 block truncate text-label text-fg-muted">{tile.hint}</span> : null}
+        <span className="mt-1 block break-words text-label leading-snug text-fg-secondary">{tile.label}</span>
+        {tile.hint ? (
+          <span className="mt-0.5 block break-words text-label leading-snug text-fg-muted">{tile.hint}</span>
+        ) : null}
       </span>
     </>
   );
@@ -121,15 +143,11 @@ export function StatTiles({
 
   const cards = tiles.map((tile) =>
     tile.href ? (
-      <Link
-        key={tile.label}
-        href={tile.href}
-        className="flex items-center gap-3 rounded-md border bg-surface p-md shadow-card transition-colors hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-      >
+      <Link key={tile.label} href={tile.href} className={tileSurfaceClass}>
         <TileBody tile={tile} locale={locale} />
       </Link>
     ) : (
-      <div key={tile.label} className="flex items-center gap-3 rounded-md border bg-surface p-md shadow-card">
+      <div key={tile.label} className={tileSurfaceClass}>
         <TileBody tile={tile} locale={locale} />
       </div>
     ),

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 
@@ -33,10 +34,18 @@ const EMPTY: OrgBilingualNames = {
  * feed. A deliberately narrow, single-purpose read rather than threading
  * `name_ar`/`name_en` through `WorkspaceContext`/`WorkspaceEntry`: those
  * types back every workspace surface, and only the Showroom Owner header
- * needs the translated pair today. If a second surface needs it, that is the
- * signal to promote this into the shared context loader — not before.
+ * needs the translated pair today.
+ *
+ * A SECOND surface now needs it — the shared `WorkspaceShell` header, not
+ * just the Showroom dashboard's own greeting line — which is exactly the
+ * signal this file's own history called out as "promote to the shared
+ * context loader." `cache()`d here instead: the two callers (`b2b/layout.tsx`
+ * for the header, `showroom-dashboard.tsx` for the greeting/timezone) share
+ * one Supabase round trip per render rather than issuing it twice, without
+ * yet committing every workspace surface to carrying these columns through
+ * `WorkspaceContext`. Promote further only if a THIRD surface needs it.
  */
-export async function orgBilingualNames(
+export const orgBilingualNames = cache(async function orgBilingualNames(
   supabase: DB,
   orgId: string,
   branchId: string | null,
@@ -64,6 +73,6 @@ export async function orgBilingualNames(
     branchAddressEn: branch.data?.address_en ?? null,
     branchTimezone: branch.data?.timezone ?? null,
   };
-}
+});
 
 export { EMPTY as EMPTY_BILINGUAL_NAMES };

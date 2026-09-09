@@ -34,3 +34,29 @@ describe("StatTiles — grid layout with a columns override", () => {
     expect(container.firstElementChild?.className).toContain("[&>*]:min-w-0");
   });
 });
+
+describe("StatTiles — single-surface card (no nested/double surface)", () => {
+  it("a tile is one bg-surface with no Tailwind border utility stacked on top", () => {
+    // Regression for the "card inside a card" defect: `bg-surface` already
+    // gets its border-color and elevation from the shared workspace-body
+    // rule; also requesting Tailwind's own `border` utility here is what
+    // stacked a visible edge on top of that shadow and read as a picture
+    // frame around a 90px-tall tile.
+    const { container } = render(<StatTiles locale="en" tiles={TILES} layout="grid" columns={6} />);
+    const tile = container.querySelector("[class*='bg-surface']");
+    expect(tile).not.toBeNull();
+    expect(tile!.className).toMatch(/(?:^|\s)bg-surface(?:\s|$)/);
+    expect(tile!.className).not.toMatch(/(?:^|\s)border(?:\s|$)/);
+    expect(tile!.className).not.toContain("shadow-card");
+  });
+
+  it("does not clip a long label — no truncate/ellipsis, wrapping is allowed", () => {
+    const longLabel: Tile[] = [
+      { label: "Open purchase requests awaiting your decision", value: 4, Icon: AlertIcon },
+    ];
+    render(<StatTiles locale="en" tiles={longLabel} layout="grid" columns={6} />);
+    const label = screen.getByText(longLabel[0]!.label);
+    expect(label.className).not.toContain("truncate");
+    expect(label.className).toContain("break-words");
+  });
+});

@@ -62,6 +62,12 @@ export function DashboardPeriodSelect({
   const [open, setOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState(from ?? "");
   const [customTo, setCustomTo] = useState(to ?? "");
+  // Whether the custom From/To sub-form is showing. Distinct from `value`
+  // itself: picking "Custom period" does not navigate (there is nothing to
+  // apply yet), so it cannot be represented by the committed URL state — it
+  // needs its own flag, reset to match the committed period every time the
+  // menu opens fresh.
+  const [showCustom, setShowCustom] = useState(value === "custom");
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
@@ -95,6 +101,10 @@ export function DashboardPeriodSelect({
     if (open) items.current[selectedIndex]?.focus();
   }, [open, selectedIndex]);
 
+  useEffect(() => {
+    if (open) setShowCustom(value === "custom");
+  }, [open, value]);
+
   const navigate = (next: DashboardPeriodKey, customRange?: { from: string; to: string }) => {
     const q = new URLSearchParams(params.toString());
     if (next === DEFAULT_DASHBOARD_PERIOD) {
@@ -118,9 +128,12 @@ export function DashboardPeriodSelect({
   const choose = (next: DashboardPeriodKey) => {
     if (next === "custom") {
       // Stays open: the date inputs need the user's next action, unlike
-      // every other option which is a complete choice on its own.
+      // every other option which is a complete choice on its own. Reveals
+      // the From/To sub-form, which stays hidden for every other preset.
+      setShowCustom(true);
       return;
     }
+    setShowCustom(false);
     setOpen(false);
     trigger.current?.focus();
     navigate(next);
@@ -181,11 +194,24 @@ export function DashboardPeriodSelect({
           role="menu"
           aria-label={label}
           data-testid="dashboard-period-menu"
-          className={cn(menuSurfaceClass, "absolute start-0 top-full mt-1 z-popover min-w-full w-max")}
+          /* `end-0`, not `start-0`: the trigger sits at the FAR end of the
+             dashboard's header row (a `justify-between` row with the period
+             control last), so anchoring the panel's leading/`start` edge to
+             the trigger let a `w-max` panel grow straight past the viewport's
+             trailing edge in LTR. Anchoring the panel's OWN trailing edge to
+             the trigger instead makes it grow back inward — toward the
+             viewport, not away from it — in both LTR and RTL, since `end`
+             flips with direction the same way `start` does. The width cap
+             keeps the custom-range sub-form (two date fields) from doing the
+             same thing sideways on a narrow phone viewport. */
+          className={cn(
+            menuSurfaceClass,
+            "absolute end-0 top-full mt-1 z-popover min-w-full w-max max-w-[min(20rem,calc(100vw-2rem))]",
+          )}
         >
           <ul className="flex flex-col py-0.5">
             {options.map((o, i) => {
-              const selected = o.value === value;
+              const selected = o.value === value || (o.value === "custom" && showCustom);
               return (
                 <li key={o.value}>
                   <button
@@ -210,46 +236,51 @@ export function DashboardPeriodSelect({
             })}
           </ul>
 
-          {/* The custom-range sub-form. Always rendered once "custom" exists in
-              the option list so it can gain focus predictably; visually
-              appears only once a user is actually choosing dates. */}
-          <div className="border-t px-2.5 py-2">
-            <div className="flex items-center gap-1.5">
-              <label className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[0.6875rem] text-fg-muted">{fromLabel}</span>
-                <input
-                  type="date"
-                  value={customFrom}
-                  onChange={(e) => setCustomFrom(e.target.value)}
-                  data-testid="dashboard-period-custom-from"
-                  className="w-full rounded-sm border bg-surface px-2 py-1 text-label text-fg"
-                />
-              </label>
-              <label className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[0.6875rem] text-fg-muted">{toLabel}</span>
-                <input
-                  type="date"
-                  value={customTo}
-                  onChange={(e) => setCustomTo(e.target.value)}
-                  data-testid="dashboard-period-custom-to"
-                  className="w-full rounded-sm border bg-surface px-2 py-1 text-label text-fg"
-                />
-              </label>
+          {/* The custom-range sub-form. Hidden for every preset except
+              "Custom period" — a committed rolling/calendar preset has no use
+              for From/To fields, and showing them anyway was the bug. */}
+          {showCustom ? (
+            <div className="border-t px-2.5 py-2">
+              {/* Stacked below `tablet`, so two native date inputs never have to
+                  fight a ~256px popover for width on a phone — side by side only
+                  once there is room for both to stay comfortably usable. */}
+              <div className="flex flex-col gap-1.5 tablet:flex-row tablet:items-center">
+                <label className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-[0.6875rem] text-fg-muted">{fromLabel}</span>
+                  <input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    data-testid="dashboard-period-custom-from"
+                    className="w-full rounded-sm border bg-surface px-2 py-1 text-label text-fg"
+                  />
+                </label>
+                <label className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-[0.6875rem] text-fg-muted">{toLabel}</span>
+                  <input
+                    type="date"
+                    value={customTo}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    data-testid="dashboard-period-custom-to"
+                    className="w-full rounded-sm border bg-surface px-2 py-1 text-label text-fg"
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                onClick={applyCustom}
+                disabled={!isValidCustomRange(customFrom, customTo)}
+                data-testid="dashboard-period-custom-apply"
+                className={cn(
+                  "mt-1.5 w-full rounded-sm bg-accent-solid px-2.5 py-1.5 text-label font-medium text-on-accent",
+                  "transition-colors hover:opacity-90 disabled:pointer-events-none disabled:opacity-50",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
+                )}
+              >
+                {applyLabel}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={applyCustom}
-              disabled={!isValidCustomRange(customFrom, customTo)}
-              data-testid="dashboard-period-custom-apply"
-              className={cn(
-                "mt-1.5 w-full rounded-sm bg-accent-solid px-2.5 py-1.5 text-label font-medium text-on-accent",
-                "transition-colors hover:opacity-90 disabled:pointer-events-none disabled:opacity-50",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-              )}
-            >
-              {applyLabel}
-            </button>
-          </div>
+          ) : null}
         </div>
       ) : null}
     </div>

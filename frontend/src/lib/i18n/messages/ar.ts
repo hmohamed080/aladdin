@@ -1696,6 +1696,7 @@ export const ar: Messages = {
     },
     title: "نظرة على يومك",
     greeting: "أهلًا بعودتك",
+    greetingNamed: "أهلًا بعودتك يا {name}",
     quickActions: "إجراءات سريعة",
     addCustomer: "إضافة عميل",
     addLead: "إضافة فرصة",
@@ -2364,6 +2365,8 @@ export const ar: Messages = {
     timezoneHint: "تُستخدم لحدود الفترة في لوحة تحكم هذا النشاط عند عدم تحديد منطقة زمنية للفرع.",
     branchTimezoneHint: "لها الأولوية على المنطقة الزمنية للنشاط في تقارير هذا الفرع.",
     timezoneUnset: "غير محددة",
+    timezoneDefault: "الافتراضي: {tz}",
+    timezoneInherited: "موروث من المؤسسة: {tz}",
     orgUpdated: "تم تحديث اسم النشاط المعروض.",
     branchUpdated: "تم تحديث الفرع.",
     errors: {

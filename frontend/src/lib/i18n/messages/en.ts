@@ -1771,6 +1771,7 @@ export const en = {
     },
     title: "Your day at a glance",
     greeting: "Welcome back",
+    greetingNamed: "Welcome back, {name}",
     quickActions: "Quick actions",
     addCustomer: "Add customer",
     addLead: "Add lead",
@@ -2462,6 +2463,10 @@ export const en = {
     timezoneHint: "Used for this business's dashboard period boundaries when no branch timezone is set.",
     branchTimezoneHint: "Takes priority over the business timezone for this branch's own reports.",
     timezoneUnset: "Not set",
+    /** No override was saved — this is the platform default, honestly labeled rather than shown as "Not set" while it is, in fact, actively governing this business's reports. */
+    timezoneDefault: "Default: {tz}",
+    /** A branch with no override of its own — the ORGANIZATION's timezone is what actually governs its reports, so that is what is shown, not a bare "Not set". */
+    timezoneInherited: "Inherited from organization: {tz}",
     orgUpdated: "Business display name updated.",
     branchUpdated: "Branch updated.",
     errors: {

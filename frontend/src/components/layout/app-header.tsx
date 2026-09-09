@@ -93,6 +93,7 @@ import type { CommerceStance } from "@/lib/workspace/supply-side";
 export async function AppHeader({
   appName,
   context,
+  mobileContext,
   actions,
   capabilities = [],
   stance = "buyer",
@@ -125,6 +126,14 @@ export async function AppHeader({
   variant?: "bar" | "card";
   /** Workspace/branch switchers, an Admin badge — whatever names the context. */
   context?: ReactNode;
+  /**
+   * An alternate rendering of `context` for the mobile row only — e.g. a
+   * labeled two-line org/branch block instead of the desktop crumb row,
+   * which relies on width it does not have below `tablet`. Falls back to
+   * `context` itself when omitted, which is every shell but the B2B
+   * workspace today.
+   */
+  mobileContext?: ReactNode;
   /** Surface-owned live controls (e.g. the sales realtime indicator). */
   actions?: ReactNode;
   /** Membership capabilities, for the palette's navigation results. */
@@ -378,10 +387,14 @@ export async function AppHeader({
       </div>
 
       {/* The context row on mobile. Kept out of the flow entirely when there is
-          no context to show, so a personal account does not carry an empty bar. */}
+          no context to show, so a personal account does not carry an empty bar.
+          Uses `mobileContext` when the caller supplied one — a mobile row has
+          the FULL width to itself (no search field or icon cluster to share it
+          with), so it can afford a fuller presentation than the desktop crumbs
+          do. */}
       {context ? (
-        <div className="flex min-w-0 items-center gap-sm border-t px-md py-2 tablet:hidden">
-          {context}
+        <div className="flex min-w-0 items-start gap-sm border-t px-md py-2 tablet:hidden">
+          {mobileContext ?? context}
         </div>
       ) : null}
     </header>

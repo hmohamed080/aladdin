@@ -9,6 +9,8 @@ import { loadWorkspaceContext } from "@/server/queries/context";
 import { personalEntry } from "@/lib/workspace/model";
 import { WorkspaceShell } from "@/components/layout/workspace-shell";
 import { NoOrgNotice } from "@/components/layout/no-org-notice";
+import { orgBilingualNames } from "@/server/queries/organization-i18n";
+import { resolveBilingualText } from "@/lib/i18n/bilingual";
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +36,33 @@ export default async function B2BLayout({ children }: { children: ReactNode }) {
 
   if (!workspace.active && personalEntry(workspace.entries)) redirect("/home");
 
+  // The header's org/branch chips need the SAME Arabic/English preference the
+  // rest of the workspace already applies (`resolveBilingualText`) — until
+  // now only the Showroom dashboard's own greeting line read it, which is
+  // exactly why the header fell back to the raw English `name` column in
+  // Arabic. One narrow read here, scoped to the active org/branch only (never
+  // every entry in the workspace switcher's dropdown — see
+  // `orgBilingualNames`'s own doc comment on why this stays a targeted read).
+  let orgDisplayName: string | undefined;
+  let branchDisplayName: string | undefined;
+  if (workspace.active) {
+    const active = workspace.active;
+    const names = await orgBilingualNames(supabase, active.organizationId, active.activeBranchId);
+    orgDisplayName = resolveBilingualText(locale, active.organizationName, names.orgNameAr, names.orgNameEn);
+    const activeBranch =
+      active.branches.find((b) => b.id === active.activeBranchId) ??
+      (active.branches.length === 1 ? active.branches[0] : undefined);
+    if (activeBranch) {
+      branchDisplayName = resolveBilingualText(locale, activeBranch.name, names.branchNameAr, names.branchNameEn);
+    }
+  }
+
   return (
     <I18nProvider locale={locale} dir={dir}>
       {workspace.active ? (
-        <WorkspaceShell workspace={workspace}>{children}</WorkspaceShell>
+        <WorkspaceShell workspace={workspace} orgDisplayName={orgDisplayName} branchDisplayName={branchDisplayName}>
+          {children}
+        </WorkspaceShell>
       ) : (
         <NoOrgNotice theme={theme} />
       )}
