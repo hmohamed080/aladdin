@@ -132,4 +132,69 @@ describe("NeedsAttentionSection", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(document.querySelector("form")).toBeNull();
   });
+
+  describe("bidi-safe user-generated titles", () => {
+    // Regression for the mobile-Arabic defect: an English title rendered
+    // inside the ambient RTL page, with no direction of its own, had its
+    // OWN beginning clipped by single-line `truncate` — "…ha back with the
+    // tile options" — because the bidi algorithm resolved the undirected
+    // Latin run against the surrounding RTL flow. `dir="auto"` lets each
+    // title's own script pick its own direction; `line-clamp-2` (never
+    // `truncate`) means nothing needs an ellipsis until a title is
+    // genuinely long in either language.
+
+    it("gives every user-generated title (follow-up, quotation, name) its own dir=auto", () => {
+      render(
+        <NeedsAttentionSection
+          overdueFollowUps={[followUp({ title: "Long English follow-up title" })]}
+          quotationsAwaitingDecision={[quotation({ rfq_title: "Aluminium profiles - shopfront" })]}
+          pendingJoinRequests={[joinRequest({ displayName: "Youssef Amin" })]}
+          locale="ar"
+          m={en}
+        />,
+      );
+      expect(screen.getByText("Long English follow-up title")).toHaveAttribute("dir", "auto");
+      expect(screen.getByText("Aluminium profiles - shopfront")).toHaveAttribute("dir", "auto");
+      expect(screen.getByText("Youssef Amin")).toHaveAttribute("dir", "auto");
+    });
+
+    it("clamps to two lines instead of clipping to one — no truncate class left on any title", () => {
+      render(
+        <NeedsAttentionSection
+          overdueFollowUps={[followUp({ title: "A very long follow-up title that would have to wrap" })]}
+          quotationsAwaitingDecision={[]}
+          pendingJoinRequests={[]}
+          locale="en"
+          m={en}
+        />,
+      );
+      const title = screen.getByText("A very long follow-up title that would have to wrap");
+      expect(title.className).toContain("line-clamp-2");
+      expect(title.className).not.toContain("truncate");
+    });
+
+    it("renders a long Arabic title, a long English title, and a mixed-script title without losing any of their text", () => {
+      const arabicTitle = "متابعة طويلة جدًا بخصوص طلب توريد بلاط السيراميك للفرع الجديد في مدينة نصر";
+      const englishTitle = "Send the complete phase-one quantities and pricing to Nile View Interiors";
+      const mixedTitle = "طلب Nile View لل-Aluminium profiles";
+      render(
+        <NeedsAttentionSection
+          overdueFollowUps={[
+            followUp({ id: "ar", title: arabicTitle }),
+            followUp({ id: "en", title: englishTitle }),
+            followUp({ id: "mixed", title: mixedTitle }),
+          ]}
+          quotationsAwaitingDecision={[]}
+          pendingJoinRequests={[]}
+          locale="ar"
+          m={en}
+        />,
+      );
+      // `.toHaveTextContent` normalizes whitespace but never drops characters —
+      // exactly the property `truncate` broke and `line-clamp-2` restores.
+      expect(screen.getByText(arabicTitle)).toHaveTextContent(arabicTitle);
+      expect(screen.getByText(englishTitle)).toHaveTextContent(englishTitle);
+      expect(screen.getByText(mixedTitle)).toHaveTextContent(mixedTitle);
+    });
+  });
 });

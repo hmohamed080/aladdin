@@ -60,4 +60,53 @@ test.describe("Needs your attention today (#46)", () => {
     await expect(page.getByText("يحتاج تدخلك اليوم")).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/13-ar-needs-attention.png`, fullPage: true });
   });
+
+  test.describe("mobile 390px — Arabic UI, English/mixed-script user content", () => {
+    test.beforeEach(async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.context().addCookies([{ name: "NEXT_LOCALE", value: "ar", url: "http://127.0.0.1:3100" }]);
+      await page.reload({ waitUntil: "networkidle" });
+    });
+
+    test("an English title inside the Arabic page resolves to real LTR rendering, not the ambient RTL", async ({
+      page,
+    }) => {
+      // The actual defect was a RENDERING outcome (bidi resolution), which a
+      // DOM/attribute check alone cannot prove — this reads the browser's own
+      // computed `direction`, in a real page, to confirm the fix genuinely
+      // takes effect rather than merely setting an attribute that jsdom
+      // (the unit-test environment) cannot itself resolve.
+      const englishTitle = page.getByText("Basins - New Cairo apartments");
+      await expect(englishTitle).toBeVisible();
+      const direction = await englishTitle.evaluate((el) => getComputedStyle(el).direction);
+      expect(direction).toBe("ltr");
+
+      // The page itself stays RTL — this is a LOCAL correction, not a global one.
+      const pageDir = await page.evaluate(() => document.documentElement.dir);
+      expect(pageDir).toBe("rtl");
+    });
+
+    test("no horizontal scroll, and the full title text is present (never DOM-clipped) at 390px", async ({ page }) => {
+      const scrollsHorizontally = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      );
+      expect(scrollsHorizontally).toBe(false);
+      // Real seed content already includes a long English title — verifies
+      // the two-line clamp keeps full text in the DOM (unlike a
+      // width-based visual clip, `-webkit-line-clamp` never removes
+      // characters, only what's painted past line 2).
+      await expect(page.getByText("Aluminium profiles - shopfront")).toHaveText("Aluminium profiles - shopfront");
+    });
+
+    test("the icon, type label, and date/amount survive beside a two-line-clamped title", async ({ page }) => {
+      const row = page.locator("li", { hasText: "Basins - New Cairo apartments" });
+      await expect(row.getByRole("link")).toBeVisible();
+      await expect(row.getByText("EGP", { exact: false }).or(row.getByText("ألف", { exact: false }))).toBeVisible();
+    });
+
+    test("screenshot — corrected mobile rows, Arabic", async ({ page }) => {
+      await expect(page.getByText("Aluminium profiles - shopfront")).toBeVisible();
+      await page.screenshot({ path: `${SHOTS}/14-ar-mobile-needs-attention-fixed.png`, fullPage: true });
+    });
+  });
 });

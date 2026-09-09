@@ -69,7 +69,23 @@ export function NeedsAttentionSection({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-label text-fg-muted">{t.overdueFollowUp}</span>
-                  <span className="block truncate text-body font-medium text-fg">{f.title}</span>
+                  {/* `dir="auto"` — this title is the CUSTOMER'S own free text, not
+                      app copy, and it sits inside an ambient RTL page in Arabic. Without
+                      an explicit direction, the browser's bidi algorithm lays an
+                      undirected Latin run out inside the surrounding RTL flow and clips
+                      `truncate`'s single-line overflow from the wrong (logical-start)
+                      edge — an English title reads "…ha back with the tile options"
+                      with its OWN beginning gone, never its end. `dir="auto"` picks the
+                      run's real direction from its first strong character (Arabic stays
+                      RTL, Latin renders properly LTR) independent of the page's own
+                      direction. `line-clamp-2` (not `truncate`) is the second half of
+                      the fix: a real title can run long in either script, and wrapping
+                      it onto a second line loses nothing a single clipped line already
+                      lost — it only stops needing an ellipsis at all until genuinely
+                      long. */}
+                  <span dir="auto" className="block line-clamp-2 break-words text-body font-medium text-fg">
+                    {f.title}
+                  </span>
                 </span>
                 {f.due_at ? (
                   <span className="shrink-0 text-label text-fg-muted">{formatDateShort(f.due_at, locale)}</span>
@@ -92,7 +108,10 @@ export function NeedsAttentionSection({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-label text-fg-muted">{t.quotationAwaitingDecision}</span>
-                  <span className="block truncate text-body font-medium text-fg">
+                  {/* Same `dir="auto"` + `line-clamp-2` fix as the follow-up title
+                      above — an RFQ title is equally free text, equally likely to be
+                      English inside the Arabic UI. */}
+                  <span dir="auto" className="block line-clamp-2 break-words text-body font-medium text-fg">
                     {q.rfq_title ?? q.supplier_name ?? q.id}
                   </span>
                 </span>
@@ -117,7 +136,11 @@ export function NeedsAttentionSection({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-label text-fg-muted">{t.pendingJoinRequest}</span>
-                  <span className="block truncate text-body font-medium text-fg">{r.displayName}</span>
+                  {/* Same fix — a person's real name is exactly the same kind of
+                      free text an English or mixed-script title is. */}
+                  <span dir="auto" className="block line-clamp-2 break-words text-body font-medium text-fg">
+                    {r.displayName}
+                  </span>
                 </span>
               </Link>
             </li>
