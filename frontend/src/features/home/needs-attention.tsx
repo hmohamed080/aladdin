@@ -126,13 +126,17 @@ export function NeedsAttentionSection({
 
   return (
     <section className="flex flex-col gap-md" aria-labelledby="needs-attention-heading">
-      {/* `gap-xs` (4px), not the old `gap-0.5` (2px) — the heading and its
-          description were reading as one merged line. */}
-      <div className="flex flex-col gap-xs">
+      {/* `gap-sm` (8px): the earlier `gap-xs` (4px) closed most of the gap
+          but visual review still read the heading and description as
+          crowded. `leading-normal` on the description (`text-label`'s own
+          baked-in line-height is a tight 1.2) is the other half of that —
+          a merged-looking pair is as often a too-tight LINE-HEIGHT on the
+          second line as it is too little space between the two. */}
+      <div className="flex flex-col gap-sm">
         <h2 id="needs-attention-heading" className="text-title text-fg">
           {t.title}
         </h2>
-        <p className="text-label text-fg-muted">{t.subtitle}</p>
+        <p className="text-label leading-normal text-fg-muted">{t.subtitle}</p>
       </div>
 
       {cards.length === 0 ? (
@@ -171,10 +175,16 @@ export function NeedsAttentionSection({
                     <card.Icon size={18} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-body-lg font-semibold text-fg">{title}</span>
-                    {/* `mt-xs` (4px), not the old `mt-0.5` (2px) — title and
-                        subtitle were reading as one crowded line. */}
-                    <span className="mt-xs block text-label text-fg-secondary">{body}</span>
+                    <span className="block text-body-lg font-semibold leading-snug text-fg">{title}</span>
+                    {/* `mt-sm` (8px), not the earlier `mt-xs` (4px) — a real
+                        stack gap, not a margin doing the work line-height
+                        should. `leading-normal` on the subtitle (`text-label`
+                        bakes in a tight 1.2) is the other half: at 1.2 the
+                        subtitle read cramped even with the wider gap above
+                        it, and a wrapping title's own `leading-snug` (1.375)
+                        keeps ITS two lines from colliding without pushing
+                        the card taller than it needs to be. */}
+                    <span className="mt-sm block text-label leading-normal text-fg-secondary">{body}</span>
                   </span>
                 </Link>
               </li>

@@ -59,4 +59,17 @@ describe("StatTiles — single-surface card (no nested/double surface)", () => {
     expect(label.className).not.toContain("truncate");
     expect(label.className).toContain("break-words");
   });
+
+  it("gives a wrapping label real inter-line breathing room, not the tighter default", () => {
+    // Regression for two wrapped Arabic lines (e.g. "طلبات قيد التنفيذ")
+    // reading as visually merged at `leading-snug` (1.375) — `leading-normal`
+    // (1.5) and a `min-h-10` reservation (up from `min-h-9`) replace it so a
+    // wrapped label has real room without breaking the shared-row equal-height
+    // reservation the tile above `it` documents.
+    render(<StatTiles locale="en" tiles={TILES} layout="grid" columns={6} />);
+    const label = screen.getByText(TILES[0]!.label);
+    expect(label.className).toContain("leading-normal");
+    expect(label.className).not.toContain("leading-snug");
+    expect(label.className).toContain("min-h-10");
+  });
 });

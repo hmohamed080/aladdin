@@ -86,16 +86,24 @@ function TileBody({ tile, locale }: { tile: Tile; locale: Locale }) {
         <span className="block min-h-[3.125rem] break-words font-display text-title leading-tight text-fg tabular-nums">
           {typeof tile.value === "number" ? formatNumber(tile.value, locale) : tile.value}
         </span>
-        {/* `min-h-9` reserves the full two-line height (13px label ×
-            leading-snug's 1.375 ≈ 36px) whether THIS label actually wraps or
-            not. Without it, a tile whose label happens to fit on one line is
-            shorter than a sibling whose label wraps — invisible while every
-            tile shares one CSS Grid row (the row auto-stretches everything
-            to the tallest member), but the collapsed/expanded KPI sections
-            are two SEPARATE grid instances (only the second one collapses),
-            so nothing stretches the two secondary cards to match the six
-            primary ones unless each card already reserves the same space. */}
-        <span className="mt-1 block min-h-9 break-words text-label leading-snug text-fg-secondary">{tile.label}</span>
+        {/* `min-h-10` reserves the full two-line height (13px label ×
+            leading-normal's 1.5 ≈ 39px, rounded up to Tailwind's 40px step)
+            whether THIS label actually wraps or not. Without it, a tile
+            whose label happens to fit on one line is shorter than a sibling
+            whose label wraps — invisible while every tile shares one CSS
+            Grid row (the row auto-stretches everything to the tallest
+            member), but the collapsed/expanded KPI sections are two
+            SEPARATE grid instances (only the second one collapses), so
+            nothing stretches the two secondary cards to match the six
+            primary ones unless each card already reserves the same space.
+            `leading-normal` (not the tighter `leading-snug` this used to
+            carry) is deliberate: at `leading-snug` a two-line Arabic label
+            ("طلبات قيد التنفيذ") read as its two lines running into each
+            other — Arabic script needs more inter-line room than Latin at
+            the same nominal ratio. */}
+        <span className="mt-1 block min-h-10 break-words text-label leading-normal text-fg-secondary">
+          {tile.label}
+        </span>
         {/* Rendered unconditionally, not only `{tile.hint ? ... : null}` —
             reserving this line's height (`min-h-5`) regardless of whether
             THIS tile has a hint is what keeps every card the same height.

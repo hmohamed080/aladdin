@@ -205,4 +205,28 @@ describe("NeedsAttentionSection", () => {
       expect(screen.getByText(/١٢ متابعة تجاوزت مواعيدها/)).toBeInTheDocument();
     });
   });
+
+  describe("typography — real line-height and stack gaps, not a tight default plus a small margin", () => {
+    it("the section heading and its description use a real gap and a readable description line-height", () => {
+      render(<NeedsAttentionSection {...baseProps()} />);
+      const heading = screen.getByText(en.home.needsAttention.title);
+      const description = screen.getByText(en.home.needsAttention.subtitle);
+      // `gap-sm` on the shared flex-col wrapper — not a margin on either child.
+      expect(heading.parentElement?.className).toContain("gap-sm");
+      // `text-label` alone bakes in a tight 1.2 line-height; the fix adds an
+      // explicit `leading-normal` (1.5) so the description isn't crowded.
+      expect(description.className).toContain("leading-normal");
+    });
+
+    it("a summary card's title and subtitle each carry a real line-height and a real stack gap", () => {
+      render(<NeedsAttentionSection {...baseProps()} overdueFollowUpsCount={1} />);
+      const title = screen.getByText("1 overdue follow-up");
+      const subtitle = screen.getByText(en.home.needsAttention.overdueFollowUpsBody);
+      expect(title.className).toContain("leading-snug");
+      // `mt-sm` (8px), not the tighter `mt-xs` (4px) — a real gap, not a
+      // margin standing in for the subtitle's own line-height.
+      expect(subtitle.className).toContain("mt-sm");
+      expect(subtitle.className).toContain("leading-normal");
+    });
+  });
 });
