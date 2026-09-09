@@ -2,199 +2,129 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NeedsAttentionSection } from "./needs-attention";
 import { en } from "@/lib/i18n/messages/en";
-import type { FollowUpRow } from "@/server/queries/sales";
-import type { QuotationListRow } from "@/server/queries/commerce";
-import type { JoinRequestRow } from "@/server/queries/affiliation";
+import { ar } from "@/lib/i18n/messages/ar";
 
-function followUp(overrides: Partial<FollowUpRow> = {}): FollowUpRow {
+/**
+ * `NeedsAttentionSection` is now a category-level SUMMARY (three counts, up
+ * to three cards) rather than a record-level list — see the component's own
+ * doc comment for why the props are plain numbers, never arrays of records.
+ * No `dir="auto"`/`line-clamp` coverage here anymore: this component no
+ * longer renders any user-generated text (a title, a name) at all, so the
+ * bidi fix from the previous pass has nothing left to protect INSIDE this
+ * component — it stays relevant wherever such content is still shown
+ * (verified separately, unaffected by this change).
+ */
+function baseProps() {
   return {
-    id: "f1",
-    organization_id: "org-a",
-    branch_id: null,
-    assigned_membership_id: "m1",
-    customer_id: null,
-    lead_id: null,
-    title: "Call Amina about the tile order",
-    description: null,
-    due_at: "2026-09-10T10:00:00Z",
-    status: "open",
-    priority: "normal",
-    created_by: "m1",
-    created_at: "2026-09-01T00:00:00Z",
-    updated_at: "2026-09-01T00:00:00Z",
-    version: 1,
-    ...overrides,
-  } as FollowUpRow;
-}
-
-function quotation(overrides: Partial<QuotationListRow> = {}): QuotationListRow {
-  return {
-    id: "q1",
-    rfq_id: "rfq1",
-    rfq_title: "Porcelain flooring — reception",
-    requester_org_id: "org-a",
-    supplier_org_id: "org-b",
-    supplier_name: "Egypt Marble Manufacturing",
-    requester_name: "Cairo Ceramics Showroom",
-    status: "submitted",
-    total: 54000,
-    subtotal: 54000,
-    item_count: 3,
-    version: 1,
-    created_at: "2026-09-01T00:00:00Z",
-    updated_at: "2026-09-01T00:00:00Z",
-    submitted_at: "2026-09-01T00:00:00Z",
-    decided_at: null,
-    validity_date: null,
-    ...overrides,
-  } as QuotationListRow;
-}
-
-function joinRequest(overrides: Partial<JoinRequestRow> = {}): JoinRequestRow {
-  return {
-    requestId: "jr1",
-    userId: "u1",
-    displayName: "Karim Adel",
-    emailMasked: "k***@example.test",
-    persona: "sales",
-    note: null,
-    branchId: null,
-    branchName: null,
-    status: "pending",
-    reason: null,
-    createdAt: "2026-09-01T00:00:00Z",
-    ...overrides,
+    overdueFollowUpsCount: 0,
+    quotationsAwaitingDecisionCount: 0,
+    pendingJoinRequestsCount: 0,
+    canSeeOverdueFollowUps: true,
+    canSeeQuotations: true,
+    canSeeJoinRequests: true,
+    locale: "en" as const,
+    m: en,
   };
 }
 
 describe("NeedsAttentionSection", () => {
-  it("shows the caught-up empty state when all three lists are empty", () => {
-    render(
-      <NeedsAttentionSection
-        overdueFollowUps={[]}
-        quotationsAwaitingDecision={[]}
-        pendingJoinRequests={[]}
-        locale="en"
-        m={en}
-      />,
-    );
+  it("shows the shared empty state when every authorized category is zero", () => {
+    render(<NeedsAttentionSection {...baseProps()} />);
     expect(screen.getByText(en.home.needsAttention.emptyTitle)).toBeInTheDocument();
     expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
   });
 
-  it("deep-links each item type to its own record's page", () => {
+  it("renders all three cards with real counts and action-oriented titles when every category is authorized and non-zero", () => {
     render(
       <NeedsAttentionSection
-        overdueFollowUps={[followUp({ id: "f-42" })]}
-        quotationsAwaitingDecision={[quotation({ id: "q-42" })]}
-        pendingJoinRequests={[joinRequest({ requestId: "jr-42" })]}
-        locale="en"
-        m={en}
+        {...baseProps()}
+        overdueFollowUpsCount={5}
+        quotationsAwaitingDecisionCount={3}
+        pendingJoinRequestsCount={1}
       />,
     );
-    expect(screen.getByRole("link", { name: /Call Amina about the tile order/ })).toHaveAttribute(
-      "href",
-      "/b2b/follow-ups/f-42/edit",
-    );
-    expect(screen.getByRole("link", { name: /Porcelain flooring/ })).toHaveAttribute("href", "/b2b/quotations/q-42");
-    expect(screen.getByRole("link", { name: /Karim Adel/ })).toHaveAttribute("href", "/b2b/organization");
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    expect(screen.getByText("5 overdue follow-ups")).toBeInTheDocument();
+    expect(screen.getByText("3 quotations awaiting review")).toBeInTheDocument();
+    expect(screen.getByText("1 pending join requests")).toBeInTheDocument();
+    // The body/explanatory line survives beside the title.
+    expect(screen.getByText(en.home.needsAttention.overdueFollowUpsBody)).toBeInTheDocument();
   });
 
-  it("renders only the records it was given — never data it wasn't handed", () => {
-    // The component itself fetches nothing; this is the presentational-layer
-    // proof that pairs with the query layer's own organization_id scoping
-    // (recentQuotations/listJoinRequests/overdueFollowUps) — data from a
-    // different org can only ever appear here if it was passed in, and nothing
-    // this component does can substitute or merge in a second source.
+  it("never shows a category the caller is unauthorized for, even with a nonzero count — omission, not a zero", () => {
     render(
       <NeedsAttentionSection
-        overdueFollowUps={[followUp({ id: "org-a-followup", title: "Org A's own follow-up" })]}
-        quotationsAwaitingDecision={[]}
-        pendingJoinRequests={[]}
-        locale="en"
-        m={en}
+        {...baseProps()}
+        pendingJoinRequestsCount={4}
+        canSeeJoinRequests={false}
+        overdueFollowUpsCount={2}
       />,
     );
+    expect(screen.queryByText(/join request/i)).not.toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
-    expect(screen.getByText("Org A's own follow-up")).toBeInTheDocument();
   });
 
-  it("never renders a mutation control — every item is a plain deep-link, not a form", () => {
+  it("an authorized category with a zero count is omitted, not shown as a hollow card", () => {
+    render(<NeedsAttentionSection {...baseProps()} overdueFollowUpsCount={2} quotationsAwaitingDecisionCount={0} />);
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.queryByText(/quotation/i)).not.toBeInTheDocument();
+  });
+
+  it("reflows to two cards when exactly two categories are authorized and non-zero", () => {
     render(
       <NeedsAttentionSection
-        overdueFollowUps={[followUp()]}
-        quotationsAwaitingDecision={[quotation()]}
-        pendingJoinRequests={[joinRequest()]}
-        locale="en"
-        m={en}
+        {...baseProps()}
+        overdueFollowUpsCount={2}
+        quotationsAwaitingDecisionCount={3}
+        pendingJoinRequestsCount={0}
+      />,
+    );
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("reflows to a single card when only one category is authorized and non-zero", () => {
+    render(<NeedsAttentionSection {...baseProps()} quotationsAwaitingDecisionCount={7} />);
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(1);
+    expect(screen.getByText("7 quotations awaiting review")).toBeInTheDocument();
+  });
+
+  it("deep-links each category to its own real, supported destination", () => {
+    render(
+      <NeedsAttentionSection
+        {...baseProps()}
+        overdueFollowUpsCount={1}
+        quotationsAwaitingDecisionCount={1}
+        pendingJoinRequestsCount={1}
+      />,
+    );
+    expect(screen.getByRole("link", { name: /overdue follow-ups/ })).toHaveAttribute("href", "/b2b/follow-ups");
+    expect(screen.getByRole("link", { name: /quotations awaiting review/ })).toHaveAttribute(
+      "href",
+      "/b2b/quotations?view=received",
+    );
+    expect(screen.getByRole("link", { name: /pending join requests/ })).toHaveAttribute("href", "/b2b/organization");
+  });
+
+  it("never renders a mutation control — every card is a plain deep-link, not a form", () => {
+    render(
+      <NeedsAttentionSection
+        {...baseProps()}
+        overdueFollowUpsCount={1}
+        quotationsAwaitingDecisionCount={1}
+        pendingJoinRequestsCount={1}
       />,
     );
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(document.querySelector("form")).toBeNull();
   });
 
-  describe("bidi-safe user-generated titles", () => {
-    // Regression for the mobile-Arabic defect: an English title rendered
-    // inside the ambient RTL page, with no direction of its own, had its
-    // OWN beginning clipped by single-line `truncate` — "…ha back with the
-    // tile options" — because the bidi algorithm resolved the undirected
-    // Latin run against the surrounding RTL flow. `dir="auto"` lets each
-    // title's own script pick its own direction; `line-clamp-2` (never
-    // `truncate`) means nothing needs an ellipsis until a title is
-    // genuinely long in either language.
-
-    it("gives every user-generated title (follow-up, quotation, name) its own dir=auto", () => {
-      render(
-        <NeedsAttentionSection
-          overdueFollowUps={[followUp({ title: "Long English follow-up title" })]}
-          quotationsAwaitingDecision={[quotation({ rfq_title: "Aluminium profiles - shopfront" })]}
-          pendingJoinRequests={[joinRequest({ displayName: "Youssef Amin" })]}
-          locale="ar"
-          m={en}
-        />,
-      );
-      expect(screen.getByText("Long English follow-up title")).toHaveAttribute("dir", "auto");
-      expect(screen.getByText("Aluminium profiles - shopfront")).toHaveAttribute("dir", "auto");
-      expect(screen.getByText("Youssef Amin")).toHaveAttribute("dir", "auto");
-    });
-
-    it("clamps to two lines instead of clipping to one — no truncate class left on any title", () => {
-      render(
-        <NeedsAttentionSection
-          overdueFollowUps={[followUp({ title: "A very long follow-up title that would have to wrap" })]}
-          quotationsAwaitingDecision={[]}
-          pendingJoinRequests={[]}
-          locale="en"
-          m={en}
-        />,
-      );
-      const title = screen.getByText("A very long follow-up title that would have to wrap");
-      expect(title.className).toContain("line-clamp-2");
-      expect(title.className).not.toContain("truncate");
-    });
-
-    it("renders a long Arabic title, a long English title, and a mixed-script title without losing any of their text", () => {
-      const arabicTitle = "متابعة طويلة جدًا بخصوص طلب توريد بلاط السيراميك للفرع الجديد في مدينة نصر";
-      const englishTitle = "Send the complete phase-one quantities and pricing to Nile View Interiors";
-      const mixedTitle = "طلب Nile View لل-Aluminium profiles";
-      render(
-        <NeedsAttentionSection
-          overdueFollowUps={[
-            followUp({ id: "ar", title: arabicTitle }),
-            followUp({ id: "en", title: englishTitle }),
-            followUp({ id: "mixed", title: mixedTitle }),
-          ]}
-          quotationsAwaitingDecision={[]}
-          pendingJoinRequests={[]}
-          locale="ar"
-          m={en}
-        />,
-      );
-      // `.toHaveTextContent` normalizes whitespace but never drops characters —
-      // exactly the property `truncate` broke and `line-clamp-2` restores.
-      expect(screen.getByText(arabicTitle)).toHaveTextContent(arabicTitle);
-      expect(screen.getByText(englishTitle)).toHaveTextContent(englishTitle);
-      expect(screen.getByText(mixedTitle)).toHaveTextContent(mixedTitle);
-    });
+  it("renders the real Arabic catalog with the count formatted for that locale", () => {
+    render(<NeedsAttentionSection {...baseProps()} locale="ar" m={ar} overdueFollowUpsCount={5} />);
+    // formatCount renders Arabic-Indic digits for locale="ar" — proves the
+    // count is genuinely locale-aware, not hardcoded to Latin digits — and
+    // the surrounding label comes from the real ar.ts catalog, not en.ts.
+    expect(screen.getByText(/٥ متابعات تجاوزت موعدها/)).toBeInTheDocument();
   });
 });

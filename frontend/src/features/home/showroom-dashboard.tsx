@@ -26,7 +26,7 @@ import { formatCompactMoney } from "@/lib/ui/format";
 import { availableKpiCards, type DashboardKpiCardKey } from "@/lib/workspace/dashboard-kpi-catalog";
 import { loadEffectiveKpiLayout } from "@/server/queries/dashboard-kpi-layout";
 import { KpiCustomizeDialog } from "@/features/home/kpi-customize-dialog";
-import { recentQuotations } from "@/server/queries/commerce";
+import { countQuotations } from "@/server/queries/commerce";
 import { listJoinRequests } from "@/server/queries/affiliation";
 import { NeedsAttentionSection } from "@/features/home/needs-attention";
 
@@ -115,7 +115,7 @@ export async function ShowroomDashboard({
   // is one fewer denied round trip, not a second authorization layer.
   const canManageMembers = has("org.members.manage");
 
-  const [currentState, periodScoped, saved, projects, overdue, dueToday, kpiLayout, quotationsAwaitingDecision, joinRequests] =
+  const [currentState, periodScoped, saved, projects, overdue, dueToday, kpiLayout, quotationsAwaitingDecisionCount, joinRequests] =
     await Promise.all([
       buys ? purchaseSummary(supabase, org.organizationId, {}) : Promise.resolve(NO_PURCHASE),
       buys
@@ -126,14 +126,20 @@ export async function ShowroomDashboard({
       sells ? overdueFollowUps(supabase, org.organizationId, branchId) : Promise.resolve([]),
       sells ? followUpsDueToday(supabase, org.organizationId, branchId) : Promise.resolve([]),
       loadEffectiveKpiLayout(supabase, org.organizationId, org.membershipId),
-      // Restrained: the 5 most recently updated, capped — a prioritized list,
-      // never a second full quotations inbox.
+      // "يحتاج تدخلك اليوم" only ever needs a COUNT for its summary card — a
+      // head-only query (`countQuotations`, `{count: exact, head: true}`)
+      // never transfers a title, a supplier name, or a total, unlike the
+      // record-level `recentQuotations` an earlier version of this section used.
       buys
-        ? recentQuotations(supabase, org.organizationId, "requester", { statuses: ["submitted"], limit: 5 })
-        : Promise.resolve({ rows: [], total: 0 }),
+        ? countQuotations(supabase, org.organizationId, "requester", ["submitted"])
+        : Promise.resolve(0),
+      // No count-only RPC exists yet for join requests (org_join_requests_list
+      // is the only read path, capability-gated), so this still resolves full
+      // rows — only their count is used below. Adding a dedicated count RPC is
+      // real, separate schema work, out of scope for this section's own fix.
       canManageMembers ? listJoinRequests(supabase, org.organizationId) : Promise.resolve([]),
     ]);
-  const pendingJoinRequests = joinRequests.filter((r) => r.status === "pending").slice(0, 5);
+  const pendingJoinRequestsCount = joinRequests.filter((r) => r.status === "pending").length;
 
   const savedCount = Object.values(saved).reduce((a, b) => a + b, 0);
   const runningProjects = (projects.executing.active ?? 0) + (projects.incoming.active ?? 0);
@@ -284,9 +290,12 @@ export async function ShowroomDashboard({
       </div>
 
       <NeedsAttentionSection
-        overdueFollowUps={overdue}
-        quotationsAwaitingDecision={quotationsAwaitingDecision.rows}
-        pendingJoinRequests={pendingJoinRequests}
+        overdueFollowUpsCount={overdue.length}
+        quotationsAwaitingDecisionCount={quotationsAwaitingDecisionCount}
+        pendingJoinRequestsCount={pendingJoinRequestsCount}
+        canSeeOverdueFollowUps={sells}
+        canSeeQuotations={buys}
+        canSeeJoinRequests={canManageMembers}
         locale={locale}
         m={m}
       />

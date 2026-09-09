@@ -1,112 +1,145 @@
 import { test, expect } from "@playwright/test";
+import { execSync } from "node:child_process";
 import { IDENTITIES, signIn } from "./helpers/auth";
 
 const SHOTS = "e2e/screenshots";
+const ORG_C = "9c000000-cccc-4ccc-8ccc-000000000001";
 
 /**
- * يحتاج تدخلك اليوم (#46) — real, authorized overdue-follow-up and
- * quotation-awaiting-decision rows, each deep-linking to the page that can
- * actually act on it. This section never mutates anything itself, so the
- * proof here is navigational: clicking a row must land on that exact
- * record's real edit/detail page, not just carry the right `href` in markup.
+ * يحتاج تدخلك اليوم (#46) — a category-level SUMMARY (up to three compact
+ * cards: overdue follow-ups, quotations awaiting decision, pending join
+ * requests), each deep-linking to a real, existing page/filter. Never a
+ * record-level list — the redesign this spec covers replaced that with
+ * exactly this.
  */
-test.describe("Needs your attention today (#46)", () => {
+function sql(statement: string) {
+  execSync(`docker exec -u postgres supabase_db_aladdin psql -d postgres -c "${statement}"`);
+}
+
+/**
+ * Temporarily clears every category to zero for the empty-state screenshot —
+ * a local, throwaway dev-database fixture, not a change to any RLS/RPC path
+ * the app itself uses. Restored by the session's own final `supabase db
+ * reset` (run once, after all local verification is done), not per-test:
+ * this local Postgres container's data is disposable dev-seed data, not a
+ * shared or hosted resource.
+ */
+function clearAllCategoriesToZero() {
+  sql(
+    `update public.follow_up_tasks set status = 'completed', completed_at = now() where organization_id = '${ORG_C}' and status = 'open';`,
+  );
+  sql(`update public.quotations set status = 'accepted' where requester_org_id = '${ORG_C}' and status = 'submitted';`);
+}
+
+test.describe("Needs your attention today (#46) — category summary", () => {
   test.beforeEach(async ({ page, context }) => {
     await context.addCookies([{ name: "NEXT_LOCALE", value: "en", url: "http://127.0.0.1:3100" }]);
     await signIn(page, page.context().request, IDENTITIES.showroom);
   });
 
-  test("renders real overdue follow-ups and quotations, each deep-linking to its own record", async ({ page }) => {
-    const section = page.locator("section", { has: page.getByRole("heading", { name: /needs your attention/i }) });
-    await expect(section).toBeVisible();
+  // Locale-agnostic: the AR heading text ("يحتاج تدخلك اليوم") does not match
+  // an English name regex, so this locates the section by its stable
+  // `aria-labelledby` wiring instead of by searching for English copy.
+  const section = (page: import("@playwright/test").Page) =>
+    page.locator('section[aria-labelledby="needs-attention-heading"]');
 
-    const followUpLink = section.getByRole("link", { name: /Call Rasha back/ });
-    await expect(followUpLink).toBeVisible();
-    const followUpHref = await followUpLink.getAttribute("href");
-    expect(followUpHref).toMatch(/^\/b2b\/follow-ups\/.+\/edit$/);
+  test("renders three compact summary cards with real counts, each deep-linking to a real destination", async ({
+    page,
+  }) => {
+    const sec = section(page);
+    await expect(sec).toBeVisible();
+    // Record-level content must be GONE — the redesign's whole point.
+    await expect(sec.getByText("Call Rasha back with the tile options")).toHaveCount(0);
 
-    const quotationLink = section.getByRole("link", { name: /Basins - New Cairo apartments/ });
-    await expect(quotationLink).toBeVisible();
-    const quotationHref = await quotationLink.getAttribute("href");
-    expect(quotationHref).toMatch(/^\/b2b\/quotations\/.+$/);
+    const overdue = sec.getByRole("link", { name: /overdue follow-ups/i });
+    const quotations = sec.getByRole("link", { name: /quotations awaiting review/i });
+    await expect(overdue).toBeVisible();
+    await expect(quotations).toBeVisible();
+    await expect(overdue).toHaveAttribute("href", "/b2b/follow-ups");
+    await expect(quotations).toHaveAttribute("href", "/b2b/quotations?view=received");
 
-    // Navigating a follow-up row lands on THAT record's real edit page — not
-    // a generic list, not a 404 — proving the deep link is genuine, not just
-    // a plausible-looking href in markup.
-    await followUpLink.click();
-    await expect(page).toHaveURL(followUpHref!);
-    await expect(page.getByLabel(/title/i)).toHaveValue("Call Rasha back with the tile options");
-
-    await page.goBack();
-    await expect(quotationLink).toBeVisible();
-    await quotationLink.click();
-    await expect(page).toHaveURL(quotationHref!);
-    await expect(page.getByRole("heading", { name: /Basins - New Cairo apartments/ })).toBeVisible();
+    // Real navigation, not just a plausible href: each destination is a real,
+    // already-existing page with the closest supported filter — never an
+    // invented query string the page ignores.
+    await quotations.click();
+    await expect(page).toHaveURL(/\/b2b\/quotations\?view=received$/);
+    await expect(page.getByRole("heading", { name: /quotations|offers/i }).first()).toBeVisible();
   });
 
-  test("this org's section never shows another organization's records", async ({ page }) => {
-    // A negative, cheap-but-real proof: Egypt Marble Manufacturing's own
-    // pilot data (seed-pilot.sql) is real and distinct from Cairo Ceramics
-    // Showroom's — if RLS or this component ever leaked across tenants, one
-    // of these strings would appear on Hana's dashboard.
-    const section = page.locator("section", { has: page.getByRole("heading", { name: /needs your attention/i }) });
-    await expect(section).toBeVisible();
-    await expect(section.getByText("Egypt Marble Manufacturing")).toHaveCount(0);
+  test("this org's summary never reveals another organization's records", async ({ page }) => {
+    const sec = section(page);
+    await expect(sec).toBeVisible();
+    await expect(sec.getByText("Egypt Marble Manufacturing")).toHaveCount(0);
   });
 
-  test("screenshot — needs-attention section, Arabic", async ({ page }) => {
+  test("no mutation control anywhere in the section", async ({ page }) => {
+    const sec = section(page);
+    await expect(sec).toBeVisible();
+    await expect(sec.getByRole("button")).toHaveCount(0);
+    expect(await sec.locator("form").count()).toBe(0);
+  });
+
+  test("screenshots — desktop light (EN), light (AR), dark (AR)", async ({ page }) => {
+    await expect(section(page)).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/15-en-needs-attention-summary.png`, fullPage: true });
+
     await page.context().addCookies([{ name: "NEXT_LOCALE", value: "ar", url: "http://127.0.0.1:3100" }]);
     await page.reload({ waitUntil: "networkidle" });
-    await expect(page.getByText("يحتاج تدخلك اليوم")).toBeVisible();
-    await page.screenshot({ path: `${SHOTS}/13-ar-needs-attention.png`, fullPage: true });
+    await expect(section(page)).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/16-ar-needs-attention-summary-light.png`, fullPage: true });
+
+    await page.context().addCookies([{ name: "aladdin-theme", value: "dark", url: "http://127.0.0.1:3100" }]);
+    await page.reload({ waitUntil: "networkidle" });
+    await expect(section(page)).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/17-ar-needs-attention-summary-dark.png`, fullPage: true });
   });
 
-  test.describe("mobile 390px — Arabic UI, English/mixed-script user content", () => {
-    test.beforeEach(async ({ page }) => {
+  test.describe("mobile 390px", () => {
+    test("one compact card per row, no horizontal scroll", async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });
       await page.context().addCookies([{ name: "NEXT_LOCALE", value: "ar", url: "http://127.0.0.1:3100" }]);
       await page.reload({ waitUntil: "networkidle" });
-    });
 
-    test("an English title inside the Arabic page resolves to real LTR rendering, not the ambient RTL", async ({
-      page,
-    }) => {
-      // The actual defect was a RENDERING outcome (bidi resolution), which a
-      // DOM/attribute check alone cannot prove — this reads the browser's own
-      // computed `direction`, in a real page, to confirm the fix genuinely
-      // takes effect rather than merely setting an attribute that jsdom
-      // (the unit-test environment) cannot itself resolve.
-      const englishTitle = page.getByText("Basins - New Cairo apartments");
-      await expect(englishTitle).toBeVisible();
-      const direction = await englishTitle.evaluate((el) => getComputedStyle(el).direction);
-      expect(direction).toBe("ltr");
+      const sec = section(page);
+      await expect(sec).toBeVisible();
+      const cards = sec.getByRole("listitem");
+      const count = await cards.count();
+      expect(count).toBeGreaterThan(0);
 
-      // The page itself stays RTL — this is a LOCAL correction, not a global one.
-      const pageDir = await page.evaluate(() => document.documentElement.dir);
-      expect(pageDir).toBe("rtl");
-    });
+      // Every card spans (approximately) the full available row width at
+      // this breakpoint — "one compact card per row" — rather than several
+      // narrow cards sharing a row.
+      const sectionBox = await sec.boundingBox();
+      for (let i = 0; i < count; i++) {
+        const box = await cards.nth(i).boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.width).toBeGreaterThan(sectionBox!.width * 0.9);
+      }
 
-    test("no horizontal scroll, and the full title text is present (never DOM-clipped) at 390px", async ({ page }) => {
       const scrollsHorizontally = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
       );
       expect(scrollsHorizontally).toBe(false);
-      // Real seed content already includes a long English title — verifies
-      // the two-line clamp keeps full text in the DOM (unlike a
-      // width-based visual clip, `-webkit-line-clamp` never removes
-      // characters, only what's painted past line 2).
-      await expect(page.getByText("Aluminium profiles - shopfront")).toHaveText("Aluminium profiles - shopfront");
+
+      await page.screenshot({ path: `${SHOTS}/18-ar-mobile-needs-attention-summary.png`, fullPage: true });
+    });
+  });
+
+  test.describe("empty state — every category cleared to zero (local fixture)", () => {
+    test.beforeAll(() => {
+      clearAllCategoriesToZero();
     });
 
-    test("the icon, type label, and date/amount survive beside a two-line-clamped title", async ({ page }) => {
-      const row = page.locator("li", { hasText: "Basins - New Cairo apartments" });
-      await expect(row.getByRole("link")).toBeVisible();
-      await expect(row.getByText("EGP", { exact: false }).or(row.getByText("ألف", { exact: false }))).toBeVisible();
+    test("shows one shared compact empty state, not three empty cards", async ({ page }) => {
+      const sec = section(page);
+      await expect(sec).toBeVisible();
+      await expect(page.getByText("You're all caught up")).toBeVisible();
+      await expect(sec.getByRole("listitem")).toHaveCount(0);
     });
 
-    test("screenshot — corrected mobile rows, Arabic", async ({ page }) => {
-      await expect(page.getByText("Aluminium profiles - shopfront")).toBeVisible();
-      await page.screenshot({ path: `${SHOTS}/14-ar-mobile-needs-attention-fixed.png`, fullPage: true });
+    test("screenshot — empty state", async ({ page }) => {
+      await expect(page.getByText("You're all caught up")).toBeVisible();
+      await page.screenshot({ path: `${SHOTS}/19-en-needs-attention-empty.png`, fullPage: true });
     });
   });
 });
