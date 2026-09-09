@@ -62,27 +62,68 @@ test.describe("Hana Showroom dashboard — Foundation completion pass", () => {
   });
 
   test("expanded KPI grid — 6+2, same card size, not a 4x2 reflow — AR expanded", async ({ page }) => {
+    // Deterministic expansion: `ExpandCollapse` already honors
+    // `prefers-reduced-motion` (both its grid-template-rows CSS transition
+    // and its framer-motion opacity fade collapse to instant), so driving
+    // the test through that same seam removes the animation entirely rather
+    // than racing it with a fixed sleep. This is also the actual reason the
+    // FIRST pass of these screenshots showed "Show less" with an empty
+    // second row: the screenshot was taken mid-fade (opacity still ~0),
+    // which Playwright's own `toBeVisible()` does not catch — that check
+    // only looks at display/visibility/size, not opacity.
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await setLocale(page, "ar");
     await page.reload({ waitUntil: "networkidle" });
+
+    const primaryCards = page.locator('[class*="desktop:grid-cols-6"]').first().locator("> *");
+    const primaryBox = await primaryCards.first().boundingBox();
+    expect(primaryBox).not.toBeNull();
 
     const showMore = page.getByRole("button", { name: /عرض المزيد|Show more/ });
     await showMore.click();
     await expect(page.getByRole("button", { name: /عرض أقل|Show less/ })).toBeVisible();
 
-    // E. The two additional cards render in the SAME 6-column grid as the
-    // primary row (desktop:grid-cols-6 on both), never a separate 4-column
-    // grid that would stretch or enlarge them.
+    // E. The two additional cards render in the SAME 6-column grid template
+    // as the primary row (desktop:grid-cols-6 on both), never a separate
+    // 4-column grid that would stretch or enlarge them.
     const grids = page.locator('[class*="desktop:grid-cols-6"]');
     await expect(grids).toHaveCount(2);
+
+    const secondaryCards = grids.last().locator("> *");
+    await expect(secondaryCards).toHaveCount(2);
+
+    for (let i = 0; i < 2; i++) {
+      const card = secondaryCards.nth(i);
+      await expect(card).toBeVisible();
+      // The actual regression: visible-but-zero-opacity mid-animation still
+      // satisfies `toBeVisible()`, so assert real screen presence too.
+      await expect
+        .poll(async () => card.evaluate((n) => getComputedStyle(n).opacity))
+        .toBe("1");
+      const box = await card.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.width).toBeGreaterThan(0);
+      expect(box!.height).toBeGreaterThan(0);
+      // Same size as a primary card — never stretched or enlarged.
+      expect(Math.abs(box!.width - primaryBox!.width)).toBeLessThanOrEqual(1);
+      expect(Math.abs(box!.height - primaryBox!.height)).toBeLessThanOrEqual(1);
+    }
 
     await page.screenshot({ path: `${SHOTS}/02-ar-desktop-light-expanded.png`, fullPage: true });
   });
 
   test("single-surface KPI cards, no nested panel — AR dark expanded", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await setLocale(page, "ar");
     await setTheme(page, "dark");
     await page.reload({ waitUntil: "networkidle" });
     await page.getByRole("button", { name: /عرض المزيد|Show more/ }).click();
+    const secondaryCards = page.locator('[class*="desktop:grid-cols-6"]').last().locator("> *");
+    await expect(secondaryCards).toHaveCount(2);
+    await expect(secondaryCards.first()).toBeVisible();
+    await expect
+      .poll(async () => secondaryCards.first().evaluate((n) => getComputedStyle(n).opacity))
+      .toBe("1");
 
     await page.screenshot({ path: `${SHOTS}/03-ar-desktop-dark-expanded.png`, fullPage: true });
   });

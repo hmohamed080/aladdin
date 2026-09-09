@@ -22,16 +22,9 @@ import { DashboardPeriodSelect } from "@/features/home/dashboard-period-select";
 import { StatTiles, type Tile } from "@/components/ui/stat-tiles";
 import { ExpandCollapse } from "@/components/ui/expand-collapse";
 import { formatCompactMoney } from "@/lib/ui/format";
-import {
-  AlertIcon,
-  ClockIcon,
-  InboxIcon,
-  ShoppingBagIcon,
-  ClipboardIcon,
-  MoneyIcon,
-  BookmarkIcon,
-  LayersIcon,
-} from "@/components/ui/icons";
+import { availableKpiCards, type DashboardKpiCardKey } from "@/lib/workspace/dashboard-kpi-catalog";
+import { loadEffectiveKpiLayout } from "@/server/queries/dashboard-kpi-layout";
+import { KpiCustomizeDialog } from "@/features/home/kpi-customize-dialog";
 
 const NO_PURCHASE: PurchaseSummary = {
   requests: {},
@@ -111,7 +104,7 @@ export async function ShowroomDashboard({
     periodKey === "custom" && rawFrom && rawTo ? { from: rawFrom, to: rawTo } : undefined,
   );
 
-  const [currentState, periodScoped, saved, projects, overdue, dueToday] = await Promise.all([
+  const [currentState, periodScoped, saved, projects, overdue, dueToday, kpiLayout] = await Promise.all([
     buys ? purchaseSummary(supabase, org.organizationId, {}) : Promise.resolve(NO_PURCHASE),
     buys
       ? purchaseSummary(supabase, org.organizationId, { from: range.from, to: range.to })
@@ -120,6 +113,7 @@ export async function ShowroomDashboard({
     buys ? projectSummary(supabase, org.organizationId) : Promise.resolve(NO_PROJECTS),
     sells ? overdueFollowUps(supabase, org.organizationId, branchId) : Promise.resolve([]),
     sells ? followUpsDueToday(supabase, org.organizationId, branchId) : Promise.resolve([]),
+    loadEffectiveKpiLayout(supabase, org.organizationId, org.membershipId),
   ]);
 
   const savedCount = Object.values(saved).reduce((a, b) => a + b, 0);
@@ -132,64 +126,80 @@ export async function ShowroomDashboard({
   const t = createTranslator(locale);
   const greeting = identity?.displayName ? t("home.greetingNamed", { name: identity.displayName }) : m.home.greeting;
 
-  const primaryTiles: Tile[] = [
-    {
+  // Capability-aware first: a card whose underlying data this caller cannot
+  // see must never be offered or rendered, REGARDLESS of what a stale saved
+  // layout says — the layout was written under whatever capabilities were
+  // true then, and may no longer match (a role change, a capability revoked
+  // since).
+  const availableCards = availableKpiCards({ buys, sells });
+  const iconFor = new Map(availableCards.map((c) => [c.key, c.Icon]));
+
+  // Every KPI tile this caller's stance permits, keyed by the same
+  // `DashboardKpiCardKey` the personalization schema uses — the ONE place a
+  // card key maps to its live value. Which of these actually render, and in
+  // what order, is decided below by the effective layout, never by this
+  // object's own iteration order.
+  const tileFor: Partial<Record<DashboardKpiCardKey, Tile>> = {
+    overdue_followups: {
       label: m.home.overdue,
       value: overdue.length,
-      Icon: AlertIcon,
+      Icon: iconFor.get("overdue_followups")!,
       tone: overdue.length > 0 ? "danger" : "neutral",
       href: "/b2b/follow-ups",
     },
-    {
+    due_today: {
       label: m.home.dueToday,
       value: dueToday.length,
-      Icon: ClockIcon,
+      Icon: iconFor.get("due_today")!,
       tone: dueToday.length > 0 ? "warning" : "neutral",
       href: "/b2b/follow-ups",
     },
-    {
+    quotations_to_review: {
       label: m.home.tile.quotationsToReview,
       value: currentState.offers.submitted ?? 0,
-      Icon: InboxIcon,
+      Icon: iconFor.get("quotations_to_review")!,
       tone: (currentState.offers.submitted ?? 0) > 0 ? "accent" : "neutral",
       href: "/b2b/quotations",
     },
-    {
+    open_purchase_requests: {
       label: m.home.tile.openRequests,
       value: (currentState.requests.submitted ?? 0) + (currentState.requests.quoted ?? 0),
-      Icon: ShoppingBagIcon,
+      Icon: iconFor.get("open_purchase_requests")!,
       href: "/b2b/rfqs",
     },
-    {
+    orders_in_progress: {
       label: m.home.tile.ordersInProgress,
       value: currentState.orders.in_progress ?? 0,
-      Icon: ClipboardIcon,
+      Icon: iconFor.get("orders_in_progress")!,
       tone: "info",
       href: "/b2b/orders",
     },
-    {
+    total_purchases: {
       label: m.home.tile.totalPurchases,
       value: formatCompactMoney(periodScoped.orderValue, locale),
-      Icon: MoneyIcon,
+      Icon: iconFor.get("total_purchases")!,
       hint: m.home.period[periodKey],
       href: "/b2b/reports",
     },
-  ];
-
-  const secondaryTiles: Tile[] = [
-    {
+    projects: {
       label: m.home.tileProjects,
       value: runningProjects,
-      Icon: LayersIcon,
+      Icon: iconFor.get("projects")!,
       href: "/b2b/projects",
     },
-    {
+    saved_products: {
       label: m.home.tile.saved,
       value: savedCount,
-      Icon: BookmarkIcon,
+      Icon: iconFor.get("saved_products")!,
       href: "/b2b/saved",
     },
-  ];
+  };
+
+  const availableKeys = availableCards.map((c) => c.key);
+  const availableKeySet = new Set(availableKeys);
+  const orderedKeys = kpiLayout.cardOrder.filter((k) => availableKeySet.has(k));
+  const primaryTiles: Tile[] = orderedKeys.slice(0, 6).map((k) => tileFor[k]!);
+  const secondaryTiles: Tile[] = orderedKeys.slice(6, 8).map((k) => tileFor[k]!);
 
   const periodOptions = DASHBOARD_PERIOD_ORDER.map((key) => ({ value: key, label: m.home.period[key] }));
 
@@ -198,7 +208,17 @@ export async function ShowroomDashboard({
       <div className="flex flex-wrap items-start justify-between gap-md">
         <div className="min-w-0">
           <p className="truncate text-label text-fg-muted">{greeting}</p>
-          <h1 className="text-headline text-fg">{m.home.title}</h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-headline text-fg">{m.home.title}</h1>
+            <KpiCustomizeDialog
+              orgId={org.organizationId}
+              availableKeys={availableKeys}
+              initialOrder={orderedKeys}
+              hasPersonal={kpiLayout.hasPersonal}
+              hasTeamDefault={kpiLayout.hasTeamDefault}
+              canManageTeamDefault={superUser}
+            />
+          </div>
         </div>
         <DashboardPeriodSelect
           value={periodKey}

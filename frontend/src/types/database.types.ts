@@ -532,6 +532,55 @@ export type Database = {
           },
         ]
       }
+      dashboard_kpi_layouts: {
+        Row: {
+          card_order: Database["public"]["Enums"]["dashboard_kpi_card_key"][]
+          id: string
+          membership_id: string | null
+          organization_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          card_order: Database["public"]["Enums"]["dashboard_kpi_card_key"][]
+          id?: string
+          membership_id?: string | null
+          organization_id: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          card_order?: Database["public"]["Enums"]["dashboard_kpi_card_key"][]
+          id?: string
+          membership_id?: string | null
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_kpi_layouts_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_kpi_layouts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_kpi_layouts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follow_up_tasks: {
         Row: {
           assigned_membership_id: string
@@ -4596,6 +4645,28 @@ export type Database = {
         }
         Returns: string
       }
+      dashboard_kpi_layout_reset_personal: {
+        Args: { p_org_id: string }
+        Returns: undefined
+      }
+      dashboard_kpi_layout_reset_team_default: {
+        Args: { p_org_id: string }
+        Returns: undefined
+      }
+      dashboard_kpi_layout_set_personal: {
+        Args: {
+          p_card_order: Database["public"]["Enums"]["dashboard_kpi_card_key"][]
+          p_org_id: string
+        }
+        Returns: undefined
+      }
+      dashboard_kpi_layout_set_team_default: {
+        Args: {
+          p_card_order: Database["public"]["Enums"]["dashboard_kpi_card_key"][]
+          p_org_id: string
+        }
+        Returns: undefined
+      }
       decide_quotation: {
         Args: {
           p_accept: boolean
@@ -5230,6 +5301,15 @@ export type Database = {
       contact_channel: "whatsapp" | "email"
       customer_status: "active" | "archived"
       customer_type: "individual" | "company"
+      dashboard_kpi_card_key:
+        | "overdue_followups"
+        | "due_today"
+        | "quotations_to_review"
+        | "open_purchase_requests"
+        | "orders_in_progress"
+        | "total_purchases"
+        | "projects"
+        | "saved_products"
       follow_up_status: "open" | "completed" | "cancelled"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
       job_application_status:
@@ -5485,6 +5565,16 @@ export const Constants = {
       contact_channel: ["whatsapp", "email"],
       customer_status: ["active", "archived"],
       customer_type: ["individual", "company"],
+      dashboard_kpi_card_key: [
+        "overdue_followups",
+        "due_today",
+        "quotations_to_review",
+        "open_purchase_requests",
+        "orders_in_progress",
+        "total_purchases",
+        "projects",
+        "saved_products",
+      ],
       follow_up_status: ["open", "completed", "cancelled"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
       job_application_status: [

@@ -75,13 +75,37 @@ function TileBody({ tile, locale }: { tile: Tile; locale: Locale }) {
             value that fits comfortably (the compact money format on tiles, the
             exact figure on the record the tile links to) — this is the safety
             net for the rare label that doesn't. */}
-        <span className="block break-words font-display text-title leading-tight text-fg tabular-nums">
+        {/* `min-h-[3.125rem]` reserves two lines of `text-title` (20px ×
+            leading-tight's 1.25 = 25px/line) the same way the label below
+            reserves two of its own — measured necessary because the compact
+            money value ("١٤٨٫٧ ألف ج.م.") genuinely wraps onto a second line
+            in a 178px card while every other tile's plain digit does not,
+            and that one wrap was stretching the whole six-card primary row
+            (shared CSS Grid row) taller than the hint-less secondary row's
+            own, separate grid instance. */}
+        <span className="block min-h-[3.125rem] break-words font-display text-title leading-tight text-fg tabular-nums">
           {typeof tile.value === "number" ? formatNumber(tile.value, locale) : tile.value}
         </span>
-        <span className="mt-1 block break-words text-label leading-snug text-fg-secondary">{tile.label}</span>
-        {tile.hint ? (
-          <span className="mt-0.5 block break-words text-label leading-snug text-fg-muted">{tile.hint}</span>
-        ) : null}
+        {/* `min-h-9` reserves the full two-line height (13px label ×
+            leading-snug's 1.375 ≈ 36px) whether THIS label actually wraps or
+            not. Without it, a tile whose label happens to fit on one line is
+            shorter than a sibling whose label wraps — invisible while every
+            tile shares one CSS Grid row (the row auto-stretches everything
+            to the tallest member), but the collapsed/expanded KPI sections
+            are two SEPARATE grid instances (only the second one collapses),
+            so nothing stretches the two secondary cards to match the six
+            primary ones unless each card already reserves the same space. */}
+        <span className="mt-1 block min-h-9 break-words text-label leading-snug text-fg-secondary">{tile.label}</span>
+        {/* Rendered unconditionally, not only `{tile.hint ? ... : null}` —
+            reserving this line's height (`min-h-5`) regardless of whether
+            THIS tile has a hint is what keeps every card the same height.
+            Two `StatTiles` calls (primary/secondary) are separate CSS Grid
+            instances; only ONE primary tile (Total Purchases) carries a
+            hint, but that alone used to stretch the whole six-card row
+            taller than the hint-less secondary row by exactly one hint
+            line — invisible in isolation, visible the moment the two rows
+            sit one above the other. */}
+        <span className="mt-0.5 block min-h-5 break-words text-label leading-snug text-fg-muted">{tile.hint}</span>
       </span>
     </>
   );
