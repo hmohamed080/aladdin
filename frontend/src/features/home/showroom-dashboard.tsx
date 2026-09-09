@@ -26,6 +26,9 @@ import { formatCompactMoney } from "@/lib/ui/format";
 import { availableKpiCards, type DashboardKpiCardKey } from "@/lib/workspace/dashboard-kpi-catalog";
 import { loadEffectiveKpiLayout } from "@/server/queries/dashboard-kpi-layout";
 import { KpiCustomizeDialog } from "@/features/home/kpi-customize-dialog";
+import { recentQuotations } from "@/server/queries/commerce";
+import { listJoinRequests } from "@/server/queries/affiliation";
+import { NeedsAttentionSection } from "@/features/home/needs-attention";
 
 const NO_PURCHASE: PurchaseSummary = {
   requests: {},
@@ -48,12 +51,13 @@ const NO_PROJECTS: ProjectSummary = { executing: {}, incoming: {}, executingValu
  * yiحتاج-تدخلك-اليوم / اكتشف-منتجات-جديدة / حركة-السوق / مشترياتك / مبيعاتك
  * structure that BuyerDashboard does not have.
  *
- * THIS INCREMENT builds only the foundation: header/context, the period
- * selector, and the six primary KPIs (نظرة على يومك) with a secondary,
- * expandable set. The remaining approved sections (يحتاج تدخلك اليوم,
- * اكتشف منتجات جديدة, حركة السوق, مشترياتك, مبيعاتك, سجل النشاط) are
- * separate map tickets, each a sibling section appended to this same
- * component — see the "Hana Showroom Owner dashboard milestone" map.
+ * Built so far: header/context, the period selector, the eight-card KPI
+ * grid (نظرة على يومك, personalizable via `KpiCustomizeDialog`), and
+ * يحتاج تدخلك اليوم (`NeedsAttentionSection` — overdue follow-ups,
+ * quotations awaiting decision, pending join requests). The remaining
+ * approved sections (اكتشف منتجات جديدة, حركة السوق, مشترياتك, مبيعاتك,
+ * سجل النشاط) are separate map tickets, each a sibling section appended to
+ * this same component — see the "Hana Showroom Owner dashboard milestone" map.
  *
  * PERIOD-DEPENDENT VS CURRENT-STATE (task requirement 5's own rule): of the
  * six KPIs, only "إجمالي المشتريات" moves with the period selector. The
@@ -105,17 +109,31 @@ export async function ShowroomDashboard({
     periodKey === "custom" && rawFrom && rawTo ? { from: rawFrom, to: rawTo } : undefined,
   );
 
-  const [currentState, periodScoped, saved, projects, overdue, dueToday, kpiLayout] = await Promise.all([
-    buys ? purchaseSummary(supabase, org.organizationId, {}) : Promise.resolve(NO_PURCHASE),
-    buys
-      ? purchaseSummary(supabase, org.organizationId, { from: range.from, to: range.to })
-      : Promise.resolve(NO_PURCHASE),
-    buys ? savedByCategory(supabase, org.organizationId) : Promise.resolve({} as Record<string, number>),
-    buys ? projectSummary(supabase, org.organizationId) : Promise.resolve(NO_PROJECTS),
-    sells ? overdueFollowUps(supabase, org.organizationId, branchId) : Promise.resolve([]),
-    sells ? followUpsDueToday(supabase, org.organizationId, branchId) : Promise.resolve([]),
-    loadEffectiveKpiLayout(supabase, org.organizationId, org.membershipId),
-  ]);
+  // "يحتاج تدخلك اليوم" needs org.members.manage to even ask for pending join
+  // requests — the RPC behind `listJoinRequests` already gates this itself,
+  // but skipping the call entirely for a caller who cannot act on the result
+  // is one fewer denied round trip, not a second authorization layer.
+  const canManageMembers = has("org.members.manage");
+
+  const [currentState, periodScoped, saved, projects, overdue, dueToday, kpiLayout, quotationsAwaitingDecision, joinRequests] =
+    await Promise.all([
+      buys ? purchaseSummary(supabase, org.organizationId, {}) : Promise.resolve(NO_PURCHASE),
+      buys
+        ? purchaseSummary(supabase, org.organizationId, { from: range.from, to: range.to })
+        : Promise.resolve(NO_PURCHASE),
+      buys ? savedByCategory(supabase, org.organizationId) : Promise.resolve({} as Record<string, number>),
+      buys ? projectSummary(supabase, org.organizationId) : Promise.resolve(NO_PROJECTS),
+      sells ? overdueFollowUps(supabase, org.organizationId, branchId) : Promise.resolve([]),
+      sells ? followUpsDueToday(supabase, org.organizationId, branchId) : Promise.resolve([]),
+      loadEffectiveKpiLayout(supabase, org.organizationId, org.membershipId),
+      // Restrained: the 5 most recently updated, capped — a prioritized list,
+      // never a second full quotations inbox.
+      buys
+        ? recentQuotations(supabase, org.organizationId, "requester", { statuses: ["submitted"], limit: 5 })
+        : Promise.resolve({ rows: [], total: 0 }),
+      canManageMembers ? listJoinRequests(supabase, org.organizationId) : Promise.resolve([]),
+    ]);
+  const pendingJoinRequests = joinRequests.filter((r) => r.status === "pending").slice(0, 5);
 
   const savedCount = Object.values(saved).reduce((a, b) => a + b, 0);
   const runningProjects = (projects.executing.active ?? 0) + (projects.incoming.active ?? 0);
@@ -264,6 +282,14 @@ export async function ShowroomDashboard({
           </ExpandCollapse>
         ) : null}
       </div>
+
+      <NeedsAttentionSection
+        overdueFollowUps={overdue}
+        quotationsAwaitingDecision={quotationsAwaitingDecision.rows}
+        pendingJoinRequests={pendingJoinRequests}
+        locale={locale}
+        m={m}
+      />
     </div>
   );
 }

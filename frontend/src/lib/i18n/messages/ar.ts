@@ -1726,6 +1726,16 @@ export const ar: Messages = {
     openReports: "التقرير الكامل",
     deliveryRunning: "أعمال تسليم جارية",
     noProjects: "لا توجد أعمال تسليم جارية.",
+    needsAttention: {
+      title: "يحتاج تدخلك اليوم",
+      subtitle: "قائمة قصيرة ومرتّبة حسب الأولوية — ليست صندوق وارد كامل.",
+      emptyTitle: "لا شيء ينتظرك",
+      emptyBody: "لا يوجد ما يحتاج تدخلك الآن.",
+      overdueFollowUp: "متابعة متأخرة",
+      quotationAwaitingDecision: "عرض ينتظر قرارك",
+      pendingJoinRequest: "طلب انضمام معلّق لفريقك",
+      viewAll: "عرض الكل",
+    },
     customize: {
       trigger: "تخصيص البطاقات",
       title: "تخصيص بطاقات المؤشرات",

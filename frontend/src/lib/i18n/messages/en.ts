@@ -1801,6 +1801,16 @@ export const en = {
     openReports: "Full report",
     deliveryRunning: "Delivery in progress",
     noProjects: "No delivery work running.",
+    needsAttention: {
+      title: "Needs your attention today",
+      subtitle: "A short, prioritized list — nothing here is a full inbox.",
+      emptyTitle: "You're all caught up",
+      emptyBody: "Nothing needs your attention right now.",
+      overdueFollowUp: "Overdue follow-up",
+      quotationAwaitingDecision: "Quotation awaiting your decision",
+      pendingJoinRequest: "Pending request to join your team",
+      viewAll: "View all",
+    },
     customize: {
       trigger: "Customize cards",
       title: "Customize KPI cards",
