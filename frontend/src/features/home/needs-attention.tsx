@@ -2,9 +2,9 @@ import Link from "next/link";
 import type { ComponentType } from "react";
 import type { Locale } from "@/lib/i18n/locales";
 import type { Messages } from "@/lib/i18n/messages/en";
+import { formatPlural } from "@/lib/i18n/plural";
 import { StatePanel } from "@/components/ui/primitives";
 import { AlertIcon, InboxIcon, UsersIcon } from "@/components/ui/icons";
-import { formatCount } from "@/lib/ui/format";
 import { cn } from "@/lib/ui/cn";
 
 /**
@@ -37,15 +37,24 @@ export type NeedsAttentionCard = {
   canSee: boolean;
   Icon: ComponentType<{ size?: number }>;
   tone: "danger" | "warning" | "info";
-  titleKey: string;
-  bodyKey: string;
+  titleKey: "overdueFollowUpsTitle" | "quotationsTitle" | "joinRequestsTitle";
+  bodyKey: "overdueFollowUpsBody" | "quotationsBody" | "joinRequestsBody";
   href: string;
 };
 
-const TONE_CLASSES: Record<NeedsAttentionCard["tone"], { surface: string; chip: string }> = {
-  danger: { surface: "bg-danger/10", chip: "bg-danger/20 text-danger" },
-  warning: { surface: "bg-warning/10", chip: "bg-warning/20 text-warning" },
-  info: { surface: "bg-info/10", chip: "bg-info/20 text-info" },
+/**
+ * Semantic color lives ONLY in the icon chip — the same "one contrasting
+ * chip inside an otherwise neutral surface" grammar `stat-tiles.tsx` uses for
+ * the KPI row above this section. Tinting the whole card red/amber/blue read
+ * as a different design system from those KPI cards; a neutral `bg-surface`
+ * card (picking up the shell's own light/dark elevation via
+ * `.workspace-body .bg-surface` in globals.css) makes this section read as
+ * part of the same dashboard.
+ */
+const TONE_CHIP: Record<NeedsAttentionCard["tone"], string> = {
+  danger: "bg-danger/15 text-danger",
+  warning: "bg-warning/15 text-warning",
+  info: "bg-info/15 text-info",
 };
 
 export function NeedsAttentionSection({
@@ -117,7 +126,9 @@ export function NeedsAttentionSection({
 
   return (
     <section className="flex flex-col gap-md" aria-labelledby="needs-attention-heading">
-      <div className="flex flex-col gap-0.5">
+      {/* `gap-xs` (4px), not the old `gap-0.5` (2px) — the heading and its
+          description were reading as one merged line. */}
+      <div className="flex flex-col gap-xs">
         <h2 id="needs-attention-heading" className="text-title text-fg">
           {t.title}
         </h2>
@@ -133,28 +144,37 @@ export function NeedsAttentionSection({
         // cards" from a plain `repeat(3, 1fr)`-shaped grid, for free.
         <ul className="grid grid-cols-1 gap-md tablet:grid-cols-2 desktop:grid-cols-3">
           {cards.map((card) => {
-            const tone = TONE_CLASSES[card.tone];
-            const title = t[card.titleKey as keyof typeof t].replace("{count}", formatCount(card.count, locale));
-            const body = t[card.bodyKey as keyof typeof t];
+            const chip = TONE_CHIP[card.tone];
+            const title = formatPlural(card.count, locale, t[card.titleKey]);
+            const body = t[card.bodyKey];
             return (
               <li key={card.key}>
                 <Link
                   href={card.href}
                   className={cn(
-                    "flex h-full items-start gap-3 rounded-md p-md transition-colors hover:brightness-95",
+                    // Same neutral surface as the KPI tiles above this
+                    // section (`stat-tiles.tsx`'s `tileSurfaceClass`) — one
+                    // clean `bg-surface`, not a colored outer shell. The
+                    // shell's global elevation rule
+                    // (`.workspace-body .bg-surface` in globals.css) supplies
+                    // the border/shadow for both themes; adding Tailwind's
+                    // own `border`/`shadow-card` on top would double it (the
+                    // "card inside a card" defect `stat-tiles.tsx` documents).
+                    "flex h-full items-start gap-3 rounded-md bg-surface p-md transition-colors hover:bg-surface-2/50",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-                    tone.surface,
                   )}
                 >
                   <span
-                    className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-sm", tone.chip)}
+                    className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-sm", chip)}
                     aria-hidden="true"
                   >
                     <card.Icon size={18} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-body-lg font-semibold text-fg">{title}</span>
-                    <span className="mt-0.5 block text-label text-fg-secondary">{body}</span>
+                    {/* `mt-xs` (4px), not the old `mt-0.5` (2px) — title and
+                        subtitle were reading as one crowded line. */}
+                    <span className="mt-xs block text-label text-fg-secondary">{body}</span>
                   </span>
                 </Link>
               </li>

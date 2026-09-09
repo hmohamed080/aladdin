@@ -47,7 +47,9 @@ describe("NeedsAttentionSection", () => {
     expect(items).toHaveLength(3);
     expect(screen.getByText("5 overdue follow-ups")).toBeInTheDocument();
     expect(screen.getByText("3 quotations awaiting review")).toBeInTheDocument();
-    expect(screen.getByText("1 pending join requests")).toBeInTheDocument();
+    // Singular, not "1 pending join requests" — the grammatical error the
+    // plural-forms pass below exists to fix.
+    expect(screen.getByText("1 pending join request")).toBeInTheDocument();
     // The body/explanatory line survives beside the title.
     expect(screen.getByText(en.home.needsAttention.overdueFollowUpsBody)).toBeInTheDocument();
   });
@@ -99,12 +101,15 @@ describe("NeedsAttentionSection", () => {
         pendingJoinRequestsCount={1}
       />,
     );
-    expect(screen.getByRole("link", { name: /overdue follow-ups/ })).toHaveAttribute("href", "/b2b/follow-ups");
-    expect(screen.getByRole("link", { name: /quotations awaiting review/ })).toHaveAttribute(
+    // `s?`/`ns?` here because count=1 below is deliberately the SINGULAR
+    // case ("1 overdue follow-up", not "-ups") — the deep-link assertion
+    // should hold regardless of which plural form rendered.
+    expect(screen.getByRole("link", { name: /overdue follow-ups?/ })).toHaveAttribute("href", "/b2b/follow-ups");
+    expect(screen.getByRole("link", { name: /quotations? awaiting review/ })).toHaveAttribute(
       "href",
       "/b2b/quotations?view=received",
     );
-    expect(screen.getByRole("link", { name: /pending join requests/ })).toHaveAttribute("href", "/b2b/organization");
+    expect(screen.getByRole("link", { name: /pending join requests?/ })).toHaveAttribute("href", "/b2b/organization");
   });
 
   it("never renders a mutation control — every card is a plain deep-link, not a form", () => {
@@ -125,6 +130,79 @@ describe("NeedsAttentionSection", () => {
     // formatCount renders Arabic-Indic digits for locale="ar" — proves the
     // count is genuinely locale-aware, not hardcoded to Latin digits — and
     // the surrounding label comes from the real ar.ts catalog, not en.ts.
-    expect(screen.getByText(/٥ متابعات تجاوزت موعدها/)).toBeInTheDocument();
+    // 5 falls in Arabic's "few" (3–10) category, hence the plural noun
+    // "متابعات" and plural possessive "مواعيدها" — see the plural-forms
+    // block below for the full one/two/few sweep.
+    expect(screen.getByText(/٥ متابعات تجاوزت مواعيدها/)).toBeInTheDocument();
+  });
+
+  describe("plural-aware count wording (English one/other, Arabic zero/one/two/few/many/other)", () => {
+    it("English distinguishes singular from plural for all three categories", () => {
+      const { rerender } = render(
+        <NeedsAttentionSection
+          {...baseProps()}
+          overdueFollowUpsCount={1}
+          quotationsAwaitingDecisionCount={1}
+          pendingJoinRequestsCount={1}
+        />,
+      );
+      expect(screen.getByText("1 overdue follow-up")).toBeInTheDocument();
+      expect(screen.getByText("1 quotation awaiting review")).toBeInTheDocument();
+      expect(screen.getByText("1 pending join request")).toBeInTheDocument();
+
+      rerender(
+        <NeedsAttentionSection
+          {...baseProps()}
+          overdueFollowUpsCount={2}
+          quotationsAwaitingDecisionCount={2}
+          pendingJoinRequestsCount={2}
+        />,
+      );
+      expect(screen.getByText("2 overdue follow-ups")).toBeInTheDocument();
+      expect(screen.getByText("2 quotations awaiting review")).toBeInTheDocument();
+      expect(screen.getByText("2 pending join requests")).toBeInTheDocument();
+    });
+
+    it("Arabic overdue follow-ups: one → dual → few agree grammatically, never a bare number glued to one plural noun", () => {
+      const { rerender } = render(<NeedsAttentionSection {...baseProps()} locale="ar" m={ar} overdueFollowUpsCount={1} />);
+      expect(screen.getByText("متابعة واحدة تجاوزت موعدها")).toBeInTheDocument();
+
+      rerender(<NeedsAttentionSection {...baseProps()} locale="ar" m={ar} overdueFollowUpsCount={2} />);
+      expect(screen.getByText("متابعتان تجاوزتا موعدهما")).toBeInTheDocument();
+
+      rerender(<NeedsAttentionSection {...baseProps()} locale="ar" m={ar} overdueFollowUpsCount={3} />);
+      expect(screen.getByText(/٣ متابعات تجاوزت مواعيدها/)).toBeInTheDocument();
+    });
+
+    it("Arabic quotations awaiting review: one → dual → few", () => {
+      const { rerender } = render(
+        <NeedsAttentionSection {...baseProps()} locale="ar" m={ar} quotationsAwaitingDecisionCount={1} />,
+      );
+      expect(screen.getByText("عرض سعر واحد ينتظر المراجعة")).toBeInTheDocument();
+
+      rerender(<NeedsAttentionSection {...baseProps()} locale="ar" m={ar} quotationsAwaitingDecisionCount={2} />);
+      expect(screen.getByText("عرضا سعر ينتظران المراجعة")).toBeInTheDocument();
+
+      rerender(<NeedsAttentionSection {...baseProps()} locale="ar" m={ar} quotationsAwaitingDecisionCount={3} />);
+      expect(screen.getByText(/٣ عروض أسعار تنتظر المراجعة/)).toBeInTheDocument();
+    });
+
+    it("Arabic pending join requests: one → dual → few", () => {
+      const { rerender } = render(
+        <NeedsAttentionSection {...baseProps()} locale="ar" m={ar} pendingJoinRequestsCount={1} />,
+      );
+      expect(screen.getByText("طلب انضمام واحد ينتظر قرارك")).toBeInTheDocument();
+
+      rerender(<NeedsAttentionSection {...baseProps()} locale="ar" m={ar} pendingJoinRequestsCount={2} />);
+      expect(screen.getByText("طلبا انضمام ينتظران قرارك")).toBeInTheDocument();
+
+      rerender(<NeedsAttentionSection {...baseProps()} locale="ar" m={ar} pendingJoinRequestsCount={3} />);
+      expect(screen.getByText(/٣ طلبات انضمام تنتظر قرارك/)).toBeInTheDocument();
+    });
+
+    it("Arabic 'many' (11–99) uses the singular counted noun, not the few-range plural", () => {
+      render(<NeedsAttentionSection {...baseProps()} locale="ar" m={ar} overdueFollowUpsCount={12} />);
+      expect(screen.getByText(/١٢ متابعة تجاوزت مواعيدها/)).toBeInTheDocument();
+    });
   });
 });

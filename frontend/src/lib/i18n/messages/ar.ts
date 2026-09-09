@@ -1731,11 +1731,35 @@ export const ar: Messages = {
       subtitle: "ملخص سريع لما يحتاج قرارًا منك — وليس صندوق وارد كامل.",
       emptyTitle: "لا شيء ينتظرك",
       emptyBody: "لا يوجد ما يحتاج تدخلك الآن.",
-      overdueFollowUpsTitle: "{count} متابعات تجاوزت موعدها",
+      // Full CLDR agreement (zero/one/two/few/many/other) — "few" is 3–10,
+      // "many" is 11–99, "other" is 100+ (and non-integers). See
+      // `formatPlural`/`PluralForms`.
+      overdueFollowUpsTitle: {
+        zero: "لا متابعات تجاوزت موعدها",
+        one: "متابعة واحدة تجاوزت موعدها",
+        two: "متابعتان تجاوزتا موعدهما",
+        few: "{count} متابعات تجاوزت مواعيدها",
+        many: "{count} متابعة تجاوزت مواعيدها",
+        other: "{count} متابعة تجاوزت مواعيدها",
+      },
       overdueFollowUpsBody: "تحتاج إلى إجراء الآن",
-      quotationsTitle: "{count} عروض أسعار تنتظر المراجعة",
+      quotationsTitle: {
+        zero: "لا عروض أسعار تنتظر المراجعة",
+        one: "عرض سعر واحد ينتظر المراجعة",
+        two: "عرضا سعر ينتظران المراجعة",
+        few: "{count} عروض أسعار تنتظر المراجعة",
+        many: "{count} عرض سعر تنتظر المراجعة",
+        other: "{count} عرض سعر تنتظر المراجعة",
+      },
       quotationsBody: "راجع العروض واتخذ قرارك",
-      joinRequestsTitle: "{count} طلبات انضمام تنتظر قرارك",
+      joinRequestsTitle: {
+        zero: "لا طلبات انضمام تنتظر قرارك",
+        one: "طلب انضمام واحد ينتظر قرارك",
+        two: "طلبا انضمام ينتظران قرارك",
+        few: "{count} طلبات انضمام تنتظر قرارك",
+        many: "{count} طلب انضمام تنتظر قرارك",
+        other: "{count} طلب انضمام تنتظر قرارك",
+      },
       joinRequestsBody: "بانتظار مراجعتك",
     },
     customize: {

@@ -1,3 +1,5 @@
+import type { PluralForms } from "@/lib/i18n/plural";
+
 /**
  * English message catalog (LTR). Arabic (`ar.ts`) is the primary UI language;
  * this file is the canonical key reference — every key here must exist in `ar`.
@@ -1806,11 +1808,37 @@ export const en = {
       subtitle: "A quick summary of what needs a decision — not a full inbox.",
       emptyTitle: "You're all caught up",
       emptyBody: "Nothing needs your attention right now.",
-      overdueFollowUpsTitle: "{count} overdue follow-ups",
+      // English `Intl.PluralRules` only ever selects "one" or "other" for a
+      // cardinal count, so "zero"/"two"/"few"/"many" are unreachable at
+      // runtime here — they exist only so this catalog's key SET matches
+      // `ar.ts`'s key-for-key (enforced by i18n.test.ts), where those
+      // categories are real and load-bearing. See `PluralForms`/`formatPlural`.
+      overdueFollowUpsTitle: {
+        zero: "No overdue follow-ups",
+        one: "1 overdue follow-up",
+        two: "{count} overdue follow-ups",
+        few: "{count} overdue follow-ups",
+        many: "{count} overdue follow-ups",
+        other: "{count} overdue follow-ups",
+      },
       overdueFollowUpsBody: "Need action now",
-      quotationsTitle: "{count} quotations awaiting review",
+      quotationsTitle: {
+        zero: "No quotations awaiting review",
+        one: "1 quotation awaiting review",
+        two: "{count} quotations awaiting review",
+        few: "{count} quotations awaiting review",
+        many: "{count} quotations awaiting review",
+        other: "{count} quotations awaiting review",
+      },
       quotationsBody: "Review the offers and decide",
-      joinRequestsTitle: "{count} pending join requests",
+      joinRequestsTitle: {
+        zero: "No pending join requests",
+        one: "1 pending join request",
+        two: "{count} pending join requests",
+        few: "{count} pending join requests",
+        many: "{count} pending join requests",
+        other: "{count} pending join requests",
+      },
       joinRequestsBody: "Awaiting your review",
     },
     customize: {
@@ -3814,4 +3842,26 @@ type DeepStringShape<T> = {
   [K in keyof T]: T[K] extends string ? string : DeepStringShape<T[K]>;
 };
 
-export type Messages = DeepStringShape<typeof en>;
+/**
+ * `needsAttention`'s three count titles are typed as `PluralForms`, not a
+ * plain string: English only ever needs `one`/`other`, but Arabic genuinely
+ * needs all six CLDR categories for correct agreement (see `formatPlural`).
+ * The auto-derived `DeepStringShape` can't express "ar has more optional
+ * keys than en" — a plain recursive mapped type ties every locale to
+ * exactly the key set `en.ts` happens to use — so these three keys are
+ * overridden explicitly rather than teaching the general recursion a
+ * structural special case that could misfire on an unrelated field
+ * elsewhere in this large catalog.
+ */
+export type Messages = Omit<DeepStringShape<typeof en>, "home"> & {
+  home: Omit<DeepStringShape<typeof en>["home"], "needsAttention"> & {
+    needsAttention: Omit<
+      DeepStringShape<typeof en>["home"]["needsAttention"],
+      "overdueFollowUpsTitle" | "quotationsTitle" | "joinRequestsTitle"
+    > & {
+      overdueFollowUpsTitle: PluralForms;
+      quotationsTitle: PluralForms;
+      joinRequestsTitle: PluralForms;
+    };
+  };
+};

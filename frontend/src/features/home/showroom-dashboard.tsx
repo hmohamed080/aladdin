@@ -238,7 +238,9 @@ export async function ShowroomDashboard({
   return (
     <div className="flex flex-col gap-lg">
       <div className="flex flex-wrap items-start justify-between gap-md">
-        <div className="min-w-0">
+        {/* `gap-sm` (8px), not the old unspaced stack — the greeting and the
+            page title were reading as one merged line. */}
+        <div className="flex min-w-0 flex-col gap-sm">
           <p className="truncate text-label text-fg-muted">{greeting}</p>
           <div className="flex items-center gap-1.5">
             <h1 className="text-headline text-fg">{m.home.title}</h1>
