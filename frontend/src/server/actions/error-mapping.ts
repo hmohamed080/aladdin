@@ -114,6 +114,26 @@ export function mapJobError(error: unknown): string {
   return "states.genericRetry";
 }
 
+/**
+ * Maps an organization/branch bilingual-identity RPC error
+ * (`organization_update_i18n`/`branch_update_i18n`) to a stable translation
+ * key. The timezone branch is checked before the generic 22023 fallback
+ * because both "not found" and "invalid timezone" raise 22023 — the
+ * settings form needs to tell an owner which field is actually wrong.
+ */
+export function mapOrgI18nError(error: unknown): string {
+  const e = (error ?? {}) as PgLikeError;
+  const code = e.code ?? "";
+  const msg = (e.message ?? "").toLowerCase();
+
+  if (msg.includes("valid iana timezone")) return "settings.errors.invalidTimezone";
+  if (msg.includes("not found")) return "settings.errors.notFound";
+  if (code === "23514") return "settings.errors.tooLong";
+  if (code === "42501" || msg.includes("required") || msg.includes("not a member"))
+    return "settings.errors.denied";
+  return "states.genericRetry";
+}
+
 /** True when the error means "the record moved under me" (caller should refresh). */
 export function isStaleVersion(error: unknown): boolean {
   const e = (error ?? {}) as PgLikeError;

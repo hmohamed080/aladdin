@@ -1,3 +1,5 @@
+import type { PluralForms } from "@/lib/i18n/plural";
+
 /**
  * English message catalog (LTR). Arabic (`ar.ts`) is the primary UI language;
  * this file is the canonical key reference — every key here must exist in `ar`.
@@ -39,6 +41,12 @@ export const en = {
     /* Shown in place of the assignee control until a branch is chosen — a
        candidate list can't be resolved without one. */
     selectBranchFirst: "Select a branch first",
+    /* The show-more/show-less expand-collapse primitive — generic, reused
+       across whichever dashboard sections cap a list (KPIs, product
+       discovery, …). Distinct from `more` above, which is a one-way "see the
+       rest of this list" link, not a toggle that also collapses back. */
+    showMore: "Show more",
+    showLess: "Show less",
     /* Language names as a professional would write them on their own profile. */
     languageName: { ar: "Arabic", en: "English" },
   },
@@ -1717,6 +1725,35 @@ export const en = {
       openRequests: "Open purchase requests",
       activeOrders: "Orders in progress",
       saved: "Saved products",
+      /* The Showroom Owner dashboard's own six primary KPIs. Three of them
+         (overdue, dueToday, openRequests above) already existed under exactly
+         this vocabulary; these three did not exist with the approved exact
+         wording, so they are new rather than reusing the close-but-not-exact
+         newOffers/activeOrders. */
+      quotationsToReview: "Quotations to review",
+      ordersInProgress: "Orders in progress",
+      /* The one PERIOD-DEPENDENT primary KPI — the other five are
+         current-state and do not move when the period selector changes. */
+      totalPurchases: "Total purchases",
+    },
+    /**
+     * The Showroom Owner dashboard's own period scope — see
+     * lib/workspace/dashboard-period.ts. Deliberately a SEPARATE vocabulary
+     * from `supply.period` above: different option set (7d/30d/90d + two
+     * calendar windows + custom, vs. the supply side's 30d/90d/365d/all),
+     * different default, different control.
+     */
+    period: {
+      label: "Period",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "90d": "Last 90 days",
+      thisMonth: "This month",
+      thisQuarter: "This quarter",
+      custom: "Custom period",
+      from: "From",
+      to: "To",
+      apply: "Apply",
     },
     action: {
       browse: "Find a product",
@@ -1736,6 +1773,7 @@ export const en = {
     },
     title: "Your day at a glance",
     greeting: "Welcome back",
+    greetingNamed: "Welcome back, {name}",
     quickActions: "Quick actions",
     addCustomer: "Add customer",
     addLead: "Add lead",
@@ -1765,6 +1803,66 @@ export const en = {
     openReports: "Full report",
     deliveryRunning: "Delivery in progress",
     noProjects: "No delivery work running.",
+    needsAttention: {
+      title: "Needs your attention today",
+      subtitle: "A quick summary of what needs a decision — not a full inbox.",
+      emptyTitle: "You're all caught up",
+      emptyBody: "Nothing needs your attention right now.",
+      // English `Intl.PluralRules` only ever selects "one" or "other" for a
+      // cardinal count, so "zero"/"two"/"few"/"many" are unreachable at
+      // runtime here — they exist only so this catalog's key SET matches
+      // `ar.ts`'s key-for-key (enforced by i18n.test.ts), where those
+      // categories are real and load-bearing. See `PluralForms`/`formatPlural`.
+      overdueFollowUpsTitle: {
+        zero: "No overdue follow-ups",
+        one: "1 overdue follow-up",
+        two: "{count} overdue follow-ups",
+        few: "{count} overdue follow-ups",
+        many: "{count} overdue follow-ups",
+        other: "{count} overdue follow-ups",
+      },
+      overdueFollowUpsBody: "Need action now",
+      quotationsTitle: {
+        zero: "No quotations awaiting review",
+        one: "1 quotation awaiting review",
+        two: "{count} quotations awaiting review",
+        few: "{count} quotations awaiting review",
+        many: "{count} quotations awaiting review",
+        other: "{count} quotations awaiting review",
+      },
+      quotationsBody: "Review the offers and decide",
+      joinRequestsTitle: {
+        zero: "No pending join requests",
+        one: "1 pending join request",
+        two: "{count} pending join requests",
+        few: "{count} pending join requests",
+        many: "{count} pending join requests",
+        other: "{count} pending join requests",
+      },
+      joinRequestsBody: "Awaiting your review",
+    },
+    customize: {
+      trigger: "Customize cards",
+      title: "Customize KPI cards",
+      body: "Choose which cards you see and in what order. The first six show right away; the rest appear under Show more.",
+      visible: "Visible cards",
+      available: "Available cards",
+      moveUp: "Move up",
+      moveDown: "Move down",
+      hide: "Hide",
+      show: "Show",
+      maxReached: "You can show at most 8 cards — hide one to add another.",
+      savePersonal: "Save my layout",
+      saveTeamDefault: "Set as team default",
+      resetPersonal: "Reset to team default",
+      resetTeamDefault: "Reset to system default",
+      personalNote: "This changes only your own view.",
+      teamDefaultNote: "This sets the starting layout for every member of the team who has not customized their own.",
+      savedPersonal: "Your layout was saved.",
+      savedTeamDefault: "The team default was updated.",
+      resetDone: "Reset.",
+      error: "Something went wrong — try again.",
+    },
   },
 
   /**
@@ -2406,7 +2504,11 @@ export const en = {
       account: "Account & access",
     },
     business: "Business profile",
-    businessNote: "Your business name, type, and verification are set during registration and review. Contact support to change them.",
+    businessNote: "Your registered business name, type, and verification are set during registration and review — contact support to change them. The Arabic/English display name and timezone below are yours to edit.",
+    editOrgTitle: "Edit business display name",
+    editOrgHelp: "An optional Arabic and/or English name shown instead of your registered name — Arabic UI prefers the Arabic value, English UI prefers the English value, and either falls back to your registered name when left blank.",
+    editBranchTitle: "Edit {name}",
+    editBranchHelp: "An optional Arabic and/or English name and address for this branch, and the timezone its own reports and \"today\"/\"this month\" boundaries use.",
     field: {
       name: "Business name",
       type: "Business type",
@@ -2414,6 +2516,26 @@ export const en = {
       verification: "Verification",
       handle: "Workspace address",
       language: "Business language",
+      nameAr: "Arabic name",
+      nameEn: "English name",
+      addressAr: "Arabic address",
+      addressEn: "English address",
+      timezone: "Timezone",
+    },
+    timezoneHint: "Used for this business's dashboard period boundaries when no branch timezone is set.",
+    branchTimezoneHint: "Takes priority over the business timezone for this branch's own reports.",
+    timezoneUnset: "Not set",
+    /** No override was saved — this is the platform default, honestly labeled rather than shown as "Not set" while it is, in fact, actively governing this business's reports. */
+    timezoneDefault: "Default: {tz}",
+    /** A branch with no override of its own — the ORGANIZATION's timezone is what actually governs its reports, so that is what is shown, not a bare "Not set". */
+    timezoneInherited: "Inherited from organization: {tz}",
+    orgUpdated: "Business display name updated.",
+    branchUpdated: "Branch updated.",
+    errors: {
+      invalidTimezone: "Not a recognized timezone. Choose one from the list.",
+      notFound: "This record could not be found.",
+      tooLong: "One of the values is too long.",
+      denied: "You do not have permission to make this change.",
     },
     orgStatus: {
       draft: "Draft",
@@ -3720,4 +3842,26 @@ type DeepStringShape<T> = {
   [K in keyof T]: T[K] extends string ? string : DeepStringShape<T[K]>;
 };
 
-export type Messages = DeepStringShape<typeof en>;
+/**
+ * `needsAttention`'s three count titles are typed as `PluralForms`, not a
+ * plain string: English only ever needs `one`/`other`, but Arabic genuinely
+ * needs all six CLDR categories for correct agreement (see `formatPlural`).
+ * The auto-derived `DeepStringShape` can't express "ar has more optional
+ * keys than en" — a plain recursive mapped type ties every locale to
+ * exactly the key set `en.ts` happens to use — so these three keys are
+ * overridden explicitly rather than teaching the general recursion a
+ * structural special case that could misfire on an unrelated field
+ * elsewhere in this large catalog.
+ */
+export type Messages = Omit<DeepStringShape<typeof en>, "home"> & {
+  home: Omit<DeepStringShape<typeof en>["home"], "needsAttention"> & {
+    needsAttention: Omit<
+      DeepStringShape<typeof en>["home"]["needsAttention"],
+      "overdueFollowUpsTitle" | "quotationsTitle" | "joinRequestsTitle"
+    > & {
+      overdueFollowUpsTitle: PluralForms;
+      quotationsTitle: PluralForms;
+      joinRequestsTitle: PluralForms;
+    };
+  };
+};

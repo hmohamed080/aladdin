@@ -39,6 +39,23 @@ const chip: Record<Tone, string> = {
   info: "bg-info/15 text-info",
 };
 
+/**
+ * ONE surface, not a card inside a card. `.workspace-body .bg-surface`
+ * (globals.css) already applies this shell's whole elevation grammar — a
+ * low-contrast border-color plus a soft two-layer shadow — to every
+ * `bg-surface` element via `!important`, unconditionally. Also requesting
+ * Tailwind's own `border` (a solid 1px edge) and `shadow-card` (a second,
+ * heavier shadow token) on top of that stacked a visible border ring *and* a
+ * near-edge shadow layer around a tile barely 90px tall, which read as a
+ * picture frame rather than a single lifted surface — the "card inside a
+ * card" defect. Dropping both Tailwind utilities here removes the border
+ * entirely (its color has no width left to draw) and leaves the shell's own
+ * soft shadow as the tile's only separation cue. The icon chip above is the
+ * one deliberately contrasting surface left inside the tile.
+ */
+const tileSurfaceClass =
+  "flex items-center gap-3 rounded-md bg-surface p-md transition-colors hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
+
 function TileBody({ tile, locale }: { tile: Tile; locale: Locale }) {
   return (
     <>
@@ -49,17 +66,54 @@ function TileBody({ tile, locale }: { tile: Tile; locale: Locale }) {
         <tile.Icon size={20} />
       </span>
       <span className="min-w-0">
-        {/* `truncate` is a GUARD, not the plan. A tile is ~180px wide in the
-            two-column mobile grid, and a long value (a money figure, say) has no
-            natural break point — without this it overflowed the tile and pushed
-            the whole page sideways. Callers should still pass a value that fits:
-            use the compact money format on tiles, and keep the exact figure on
-            the record the tile links to. */}
-        <span className="block truncate font-display text-title leading-none text-fg tabular-nums">
+        {/* `break-words`, not `truncate`. A clipped KPI label or an ellipsized
+            money figure is a defect, not a guard — the requirement is to WRAP a
+            long label onto a second line rather than hide part of it. `min-w-0`
+            on the wrapping span (above) is what actually stops the tile from
+            being pushed wide by an unbroken token; wrapping is the presentation
+            once that space constraint is real. Callers should still pass a
+            value that fits comfortably (the compact money format on tiles, the
+            exact figure on the record the tile links to) — this is the safety
+            net for the rare label that doesn't. */}
+        {/* `min-h-[3.125rem]` reserves two lines of `text-title` (20px ×
+            leading-tight's 1.25 = 25px/line) the same way the label below
+            reserves two of its own — measured necessary because the compact
+            money value ("١٤٨٫٧ ألف ج.م.") genuinely wraps onto a second line
+            in a 178px card while every other tile's plain digit does not,
+            and that one wrap was stretching the whole six-card primary row
+            (shared CSS Grid row) taller than the hint-less secondary row's
+            own, separate grid instance. */}
+        <span className="block min-h-[3.125rem] break-words font-display text-title leading-tight text-fg tabular-nums">
           {typeof tile.value === "number" ? formatNumber(tile.value, locale) : tile.value}
         </span>
-        <span className="mt-1 block truncate text-label text-fg-secondary">{tile.label}</span>
-        {tile.hint ? <span className="mt-0.5 block truncate text-label text-fg-muted">{tile.hint}</span> : null}
+        {/* `min-h-10` reserves the full two-line height (13px label ×
+            leading-normal's 1.5 ≈ 39px, rounded up to Tailwind's 40px step)
+            whether THIS label actually wraps or not. Without it, a tile
+            whose label happens to fit on one line is shorter than a sibling
+            whose label wraps — invisible while every tile shares one CSS
+            Grid row (the row auto-stretches everything to the tallest
+            member), but the collapsed/expanded KPI sections are two
+            SEPARATE grid instances (only the second one collapses), so
+            nothing stretches the two secondary cards to match the six
+            primary ones unless each card already reserves the same space.
+            `leading-normal` (not the tighter `leading-snug` this used to
+            carry) is deliberate: at `leading-snug` a two-line Arabic label
+            ("طلبات قيد التنفيذ") read as its two lines running into each
+            other — Arabic script needs more inter-line room than Latin at
+            the same nominal ratio. */}
+        <span className="mt-1 block min-h-10 break-words text-label leading-normal text-fg-secondary">
+          {tile.label}
+        </span>
+        {/* Rendered unconditionally, not only `{tile.hint ? ... : null}` —
+            reserving this line's height (`min-h-5`) regardless of whether
+            THIS tile has a hint is what keeps every card the same height.
+            Two `StatTiles` calls (primary/secondary) are separate CSS Grid
+            instances; only ONE primary tile (Total Purchases) carries a
+            hint, but that alone used to stretch the whole six-card row
+            taller than the hint-less secondary row by exactly one hint
+            line — invisible in isolation, visible the moment the two rows
+            sit one above the other. */}
+        <span className="mt-0.5 block min-h-5 break-words text-label leading-snug text-fg-muted">{tile.hint}</span>
       </span>
     </>
   );
@@ -121,15 +175,11 @@ export function StatTiles({
 
   const cards = tiles.map((tile) =>
     tile.href ? (
-      <Link
-        key={tile.label}
-        href={tile.href}
-        className="flex items-center gap-3 rounded-md border bg-surface p-md shadow-card transition-colors hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-      >
+      <Link key={tile.label} href={tile.href} className={tileSurfaceClass}>
         <TileBody tile={tile} locale={locale} />
       </Link>
     ) : (
-      <div key={tile.label} className="flex items-center gap-3 rounded-md border bg-surface p-md shadow-card">
+      <div key={tile.label} className={tileSurfaceClass}>
         <TileBody tile={tile} locale={locale} />
       </div>
     ),
@@ -146,7 +196,8 @@ export function StatTiles({
   return (
     <div
       className={cn(
-        "grid grid-cols-2 gap-sm tablet:grid-cols-3 desktop:grid-cols-4 [&>*]:min-w-0",
+        "grid grid-cols-2 gap-sm [&>*]:min-w-0",
+        columns ? GRID_COLUMNS[columns] : "tablet:grid-cols-3 desktop:grid-cols-4",
         className,
       )}
     >
@@ -154,6 +205,19 @@ export function StatTiles({
     </div>
   );
 }
+
+/**
+ * Tailwind class names must appear as literal strings for the compiler to
+ * find them — `desktop:grid-cols-${columns}` would never ship the class it
+ * builds. A lookup table is the honest way to make `columns` configurable.
+ */
+const GRID_COLUMNS: Record<2 | 3 | 4 | 5 | 6, string> = {
+  2: "tablet:grid-cols-2 desktop:grid-cols-2",
+  3: "tablet:grid-cols-3 desktop:grid-cols-3",
+  4: "tablet:grid-cols-4 desktop:grid-cols-4",
+  5: "tablet:grid-cols-3 desktop:grid-cols-5",
+  6: "tablet:grid-cols-3 desktop:grid-cols-6",
+};
 
 /**
  * Status filter tabs expressed as links (`?status=…`), so the whole list stays a

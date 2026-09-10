@@ -101,34 +101,56 @@ update public.users set primary_account_type = 'installer_technician', status = 
 -- so my_registration_state resolves to the invitation path, not active_personal.
 update public.users set primary_account_type = 'engineer' where id = '70000010-0000-4000-8000-000000000010';
 
+-- Hana's real bilingual display name (20260916090001) — additive to the
+-- profile row `app.handle_new_user()` already created from her
+-- raw_user_meta_data display_name above; only the Showroom milestone's pilot
+-- account gets a real Arabic value here, matching the same narrow scope as
+-- the organization/branch bilingual names below.
+update public.profiles set display_name_ar = 'هناء منصور', display_name_en = 'Hana Mansour'
+  where user_id = '70000001-0000-4000-8000-000000000001';
+
 -- ---------------------------------------------------------------------------
 -- 2. Organizations (all is_verified = false; two of them pending review)
 -- ---------------------------------------------------------------------------
-insert into public.organizations (id, name, slug, org_type, status, is_verified, primary_locale, created_by)
+-- `name_ar`/`name_en` are the OWNER'S real bilingual trading name, additive to
+-- the original single `name` column (see `lib/i18n/bilingual.ts` for why this
+-- is not the key+message-catalog pattern). Only the Showroom's pilot account
+-- (Hana Mansour's Cairo Ceramics Showroom) gets a real Arabic value here —
+-- the other four demo orgs were never part of that milestone and stay as
+-- they were, still correctly falling back to their English `name`.
+insert into public.organizations (id, name, slug, org_type, status, is_verified, primary_locale, created_by, name_ar, name_en)
 values
   ('9c000000-cccc-4ccc-8ccc-000000000001', 'Cairo Ceramics Showroom', 'cairo-ceramics',
-   'showroom_dealer', 'active', false, 'en', '70000001-0000-4000-8000-000000000001'),
+   'showroom_dealer', 'active', false, 'en', '70000001-0000-4000-8000-000000000001',
+   'معرض سيراميك القاهرة', 'Cairo Ceramics Showroom'),
   ('9d000000-dddd-4ddd-8ddd-000000000002', 'Egypt Marble Manufacturing', 'egypt-marble',
-   'manufacturer', 'pending_verification', false, 'en', '70000003-0000-4000-8000-000000000003'),
+   'manufacturer', 'pending_verification', false, 'en', '70000003-0000-4000-8000-000000000003', null, null),
   ('9e000000-eeee-4eee-8eee-000000000003', 'Nile Import & Trade', 'nile-import',
-   'importer', 'pending_verification', false, 'en', '70000004-0000-4000-8000-000000000004'),
+   'importer', 'pending_verification', false, 'en', '70000004-0000-4000-8000-000000000004', null, null),
   ('9f000000-ffff-4fff-8fff-000000000004', 'Delta Wholesale Supply', 'delta-wholesale',
-   'wholesaler', 'active', false, 'en', '70000005-0000-4000-8000-000000000005'),
+   'wholesaler', 'active', false, 'en', '70000005-0000-4000-8000-000000000005', null, null),
   -- A contracting BUSINESS is `contractor_company`; its owner is separately an
   -- individual `contractor` PERSONA (two enums since Sprint 13, never one value).
   ('9a000000-aaaa-4aaa-8aaa-000000000005', 'Horizon Contracting', 'horizon-contracting',
-   'contractor_company', 'active', false, 'en', '70000006-0000-4000-8000-000000000006');
+   'contractor_company', 'active', false, 'en', '70000006-0000-4000-8000-000000000006', null, null);
 
 -- ---------------------------------------------------------------------------
 -- 3. Branches (one per new org)
 -- ---------------------------------------------------------------------------
-insert into public.branches (id, organization_id, name, is_active)
+-- Same additive bilingual columns as the organizations insert above; only
+-- Nasr City Showroom (the Foundation milestone's pilot branch) gets real
+-- Arabic name/address values. `address_en` reuses "Nasr City, Cairo" — the
+-- same English address string already used elsewhere in this codebase for
+-- this branch (customer records, `branch-identity-dialog.test.tsx`) — rather
+-- than inventing a second, possibly-inconsistent one.
+insert into public.branches (id, organization_id, name, is_active, name_ar, name_en, address_ar, address_en)
 values
-  ('b0000001-0000-4000-8000-000000000001', '9c000000-cccc-4ccc-8ccc-000000000001', 'Nasr City Showroom', true),
-  ('b0000002-0000-4000-8000-000000000002', '9d000000-dddd-4ddd-8ddd-000000000002', '6th of October Plant', true),
-  ('b0000003-0000-4000-8000-000000000003', '9e000000-eeee-4eee-8eee-000000000003', 'Alexandria Port Office', true),
-  ('b0000004-0000-4000-8000-000000000004', '9f000000-ffff-4fff-8fff-000000000004', 'Tanta Depot', true),
-  ('b0000005-0000-4000-8000-000000000005', '9a000000-aaaa-4aaa-8aaa-000000000005', 'New Cairo Office', true);
+  ('b0000001-0000-4000-8000-000000000001', '9c000000-cccc-4ccc-8ccc-000000000001', 'Nasr City Showroom', true,
+   'فرع مدينة نصر', 'Nasr City Showroom', 'مدينة نصر، القاهرة', 'Nasr City, Cairo'),
+  ('b0000002-0000-4000-8000-000000000002', '9d000000-dddd-4ddd-8ddd-000000000002', '6th of October Plant', true, null, null, null, null),
+  ('b0000003-0000-4000-8000-000000000003', '9e000000-eeee-4eee-8eee-000000000003', 'Alexandria Port Office', true, null, null, null, null),
+  ('b0000004-0000-4000-8000-000000000004', '9f000000-ffff-4fff-8fff-000000000004', 'Tanta Depot', true, null, null, null, null),
+  ('b0000005-0000-4000-8000-000000000005', '9a000000-aaaa-4aaa-8aaa-000000000005', 'New Cairo Office', true, null, null, null, null);
 
 -- ---------------------------------------------------------------------------
 -- 4. Memberships (9 active; Nour is a PENDING token invitation, not a member yet)

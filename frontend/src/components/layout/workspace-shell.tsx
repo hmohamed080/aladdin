@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import type { WorkspaceContext } from "@/server/queries/context";
-import { BranchSwitcher } from "@/components/layout/context-switchers";
+import { BranchSwitcher, WorkspaceContextMobile } from "@/components/layout/context-switchers";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { AppHeader, HeaderSeparator } from "@/components/layout/app-header";
 import { WorkspaceNavPanel, MobileNav } from "@/components/layout/workspace-nav";
@@ -34,9 +34,15 @@ import { commerceStance } from "@/lib/workspace/supply-side";
 export async function WorkspaceShell({
   workspace,
   children,
+  orgDisplayName,
+  branchDisplayName,
 }: {
   workspace: WorkspaceContext;
   children: ReactNode;
+  /** The active organization's own Arabic/English name, already resolved for the caller's locale — see `WorkspaceSwitcher`'s `activeDisplayName`. */
+  orgDisplayName?: string | null;
+  /** The active (single) branch's own Arabic/English name, when there is exactly one in scope — see `BranchSwitcher`'s `activeDisplayName`. */
+  branchDisplayName?: string | null;
 }) {
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
@@ -70,7 +76,7 @@ export async function WorkspaceShell({
           capabilities={active.capabilities}
           stance={stance}
           hasWorkspace
-          workspaceLabel={active.organizationName}
+          workspaceLabel={orgDisplayName ?? active.organizationName}
           orgId={active.organizationId}
           preferencesHref="/b2b/settings"
           /* The floating form. The brand is NOT drawn here in this variant — it
@@ -79,7 +85,11 @@ export async function WorkspaceShell({
           variant="card"
           context={
             <>
-              <WorkspaceSwitcher entries={workspace.entries} activeKey={active.organizationId} />
+              <WorkspaceSwitcher
+                entries={workspace.entries}
+                activeKey={active.organizationId}
+                activeDisplayName={orgDisplayName}
+              />
               {/* The branch is a scope INSIDE the organization, so it reads as
                   the next crumb rather than as a second, unrelated chip. */}
               <HeaderSeparator />
@@ -87,8 +97,22 @@ export async function WorkspaceShell({
                 branches={active.branches}
                 activeId={active.activeBranchId}
                 orgWide={orgWide}
+                activeDisplayName={branchDisplayName}
               />
             </>
+          }
+          mobileContext={
+            <WorkspaceContextMobile
+              orgLabel={m.nav.organization}
+              orgName={orgDisplayName || active.organizationName}
+              branchLabel={m.nav.branch}
+              branchName={active.branches.length <= 1 ? (branchDisplayName || active.branches[0]?.name || null) : null}
+              branchSelector={
+                active.branches.length > 1 ? (
+                  <BranchSwitcher branches={active.branches} activeId={active.activeBranchId} orgWide={orgWide} />
+                ) : undefined
+              }
+            />
           }
           actions={<SalesRealtime orgId={active.organizationId} branchId={active.activeBranchId} />}
         />

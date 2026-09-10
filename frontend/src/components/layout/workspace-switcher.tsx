@@ -28,6 +28,7 @@ export function WorkspaceSwitcher({
   entries,
   activeKey,
   showConnectShowroom = false,
+  activeDisplayName,
 }: {
   /** Personal + every organization with an active membership. */
   entries: WorkspaceEntry[];
@@ -39,6 +40,15 @@ export function WorkspaceSwitcher({
    * business (Sprint 13).
    */
   showConnectShowroom?: boolean;
+  /**
+   * The active organization's own Arabic/English trading name, already
+   * resolved for the caller's locale (see `resolveBilingualText`) — an
+   * override for the TRIGGER label only. `entries` (and therefore the
+   * dropdown's own rows) still carries every organization's raw `name`;
+   * only the active one has a translated pair to show, so only the active
+   * one's displayed label is overridden here.
+   */
+  activeDisplayName?: string | null;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -67,7 +77,9 @@ export function WorkspaceSwitcher({
     e.kind === "personal" ? activeKey === PERSONAL_CONTEXT : e.organizationId === activeKey,
   );
   const activeLabel =
-    active?.kind === "personal" ? t("workspace.personal") : (active?.name ?? t("workspace.title"));
+    active?.kind === "personal"
+      ? t("workspace.personal")
+      : (activeDisplayName || active?.name || t("workspace.title"));
 
   /**
    * The organization's KIND, in the words the product shows users.
@@ -109,7 +121,11 @@ export function WorkspaceSwitcher({
           // parked in the chrome, and it was the tallest thing in the row. The
           // cap stays responsive — at 393px this trigger shares its row with the
           // search, help, theme and avatar controls.
-          "flex h-7 min-w-0 max-w-32 items-center gap-1.5 rounded-sm px-2 text-label font-medium text-fg tablet:max-w-56",
+          // Capped on mobile/tablet, where header width is genuinely scarce —
+          // but NOT on desktop: a real organization name ("معرض سيراميك
+          // القاهرة") must never truncate there, so desktop drops the cap
+          // rather than inheriting tablet's.
+          "flex h-7 min-w-0 max-w-32 items-center gap-1.5 rounded-sm px-2 text-label font-medium text-fg tablet:max-w-56 desktop:max-w-none",
           "transition-colors hover:bg-surface-hover disabled:opacity-60",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
         )}

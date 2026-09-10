@@ -2,6 +2,7 @@ import { getPageContext } from "@/server/queries/page-context";
 import { commerceStance } from "@/lib/workspace/supply-side";
 import { BuyerDashboard } from "@/features/home/buyer-dashboard";
 import { SupplyDashboard } from "@/features/home/supply-dashboard";
+import { ShowroomDashboard } from "@/features/home/showroom-dashboard";
 
 // Auth + organization context come from cookies, so this route is dynamic by
 // construction. The declaration stays because it states the intent explicitly:
@@ -36,6 +37,22 @@ export default async function B2BHomePage({
 }) {
   const [ctx, params] = await Promise.all([getPageContext(), searchParams]);
   if (!ctx) return null;
+
+  // Showroom/Dealer gets its own approved dashboard IA — a sibling of the
+  // buyer/seller composition below, not a fork of either (see
+  // features/home/showroom-dashboard.tsx). Checked before the generic
+  // buyer/seller stance so a showroom, which IS buyer-stance under
+  // `commerceStance`, does not fall through to the generic buyer dashboard.
+  if (ctx.org.orgType === "showroom_dealer") {
+    return (
+      <ShowroomDashboard
+        ctx={ctx}
+        period={one(params.period)}
+        from={one(params.from)}
+        to={one(params.to)}
+      />
+    );
+  }
 
   return commerceStance(ctx.org.orgType) === "seller" ? (
     <SupplyDashboard

@@ -87,33 +87,48 @@ export type Database = {
       }
       branches: {
         Row: {
+          address_ar: string | null
+          address_en: string | null
           created_at: string
           deleted_at: string | null
           id: string
           is_active: boolean
           locality_id: string | null
           name: string
+          name_ar: string | null
+          name_en: string | null
           organization_id: string
+          timezone: string | null
           updated_at: string
         }
         Insert: {
+          address_ar?: string | null
+          address_en?: string | null
           created_at?: string
           deleted_at?: string | null
           id?: string
           is_active?: boolean
           locality_id?: string | null
           name: string
+          name_ar?: string | null
+          name_en?: string | null
           organization_id: string
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
+          address_ar?: string | null
+          address_en?: string | null
           created_at?: string
           deleted_at?: string | null
           id?: string
           is_active?: boolean
           locality_id?: string | null
           name?: string
+          name_ar?: string | null
+          name_en?: string | null
           organization_id?: string
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -514,6 +529,55 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["organization_id", "id"]
+          },
+        ]
+      }
+      dashboard_kpi_layouts: {
+        Row: {
+          card_order: Database["public"]["Enums"]["dashboard_kpi_card_key"][]
+          id: string
+          membership_id: string | null
+          organization_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          card_order: Database["public"]["Enums"]["dashboard_kpi_card_key"][]
+          id?: string
+          membership_id?: string | null
+          organization_id: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          card_order?: Database["public"]["Enums"]["dashboard_kpi_card_key"][]
+          id?: string
+          membership_id?: string | null
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_kpi_layouts_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_kpi_layouts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_kpi_layouts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2017,12 +2081,15 @@ export type Database = {
           locality_id: string | null
           logo_media_id: string | null
           name: string
+          name_ar: string | null
+          name_en: string | null
           org_type: Database["public"]["Enums"]["organization_type"]
           primary_locale: string
           referred_by_user_id: string | null
           slug: string | null
           source: string
           status: Database["public"]["Enums"]["org_status"]
+          timezone: string | null
           updated_at: string
         }
         Insert: {
@@ -2034,12 +2101,15 @@ export type Database = {
           locality_id?: string | null
           logo_media_id?: string | null
           name: string
+          name_ar?: string | null
+          name_en?: string | null
           org_type: Database["public"]["Enums"]["organization_type"]
           primary_locale?: string
           referred_by_user_id?: string | null
           slug?: string | null
           source?: string
           status?: Database["public"]["Enums"]["org_status"]
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
@@ -2051,12 +2121,15 @@ export type Database = {
           locality_id?: string | null
           logo_media_id?: string | null
           name?: string
+          name_ar?: string | null
+          name_en?: string | null
           org_type?: Database["public"]["Enums"]["organization_type"]
           primary_locale?: string
           referred_by_user_id?: string | null
           slug?: string | null
           source?: string
           status?: Database["public"]["Enums"]["org_status"]
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2373,6 +2446,8 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           display_name: string
+          display_name_ar: string | null
+          display_name_en: string | null
           headline: string | null
           id: string
           languages: string[] | null
@@ -2389,6 +2464,8 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           display_name: string
+          display_name_ar?: string | null
+          display_name_en?: string | null
           headline?: string | null
           id?: string
           languages?: string[] | null
@@ -2405,6 +2482,8 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           display_name?: string
+          display_name_ar?: string | null
+          display_name_en?: string | null
           headline?: string | null
           id?: string
           languages?: string[] | null
@@ -4411,6 +4490,17 @@ export type Database = {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: undefined
       }
+      branch_update_i18n: {
+        Args: {
+          p_address_ar: string
+          p_address_en: string
+          p_branch_id: string
+          p_name_ar: string
+          p_name_en: string
+          p_timezone: string
+        }
+        Returns: undefined
+      }
       business_draft_save: {
         Args: {
           p_city?: string
@@ -4560,6 +4650,28 @@ export type Database = {
           p_title: string
         }
         Returns: string
+      }
+      dashboard_kpi_layout_reset_personal: {
+        Args: { p_org_id: string }
+        Returns: undefined
+      }
+      dashboard_kpi_layout_reset_team_default: {
+        Args: { p_org_id: string }
+        Returns: undefined
+      }
+      dashboard_kpi_layout_set_personal: {
+        Args: {
+          p_card_order: Database["public"]["Enums"]["dashboard_kpi_card_key"][]
+          p_org_id: string
+        }
+        Returns: undefined
+      }
+      dashboard_kpi_layout_set_team_default: {
+        Args: {
+          p_card_order: Database["public"]["Enums"]["dashboard_kpi_card_key"][]
+          p_org_id: string
+        }
+        Returns: undefined
       }
       decide_quotation: {
         Args: {
@@ -4881,6 +4993,15 @@ export type Database = {
           user_id: string
         }[]
       }
+      organization_update_i18n: {
+        Args: {
+          p_name_ar: string
+          p_name_en: string
+          p_org_id: string
+          p_timezone: string
+        }
+        Returns: undefined
+      }
       points_balance: { Args: { p_user_id?: string }; Returns: number }
       portfolio_item_create: {
         Args: { p_content_type: string; p_description: string; p_title: string }
@@ -5186,6 +5307,15 @@ export type Database = {
       contact_channel: "whatsapp" | "email"
       customer_status: "active" | "archived"
       customer_type: "individual" | "company"
+      dashboard_kpi_card_key:
+        | "overdue_followups"
+        | "due_today"
+        | "quotations_to_review"
+        | "open_purchase_requests"
+        | "orders_in_progress"
+        | "total_purchases"
+        | "projects"
+        | "saved_products"
       follow_up_status: "open" | "completed" | "cancelled"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
       job_application_status:
@@ -5441,6 +5571,16 @@ export const Constants = {
       contact_channel: ["whatsapp", "email"],
       customer_status: ["active", "archived"],
       customer_type: ["individual", "company"],
+      dashboard_kpi_card_key: [
+        "overdue_followups",
+        "due_today",
+        "quotations_to_review",
+        "open_purchase_requests",
+        "orders_in_progress",
+        "total_purchases",
+        "projects",
+        "saved_products",
+      ],
       follow_up_status: ["open", "completed", "cancelled"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
       job_application_status: [
