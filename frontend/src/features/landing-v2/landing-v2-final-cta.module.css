@@ -1,0 +1,147 @@
+.section {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  /* `section-4.png`'s 2172×724 canvas has ~147px of fully-transparent
+     padding baked in above the visible pill card and ~207px below it
+     (pixel-alpha-scanned) — sizing this section to the FULL canvas
+     reserved that dead space as visible page height, reading as a large
+     gap before/after this section. The box is sized to the CONTENT band
+     only (~385px, with an 8px safety margin on each side of the measured
+     edges); the asset itself is never cropped, resized, re-exported, or
+     given any new border-radius/mask/transform — `.sceneImg` below scales
+     it to its own untouched native ratio via `object-fit: cover` and
+     simply lets the section's shorter box clip the transparent margin off,
+     the same way a picture frame crops a print without touching the
+     print. The pill's own rounded ends (baked into the artwork, left/right
+     only) are untouched since this crop is vertical-only. */
+  aspect-ratio: 2172 / 385;
+  margin-top: 0.75rem;
+  /* Shared landing-page gutter (see globals.css) minus this asset's own
+     ~1.15% baked-in transparent inset (25px/24px of its 2172px canvas,
+     pixel-alpha-scanned) — nets out to the same VISIBLE card edge as
+     Hero/Section 2/3, replacing the previous unrelated `mx-[0.9%]`. */
+  margin-inline: calc(var(--landing-page-gutter) - 1.15%);
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+.sceneImg {
+  object-fit: cover;
+  /* Vertical only (horizontal padding in the source canvas is ~25px each
+     side out of 2172 — negligible, so centered). 41% places the crop
+     window over the measured content band (147px top / 207px bottom of
+     339px total overflow, plus the 8px safety margin above). */
+  object-position: 50% 41%;
+}
+
+.copyWrap {
+  /* `justify-content: flex-end` is a LOGICAL end, not a physical one — under
+     `dir="rtl"` it resolves to the physical LEFT, which put the copy block
+     on top of the decorative wordmark instead of on the cream side of the
+     photo. Pinning `direction: ltr` here (same fixed-physical convention as
+     the Hero's caps and the Products grid) keeps "flex-end" meaning
+     physical-right regardless of locale; `.copy`'s own `dir` still governs
+     how the actual text aligns and reads inside that fixed box. */
+  direction: ltr;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.copy {
+  width: min(36rem, 48%);
+  padding-inline-end: clamp(1.25rem, 5vw, 3.5rem);
+  padding-inline-start: 1rem;
+  text-align: start;
+}
+
+.title {
+  /* Task 6: scaled up (max 1.6rem → 2.1rem) — the CTA group read small
+     next to the approved reference. */
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.35rem, 2.5vw, 2.1rem);
+  line-height: 1.22;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.subtitle {
+  margin: 0 0 1.3rem;
+  font-size: clamp(0.85rem, 1.35vw, 1.15rem);
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ink) 72%, transparent);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.secondaryCta {
+  min-height: 2.85rem;
+  padding-inline: 1.3rem;
+  font-size: 1rem;
+  border-color: color-mix(in srgb, var(--ink) 30%, transparent);
+  color: var(--ink);
+}
+
+.primaryCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.85rem;
+  padding-inline: 1.5rem 0.45rem;
+  font-size: 1rem;
+  background: var(--lumen);
+  color: var(--basalt);
+}
+
+.ctaIcon {
+  display: grid;
+  place-items: center;
+  width: 1.95rem;
+  height: 1.95rem;
+  flex: none;
+  border-radius: 999px;
+  background: var(--plaster);
+  color: var(--ink);
+}
+
+@media (max-width: 63.999rem) {
+  .copy {
+    width: min(24rem, 60%);
+  }
+}
+
+@media (max-width: 47.999rem) {
+  /* `min-height: 15rem` (and, before that, 30rem — the original root cause
+     of a reported scroll/blank-space bug), the mobile-only `border-radius`
+     override, and the object-position hack below are all gone: a fixed
+     `aspect-ratio` plus `border-radius: 999px` on `.section` already keep
+     the same vertical-only crop and true pill ends at every width, so none
+     of them need a breakpoint-specific rescue any more. */
+  .copyWrap {
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 1.5rem;
+  }
+
+  .copy {
+    width: min(26rem, 88%);
+    padding-inline: 1.25rem;
+    text-align: center;
+  }
+
+  .actions {
+    justify-content: center;
+  }
+}

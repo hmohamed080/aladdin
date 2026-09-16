@@ -1,0 +1,412 @@
+/* ============================================================================
+ * ONE HeroStage — container-query architecture.
+ *
+ * `.heroFrame` IS the design canvas: `width: 100%; aspect-ratio: 1728 / 735`
+ * (the trimmed artwork's own native ratio) and `container-type: inline-size`,
+ * which turns its own rendered width into a query context every descendant's
+ * `cqw` unit resolves against.
+ *
+ * Every overlay is positioned as a PERCENTAGE of that one box (`top`/`left`/
+ * `right`/`width`/`height` on the absolutely-positioned caps/nav/copy), and
+ * every piece of CONTENT sizing inside them (font-size, icon/button
+ * dimensions, gaps, padding, margins, max-widths that control line breaks)
+ * is a plain `cqw` value — no `clamp()`, no `vw`, no fixed `rem`/`px`, no
+ * breakpoint. Both dimensions of the frame are locked to each other by the
+ * fixed `aspect-ratio`, so `cqw` (based on inline-size) and `%` (based on
+ * the containing block's height, for top/height) scale in exact lockstep —
+ * the whole Hero is one number line, not two systems that happen to agree
+ * at one viewport width.
+ *
+ * This replaces the previous `clamp(MINrem, Nvw, MAXrem)` scheme, whose `vw`
+ * term ties sizing to the VIEWPORT rather than to the Hero's own rendered
+ * box — the two only stay proportional when the Hero happens to fill the
+ * full viewport width exactly, which breaks under browser zoom, OS/display
+ * scaling, or anything that changes the relationship between viewport size
+ * and the Hero's own rendered size. It also replaces the old
+ * `@media (max-width: 30rem)` block of independently hand-tuned mobile
+ * values (a second, disconnected geometry) with nothing: at any container
+ * width, every value below is the same percentage of that width, so mobile
+ * needs no separate rules to already be proportionally correct.
+ *
+ * Every `cqw` figure below was converted from this file's own previous
+ * `MAXrem` values (each already tuned to look right at a 1440px-wide Hero),
+ * using `cqw = MAXrem × 16 / 14.4` (14.4px = 1cqw at a 1440px container) —
+ * so the rendered result at a 1440px-wide Hero is unchanged; only how it
+ * scales away from that width is fixed.
+ *
+ * Legibility at very small container widths (a consequence of pure
+ * proportional scaling, not a bug) is an explicitly separate, later pass —
+ * this one only makes the geometry itself mathematically stable.
+ * ==========================================================================*/
+
+.heroFrame {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: 100%;
+  container-type: inline-size;
+  background: transparent;
+  /* The trimmed runtime asset's own native ratio (1728×735 — see the
+     `<Image>` comment in the TSX for how it was derived from
+     `background (2).png`). The artwork fills this box exactly: no crop, no
+     distortion, `width: 100%; height: auto` on the image below. */
+  aspect-ratio: 1728 / 735;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.scene img {
+  /* No `object-fit` here on purpose — `fill` was dropped from the `<Image>`
+     in the TSX specifically so this rule has full control instead of
+     fighting Next's own inline inset/width/height styles. The trimmed
+     asset's own ratio already matches `.heroFrame`'s, so `width: 100%;
+     height: auto` fills the frame exactly with no offset needed. */
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: auto;
+}
+
+.brandCap,
+.actionCap {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  background: transparent;
+}
+
+.brandCap {
+  top: 0;
+  left: 0;
+  width: 20%;
+  /* Was 16.03% — raised (with less vertical padding below) to give the
+     logo more room to grow into per the "fills the cutout better" note,
+     without pushing it back into overflow. */
+  height: 17.5%;
+  justify-content: center;
+  padding: 0.4cqw 2.5cqw 0.4cqw 1.1111cqw;
+}
+
+.brandLogo {
+  width: auto;
+  /* Was 5.4cqw (the fix for the earlier clipping bug), then judged slightly
+     too small once clipping was gone. +17.6% — still safely inside
+     `.brandCap`'s now-larger available height (~6.64cqw), with clearance
+     left over, keeping the source PNG's own 684:643 ratio via
+     `width: auto`. */
+  height: 6.35cqw;
+  max-width: 82%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.actionCap {
+  /* Moves the whole EN/Sign-in/Create-account group slightly down and left
+     from the transparent corner's own top-right edge — both as a % of the
+     frame, so the offset scales with the Hero exactly like the box's own
+     width/height do. */
+  top: 1.4%;
+  right: 1.5%;
+  width: 32%;
+  min-width: 0;
+  height: 7.96%;
+  justify-content: flex-end;
+  gap: 0.3889cqw;
+  padding: 0.7222cqw 1.3889cqw 0.7778cqw 2.2222cqw;
+  color: var(--ink);
+}
+
+.actionCap button {
+  color: var(--ink);
+}
+
+.actionCap a,
+.languageControl {
+  flex: none;
+  white-space: nowrap;
+}
+
+.languageControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1cqw;
+}
+
+.languageControl button {
+  min-height: 0;
+  padding: 0;
+  /* `text-label` (the shared Button component's own size, 0.8125rem/13px)
+     is a fixed Tailwind theme value — overridden here so the "EN"/"ع"
+     label scales with the Hero like everything else instead of staying
+     pinned to a viewport-independent 13px. */
+  font-size: 0.9028cqw;
+  line-height: 1.2;
+}
+
+/* Same fixed-size problem, one level down: the shared Button's label span
+   carries a Tailwind `min-w-5` (1.25rem/20px) utility, and the icon
+   components render a literal `width`/`height` HTML attribute in px (14 on
+   the globe, 16/18 on the arrows) — neither scales with `cqw` on its own,
+   so both are overridden here at the actual rendered element. */
+.languageControl button span {
+  min-width: 1.3889cqw;
+}
+
+.languageControl svg {
+  width: 0.9722cqw;
+  height: 0.9722cqw;
+}
+
+.actionIcon svg {
+  width: 1.1111cqw;
+  height: 1.1111cqw;
+}
+
+.ctaIcon svg {
+  width: 1.25cqw;
+  height: 1.25cqw;
+}
+
+.accountCta,
+.heroCta {
+  border-radius: 999px;
+  /* One premium gold family for both buttons (brand-lumen, not the pastel
+     `--lumen-soft`), paired with `--basalt` for contrast — see `--on-accent`
+     in tokens.css. Unchanged this pass. */
+  background: var(--lumen);
+  color: var(--basalt);
+}
+
+.accountCta {
+  min-height: 2.6111cqw;
+  /* The shared Button component's `sizes.sm` also carries a fixed
+     `gap-1.5` (0.375rem/6px) Tailwind utility between the label and its
+     icon span — every other property of that size class was already
+     overridden above, but this one was missed, so this button's own
+     internal gap was the one remaining thing on the whole Hero that
+     stayed pinned to a fixed pixel value instead of scaling with
+     everything else. Converted at the same 1440-reference basis as the
+     rest of this file: 6px / 14.4 (1cqw at 1440px). */
+  gap: 0.4167cqw;
+  padding: 0.3333cqw 0.3889cqw;
+  font-size: 0.8cqw;
+}
+
+.signIn {
+  padding: 0.3889cqw;
+  font-size: 0.8cqw;
+}
+
+.actionDivider {
+  width: 1px;
+  height: 1.1111cqw;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+}
+
+.actionIcon,
+.ctaIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 999px;
+  background: var(--plaster);
+  color: var(--ink);
+}
+
+.actionIcon {
+  width: 1.9444cqw;
+  height: 1.9444cqw;
+}
+
+.ctaIcon {
+  width: 2.2222cqw;
+  height: 2.2222cqw;
+  margin-inline-start: 0.3889cqw;
+}
+
+.navigation {
+  display: flex;
+  position: absolute;
+  /* Height-relative %, not `cqw` — this is a Y-POSITION (how far down from
+     the frame's own top edge), and `top` on an absolutely-positioned box
+     resolves against the containing block's HEIGHT. Since height is locked
+     to width by the fixed `aspect-ratio`, this scales in the same lockstep
+     as every `cqw` value below regardless of which axis it's expressed
+     against. */
+  top: 5.22%;
+  left: 20%;
+  right: 32%;
+  z-index: 20;
+  height: 13%;
+  align-items: center;
+  justify-content: center;
+  gap: 3.3333cqw;
+  white-space: nowrap;
+}
+
+.navLink {
+  font-size: 0.9722cqw;
+  padding: 0.5556cqw 0.5556cqw;
+}
+
+/* -------------------------------------------------------------------------
+ * HeroCopyZone — ONE box (position, size, alignment) for both locales at
+ * every container width. Only the text strings differ between AR/EN; the
+ * geometry is identical by construction (both use this same class).
+ * ---------------------------------------------------------------------- */
+.copy {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  top: 27%;
+  left: 10%;
+  /* Plain %, not `min(36%, 31rem)` — a fixed-rem cap would stop scaling
+     with the Hero past whatever width it was tuned for, which is exactly
+     the two-systems bug this pass removes. Widened from 32% back to 35%:
+     pixel-sampling the actual background asset (not eyeballing) put the
+     navy-to-material transition at ~57-58% of the frame, well past 32%'s
+     right edge (49%) — 32% was over-narrowed, forcing the main headline
+     into 3 lines. 35% (right edge 52%) still leaves a clear ~5% margin
+     before the material stack while giving the headline more room to
+     break better. */
+  width: 40%;
+}
+
+.copyArabic,
+.copyEnglish {
+  align-items: center;
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 1.3889cqw;
+  font-size: 0.9028cqw;
+  letter-spacing: 0.02em;
+}
+
+.brandHeadline {
+  position: relative;
+  font-weight: 700;
+}
+
+.copyArabic .brandHeadline {
+  font-size: 4.7cqw;
+  line-height: 1.08;
+}
+
+.copyEnglish .brandHeadline {
+  font-size: 4.55cqw;
+  line-height: 1.05;
+}
+
+.mainHeadline {
+  position: relative;
+  font-weight: 700;
+  white-space: normal;
+}
+
+.copyArabic .mainHeadline {
+  margin-top: 0.5cqw;
+  font-size: 3.75cqw;
+  line-height: 1.12;
+}
+
+.copyEnglish .mainHeadline {
+  margin-top: 0.4cqw;
+  /* Forces the intentional "Connects every side / of finishing" break
+     instead of one long line that would push toward the laptop artwork —
+     narrower than `.copy`'s own 35% width, in `cqw` so the break point
+     itself scales with the Hero instead of only applying below a fixed
+     pixel width. */
+  max-width: 30cqw;
+  font-size: 3.4cqw;
+  line-height: 1.14;
+}
+
+.supportCopy {
+  margin: 0.6cqw 0 0;
+  font-size: 1.1111cqw;
+  line-height: 1.4;
+}
+
+.copyArabic .supportCopy {
+  max-width: 30cqw;
+}
+
+.copyEnglish .supportCopy {
+  max-width: 30cqw;
+}
+
+.ctaWrap {
+  margin-top: 1.3cqw;
+}
+
+.heroCta {
+  direction: ltr;
+  min-width: 10.8333cqw;
+  min-height: 3.1667cqw;
+  justify-content: space-between;
+  gap: 1.1111cqw;
+  padding: 0.4444cqw 0.5cqw 0.4444cqw 1.6667cqw;
+  font-size: 1.0556cqw;
+}
+
+.proofStrip {
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  align-items: stretch;
+  margin-top: 1.7cqw;
+  color: color-mix(in srgb, var(--limestone) 72%, transparent);
+  font-size: 0.7556cqw;
+  font-weight: 500;
+  list-style: none;
+  /* The proof strip sits over the countertop, whose reflections vary in
+     brightness across its width — and RTL vs LTR column order puts each
+     label over a DIFFERENT part of that countertop, so a fix tuned only for
+     one locale's word order silently under-covers the other. A small shadow
+     keeps every label readable regardless of which part of the surface is
+     under it. */
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.55);
+}
+
+.proofStrip li {
+  display: flex;
+  /* Was 6.9444cqw with 0.8333cqw inline padding each side — at the copy
+     zone's narrower widths this pushed the row's own natural width past
+     the copy box, drifting the last column (physically rightmost in RTL)
+     toward the material stack. Tightened so all three stats stay inside
+     the copy zone's own width, not just its center. */
+  min-width: 5.5cqw;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2cqw;
+  padding-inline: 0.5556cqw;
+  text-align: center;
+}
+
+.proofStrip li + li {
+  border-inline-start: 1px solid color-mix(in srgb, var(--limestone) 24%, transparent);
+}
+
+.proofStrip strong {
+  color: var(--limestone);
+  font-size: 1.0667cqw;
+  font-weight: 700;
+  line-height: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene {
+    transform: none;
+  }
+}

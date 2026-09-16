@@ -1,0 +1,242 @@
+.footer {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--limestone);
+  /* Rounded top only — this is the page's last section, so unlike the
+     image bands above it there's no card below it to echo a bottom radius
+     against. `vw`-scaled, not a fixed rem, so the sweep stays proportional
+     at narrow viewports instead of reading oversized on mobile relative to
+     the page (same reasoning as the section cards' own corners, which are
+     baked into their PNGs and shrink with the image's rendered width). The
+     6vw/5.5rem values themselves are tuned to a visual target (an
+     annotated reference screenshot marking a large, clearly visible sweep
+     on this corner) rather than measured off the card PNGs' own — much
+     more subtle — baked corner. */
+  border-radius: min(6vw, 5.5rem) min(6vw, 5.5rem) 0 0;
+  margin-top: 0.75rem;
+  padding-block: clamp(2rem, 4vw, 3.5rem) clamp(1rem, 2vw, 1.5rem);
+  padding-inline: clamp(1rem, 4vw, 3rem);
+}
+
+.texture {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: #0b0c0f;
+}
+
+.textureImg {
+  object-fit: cover;
+  opacity: 0.9;
+}
+
+.top {
+  /* Fixed physical layout matching the reference — logo left, link columns
+     middle, newsletter right, at every locale (`dir` still applies per
+     block below, only the grid's own left-to-right order is pinned). */
+  direction: ltr;
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 3rem);
+  max-width: 90rem;
+  margin: 0 auto;
+  padding-bottom: clamp(1.5rem, 3vw, 2.5rem);
+  border-bottom: 1px solid color-mix(in srgb, var(--limestone) 16%, transparent);
+}
+
+.brandBlock {
+  min-width: 0;
+}
+
+.logo {
+  /* Was 2.75rem (too small, barely taller than its own tagline), then
+     5.5rem — judged slightly oversized once seen at full size next to the
+     compact column/newsletter text. 4.25rem keeps it clearly the most
+     prominent element in the block without dominating it. */
+  height: 4.25rem;
+  width: auto;
+  object-fit: contain;
+}
+
+.tagline {
+  margin: 0.85rem 0 0;
+  max-width: 16rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--limestone) 72%, transparent);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.column {
+  min-width: 0;
+}
+
+.columnTitle {
+  margin: 0 0 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--lumen);
+}
+
+.columnList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.columnLink {
+  font-size: 0.85rem;
+  color: color-mix(in srgb, var(--limestone) 82%, transparent);
+  transition: color 0.15s ease;
+}
+
+.columnLink:hover {
+  color: var(--limestone);
+}
+
+.newsletter {
+  min-width: 0;
+}
+
+.newsletterTitle {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--lumen);
+}
+
+.newsletterText {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--limestone) 72%, transparent);
+}
+
+.subscribeForm {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--limestone) 10%, transparent);
+  padding: 0.35rem 0.35rem 0.35rem 1rem;
+}
+
+.subscribeInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 0.85rem;
+  color: var(--limestone);
+  outline: none;
+}
+
+.subscribeInput::placeholder {
+  color: color-mix(in srgb, var(--limestone) 55%, transparent);
+}
+
+.subscribeSubmit {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  background: var(--lumen);
+  color: var(--basalt);
+}
+
+.subscribedNote {
+  margin: 0.6rem 0 0;
+  font-size: 0.78rem;
+  color: var(--lumen);
+}
+
+.social {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+
+.socialLink {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  background: var(--limestone);
+  color: var(--basalt);
+}
+
+.bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  max-width: 90rem;
+  margin: 0 auto;
+  padding-top: clamp(1rem, 2vw, 1.5rem);
+}
+
+.copyright {
+  margin: 0;
+  font-size: 0.78rem;
+  color: color-mix(in srgb, var(--limestone) 65%, transparent);
+}
+
+.bottomLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bottomLink {
+  font-size: 0.78rem;
+  color: color-mix(in srgb, var(--limestone) 65%, transparent);
+}
+
+.bottomLink:hover {
+  color: var(--limestone);
+}
+
+@media (max-width: 63.999rem) {
+  .top {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .newsletter {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 47.999rem) {
+  .top {
+    grid-template-columns: 1fr;
+  }
+
+  .columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .newsletter {
+    grid-column: auto;
+  }
+
+  .bottom {
+    justify-content: center;
+    text-align: center;
+  }
+}

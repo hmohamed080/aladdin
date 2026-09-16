@@ -1,0 +1,161 @@
+.section {
+  position: relative;
+  /* Small fixed gap from the section above (Audience), matching the thin
+     cream seam visible between every card band in the approved reference —
+     not the large section-to-section whitespace this replaced. */
+  margin-top: 0.75rem;
+  /* Shared landing-page gutter (see globals.css) minus this asset's own
+     ~0.9% baked-in transparent inset (16px of its 1774px canvas,
+     pixel-alpha-scanned) — nets out to the same VISIBLE card edge as
+     Hero/Section 3/4, replacing the previous unrelated `mx-[2.1%]`. */
+  margin-inline: calc(var(--landing-page-gutter) - 0.9%);
+}
+
+.frame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  /* `section-2.png`'s 1774×887 canvas has ~192px of fully-transparent
+     padding baked in above the visible card and ~147px below it (pixel-
+     alpha-scanned) — sizing this frame to the FULL canvas reserved that
+     dead space as visible page height, reading as a large gap before/after
+     this section. The frame is sized to the CONTENT band only (~563px,
+     with an 8px safety margin on each side of the measured edges); the
+     asset itself is never cropped, resized, or re-exported — `.sceneImg`
+     below scales it to its own untouched native ratio via `object-fit:
+     cover` and simply lets the frame's shorter box clip the transparent
+     margin off, the same way a picture frame crops a print without
+     touching the print. */
+  aspect-ratio: 1774 / 563;
+}
+
+.sceneImg {
+  object-fit: cover;
+  /* Vertical only (horizontal padding in the source canvas is ~16px each
+     side out of 1774 — negligible, so centered). 56.8% places the crop
+     window over the measured content band (192px top / 147px bottom of
+     340px total overflow, plus the 8px safety margin above). */
+  object-position: 50% 56.8%;
+}
+
+.copyWrap {
+  /* Fixed physical position regardless of locale — the asset's own empty
+     dark-wall zone (and its baked wordmark at the opposite edge) don't move
+     when the page direction flips, so the overlay can't either. Same
+     convention as the Hero's Brand/Action caps. Positioned against
+     `.section` (now a sibling of `.frame`, not a child of it — see the
+     mobile override below, where this switches to a real static block
+     stacked under the image instead of over it). */
+  position: absolute;
+  inset: 0;
+  direction: ltr;
+  display: flex;
+  align-items: center;
+}
+
+.copy {
+  /* Widened (32rem/38% → 34rem/40%) so the larger title below (Task 4:
+     "use the available dark-left space better") gets a bit more room —
+     kept well short of the asset's own dark-to-material transition
+     (~57% of the frame, pixel-sampled — see the Hero's `.copy` comment
+     for the same measurement) so the longer description line never
+     collides with the laptop artwork. */
+  width: min(34rem, 40%);
+  margin-inline-start: clamp(1.5rem, 5.5vw, 5rem);
+}
+
+/* Logical `start`, resolved against EACH element's own `dir={dir}` (set
+   directly on `.eyebrow`/`.title`/`.description` themselves, not inherited
+   from `.copy`) — so Arabic reads right-aligned (proper RTL) and English
+   reads left-aligned, while the BLOCK's own position/inset stays pinned
+   physically left via `.copy`'s uninherited `margin-inline-start` above. */
+.eyebrow,
+.title,
+.description {
+  text-align: start;
+}
+
+.eyebrow {
+  margin: 0 0 0.75em;
+  font-size: clamp(0.65rem, 1vw, 0.9rem);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--lumen);
+}
+
+.title {
+  /* Scaled up (max 2rem → 2.35rem) — Task 4: the overlay read as too
+     small next to the approved reference's stronger title. Capped short
+     of the 2.6rem first tried: at the narrower `.copy` width above that
+     size pushed the description's longest line into the laptop art. */
+  margin: 0 0 0.5em;
+  font-size: clamp(1.25rem, 2.6vw, 2.35rem);
+  line-height: 1.22;
+  font-weight: 700;
+  color: var(--limestone);
+}
+
+.description {
+  margin: 0 0 1.3em;
+  font-size: clamp(0.68rem, 1.05vw, 0.98rem);
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--limestone) 78%, transparent);
+}
+
+/* No `text-align` override needed here — none of this component's other
+   rules ever set a PHYSICAL `text-align`, so the inherited value stays the
+   logical `start` keyword all the way down and resolves against THIS div's
+   own `dir` (set in the TSX), matching the title/description above it. */
+.ctaWrap {
+  text-align: start;
+}
+
+.cta {
+  /* Scaled up alongside the title/description (Task 4). */
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(0.45rem, 0.95vw, 0.85rem);
+  min-height: clamp(1.7rem, 3.7vw, 3rem);
+  padding-inline: clamp(0.85rem, 1.9vw, 1.6rem) clamp(0.25rem, 0.5vw, 0.45rem);
+  font-size: clamp(0.62rem, 1vw, 0.95rem);
+  background: var(--lumen);
+  color: var(--basalt);
+}
+
+.ctaIcon {
+  display: grid;
+  place-items: center;
+  width: clamp(1.2rem, 2.5vw, 2rem);
+  height: clamp(1.2rem, 2.5vw, 2rem);
+  flex: none;
+  border-radius: 999px;
+  background: var(--plaster);
+  color: var(--ink);
+}
+
+@media (max-width: 47.999rem) {
+  /* Below the image, not over it, at this width only — the cropped frame
+     (Task 1's content-only band) renders too short at mobile widths
+     (~124px at 390px wide) to lay the eyebrow/title/description/CTA over
+     it without either shrinking past legibility or running the
+     description into the laptop artwork. The image itself stays full and
+     uncropped; the copy just moves to sit under it instead of on top of
+     it — the same mobile treatment already used by Section 3/Section 4. */
+  .section {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .copyWrap {
+    position: static;
+    background: #0c1922;
+    padding-block: 1.75rem;
+    align-items: flex-start;
+  }
+
+  .copy {
+    width: 100%;
+    margin-inline-start: 0;
+    padding-inline: 1.25rem;
+  }
+}

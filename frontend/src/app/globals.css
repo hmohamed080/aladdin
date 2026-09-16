@@ -1,5 +1,26 @@
 @import "../styles/tokens.css";
 
+/* ------------------------------------------------------------------
+ * LANDING PAGE (`/`) — ONE SHARED VISIBLE GUTTER
+ *
+ * Hero, Audience, Section 2, Section 3 and Section 4 must all show the
+ * same visible left/right margin (Footer is exempt — it keeps its own
+ * full-bleed layout). The three section artworks (`products-scene.png`,
+ * `value-band.png`, `final-cta-scene.png`) each bake a few percent of
+ * fully-transparent canvas around the visible card — pixel-alpha-scanned
+ * per asset: Hero ~1.65% of its own width, Section 2 ~0.9%, Section 3
+ * ~1.05%, Section 4 ~1.15%. Sizing every section's OUTER margin off this
+ * one token and subtracting its own asset's measured inset is what lands
+ * the VISIBLE card edge — not the DOM box edge — on one shared line,
+ * instead of five unrelated per-section margin values. Hero's own
+ * existing `px-[5px]` already nets out to ~this value once its asset's
+ * inset is added back (5px + 1.65% ≈ 2.02% at a 1440px viewport), so it
+ * is the value this token is calibrated from and is left unchanged.
+ * ------------------------------------------------------------------ */
+:root {
+  --landing-page-gutter: 2.02%;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -231,6 +252,72 @@
       circle at var(--carve-x) 100%,
       transparent 0 var(--carve-r),
       var(--shell-active) calc(var(--carve-r) + 0.5px)
+    );
+  }
+}
+
+/* ------------------------------------------------------------------
+ * THE LANDING HERO'S CORNER CAPS — the same carve idea as
+ * `.nav-carve-fillet` above, one level of the page up: two white "caps" (the
+ * brand mark, the sign-in/create-account actions) sit inset from the hero's
+ * own top corners, and the dark hero curves AROUND each cap rather than the
+ * cap simply sitting on top of a square dark corner. Desktop/tablet only —
+ * mobile's Hero uses a plain stacked header (see `landing-page.tsx`), so
+ * there is no narrow-screen cut-out to get wrong.
+ *
+ * Same mechanism as nav-carve: a small radial-gradient box, transparent in
+ * the quarter nearest the cap (revealing the canvas page/cap colour already
+ * behind it) and solid `--basalt` everywhere else in the box, so the fillet
+ * reads as the dark hero's own edge bending around the cap's corner. Physical
+ * `left`/`top` in the gradient's own position argument cannot be expressed as
+ * a logical property, so — exactly like `--carve-x` — the two directions get
+ * their own rule rather than one gradient mirrored by the browser.
+ * ------------------------------------------------------------------ */
+:root {
+  --hero-fillet-r: 22px;
+}
+
+@layer components {
+  .hero-cap-fillet {
+    position: absolute;
+    top: 100%;
+    width: var(--hero-fillet-r);
+    height: var(--hero-fillet-r);
+    pointer-events: none;
+  }
+
+  /* The brand cap's INNER corner — inline-end in LTR (physical right),
+     inline-start in RTL (physical left) once the cap itself has mirrored. */
+  .hero-cap-fillet--brand {
+    inset-inline-start: 100%;
+    background: radial-gradient(
+      circle at 0 0,
+      transparent 0 var(--hero-fillet-r),
+      var(--basalt) calc(var(--hero-fillet-r) + 0.5px)
+    );
+  }
+  [dir="rtl"] .hero-cap-fillet--brand {
+    background: radial-gradient(
+      circle at 100% 0,
+      transparent 0 var(--hero-fillet-r),
+      var(--basalt) calc(var(--hero-fillet-r) + 0.5px)
+    );
+  }
+
+  /* The action cap's INNER corner — the mirror image of the brand one. */
+  .hero-cap-fillet--action {
+    inset-inline-end: 100%;
+    background: radial-gradient(
+      circle at 100% 0,
+      transparent 0 var(--hero-fillet-r),
+      var(--basalt) calc(var(--hero-fillet-r) + 0.5px)
+    );
+  }
+  [dir="rtl"] .hero-cap-fillet--action {
+    background: radial-gradient(
+      circle at 0 0,
+      transparent 0 var(--hero-fillet-r),
+      var(--basalt) calc(var(--hero-fillet-r) + 0.5px)
     );
   }
 }

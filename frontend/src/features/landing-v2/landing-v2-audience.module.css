@@ -1,0 +1,143 @@
+.section {
+  background: var(--plaster);
+  /* Compact strip attached to the Hero, matching the approved reference —
+     trimmed from a 2rem max, then nudged back up slightly (1rem→1.2rem)
+     since the tighter value read as over-compressed against the icons. */
+  padding-block: clamp(0.95rem, 1.8vw, 1.2rem);
+  /* Shared landing-page gutter (see globals.css) — matches Hero/Section
+     2/3/4's visible edge instead of its own unrelated clamp(). */
+  padding-inline: var(--landing-page-gutter);
+}
+
+.row {
+  display: flex;
+  /* Fixed physical order — the approved reference draws the same 9 tiles
+     in the same left-to-right order (Personal Account ... Showrooms) at
+     every locale, not a mirrored strip. Without this, `dir="rtl"` flips
+     which end of a `flex-row` is the main-axis start, so plain DOM order
+     rendered Showrooms on the LEFT and Personal Account on the RIGHT in
+     Arabic — backwards from the reference. Pinning `direction: ltr` here
+     (the same fixed-physical convention as the Hero's caps, Products'
+     `.copyWrap`, Value's `.overlay` and the Footer's `.top`) keeps DOM
+     order = physical order regardless of locale; each `.label`'s own
+     `dir` (set in the TSX) still governs how its OWN text reads. */
+  direction: ltr;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  /* `space-between`, not `center` — the 9 items' own combined width is
+     narrower than the section's available inner width, so `center` was
+     absorbing the difference as one large symmetric OUTER margin instead
+     of matching the shared page gutter (Task 2): the strip's visible
+     first/last item landed well inside Hero/Section 2-4's edge instead of
+     flush with it. `space-between` puts that leftover space back between
+     the items (closer to the approved reference's own even spacing)
+     instead of around the whole group, so the first/last item's edge
+     lands exactly at `.section`'s own padding-inline — the same shared
+     gutter every other section uses. */
+  justify-content: space-between;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.row::-webkit-scrollbar {
+  display: none;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  /* Icon-to-label (and label-to-badge) spacing, trimmed for a tighter
+     vertical rhythm per item — the icon itself is unchanged. */
+  gap: 0.35rem;
+  min-width: 4.75rem;
+  padding-inline: clamp(0.75rem, 2.5vw, 2.75rem);
+  text-align: center;
+}
+
+.item:first-child {
+  padding-inline-start: 0;
+}
+
+.item:last-child {
+  padding-inline-end: 0;
+}
+
+/* Thin fixed-position divider centered in the gap between items, matching
+   the approved reference — physical (not logical) start edge, since it
+   belongs to the gap itself rather than to either tile's own text
+   direction. */
+.item:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  width: 1px;
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+.iconWrap {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 999px;
+  background: var(--quartz);
+  color: var(--ink);
+}
+
+.iconWrap svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.badge {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  padding: 0.1rem 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--stone-muted);
+}
+
+@media (max-width: 47.999rem) {
+  .section {
+    padding-inline: 0;
+  }
+
+  .row {
+    justify-content: flex-start;
+    padding-inline: 1rem;
+  }
+
+  .item {
+    min-width: 4.25rem;
+    padding-inline: 0.9rem;
+  }
+
+  .iconWrap {
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+
+  .label {
+    font-size: 0.7rem;
+    white-space: normal;
+    max-width: 4.5rem;
+  }
+}
