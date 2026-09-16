@@ -196,6 +196,16 @@ export const ShieldIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const HandshakeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M2.5 12.5 6 9l3 1.5M21.5 12.5 18 9l-3 1.5" />
+    <path d="m9 10.5 3.2 3a1.4 1.4 0 0 0 2-2L11 8.4a3 3 0 0 0-2.1-.9H7.2L4 10.6" />
+    <path d="m15 10.5-1.6 1.6a1.4 1.4 0 0 0 2 2L17.5 12" />
+    <path d="M6 9v6.5l2.5 2.3a1.3 1.3 0 0 0 1.8-1.9" />
+    <path d="M18 9v6.5l-2.5 2.3a1.3 1.3 0 0 1-1.8-1.9" />
+  </Svg>
+);
+
 export const GaugeIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M12 13 15 9.5" />
@@ -403,6 +413,13 @@ export const TrendingUpIcon = (p: IconProps) => (
 export const MenuIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 6h16M4 12h16M4 18h16" />
+  </Svg>
+);
+
+export const ArrowUpRightIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 17 17 7" />
+    <path d="M8 7h9v9" />
   </Svg>
 );
 

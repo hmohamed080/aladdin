@@ -1,0 +1,159 @@
+.section {
+  position: relative;
+  /* Small fixed gap from Products above, matching the thin cream seam
+     between every card band in the approved reference. */
+  margin-top: 0.75rem;
+  /* Shared landing-page gutter (see globals.css) minus this asset's own
+     ~1.04% baked-in transparent inset (23px/22px of its 2172px canvas,
+     pixel-alpha-scanned) — nets out to the same VISIBLE card edge as
+     Hero/Section 2/4, replacing the previous unrelated `mx-[2.1%]`. */
+  margin-inline: calc(var(--landing-page-gutter) - 1.04%);
+}
+
+.frame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  /* `section-3.png`'s 2172×724 canvas has ~143px of fully-transparent
+     padding baked in above the visible band and ~145px below it
+     (pixel-alpha-scanned) — sizing this frame to the FULL canvas reserved
+     that dead space as visible page height, reading as a large gap
+     before/after this section. The frame is sized to the CONTENT band only
+     (~451px, with an 8px safety margin on each side of the measured
+     edges); the asset itself is never cropped, resized, or re-exported —
+     `.sceneImg` below scales it to its own untouched native ratio via
+     `object-fit: cover` and simply lets the frame's shorter box clip the
+     transparent margin off, the same way a picture frame crops a print
+     without touching the print. */
+  aspect-ratio: 2172 / 451;
+}
+
+.sceneImg {
+  object-fit: cover;
+  /* Vertical only (horizontal padding in the source canvas is ~23px each
+     side out of 2172 — negligible, so centered). 49.5% places the crop
+     window over the measured content band (143px top / 145px bottom of
+     273px total overflow, plus the 8px safety margin above). */
+  object-position: 50% 49.5%;
+}
+
+.overlay {
+  /* Absolutely positioned against `.section` (its nearest positioned
+     ancestor now that it's a sibling of `.frame`, not a child) — `.section`
+     has no other in-flow content besides `.frame`, so `inset: 0` lands this
+     exactly over the image on desktop/tablet. See the mobile override
+     below, where this switches to a real static block instead. It's just a
+     positioning context for `.row` now (see there for why), not a flex
+     container. */
+  position: absolute;
+  inset: 0;
+  direction: ltr;
+}
+
+.row {
+  /* `top` as a percentage resolves against the CONTAINING BLOCK'S HEIGHT
+     for an absolutely positioned box (unlike `padding-top`, which always
+     resolves against width regardless of writing mode — a real trap here
+     since this box is much wider than it is tall). `section-3.png` is a
+     plain decorative background (no baked columns of its own in either
+     language), so this real HTML row is centered in the frame's own empty
+     middle rather than chasing a baked layout that doesn't exist. */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  width: min(78%, 62rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-inline: clamp(0.5rem, 2vw, 1.5rem);
+  text-align: center;
+}
+
+/* Thin vertical separators between the 3 value statements, matching the
+   approved reference — the row's own `.overlay` ancestor is pinned
+   `direction: ltr` (see above), so "the item before me in DOM order" is
+   always the one physically to the start side regardless of locale. */
+.item:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 10%;
+  bottom: 10%;
+  width: 1px;
+  background: color-mix(in srgb, var(--limestone) 20%, transparent);
+}
+
+.icon {
+  /* Task 5: bumped again (2.35rem cap → 2.65rem) — the three content
+     groups read small next to the approved reference. Frame's own height
+     is untouched, only the HTML content inside it. */
+  width: clamp(1.7rem, 3.4vw, 2.65rem);
+  height: clamp(1.7rem, 3.4vw, 2.65rem);
+  margin-bottom: 0.55em;
+  color: var(--lumen);
+}
+
+.title {
+  margin: 0 0 0.35em;
+  font-size: clamp(0.85rem, 1.6vw, 1.3rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--limestone);
+}
+
+.text {
+  margin: 0;
+  font-size: clamp(0.6rem, 1vw, 0.95rem);
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--limestone) 78%, transparent);
+}
+
+@media (max-width: 47.999rem) {
+  .section {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Below the image, not over it, at this width only — the native ratio
+     renders too short (~125px at 375px wide) to lay real text across it
+     without either shrinking past legibility or cropping two of the three
+     baked columns out of frame. The image itself stays full and uncropped;
+     the copy just moves to sit under it instead of on top of it. */
+  .overlay {
+    position: static;
+    background: #0c1922;
+    padding-block: 1.75rem;
+  }
+
+  .row {
+    position: static;
+    transform: none;
+    width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .item {
+    padding-inline: 1.25rem;
+  }
+
+  /* Stacked in one column at this width — a vertical rule between rows
+     reads as a stray line, not a separator, so it's dropped here. */
+  .item:not(:first-child)::before {
+    display: none;
+  }
+}
