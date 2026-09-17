@@ -156,10 +156,11 @@ select is((select count(*)::int from public.organization_public_directory), 10,
   'anon still discovers every active+verified org through the hardened view');
 -- Sprint 12: the seeded supplier owner is a business-only identity, so the
 -- interior designer is the single listed PERSONAL professional.
--- 8 = the base interior designer plus the Sprint-14 trades and consultants who
--- chose to be discoverable. Business owners are business-only identities and are
--- never listed here.
-select is((select count(*)::int from public.profile_public_directory), 8,
+-- 9 = the base interior designer, the Sprint-14 trades and consultants who
+-- chose to be discoverable, and seed-pilot section 11's dedicated client-demo
+-- Tradesperson (Hossam Kandil). Business owners are business-only identities
+-- and are never listed here.
+select is((select count(*)::int from public.profile_public_directory), 9,
   'anon still discovers the listed personal professional profiles through the hardened view');
 select is((select count(*)::int from public.profile_public_directory where display_name like 'Karim%'),
   0, 'a hidden professional is still absent after hardening');

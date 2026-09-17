@@ -37,9 +37,10 @@ select is((select count(*)::int from public.organization_public_directory), 10,
 -- gates discovery (Sprint 1.2).
 -- Sprint 12: only PERSONAL professionals are discoverable here. A business OWNER
 -- is a business-only identity (no personal persona) — their business is
--- discovered through organization_public_directory instead. The 8 are the base
--- interior designer plus the Sprint-14 trades and consultants.
-select is((select count(*)::int from public.profile_public_directory), 8,
+-- discovered through organization_public_directory instead. The 9 are the base
+-- interior designer, the Sprint-14 trades and consultants, and seed-pilot
+-- section 11's dedicated client-demo Tradesperson (Hossam Kandil).
+select is((select count(*)::int from public.profile_public_directory), 9,
   'anon sees only the LISTED personal professional profiles');
 select is(
   (select count(*)::int from public.profile_public_directory where display_name like 'Karim%'),

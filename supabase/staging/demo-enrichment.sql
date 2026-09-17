@@ -636,3 +636,155 @@ values
   ('70000004-0000-4000-8000-000000000004', 'quotation.submitted', 'quotation', 'fa700002-0000-4000-8000-000000000002', '9e000000-eeee-4eee-8eee-000000000003', '{"total":167400}'::jsonb, now() - interval '62 days'),
   ('70000001-0000-4000-8000-000000000001', 'quotation.accepted', 'quotation', 'fa700002-0000-4000-8000-000000000002', '9c000000-cccc-4ccc-8ccc-000000000001', '{}'::jsonb, now() - interval '60 days'),
   ('70000004-0000-4000-8000-000000000004', 'quotation.submitted', 'quotation', 'fa700003-0000-4000-8000-000000000003', '9e000000-eeee-4eee-8eee-000000000003', '{"total":126000}'::jsonb, now() - interval '4 days');
+
+
+-- ---------------------------------------------------------------------------
+-- 10. Hossam Kandil (`hossam-ac-technician`) — the dedicated CLIENT DEMO
+--     Tradesperson, made demo-ready
+-- ---------------------------------------------------------------------------
+-- His identity (auth.users, persona, contacts, listed profile, primary trade)
+-- is seeded in supabase/seed-pilot.sql section 11 — the local/pgTAP world.
+-- Everything below is the same "personal onboarding" + "verification spread"
+-- + "availability" treatment section 3/3b/7 already gives the QA installers,
+-- plus a portfolio and a job history neither seed file nor this file gave
+-- ANY of the 26 original accounts (Increment 11 and the Jobs domain both
+-- shipped with zero seeded examples anywhere — every screen they drive was
+-- untested-looking before this). He is deliberately the richest single
+-- account in the demo world: one clean story, not a QA matrix.
+
+insert into public.onboarding_progress
+  (user_id, phone, selected_track, selected_persona, selected_org_type,
+   profile_completed_at, contact_completed_at, account_type_completed_at, completed_at)
+values
+  ('72000001-0000-4000-8000-000000000001', '01012000115', 'professional', 'installer_technician', null,
+   now() - interval '65 days', now() - interval '65 days', now() - interval '65 days', now() - interval '65 days');
+
+insert into public.individual_onboarding
+  (user_id, prof_concrete_type, prof_years_experience, prof_specialization,
+   prof_services, prof_additional_services, prof_availability, prof_service_areas,
+   prof_offers_remote, prof_governorate, prof_city, prof_max_travel_km,
+   professional_completed_at)
+values
+  ('72000001-0000-4000-8000-000000000001', 'installer_technician', 14, 'Air conditioning installation and maintenance',
+   array['split_ac_installation','central_ac_maintenance','duct_installation','refrigerant_recharge'],
+   array['preventive_maintenance_contracts'],
+   'full_time', array['Cairo','Nasr City','New Cairo','Heliopolis'], false, 'Cairo', 'Nasr City', 45,
+   now() - interval '65 days');
+
+-- Approved and publicly listed, like Sayed — this account exists to be shown,
+-- not to demonstrate a pending or contested state.
+insert into public.verifications
+  (id, subject_type, user_id, verification_type, requested_account_type,
+   grants_public_listing, status, reviewer_id, reason, submitted_at, decided_at, applied_at)
+values
+  ('faa00005-0000-4000-8000-000000000005', 'user', '72000001-0000-4000-8000-000000000001', 'professional', 'installer_technician',
+   true, 'approved', '55555555-5555-4555-8555-555555555555', null,
+   now() - interval '60 days', now() - interval '52 days', now() - interval '52 days');
+
+-- Available for work, same trigger-backed write Sayed's row uses (§3b above).
+update public.profiles
+   set available_for_work = true
+ where user_id = '72000001-0000-4000-8000-000000000001'
+   and available_for_work is distinct from true;
+
+-- ---------------------------------------------------------------------------
+-- 10a. Portfolio — three published work photos
+-- ---------------------------------------------------------------------------
+-- Bytes already live in the `professional-portfolio` bucket at these exact
+-- opaque keys (uploaded once via `supabase storage cp --linked`, not part of
+-- any SQL bundle — Storage and Postgres are separate systems, S3). Simple
+-- on-brand illustrations, not photographs, for the same reason section 10.4's
+-- product swatches are SVG material swatches rather than photos: no
+-- licensing question, no external host, deterministic. `state = 'ready'`
+-- because the bytes are already there; `visibility = 'public'` because a
+-- demo portfolio with nothing published is not a demo of Increment 11 at all.
+insert into public.portfolio_items
+  (owner_user_id, object_key, content_type, title, description, visibility, state, sort_order)
+values
+  ('72000001-0000-4000-8000-000000000001',
+   'fb000001-0000-4000-8000-000000000001.jpg', 'image/jpeg',
+   'Split AC installation — New Cairo villa bedroom',
+   'Indoor unit mounted and commissioned for a 2.25 HP split system, including condensate routing.',
+   'public', 'ready', 0),
+  ('72000001-0000-4000-8000-000000000001',
+   'fb000002-0000-4000-8000-000000000002.jpg', 'image/jpeg',
+   'Outdoor compressor mounting — exterior wall bracket',
+   'Compressor unit fixed on a vibration-isolated wall bracket with weatherproofed piping.',
+   'public', 'ready', 1),
+  ('72000001-0000-4000-8000-000000000001',
+   'fb000003-0000-4000-8000-000000000003.jpg', 'image/jpeg',
+   'Ceiling duct and vent fitting — office fit-out',
+   'Supply air vent installed as part of a ducted system for a small office space.',
+   'public', 'ready', 2)
+on conflict (object_key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- 10b. Job history — one open opportunity to discover, one completed job
+--      with a real review
+-- ---------------------------------------------------------------------------
+-- Both posted by Horizon Contracting, which already holds `job.post`
+-- (seed-pilot.sql section 12.1) — no new capability grant needed. HVAC,
+-- deliberately: the one trade none of the two seed-pilot jobs (marble/granite,
+-- plumbing) already cover, so discovering Job A is a genuine trade match, not
+-- the "apply outside your declared trades" edge case (D8/O5 still permits
+-- that, it is just not what this demo shows).
+insert into public.jobs
+  (id, poster_org_id, poster_branch_id, title, description, trade_id,
+   offered_amount, governorate, city, site_address,
+   expected_duration_days, starts_on, status, version, published_at, closed_at,
+   created_by, created_at)
+select v.id, '9a000000-aaaa-4aaa-8aaa-000000000005', 'b0000005-0000-4000-8000-000000000005',
+       v.title, v.description, t.id, v.offered_amount,
+       v.governorate, v.city, v.site_address, v.duration, v.starts_on,
+       v.status::public.job_status, 1, v.published_at, v.closed_at, v.created_by, v.created_at
+from (values
+  -- Open — Hossam has not applied. Discoverable from /home/jobs.
+  ('f1000003-0000-4000-8000-000000000003'::uuid,
+   'Central AC maintenance contract — New Cairo compound',
+   'Seasonal maintenance of split units across the compound''s common areas and clubhouse ahead of summer.',
+   'hvac', 12000.00, 'Cairo', 'New Cairo', '14 Rehab Gate 3, New Cairo',
+   5::smallint, (now() + interval '15 days')::date,
+   'open', now() - interval '2 days', null,
+   '70000006-0000-4000-8000-000000000006'::uuid, now() - interval '2 days'),
+  -- Completed — Hossam's finished engagement, reviewed below.
+  ('f1000004-0000-4000-8000-000000000004'::uuid,
+   'Split AC installation — New Cairo villa',
+   'Supply and installation of three split units across a villa''s bedrooms and living room.',
+   'hvac', 16500.00, 'Cairo', 'New Cairo', '9 Villa District, New Cairo',
+   6::smallint, (now() - interval '40 days')::date,
+   'completed', now() - interval '45 days', now() - interval '30 days',
+   '70000006-0000-4000-8000-000000000006'::uuid, now() - interval '46 days')
+) as v(id, title, description, trade_key, offered_amount, governorate, city,
+       site_address, duration, starts_on, status, published_at, closed_at, created_by, created_at)
+join public.trades t on t.key = v.trade_key
+on conflict (id) do nothing;
+
+insert into public.job_applications
+  (id, job_id, applicant_user_id, note, status, decided_by, decided_at, created_at)
+values
+  ('f2000001-0000-4000-8000-000000000001', 'f1000004-0000-4000-8000-000000000004',
+   '72000001-0000-4000-8000-000000000001',
+   'I''ve installed and serviced split systems across New Cairo for years — happy to share references from past sites.',
+   'accepted', '70000006-0000-4000-8000-000000000006', now() - interval '42 days', now() - interval '44 days')
+on conflict (id) do nothing;
+
+insert into public.job_assignments
+  (id, job_id, application_id, installer_user_id, poster_org_id,
+   agreed_amount, status, latest_progress_percent, last_progress_at,
+   started_at, completed_at, created_at)
+values
+  ('f3000001-0000-4000-8000-000000000001', 'f1000004-0000-4000-8000-000000000004',
+   'f2000001-0000-4000-8000-000000000001', '72000001-0000-4000-8000-000000000001',
+   '9a000000-aaaa-4aaa-8aaa-000000000005',
+   16500.00, 'completed', 100, now() - interval '31 days',
+   now() - interval '40 days', now() - interval '30 days', now() - interval '42 days')
+on conflict (id) do nothing;
+
+insert into public.job_reviews
+  (id, assignment_id, installer_user_id, poster_org_id, rating, comment, submitted_by, created_at)
+values
+  ('f4000001-0000-4000-8000-000000000001', 'f3000001-0000-4000-8000-000000000001',
+   '72000001-0000-4000-8000-000000000001', '9a000000-aaaa-4aaa-8aaa-000000000005',
+   5, 'Hossam fitted three split units to schedule and left the site spotless. Would hire again without hesitation.',
+   '70000007-0000-4000-8000-000000000007', now() - interval '29 days')
+on conflict (id) do nothing;

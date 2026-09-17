@@ -2,7 +2,7 @@
 
 **Status:** Generated — do not edit by hand. Rebuild with `python scripts/build_staging_seed.py --write-docs`.
 
-The 26 demo identities in the STAGING demo world: who they are, where they land, what they can see, and what each one is for. Source of truth: [`supabase/staging/demo-accounts.toml`](../../supabase/staging/demo-accounts.toml).
+The 27 demo identities in the STAGING demo world: who they are, where they land, what they can see, and what each one is for. Source of truth: [`supabase/staging/demo-accounts.toml`](../../supabase/staging/demo-accounts.toml).
 
 ## How these accounts sign in
 
@@ -56,6 +56,7 @@ appears in this repository.**
 | 24 | Wael Sobhy | `wael-gypsum-fitter` | installer_technician | — (no organization) | listed independent professional | `/home` |
 | 25 | Heba Kamal | `heba-interior-designer` | interior_designer | — (no organization) | listed independent professional | `/home` |
 | 26 | Amr Selim | `amr-site-engineer` | engineer | — (no organization) | listed independent professional | `/home` |
+| 27 | Hossam Kandil | `hossam-ac-technician` | installer_technician | — (no organization) | listed independent professional | `/home` |
 
 ## What each account shows
 
@@ -318,6 +319,16 @@ appears in this repository.**
 - **Expected landing route:** `/home`
 - **Key visible data:** A LISTED public profile (site and finishing engineering); personal profile at 100% — quantity take-offs, contractor coordination, Cairo and Giza service areas.
 - **What to demo:** The consultation-first entry point: the engineer a consumer or contractor would find and engage before any product is chosen.
+
+### 27. Hossam Kandil
+
+- **Email slug:** `hossam-ac-technician` — composed against your configured mailbox
+- **Persona / account type:** installer_technician
+- **Organization:** — (no organization)
+- **Role:** listed independent professional
+- **Expected landing route:** `/home`
+- **Key visible data:** A LISTED public profile (air conditioning installation and maintenance, the one trade none of the five QA installers above cover); personal profile at 100% — 14 years, Cairo/Nasr City/New Cairo/Heliopolis service areas, full-time availability; an APPROVED professional verification; available_for_work = true; THREE published portfolio photos (Increment 11 — no other seeded account has any); one OPEN job opportunity he has not yet applied to and one COMPLETED job with a full history (application → assignment → 5-star review) — the Jobs domain's first seeded example of either state, for any account.
+- **What to demo:** RESERVED FOR CLIENT-FACING DEMOS ONLY — do not reuse this account to also demonstrate verification states; that is what sayed-marble-fixer / fathy-electrician / ibrahim-plumber / wael-gypsum-fitter exist for. Open his public profile to show the portfolio, then sign in as him: /home for the completed job's review and the open opportunity in Jobs, /home/profile/portfolio for the photos. The single richest, most demo-ready account in the manifest, by design — one clean story, not a QA matrix.
 
 ## Hosted verification notes (Phase 0 reconciliation)
 

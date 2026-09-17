@@ -1140,3 +1140,62 @@ from (values
        site_address, duration, starts_on, status, published_at, created_by, created_at)
 join public.trades t on t.key = v.trade_key
 on conflict (id) do nothing;
+
+-- ===========================================================================
+-- 11. Client Demo — a dedicated Tradesperson identity for external demos
+-- ===========================================================================
+-- Hossam Kandil is NOT one of section 10's five listed installers. Those five
+-- exist to show the verification state machine (approved / not verified /
+-- submitted / needs_more_info) for INTERNAL QA — reusing one of them for a
+-- client pitch risks a future session finding "the account we showed the
+-- client" mid-way through an unrelated verification-flow test. This one
+-- account is reserved for external, client-facing demonstrations only: an
+-- independent, verified, single-trade professional with nothing else going
+-- on. See supabase/staging/demo-accounts.toml for the full manifest entry and
+-- supabase/staging/demo-enrichment.sql for the onboarding, verification,
+-- availability, portfolio and job-history rows that make the account
+-- demo-ready on hosted staging (none of that belongs in the pgTAP-snapshotted
+-- local world, same reasoning as every other staging-only enrichment).
+--
+-- Trade is `hvac` — air conditioning — deliberately the one trade none of the
+-- five QA installers already cover (tiling, marble/granite, electrical,
+-- plumbing, gypsum/paint), so this account is never mistaken for one of them
+-- at a glance.
+insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data,
+                        raw_user_meta_data, email_confirmed_at, created_at, updated_at)
+values
+  ('72000001-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000',
+   'authenticated', 'authenticated', 'hossam@example.test',
+   '{"provider":"email","providers":["email"]}'::jsonb,
+   '{"display_name":"Hossam Kandil","locale":"ar"}'::jsonb, now(), now(), now());
+
+update auth.users set
+  confirmation_token = coalesce(confirmation_token, ''),
+  recovery_token = coalesce(recovery_token, ''),
+  email_change = coalesce(email_change, ''),
+  email_change_token_new = coalesce(email_change_token_new, ''),
+  email_change_token_current = coalesce(email_change_token_current, ''),
+  reauthentication_token = coalesce(reauthentication_token, ''),
+  phone_change = coalesce(phone_change, ''),
+  phone_change_token = coalesce(phone_change_token, '')
+where id = '72000001-0000-4000-8000-000000000001';
+
+update public.users set primary_account_type = 'installer_technician', status = 'active'
+  where id = '72000001-0000-4000-8000-000000000001';
+
+insert into public.contacts (user_id, channel, value, is_primary, is_verified, verified_at)
+values
+  ('72000001-0000-4000-8000-000000000001', 'email', 'hossam@example.test', true, true, now());
+
+-- Listed public profile — same mechanism as section 10.3/10.3b.
+update public.profiles p set
+  public_profile_status = 'listed',
+  headline = 'Air conditioning installation and maintenance',
+  bio = 'Fourteen years installing and servicing split and central air conditioning systems for homes, offices and light-commercial sites across Cairo.',
+  languages = array['ar','en']
+where p.user_id = '72000001-0000-4000-8000-000000000001';
+
+insert into public.user_trades (user_id, trade_id, is_primary)
+select '72000001-0000-4000-8000-000000000001'::uuid, t.id, true
+from public.trades t where t.key = 'hvac'
+on conflict (user_id, trade_id) do nothing;
