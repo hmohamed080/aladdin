@@ -46,6 +46,30 @@ function isUnknownIdentityError(error: { code?: string; message?: string }): boo
 }
 
 /**
+ * True when GoTrue rejected an OTP *send* specifically for rate limiting
+ * (`over_email_send_rate_limit`, documented at
+ * supabase.com/docs/guides/auth/debugging/error-codes) rather than a generic
+ * transient failure.
+ */
+function isSendRateLimitError(error: { code?: string }): boolean {
+  return error.code === "over_email_send_rate_limit";
+}
+
+/**
+ * Maps a `verifyOtp` failure to the most specific translation key GoTrue's
+ * error code actually supports. Only `otp_expired` and `over_request_rate_limit`
+ * are distinct, documented codes — everything else (including a genuinely
+ * wrong code) collapses to one generic message, because GoTrue does not expose
+ * a separate code for "wrong" vs. other invalid-token cases. Do not invent a
+ * finer distinction the backend doesn't actually provide.
+ */
+function verifyFailureCode(error: { code?: string }): string {
+  if (error.code === "otp_expired") return "auth.error.otpExpired";
+  if (error.code === "over_request_rate_limit") return "auth.error.rateLimited";
+  return "auth.error.verifyFailed";
+}
+
+/**
  * Step 1 — send a 6-digit code to the email.
  *
  * This is SIGN IN, not registration: `shouldCreateUser: false` means an unknown
@@ -68,6 +92,9 @@ export async function requestEmailOtp(_prev: AuthState, formData: FormData): Pro
     if (isUnknownIdentityError(error as { code?: string; message?: string })) {
       return { ok: true, code: "auth.info.codeSent", email: parsed.data };
     }
+    if (isSendRateLimitError(error as { code?: string })) {
+      return { ok: false, code: "auth.error.rateLimited", email: parsed.data };
+    }
     return { ok: false, code: "auth.error.sendFailed", email: parsed.data };
   }
   return { ok: true, code: "auth.info.codeSent", email: parsed.data };
@@ -86,7 +113,7 @@ export async function verifyEmailOtp(_prev: AuthState, formData: FormData): Prom
     token: token.data,
     type: "email",
   });
-  if (error) return { ok: false, code: "auth.error.verifyFailed", email: email.data };
+  if (error) return { ok: false, code: verifyFailureCode(error as { code?: string }), email: email.data };
 
   const next = sanitizeNext(formData.get("next"));
 
@@ -129,7 +156,12 @@ export async function requestSignUpOtp(_prev: AuthState, formData: FormData): Pr
     email: parsed.data,
     options: { shouldCreateUser: true },
   });
-  if (error) return { ok: false, code: "auth.error.sendFailed", email: parsed.data };
+  if (error) {
+    if (isSendRateLimitError(error as { code?: string })) {
+      return { ok: false, code: "auth.error.rateLimited", email: parsed.data };
+    }
+    return { ok: false, code: "auth.error.sendFailed", email: parsed.data };
+  }
   return { ok: true, code: "auth.info.codeSent", email: parsed.data };
 }
 
@@ -152,7 +184,7 @@ export async function verifySignUpOtp(_prev: AuthState, formData: FormData): Pro
     token: token.data,
     type: "email",
   });
-  if (error) return { ok: false, code: "auth.error.verifyFailed", email: email.data };
+  if (error) return { ok: false, code: verifyFailureCode(error as { code?: string }), email: email.data };
 
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);

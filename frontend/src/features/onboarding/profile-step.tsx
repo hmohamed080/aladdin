@@ -3,8 +3,9 @@
 import { useActionState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { saveProfileAction, type OnboardingActionState } from "@/server/actions/onboarding";
-import { StepCard } from "@/features/onboarding/step-card";
+import { WizardShell, WizardProgress } from "@/features/onboarding/wizard";
 import { Input, Select, LabeledField, SubmitButton } from "@/components/ui/controls";
+import { InlineError } from "@/components/ui/primitives";
 import { UsersIcon } from "@/components/ui/icons";
 
 const initial: OnboardingActionState = { ok: false };
@@ -18,9 +19,10 @@ const initial: OnboardingActionState = { ok: false };
 export function ProfileStep({ displayName, locale }: { displayName: string; locale: "en" | "ar" }) {
   const { t } = useI18n();
   const [state, dispatch] = useActionState(saveProfileAction, initial);
+  const progress = <WizardProgress current={0} total={3} label={t("onboarding.stepProfile")} />;
 
   return (
-    <StepCard step="profile" title={t("onboarding.profile.title")} subtitle={t("onboarding.profile.subtitle")}>
+    <WizardShell progress={progress} title={t("onboarding.profile.title")} subtitle={t("onboarding.profile.subtitle")}>
       <form action={dispatch} className="flex flex-col gap-md" noValidate>
         <div className="flex items-center gap-3">
           <span className="grid h-14 w-14 shrink-0 place-items-center rounded-pill bg-surface-2 text-fg-muted" aria-hidden="true">
@@ -55,13 +57,11 @@ export function ProfileStep({ displayName, locale }: { displayName: string; loca
           </Select>
         </LabeledField>
 
-        {state.code === "onboarding.error.saveFailed" ? (
-          <p role="alert" className="text-label text-danger">{t(state.code)}</p>
-        ) : null}
+        {state.code === "onboarding.error.saveFailed" ? <InlineError>{t(state.code)}</InlineError> : null}
 
         <SubmitButton className="w-full" pendingLabel={t("onboarding.saving")}>{t("onboarding.continue")}</SubmitButton>
         <p className="text-center text-label text-fg-muted">{t("onboarding.savedProgress")}</p>
       </form>
-    </StepCard>
+    </WizardShell>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { saveContactAction, type OnboardingActionState } from "@/server/actions/onboarding";
-import { StepCard } from "@/features/onboarding/step-card";
+import { EG_PHONE_PATTERN } from "@/lib/onboarding/validation";
+import { WizardShell, WizardProgress } from "@/features/onboarding/wizard";
 import { Input, LabeledField, SubmitButton, Button } from "@/components/ui/controls";
-import { Badge } from "@/components/ui/primitives";
+import { Badge, InlineError } from "@/components/ui/primitives";
 
 const initial: OnboardingActionState = { ok: false };
 
@@ -15,13 +16,24 @@ const initial: OnboardingActionState = { ok: false };
  * here). The phone is an Egyptian mobile collected as UNVERIFIED — it is clearly
  * labelled "not verified yet" and no OTP is sent (Phone/WhatsApp OTP are out of
  * scope). Email/phone render `dir="ltr"` so the digits read correctly in RTL.
+ *
+ * The phone field also gets an on-blur client check against the exact same
+ * `EG_PHONE_PATTERN` the server enforces (`onboarding.ts`'s `egPhoneSchema`) —
+ * immediate feedback, not a second validation rule. The server response
+ * remains authoritative and always overrides once a submit round-trips.
  */
 export function ContactStep({ email, phone }: { email: string; phone: string | null }) {
   const { t } = useI18n();
   const [state, dispatch] = useActionState(saveContactAction, initial);
+  const [phoneValue, setPhoneValue] = useState(phone ?? "");
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const progress = <WizardProgress current={1} total={3} label={t("onboarding.stepContact")} />;
+
+  const localPhoneInvalid = phoneTouched && phoneValue.length > 0 && !EG_PHONE_PATTERN.test(phoneValue);
+  const phoneError = state.code === "onboarding.error.phone" ? t(state.code) : localPhoneInvalid ? t("onboarding.error.phone") : undefined;
 
   return (
-    <StepCard step="contact" title={t("onboarding.contact.title")} subtitle={t("onboarding.contact.subtitle")}>
+    <WizardShell progress={progress} title={t("onboarding.contact.title")} subtitle={t("onboarding.contact.subtitle")}>
       <form action={dispatch} className="flex flex-col gap-md" noValidate>
         <LabeledField label={t("onboarding.contact.emailLabel")} htmlFor="email">
           <div className="flex items-center gap-2">
@@ -34,7 +46,7 @@ export function ContactStep({ email, phone }: { email: string; phone: string | n
           label={t("onboarding.contact.phoneLabel")}
           htmlFor="phone"
           hint={t("onboarding.contact.phoneHint")}
-          error={state.code === "onboarding.error.phone" ? t(state.code) : undefined}
+          error={phoneError}
         >
           <Input
             id="phone"
@@ -44,16 +56,16 @@ export function ContactStep({ email, phone }: { email: string; phone: string | n
             autoComplete="tel"
             required
             dir="ltr"
-            defaultValue={phone ?? ""}
+            value={phoneValue}
+            onChange={(e) => setPhoneValue(e.target.value)}
+            onBlur={() => setPhoneTouched(true)}
             placeholder={t("onboarding.contact.phonePlaceholder")}
-            aria-invalid={state.code === "onboarding.error.phone" ? true : undefined}
+            aria-invalid={Boolean(phoneError) || undefined}
           />
         </LabeledField>
         <p className="text-label text-fg-muted">{t("onboarding.contact.phoneUnverified")}</p>
 
-        {state.code === "onboarding.error.saveFailed" ? (
-          <p role="alert" className="text-label text-danger">{t(state.code)}</p>
-        ) : null}
+        {state.code === "onboarding.error.saveFailed" ? <InlineError>{t(state.code)}</InlineError> : null}
 
         <div className="flex items-center gap-sm">
           <Link href="/onboarding/profile">
@@ -62,6 +74,6 @@ export function ContactStep({ email, phone }: { email: string; phone: string | n
           <SubmitButton className="flex-1" pendingLabel={t("onboarding.saving")}>{t("onboarding.continue")}</SubmitButton>
         </div>
       </form>
-    </StepCard>
+    </WizardShell>
   );
 }

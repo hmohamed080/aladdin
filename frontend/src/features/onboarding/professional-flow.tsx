@@ -24,7 +24,9 @@ import {
 
 /** The six professional steps (05.2.1–6); review is a separate route (index 5). */
 const STEPS = ["identity", "services", "location", "portfolio", "verification"] as const;
-const TOTAL = 6;
+// +1 for the Review route, which isn't part of this in-page STEPS array — derived
+// so the two can never silently drift out of sync again.
+const TOTAL = STEPS.length + 1;
 type Step = (typeof STEPS)[number];
 
 type PState = {

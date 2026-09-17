@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import type { AuthState } from "@/server/actions/auth";
-import { Input, LabeledField, SubmitButton, Button, Checkbox } from "@/components/ui/controls";
+import { Input, LabeledField, SubmitButton, Button, Checkbox, ResendButton } from "@/components/ui/controls";
+import { OtpInput } from "@/components/ui/otp-input";
 
 const initial: AuthState = { ok: false };
 const RESEND_COOLDOWN_SECONDS = 30;
@@ -48,7 +49,6 @@ export function EmailOtpFlow({
   const [consents, setConsents] = useState({ terms: false, privacy: false, pilot: false });
 
   const emailRef = useRef<HTMLInputElement>(null);
-  const tokenRef = useRef<HTMLInputElement>(null);
 
   const codeSent = sendState.ok && !editingEmail;
   const email = sendState.email ?? "";
@@ -68,9 +68,8 @@ export function EmailOtpFlow({
   }, [cooldown]);
 
   useEffect(() => {
-    if (codeSent) tokenRef.current?.focus();
-    else if (editingEmail) emailRef.current?.focus();
-  }, [codeSent, editingEmail]);
+    if (editingEmail) emailRef.current?.focus();
+  }, [editingEmail]);
 
   return !codeSent ? (
     <form action={dispatchSend} className="flex flex-col gap-md" noValidate>
@@ -133,19 +132,7 @@ export function EmailOtpFlow({
           htmlFor="token"
           error={verifyState.code && !verifyState.ok ? t(verifyState.code) : undefined}
         >
-          <Input
-            ref={tokenRef}
-            id="token"
-            name="token"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            pattern="\d{6}"
-            maxLength={6}
-            required
-            placeholder={t("auth.codePlaceholder")}
-            aria-invalid={verifyState.code && !verifyState.ok ? true : undefined}
-            className="text-center font-mono text-title tracking-[0.4em]"
-          />
+          <OtpInput id="token" name="token" autoFocus error={Boolean(verifyState.code) && !verifyState.ok} />
         </LabeledField>
         <SubmitButton className="w-full" pendingLabel={t("auth.verifying")}>{t("auth.verify")}</SubmitButton>
       </form>
@@ -168,16 +155,5 @@ export function EmailOtpFlow({
         </Button>
       </div>
     </div>
-  );
-}
-
-/** Resend control: disabled during the cooldown, showing the remaining seconds. */
-function ResendButton({ cooldown }: { cooldown: number }) {
-  const { t } = useI18n();
-  const waiting = cooldown > 0;
-  return (
-    <Button type="submit" variant="ghost" size="sm" disabled={waiting}>
-      {waiting ? t("auth.resendIn", { seconds: cooldown }) : t("auth.resend")}
-    </Button>
   );
 }

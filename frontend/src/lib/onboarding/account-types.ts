@@ -42,6 +42,14 @@ export type AccountTypeChoice = {
    * resume. Never rendered as a new-registration option.
    */
   transitional?: true;
+  /**
+   * Visible but not yet open for new-registration self-service (shown disabled
+   * with a "Coming soon" state). The architecture already represents these as
+   * real persona/org types — only the self-service registration path is gated.
+   * Never selectable client-side, and rejected server-side in
+   * `selectAccountTypeAction` as defense in depth.
+   */
+  comingSoon?: true;
 };
 
 /** The invitation-only path is not selectable through public registration. */
@@ -79,11 +87,11 @@ export function businessOrgTypeFromAccountType(
 
 export const ACCOUNT_TYPE_CHOICES: AccountTypeChoice[] = [
   // ---- Personal: a persona the person claims for themselves. ----
-  { key: "end_consumer", track: "consumer", accountType: "end_consumer" },
-  { key: "engineer", track: "professional", accountType: "engineer" },
+  { key: "end_consumer", track: "consumer", accountType: "end_consumer", comingSoon: true },
+  { key: "engineer", track: "professional", accountType: "engineer", comingSoon: true },
   { key: "interior_designer", track: "professional", accountType: "interior_designer" },
   { key: "installer_technician", track: "professional", accountType: "installer_technician" },
-  { key: "contractor", track: "professional", accountType: "contractor" },
+  { key: "contractor", track: "professional", accountType: "contractor", comingSoon: true },
   { key: "salesperson", track: "professional", accountType: "sales" },
   // ---- Business: the org_type of the business being created. ----
   { key: "showroom_dealer", track: "business", accountType: "showroom_dealer" },

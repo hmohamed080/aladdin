@@ -4,9 +4,10 @@ import { useActionState, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import type { RegistrationState } from "@/server/queries/registration";
 import { recordConsentAction, type ConsentState } from "@/server/actions/registration";
-import { Card, Badge } from "@/components/ui/primitives";
+import { Card, Badge, InlineError } from "@/components/ui/primitives";
 import { SubmitButton, Checkbox } from "@/components/ui/controls";
-import { ApertureMark, CalendarCheckIcon } from "@/components/ui/icons";
+import { CalendarCheckIcon } from "@/components/ui/icons";
+import { Brand } from "@/components/layout/brand";
 
 const initialConsent: ConsentState = { ok: false };
 
@@ -27,7 +28,7 @@ export function OnboardingPanel({ state }: { state: RegistrationState }) {
   return (
     <Card className="flex flex-col gap-lg p-lg tablet:p-xl">
       <div className="flex flex-col gap-md">
-        <ApertureMark size={36} />
+        <Brand name={t("common.appName")} size="sm" wordmark={false} />
         <div className="flex items-center gap-2">
           <Badge tone="success">
             <span className="inline-flex items-center gap-1.5">
@@ -76,7 +77,7 @@ function ConsentStep() {
           {t("auth.consent.pilot")}
         </Checkbox>
         {state.code ? (
-          <p role="alert" className="text-label text-danger">{t(state.code)}</p>
+          <InlineError>{t(state.code)}</InlineError>
         ) : (
           <p className="text-label text-fg-muted">{t("auth.consent.note")}</p>
         )}
