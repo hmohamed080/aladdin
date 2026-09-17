@@ -4,6 +4,24 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session continuation — Expand the isolated landing preview
+
+**Date:** 2026-09-17 · **Branch:** `main` · **Base:** `93e2410`.
+
+Added the requested post-hero experience only under the preview route: a
+bilingual `LandingEcosystem` section explains the current participants and flow,
+adds three role/value cards, and presents the nine user-supplied logo assets in
+contained, accessible containers. Navigation now points “How it works” to the
+new real anchor. Replaced inherited unsupported hero metrics with qualitative
+proof in both locales. The purple references were used for information patterns
+only; purple styling, testimonials, fabricated videos/claims, and screenshot
+metrics were not adopted. No shared or production file was changed.
+
+Validation: preview focused Vitest passes after the update and typecheck passes;
+the earlier full lint result remains zero errors with one pre-existing
+`sidebar-shell.tsx` hook warning. Live preview AX/browser verification shows all
+new AR content, nine logo images, valid anchors, and HTTP 200 on localhost:3100.
+
 ## Session — Isolate the landing redesign from the production homepage
 
 **Date:** 2026-09-17 · **Branch:** `main` · **Starting HEAD:** `14d8c55`.

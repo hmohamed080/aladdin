@@ -16,7 +16,7 @@ const content = {
       ["المنصة", "#platform"],
       ["الحلول", "#value"],
       ["لمن علاء الدين", "#audience"],
-      ["كيف يعمل", "#platform"],
+      ["كيف يعمل", "#how-it-works"],
     ],
     eyebrow: "قطاع التشطيبات في مصر",
     brandLine: "علاء الدين",
@@ -25,12 +25,11 @@ const content = {
     start: "ابدأ الآن",
     signIn: "تسجيل الدخول",
     createAccount: "إنشاء حساب",
-    // Inherited baseline figures, not verified production metrics.
-    // Review or replace these before this preview can be promoted.
+    // Qualitative proof only: this preview must not introduce unsupported metrics.
     proof: [
-      ["+50", "علامة تجارية"],
-      ["+500", "شركة ومورد"],
-      ["+10,000", "مستخدم محترف"],
+      ["موثوق", "منتجات وخيارات"],
+      ["مباشر", "تواصل مع السوق"],
+      ["واضح", "من الاحتياج للقرار"],
     ],
   },
   en: {
@@ -39,7 +38,7 @@ const content = {
       ["Platform", "#platform"],
       ["Solutions", "#value"],
       ["Who it is for", "#audience"],
-      ["How it works", "#platform"],
+      ["How it works", "#how-it-works"],
     ],
     eyebrow: "Egypt's finishing sector",
     brandLine: "Aladdin",
@@ -48,12 +47,10 @@ const content = {
     start: "Start now",
     signIn: "Sign in",
     createAccount: "Create account",
-    // STILL UNVERIFIED FIGURES — see the Arabic entry above; same
-    // requirement applies here (must be confirmed or reverted).
     proof: [
-      ["+50", "brands"],
-      ["+500", "companies & suppliers"],
-      ["+10,000", "professionals"],
+      ["Trusted", "products & options"],
+      ["Direct", "market connection"],
+      ["Clear", "need to decision"],
     ],
   },
 } as const;

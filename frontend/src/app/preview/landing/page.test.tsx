@@ -20,6 +20,7 @@ describe("landing preview", () => {
     const { container } = render(await LandingPreviewPage());
 
     expect(screen.getByRole("heading", { level: 1, name: heading })).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/\+10,000|\+500|\+50/);
     expect(screen.getByRole("link", { name: start })).toHaveAttribute("href", "/auth/sign-up");
     const anchors = container.querySelectorAll<HTMLAnchorElement>('a[href^="#"]');
     expect(anchors.length).toBeGreaterThan(0);
@@ -32,5 +33,6 @@ describe("landing preview", () => {
       expect(decodeURIComponent(image.getAttribute("src") ?? "")).toContain("/preview/landing/");
     }
     expect(container.querySelector("footer")).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-landing-preview-part="Ecosystem"] img')).toHaveLength(9);
   });
 });

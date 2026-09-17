@@ -25,6 +25,15 @@
   explicit approval and a separate promotion task. See
   [Landing preview](../frontend/landing-preview.md).
 
+### Current session continuation — 2026-09-17
+
+- Preview now includes `LandingEcosystem` after the hero: bilingual participant
+  flow, role/value cards, and a nine-logo supplied asset showcase. Unsupported
+  `+50`, `+500`, and `+10,000` hero metrics were replaced with qualitative proof.
+- Focused preview tests now assert no unsupported metrics and all nine logo images.
+- `/` remains untouched; no APIs, auth, database, middleware, shared styles, or
+  production assets changed.
+
 <!-- CANONICAL PROJECT MEMORY — mutable current-state snapshot. Refresh at the end of every substantive session. -->
 
 This is a **mutable snapshot** of the current live repository state — not an append-only history (that is [`AGENT_WORK_LOG.md`](./AGENT_WORK_LOG.md)). Overwrite it each session with verified values.

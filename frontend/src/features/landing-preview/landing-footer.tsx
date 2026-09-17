@@ -10,7 +10,7 @@ const content = {
   ar: {
     tagline: "في التشطيبات.. كل الأطراف في منصة واحدة",
     columns: [
-      { title: "المنصة", links: [["المنتجات", "/auth/sign-up"], ["الموردون", "/auth/sign-up"], ["المعارض", "/auth/sign-up"], ["كيف يعمل", "#platform"]] },
+      { title: "المنصة", links: [["المنتجات", "/auth/sign-up"], ["الموردون", "/auth/sign-up"], ["المعارض", "/auth/sign-up"], ["كيف يعمل", "#how-it-works"]] },
       { title: "الحلول", links: [["للمقاولين", "/auth/sign-up"], ["للمهندسين", "/auth/sign-up"], ["للمصنّعين", "/auth/sign-up"], ["للموردين", "/auth/sign-up"]] },
       { title: "علاء الدين", links: [["من نحن", "/auth/sign-up"], ["المقالات", "/auth/sign-up"], ["تواصل معنا", "/auth/sign-up"]] },
     ],
@@ -23,7 +23,7 @@ const content = {
   en: {
     tagline: "In finishing.. every side, one platform",
     columns: [
-      { title: "Platform", links: [["Products", "/auth/sign-up"], ["Suppliers", "/auth/sign-up"], ["Showrooms", "/auth/sign-up"], ["How it works", "#platform"]] },
+      { title: "Platform", links: [["Products", "/auth/sign-up"], ["Suppliers", "/auth/sign-up"], ["Showrooms", "/auth/sign-up"], ["How it works", "#how-it-works"]] },
       { title: "Solutions", links: [["For contractors", "/auth/sign-up"], ["For engineers", "/auth/sign-up"], ["For manufacturers", "/auth/sign-up"], ["For suppliers", "/auth/sign-up"]] },
       { title: "Aladdin", links: [["About us", "/auth/sign-up"], ["Articles", "/auth/sign-up"], ["Contact us", "/auth/sign-up"]] },
     ],
