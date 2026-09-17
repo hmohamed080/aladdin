@@ -3,7 +3,8 @@
 import type { ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { Card, Badge } from "@/components/ui/primitives";
-import { ApertureMark, CalendarCheckIcon, ClockIcon } from "@/components/ui/icons";
+import { CalendarCheckIcon, ClockIcon } from "@/components/ui/icons";
+import { Brand } from "@/components/layout/brand";
 
 /**
  * A calm terminal card for the individual onboarding handoffs (Sprint 7.4). It is a
@@ -29,7 +30,7 @@ export function TerminalPanel({
   return (
     <Card className="flex flex-col gap-lg p-lg tablet:p-xl">
       <div className="flex flex-col gap-md">
-        <ApertureMark size={36} />
+        <Brand name={t("common.appName")} size="sm" wordmark={false} />
         <Badge tone={tone}>
           <span className="inline-flex items-center gap-1.5">
             {tone === "success" ? <CalendarCheckIcon size={14} /> : <ClockIcon size={14} />}

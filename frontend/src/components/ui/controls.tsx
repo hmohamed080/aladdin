@@ -2,6 +2,7 @@
 
 import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
+import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
 
 /**
@@ -171,6 +172,35 @@ export function Checkbox({
       />
       <span>{children}</span>
     </label>
+  );
+}
+
+/**
+ * Resend control shared by every OTP screen: disabled during the cooldown,
+ * showing the remaining seconds, and separately reflecting its own request
+ * actually in flight (`useFormStatus`, since it submits its own sibling form)
+ * rather than only ever showing the cooldown countdown. One canonical
+ * implementation (was previously forked inside the Sign In / Sign Up flow) so
+ * Sign In, Sign Up, Recovery, and the standalone `/auth/verify` screen all
+ * resend identically.
+ */
+export function ResendButton({ cooldown }: { cooldown: number }) {
+  const { t } = useI18n();
+  const { pending } = useFormStatus();
+  const waiting = cooldown > 0;
+  return (
+    <Button type="submit" variant="ghost" size="sm" disabled={waiting || pending} aria-busy={pending}>
+      {pending ? (
+        <>
+          <Spinner />
+          {t("auth.sending")}
+        </>
+      ) : waiting ? (
+        t("auth.resendIn", { seconds: cooldown })
+      ) : (
+        t("auth.resend")
+      )}
+    </Button>
   );
 }
 

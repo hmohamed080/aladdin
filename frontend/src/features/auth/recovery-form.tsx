@@ -13,7 +13,7 @@ import { EmailOtpFlow } from "@/features/auth/email-otp-flow";
  * false`, never creates a user). When the user no longer controls the email, the
  * only safe path is the manual support review at `/auth/support`.
  */
-export function RecoveryForm() {
+export function RecoveryForm({ next }: { next: string }) {
   const { t } = useI18n();
   return (
     <AuthCard
@@ -39,7 +39,7 @@ export function RecoveryForm() {
         verifyAction={verifyEmailOtp}
         sendLabel={t("auth.sendCode")}
         sendingLabel={t("auth.sending")}
-        next="/b2b"
+        next={next}
         note={t("auth.recoveryChannelNote")}
       />
     </AuthCard>

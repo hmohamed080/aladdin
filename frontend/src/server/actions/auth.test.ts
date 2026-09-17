@@ -79,6 +79,13 @@ describe("requestEmailOtp", () => {
     expect(res.ok).toBe(false);
     expect(res.code).toBe("auth.error.sendFailed");
   });
+
+  it("distinguishes a send-side rate limit (GoTrue's documented over_email_send_rate_limit)", async () => {
+    signInWithOtp.mockResolvedValueOnce({ error: { code: "over_email_send_rate_limit", message: "email rate limit exceeded" } });
+    const res = await requestEmailOtp({ ok: false }, fd({ email: "a-owner@example.test" }));
+    expect(res.ok).toBe(false);
+    expect(res.code).toBe("auth.error.rateLimited");
+  });
 });
 
 describe("verifyEmailOtp", () => {
@@ -180,5 +187,17 @@ describe("verifyEmailOtp", () => {
     verifyOtp.mockResolvedValueOnce({ error: new Error("bad code") });
     const res = await verifyEmailOtp({ ok: false }, fd({ email: "a-owner@example.test", token: "000000" }));
     expect(res.code).toBe("auth.error.verifyFailed");
+  });
+
+  it("distinguishes an expired code (GoTrue's documented otp_expired)", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: { code: "otp_expired", message: "Token has expired" } });
+    const res = await verifyEmailOtp({ ok: false }, fd({ email: "a-owner@example.test", token: "000000" }));
+    expect(res.code).toBe("auth.error.otpExpired");
+  });
+
+  it("distinguishes a verify-side rate limit (GoTrue's documented over_request_rate_limit)", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: { code: "over_request_rate_limit", message: "Too many requests" } });
+    const res = await verifyEmailOtp({ ok: false }, fd({ email: "a-owner@example.test", token: "000000" }));
+    expect(res.code).toBe("auth.error.rateLimited");
   });
 });

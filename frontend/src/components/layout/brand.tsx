@@ -53,6 +53,7 @@ export function Brand({
   size = "md",
   tone = "ink",
   wordmark = true,
+  variant = "emblem",
   className,
 }: {
   name: string;
@@ -71,7 +72,9 @@ export function Brand({
    */
   tone?: "ink" | "shell";
   /**
-   * Whether the localized name is painted beside the mark.
+   * Whether the localized name is painted beside the mark. Only consulted when
+   * `variant` is `"emblem"` — the `"lockup"` variant already carries its own
+   * baked-in wordmark and never takes a manual text span (see `variant`).
    *
    * `false` is the COLLAPSED SIDEBAR RAIL and nothing else. At 56px there is no
    * room for a wordmark, but there is room for the emblem, and the emblem alone
@@ -90,8 +93,35 @@ export function Brand({
    * landmark still names itself.
    */
   wordmark?: boolean;
+  /**
+   * `"emblem"` (default) is every existing call site: the mark alone, optionally
+   * paired with a SEPARATE localized text span (see `wordmark`) — the pattern
+   * the authenticated product's compact chrome needs, per the file-level doc.
+   *
+   * `"lockup"` renders the OTHER approved export, `aladdin-logo.png`, as one
+   * flattened image — the emblem with its own baked-in "ALADDIN" wordmark,
+   * cut from the same master artwork. It takes `wordmark`/`tone` from nowhere;
+   * there is no text span to place, which is the point of it — a caller that
+   * genuinely has the room for the full lockup (a marketing nav, a footer
+   * signature) gets the real artwork with nothing hand-set beside it, instead
+   * of composing the emblem with a manually typed name.
+   */
+  variant?: "emblem" | "lockup";
   className?: string;
 }) {
+  if (variant === "lockup") {
+    const lockup = size === "lg" ? "h-16" : size === "sm" ? "h-9" : "h-11 tablet:h-14";
+    return (
+      <Image
+        src="/brand/aladdin-logo.png"
+        alt={name}
+        width={684}
+        height={643}
+        priority
+        className={cn("w-auto shrink-0 object-contain", lockup, className)}
+      />
+    );
+  }
   // The emblem is PORTRAIT (the ponytail carries it well above the circle), so
   // it is sized by height and left to find its own width. Sizing it by width —
   // the reflex, and what the square `ApertureMark` used to do — would make it

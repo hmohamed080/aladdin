@@ -7,6 +7,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { isLocale } from "@/lib/i18n/locales";
 import { CHOICES_BY_KEY, INVITED_EMPLOYEE_KEY } from "@/lib/onboarding/account-types";
+import { EG_PHONE_PATTERN } from "@/lib/onboarding/validation";
 
 /**
  * Shared-onboarding step writers. Each autosaves on explicit Continue and advances
@@ -18,8 +19,7 @@ import { CHOICES_BY_KEY, INVITED_EMPLOYEE_KEY } from "@/lib/onboarding/account-t
 export type OnboardingActionState = { ok: boolean; code?: string };
 
 const displayNameSchema = z.string().trim().min(1).max(80);
-// Egyptian mobile: 01 + operator (0/1/2/5) + 8 digits.
-const egPhoneSchema = z.string().trim().regex(/^01[0125]\d{8}$/);
+const egPhoneSchema = z.string().trim().regex(EG_PHONE_PATTERN);
 
 /** Step 1 — Basic Profile: display name + preferred locale. */
 export async function saveProfileAction(_prev: OnboardingActionState, formData: FormData): Promise<OnboardingActionState> {
@@ -70,6 +70,10 @@ export async function selectAccountTypeAction(_prev: OnboardingActionState, form
   }
   const choice = CHOICES_BY_KEY[choiceKey];
   if (!choice) return { ok: false, code: "onboarding.error.selectType" };
+  // Visible-but-disabled types (see account-types.ts) must never be selectable,
+  // even via a direct/forged request — the client already prevents this, this is
+  // the server-side backstop.
+  if (choice.comingSoon) return { ok: false, code: "onboarding.error.comingSoon" };
 
   const supabase = await getServerSupabase();
   const { error } = await supabase.rpc("onboarding_select_account_type", {

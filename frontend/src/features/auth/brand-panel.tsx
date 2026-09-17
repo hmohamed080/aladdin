@@ -1,9 +1,9 @@
-import { ApertureMark } from "@/components/ui/icons";
+import { Brand } from "@/components/layout/brand";
 
 /**
  * The desktop auth Brand Panel — a premium, always-dark brand plate (a deliberate
- * brand moment, like Admin surfaces) with a restrained Lumen glow and the
- * Aperture mark. Presentational; copy is passed localized. Hidden below desktop
+ * brand moment, like Admin surfaces) with a restrained Lumen glow and the real
+ * Aladdin mark. Presentational; copy is passed localized. Hidden below desktop
  * (the form panel stacks full-width on tablet/mobile).
  */
 export function AuthBrandPanel({ name, tagline, note }: { name: string; tagline: string; note: string }) {
@@ -22,7 +22,10 @@ export function AuthBrandPanel({ name, tagline, note }: { name: string; tagline:
       />
 
       <div className="relative flex items-center gap-sm">
-        <ApertureMark size={32} />
+        {/* Mark only from `Brand` — the wordmark stays this panel's own
+            `text-brand-limestone` span (unchanged) since neither of `Brand`'s
+            two tones matches this specific dark-basalt plate's brand color. */}
+        <Brand name={name} size="lg" wordmark={false} />
         <span className="font-display-ar text-title text-brand-limestone">{name}</span>
       </div>
 

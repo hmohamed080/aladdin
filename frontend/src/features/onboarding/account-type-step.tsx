@@ -4,10 +4,10 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { selectAccountTypeAction, type OnboardingActionState } from "@/server/actions/onboarding";
-import { CHOICE_GROUPS, INVITED_EMPLOYEE_KEY } from "@/lib/onboarding/account-types";
-import { StepCard } from "@/features/onboarding/step-card";
+import { CHOICE_GROUPS, CHOICES_BY_KEY, INVITED_EMPLOYEE_KEY } from "@/lib/onboarding/account-types";
+import { WizardShell, WizardProgress, ChoiceCard } from "@/features/onboarding/wizard";
+import { InlineError } from "@/components/ui/primitives";
 import { SubmitButton, Button } from "@/components/ui/controls";
-import { cn } from "@/lib/ui/cn";
 
 const initial: OnboardingActionState = { ok: false };
 
@@ -20,6 +20,11 @@ const initial: OnboardingActionState = { ok: false };
  * "Organization owner / manager" — owning is what creating a business makes you,
  * so it is a relationship, never a type to choose.
  *
+ * Some persona types (see `comingSoon` in account-types.ts) are shown but not yet
+ * open for self-service registration — a real `ChoiceCard`, disabled, with a
+ * "Coming soon" badge, never simply omitted (the architecture already models
+ * them; only the registration entry point is gated).
+ *
  * Also here: a non-selectable "joining a team?" note directing invited employees
  * to their invitation link (that path is never a public choice). The chosen key is
  * controlled so a validation error keeps the selection. Records intent only — no
@@ -30,8 +35,10 @@ export function AccountTypeStep({ selectedKey }: { selectedKey: string | null })
   const [state, dispatch] = useActionState(selectAccountTypeAction, initial);
   const [choice, setChoice] = useState<string | null>(selectedKey);
 
+  const progress = <WizardProgress current={2} total={3} label={t("onboarding.stepAccountType")} />;
+
   return (
-    <StepCard step="account_type" title={t("onboarding.accountType.title")} subtitle={t("onboarding.accountType.subtitle")}>
+    <WizardShell progress={progress} title={t("onboarding.accountType.title")} subtitle={t("onboarding.accountType.subtitle")}>
       <form action={dispatch} className="flex flex-col gap-lg" noValidate>
         <input type="hidden" name="choice" value={choice ?? ""} />
 
@@ -47,27 +54,21 @@ export function AccountTypeStep({ selectedKey }: { selectedKey: string | null })
             </p>
             <div className="grid gap-2.5 tablet:grid-cols-2">
               {keys.map((key) => {
-                const active = choice === key;
+                const comingSoon = CHOICES_BY_KEY[key]?.comingSoon === true;
                 return (
-                  <button
-                    type="button"
+                  <ChoiceCard
                     key={key}
-                    onClick={() => setChoice(key)}
-                    aria-pressed={active}
-                    className={cn(
-                      "flex flex-col items-start gap-1 rounded-md border p-md text-start transition-colors",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-                      active ? "border-accent bg-accent-solid/10" : "border-strong hover:bg-surface-2/60",
-                    )}
-                  >
-                    <span className="flex w-full items-center justify-between gap-2">
-                      <span className="font-medium text-fg">{t(`onboarding.accountType.types.${key}`)}</span>
-                      {active ? (
-                        <span className="shrink-0 text-label font-medium text-accent">{t("onboarding.accountType.selected")}</span>
-                      ) : null}
-                    </span>
-                    <span className="text-label text-fg-secondary">{t(`onboarding.accountType.types.${key}Desc`)}</span>
-                  </button>
+                    selected={choice === key}
+                    disabled={comingSoon}
+                    badge={comingSoon ? t("onboarding.accountType.comingSoon") : undefined}
+                    title={t(`onboarding.accountType.types.${key}`)}
+                    description={
+                      comingSoon
+                        ? t("onboarding.accountType.comingSoonHint")
+                        : t(`onboarding.accountType.types.${key}Desc`)
+                    }
+                    onSelect={() => setChoice(key)}
+                  />
                 );
               })}
             </div>
@@ -80,7 +81,7 @@ export function AccountTypeStep({ selectedKey }: { selectedKey: string | null })
           <p className="mt-1 text-body text-fg-secondary">{t("onboarding.accountType.invitedNote")}</p>
         </div>
 
-        {state.code ? <p role="alert" className="text-label text-danger">{t(state.code)}</p> : null}
+        {state.code ? <InlineError>{t(state.code)}</InlineError> : null}
 
         <div className="flex items-center gap-sm">
           <Link href="/onboarding/contact">
@@ -91,6 +92,6 @@ export function AccountTypeStep({ selectedKey }: { selectedKey: string | null })
           </SubmitButton>
         </div>
       </form>
-    </StepCard>
+    </WizardShell>
   );
 }

@@ -67,38 +67,14 @@ export function WizardShell({
   );
 }
 
-/** Single-select option card (intent, budget, availability, type, specialization). */
-export function ChoiceCard({
-  selected,
-  title,
-  description,
-  onSelect,
-}: {
-  selected: boolean;
-  title: string;
-  description?: string;
-  onSelect: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      className={cn(
-        "flex flex-col items-start gap-1 rounded-md border p-md text-start transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
-        selected ? "border-accent bg-accent-solid/10" : "border-strong hover:bg-surface-2/60",
-      )}
-    >
-      <span className="flex w-full items-center justify-between gap-2">
-        <span className="font-medium text-fg">{title}</span>
-        {selected ? <span className="shrink-0 text-label font-medium text-accent">{t("onboarding.accountType.selected")}</span> : null}
-      </span>
-      {description ? <span className="text-label text-fg-secondary">{description}</span> : null}
-    </button>
-  );
-}
+/**
+ * The canonical choice-card implementation now lives in `components/ui` — it's
+ * used by onboarding's selection grids AND the Landing Page's audience tiles.
+ * Re-exported here so the three existing onboarding call sites
+ * (`professional-flow.tsx`, `business-flow.tsx`, `account-type-step.tsx`)
+ * don't need to change their import path.
+ */
+export { ChoiceCard } from "@/components/ui/choice-card";
 
 /** Multi-select toggle chip (interests, services, languages, service areas). */
 export function ChoiceChip({ selected, label, onToggle }: { selected: boolean; label: string; onToggle: () => void }) {

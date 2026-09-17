@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { Input, Textarea, Select, LabeledField } from "@/components/ui/controls";
+import { InlineError } from "@/components/ui/primitives";
 import { WizardShell, WizardProgress, ChoiceCard, FlowActions, SavedHint } from "@/features/onboarding/wizard";
 import { saveBusiness, submitBusiness, type BusinessInput } from "@/server/actions/business-onboarding";
 import type { BusinessAnswers } from "@/server/queries/onboarding";
@@ -268,11 +269,7 @@ export function BusinessFlow({
         </div>
       ) : null}
 
-      {error ? (
-        <p role="alert" className="text-label text-danger">
-          {t(error)}
-        </p>
-      ) : null}
+      {error ? <InlineError>{t(error)}</InlineError> : null}
 
       <FlowActions
         onBack={step > 0 ? back : undefined}
