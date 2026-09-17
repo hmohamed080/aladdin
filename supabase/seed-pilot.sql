@@ -184,7 +184,8 @@ cross join unnest(array[
   'rfq.create','rfq.respond','quote.submit','quote.decide',
   'order.create','order.manage','project.read','project.write',
   'sales.read','sales.write','sales.assign','sales.manage',
-  'verification.submit','verification.read'
+  'verification.submit','verification.read',
+  'activity.read'
 ]) as cap;
 
 -- Youssef — a branch-scoped SALESPERSON (scoped CRM only).
@@ -519,7 +520,8 @@ cross join unnest(array[
   'rfq.create','rfq.respond','quote.submit','quote.decide',
   'order.create','order.manage','project.read','project.write',
   'sales.read','sales.write','sales.assign','sales.manage',
-  'verification.submit','verification.read'
+  'verification.submit','verification.read',
+  'activity.read'
 ]) as cap;
 
 -- ---------------------------------------------------------------------------

@@ -26,6 +26,7 @@ import {
   BriefcaseIcon,
   LandmarkIcon,
   BarChartIcon,
+  ActivityIcon,
   SettingsIcon,
   StorefrontIcon,
   UserIcon,
@@ -88,6 +89,7 @@ const NAV_ICONS: Record<NavKey, ComponentType<{ size?: number }>> = {
   projects: LayersIcon,
   team: UsersIcon,
   reports: BarChartIcon,
+  activity: ActivityIcon,
   settings: SettingsIcon,
 };
 
@@ -117,6 +119,7 @@ const NAV_HREFS: Record<NavKey, string> = {
   projects: "/b2b/projects",
   team: "/b2b/organization",
   reports: "/b2b/reports",
+  activity: "/b2b/activity",
   settings: "/b2b/settings",
 };
 

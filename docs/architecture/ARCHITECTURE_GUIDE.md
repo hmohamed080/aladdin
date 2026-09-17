@@ -67,6 +67,7 @@ Token/brand changes follow the design-system edit-order (token JSON first) and u
 - **The database schema is owned exclusively by `supabase/migrations/*.sql`** (ADR-0002). No application component — JS or Python — creates or alters schema.
 - The web app owns user-facing CRUD; the FastAPI service owns derived/AI artifacts (embeddings, extractions, evaluations) it writes back through the same RLS-governed tables.
 - No second database. No per-service private schema unless a future ADR introduces one.
+- **Organization activity is a PII-minimised projection, never a view over the security audit.** `public.audit_log` remains platform-administrator-only; the single audit writer atomically copies only allow-listed business actions and explicitly named safe parameters into the separately RLS-governed `organization_activity_events` table ([ADR-0010](../decisions/ADR-0010-organization-activity-log.md)).
 
 ## Multi-Tenancy Model
 - The **tenant unit is the organization**, with **branch** scoping where applicable.

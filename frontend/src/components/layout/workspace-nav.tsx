@@ -27,6 +27,7 @@ import {
   BriefcaseIcon,
   LandmarkIcon,
   BarChartIcon,
+  ActivityIcon,
   GaugeIcon,
   SettingsIcon,
   MenuIcon,
@@ -78,6 +79,7 @@ const ITEMS: Record<NavKey, Item> = {
   projects: { href: "/b2b/projects", key: "nav.projects", exact: false, Icon: LayersIcon },
   team: { href: "/b2b/organization", key: "nav.team", exact: false, Icon: UsersIcon },
   reports: { href: "/b2b/reports", key: "nav.reports", exact: false, Icon: BarChartIcon },
+  activity: { href: "/b2b/activity", key: "nav.activity", exact: false, Icon: ActivityIcon },
   settings: { href: "/b2b/settings", key: "nav.settings", exact: false, Icon: SettingsIcon },
 };
 

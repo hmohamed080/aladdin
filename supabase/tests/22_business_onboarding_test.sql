@@ -95,7 +95,7 @@ select is(
   (select count(*)::int from public.membership_capabilities c
    join public.memberships m on m.id = c.membership_id
    where m.user_id='44444444-4444-4444-8444-444444444444'),
-  26, 'the owner receives the full org capability set');
+  27, 'the owner receives the full org capability set');
 
 -- Now an active member -> the workspace.
 select is((select public.my_registration_state()), 'active_personal',
