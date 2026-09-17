@@ -1,5 +1,30 @@
 # Runtime State
 
+## Current session override — 2026-09-17: isolated landing preview
+
+- Branch: `main`; starting HEAD `14d8c55`, 0 commits ahead of `main` before
+  this change. The preview is recorded in the next local commit; no push or
+  deployment is performed in this session.
+- Added `/preview/landing`, with route-local `noindex, nofollow` metadata.
+  Presentation and bilingual copy live in `frontend/src/features/landing-preview/`;
+  all six referenced image assets are private copies in `frontend/public/preview/landing/`.
+- `/` still mounts the original `landing-v2` composition. Its route, components,
+  assets, shared primitives, layout, global styles, tokens, and middleware are
+  unchanged against the starting commit.
+- Validation: TypeScript passes; frontend lint has no errors and one existing
+  `sidebar-shell.tsx` hook-dependency warning; five focused tests pass (three
+  preview tests and two existing homepage hero tests); Impeccable detector has
+  zero findings. Documentation links: 979 checked, zero broken before this entry.
+- Browser smoke check: `/preview/landing` returns HTTP 200 with no redirect and
+  `noindex, nofollow` in AR/EN at 1440 and 390 widths. `/` returns HTTP 200 and
+  renders only the production hero. This is baseline route verification, not
+  final redesign or accessibility approval.
+- Schema unchanged: 62 migration files. No database or hosted state touched.
+- Local dev server: `http://localhost:3100` for review. Remaining work: redesign
+  iteration, inherited content/interaction issues, full visual review, then
+  explicit approval and a separate promotion task. See
+  [Landing preview](../frontend/landing-preview.md).
+
 <!-- CANONICAL PROJECT MEMORY — mutable current-state snapshot. Refresh at the end of every substantive session. -->
 
 This is a **mutable snapshot** of the current live repository state — not an append-only history (that is [`AGENT_WORK_LOG.md`](./AGENT_WORK_LOG.md)). Overwrite it each session with verified values.

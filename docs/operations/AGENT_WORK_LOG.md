@@ -4,6 +4,41 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Isolate the landing redesign from the production homepage
+
+**Date:** 2026-09-17 · **Branch:** `main` · **Starting HEAD:** `14d8c55`.
+
+**Purpose / decision:** establish `/preview/landing` as the only redesign surface.
+User explicitly requires `/` to remain unchanged until a separately authorized
+promotion after review. Recorded the boundary in
+[Landing preview](../frontend/landing-preview.md) before implementation.
+
+**Changes / rationale:** thin Next.js route with private section components,
+bilingual copy, CSS Modules, and six copied image assets. This intentional
+presentation fork allows iteration without modifying the production composition.
+Shared primitives, locale services, and business destinations are consumed
+unchanged. Preview metadata requests `noindex, nofollow`; no redirect, global
+CSS change, middleware change, database change, or navigation link was added.
+
+**Validation:** `pnpm --filter frontend typecheck` passes; `pnpm --filter frontend
+lint` passes with one pre-existing `sidebar-shell.tsx` missing-hook-dependency
+warning. Focused Vitest run passes 5/5 (AR/EN full preview rendering, local anchor
+targets, isolated image URLs, indexing metadata, and original hero behavior).
+Next/Image emits layout warnings in happy-dom, which does not lay out CSS.
+Impeccable detector: zero findings. Documentation link checker: 979 links,
+zero broken before the memory updates. Browser smoke via installed Edge:
+preview HTTP 200/no redirect/noindex in AR/EN at 1440/390, and homepage HTTP 200
+with the original hero and no preview hero. `git diff` confirms no production
+homepage, shared component/style, middleware, or original asset changes.
+
+**Deferred / consequence:** baseline isolation is ready; a new visual direction
+is not approved or promoted. Inherited unverified marketing figures, footer
+destinations, newsletter simulation, and responsive/theme/accessibility issues
+remain review items. No push or deployment performed. Local review server is
+available on port 3100. Schema stays at 62 migration files.
+
+---
+
 ## Session — Hana Mansour, the first non-admin account review: audit, then approved fixes
 
 **Date:** 2026-09-07 · **Branches:** `chore/staging-readiness-phase0` (PR #42, merged as `27b8943` before this session started), `fix/hana-account-acceptance` (this session, in review) · **Base:** `main` @ `27b8943` throughout.
