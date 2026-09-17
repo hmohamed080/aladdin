@@ -3,12 +3,7 @@ import { cookies } from "next/headers";
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/context";
 import { LandingHero } from "@/features/landing-preview/landing-hero";
-import { LandingAudience } from "@/features/landing-preview/landing-audience";
 import { LandingEcosystem } from "@/features/landing-preview/landing-ecosystem";
-import { LandingProducts } from "@/features/landing-preview/landing-products";
-import { LandingValue } from "@/features/landing-preview/landing-value";
-import { LandingFinalCta } from "@/features/landing-preview/landing-final-cta";
-import { LandingFooter } from "@/features/landing-preview/landing-footer";
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +23,6 @@ export default async function LandingPreviewPage() {
       <main className="flex flex-col overflow-x-hidden bg-brand-plaster">
         <LandingHero />
         <LandingEcosystem />
-        <LandingAudience />
-        <LandingProducts />
-        <LandingValue />
-        <LandingFinalCta />
-        <LandingFooter />
       </main>
     </I18nProvider>
   );

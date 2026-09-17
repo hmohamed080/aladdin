@@ -1,34 +1,94 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowUpRightIcon, BriefcaseIcon, BuildingIcon, CheckIcon, PackageIcon, UserIcon, WrenchIcon } from "@/components/ui/icons";
-import { Reveal } from "@/components/ui/reveal";
+import { useState } from "react";
+import { CheckIcon, PlayIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
+import { landingBlockContent, landingLogos } from "./landing-block-content";
+import { LandingFinalCta } from "./landing-final-cta";
+import { LandingFooter } from "./landing-footer";
+import { LandingStories } from "./landing-stories";
+import { LandingDetails, type LandingDetail } from "./landing-details";
 import styles from "./landing-ecosystem.module.css";
 
-const copy = {
-  ar: {
-    worksTitle: "كيف يعمل Aladdin؟", worksText: "من الاحتياج إلى القرار، يجمع علاء الدين أطراف التشطيبات في مسار واضح.",
-    flow: [[BuildingIcon, "المصنّعون", "يعرضون منتجاتهم وخبراتهم"], [PackageIcon, "الموردون", "يوصلون الخيارات إلى السوق"], [BriefcaseIcon, "المعارض", "تساعد العملاء على الاكتشاف"], [UserIcon, "المحترفون", "يقدمون المشورة والتنفيذ"], [WrenchIcon, "صاحب المشروع", "يصل إلى قرار أفضل"]] as const,
-    rolesTitle: "لأن كل دور مهم", roles: [["للمصنّعين والمستوردين", "اعرض منتجاتك ووصل إلى طلبات أكثر"], ["للموردين والمعارض", "نظّم الكتالوج وتواصل مع العملاء مباشرة"], ["للمحترفين", "اكتشف منتجات موثوقة وابنِ حضورك المهني"]] as const,
-    explore: "استكشف المنصة", partnersTitle: "علامات يكتشفها مجتمع التشطيبات", partnersText: "مجموعة من العلامات المرفوعة للعرض داخل تجربة المنصة.",
-  },
-  en: {
-    worksTitle: "How Aladdin works", worksText: "From a need to a decision, Aladdin brings the finishing ecosystem into one clear path.",
-    flow: [[BuildingIcon, "Manufacturers", "Share products and expertise"], [PackageIcon, "Suppliers", "Bring options to the market"], [BriefcaseIcon, "Showrooms", "Help people discover"], [UserIcon, "Professionals", "Advise and execute"], [WrenchIcon, "Project owners", "Reach a better decision"]] as const,
-    rolesTitle: "Every role matters", roles: [["For manufacturers and importers", "Put your products in front of more demand"], ["For suppliers and showrooms", "Organize your catalogue and talk directly"], ["For professionals", "Discover trusted products and build your profile"]] as const,
-    explore: "Explore the platform", partnersTitle: "Brands discovered by the finishing community", partnersText: "A selection of supplied brand assets shown inside the platform experience.",
-  },
-} as const;
+function RoleIllustration({ index, small = false }: { index: number; small?: boolean }) {
+  return <span aria-hidden="true" className={`${styles.illustration} ${small ? styles.smallIllustration : ""}`}
+    style={{ backgroundPosition: `${(index % 3) * 50}% ${index < 3 ? 0 : 100}%` }} />;
+}
 
-const logos = [["venecia.png", "Venecia"], ["shbab.png", "Shbab"], ["ahmed-el-sallab.png", "Ahmed El Sallab"], ["elsalam.png", "Elsalam"], ["konouz.png", "Konouz Decoration"], ["jazeerah.png", "Jazeerah Paints"], ["glc.png", "GLC Paints"], ["jotun.png", "Jotun"], ["scib.png", "SCIB Paints"]] as const;
-
+/** The reference's complete post-hero composition, scoped to the preview. */
 export function LandingEcosystem() {
-  const { locale, dir } = useI18n(); const t = copy[locale];
-  return <section className={styles.section} id="how-it-works" data-landing-preview-part="Ecosystem">
-    <Reveal className={styles.intro}><p className={styles.kicker}>ALADDIN / ECOSYSTEM</p><h2 dir={dir}>{t.worksTitle}</h2><p dir={dir}>{t.worksText}</p></Reveal>
-    <div className={styles.flow} dir="ltr">{t.flow.map(([Icon, title, text], index) => <div className={styles.flowItem} key={title}><div className={styles.flowIcon}><Icon size={22} aria-hidden="true" /></div><h3 dir={dir}>{title}</h3><p dir={dir}>{text}</p>{index < t.flow.length - 1 ? <ArrowUpRightIcon className={styles.arrow} size={20} aria-hidden="true" /> : null}</div>)}</div>
-    <Reveal className={styles.rolesBlock}><h2 dir={dir}>{t.rolesTitle}</h2><div className={styles.roles}>{t.roles.map(([title, text]) => <article key={title}><CheckIcon size={20} aria-hidden="true" /><h3 dir={dir}>{title}</h3><p dir={dir}>{text}</p><a href="/auth/sign-up" dir={dir}>{t.explore} <ArrowUpRightIcon size={15} aria-hidden="true" /></a></article>)}</div></Reveal>
-    <Reveal className={styles.partners}><div className={styles.partnerIntro}><h2 dir={dir}>{t.partnersTitle}</h2><p dir={dir}>{t.partnersText}</p></div><ul className={styles.logoGrid} aria-label={t.partnersTitle}>{logos.map(([file, alt]) => <li key={alt}><Image src={`/preview/landing/partners/${file}`} alt={alt} width={180} height={110} /></li>)}</ul></Reveal>
-  </section>;
+  const { locale, dir } = useI18n();
+  const t = landingBlockContent[locale];
+  const [detail, setDetail] = useState<LandingDetail | null>(null);
+  return (
+    <div className={styles.block} dir={dir} data-landing-preview-part="Ecosystem">
+      <div className={styles.container}>
+        <section id="how-it-works" className={styles.process} aria-labelledby="process-heading">
+          <h2 id="process-heading" className={styles.heading}>{t.how}</h2>
+          <ol className={styles.flow}>
+            {t.flow.map((item, index) => {
+              return (
+                <li key={item.title}>
+                  <RoleIllustration index={index} />
+                  <h3>{item.title}</h3><p>{item.text}</p>
+                  {index < t.flow.length - 1 && <span className={styles.flowArrow} aria-hidden="true">→</span>}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+        <section id="audience" className={styles.rolesSection} aria-labelledby="roles-heading">
+          <h2 id="roles-heading" className={styles.heading}>{t.rolesTitle}</h2>
+          <div className={styles.roles}>
+            {t.roles.map((role, index) => {
+              return (
+                <article key={role.title} className={styles.roleCard}>
+                  <div className={styles.roleHeading}><RoleIllustration index={index} small /><h3>{role.title}</h3></div>
+                  <ul>{role.bullets.map((bullet) => <li key={bullet}><CheckIcon aria-hidden="true" /><span>{bullet}</span></li>)}</ul>
+                  <button type="button" className={styles.roleCta} onClick={() => setDetail(index)}>{t.learn}</button>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+        <section id="platform" className={styles.videosSection} aria-labelledby="videos-heading">
+          <div className={styles.sectionHeading}>
+            <h2 id="videos-heading" className={styles.heading}>{t.videos}</h2>
+            <button type="button" className={styles.secondaryAction} onClick={() => setDetail("videos")}>{t.videoAction}</button>
+          </div>
+          <div className={styles.videos}>
+            {t.videoCategories.map((category) => (
+              <article key={category} className={styles.videoCard} data-content-slot="video">
+                <div className={styles.thumbnail}>
+                  <span className={styles.category}>{category}</span>
+                  <span className={styles.play} aria-hidden="true"><PlayIcon /></span>
+                  <span className={styles.duration} aria-label={t.durationPending}>—:—</span>
+                </div>
+                <h3>{t.videoPending}</h3><p>{t.videoDescription}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+        <section id="brands" className={styles.brandsSection} aria-labelledby="brands-heading">
+          <div className={`${styles.sectionHeading} ${styles.brandHeading}`}>
+            <h2 id="brands-heading" className={styles.heading}>{t.brands}</h2>
+            <button type="button" className={styles.secondaryAction} onClick={() => setDetail("partners")}>{t.partnerAction}</button>
+          </div>
+          <ul className={styles.logoStrip}>
+            {landingLogos.map(({ file, name }) => (
+              <li key={file} data-logo={file}><Image src={`/preview/landing/partners/${file}`} alt={name} width={180} height={110} sizes="(max-width: 767px) 28vw, 10vw" /></li>
+            ))}
+          </ul>
+        </section>
+        <section id="value" className={styles.storiesSection} aria-labelledby="stories-heading">
+          <h2 id="stories-heading" className={styles.heading}>{t.stories}</h2>
+          <LandingStories />
+        </section>
+        <LandingFinalCta />
+      </div>
+      <LandingFooter />
+      <LandingDetails detail={detail} onClose={() => setDetail(null)} />
+    </div>
+  );
 }

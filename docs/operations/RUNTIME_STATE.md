@@ -1,5 +1,21 @@
 # Runtime State
 
+## Current continuation — 2026-09-17: reference composition pass
+
+- Branch `main`, starting HEAD `cb7616a`, 340 commits before this local change.
+- `/preview/landing` now mounts its existing hero plus the complete reference
+  block (6 process positions / 5 role cards / 5 pending videos / 9 supplied logos /
+  3 pending testimonials / compact CTA / footer). The old duplicate bands are
+  unmounted. All presentation changes remain in the preview directories.
+- Desktop/mobile browser inspection and CSS iteration completed; AR 1440/390 and
+  EN 1440/834 checked. Typecheck and five focused tests pass; lint has only the
+  existing sidebar hook warning. 981 documentation links checked, zero broken.
+- `/`, shared components/styles, original artwork, business logic, and 62 database
+  migrations remain unchanged. No push/deploy or promotion was performed.
+- Missing approved videos and testimonials remain explicit slots. Final visual
+  review and promotion are deferred to the user. See
+  [Landing preview](../frontend/landing-preview.md).
+
 ## Current session override — 2026-09-17: isolated landing preview
 
 - Branch: `main`; starting HEAD `14d8c55`, 0 commits ahead of `main` before

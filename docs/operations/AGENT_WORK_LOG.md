@@ -4,6 +4,41 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Match the complete reference block in the landing preview
+
+**Date:** 2026-09-17 · **Branch:** `main` · **Base:** `cb7616a` (340 commits).
+
+**Decision / scope:** the user's latest cropped screenshot supersedes the earlier
+inspiration-only treatment. Rebuilt the isolated post-hero block as six process
+positions, five role cards, five video slots, nine supplied logos, three story
+slots, one compact product CTA, and a four-column footer. Navy/gold/cream tokens,
+existing fonts/icons, and current terminology remain authoritative. Removed the
+old duplicate bands from the preview composition. Production files are unchanged.
+
+**Visual verification:** inspected real-browser full-page captures at 1440px
+(Arabic and English), 390px (Arabic), and 834px (English). Compared desktop section
+proportions with the 614×675 reference, then adjusted process whitespace, role
+headers, video badge position/play treatment, and logo canvas cropping. Desktop
+CTA is 144px high and footer approximately 170px; role cards are 248px high,
+video thumbnails 16:10, logo boxes 80px high, and story cards 168px minimum.
+Mobile has no horizontal overflow and all images load. Current icons replace the
+old illustrations; existing product artwork replaces the old purple device art.
+
+**Validation:** typecheck passes; lint has zero errors and the existing
+`sidebar-shell.tsx:160` dependency warning. Five focused preview/production hero
+tests pass; the DOM test emits a CSS-less next/image size warning, while the live
+CTA image has verified nonzero dimensions. Documentation validator checks 981
+links with zero broken. `git diff --check` passes. Production homepage, original
+landing components, shared styles/components, and artwork have no diff against
+`14d8c55`. Database remains at 62 migrations.
+
+**Deferred:** five approved videos with thumbnails/metadata and three approved
+testimonials with portraits are missing. Explicit pending slots preserve their
+composition without fabricated media, quotes, duration, or partnership claims.
+Play/pagination graphics are inert. Footer now uses real support/legal/auth routes
+and has no simulated newsletter or generic social links. User review and separate
+explicit promotion to `/` are still required; no push/deploy occurred.
+
 ## Session continuation — Expand the isolated landing preview
 
 **Date:** 2026-09-17 · **Branch:** `main` · **Base:** `93e2410`.

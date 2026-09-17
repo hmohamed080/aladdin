@@ -8,18 +8,34 @@ approval and a separate implementation step; it is not part of preview work.
 
 ## Rationale and scope
 
-The preview begins with a snapshot of the current homepage, preserving its
-content and interactions as a baseline for review. It now adds an ecosystem
-explanation immediately after the hero: a participant flow, three role/value
-cards, and a supplied-logo showcase. Its route lives at
+### Visual fidelity contract — 2026-09-17
+
+The supplied cropped reference beginning “كيف يعمل Aladdin؟” is now the
+composition authority for the entire post-hero block, superseding the earlier
+inspiration-only treatment. Preserve six process positions, five role cards,
+five video slots, one logo row, three testimonial slots with pagination markers,
+one wide device CTA, and the compact four-column footer in that order. Reuse
+Aladdin fonts, navy/gold/cream palette, icons, terminology, and real logo assets.
+The existing preview hero remains; the old audience/products/value bands are
+unmounted from this preview to avoid duplication. Production `/` is unchanged.
+
+Desktop proportions are measured against the 614 × 675 supplied reference;
+tablet/mobile reflow the same content. Missing video media, titles, durations,
+testimonial quotes, author names, roles, and portraits retain explicitly labelled
+slots. Play controls and pagination markers are non-interactive until backed by
+approved content. Supplied logos do not establish a partnership claim.
+
+The preview retains its isolated hero and now reproduces the full post-hero
+reference sequence. Its route lives at
 `frontend/src/app/preview/landing/page.tsx`; its presentation, bilingual copy,
 and CSS Modules live in `frontend/src/features/landing-preview/`.
 Landing artwork is copied into `frontend/public/preview/landing/` so replacing
 preview images cannot change the production artwork. The nine supplied partner
-images are rendered from those copies with contained sizing and accessible alt
-text. The purple reference contributed the information patterns only; its
-palette, hero, testimonials, unsupported metrics, and invented video/content
-claims were intentionally not adopted.
+images are rendered from those copies with contained sizing, local cropping of
+empty canvas margins, and accessible alt text. Their aspect ratios are preserved.
+The screenshot governs layout; current branding and verified content govern
+appearance and copy. Unsupported metrics and invented video/testimonial claims
+are not adopted.
 
 This deliberate presentation fork is explicitly requested for safe iteration.
 Existing design-system primitives, locale infrastructure, and business services
@@ -37,10 +53,13 @@ needed. CSS Modules scope preview rules; shared tokens remain read-only.
 
 ## Deferred review and promotion
 
-This is an isolated starting point, not an approved new visual design. Footer
-destinations and locally simulated
-newsletter submission, and responsive/theme/accessibility limitations still need
-review before promotion. No new factual claims are approved by copying the page.
+This remains a review preview, not an approved production design. The footer uses
+existing authentication, support, privacy, and terms routes; simulated newsletter
+submission and generic social destinations are no longer mounted. Five approved
+videos (media, thumbnails, titles, descriptions, durations) and three approved
+testimonials (quotes, names, roles, portraits) are still needed. Existing product
+artwork fills the CTA visual slot. The inherited hero is outside this block's
+fidelity pass. Final visual/content approval remains with the user.
 Do not replace, redirect, or delete `/` until explicitly instructed after review.
 
 ## Related files

@@ -21,7 +21,7 @@ describe("landing preview", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: heading })).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/\+10,000|\+500|\+50/);
-    expect(screen.getByRole("link", { name: start })).toHaveAttribute("href", "/auth/sign-up");
+    expect(screen.getAllByRole("link", { name: start })[0]).toHaveAttribute("href", "/auth/sign-up");
     const anchors = container.querySelectorAll<HTMLAnchorElement>('a[href^="#"]');
     expect(anchors.length).toBeGreaterThan(0);
     for (const anchor of anchors) {
@@ -33,6 +33,13 @@ describe("landing preview", () => {
       expect(decodeURIComponent(image.getAttribute("src") ?? "")).toContain("/preview/landing/");
     }
     expect(container.querySelector("footer")).toBeInTheDocument();
-    expect(container.querySelectorAll('[data-landing-preview-part="Ecosystem"] img')).toHaveLength(9);
+    expect(container.querySelectorAll('#brands img')).toHaveLength(9);
+    expect(container.querySelectorAll('[data-content-slot="video"]')).toHaveLength(5);
+    expect(container.querySelectorAll('#value [data-content-slot="testimonial"]')).toHaveLength(9);
+    expect(container.querySelectorAll('footer')).toHaveLength(1);
+    expect(container.querySelector('a[href="/legal/privacy"]')).toBeInTheDocument();
+    expect(container.querySelector('a[href="/auth/support"]')).toBeInTheDocument();
+    const ids = [...container.querySelectorAll('[id]')].map((node) => node.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
