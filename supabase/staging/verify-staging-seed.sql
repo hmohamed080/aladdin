@@ -4,12 +4,12 @@
 -- ONE canonical file, TWO modes, no fork:
 --
 --   REHEARSAL / FIXTURE mode (strict — the default when nothing sets the mode)
---     Requires the database to hold EXACTLY the 26 demo accounts and nothing
+--     Requires the database to hold EXACTLY the 27 demo accounts and nothing
 --     else. Used by scripts/rehearse_staging_seed.py against a local/isolated
 --     database that was just built from a clean seed load.
 --
 --   HOSTED mode (tolerant of unrelated non-demo registrations)
---     Requires the 26 expected demo identities to exist, by UUID, but does
+--     Requires the 27 expected demo identities to exist, by UUID, but does
 --     NOT require them to be the only rows in auth.users — hosted staging may
 --     carry accounts this manifest never created. Used against the hosted
 --     Supabase project via scripts/verify_staging_seed.py.
@@ -28,10 +28,10 @@
 --
 -- WHAT IT CHECKS, AND WHY EACH ONE EARNS ITS PLACE
 -- ------------------------------------------------
---   A. Population    — the 26 accounts exist. Exactly 26 total in rehearsal
---                       mode; at least those 26 (by UUID) in hosted mode.
+--   A. Population    — the 27 accounts exist. Exactly 27 total in rehearsal
+--                       mode; at least those 27 (by UUID) in hosted mode.
 --   B. Addresses     — unique, deliverable, and in lockstep with public.contacts,
---                      scoped to the 26 expected accounts either way. Sign-in
+--                      scoped to the 27 expected accounts either way. Sign-in
 --                      is Email OTP only, so a duplicate or reserved address is
 --                      an account nobody can open.
 --   C. Linkage       — persona, membership, capability and branch rows all point
@@ -55,7 +55,7 @@
 -- Deliberately keyed on UUIDs, never on email addresses: the addresses are
 -- composed from a mailbox that must never enter the repository, so this file
 -- checks their PROPERTIES and leaves their VALUES to the generated manifest.
--- Never prints credentials, tokens, or the identity of any row outside the 26
+-- Never prints credentials, tokens, or the identity of any row outside the 27
 -- expected demo accounts — hosted mode's extra registrations are counted,
 -- never named.
 -- ===========================================================================
@@ -100,7 +100,7 @@ declare
   v_karim_org         uuid;
   v_karim_branches    uuid[];
 
-  -- The 26 accounts, keyed by the deterministic UUIDs the seed files own.
+  -- The 27 accounts, keyed by the deterministic UUIDs the seed files own.
   -- `expect_landing` mirrors landingFor(); `exempt_reason` is non-null for the
   -- one account that is SUPPOSED to be empty.
   c_accounts constant text := $acc$
@@ -130,6 +130,7 @@ declare
     71000009-0000-4000-8000-000000000009|Wael Sobhy|/home|
     71000010-0000-4000-8000-000000000010|Heba Kamal|/home|
     71000011-0000-4000-8000-000000000011|Amr Selim|/home|
+    72000001-0000-4000-8000-000000000001|Hossam Kandil|/home|
   $acc$;
 begin
   create temporary table if not exists _expect (
@@ -152,8 +153,8 @@ begin
   where btrim(line) <> '';
 
   select count(*) into v_n from _expect;
-  if v_n <> 26 then
-    raise exception 'verify: expected 26 accounts in the check list, parsed %', v_n;
+  if v_n <> 27 then
+    raise exception 'verify: expected 27 accounts in the check list, parsed %', v_n;
   end if;
 
   -- =========================================================================
@@ -161,12 +162,12 @@ begin
   -- =========================================================================
   select count(*) into v_n from auth.users;
   if v_hosted then
-    if v_n < 26 then
-      raise exception 'A1 population: auth.users holds % rows, expected at least 26 (hosted mode tolerates unrelated non-demo registrations)', v_n;
+    if v_n < 27 then
+      raise exception 'A1 population: auth.users holds % rows, expected at least 27 (hosted mode tolerates unrelated non-demo registrations)', v_n;
     end if;
   else
-    if v_n <> 26 then
-      raise exception 'A1 population: auth.users holds % rows, expected exactly 26 (rehearsal/fixture mode requires a clean 26-account world)', v_n;
+    if v_n <> 27 then
+      raise exception 'A1 population: auth.users holds % rows, expected exactly 27 (rehearsal/fixture mode requires a clean 27-account world)', v_n;
     end if;
   end if;
 
@@ -201,16 +202,16 @@ begin
 
   -- =========================================================================
   -- B. Addresses — the credential path, since sign-in is Email OTP only.
-  -- Scoped to the 26 expected demo accounts in BOTH modes: in rehearsal mode
+  -- Scoped to the 27 expected demo accounts in BOTH modes: in rehearsal mode
   -- that is identical to checking all of auth.users (A1 already pins the
-  -- total to exactly 26), and in hosted mode it is the whole point — a
+  -- total to exactly 27), and in hosted mode it is the whole point — a
   -- pre-existing, unrelated registration must never fail this file.
   -- =========================================================================
   select count(*) into v_n from (
     select lower(u.email) from auth.users u join _expect e on e.user_id = u.id group by 1 having count(*) > 1
   ) d;
   if v_n > 0 then
-    raise exception 'B1 email: % duplicate address(es) among the 26 demo accounts', v_n;
+    raise exception 'B1 email: % duplicate address(es) among the 27 demo accounts', v_n;
   end if;
 
   select string_agg(u.id::text, ', ') into v_txt
@@ -631,14 +632,14 @@ begin
     raise exception E'E-F per-account checks FAILED:\n  - %', array_to_string(v_failures, E'\n  - ');
   end if;
 
-  raise notice 'E-F per-account checks passed for all 26 accounts.';
+  raise notice 'E-F per-account checks passed for all 27 accounts.';
 end
 $verify$;
 
 -- The report. Emails are shown MASKED: this script is safe to paste into a issue
 -- or a chat log, and the real addresses live only in the generated manifest.
 -- In hosted mode this SELECT never touches, names, or counts any row outside
--- the 26 expected demo accounts — unrelated registrations are simply absent
+-- the 27 expected demo accounts — unrelated registrations are simply absent
 -- from it, not summarized.
 select
   row_number() over (order by s.user_id)                       as "#",

@@ -58,7 +58,7 @@ EMAIL_RE = re.compile(r"^[^@\s,;<>\"]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9](
 RESERVED_TLDS = {"test", "example", "invalid", "localhost", "local"}
 RESERVED_DOMAINS = {"example.com", "example.net", "example.org"}
 
-EXPECTED_ACCOUNT_COUNT = 26
+EXPECTED_ACCOUNT_COUNT = 27
 
 
 class DemoEmailError(RuntimeError):
