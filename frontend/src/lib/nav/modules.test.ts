@@ -50,8 +50,10 @@ describe("allowedNavKeys", () => {
     expect(keys).toContain("saved");
   });
 
-  it("treats org.manage as a blanket in-org unlock", () => {
-    expect(allowedNavKeys(["org.manage"])).toEqual(NAV_ORDER);
+  it("keeps the org.manage blanket unlock for every module except exact-gated activity", () => {
+    expect(allowedNavKeys(["org.manage"])).toEqual(
+      NAV_ORDER.filter((key) => key !== "activity"),
+    );
   });
 
   it("gates people-ops behind org.members.manage", () => {
@@ -74,7 +76,7 @@ describe("allowedNavSections", () => {
     expect(sections.every((s) => s.keys.length > 0)).toBe(true);
   });
 
-  it("returns every section for a full-access member, in canonical order", () => {
+  it("returns every section for an org manager, without exact-gated activity", () => {
     const sections = allowedNavSections(["org.manage"]);
     expect(sections.map((s) => s.section)).toEqual([
       "overview",
@@ -83,7 +85,9 @@ describe("allowedNavSections", () => {
       "selling",
       "business",
     ]);
-    expect(sections.flatMap((s) => s.keys)).toEqual(NAV_ORDER);
+    expect(sections.flatMap((s) => s.keys)).toEqual(
+      NAV_ORDER.filter((key) => key !== "activity"),
+    );
   });
 
   it("gives a salesperson a Selling section and no Buying section", () => {
@@ -91,6 +95,26 @@ describe("allowedNavSections", () => {
     const names = sections.map((s) => s.section);
     expect(names).toContain("selling");
     expect(names).not.toContain("buying");
+  });
+});
+
+describe("activity log", () => {
+  it("is visible with activity.read and hidden without it", () => {
+    expect(allowedNavKeys(["activity.read"])).toContain("activity");
+    expect(allowedNavKeys([])).not.toContain("activity");
+    expect(allowedNavKeys(["sales.read"])).not.toContain("activity");
+  });
+
+  it("stays hidden with org.manage alone because activity.read is exact-gated", () => {
+    expect(allowedNavKeys(["org.manage"])).not.toContain("activity");
+  });
+
+  it("sits immediately after Reports and before Settings in both stances", () => {
+    for (const stance of ["buyer", "seller"] as const) {
+      const keys = allowedNavKeys(["org.manage", "activity.read"], stance);
+      expect(keys.indexOf("activity")).toBe(keys.indexOf("reports") + 1);
+      expect(keys.indexOf("settings")).toBe(keys.indexOf("activity") + 1);
+    }
   });
 });
 

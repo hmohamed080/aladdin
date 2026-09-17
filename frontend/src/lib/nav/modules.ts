@@ -30,9 +30,8 @@
  * `showroomNav` / `distributorNav` split to drift apart.
  *
  * Each module lists the capabilities that make it reachable (ANY-of). `org.manage`
- * is a blanket in-org unlock — the commerce/sales RPCs already treat it as a
- * superuser (checked as an OR on every trusted write path), so the nav mirrors that
- * exactly and never shows a module the caller cannot act on (no dead-ends).
+ * is a blanket in-org unlock for ordinary modules. The narrow exact-gate set
+ * below records the exceptions whose capabilities must remain withholdable.
  *
  * This is a pure, server-safe module: the AppShell computes the allowed keys from
  * the derived membership capabilities and passes them to the client nav.
@@ -68,6 +67,7 @@ export type NavKey =
   | "projects"
   | "team"
   | "reports"
+  | "activity"
   | "settings";
 
 export type NavSection = "overview" | "supply" | "buying" | "network" | "selling" | "business";
@@ -144,8 +144,17 @@ export const NAV_CAPS: Record<NavKey, string[] | null> = {
   projects: ["project.write", "project.read", "order.manage"],
   team: ["org.members.manage"],
   reports: [...SALES, ...COMMERCE, "catalog.read", "project.read"],
+  activity: ["activity.read"],
   settings: null,
 };
+
+/**
+ * Modules whose listed capability must be held exactly, even by org managers.
+ * A capability that `org.manage` can override cannot be withheld, which would
+ * make `activity.read` untruthful. Keep this exemption narrow and deliberate;
+ * every other module continues to inherit the existing blanket unlock.
+ */
+const EXACT_CAPABILITY_NAV_KEYS: ReadonlySet<NavKey> = new Set(["activity"]);
 
 /**
  * Canonical order within each section, per stance; sections render in this order.
@@ -163,7 +172,7 @@ const BUYER_SECTIONS: { section: NavSection; keys: NavKey[] }[] = [
   { section: "buying", keys: ["purchaseRequests", "offers", "orders", "catalog", "saved"] },
   { section: "network", keys: ["suppliers", "technicians", "jobs", "institutions"] },
   { section: "selling", keys: ["customers", "leads", "followUps", "products"] },
-  { section: "business", keys: ["points", "projects", "team", "reports", "settings"] },
+  { section: "business", keys: ["points", "projects", "team", "reports", "activity", "settings"] },
 ];
 
 const SELLER_SECTIONS: { section: NavSection; keys: NavKey[] }[] = [
@@ -173,7 +182,7 @@ const SELLER_SECTIONS: { section: NavSection; keys: NavKey[] }[] = [
   { section: "selling", keys: ["customers", "leads", "followUps"] },
   // Still present, deliberately last: a distributor buys raw materials too.
   { section: "buying", keys: ["catalog", "saved"] },
-  { section: "business", keys: ["points", "projects", "team", "reports", "settings"] },
+  { section: "business", keys: ["points", "projects", "team", "reports", "activity", "settings"] },
 ];
 
 export function navSectionsFor(stance: CommerceStance) {
@@ -228,6 +237,7 @@ export function allowedNavKeys(
     .filter((key) => {
       const required = NAV_CAPS[key];
       if (required === null) return true;
+      if (EXACT_CAPABILITY_NAV_KEYS.has(key)) return required.some((c) => caps.has(c));
       if (superUser) return true;
       return required.some((c) => caps.has(c));
     });

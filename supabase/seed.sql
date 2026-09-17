@@ -127,10 +127,12 @@ values
   ('e1111111-eeee-4eee-8eee-eeeeeeeeeee1', 'org.members.manage'),
   ('e1111111-eeee-4eee-8eee-eeeeeeeeeee1', 'branch.manage'),
   ('e1111111-eeee-4eee-8eee-eeeeeeeeeee1', 'catalog.write'),
+  ('e1111111-eeee-4eee-8eee-eeeeeeeeeee1', 'activity.read'),
   ('e2222222-eeee-4eee-8eee-eeeeeeeeeee2', 'sales.read'),
   ('e2222222-eeee-4eee-8eee-eeeeeeeeeee2', 'sales.write'),
   ('e3333333-eeee-4eee-8eee-eeeeeeeeeee3', 'org.manage'),
-  ('e3333333-eeee-4eee-8eee-eeeeeeeeeee3', 'org.members.manage');
+  ('e3333333-eeee-4eee-8eee-eeeeeeeeeee3', 'org.members.manage'),
+  ('e3333333-eeee-4eee-8eee-eeeeeeeeeee3', 'activity.read');
 
 -- Branch assignment: the Cairo staff member is explicitly limited to the Cairo branch.
 insert into public.membership_branch_access (membership_id, branch_id)
