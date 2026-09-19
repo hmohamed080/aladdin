@@ -4,6 +4,46 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Promote landing preview to staging only
+
+**Date:** 2026-09-19 · **Branch:** `codex/landing-staging-promotion` · **Base:** `dc2ec12`.
+
+**Purpose:** Promote the redesigned landing page (currently at `/preview/landing`) to `/` on staging
+only, preserving production `/` unchanged. Five supplied videos with thumbnails and metadata added.
+
+**Changes:**
+- `frontend/src/app/page.tsx`: staging-only environment switch — when
+  `NEXT_PUBLIC_APP_ENV === "staging"`, `/` renders `LandingMotion > LandingHero +
+  LandingEcosystem`; production and local render existing LandingV2.
+- `frontend/public/preview/landing/videos/`: five video files (`1.mp4`–`5.mp4`)
+  with thumbnails (`1.jpg`–`5.jpg`) copied from the supplied downloads.
+- `frontend/src/features/landing-preview/landing-video-content.ts`: bilingual
+  titles, descriptions, durations, and category labels for all five videos.
+- `frontend/src/features/landing-preview/landing-videos.tsx` + `.module.css`:
+  new `LandingVideos` component with working `<video>` playback, thumbnail grid,
+  play button overlay, duration badge, and a gallery dialog for "View all videos".
+- `frontend/src/app/page.test.tsx`: homepage routing tests verifying staging
+  renders the preview hero (with `data-landing-preview-part="Header"` and five
+  `data-content-slot="video"` slots) while production/local render LandingV2.
+- CSS refinements in `globals.css`, `landing-ecosystem.module.css`,
+  `landing-footer.module.css`, `landing-hero.module.css`: shared container
+  alignment via `--landing-preview-container-max`/`--landing-preview-gutter`,
+  hero artwork crop from top, ecosystem/footer padding and typography.
+- `landing-details.tsx`: removed "videos" dialog variant (videos now play inline).
+
+**Preserved:** four pre-existing dirty CSS files retained with their changes.
+
+**Validation:** `pnpm --filter @aladdin/frontend typecheck` clean; `pnpm --filter
+@aladdin/frontend lint` 0 errors (1 pre-existing `sidebar-shell.tsx` hook warning);
+`pnpm --filter @aladdin/frontend test` 1468 passed (124 files); `python
+scripts/check_doc_links.py` 982 links, 0 broken.
+
+**Staging-only scope:** production `/` remains on LandingV2; no redirect, no
+middleware change, no database change, no deployment. `/preview/landing` remains
+available.
+
+---
+
 ## Session — Round the visible hero artwork
 
 **Date:** 2026-09-19 · **Base:** `3202456`.

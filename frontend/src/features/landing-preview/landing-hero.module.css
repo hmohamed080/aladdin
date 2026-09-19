@@ -43,14 +43,27 @@
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  /* Always 100% of the section -- width tracks the viewport exactly like
+     every section below it, at every intermediate size during a live
+     resize, with no plateau. (An earlier pass capped this by viewport
+     HEIGHT instead: since height doesn't change while only dragging
+     width, that made the Hero sit at a fixed pixel width across a wide
+     range of window widths while the body sections kept resizing --
+     the "fixed canvas" bug. Reducing the Hero's height had to happen a
+     different way: see the aspect-ratio note below.) */
   width: 100%;
   container-type: inline-size;
   background: transparent;
-  /* The trimmed runtime asset's own native ratio (1728×735 — see the
-     `<Image>` comment in the TSX for how it was derived from
-     `background (2).png`). The artwork fills this box exactly: no crop, no
-     distortion, `width: 100%; height: auto` on the image below. */
-  aspect-ratio: 1728 / 735;
+  /* The artwork's own native ratio is 1728x735. This is deliberately
+     ~10% shorter (1728x661.5): `.scene img` below is anchored to the
+     frame's BOTTOM edge instead of its top, so the extra height is
+     cropped off the TOP -- the mostly-empty wall behind the header,
+     confirmed clear of the lamp shades and product tableau -- instead
+     of stretching or distorting the image. Both numbers stay in the
+     same 1728-wide basis as every `cqw` value in this file, so the crop
+     itself scales proportionally with the Hero at any width; it is not
+     a fixed pixel amount and does not depend on viewport height. */
+  aspect-ratio: 1728 / 661.5;
 }
 
 .scene {
@@ -63,12 +76,15 @@
 .scene img {
   /* No `object-fit` here on purpose — `fill` was dropped from the `<Image>`
      in the TSX specifically so this rule has full control instead of
-     fighting Next's own inline inset/width/height styles. The trimmed
-     asset's own ratio already matches `.heroFrame`'s, so `width: 100%;
-     height: auto` fills the frame exactly with no offset needed. */
+     fighting Next's own inline inset/width/height styles. The image still
+     renders at its own native ratio (`width: 100%; height: auto`), which
+     is now taller than `.heroFrame`'s shorter aspect-ratio — anchoring to
+     `bottom: 0` instead of `top: 0` keeps the countertop/product tableau
+     (the bottom of the artwork) fully in place and lets the excess spill
+     upward, where `.scene`'s `overflow: hidden` crops it. */
   position: absolute;
   left: 0;
-  top: 0;
+  bottom: 0;
   width: 100%;
   height: auto;
 }

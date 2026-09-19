@@ -1,5 +1,28 @@
 # Runtime State
 
+## Current session — 2026-09-19: staging-only landing promotion
+
+- Branch `codex/landing-staging-promotion`, base `dc2ec12`. Promoted the
+  redesigned landing page to `/` on staging only: when `NEXT_PUBLIC_APP_ENV`
+  equals `"staging"`, `/` renders `LandingMotion > LandingHero + LandingEcosystem`.
+  Production and local `/` continue to render the existing LandingV2 page.
+  `/preview/landing` remains available unchanged.
+- Five supplied videos added with thumbnails (`1.jpg`–`5.jpg`) and source files
+  (`1.mp4`–`5.mp4`) in `frontend/public/preview/landing/videos/`. Bilingual
+  titles, descriptions, durations, and category labels in `landing-video-content.ts`.
+  Working playback via `<video>` with controls; "View all videos" opens a gallery
+  dialog. Arabic and English both work; desktop and mobile layouts have no
+  horizontal overflow.
+- CSS refinements: shared container max-width (`--landing-preview-container-max`)
+  and gutter (`--landing-preview-gutter`) in globals.css for aligned section
+  edges; hero artwork cropped from top via bottom-anchored positioning; ecosystem
+  and footer padding/typography refinements.
+- Typecheck clean; lint 0 errors (1 pre-existing sidebar hook warning);
+  1468 tests passed across 124 files; 982 documentation links checked, 0 broken.
+- Pre-existing dirty CSS files (globals.css, landing-ecosystem.module.css,
+  landing-footer.module.css, landing-hero.module.css) preserved with their
+  changes.
+
 ## Current continuation — 2026-09-19: rounded hero artwork
 
 - Base `3202456`: clipped the visible preview artwork to rounded corners inside
