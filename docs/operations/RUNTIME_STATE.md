@@ -1,5 +1,16 @@
 # Runtime State
 
+## Current continuation — 2026-09-19: approved preview header
+
+- Base `9afac18`, branch `main`. Preview header now has one cream row with aligned
+  logo/navigation/account actions, seven navigation entries and a mobile disclosure.
+- Existing hero content/artwork retained; old upper cutouts cropped by preview CSS.
+  No hero video, new statistics, production homepage changes or deployment.
+- Edge: AR/EN 1488px header groups share y=64px center; 390px menu opens and closes
+  after navigation, no horizontal overflow. FAQ opens and Escape closes it.
+- Typecheck, lint (existing sidebar hook warning), three preview tests pass.
+- Four pre-existing dirty CSS files remain excluded from this change.
+
 ## Current continuation — 2026-09-19: preview motion and mobile hero
 
 - Branch `main`, base `2393334`. Added route-local heading reveals, staggered

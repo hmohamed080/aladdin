@@ -3,8 +3,9 @@
 import Image from "next/image";
 import { motion } from "motion/react";
 import { ButtonLink } from "@/components/ui/controls";
-import { ArrowUpRightIcon, GlobeIcon } from "@/components/ui/icons";
-import { LanguageSwitch } from "@/components/layout/switchers";
+import { ArrowUpRightIcon } from "@/components/ui/icons";
+import { LandingHeader } from "./landing-header";
+import headerStyles from "./landing-header.module.css";
 import { useI18n } from "@/lib/i18n/context";
 import styles from "./landing-hero.module.css";
 import widthStyles from "./landing-hero-width.module.css";
@@ -80,10 +81,12 @@ export function LandingHero() {
       // uses).
       className={`${widthStyles.section} pb-sm pt-[12px] px-[5px]`}
       aria-labelledby="landing-preview-title"
+      id="landing-top"
       data-landing-preview-part="Hero"
     >
+      <LandingHeader />
       <div
-        className={styles.heroFrame}
+        className={`${styles.heroFrame} ${headerStyles.stage}`}
         dir="ltr"
       >
         <div
@@ -109,69 +112,6 @@ export function LandingHero() {
             sizes="100vw"
           />
         </div>
-
-        <div
-          className={styles.brandCap}
-          data-landing-preview-part="BrandCap"
-        >
-          <Image
-            src="/preview/landing/aladdin-logo.png"
-            alt="Aladdin"
-            width={684}
-            height={643}
-            priority
-            className={styles.brandLogo}
-          />
-        </div>
-
-        <div
-          className={styles.actionCap}
-          data-landing-preview-part="ActionCap"
-        >
-          <span className={styles.languageControl}>
-            <LanguageSwitch />
-            <GlobeIcon size={14} aria-hidden="true" />
-          </span>
-          <span className={styles.actionDivider} aria-hidden="true" />
-          <a
-            href="/auth/sign-in"
-            dir={dir}
-            className={`${styles.signIn} rounded-sm font-medium text-brand-ink transition-colors duration-fast hover:text-brand-lumen-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
-          >
-            {copy.signIn}
-          </a>
-          <ButtonLink
-            href="/auth/sign-up"
-            variant="accent"
-            size="sm"
-            className={`${styles.accountCta} rounded-pill ps-md`}
-          >
-            <span dir={dir}>{copy.createAccount}</span>
-            <span className={styles.actionIcon}>
-              <ArrowUpRightIcon size={16} strokeWidth={2} />
-            </span>
-          </ButtonLink>
-        </div>
-
-        <motion.nav
-          aria-label={copy.navLabel}
-          className={styles.navigation}
-          data-landing-preview-part="Navigation"
-          dir={dir}
-          initial={false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.28, ease: [0.16, 1, 0.3, 1] }}
-        >
-          {copy.nav.map(([label, href]) => (
-            <a
-              key={label}
-              href={href}
-              className={`${styles.navLink} rounded-xs font-medium text-brand-limestone/80 transition-colors duration-fast hover:text-brand-limestone focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
-            >
-              {label}
-            </a>
-          ))}
-        </motion.nav>
 
         <motion.div
           className={`${styles.copy} ${isArabic ? styles.copyArabic : styles.copyEnglish}`}

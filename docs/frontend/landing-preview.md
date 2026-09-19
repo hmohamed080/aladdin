@@ -8,6 +8,16 @@ approval and a separate implementation step; it is not part of preview work.
 
 ## Rationale and scope
 
+### Approved header refinement — 2026-09-19
+
+The user approved a continuous cream header with the existing logo, expanded
+navigation and account actions optically centered on one desktop row. Keep the
+existing hero artwork, headline, CTA and qualitative proof unchanged; do not add
+a hero video or marketing claims. Narrow screens use an explicit navigation
+disclosure. Home/about/features/partners/videos map to existing preview sections;
+FAQ uses a local disclosure with current account facts, and contact uses support.
+The header is preview-local and does not modify the production navigation.
+
 ### Visual fidelity contract — 2026-09-17
 
 The supplied cropped reference beginning “كيف يعمل Aladdin؟” is now the

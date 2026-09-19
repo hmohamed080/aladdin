@@ -4,6 +4,28 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Implement approved aligned preview header
+
+**Date:** 2026-09-19 · **Branch:** `main` · **Base:** `9afac18`.
+
+**Scope:** user approved the cream single-row header mockup. Extracted existing
+hero header presentation into preview-local LandingHeader with canonical controls,
+the original logo, seven navigation entries, a native FAQ disclosure and a mobile
+menu. Existing hero copy/artwork/CTA remain; CSS crops the obsolete upper cutouts.
+No production route, global styles or business logic changed. Four pre-existing
+dirty CSS files preserved and excluded from this commit.
+
+**Validation:** typecheck passed; lint zero errors with existing sidebar hook
+warning; three preview tests passed with the existing simulated-DOM image warning.
+Edge screenshots inspected in AR/EN at 1488px and mobile 390px. All desktop header
+groups have identical y=64px center. Mobile disclosure opens, selection closes it,
+no overflow. FAQ opens and Escape closes it. `git diff --check` passed.
+
+**Deferred:** final visual review and homepage promotion remain separate. Approved
+videos/testimonials are still missing; no new hero video added. No push/deployment.
+
+---
+
 ## Session — Add preview motion and readable mobile composition
 
 **Date:** 2026-09-19 · **Branch:** `main` · **Base:** `2393334`.
