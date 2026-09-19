@@ -46,6 +46,12 @@ New data access should reuse existing authorized query/action layers.
 
 ## Consequences
 
+The preview hero, body and footer share a route-local 2560px wide-screen boundary,
+with 24px inner content gutters. This uses ordinary desktop space without the
+previous narrow centered column, while preventing unlimited hero growth during
+zoom-out. The process flow always reads visually left-to-right from end consumers
+to manufacturers in both locales; its text retains the selected locale direction.
+
 The route is publicly reachable but has `noindex, nofollow` metadata; this is
 search-index guidance, not access control. No navigation entry, redirect,
 middleware change, global stylesheet change, or production homepage import is

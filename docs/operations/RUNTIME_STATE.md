@@ -1,5 +1,16 @@
 # Runtime State
 
+## Current continuation — 2026-09-19: preview hero zoom fix
+
+- Branch `main`, base `6da26c6`. Preview hero/body/footer share a route-local
+  2560px maximum with 24px body gutters, using wide desktop space while bounding
+  cqw-based growth during zoom-out. Process order is consumer-first in both locales.
+- Browser geometry verified at 4096, 1440, and 390px; typecheck and five focused
+  tests pass; lint retains the existing sidebar hook warning only.
+- Four CSS files were already modified when this session began (global styles,
+  preview ecosystem, footer, hero). They are preserved and excluded from this
+  fix's commit. Production `/` has no new changes from this session. No deployment.
+
 ## Current continuation — 2026-09-17: reference composition pass
 
 - Branch `main`, starting HEAD `cb7616a`, 340 commits before this local change.

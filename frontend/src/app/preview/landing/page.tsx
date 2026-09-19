@@ -4,6 +4,7 @@ import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/context";
 import { LandingHero } from "@/features/landing-preview/landing-hero";
 import { LandingEcosystem } from "@/features/landing-preview/landing-ecosystem";
+import widthStyles from "@/features/landing-preview/landing-hero-width.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export default async function LandingPreviewPage() {
 
   return (
     <I18nProvider locale={locale} dir={directionFor(locale)}>
-      <main className="flex flex-col overflow-x-hidden bg-brand-plaster">
+      <main className={`${widthStyles.page} flex flex-col overflow-x-hidden bg-brand-plaster`}>
         <LandingHero />
         <LandingEcosystem />
       </main>

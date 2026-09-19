@@ -34,6 +34,9 @@ describe("landing preview", () => {
     }
     expect(container.querySelector("footer")).toBeInTheDocument();
     expect(container.querySelectorAll('#brands img')).toHaveLength(9);
+    const flow = container.querySelector('#how-it-works ol');
+    expect(flow).toHaveAttribute('dir', 'ltr');
+    expect(flow?.querySelector('li h3')).toHaveTextContent(locale === 'ar' ? 'العميل النهائي' : 'End consumers');
     expect(container.querySelectorAll('[data-content-slot="video"]')).toHaveLength(5);
     expect(container.querySelectorAll('#value [data-content-slot="testimonial"]')).toHaveLength(9);
     expect(container.querySelectorAll('footer')).toHaveLength(1);

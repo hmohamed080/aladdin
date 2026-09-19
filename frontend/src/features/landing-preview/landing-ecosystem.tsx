@@ -26,13 +26,14 @@ export function LandingEcosystem() {
       <div className={styles.container}>
         <section id="how-it-works" className={styles.process} aria-labelledby="process-heading">
           <h2 id="process-heading" className={styles.heading}>{t.how}</h2>
-          <ol className={styles.flow}>
-            {t.flow.map((item, index) => {
+          <ol className={styles.flow} dir="ltr">
+            {[5, 4, 3, 2, 1, 0].map((index, position) => {
+              const item = t.flow[index]!;
               return (
                 <li key={item.title}>
                   <RoleIllustration index={index} />
-                  <h3>{item.title}</h3><p>{item.text}</p>
-                  {index < t.flow.length - 1 && <span className={styles.flowArrow} aria-hidden="true">→</span>}
+                  <h3 dir={dir}>{item.title}</h3><p dir={dir}>{item.text}</p>
+                  {position < t.flow.length - 1 && <span className={styles.flowArrow} aria-hidden="true">→</span>}
                 </li>
               );
             })}

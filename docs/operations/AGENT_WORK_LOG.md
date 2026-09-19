@@ -4,6 +4,28 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Bound the preview hero during browser zoom-out
+
+**Date:** 2026-09-19 · **Branch:** `main` · **Base:** `6da26c6`.
+
+**Cause / fix:** the uncapped hero container grew with the CSS viewport, and
+its cqw-sized contents grew along with it, cancelling zoom-out. A first 1440px
+cap fixed the mismatch but the user requested less desktop whitespace. The final
+route-local width module shares a 2560px bound across hero/body/footer, with 24px
+body gutters. Process order now stays visually consumer-first left-to-right in
+both locales, retaining correct Arabic text direction and illustration identity.
+Preserved the four pre-existing dirty CSS files, including the current hero crop.
+Only the preview hero and documentation are included in this fix.
+
+**Validation:** live browser at 4096px layout width reproduced hero/body widths
+4086/1312 before the correction. At 1753px, the final expanded layout measures
+1743px hero / 1695px body, eliminating the narrow column. This tests CSS widths
+by zoom-out; browser chrome zoom itself was not automated. At 1440 and 390,
+the hero remains fluid (1430 and 380px), without horizontal overflow. Screenshots
+confirm centered alignment. Typecheck and five focused tests pass; lint has only
+the pre-existing sidebar dependency warning. Production `/` is unchanged by this
+session. Missing media/testimonial content and visual approval remain deferred.
+
 ## Session — Match the complete reference block in the landing preview
 
 **Date:** 2026-09-17 · **Branch:** `main` · **Base:** `cb7616a` (340 commits).

@@ -7,6 +7,7 @@ import { ArrowUpRightIcon, GlobeIcon } from "@/components/ui/icons";
 import { LanguageSwitch } from "@/components/layout/switchers";
 import { useI18n } from "@/lib/i18n/context";
 import styles from "./landing-hero.module.css";
+import widthStyles from "./landing-hero-width.module.css";
 
 const content = {
   ar: {
@@ -78,7 +79,7 @@ export function LandingHero() {
       // 8px this replaced (which put too much air on the sides and too
       // little on top for the near-full-bleed composition the reference
       // uses).
-      className="pb-sm pt-[12px] px-[5px]"
+      className={`${widthStyles.section} pb-sm pt-[12px] px-[5px]`}
       aria-labelledby="landing-preview-title"
       data-landing-preview-part="Hero"
     >
