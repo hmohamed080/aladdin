@@ -1,0 +1,110 @@
+/* Reference composition: compact 6 / 5 / 5 / 9 / 3 desktop rows.
+   The supplied marketing palette is intentionally independent of workspace theme. */
+.block { color: var(--ink); background: var(--plaster); border-radius: 14px 14px 0 0; }
+/* Shared with the footer's `.columns` (see landing-footer.module.css) via
+   `--landing-preview-container-max` / `--landing-preview-gutter` in
+   globals.css, so every section below the Hero lines up on the same left
+   edge instead of each picking its own width. */
+.container { width: 100%; max-width: var(--landing-preview-container-max); margin-inline: auto; padding-inline: var(--landing-preview-gutter); }
+.block section { scroll-margin-block-start: 24px; }
+.heading { margin: 0; font-family: var(--font-archivo), var(--font-readex), sans-serif; font-size: 1.75rem; font-weight: 700; line-height: 1.3; text-align: center; }
+.block[dir="rtl"] .heading { font-family: var(--font-reem-kufi), var(--font-readex), sans-serif; }
+.process { padding-block: 56px 64px; }
+.flow { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 32px; padding: 0; margin: 28px 0 0; list-style: none; }
+.flow li { position: relative; min-width: 0; text-align: center; }
+.illustration { display:block; width:92px; height:92px; margin:0 auto 8px; background-image:url('/preview/landing/roles/role-atlas.png'); background-size:300% 200%; background-repeat:no-repeat; flex:none; }
+.smallIllustration { width:40px; height:40px; margin:0; }
+.flow h3 { font-size: .875rem; line-height: 1.3; font-weight: 600; margin: 0 0 4px; }
+.flow p { max-width: 180px; margin: 0 auto; font-size: .8125rem; line-height: 1.5; color: var(--stone); }
+.flowArrow { position:absolute; inset-inline-end:-32px; top:24px; width:32px; color:var(--stone); font-size:2.25rem; line-height:1; font-family:Arial,sans-serif; }
+.rolesSection { padding-block: 40px 48px; }
+.roles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 24px; margin-block-start: 28px; }
+.roleCard { display: flex; flex-direction: column; align-items: stretch; padding: 22px; min-height: 264px; border: 1px solid var(--quartz-line); border-radius: 10px; background: var(--quartz-raised); }
+.roleHeading { display: flex; flex-direction:row-reverse; justify-content:center; align-items: center; gap: 8px; min-height: 40px; margin-block-end: 16px; color: var(--bronze-ink); }
+.roleHeading > svg { flex: none; width: 32px; height: 32px; }
+.roleHeading h3 { margin: 0; font-size: .8125rem; line-height: 1.4; font-weight: 600; }
+.roleCard ul { display: grid; gap: 8px; padding: 0; margin: 0 0 16px; list-style: none; }
+.roleCard li { display: flex; gap: 8px; align-items: start; font-size: .75rem; line-height: 1.5; }
+.roleCard li svg { flex: none; width: 12px; height: 12px; margin-block-start: 4px; color: var(--bronze-ink); }
+.roleCta { align-self:center; margin-block-start:auto; min-width:104px; min-height:32px; padding:4px 16px; font-size:.75rem; border:1px solid var(--quartz-line-strong); border-radius:8px; color:var(--bronze-ink); background:transparent; }
+.roleCta:focus-visible,.secondaryAction:focus-visible {outline:2px solid var(--bronze-ink);outline-offset:4px;}
+.roleCta:hover { background: var(--sand); color: var(--ink); }
+.videosSection { padding-block: 8px 48px; }
+.sectionHeading { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; margin-block-end: 20px; }
+.sectionHeading .heading { grid-column: 2; grid-row: 1; }
+.secondaryAction { grid-column: 3; grid-row: 1; justify-self: end; font-size: .75rem; line-height: 1.4; color: var(--bronze-ink); }
+.secondaryAction:hover {text-decoration:underline;}
+.videos { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; }
+.thumbnail { position: relative; aspect-ratio: 16 / 10; border: 1px solid var(--quartz-line); border-radius: 10px; background: var(--sand); overflow: hidden; }
+.category { position: absolute; left: 8px; top: 8px; max-width: calc(100% - 16px); padding: 4px 8px; border-radius: 999px; background: var(--shell-deep); color: var(--limestone); font-size: .75rem; line-height: 1.35; }
+.play { position: absolute; inset: 0; display: grid; place-items: center; }
+.play svg { width: 48px; height: 48px; color: var(--stone); stroke-width: 1; }
+.duration { position: absolute; inset-inline-end: 8px; bottom: 8px; background: var(--shell-deep); color: var(--limestone); padding: 0 4px; border-radius: 4px; font-size: .75rem; direction: ltr; }
+.videoCard h3 { margin: 8px 0 4px; font-size: .8125rem; line-height: 1.35; font-weight: 600; text-align: center; }
+.videoCard p { margin: 0; color: var(--stone); font-size: .75rem; line-height: 1.5; text-align: center; }
+.brandsSection { padding-block: 16px 48px; }
+.brandHeading { display: flex; justify-content: space-between; }
+.brandHeading .heading { text-align: start; }
+.brandHeading .secondaryAction { max-width: 35%; text-align: end; }
+.logoStrip { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 16px; list-style: none; padding: 0; margin: 0; }
+.logoStrip li { height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--quartz-line); border-radius: 8px; background: var(--quartz-raised); padding: 8px; }
+.logoStrip img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* Remove the supplied canvases' empty margins without stretching the marks. */
+.logoStrip [data-logo="shbab.png"] img { transform: scale(1.5); }
+.logoStrip [data-logo="ahmed-el-sallab.png"] img { transform: scale(1.7); }
+.logoStrip [data-logo="elsalam.png"] img { transform: scale(1.4); }
+.logoStrip [data-logo="konouz.png"] img { transform: scale(1.8); }
+.logoStrip [data-logo="glc.png"] img, .logoStrip [data-logo="jotun.png"] img { transform: scale(1.8); }
+.logoStrip [data-logo="scib.png"] img { transform: scale(1.7); }
+.storiesSection { padding-block: 16px 32px; }
+.stories { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-block-start: 16px; }
+.storyCard { display: flex; flex-direction: column; justify-content: space-between; min-height: 176px; padding: 20px 28px; border: 1px solid var(--quartz-line); border-radius: 10px; background: var(--quartz-raised); }
+.quoteLine { display: flex; align-items: start; gap: 12px; }
+.quoteMark { color: var(--bronze-ink); font-family: var(--font-archivo), sans-serif; font-size: 2rem; line-height: 1; }
+.quoteLine p { margin: 0; font-size: .8125rem; line-height: 1.6; }
+.author { display: flex; align-items: center; gap: 12px; margin-block-start: 16px; }
+.avatar { display: grid; place-items: center; width: 48px; height: 48px; flex: none; background: var(--sand); border-radius: 999px; color: var(--stone); }
+.author h3 { font-size: .75rem; line-height: 1.4; margin: 0 0 4px; font-weight: 600; }
+.author p { font-size: .75rem; line-height: 1.4; margin: 0; color: var(--stone); }
+.pagination { display: flex; justify-content: center; gap: 8px; margin-block-start: 8px; }
+.pagination span { width: 8px; height: 8px; background: var(--quartz-line-strong); border-radius: 999px; }
+.pagination span:first-child { background: var(--bronze-ink); }
+@media (max-width: 1023px) {
+  .heading { font-size: 1.5rem; }
+  .process { padding-block: 40px 48px; }
+  .flow { gap: 24px; }
+  .flowArrow { inset-inline-end: -24px; }
+  .rolesSection { padding-block: 32px 40px; }
+  .roles, .videos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .videosSection { padding-block: 8px 40px; }
+  .brandsSection { padding-block: 16px 40px; }
+  .logoStrip { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .sectionHeading { display: flex; justify-content: space-between; }
+  .sectionHeading .heading { text-align: start; }
+  .secondaryAction { max-width: 32%; text-align: end; }
+  .storiesSection { padding-block: 16px 24px; }
+  .stories { gap: 12px; }
+  .storyCard { padding: 16px; min-height: 168px; }
+}
+@media (max-width: 767px) {
+  .heading { font-size: 1.25rem; }
+  .process { padding-block: 24px; }
+  .flow { grid-template-columns: 1fr; gap: 24px; margin-block-start: 24px; }
+  .flow li { display: grid; grid-template-columns: 48px 1fr; column-gap: 16px; align-items: center; text-align: start; }
+  .flow .illustration { grid-row: span 2; width: 56px; height: 56px; margin: 0; }
+  .flow p { max-width: none; margin: 0; }
+  .flowArrow, .block[dir="rtl"] .flowArrow { top: auto; bottom: -24px; inset-inline-start: 12px; inset-inline-end: auto; transform: rotate(90deg); }
+  .rolesSection { padding-block: 24px 32px; }
+  .roles { grid-template-columns: 1fr; gap: 16px; }
+  .roleCard { min-height: 0; padding: 16px; }
+  .roleCta { min-height: 44px; }
+  .videosSection { padding-block: 0 32px; }
+  .videos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .thumbnail { aspect-ratio: 4 / 3; }
+  .sectionHeading { display: block; }
+  .secondaryAction, .brandHeading .secondaryAction { display: block; max-width: none; text-align: start; margin-block-start: 8px; }
+  .brandsSection { padding-block: 8px 32px; }
+  .logoStrip { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .storiesSection { padding-block: 8px 24px; }
+  .stories { grid-template-columns: 1fr; }
+}

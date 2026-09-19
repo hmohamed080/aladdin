@@ -1,0 +1,12 @@
+.banner { position:relative; display:grid; grid-template-columns:28% 1fr; min-height:144px; overflow:hidden; border-radius:10px; background:var(--shell-deep); color:var(--plaster); margin-bottom:8px; }
+.visual { position:relative; overflow:hidden; }
+.image { object-fit:cover; object-position:76% center; }
+.copy { padding:16px 24px; text-align:center; align-self:center; }
+.copy h2 { font-family:var(--font-archivo),var(--font-readex),sans-serif; font-size:1.5rem; font-weight:700; line-height:1.35; }
+:global([dir="rtl"]) .copy h2 { font-family:var(--font-reem-kufi),var(--font-readex),sans-serif; }
+.copy p { margin-top:4px; font-size:.8125rem; line-height:1.5; }
+.actions { display:flex; justify-content:center; gap:24px; margin-top:12px; }
+.actions a { min-width:224px; min-height:40px; border-radius:6px; }
+.contact { background:var(--plaster); color:var(--ink); }
+@media(max-width:1023px) { .copy h2 {font-size:1.25rem;} .actions {gap:12px;} .actions a {min-width:160px;} }
+@media(max-width:767px) { .banner {grid-template-columns:1fr;} .visual {height:144px;grid-row:2;} .copy {padding:24px 16px;} .actions {flex-wrap:wrap;} .actions a {min-height:44px;flex:1;} }

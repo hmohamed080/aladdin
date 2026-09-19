@@ -1,5 +1,119 @@
 # Runtime State
 
+## Current session — 2026-09-19: staging-only landing promotion
+
+- Branch `codex/landing-staging-promotion`, base `dc2ec12`. Promoted the
+  redesigned landing page to `/` on staging only: when `NEXT_PUBLIC_APP_ENV`
+  equals `"staging"`, `/` renders `LandingMotion > LandingHero + LandingEcosystem`.
+  Production and local `/` continue to render the existing LandingV2 page.
+  `/preview/landing` remains available unchanged.
+- Five supplied videos added with thumbnails (`1.jpg`–`5.jpg`) and source files
+  (`1.mp4`–`5.mp4`) in `frontend/public/preview/landing/videos/`. Bilingual
+  titles, descriptions, durations, and category labels in `landing-video-content.ts`.
+  Working playback via `<video>` with controls; "View all videos" opens a gallery
+  dialog. Arabic and English both work; desktop and mobile layouts have no
+  horizontal overflow.
+- CSS refinements: shared container max-width (`--landing-preview-container-max`)
+  and gutter (`--landing-preview-gutter`) in globals.css for aligned section
+  edges; hero artwork cropped from top via bottom-anchored positioning; ecosystem
+  and footer padding/typography refinements.
+- Typecheck clean; lint 0 errors (1 pre-existing sidebar hook warning);
+  1468 tests passed across 124 files; 982 documentation links checked, 0 broken.
+- Pre-existing dirty CSS files (globals.css, landing-ecosystem.module.css,
+  landing-footer.module.css, landing-hero.module.css) preserved with their
+  changes.
+
+## Current continuation — 2026-09-19: rounded hero artwork
+
+- Base `3202456`: clipped the visible preview artwork to rounded corners inside
+  its transparent side gutters, removing the angular upper-right remnant.
+- Edge screenshot inspected at 1488px; 834px has no horizontal overflow.
+  Typecheck and diff whitespace checks pass. Production homepage untouched.
+
+## Current continuation — 2026-09-19: approved preview header
+
+- Base `9afac18`, branch `main`. Preview header now has one cream row with aligned
+  logo/navigation/account actions, seven navigation entries and a mobile disclosure.
+- Existing hero content/artwork retained; old upper cutouts cropped by preview CSS.
+  No hero video, new statistics, production homepage changes or deployment.
+- Edge: AR/EN 1488px header groups share y=64px center; 390px menu opens and closes
+  after navigation, no horizontal overflow. FAQ opens and Escape closes it.
+- Typecheck, lint (existing sidebar hook warning), three preview tests pass.
+- Four pre-existing dirty CSS files remain excluded from this change.
+
+## Current continuation — 2026-09-19: preview motion and mobile hero
+
+- Branch `main`, base `2393334`. Added route-local heading reveals, staggered
+  section entrances, hover feedback, and a readable mobile hero composition.
+- Edge checks: Arabic/English at 1440/390px, consumer-first order, no overflow or
+  page errors, five scroll card animations and zero under reduced motion.
+- Typecheck and ten focused tests pass. Lint: zero errors, existing sidebar hook
+  warning. Tests retain a simulated-DOM image geometry warning.
+- The same four pre-existing dirty CSS files remain excluded from this commit.
+  Production homepage unchanged by this work; no deployment or promotion.
+- Approved video/testimonial content and final user visual approval remain pending.
+
+## Current continuation — 2026-09-19: preview hero zoom fix
+
+- Branch `main`, base `6da26c6`. Preview hero/body/footer share a route-local
+  2560px maximum with 24px body gutters, using wide desktop space while bounding
+  cqw-based growth during zoom-out. Process order is consumer-first in both locales.
+- Browser geometry verified at 4096, 1440, and 390px; typecheck and five focused
+  tests pass; lint retains the existing sidebar hook warning only.
+- Four CSS files were already modified when this session began (global styles,
+  preview ecosystem, footer, hero). They are preserved and excluded from this
+  fix's commit. Production `/` has no new changes from this session. No deployment.
+
+## Current continuation — 2026-09-17: reference composition pass
+
+- Branch `main`, starting HEAD `cb7616a`, 340 commits before this local change.
+- `/preview/landing` now mounts its existing hero plus the complete reference
+  block (6 process positions / 5 role cards / 5 pending videos / 9 supplied logos /
+  3 pending testimonials / compact CTA / footer). The old duplicate bands are
+  unmounted. All presentation changes remain in the preview directories.
+- Desktop/mobile browser inspection and CSS iteration completed; AR 1440/390 and
+  EN 1440/834 checked. Typecheck and five focused tests pass; lint has only the
+  existing sidebar hook warning. 981 documentation links checked, zero broken.
+- `/`, shared components/styles, original artwork, business logic, and 62 database
+  migrations remain unchanged. No push/deploy or promotion was performed.
+- Missing approved videos and testimonials remain explicit slots. Final visual
+  review and promotion are deferred to the user. See
+  [Landing preview](../frontend/landing-preview.md).
+
+## Current session override — 2026-09-17: isolated landing preview
+
+- Branch: `main`; starting HEAD `14d8c55`, 0 commits ahead of `main` before
+  this change. The preview is recorded in the next local commit; no push or
+  deployment is performed in this session.
+- Added `/preview/landing`, with route-local `noindex, nofollow` metadata.
+  Presentation and bilingual copy live in `frontend/src/features/landing-preview/`;
+  all six referenced image assets are private copies in `frontend/public/preview/landing/`.
+- `/` still mounts the original `landing-v2` composition. Its route, components,
+  assets, shared primitives, layout, global styles, tokens, and middleware are
+  unchanged against the starting commit.
+- Validation: TypeScript passes; frontend lint has no errors and one existing
+  `sidebar-shell.tsx` hook-dependency warning; five focused tests pass (three
+  preview tests and two existing homepage hero tests); Impeccable detector has
+  zero findings. Documentation links: 979 checked, zero broken before this entry.
+- Browser smoke check: `/preview/landing` returns HTTP 200 with no redirect and
+  `noindex, nofollow` in AR/EN at 1440 and 390 widths. `/` returns HTTP 200 and
+  renders only the production hero. This is baseline route verification, not
+  final redesign or accessibility approval.
+- Schema unchanged: 62 migration files. No database or hosted state touched.
+- Local dev server: `http://localhost:3100` for review. Remaining work: redesign
+  iteration, inherited content/interaction issues, full visual review, then
+  explicit approval and a separate promotion task. See
+  [Landing preview](../frontend/landing-preview.md).
+
+### Current session continuation — 2026-09-17
+
+- Preview now includes `LandingEcosystem` after the hero: bilingual participant
+  flow, role/value cards, and a nine-logo supplied asset showcase. Unsupported
+  `+50`, `+500`, and `+10,000` hero metrics were replaced with qualitative proof.
+- Focused preview tests now assert no unsupported metrics and all nine logo images.
+- `/` remains untouched; no APIs, auth, database, middleware, shared styles, or
+  production assets changed.
+
 <!-- CANONICAL PROJECT MEMORY — mutable current-state snapshot. Refresh at the end of every substantive session. -->
 
 This is a **mutable snapshot** of the current live repository state — not an append-only history (that is [`AGENT_WORK_LOG.md`](./AGENT_WORK_LOG.md)). Overwrite it each session with verified values.

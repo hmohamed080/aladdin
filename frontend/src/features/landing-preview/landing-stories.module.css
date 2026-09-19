@@ -1,0 +1,22 @@
+.carousel { margin-top:16px; }
+.viewport { overflow:hidden; touch-action:pan-y; }
+.track { display:flex; direction:ltr; transition:transform 450ms ease; }
+.group { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; min-width:100%; flex:0 0 100%; }
+.card { display:flex; flex-direction:column; justify-content:space-between; min-height:168px; padding:16px 24px; border:1px solid var(--quartz-line); border-radius:10px; background:var(--quartz-raised); }
+.quote { display:flex; gap:12px; align-items:start; }
+.quote > span { color:var(--bronze-ink); font-family:var(--font-archivo),sans-serif; font-size:2rem; line-height:1; }
+.quote p { font-size:.8125rem; line-height:1.6; margin:0; }
+.author { display:flex; gap:12px; align-items:center; margin-top:16px; }
+.avatar { display:grid; place-items:center; flex:none; width:48px; height:48px; border-radius:999px; background:var(--sand); color:var(--stone); object-fit:cover; }
+.author h3 { font-size:.75rem; font-weight:600; line-height:1.4; margin:0 0 4px; }
+.author p,.author small { font-size:.6875rem; line-height:1.4; color:var(--stone); }
+.controls { position:relative; display:flex; justify-content:center; align-items:center; min-height:32px; }
+.dots { display:flex; direction:ltr; }
+.dots button { display:grid; place-items:center; width:24px; height:32px; }
+.dots span { width:8px; height:8px; background:var(--quartz-line-strong); border-radius:999px; }
+.dots [aria-current="true"] span { background:var(--bronze-ink); }
+.pause { position:absolute; inset-inline-end:0; color:var(--bronze-ink); font-size:.6875rem; min-height:32px; padding-inline:8px; }
+.controls button:focus-visible { outline:2px solid var(--bronze-ink); outline-offset:2px; border-radius:4px; }
+@media(max-width:1023px) { .group {grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;} }
+@media(max-width:767px) { .group {grid-template-columns:1fr;} .dots button,.pause {min-height:44px;min-width:32px;} }
+@media(prefers-reduced-motion:reduce) { .track {transition:none;} }

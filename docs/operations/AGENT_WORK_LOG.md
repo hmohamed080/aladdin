@@ -4,6 +4,215 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Promote landing preview to staging only
+
+**Date:** 2026-09-19 · **Branch:** `codex/landing-staging-promotion` · **Base:** `dc2ec12`.
+
+**Purpose:** Promote the redesigned landing page (currently at `/preview/landing`) to `/` on staging
+only, preserving production `/` unchanged. Five supplied videos with thumbnails and metadata added.
+
+**Changes:**
+- `frontend/src/app/page.tsx`: staging-only environment switch — when
+  `NEXT_PUBLIC_APP_ENV === "staging"`, `/` renders `LandingMotion > LandingHero +
+  LandingEcosystem`; production and local render existing LandingV2.
+- `frontend/public/preview/landing/videos/`: five video files (`1.mp4`–`5.mp4`)
+  with thumbnails (`1.jpg`–`5.jpg`) copied from the supplied downloads.
+- `frontend/src/features/landing-preview/landing-video-content.ts`: bilingual
+  titles, descriptions, durations, and category labels for all five videos.
+- `frontend/src/features/landing-preview/landing-videos.tsx` + `.module.css`:
+  new `LandingVideos` component with working `<video>` playback, thumbnail grid,
+  play button overlay, duration badge, and a gallery dialog for "View all videos".
+- `frontend/src/app/page.test.tsx`: homepage routing tests verifying staging
+  renders the preview hero (with `data-landing-preview-part="Header"` and five
+  `data-content-slot="video"` slots) while production/local render LandingV2.
+- CSS refinements in `globals.css`, `landing-ecosystem.module.css`,
+  `landing-footer.module.css`, `landing-hero.module.css`: shared container
+  alignment via `--landing-preview-container-max`/`--landing-preview-gutter`,
+  hero artwork crop from top, ecosystem/footer padding and typography.
+- `landing-details.tsx`: removed "videos" dialog variant (videos now play inline).
+
+**Preserved:** four pre-existing dirty CSS files retained with their changes.
+
+**Validation:** `pnpm --filter @aladdin/frontend typecheck` clean; `pnpm --filter
+@aladdin/frontend lint` 0 errors (1 pre-existing `sidebar-shell.tsx` hook warning);
+`pnpm --filter @aladdin/frontend test` 1468 passed (124 files); `python
+scripts/check_doc_links.py` 982 links, 0 broken.
+
+**Staging-only scope:** production `/` remains on LandingV2; no redirect, no
+middleware change, no database change, no deployment. `/preview/landing` remains
+available.
+
+---
+
+## Session — Round the visible hero artwork
+
+**Date:** 2026-09-19 · **Base:** `3202456`.
+
+Applied a preview-local rounded clip to the visible image rather than its larger
+transparent canvas, removing the remaining angular header-cutout edge. No source
+image, content or production stylesheet changed. Edge screenshot inspected at
+1488px; 834px overflow check passed. Typecheck and `git diff --check` pass.
+The four unrelated dirty CSS files remain preserved. No deployment.
+
+---
+
+## Session — Implement approved aligned preview header
+
+**Date:** 2026-09-19 · **Branch:** `main` · **Base:** `9afac18`.
+
+**Scope:** user approved the cream single-row header mockup. Extracted existing
+hero header presentation into preview-local LandingHeader with canonical controls,
+the original logo, seven navigation entries, a native FAQ disclosure and a mobile
+menu. Existing hero copy/artwork/CTA remain; CSS crops the obsolete upper cutouts.
+No production route, global styles or business logic changed. Four pre-existing
+dirty CSS files preserved and excluded from this commit.
+
+**Validation:** typecheck passed; lint zero errors with existing sidebar hook
+warning; three preview tests passed with the existing simulated-DOM image warning.
+Edge screenshots inspected in AR/EN at 1488px and mobile 390px. All desktop header
+groups have identical y=64px center. Mobile disclosure opens, selection closes it,
+no overflow. FAQ opens and Escape closes it. `git diff --check` passed.
+
+**Deferred:** final visual review and homepage promotion remain separate. Approved
+videos/testimonials are still missing; no new hero video added. No push/deployment.
+
+---
+
+## Session — Add preview motion and readable mobile composition
+
+**Date:** 2026-09-19 · **Branch:** `main` · **Base:** `2393334`.
+
+**Request / implementation:** inspected nine frames from the supplied local
+Pinterest MP4 (25.386 seconds). Added masked title entrances, once-per-visit
+staggered section cards and restrained hover feedback inside the preview wrapper.
+Mobile hero now has readable text/navigation/touch controls over the existing
+artwork. Browser APIs provide progressive enhancement and preference-change cleanup;
+no new dependency or production-route modification. Existing unrelated dirty CSS
+is preserved and excluded from the commit.
+
+**Validation:** `pnpm --filter @aladdin/frontend typecheck`, lint (zero errors,
+existing sidebar hook warning), focused preview/query tests (10 passed; simulated
+DOM image geometry warning). Edge rendered screenshots inspected at 1440 and 390px
+in both locales. No horizontal overflow or page errors. English consumer-first
+order confirmed. Five card animations observed while scrolling; reduced-motion
+produced zero. Documentation references retain their existing valid paths.
+
+**Pending:** approved media/testimonials remain missing and explicitly labelled;
+final visual approval and promotion to `/` remain separate user decisions. No push
+or deployment. Screenshot evidence is in the session visualization directory.
+
+---
+
+## Session — Bound the preview hero during browser zoom-out
+
+**Date:** 2026-09-19 · **Branch:** `main` · **Base:** `6da26c6`.
+
+**Cause / fix:** the uncapped hero container grew with the CSS viewport, and
+its cqw-sized contents grew along with it, cancelling zoom-out. A first 1440px
+cap fixed the mismatch but the user requested less desktop whitespace. The final
+route-local width module shares a 2560px bound across hero/body/footer, with 24px
+body gutters. Process order now stays visually consumer-first left-to-right in
+both locales, retaining correct Arabic text direction and illustration identity.
+Preserved the four pre-existing dirty CSS files, including the current hero crop.
+Only the preview hero and documentation are included in this fix.
+
+**Validation:** live browser at 4096px layout width reproduced hero/body widths
+4086/1312 before the correction. At 1753px, the final expanded layout measures
+1743px hero / 1695px body, eliminating the narrow column. This tests CSS widths
+by zoom-out; browser chrome zoom itself was not automated. At 1440 and 390,
+the hero remains fluid (1430 and 380px), without horizontal overflow. Screenshots
+confirm centered alignment. Typecheck and five focused tests pass; lint has only
+the pre-existing sidebar dependency warning. Production `/` is unchanged by this
+session. Missing media/testimonial content and visual approval remain deferred.
+
+## Session — Match the complete reference block in the landing preview
+
+**Date:** 2026-09-17 · **Branch:** `main` · **Base:** `cb7616a` (340 commits).
+
+**Decision / scope:** the user's latest cropped screenshot supersedes the earlier
+inspiration-only treatment. Rebuilt the isolated post-hero block as six process
+positions, five role cards, five video slots, nine supplied logos, three story
+slots, one compact product CTA, and a four-column footer. Navy/gold/cream tokens,
+existing fonts/icons, and current terminology remain authoritative. Removed the
+old duplicate bands from the preview composition. Production files are unchanged.
+
+**Visual verification:** inspected real-browser full-page captures at 1440px
+(Arabic and English), 390px (Arabic), and 834px (English). Compared desktop section
+proportions with the 614×675 reference, then adjusted process whitespace, role
+headers, video badge position/play treatment, and logo canvas cropping. Desktop
+CTA is 144px high and footer approximately 170px; role cards are 248px high,
+video thumbnails 16:10, logo boxes 80px high, and story cards 168px minimum.
+Mobile has no horizontal overflow and all images load. Current icons replace the
+old illustrations; existing product artwork replaces the old purple device art.
+
+**Validation:** typecheck passes; lint has zero errors and the existing
+`sidebar-shell.tsx:160` dependency warning. Five focused preview/production hero
+tests pass; the DOM test emits a CSS-less next/image size warning, while the live
+CTA image has verified nonzero dimensions. Documentation validator checks 981
+links with zero broken. `git diff --check` passes. Production homepage, original
+landing components, shared styles/components, and artwork have no diff against
+`14d8c55`. Database remains at 62 migrations.
+
+**Deferred:** five approved videos with thumbnails/metadata and three approved
+testimonials with portraits are missing. Explicit pending slots preserve their
+composition without fabricated media, quotes, duration, or partnership claims.
+Play/pagination graphics are inert. Footer now uses real support/legal/auth routes
+and has no simulated newsletter or generic social links. User review and separate
+explicit promotion to `/` are still required; no push/deploy occurred.
+
+## Session continuation — Expand the isolated landing preview
+
+**Date:** 2026-09-17 · **Branch:** `main` · **Base:** `93e2410`.
+
+Added the requested post-hero experience only under the preview route: a
+bilingual `LandingEcosystem` section explains the current participants and flow,
+adds three role/value cards, and presents the nine user-supplied logo assets in
+contained, accessible containers. Navigation now points “How it works” to the
+new real anchor. Replaced inherited unsupported hero metrics with qualitative
+proof in both locales. The purple references were used for information patterns
+only; purple styling, testimonials, fabricated videos/claims, and screenshot
+metrics were not adopted. No shared or production file was changed.
+
+Validation: preview focused Vitest passes after the update and typecheck passes;
+the earlier full lint result remains zero errors with one pre-existing
+`sidebar-shell.tsx` hook warning. Live preview AX/browser verification shows all
+new AR content, nine logo images, valid anchors, and HTTP 200 on localhost:3100.
+
+## Session — Isolate the landing redesign from the production homepage
+
+**Date:** 2026-09-17 · **Branch:** `main` · **Starting HEAD:** `14d8c55`.
+
+**Purpose / decision:** establish `/preview/landing` as the only redesign surface.
+User explicitly requires `/` to remain unchanged until a separately authorized
+promotion after review. Recorded the boundary in
+[Landing preview](../frontend/landing-preview.md) before implementation.
+
+**Changes / rationale:** thin Next.js route with private section components,
+bilingual copy, CSS Modules, and six copied image assets. This intentional
+presentation fork allows iteration without modifying the production composition.
+Shared primitives, locale services, and business destinations are consumed
+unchanged. Preview metadata requests `noindex, nofollow`; no redirect, global
+CSS change, middleware change, database change, or navigation link was added.
+
+**Validation:** `pnpm --filter frontend typecheck` passes; `pnpm --filter frontend
+lint` passes with one pre-existing `sidebar-shell.tsx` missing-hook-dependency
+warning. Focused Vitest run passes 5/5 (AR/EN full preview rendering, local anchor
+targets, isolated image URLs, indexing metadata, and original hero behavior).
+Next/Image emits layout warnings in happy-dom, which does not lay out CSS.
+Impeccable detector: zero findings. Documentation link checker: 979 links,
+zero broken before the memory updates. Browser smoke via installed Edge:
+preview HTTP 200/no redirect/noindex in AR/EN at 1440/390, and homepage HTTP 200
+with the original hero and no preview hero. `git diff` confirms no production
+homepage, shared component/style, middleware, or original asset changes.
+
+**Deferred / consequence:** baseline isolation is ready; a new visual direction
+is not approved or promoted. Inherited unverified marketing figures, footer
+destinations, newsletter simulation, and responsive/theme/accessibility issues
+remain review items. No push or deployment performed. Local review server is
+available on port 3100. Schema stays at 62 migration files.
+
+---
+
 ## Session — Hana Mansour, the first non-admin account review: audit, then approved fixes
 
 **Date:** 2026-09-07 · **Branches:** `chore/staging-readiness-phase0` (PR #42, merged as `27b8943` before this session started), `fix/hana-account-acceptance` (this session, in review) · **Base:** `main` @ `27b8943` throughout.

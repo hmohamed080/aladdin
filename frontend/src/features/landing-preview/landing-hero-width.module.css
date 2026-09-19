@@ -1,0 +1,20 @@
+/* One wide-screen boundary for hero, body and footer keeps zoom proportional
+   while using available desktop space with only small side gutters. */
+.page {
+  --landing-preview-container-max: 2560px;
+  --landing-preview-gutter: 24px;
+}
+
+.page :global([data-landing-preview-part="Ecosystem"]) > div:first-child,
+.page :global([data-landing-preview-part="Footer"]) > div:first-child {
+  width: 100%;
+  max-width: var(--landing-preview-container-max);
+  padding-inline: var(--landing-preview-gutter);
+  margin-inline: auto;
+}
+
+.section {
+  width: 100%;
+  max-width: var(--landing-preview-container-max);
+  margin-inline: auto;
+}
