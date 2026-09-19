@@ -1,5 +1,12 @@
 # Runtime State
 
+## Current continuation — 2026-09-19: rounded hero artwork
+
+- Base `3202456`: clipped the visible preview artwork to rounded corners inside
+  its transparent side gutters, removing the angular upper-right remnant.
+- Edge screenshot inspected at 1488px; 834px has no horizontal overflow.
+  Typecheck and diff whitespace checks pass. Production homepage untouched.
+
 ## Current continuation — 2026-09-19: approved preview header
 
 - Base `9afac18`, branch `main`. Preview header now has one cream row with aligned

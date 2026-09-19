@@ -32,6 +32,11 @@
 
 /* Crop only the old header cutouts, retaining the product tableau at its native scale. */
 .stage.stage { aspect-ratio: 1728 / 588; border-radius: 4cqw; }
+.stage [data-landing-preview-part="ShowroomVisual"] {
+  /* The source has transparent side gutters and remnants of its former header
+     cutouts. Round the visible picture, rather than only its larger canvas. */
+  clip-path: inset(0 1.6% round 4cqw);
+}
 .stage [data-landing-preview-part="HeroContent"] { top: 6.1cqw; }
 
 @media (max-width: 1439px) {

@@ -4,6 +4,18 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Round the visible hero artwork
+
+**Date:** 2026-09-19 · **Base:** `3202456`.
+
+Applied a preview-local rounded clip to the visible image rather than its larger
+transparent canvas, removing the remaining angular header-cutout edge. No source
+image, content or production stylesheet changed. Edge screenshot inspected at
+1488px; 834px overflow check passed. Typecheck and `git diff --check` pass.
+The four unrelated dirty CSS files remain preserved. No deployment.
+
+---
+
 ## Session — Implement approved aligned preview header
 
 **Date:** 2026-09-19 · **Branch:** `main` · **Base:** `9afac18`.
