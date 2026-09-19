@@ -59,6 +59,19 @@ needed. CSS Modules scope preview rules; shared tokens remain read-only.
 
 ## Deferred review and promotion
 
+### Motion review — 2026-09-19
+
+The supplied Pinterest video is a motion reference only: masked headline entrances,
+staggered cards on first intersection, and restrained hover feedback. The isolated
+`LandingMotion` wrapper uses browser animation/observer APIs without dependencies.
+Content remains visible without JavaScript or animation support. Reduced-motion
+preferences cancel active effects and disable subsequent entrances. Desktop keeps
+the established composition; below 768px the hero reflows to readable text and
+touch controls rather than scaling the entire desktop canvas into tiny text.
+Current branding, role order, and honest unpublished-content slots remain intact.
+Verified in Edge at 1440px and 390px in Arabic/English, with no horizontal overflow
+or runtime errors. Scroll revealed five card animations; reduced-motion revealed zero.
+
 This remains a review preview, not an approved production design. The footer uses
 existing authentication, support, privacy, and terms routes; simulated newsletter
 submission and generic social destinations are no longer mounted. Five approved

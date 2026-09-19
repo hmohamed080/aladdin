@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { ButtonLink } from "@/components/ui/controls";
 import { ArrowUpRightIcon, GlobeIcon } from "@/components/ui/icons";
 import { LanguageSwitch } from "@/components/layout/switchers";
@@ -68,7 +68,6 @@ const copyItem = {
 
 export function LandingHero() {
   const { locale, dir } = useI18n();
-  const reducedMotion = useReducedMotion();
   const copy = content[locale];
   const isArabic = locale === "ar";
 
@@ -159,7 +158,7 @@ export function LandingHero() {
           className={styles.navigation}
           data-landing-preview-part="Navigation"
           dir={dir}
-          initial={reducedMotion ? false : { opacity: 0, y: -12 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.28, ease: [0.16, 1, 0.3, 1] }}
         >
@@ -182,7 +181,7 @@ export function LandingHero() {
             hidden: {},
             shown: { transition: { staggerChildren: 0.11, delayChildren: 0.34 } },
           }}
-          initial={reducedMotion ? "shown" : "hidden"}
+          initial={false}
           animate="shown"
         >
           <motion.p variants={copyItem} className={`${styles.eyebrow} font-medium text-brand-limestone/70`}>

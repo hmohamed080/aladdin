@@ -1,5 +1,17 @@
 # Runtime State
 
+## Current continuation — 2026-09-19: preview motion and mobile hero
+
+- Branch `main`, base `2393334`. Added route-local heading reveals, staggered
+  section entrances, hover feedback, and a readable mobile hero composition.
+- Edge checks: Arabic/English at 1440/390px, consumer-first order, no overflow or
+  page errors, five scroll card animations and zero under reduced motion.
+- Typecheck and ten focused tests pass. Lint: zero errors, existing sidebar hook
+  warning. Tests retain a simulated-DOM image geometry warning.
+- The same four pre-existing dirty CSS files remain excluded from this commit.
+  Production homepage unchanged by this work; no deployment or promotion.
+- Approved video/testimonial content and final user visual approval remain pending.
+
 ## Current continuation — 2026-09-19: preview hero zoom fix
 
 - Branch `main`, base `6da26c6`. Preview hero/body/footer share a route-local

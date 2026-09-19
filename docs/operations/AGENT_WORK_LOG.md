@@ -4,6 +4,31 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Add preview motion and readable mobile composition
+
+**Date:** 2026-09-19 · **Branch:** `main` · **Base:** `2393334`.
+
+**Request / implementation:** inspected nine frames from the supplied local
+Pinterest MP4 (25.386 seconds). Added masked title entrances, once-per-visit
+staggered section cards and restrained hover feedback inside the preview wrapper.
+Mobile hero now has readable text/navigation/touch controls over the existing
+artwork. Browser APIs provide progressive enhancement and preference-change cleanup;
+no new dependency or production-route modification. Existing unrelated dirty CSS
+is preserved and excluded from the commit.
+
+**Validation:** `pnpm --filter @aladdin/frontend typecheck`, lint (zero errors,
+existing sidebar hook warning), focused preview/query tests (10 passed; simulated
+DOM image geometry warning). Edge rendered screenshots inspected at 1440 and 390px
+in both locales. No horizontal overflow or page errors. English consumer-first
+order confirmed. Five card animations observed while scrolling; reduced-motion
+produced zero. Documentation references retain their existing valid paths.
+
+**Pending:** approved media/testimonials remain missing and explicitly labelled;
+final visual approval and promotion to `/` remain separate user decisions. No push
+or deployment. Screenshot evidence is in the session visualization directory.
+
+---
+
 ## Session — Bound the preview hero during browser zoom-out
 
 **Date:** 2026-09-19 · **Branch:** `main` · **Base:** `6da26c6`.
