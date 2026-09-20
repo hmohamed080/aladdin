@@ -3,8 +3,10 @@
 ## Purpose and current decision
 
 The landing redesign is developed and reviewed only at `/preview/landing`.
-The production `/` route stays unchanged. Promotion requires explicit user
-approval and a separate implementation step; it is not part of preview work.
+The production `/` route stays unchanged. **This session promotes the
+redesign to `/` on staging only** — when `NEXT_PUBLIC_APP_ENV === "staging"`,
+`/` renders the redesigned landing page; production and local continue to
+render the existing LandingV2 page. `/preview/landing` remains available.
 
 ## Rationale and scope
 
@@ -69,6 +71,14 @@ needed. CSS Modules scope preview rules; shared tokens remain read-only.
 
 ## Deferred review and promotion
 
+### Staging promotion — 2026-09-19
+
+The redesigned landing page has been promoted to `/` on staging only via the
+`NEXT_PUBLIC_APP_ENV` environment switch. Production `/` remains on LandingV2.
+`/preview/landing` remains available. Five approved videos with thumbnails,
+bilingual titles, descriptions, durations, and categories are now live with
+working playback and a gallery view.
+
 ### Motion review — 2026-09-19
 
 The supplied Pinterest video is a motion reference only: masked headline entrances,
@@ -89,7 +99,7 @@ videos (media, thumbnails, titles, descriptions, durations) and three approved
 testimonials (quotes, names, roles, portraits) are still needed. Existing product
 artwork fills the CTA visual slot. The inherited hero is outside this block's
 fidelity pass. Final visual/content approval remains with the user.
-Do not replace, redirect, or delete `/` until explicitly instructed after review.
+Do not replace, redirect, or delete production `/` — only staging is promoted.
 
 ## Related files
 

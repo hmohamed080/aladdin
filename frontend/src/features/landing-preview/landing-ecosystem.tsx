@@ -2,11 +2,12 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { CheckIcon, PlayIcon } from "@/components/ui/icons";
+import { CheckIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
 import { landingBlockContent, landingLogos } from "./landing-block-content";
 import { LandingFinalCta } from "./landing-final-cta";
 import { LandingFooter } from "./landing-footer";
+import { LandingVideos } from "./landing-videos";
 import { LandingStories } from "./landing-stories";
 import { LandingDetails, type LandingDetail } from "./landing-details";
 import styles from "./landing-ecosystem.module.css";
@@ -53,24 +54,7 @@ export function LandingEcosystem() {
             })}
           </div>
         </section>
-        <section id="platform" className={styles.videosSection} aria-labelledby="videos-heading">
-          <div className={styles.sectionHeading}>
-            <h2 id="videos-heading" className={styles.heading}>{t.videos}</h2>
-            <button type="button" className={styles.secondaryAction} onClick={() => setDetail("videos")}>{t.videoAction}</button>
-          </div>
-          <div className={styles.videos}>
-            {t.videoCategories.map((category) => (
-              <article key={category} className={styles.videoCard} data-content-slot="video">
-                <div className={styles.thumbnail}>
-                  <span className={styles.category}>{category}</span>
-                  <span className={styles.play} aria-hidden="true"><PlayIcon /></span>
-                  <span className={styles.duration} aria-label={t.durationPending}>—:—</span>
-                </div>
-                <h3>{t.videoPending}</h3><p>{t.videoDescription}</p>
-              </article>
-            ))}
-          </div>
-        </section>
+        <LandingVideos />
         <section id="brands" className={styles.brandsSection} aria-labelledby="brands-heading">
           <div className={`${styles.sectionHeading} ${styles.brandHeading}`}>
             <h2 id="brands-heading" className={styles.heading}>{t.brands}</h2>

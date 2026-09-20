@@ -19,6 +19,24 @@
  * ------------------------------------------------------------------ */
 :root {
   --landing-page-gutter: 2.02%;
+
+  /* --------------------------------------------------------------
+   * LANDING PREVIEW (/preview/landing) — shared body container.
+   *
+   * The Ecosystem block (process/roles/videos/brands/stories/CTA) and
+   * the footer previously capped at two different, independently
+   * chosen widths (1320px vs 1248px), so their left edges never lined
+   * up and both read as narrow columns floating in the middle of wide
+   * viewports while the Hero used the full window. One shared
+   * max-width, sized to this project's own canonical desktop design
+   * viewport (1440px — see PRODUCT.md's screen-organization policy),
+   * plus one shared responsive gutter, gives every section below the
+   * Hero the same content edge and lets the body use large screens
+   * confidently without the excess side margin the 1320/1248 mismatch
+   * produced.
+   * -------------------------------------------------------------- */
+  --landing-preview-container-max: 1440px;
+  --landing-preview-gutter: clamp(24px, 3.6vw, 64px);
 }
 
 @tailwind base;

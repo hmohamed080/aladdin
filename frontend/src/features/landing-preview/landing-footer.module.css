@@ -1,6 +1,10 @@
-.footer { background:var(--shell-deep); color:var(--plaster); padding:16px 4% 8px; }
-.columns { max-width:1248px; margin-inline:auto; display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr; gap:64px; font-size:.6875rem; line-height:1.7; }
-.columns h3 { font-size:.75rem; font-weight:700; margin-bottom:8px; }
+.footer { background:var(--shell-deep); color:var(--plaster); padding-block:56px 24px; }
+/* Shares its container edge with `.container` in landing-ecosystem.module.css
+   (both read `--landing-preview-container-max` / `--landing-preview-gutter`
+   from globals.css) so the footer's left/right edge lines up with every
+   section above it instead of using its own, slightly different width. */
+.columns { width:100%; max-width:var(--landing-preview-container-max); margin-inline:auto; padding-inline:var(--landing-preview-gutter); display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr; gap:64px; font-size:.75rem; line-height:1.7; }
+.columns h3 { font-size:.8125rem; font-weight:700; margin-bottom:8px; }
 .columns ul {list-style:none;padding:0;margin:0;}
 .columns li + li {margin-top:2px;}
 .columns a:hover {color:var(--lumen);}
@@ -10,5 +14,5 @@
 .support p {max-width:208px;margin-bottom:8px;}
 .support a {display:inline-flex;align-items:center;gap:8px;}
 .copyright {text-align:center;font-size:.5625rem;margin-top:8px;}
-@media(max-width:1023px) {.columns{gap:24px;}}
-@media(max-width:767px) {.footer{padding:24px;} .columns{grid-template-columns:1fr 1fr;gap:24px;} .columns a {display:inline-flex;align-items:center;min-height:44px;} .copyright{margin-top:24px;}}
+@media(max-width:1023px) {.footer{padding-block:40px 24px;} .columns{gap:32px;}}
+@media(max-width:767px) {.footer{padding-block:32px 16px;} .columns{grid-template-columns:1fr 1fr;gap:24px;} .columns a {display:inline-flex;align-items:center;min-height:44px;} .copyright{margin-top:24px;}}
