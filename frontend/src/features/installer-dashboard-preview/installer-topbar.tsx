@@ -118,14 +118,16 @@ export function InstallerTopbar({
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5">
-        <button
-          type="button"
-          aria-label={locale === "ar" ? "الإشعارات" : "Notifications"}
-          className="relative grid h-8 w-8 shrink-0 place-items-center rounded-sm text-fg-secondary hover:bg-surface-2 hover:text-fg"
-        >
-          <BellIcon size={18} />
-          <span className="absolute end-1.5 top-1.5 h-1.5 w-1.5 rounded-pill bg-danger" aria-hidden="true" />
-        </button>
+        {production ? null : (
+          <button
+            type="button"
+            aria-label={locale === "ar" ? "الإشعارات" : "Notifications"}
+            className="relative grid h-8 w-8 shrink-0 place-items-center rounded-sm text-fg-secondary hover:bg-surface-2 hover:text-fg"
+          >
+            <BellIcon size={18} />
+            <span className="absolute end-1.5 top-1.5 h-1.5 w-1.5 rounded-pill bg-danger" aria-hidden="true" />
+          </button>
+        )}
 
         <div className="hidden shrink-0 items-center gap-0.5 tablet:flex">
           <ThemeSwitch current={theme} compact />

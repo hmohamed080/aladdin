@@ -18,6 +18,36 @@
   1/1 through real OTP as `hossam@example.test` against local Supabase. Staging
   deployment and hosted smoke verification are the remaining steps.
 
+## Current continuation — 2026-09-19: rounded hero artwork
+
+- Base `3202456`: clipped the visible preview artwork to rounded corners inside
+  its transparent side gutters, removing the angular upper-right remnant.
+- Edge screenshot inspected at 1488px; 834px has no horizontal overflow.
+  Typecheck and diff whitespace checks pass. Production homepage untouched.
+
+## Current continuation — 2026-09-19: approved preview header
+
+- Base `9afac18`, branch `main`. Preview header now has one cream row with aligned
+  logo/navigation/account actions, seven navigation entries and a mobile disclosure.
+- Existing hero content/artwork retained; old upper cutouts cropped by preview CSS.
+  No hero video, new statistics, production homepage changes or deployment.
+- Edge: AR/EN 1488px header groups share y=64px center; 390px menu opens and closes
+  after navigation, no horizontal overflow. FAQ opens and Escape closes it.
+- Typecheck, lint (existing sidebar hook warning), three preview tests pass.
+- Four pre-existing dirty CSS files remain excluded from this change.
+
+## Current continuation — 2026-09-19: preview motion and mobile hero
+
+- Branch `main`, base `2393334`. Added route-local heading reveals, staggered
+  section entrances, hover feedback, and a readable mobile hero composition.
+- Edge checks: Arabic/English at 1440/390px, consumer-first order, no overflow or
+  page errors, five scroll card animations and zero under reduced motion.
+- Typecheck and ten focused tests pass. Lint: zero errors, existing sidebar hook
+  warning. Tests retain a simulated-DOM image geometry warning.
+- The same four pre-existing dirty CSS files remain excluded from this commit.
+  Production homepage unchanged by this work; no deployment or promotion.
+- Approved video/testimonial content and final user visual approval remain pending.
+
 ## Current continuation — 2026-09-19: preview hero zoom fix
 
 - Branch `main`, base `6da26c6`. Preview hero/body/footer share a route-local
