@@ -29,13 +29,17 @@ one-character input. Added a production E2E for the Hossam installer identity.
 
 **Validation:** frontend typecheck passes; lint has zero errors and the existing
 `sidebar-shell.tsx:160` hook-dependency warning; focused dashboard/navigation
-tests pass 49/49; full unit suite reached 1,464/1,465 before finding one invalid
-opacity utility in the approved preview, which was corrected and its guard then
-passed; production Next.js build completed as part of Playwright; the targeted
+tests pass 49/49; the corrected opacity utility is covered and the full unit
+suite passes 1,465/1,465; production Next.js build completed as part of Playwright; the targeted
 real-OTP Edge run passes 1/1 against local Supabase and confirms the production
 dashboard, real navigation, zero page errors, zero failed application assets,
 and no preview-only match/distance/message claims. No database migration was
-added. Staging deployment remains the next step in this session.
+added. Before deployment, the documented safety gate found staging five existing
+`main` migrations behind; a private ACL-restricted snapshot was taken outside Git,
+the exact five-migration dry run was reviewed, and staging was pushed to full
+parity. All 27 hosted demo identities then passed the repository verifier and the
+pre/post business and Storage row counts were identical. Vercel deployment remains
+the next step in this session.
 
 ---
 

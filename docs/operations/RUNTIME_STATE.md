@@ -13,10 +13,14 @@
 - Unsupported reference content is not fabricated: matching/distance, messages,
   training, brands, reward tiers, and person-to-person bonuses render no false
   records. Navigation, workspace switching, preferences, and sign-out are live.
-- Verified: typecheck; lint (zero errors, one pre-existing hook warning); focused
-  unit 49/49; opacity guard; successful production build; targeted Playwright
-  1/1 through real OTP as `hossam@example.test` against local Supabase. Staging
-  deployment and hosted smoke verification are the remaining steps.
+- Verified: typecheck; lint (zero errors, one pre-existing hook warning); full
+  unit 1,465/1,465; successful production build; targeted Playwright
+  1/1 through real OTP as `hossam@example.test` against local Supabase.
+- Hosted Supabase `aladdin-staging` is now at full local migration parity. The
+  required pre-push snapshot is stored outside Git with restricted ACLs and
+  verified checksums; all 27 hosted demo identities pass verification and the
+  pre/post protected row counts are unchanged. Vercel deployment and hosted
+  application smoke verification are the remaining steps.
 
 ## Current continuation — 2026-09-19: rounded hero artwork
 
