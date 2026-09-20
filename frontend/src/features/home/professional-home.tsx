@@ -26,7 +26,9 @@ import type { MyAssignmentRow } from "@/server/queries/job-assignments";
 import { CurrentWorkBlock } from "./current-work-block";
 import { OpportunityCard } from "@/features/jobs/opportunity-list";
 import type { OpportunityRow } from "@/server/queries/job-opportunities";
+import type { NetworkOrganization } from "@/server/queries/network";
 import { formatNumber } from "@/lib/ui/format";
+import { InstallerHome } from "./installer-home";
 
 /**
  * The PROFESSIONAL variant of the personal surface — an operational dashboard,
@@ -84,6 +86,7 @@ export function ProfessionalHome({
   reviewsAverage,
   reviewsTotal,
   networkCount,
+  network = [],
   completedJobsCount,
   locale,
   t,
@@ -97,10 +100,29 @@ export function ProfessionalHome({
   reviewsAverage: number | null;
   reviewsTotal: number;
   networkCount: number;
+  network?: readonly NetworkOrganization[];
   completedJobsCount: number;
   locale: Locale;
   t: TranslateFn;
 }) {
+  if (data.accountType === "installer_technician") {
+    return (
+      <InstallerHome
+        data={data}
+        currentWork={currentWork}
+        opportunities={opportunities}
+        pointsBalance={pointsBalance}
+        reviewsAverage={reviewsAverage}
+        reviewsTotal={reviewsTotal}
+        network={network}
+        networkCount={networkCount}
+        completedJobsCount={completedJobsCount}
+        locale={locale}
+        t={t}
+      />
+    );
+  }
+
   const { completeness, verification } = data;
   const name = data.displayName || t("personalHome.professional.friend");
   const persona = t(`accountType.${data.accountType}`);

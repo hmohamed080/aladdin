@@ -28,6 +28,25 @@ function Svg({ size = 20, children, ...rest }: IconProps) {
   );
 }
 
+export const GiftIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="8" width="18" height="4" rx="1" />
+    <path d="M5 12v9h14v-9M12 8v13M12 8H7.5a2.5 2.5 0 1 1 2.5-2.5C10 7 12 8 12 8Zm0 0h4.5A2.5 2.5 0 1 0 14 5.5C14 7 12 8 12 8Z" />
+  </Svg>
+);
+
+export const HeartIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z" />
+  </Svg>
+);
+
+export const HeartFilledIcon = (p: IconProps) => (
+  <Svg {...p} fill="currentColor">
+    <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z" />
+  </Svg>
+);
+
 export const HomeIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 10.5 12 3l9 7.5" />
@@ -186,6 +205,15 @@ export const BuildingIcon = (p: IconProps) => (
     <path d="M15 9h4a1 1 0 0 1 1 1v11" />
     <path d="M3 21h18" />
     <path d="M8 8h3M8 12h3M8 16h3" />
+  </Svg>
+);
+
+/** An industrial plant — manufacturing and factory-originated content. */
+export const FactoryIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 21V10l6 3V9l6 4V6h4v15" />
+    <path d="M2 21h20M7 17h2M12 17h2M17 17h2" />
+    <path d="M15 6h4M16 3h2v3" />
   </Svg>
 );
 

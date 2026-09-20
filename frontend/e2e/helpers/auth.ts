@@ -84,7 +84,10 @@ export async function signIn(
   await expect(page.getByText(/we sent a code|أرسلنا رمزًا/i)).toBeVisible();
 
   const code = await readNewOtp(request, email, seen);
-  await page.getByLabel(/one-time code|الرمز/i).fill(code);
+  // The canonical OTP control is one box per digit. Keyboard input exercises
+  // its real auto-advance contract; `fill(code)` targets only box zero and is
+  // rejected by that box's `maxLength=1`.
+  await page.getByLabel(/one-time code|الرمز/i).pressSequentially(code);
   await page.getByRole("button", { name: /verify|تأكيد/i }).click();
 
   // Wait on the URL committing, not the full "load" event — under sustained

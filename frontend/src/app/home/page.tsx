@@ -105,6 +105,7 @@ export default async function PersonalHomePage() {
       reviewsAverage={reviews.average}
       reviewsTotal={reviews.total}
       networkCount={network.length}
+      network={network}
       completedJobsCount={completedJobsCount}
       locale={locale}
       t={t}

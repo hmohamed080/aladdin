@@ -4,6 +4,39 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Promote the approved installer dashboard and wire production reads
+
+**Date:** 2026-09-20 · **Branch:** `claude/aladdin-craftsman-redesign-0bb1b2` · **Base:** `2393334`.
+
+Promoted the approved `/preview/installer-dashboard` composition into the real
+installer account surface at `/home`. The home layout now selects the new shell
+only for `installer_technician`; consumers, engineers, designers, contractors,
+and salespeople retain their existing personal shell and dashboard. Installer
+subroutes keep the same shell, working navigation, workspace switcher, locale,
+theme, sidebar preference, account links, and server-action sign-out.
+
+The production dashboard consumes the existing caller-scoped Supabase reads for
+open opportunities, assignments, points, reviews, network organizations, and
+profile state. No user id crosses the query boundary and no RLS or schema change
+was required. Reference-only claims without backend authority were deliberately
+not promoted: match percentages, distances, unread messages, referral bonuses,
+reward tiers, brands, and training records are replaced by real data or explicit
+empty states. Decorative job photography is not described as record media.
+
+Also repaired the shared Playwright OTP helper to type across the canonical
+six-box control instead of attempting to fill all six digits into the first
+one-character input. Added a production E2E for the Hossam installer identity.
+
+**Validation:** frontend typecheck passes; lint has zero errors and the existing
+`sidebar-shell.tsx:160` hook-dependency warning; focused dashboard/navigation
+tests pass 49/49; full unit suite reached 1,464/1,465 before finding one invalid
+opacity utility in the approved preview, which was corrected and its guard then
+passed; production Next.js build completed as part of Playwright; the targeted
+real-OTP Edge run passes 1/1 against local Supabase and confirms the production
+dashboard, real navigation, zero page errors, zero failed application assets,
+and no preview-only match/distance/message claims. No database migration was
+added. Staging deployment remains the next step in this session.
+
 ## Session — Bound the preview hero during browser zoom-out
 
 **Date:** 2026-09-19 · **Branch:** `main` · **Base:** `6da26c6`.

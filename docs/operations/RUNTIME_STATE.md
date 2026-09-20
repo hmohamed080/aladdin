@@ -1,5 +1,23 @@
 # Runtime State
 
+## Current continuation — 2026-09-20: installer dashboard production promotion
+
+- Branch `claude/aladdin-craftsman-redesign-0bb1b2`, based at `2393334` before
+  this continuation. The approved installer dashboard is now the real `/home`
+  surface for `installer_technician` accounts only; other personal personas are
+  unchanged.
+- Production data is sourced from the existing RLS-backed assignments,
+  opportunities, points, reviews, network, profile, workspace, and auth seams.
+  No schema change, service-role path, client-side fetch, or caller-supplied user
+  id was added.
+- Unsupported reference content is not fabricated: matching/distance, messages,
+  training, brands, reward tiers, and person-to-person bonuses render no false
+  records. Navigation, workspace switching, preferences, and sign-out are live.
+- Verified: typecheck; lint (zero errors, one pre-existing hook warning); focused
+  unit 49/49; opacity guard; successful production build; targeted Playwright
+  1/1 through real OTP as `hossam@example.test` against local Supabase. Staging
+  deployment and hosted smoke verification are the remaining steps.
+
 ## Current continuation — 2026-09-19: preview hero zoom fix
 
 - Branch `main`, base `6da26c6`. Preview hero/body/footer share a route-local

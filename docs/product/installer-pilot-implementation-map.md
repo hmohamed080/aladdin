@@ -54,6 +54,13 @@ bucket is declared and no code calls `.storage.from(...)`.
 
 ---
 
+> **Production promotion (2026-09-20).** The approved craftsman composition is
+> now selected at `/home` for `installer_technician` accounts and reads the
+> existing caller-scoped assignments, opportunities, points, reviews, network,
+> profile, workspace, and auth seams. Reference-only claims without a backend
+> source remain absent or explicit empty states; no schema or RLS change was
+> needed.
+
 ## 1. Existing and reusable
 
 | Area | What exists | Where |
@@ -65,7 +72,7 @@ bucket is declared and no code calls `.storage.from(...)`.
 | **Write paths** | `individual_save_professional` / `individual_submit_professional` (track-guarded, re-entrant) | same migration |
 | **Verification model** | `verifications` + `request_account_upgrade` → `review_*` → `apply_account_upgrade`; approval is the **only** writer of `primary_account_type` and `public_profile_status='listed'` | `20260803090001` |
 | **Activation ≠ verification** | Onboarding activates; an installer is never held in a review screen | `PRODUCT_DIRECTION_GUIDE.md` |
-| **Personal home + shell** | `/home` is persona-aware and routes an installer to `ProfessionalHome`; personal chrome is deliberately not the B2B cockpit | `src/app/home/` |
+| **Personal home + shell** | `/home` is persona-aware; an installer gets the approved craftsman shell and production dashboard while every other personal persona retains the canonical personal shell | `src/app/home/`, `src/features/home/installer-home.tsx` |
 | **Public directory projection** | `profile_public_directory` (invoker-hardened) | `20260816090001` |
 | **Discovery *of* installers** | `/b2b/technicians` — trades-first directory | `src/app/b2b/technicians/page.tsx` |
 | **Points contract** | `points_ledger`, `points_balance()`, `+100` on `referral.organization_approved` | `20260830090001/2` |
@@ -82,7 +89,7 @@ bucket is declared and no code calls `.storage.from(...)`.
 | 2.4 | **Experience** | A single integer. No work history. |
 | 2.5 | **Public profile** | No route exists; `ProfessionalDirectoryTable` rows link nowhere. |
 | 2.6 | **Points reachability** | `/b2b/points` is the only Points UI, and `/b2b/layout.tsx:35` redirects org-less users to `/home`. **An org-less installer cannot reach their own Points today.** |
-| 2.7 | **Home dashboard** | `ProfessionalHome` is one structure for all five professional personas — correct until this domain gives it real content. |
+| 2.7 | **Home dashboard** | **Closed 2026-09-20.** `installer_technician` now receives its approved production composition; the other professional personas retain the shared dashboard. |
 | 2.8 | **Personal navigation** | `src/lib/nav/modules.ts` is the **B2B org** nav only. No personal nav model exists. |
 | 2.9 | **Settings** | No personal `/home/settings`. **Closed by D7** — a composition route, no new domain. |
 | 2.10 | **Nav comment drift** | `modules.ts:105-108` still calls Points *"a UI shell in this sprint"* — stale since `b25e249`. Comment-only; **not touched by this documentation reconciliation.** |
