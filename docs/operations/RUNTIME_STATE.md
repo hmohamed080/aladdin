@@ -1,5 +1,27 @@
 # Runtime State
 
+## Current continuation — 2026-09-20: installer dashboard production promotion
+
+- Branch `claude/aladdin-craftsman-redesign-0bb1b2`, based at `2393334` before
+  this continuation. The approved installer dashboard is now the real `/home`
+  surface for `installer_technician` accounts only; other personal personas are
+  unchanged.
+- Production data is sourced from the existing RLS-backed assignments,
+  opportunities, points, reviews, network, profile, workspace, and auth seams.
+  No schema change, service-role path, client-side fetch, or caller-supplied user
+  id was added.
+- Unsupported reference content is not fabricated: matching/distance, messages,
+  training, brands, reward tiers, and person-to-person bonuses render no false
+  records. Navigation, workspace switching, preferences, and sign-out are live.
+- Verified: typecheck; lint (zero errors, one pre-existing hook warning); full
+  unit 1,465/1,465; successful production build; targeted Playwright
+  1/1 through real OTP as `hossam@example.test` against local Supabase.
+- Hosted Supabase `aladdin-staging` is now at full local migration parity. The
+  required pre-push snapshot is stored outside Git with restricted ACLs and
+  verified checksums; all 27 hosted demo identities pass verification and the
+  pre/post protected row counts are unchanged. Vercel deployment and hosted
+  application smoke verification are the remaining steps.
+
 ## Current session — 2026-09-19: staging-only landing promotion
 
 - Branch `codex/landing-staging-promotion`, base `dc2ec12`. Promoted the

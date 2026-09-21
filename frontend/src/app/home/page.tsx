@@ -17,7 +17,7 @@ import {
   countAssignmentsByStatus,
 } from "@/server/queries/job-assignments";
 import { listJobOpportunities } from "@/server/queries/job-opportunities";
-import { getPointsBalance } from "@/server/queries/points";
+import { getPointsBalance, listPointsEntries } from "@/server/queries/points";
 import { loadMyReviewSummary } from "@/server/queries/reviews";
 import { listMyNetworkOrganizations } from "@/server/queries/network";
 
@@ -53,9 +53,10 @@ const HOME_OPPORTUNITIES_PREVIEW = 3;
  * Reaching this page never depends on a verification decision — completing
  * onboarding activates the account, and trust state is shown, not enforced.
  *
- * FIVE REAL READS, IN PARALLEL (Increment 14). `loadMyTrades` dropped out of
- * this page's own `Promise.all` — the professional's practice detail moved to
- * the Account Overview, so Home no longer pays for a trades round trip it does
+ * SIX REAL READS, IN PARALLEL (Increment 14, plus the installer dashboard's
+ * own recent-points-entry read). `loadMyTrades` dropped out of this page's
+ * own `Promise.all` — the professional's practice detail moved to the
+ * Account Overview, so Home no longer pays for a trades round trip it does
  * not render. What replaced it are the same functions `/home/points`,
  * `/home/reviews`, `/home/network` and `/home/jobs` already call, so the
  * summary strip and the opportunities preview cannot disagree with those
@@ -87,10 +88,11 @@ export default async function PersonalHomePage() {
   // review or referral only a professional persona could have.
   if (data.variant !== "professional") return <ConsumerHome data={data} t={t} />;
 
-  const [assignments, opportunities, pointsBalance, reviews, network] = await Promise.all([
+  const [assignments, opportunities, pointsBalance, recentPointsEntries, reviews, network] = await Promise.all([
     listMyAssignments(supabase),
     listJobOpportunities(supabase, { limit: HOME_OPPORTUNITIES_PREVIEW }),
     getPointsBalance(supabase),
+    listPointsEntries(supabase, { limit: 1 }),
     loadMyReviewSummary(),
     listMyNetworkOrganizations(supabase),
   ]);
@@ -102,6 +104,7 @@ export default async function PersonalHomePage() {
       currentWork={featuredAssignment(assignments)}
       opportunities={opportunities}
       pointsBalance={pointsBalance}
+      recentPointsEntry={recentPointsEntries[0] ?? null}
       reviewsAverage={reviews.average}
       reviewsTotal={reviews.total}
       networkCount={network.length}

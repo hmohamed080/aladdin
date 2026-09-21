@@ -26,7 +26,9 @@ import type { MyAssignmentRow } from "@/server/queries/job-assignments";
 import { CurrentWorkBlock } from "./current-work-block";
 import { OpportunityCard } from "@/features/jobs/opportunity-list";
 import type { OpportunityRow } from "@/server/queries/job-opportunities";
+import type { PointsEntrySource } from "@/features/points/view-model";
 import { formatNumber } from "@/lib/ui/format";
+import { InstallerHome } from "./installer-home";
 
 /**
  * The PROFESSIONAL variant of the personal surface — an operational dashboard,
@@ -55,6 +57,13 @@ import { formatNumber } from "@/lib/ui/format";
  * before this composition pass existed to hold a real list. A handful of
  * actual open jobs, capped at the query layer (`listJobOpportunities`'s own
  * `limit`), costs one bounded read and is exactly what the reference shows.
+ *
+ * INSTALLER/TECHNICIAN IS A DIFFERENT COMPOSITION, NOT A DIFFERENT PAGE. It
+ * delegates to `InstallerHome`, which renders the SAME approved presentation
+ * components as `/preview/installer-dashboard` (see that component's own doc
+ * comment) — it does not carry `network`, because the approved composition
+ * has no network module; that data stays reachable from the sidebar's own
+ * "My network" link instead.
  */
 
 const STEP_FOR_ITEM: Record<CompletenessItemKey, string> = {
@@ -81,6 +90,7 @@ export function ProfessionalHome({
   currentWork,
   opportunities,
   pointsBalance,
+  recentPointsEntry,
   reviewsAverage,
   reviewsTotal,
   networkCount,
@@ -94,6 +104,9 @@ export function ProfessionalHome({
   /** A REAL, bounded preview — never the full board. */
   opportunities: readonly OpportunityRow[];
   pointsBalance: number;
+  /** The caller's single most recent points-ledger entry — the installer
+   *  dashboard's "recent activity" row. Null when the ledger is empty. */
+  recentPointsEntry: PointsEntrySource | null;
   reviewsAverage: number | null;
   reviewsTotal: number;
   networkCount: number;
@@ -101,6 +114,22 @@ export function ProfessionalHome({
   locale: Locale;
   t: TranslateFn;
 }) {
+  if (data.accountType === "installer_technician") {
+    return (
+      <InstallerHome
+        data={data}
+        opportunities={opportunities}
+        pointsBalance={pointsBalance}
+        recentPointsEntry={recentPointsEntry}
+        reviewsAverage={reviewsAverage}
+        reviewsTotal={reviewsTotal}
+        completedJobsCount={completedJobsCount}
+        locale={locale}
+        t={t}
+      />
+    );
+  }
+
   const { completeness, verification } = data;
   const name = data.displayName || t("personalHome.professional.friend");
   const persona = t(`accountType.${data.accountType}`);
