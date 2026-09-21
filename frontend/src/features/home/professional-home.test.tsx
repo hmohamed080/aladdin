@@ -199,6 +199,11 @@ describe("ProfessionalHome", () => {
  * this path, no fabricated field (match %, distance, points level) appears,
  * and a module with no real backend source yet renders its approved empty
  * state rather than the old bespoke "Current work" / "My network" modules.
+ *
+ * Empirically cross-checked (2026-09-21) against two real, live-seeded
+ * `installer_technician` accounts (local Supabase, OTP sign-in) — the same
+ * composition asserted here rendered in the browser with zero console
+ * errors and none of the legacy generic-path strings.
  */
 describe("ProfessionalHome — installer_technician (shared with /preview/installer-dashboard)", () => {
   const installerData = (over: Partial<PersonalHomeData> = {}) =>
@@ -278,6 +283,31 @@ describe("ProfessionalHome — installer_technician (shared with /preview/instal
     renderWithI18n(<ProfessionalHome {...installerProps} currentWork={assignment} />, "en");
     expect(screen.queryByText("Marble staircase cladding")).toBeNull();
     expect(screen.queryByText("My showroom network")).toBeNull();
+  });
+
+  it("hides the profile-completion banner completely at 100% — no legacy standalone cards either", () => {
+    // installerProps.data defaults to completeness.percent === 100.
+    const { container } = renderWithI18n(<ProfessionalHome {...installerProps} />, "en");
+    expect(screen.queryByText("Complete your profile to appear more to showrooms")).toBeNull();
+    expect(screen.queryByText("Complete profile")).toBeNull();
+    // The legacy generic-path strings (quick-access panel, standalone
+    // completeness/verification cards, a "current work" section heading)
+    // must never appear on the installer path, at any completeness level.
+    expect(container.textContent).not.toMatch(/Quick access/);
+    expect(screen.queryByText("Profile completion")).toBeNull();
+    expect(screen.queryByText("Verification", { selector: "h2, h3" })).toBeNull();
+  });
+
+  it("shows the profile-completion banner when completeness is under 100%, with the real percentage", () => {
+    renderWithI18n(
+      <ProfessionalHome
+        {...installerProps}
+        data={installerData({ completeness: { percent: 62, completed: 5, total: 8, missing: ["bio"] } })}
+      />,
+      "en",
+    );
+    expect(screen.getByText("Complete your profile to appear more to showrooms")).toBeTruthy();
+    expect(screen.getByText("62%")).toBeTruthy();
   });
 
   it("renders in Arabic with no key leak", () => {
