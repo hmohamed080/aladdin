@@ -4,17 +4,17 @@ import Image from "next/image";
 import { useI18n } from "@/lib/i18n/context";
 import { FactoryIcon } from "@/components/ui/icons";
 import { ModuleCard, ModuleFooterLink } from "./module-card";
-import { BRAND_ECOSYSTEM_ITEMS, pick, type BrandEcosystemItem } from "./mock-data";
+import { pick } from "./mock-data";
+import type { InstallerBrandItemVM } from "./view-model";
 
 /**
  * "From the factories and brands" — the one section whose entire job is to
- * make the ecosystem visible: craftsman, showroom, supplier, manufacturer,
- * and training, all reachable from one card. Each brand is identified by its
- * own supplied logo (never recreated as text) inside a fixed-size plate so
- * four differently-proportioned marks — Jotun's wide lockup, MarbleX's square
- * badge — still sit optically balanced in one row.
+ * make the ecosystem visible. No `factories`/`brand_ecosystem` domain exists
+ * in the backend yet (see `docs/operations/staging-demo-accounts.md`'s
+ * uncovered-domains note), so production always renders the empty state below
+ * rather than inventing a brand feed.
  */
-export function BrandEcosystemSection() {
+export function BrandEcosystemSection({ items }: { items: readonly InstallerBrandItemVM[] }) {
   const { locale } = useI18n();
 
   return (
@@ -23,18 +23,32 @@ export function BrandEcosystemSection() {
       icon={FactoryIcon}
       iconClassName="bg-bronze/10 text-bronze"
       title={locale === "ar" ? "من المصانع والعلامات التجارية" : "From factories & brands"}
-      footer={<ModuleFooterLink>{locale === "ar" ? "عرض الكل" : "View all"}</ModuleFooterLink>}
+      footer={
+        items.length > 0 ? (
+          <ModuleFooterLink>{locale === "ar" ? "عرض الكل" : "View all"}</ModuleFooterLink>
+        ) : undefined
+      }
     >
-      <ul className="flex flex-col gap-0.5">
-        {BRAND_ECOSYSTEM_ITEMS.map((item) => (
-          <BrandRow key={item.id} item={item} />
-        ))}
-      </ul>
+      {items.length === 0 ? (
+        <Empty
+          text={
+            locale === "ar"
+              ? "لسه معندناش تحديثات من المصانع والعلامات التجارية."
+              : "No factory or brand updates yet."
+          }
+        />
+      ) : (
+        <ul className="flex flex-col gap-0.5">
+          {items.map((item) => (
+            <BrandRow key={item.id} item={item} />
+          ))}
+        </ul>
+      )}
     </ModuleCard>
   );
 }
 
-function BrandRow({ item }: { item: BrandEcosystemItem }) {
+function BrandRow({ item }: { item: InstallerBrandItemVM }) {
   const { locale } = useI18n();
 
   return (
@@ -53,5 +67,13 @@ function BrandRow({ item }: { item: BrandEcosystemItem }) {
         </span>
       ) : null}
     </li>
+  );
+}
+
+function Empty({ text }: { text: string }) {
+  return (
+    <div className="flex min-h-28 flex-1 items-center justify-center rounded-md border border-dashed bg-surface-2/30 p-4 text-center text-body text-fg-muted">
+      {text}
+    </div>
   );
 }

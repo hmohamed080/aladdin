@@ -1,4 +1,14 @@
 import type { Locale } from "@/lib/i18n/locales";
+import type {
+  InstallerBrandItemVM,
+  InstallerFeaturedLearningVM,
+  InstallerLearningItemVM,
+  InstallerNeedsActionItemVM,
+  InstallerOpportunityVM,
+  InstallerProfileCompletionVM,
+  InstallerRewardsVM,
+  InstallerWelcomeVM,
+} from "./view-model";
 
 /**
  * MOCK, FRONTEND-ONLY DEMO DATA — Phase 1 of the craftsman/technician dashboard
@@ -253,3 +263,92 @@ export const PROFILE = {
 };
 
 export const NEARBY_OPPORTUNITIES_COUNT = 3;
+
+/**
+ * MOCK -> VIEW MODEL. The only place this file's exports feed the shared
+ * section components — every other symbol above stays private to the preview
+ * route (`installer-search.tsx`'s nav search and `installer-topbar.tsx`'s
+ * account menu read the raw exports directly, which is fine: both are
+ * preview-only code paths gated on `production === false`).
+ */
+export function mockWelcome(locale: Locale): InstallerWelcomeVM {
+  return {
+    firstName: pick(locale, PROFILE.name).split(" ")[0] ?? "",
+    nearbyOpportunitiesCount: NEARBY_OPPORTUNITIES_COUNT,
+    points: REWARDS.points,
+  };
+}
+
+export function mockProfileCompletion(): InstallerProfileCompletionVM {
+  if (PROFILE.completionPercent >= 100) return null;
+  return {
+    percent: PROFILE.completionPercent,
+    hint: PROFILE.completionHint,
+    verified: PROFILE.verified,
+    verifiedHint: {
+      ar: `موثّق · ${PROFILE.verifiedHint.ar}`,
+      en: `Verified · ${PROFILE.verifiedHint.en}`,
+    },
+    href: "#",
+  };
+}
+
+export function mockOpportunities(): InstallerOpportunityVM[] {
+  return JOB_OPPORTUNITIES.map((job) => ({
+    id: job.id,
+    title: job.title,
+    org: job.org,
+    place: { ar: `${job.area.ar} · ${job.city.ar}`, en: `${job.area.en} · ${job.city.en}` },
+    distanceKm: job.distanceKm,
+    matchPercent: job.matchPercent,
+    paymentEGP: job.paymentEGP,
+    durationDays: job.durationDays,
+    publishedAgo: job.publishedAgo,
+    tradeLabel: TRADE_LABEL[job.trade],
+    image: job.image,
+    hasApplied: false,
+    href: "#",
+  }));
+}
+
+export function mockNeedsAction(): InstallerNeedsActionItemVM[] {
+  return ACTION_REQUIRED_ITEMS.map((item) => ({
+    id: item.id,
+    icon: item.icon,
+    title: item.title,
+    subtitle: item.subtitle,
+    meta: item.meta,
+    ctaLabel: item.ctaLabel,
+  }));
+}
+
+export function mockBrandEcosystem(): InstallerBrandItemVM[] {
+  return BRAND_ECOSYSTEM_ITEMS.map((item) => ({
+    id: item.id,
+    brand: item.brand,
+    logo: item.logo,
+    kindLabel: item.kindLabel,
+    title: item.title,
+    tag: item.tag,
+  }));
+}
+
+export function mockLearning(): { featured: InstallerFeaturedLearningVM; items: InstallerLearningItemVM[] } {
+  return { featured: FEATURED_LEARNING, items: LEARNING_ITEMS };
+}
+
+export function mockRewards(locale: Locale): InstallerRewardsVM {
+  return {
+    points: REWARDS.points,
+    level: { label: REWARDS.levelLabel, nextLabel: REWARDS.nextLevelLabel, nextAt: REWARDS.nextLevelAt },
+    recentActivity: {
+      title: pick(locale, REWARDS.recentReward),
+      body: null,
+      dateLabel: pick(locale, REWARDS.recentRewardAgo),
+      deltaLabel: "",
+    },
+    rating: PROFILE.rating,
+    ratingCount: PROFILE.ratingCount,
+    completedJobs: PROFILE.completedJobs,
+  };
+}

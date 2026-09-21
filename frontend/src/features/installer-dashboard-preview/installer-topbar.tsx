@@ -16,7 +16,8 @@ import {
   UserIcon,
 } from "@/components/ui/icons";
 import { InstallerSearch } from "./installer-search";
-import { PROFILE, pick } from "./mock-data";
+import { PROFILE, mockOpportunities, pick } from "./mock-data";
+import type { InstallerOpportunityVM } from "./view-model";
 import { signOut } from "@/server/actions/auth";
 
 const dividerClass = "hidden h-5 w-px border-e tablet:block";
@@ -53,6 +54,7 @@ export function InstallerTopbar({
   displayName,
   location,
   production = false,
+  searchJobs,
   context,
 }: {
   theme: "light" | "dark";
@@ -60,6 +62,9 @@ export function InstallerTopbar({
   displayName?: string;
   location?: string | null;
   production?: boolean;
+  /** Real, bounded opportunities for the shared search overlay — required in
+   *  production; the preview falls back to its own mock list. */
+  searchJobs?: readonly InstallerOpportunityVM[];
   context?: ReactNode;
 }) {
   const { locale, t } = useI18n();
@@ -110,11 +115,7 @@ export function InstallerTopbar({
       {production && context ? <div className="hidden shrink-0 tablet:block">{context}</div> : null}
 
       <div className="min-w-0 flex-1">
-        {production ? (
-          <form action="/home/jobs" method="get" className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-field-line bg-field px-3.5">
-            <input name="search" aria-label={locale === "ar" ? "ابحث عن فرص شغل" : "Search job opportunities"} placeholder={locale === "ar" ? "ابحث عن فرص شغل…" : "Search job opportunities…"} className="min-w-0 flex-1 bg-transparent text-body text-field-fg outline-none placeholder:text-field-placeholder" />
-          </form>
-        ) : <InstallerSearch />}
+        <InstallerSearch jobs={production ? (searchJobs ?? []) : mockOpportunities()} production={production} />
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5">

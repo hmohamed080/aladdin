@@ -26,7 +26,7 @@ import type { MyAssignmentRow } from "@/server/queries/job-assignments";
 import { CurrentWorkBlock } from "./current-work-block";
 import { OpportunityCard } from "@/features/jobs/opportunity-list";
 import type { OpportunityRow } from "@/server/queries/job-opportunities";
-import type { NetworkOrganization } from "@/server/queries/network";
+import type { PointsEntrySource } from "@/features/points/view-model";
 import { formatNumber } from "@/lib/ui/format";
 import { InstallerHome } from "./installer-home";
 
@@ -57,6 +57,13 @@ import { InstallerHome } from "./installer-home";
  * before this composition pass existed to hold a real list. A handful of
  * actual open jobs, capped at the query layer (`listJobOpportunities`'s own
  * `limit`), costs one bounded read and is exactly what the reference shows.
+ *
+ * INSTALLER/TECHNICIAN IS A DIFFERENT COMPOSITION, NOT A DIFFERENT PAGE. It
+ * delegates to `InstallerHome`, which renders the SAME approved presentation
+ * components as `/preview/installer-dashboard` (see that component's own doc
+ * comment) — it does not carry `network`, because the approved composition
+ * has no network module; that data stays reachable from the sidebar's own
+ * "My network" link instead.
  */
 
 const STEP_FOR_ITEM: Record<CompletenessItemKey, string> = {
@@ -83,10 +90,10 @@ export function ProfessionalHome({
   currentWork,
   opportunities,
   pointsBalance,
+  recentPointsEntry,
   reviewsAverage,
   reviewsTotal,
   networkCount,
-  network = [],
   completedJobsCount,
   locale,
   t,
@@ -97,10 +104,12 @@ export function ProfessionalHome({
   /** A REAL, bounded preview — never the full board. */
   opportunities: readonly OpportunityRow[];
   pointsBalance: number;
+  /** The caller's single most recent points-ledger entry — the installer
+   *  dashboard's "recent activity" row. Null when the ledger is empty. */
+  recentPointsEntry: PointsEntrySource | null;
   reviewsAverage: number | null;
   reviewsTotal: number;
   networkCount: number;
-  network?: readonly NetworkOrganization[];
   completedJobsCount: number;
   locale: Locale;
   t: TranslateFn;
@@ -109,13 +118,11 @@ export function ProfessionalHome({
     return (
       <InstallerHome
         data={data}
-        currentWork={currentWork}
         opportunities={opportunities}
         pointsBalance={pointsBalance}
+        recentPointsEntry={recentPointsEntry}
         reviewsAverage={reviewsAverage}
         reviewsTotal={reviewsTotal}
-        network={network}
-        networkCount={networkCount}
         completedJobsCount={completedJobsCount}
         locale={locale}
         t={t}

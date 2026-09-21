@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/context";
-import { getMessages } from "@/lib/i18n/translate";
+import { getMessages, createTranslator } from "@/lib/i18n/translate";
 import { getWorkspaces } from "@/server/queries/workspace";
 import { loadIsSalesPersona } from "@/server/queries/sales-persona";
 import { loadPersonalHome } from "@/server/queries/personal-home";
@@ -16,6 +16,14 @@ import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { SIDEBAR_MODE_COOKIE, resolveSidebarMode } from "@/lib/ui/sidebar-mode";
 import { THEME_COOKIE, resolveTheme, resolveThemePreference } from "@/lib/theme/config";
 import { InstallerDashboardShell } from "@/features/installer-dashboard-preview/installer-dashboard-shell";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { listJobOpportunities } from "@/server/queries/job-opportunities";
+import { toOpportunityVMs } from "@/features/home/installer-dashboard-data";
+
+/** Bounded read backing the topbar's search overlay — a handful of recent,
+ *  open opportunities to jump to, never the full board (see
+ *  `installer-search.tsx`'s own doc comment on this scope). */
+const SEARCH_OPPORTUNITIES_LIMIT = 8;
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +88,9 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
 
   if (home?.accountType === "installer_technician") {
     const location = [home.professional.city, home.professional.governorate].filter(Boolean).join("، ") || null;
+    const supabase = await getServerSupabase();
+    const searchOpportunities = await listJobOpportunities(supabase, { limit: SEARCH_OPPORTUNITIES_LIMIT });
+    const searchJobs = toOpportunityVMs(searchOpportunities, createTranslator(locale), locale);
     return (
       <I18nProvider locale={locale} dir={dir}>
         <InstallerDashboardShell
@@ -87,6 +98,7 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
           sidebarMode={sidebarMode}
           displayName={home.displayName}
           location={location}
+          searchJobs={searchJobs}
           context={
             <WorkspaceSwitcher
               entries={entries}

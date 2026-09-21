@@ -12,6 +12,15 @@ import { NeedsAttentionSection } from "./needs-attention-section";
 import { BrandEcosystemSection } from "./brand-ecosystem-section";
 import { LearningSection } from "./learning-section";
 import { RewardsCard } from "./rewards-card";
+import {
+  mockBrandEcosystem,
+  mockLearning,
+  mockNeedsAction,
+  mockOpportunities,
+  mockProfileCompletion,
+  mockRewards,
+  mockWelcome,
+} from "./mock-data";
 
 /**
  * THE PREVIEW ROOT — ported onto the SAME shell contract as staging's AppShell.
@@ -35,8 +44,9 @@ export function InstallerDashboardPreview({
   theme: "light" | "dark";
   sidebarMode: SidebarMode;
 }) {
-  const { dir } = useI18n();
+  const { locale, dir } = useI18n();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const learning = mockLearning();
 
   return (
     <div dir={dir} className="flex min-h-dvh bg-workspace">
@@ -50,15 +60,19 @@ export function InstallerDashboardPreview({
         <InstallerTopbar theme={theme} onMenuClick={() => setMobileNavOpen(true)} />
 
         <main id="top" className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-5 p-4 tablet:p-6 desktop:p-7">
-          <InstallerWelcome />
-          <ProfileCompletionBanner />
-          <JobOpportunitiesSection />
+          <InstallerWelcome data={mockWelcome(locale)} />
+          <ProfileCompletionBanner data={mockProfileCompletion()} />
+          <JobOpportunitiesSection
+            opportunities={mockOpportunities()}
+            emptyTitle={locale === "ar" ? "لا توجد فرص مطابقة" : "No matching opportunities"}
+            emptyBody={locale === "ar" ? "حاول تغيير الفلاتر أو راجع لاحقًا." : "Try different filters or check back later."}
+          />
 
           <div className="grid items-stretch gap-4 tablet:grid-cols-2 desktop:grid-cols-4">
-            <NeedsAttentionSection />
-            <BrandEcosystemSection />
-            <LearningSection />
-            <RewardsCard />
+            <NeedsAttentionSection items={mockNeedsAction()} />
+            <BrandEcosystemSection items={mockBrandEcosystem()} />
+            <LearningSection featured={learning.featured} items={learning.items} />
+            <RewardsCard data={mockRewards(locale)} />
           </div>
         </main>
       </div>

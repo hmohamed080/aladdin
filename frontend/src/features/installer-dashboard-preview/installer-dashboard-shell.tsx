@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import type { SidebarMode } from "@/lib/ui/sidebar-mode";
 import { InstallerSidebar } from "./installer-sidebar";
 import { InstallerTopbar } from "./installer-topbar";
+import type { InstallerOpportunityVM } from "./view-model";
 
 /** Production shell for every installer route under `/home`. */
 export function InstallerDashboardShell({
@@ -12,6 +13,7 @@ export function InstallerDashboardShell({
   sidebarMode,
   displayName,
   location,
+  searchJobs,
   context,
 }: {
   children: ReactNode;
@@ -19,6 +21,8 @@ export function InstallerDashboardShell({
   sidebarMode: SidebarMode;
   displayName: string;
   location: string | null;
+  /** Real, bounded opportunities the shared search overlay can jump to. */
+  searchJobs: readonly InstallerOpportunityVM[];
   context?: ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -37,6 +41,7 @@ export function InstallerDashboardShell({
           onMenuClick={() => setMobileNavOpen(true)}
           displayName={displayName}
           location={location}
+          searchJobs={searchJobs}
           context={context}
           production
         />

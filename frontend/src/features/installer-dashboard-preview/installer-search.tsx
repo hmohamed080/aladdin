@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
 import { CommandIcon, EnterKeyIcon, SearchIcon, XIcon } from "@/components/ui/icons";
-import { pick, JOB_OPPORTUNITIES, type Bi } from "./mock-data";
+import { pick } from "./mock-data";
 import { INSTALLER_PRIMARY_NAV, INSTALLER_QUICK_NAV, type InstallerNavItem } from "./installer-nav";
+import type { InstallerOpportunityVM } from "./view-model";
 import styles from "./installer-search.module.css";
 
 type Hit = {
@@ -14,18 +16,31 @@ type Hit = {
   label: string;
   meta?: string;
   Icon: ComponentType<{ size?: number }>;
+  /** In-page scroll target — the preview's only navigation mechanism. */
   anchor?: string;
+  /** A real route — production navigates here instead of scrolling. */
+  href?: string;
 };
 
 /**
- * The topbar's search field — REWRITTEN to match the staging GlobalSearch
- * modal/overlay pattern. Instead of a dropdown attached to the input, this
- * opens a centered command palette portaled to document.body, with a dimmed
- * backdrop and backdrop-blur. All styling values mirror the staging
- * implementation's global-search.tsx.
+ * The topbar's search field — a centered command palette portaled to
+ * `document.body`, with a dimmed + blurred backdrop, matching the staging
+ * GlobalSearch pattern. SHARED between the preview (`production=false`,
+ * anchors scroll the single mock page) and the real installer `/home`
+ * (`production=true`, hits navigate to real routes via the router) — the
+ * jobs it searches are always passed in by the caller
+ * (`mockOpportunities()` for the preview, the caller's own real, bounded
+ * `listJobOpportunities` read for production), never read from this file.
  */
-export function InstallerSearch() {
+export function InstallerSearch({
+  jobs,
+  production = false,
+}: {
+  jobs: readonly InstallerOpportunityVM[];
+  production?: boolean;
+}) {
   const { locale, dir } = useI18n();
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -35,25 +50,29 @@ export function InstallerSearch() {
 
   const navHits: Hit[] = useMemo(
     () =>
-      [...INSTALLER_PRIMARY_NAV, ...INSTALLER_QUICK_NAV].map((item: InstallerNavItem) => ({
-        id: `nav-${item.id}`,
-        label: pick(locale, item.label),
-        Icon: item.Icon,
-        anchor: item.anchor,
-      })),
-    [locale],
+      [...INSTALLER_PRIMARY_NAV, ...INSTALLER_QUICK_NAV]
+        .filter((item: InstallerNavItem) => !production || Boolean(item.href))
+        .map((item: InstallerNavItem) => ({
+          id: `nav-${item.id}`,
+          label: pick(locale, item.label),
+          Icon: item.Icon,
+          anchor: item.anchor,
+          href: item.href,
+        })),
+    [locale, production],
   );
 
   const jobHits: Hit[] = useMemo(
     () =>
-      JOB_OPPORTUNITIES.map((job) => ({
+      jobs.map((job) => ({
         id: `job-${job.id}`,
         label: pick(locale, job.title),
-        meta: pick(locale, job.org as Bi),
+        meta: job.org ? pick(locale, job.org) : undefined,
         Icon: SearchIcon,
         anchor: "opportunities",
+        href: job.href,
       })),
-    [locale],
+    [jobs, locale],
   );
 
   const results = useMemo(() => {
@@ -101,7 +120,9 @@ export function InstallerSearch() {
 
   function select(hit: Hit | undefined) {
     if (!hit) return;
-    if (hit.anchor) {
+    if (production && hit.href) {
+      router.push(hit.href);
+    } else if (hit.anchor) {
       document.getElementById(hit.anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     setOpen(false);
