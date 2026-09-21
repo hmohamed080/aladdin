@@ -1,5 +1,23 @@
 # Runtime State
 
+## Current session — 2026-09-21: installer job-opportunities preview
+
+- Branch `feature/installer-job-opportunities-preview`, based on `0ba7fa6` from
+  `main`. The isolated `/preview/installer-job-opportunities` route now composes
+  the approved installer shell with bilingual local fixtures, responsive
+  grid/list cards, sorting, saved/applied state, filters, and an illustrative
+  location map. It is presentation-only and marked noindex.
+- Four generated preview images live under
+  `frontend/public/assets/installer-dashboard/jobs/`, with provenance recorded.
+  The preview sidebar accepts an optional active item so this route highlights
+  Job opportunities while the dashboard default remains Home.
+- Production `/home`, `/home/jobs`, Supabase, auth, backend queries, schema, and
+  hosted environments are unchanged. No push, deployment, or merge occurred.
+- Verified: frontend typecheck; focused data tests 3/3; lint with zero errors and
+  the existing sidebar-shell hook warning; Impeccable detector with zero
+  findings; browser QA in AR/EN, light/dark, desktop/tablet/mobile, including
+  sort/save/grid-list/apply/mobile-filter interactions.
+
 ## Current continuation — 2026-09-20: installer dashboard production promotion
 
 - Branch `claude/aladdin-craftsman-redesign-0bb1b2`, based at `2393334` before

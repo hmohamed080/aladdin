@@ -41,11 +41,14 @@ export function InstallerSidebar({
   mobileOpen,
   onCloseMobile,
   production = false,
+  previewActiveItemId = "home",
 }: {
   initialMode: SidebarMode;
   mobileOpen: boolean;
   onCloseMobile: () => void;
   production?: boolean;
+  /** Preview routes share this shell but need to identify their own current destination. */
+  previewActiveItemId?: InstallerNavItem["id"];
 }) {
   const { locale, dir, t } = useI18n();
   const pathname = usePathname();
@@ -108,8 +111,8 @@ export function InstallerSidebar({
           )}
         >
           <ul className="flex flex-col gap-0.5">
-            {INSTALLER_PRIMARY_NAV.filter((item) => !production || Boolean(item.href)).map((item, index) => (
-              <NavRow key={item.id} item={item} locale={locale} active={production && item.href ? pathname === item.href || (item.href !== "/home" && pathname.startsWith(`${item.href}/`)) : index === 0} narrow={narrow} production={production} />
+            {INSTALLER_PRIMARY_NAV.filter((item) => !production || Boolean(item.href)).map((item) => (
+              <NavRow key={item.id} item={item} locale={locale} active={production && item.href ? pathname === item.href || (item.href !== "/home" && pathname.startsWith(`${item.href}/`)) : item.id === previewActiveItemId} narrow={narrow} production={production} />
             ))}
           </ul>
 

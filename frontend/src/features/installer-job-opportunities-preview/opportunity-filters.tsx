@@ -1,0 +1,166 @@
+"use client";
+
+import { Button } from "@/components/ui/controls";
+import { ChevronDownIcon, MapPinIcon } from "@/components/ui/icons";
+import type { Locale } from "@/lib/i18n/locales";
+import {
+  pick,
+  TRADE_OPTIONS,
+  type DurationKey,
+  type TradeKey,
+} from "./preview-data";
+
+export function OpportunityFilters({
+  locale,
+  selectedTrades,
+  maxBudget,
+  duration,
+  radiusKm,
+  resultCount,
+  onTradeToggle,
+  onBudgetChange,
+  onDurationChange,
+  onRadiusChange,
+  onApply,
+}: {
+  locale: Locale;
+  selectedTrades: ReadonlySet<TradeKey>;
+  maxBudget: number;
+  duration: DurationKey;
+  radiusKm: number;
+  resultCount: number;
+  onTradeToggle: (trade: TradeKey) => void;
+  onBudgetChange: (value: number) => void;
+  onDurationChange: (value: DurationKey) => void;
+  onRadiusChange: (value: number) => void;
+  onApply: () => void;
+}) {
+  const ar = locale === "ar";
+  return (
+    <aside aria-label={ar ? "تصفية النتائج" : "Filter results"} className="overflow-hidden rounded-md border bg-surface shadow-card">
+      <div className="flex items-center justify-between border-b px-md py-3">
+        <h2 className="text-body-lg font-semibold text-fg">{ar ? "تصفية النتائج" : "Filter results"}</h2>
+        <button
+          type="button"
+          onClick={() => {
+            for (const option of TRADE_OPTIONS) if (selectedTrades.has(option.key)) onTradeToggle(option.key);
+            onBudgetChange(12000);
+            onDurationChange("all");
+            onRadiusChange(15);
+          }}
+          className="text-label font-medium text-accent underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          {ar ? "مسح الكل" : "Clear all"}
+        </button>
+      </div>
+
+      <FilterSection title={ar ? "موقع العمل" : "Work location"}>
+        <StaticMap locale={locale} />
+        <label className="relative mt-sm block">
+          <span className="sr-only">{ar ? "نطاق المسافة" : "Distance radius"}</span>
+          <select
+            value={radiusKm}
+            onChange={(event) => onRadiusChange(Number(event.target.value))}
+            className="h-10 w-full appearance-none rounded-sm border bg-field px-3 pe-9 text-body text-field-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            <option value={5}>{ar ? "داخل ٥ كم" : "Within 5 km"}</option>
+            <option value={10}>{ar ? "داخل ١٠ كم" : "Within 10 km"}</option>
+            <option value={15}>{ar ? "داخل ١٥ كم" : "Within 15 km"}</option>
+          </select>
+          <ChevronDownIcon size={15} className="pointer-events-none absolute end-3 top-3 text-fg-muted" />
+        </label>
+      </FilterSection>
+
+      <FilterSection title={ar ? "نوع العمل" : "Work type"}>
+        <div className="grid gap-2">
+          {TRADE_OPTIONS.map((option) => (
+            <label key={option.key} className="flex cursor-pointer items-center gap-2.5 text-body text-fg-secondary">
+              <input
+                type="checkbox"
+                checked={selectedTrades.has(option.key)}
+                onChange={() => onTradeToggle(option.key)}
+                className="h-4 w-4 rounded-xs border-strong accent-accent-solid focus-visible:ring-2 focus-visible:ring-focus"
+              />
+              <span>{pick(locale, option.label)}</span>
+            </label>
+          ))}
+        </div>
+      </FilterSection>
+
+      <FilterSection title={ar ? "ميزانية العمل" : "Job budget"}>
+        <div className="mb-2 flex items-center justify-between gap-sm text-label text-fg-secondary">
+          <span>{ar ? "من ٠" : "From 0"}</span>
+          <span className="font-mono text-fg">{formatBudget(maxBudget, locale)}</span>
+        </div>
+        <input
+          type="range"
+          min={2000}
+          max={12000}
+          step={500}
+          value={maxBudget}
+          onChange={(event) => onBudgetChange(Number(event.target.value))}
+          aria-label={ar ? "الحد الأقصى للميزانية" : "Maximum budget"}
+          className="w-full accent-accent-solid"
+        />
+      </FilterSection>
+
+      <FilterSection title={ar ? "مدة التنفيذ" : "Duration"}>
+        <label className="relative block">
+          <span className="sr-only">{ar ? "مدة التنفيذ" : "Duration"}</span>
+          <select
+            value={duration}
+            onChange={(event) => onDurationChange(event.target.value as DurationKey)}
+            className="h-10 w-full appearance-none rounded-sm border bg-field px-3 pe-9 text-body text-field-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            <option value="all">{ar ? "كل المدد" : "All durations"}</option>
+            <option value="short">{ar ? "يومان أو أقل" : "2 days or less"}</option>
+            <option value="medium">{ar ? "من ٣ إلى ٥ أيام" : "3 to 5 days"}</option>
+          </select>
+          <ChevronDownIcon size={15} className="pointer-events-none absolute end-3 top-3 text-fg-muted" />
+        </label>
+      </FilterSection>
+
+      <div className="p-md pt-0">
+        <Button className="w-full gap-2" onClick={onApply}>
+          {ar ? "تطبيق الفلاتر" : "Apply filters"}
+          <span className="rounded-pill bg-primary-foreground/15 px-2 py-0.5 text-label tabular-nums">{resultCount}</span>
+        </Button>
+      </div>
+    </aside>
+  );
+}
+
+function FilterSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="border-b p-md last:border-b-0">
+      <h3 className="mb-sm text-body font-semibold text-fg">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function StaticMap({ locale }: { locale: Locale }) {
+  const ar = locale === "ar";
+  return (
+    <div className="relative h-36 overflow-hidden rounded-sm border bg-surface-2 text-info" role="img" aria-label={ar ? "خريطة توضيحية للقاهرة الجديدة" : "Illustrative New Cairo map"}>
+      <svg viewBox="0 0 320 160" className="h-full w-full" aria-hidden="true">
+        <path d="M-15 34 C55 62 86 8 150 42 S250 90 340 45" fill="none" stroke="currentColor" strokeOpacity=".18" strokeWidth="8" />
+        <path d="M8 130 C70 100 92 126 150 92 S236 28 332 92" fill="none" stroke="currentColor" strokeOpacity=".16" strokeWidth="5" />
+        <path d="M42 -10 C74 44 70 88 112 174 M220 -8 C196 45 225 94 190 174" fill="none" stroke="currentColor" strokeOpacity=".14" strokeWidth="4" />
+        <circle cx="168" cy="79" r="43" fill="currentColor" fillOpacity=".1" />
+        <circle cx="168" cy="79" r="5" fill="currentColor" />
+      </svg>
+      <span className="absolute start-1/2 top-1/2 grid h-10 w-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-pill bg-primary text-primary-foreground shadow-card">
+        <MapPinIcon size={20} />
+      </span>
+      <span className="absolute bottom-2 start-2 rounded-xs bg-surface/90 px-2 py-1 text-label font-medium text-fg-secondary">
+        {ar ? "القاهرة الجديدة" : "New Cairo"}
+      </span>
+    </div>
+  );
+}
+
+function formatBudget(value: number, locale: Locale) {
+  const amount = new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-EG", { maximumFractionDigits: 0 }).format(value);
+  return locale === "ar" ? `${amount} جنيه` : `EGP ${amount}`;
+}

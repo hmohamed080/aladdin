@@ -8,3 +8,14 @@ with the craftsman's own portfolio photos once the media pipeline exists.
 - `spc-flooring.jpg` — https://unsplash.com/photos/1581858726788-75bc0f6a952d
 - `ac-install.jpg` — https://unsplash.com/photos/1667983453881-4992fe86ab1b
 - `marble-alt.jpg` — https://unsplash.com/photos/1558346648-9757f2fa4474
+
+Generated with OpenAI's built-in image generation tool on 2026-09-21 for the
+isolated `/preview/installer-job-opportunities` reference review. Prompts asked
+for photorealistic, documentary-style Egyptian finishing sites, landscape card
+composition, accurate tools/materials, unobtrusive faces, and no text, logos,
+watermarks, UI overlays, unsafe work, or generic office imagery.
+
+- `interior-painting.png` — painter rolling an apartment wall in New Cairo.
+- `wpc-terrace.png` — installer fitting WPC slats on a villa terrace boundary.
+- `gypsum-ceiling.png` — installer fixing gypsum board to a suspended-ceiling frame.
+- `decorative-wall.png` — artisan applying textured mineral plaster to a feature wall.

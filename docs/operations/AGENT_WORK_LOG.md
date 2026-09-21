@@ -4,6 +4,29 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Build installer job-opportunities reference preview
+
+**Date:** 2026-09-21 · **Branch:** `feature/installer-job-opportunities-preview` · **Base:** `0ba7fa6`.
+
+Added the isolated, noindex `/preview/installer-job-opportunities` route using
+the approved installer preview shell. The Arabic-first RTL page includes
+English parity, light/dark support, responsive grid/list views, local sorting,
+saved and applied states, work-type/budget/duration/distance filters, an
+illustrative map, and seven fixture opportunities. Four task-specific finishing
+images were generated for the preview and recorded in the existing asset
+provenance file. The shared preview sidebar gained an optional active-item prop;
+its existing dashboard behavior remains the default.
+
+No production `/home` or `/home/jobs` file, Supabase module, auth flow, query,
+migration, hosted environment, or other persona was changed. Browser checks
+covered Arabic and English, light and dark themes, 1440/1024/768/390 widths,
+and the core sort/save/view/apply/mobile-filter interactions. Frontend
+typecheck passes, the focused data tests pass 3/3, lint has zero errors and the
+existing `sidebar-shell.tsx:160` hook-dependency warning, and the Impeccable
+design detector reports zero findings. No push, deployment, or merge was made.
+
+---
+
 ## Session — Promote the approved installer dashboard and wire production reads
 
 **Date:** 2026-09-20 · **Branch:** `claude/aladdin-craftsman-redesign-0bb1b2` · **Base:** `2393334`.
