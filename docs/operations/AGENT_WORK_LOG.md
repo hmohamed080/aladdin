@@ -4,6 +4,23 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Remove lower-module dead space
+
+**Date:** 2026-09-22 · **Branch:** `feature/installer-job-opportunities-preview` · **Base:** `cf0e508`.
+
+Corrected the populated lower-module layout on `/preview/installer-dashboard`
+after review showed that equal outer heights had left content clustered at the
+top of the attention, brand, and rewards cards. The attention and brand lists
+now distribute their existing rows through the flexible body, while the real
+recent-activity panel expands to occupy the rewards body. Footer baselines and
+equal outer heights remain unchanged; no placeholder or fake content was added.
+
+Validation: frontend typecheck and targeted ESLint passed; Impeccable detection
+reported zero findings; `git diff --check` is clean. No route, data logic,
+backend, push, deployment, or merge changed.
+
+---
+
 ## Session — Align installer dashboard lower modules
 
 **Date:** 2026-09-22 · **Branch:** `feature/installer-job-opportunities-preview` · **Base:** `2e5c261`.
