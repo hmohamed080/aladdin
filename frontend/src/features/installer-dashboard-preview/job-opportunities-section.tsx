@@ -67,7 +67,7 @@ export function JobOpportunitiesSection({
                 className={cn(
                   "rounded-pill px-3.5 py-1.5 text-label font-medium transition-colors",
                   sort === key
-                    ? "bg-iris-solid text-white"
+                    ? "bg-[var(--installer-cta)] text-white"
                     : "border border-strong bg-surface text-fg-secondary hover:bg-surface-2",
                 )}
               >
@@ -79,7 +79,7 @@ export function JobOpportunitiesSection({
       </div>
 
       {jobs.length === 0 ? (
-        <div className="rounded-lg border bg-surface p-6 text-center shadow-card">
+        <div className="rounded-lg border border-strong bg-surface p-6 text-center shadow-card">
           <p className="text-title text-fg">{emptyTitle}</p>
           <p className="mt-1 text-body text-fg-secondary">{emptyBody}</p>
         </div>

@@ -16,6 +16,12 @@ import type { InstallerProfileCompletionVM } from "./view-model";
  * has no completeness to report) — renders `null` rather than an
  * empty/disabled card, exactly like the profile-completion rule everywhere
  * else in the product. Session-local dismiss only — no backend persistence.
+ *
+ * Outer border is `border-strong` (the same neutral token every card on this
+ * dashboard uses) rather than the iris-tinted hairline it had before — the
+ * decorative wash and icon-badge tint stay iris; only the boundary itself
+ * moved to the shared neutral treatment so the card reads as clearly
+ * separated from the page at a glance.
  */
 export function ProfileCompletionBanner({ data }: { data: InstallerProfileCompletionVM }) {
   const { locale } = useI18n();
@@ -24,7 +30,7 @@ export function ProfileCompletionBanner({ data }: { data: InstallerProfileComple
   if (!data || dismissed) return null;
 
   return (
-    <div className="relative overflow-hidden rounded-lg border border-iris-solid/20 bg-surface p-4 shadow-card tablet:p-5">
+    <div className="relative overflow-hidden rounded-lg border border-strong bg-surface p-4 shadow-card tablet:p-5">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-y-0 end-0 w-40 bg-gradient-to-l from-iris-solid/[0.07] to-transparent"
@@ -66,7 +72,7 @@ export function ProfileCompletionBanner({ data }: { data: InstallerProfileComple
           <Link
             href={data.href}
             onClick={data.href === "#" ? (e) => e.preventDefault() : undefined}
-            className="rounded-sm bg-iris-solid px-4 py-2 text-label font-semibold text-white transition-colors hover:brightness-105"
+            className="rounded-sm bg-[var(--installer-cta)] px-4 py-2 text-label font-semibold text-white transition-colors hover:bg-[var(--installer-cta-hover)]"
           >
             {locale === "ar" ? "استكمال الملف" : "Complete profile"}
           </Link>
@@ -74,7 +80,7 @@ export function ProfileCompletionBanner({ data }: { data: InstallerProfileComple
             type="button"
             onClick={() => setDismissed(true)}
             aria-label={locale === "ar" ? "إخفاء" : "Dismiss"}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-sm text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-sm border border-strong text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
           >
             <XIcon size={16} />
           </button>

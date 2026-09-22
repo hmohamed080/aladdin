@@ -5,8 +5,16 @@ import type { SidebarMode } from "@/lib/ui/sidebar-mode";
 import { InstallerSidebar } from "./installer-sidebar";
 import { InstallerTopbar } from "./installer-topbar";
 import type { InstallerOpportunityVM } from "./view-model";
+import "./installer-theme.css";
 
-/** Production shell for every installer route under `/home`. */
+/**
+ * Production shell for every installer route under `/home`.
+ *
+ * `installer-dashboard` on the root scopes `installer-theme.css`'s
+ * near-black CTA tokens to installer routes only — see that file's doc
+ * comment for why this dashboard doesn't reuse the site-wide `--primary`
+ * token (which inverts to a light fill in dark mode).
+ */
 export function InstallerDashboardShell({
   children,
   theme,
@@ -28,7 +36,7 @@ export function InstallerDashboardShell({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <div className="flex min-h-dvh bg-workspace">
+    <div className="installer-dashboard flex min-h-dvh bg-workspace">
       <InstallerSidebar
         initialMode={sidebarMode}
         mobileOpen={mobileNavOpen}

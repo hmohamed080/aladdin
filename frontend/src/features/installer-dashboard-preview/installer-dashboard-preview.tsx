@@ -74,7 +74,7 @@ export function InstallerDashboardPreview({
 
           <div
             data-lower-module-grid=""
-            className="grid items-stretch gap-4 tablet:grid-cols-2 desktop:auto-rows-fr desktop:grid-cols-4"
+            className="grid items-stretch gap-4 tablet:grid-cols-2 desktop:grid-cols-4"
           >
             <NeedsAttentionSection items={mockNeedsAction()} />
             <BrandEcosystemSection items={mockBrandEcosystem()} />

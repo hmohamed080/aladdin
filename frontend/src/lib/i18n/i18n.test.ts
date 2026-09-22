@@ -29,6 +29,10 @@ const ARABIC = /[؀-ۿ]/;
 // (neutral placeholders), so they carry Latin/digits and no Arabic script.
 const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   "auth.emailPlaceholder",
+  "authPasswordPreview.emailPlaceholder",
+  // Illustrative bad-pattern examples ("aaaa", "1234") inside an otherwise
+  // Arabic sentence — technical samples, not translated prose.
+  "authPasswordPreview.error.passwordSequential",
   "onboarding.contact.phonePlaceholder",
   // A KEYCAP legend, not prose. The Enter key is engraved "Enter" on Arabic
   // keyboards too, so translating it would name a key the user cannot find.

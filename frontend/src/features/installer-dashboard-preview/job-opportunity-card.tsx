@@ -42,7 +42,7 @@ export function JobOpportunityCard({ job }: { job: InstallerOpportunityVM }) {
         : `${formatNumber(job.durationDays, locale)} ${job.durationDays === 1 ? "day" : "days"}`;
 
   return (
-    <li className="flex h-full min-w-0 flex-col overflow-hidden rounded-lg border bg-surface shadow-card transition-[transform,box-shadow] duration-base ease-out-expo hover:-translate-y-1 hover:shadow-lg">
+    <li className="flex h-full min-w-0 flex-col overflow-hidden rounded-lg border border-strong bg-surface shadow-card transition-[transform,box-shadow] duration-base ease-out-expo hover:-translate-y-1 hover:shadow-lg">
       <div className="relative h-40 shrink-0 tablet:h-44">
         <Image src={job.image} alt="" fill sizes="(min-width: 1024px) 33vw, 100vw" className="object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/0 to-black/0" aria-hidden="true" />
@@ -105,13 +105,13 @@ export function JobOpportunityCard({ job }: { job: InstallerOpportunityVM }) {
           ) : null}
         </ul>
 
-        <div className="mt-auto flex items-end justify-between gap-2 border-t pt-2.5">
+        <div className="mt-auto flex items-end justify-between gap-2 border-t border-strong pt-2.5">
           <p className="font-mono text-body-lg font-bold text-success">{formatWholeEGP(job.paymentEGP, locale)}</p>
           <div className="flex shrink-0 items-center gap-1.5">
             <Link
               href={job.href}
               onClick={job.href === "#" ? (e) => e.preventDefault() : undefined}
-              className="rounded-sm border border-strong px-2.5 py-1.5 text-label font-medium text-fg transition-colors hover:bg-surface-2"
+              className="rounded-sm border border-strong bg-surface px-2.5 py-1.5 text-label font-medium text-fg transition-colors hover:bg-surface-2"
             >
               {locale === "ar" ? "تفاصيل أكثر" : "More details"}
             </Link>
@@ -121,7 +121,9 @@ export function JobOpportunityCard({ job }: { job: InstallerOpportunityVM }) {
               onClick={() => setApplied(true)}
               className={cn(
                 "flex items-center gap-1.5 rounded-sm px-2.5 py-1.5 text-label font-medium transition-colors",
-                applied ? "bg-success/15 text-success" : "bg-iris-solid text-white hover:brightness-105",
+                applied
+                  ? "bg-success/15 text-success"
+                  : "bg-[var(--installer-cta)] text-white hover:bg-[var(--installer-cta-hover)]",
               )}
             >
               {applied ? <CheckIcon size={14} /> : null}
