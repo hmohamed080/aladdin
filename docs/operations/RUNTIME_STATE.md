@@ -1,5 +1,24 @@
 # Runtime State
 
+## Current continuation — 2026-09-22: installer visual-consistency pass
+
+- Installer/craftsman roots now have the documented `installer-surface` border
+  rule: the existing theme-aware `border-strong` neutral defines cards, controls,
+  panels, maps, dividers, and nested sections without additional shadow. The
+  opportunities preview opts in now; future installer roots must retain it.
+- Job-opportunity cards now match the approved dashboard's red saved-heart and
+  solid success match-pill patterns. The saved summary heart is red, grid cards
+  are equal height with bottom-aligned actions, and the budget range keeps its
+  draggable native thumb with the shared accent colour.
+- The wide opportunities root is viewport-fixed, eliminating document-level
+  trailing space while preserving the independent jobs scroll and fixed filter
+  rail. Tablet/mobile behavior remains normally scrollable.
+- Browser QA verified dashboard colour parity, equal card heights, functional
+  keyboard range changes, light/dark edge visibility, exact root/sidebar viewport
+  endings, and no mobile horizontal overflow. Impeccable detection is clean.
+- Production routes, backend, Supabase, and hosted environments are unchanged.
+  No push, deployment, or merge occurred.
+
 ## Current continuation — 2026-09-22: installer opportunities viewport refinement
 
 - On `feature/installer-job-opportunities-preview`, the wide preview now uses a

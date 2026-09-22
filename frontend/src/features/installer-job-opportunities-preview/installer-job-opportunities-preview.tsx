@@ -77,7 +77,7 @@ export function InstallerJobOpportunitiesPreview({
   };
 
   return (
-    <div dir={dir} className="flex min-h-dvh bg-workspace wide:h-dvh wide:overflow-hidden">
+    <div data-installer-opportunities-root="" dir={dir} className="installer-surface flex min-h-dvh bg-workspace wide:fixed wide:inset-0 wide:h-dvh wide:overflow-hidden">
       <InstallerSidebar
         initialMode={sidebarMode}
         mobileOpen={mobileNavOpen}
@@ -105,7 +105,7 @@ export function InstallerJobOpportunitiesPreview({
                 setExpanded(false);
               }}
             >
-              <HeartFilledIcon size={17} />
+              <HeartFilledIcon size={17} className="text-danger" />
               {ar ? "فرص محفوظة" : "Saved opportunities"}
               <span className="tabular-nums">{savedIds.size}</span>
             </Button>

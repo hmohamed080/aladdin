@@ -10,8 +10,8 @@ import {
   HeartIcon,
   MapPinIcon,
   MoneyIcon,
+  TargetIcon,
 } from "@/components/ui/icons";
-import { Badge } from "@/components/ui/primitives";
 import { cn } from "@/lib/ui/cn";
 import type { Locale } from "@/lib/i18n/locales";
 import { pick, type PreviewOpportunity } from "./preview-data";
@@ -38,8 +38,8 @@ export function OpportunityCard({
   return (
     <article
       className={cn(
-        "group overflow-hidden rounded-md border bg-surface shadow-card transition-[border-color,box-shadow,transform] duration-fast hover:-translate-y-0.5 hover:border-strong hover:shadow-raised",
-        view === "list" && "tablet:grid tablet:grid-cols-[14rem_minmax(0,1fr)]",
+        "group h-full overflow-hidden rounded-md border bg-surface shadow-card transition-[border-color,box-shadow,transform] duration-fast hover:-translate-y-0.5 hover:border-strong hover:shadow-raised",
+        view === "grid" ? "flex flex-col" : "tablet:grid tablet:grid-cols-[14rem_minmax(0,1fr)]",
       )}
     >
       <div className={cn("relative overflow-hidden bg-surface-2", view === "grid" ? "aspect-[16/7]" : "aspect-[16/7] tablet:aspect-auto tablet:min-h-full")}>
@@ -51,23 +51,25 @@ export function OpportunityCard({
           className="object-cover transition-transform duration-base group-hover:scale-[1.025]"
         />
         <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-sm p-sm">
-          <Badge tone="success">
-            <span className="tabular-nums">{opportunity.matchPercent}%</span>
-            {ar ? "مناسب لمهاراتك" : "skill match"}
-          </Badge>
+          <span className="flex items-center gap-1 rounded-pill bg-success px-2.5 py-1 text-label font-semibold text-white shadow-sm">
+            <TargetIcon size={13} />
+            {ar
+              ? `${formatNumber(opportunity.matchPercent, locale)}% مناسب لمهاراتك`
+              : `${formatNumber(opportunity.matchPercent, locale)}% skill match`}
+          </span>
           <button
             type="button"
             aria-label={saved ? (ar ? "إزالة من الفرص المحفوظة" : "Remove from saved jobs") : ar ? "حفظ الفرصة" : "Save opportunity"}
             aria-pressed={saved}
             onClick={onToggleSaved}
-            className="grid h-9 w-9 place-items-center rounded-pill border bg-surface/95 text-fg-secondary shadow-card transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            className="grid h-9 w-9 place-items-center rounded-pill bg-white/90 text-fg-secondary shadow-sm backdrop-blur transition-colors hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
-            {saved ? <HeartFilledIcon size={19} className="text-accent" /> : <HeartIcon size={19} />}
+            {saved ? <HeartFilledIcon size={19} className="text-danger" /> : <HeartIcon size={19} />}
           </button>
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-col gap-sm p-md">
+      <div className="flex min-w-0 flex-1 flex-col gap-sm p-md">
         <div>
           <h2 className="text-title font-semibold text-fg">{pick(locale, opportunity.title)}</h2>
           <p className="mt-1 text-caption text-fg-secondary">{pick(locale, opportunity.company)}</p>
@@ -80,7 +82,7 @@ export function OpportunityCard({
           <Meta icon={<CalendarIcon size={14} />} label={ar ? `${formatNumber(opportunity.durationDays, locale)} أيام` : `${formatNumber(opportunity.durationDays, locale)} days`} />
         </dl>
 
-        <div className="flex items-center justify-between gap-sm border-t pt-sm">
+        <div className="mt-auto flex items-center justify-between gap-sm border-t pt-sm">
           <div className="min-w-0">
             <p className="flex items-center gap-1 text-body-lg font-semibold text-success">
               <MoneyIcon size={15} aria-hidden="true" />

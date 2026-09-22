@@ -605,6 +605,15 @@ header[data-app-header="card"] [data-testid="global-search-trigger"] [class*="te
   color: color-mix(in srgb, var(--field-hint) 45%, var(--field-fg)) !important;
 }
 
+/* INSTALLER / CRAFTSMAN SURFACE SEPARATION
+   These operational screens carry many adjacent cards, controls and nested
+   regions. Their ordinary hairline needs the existing stronger neutral edge so
+   surfaces remain legible without adding shadow or inventing a page-local
+   colour. Apply this scope at every installer/craftsman page root. */
+.installer-surface {
+  --border: var(--border-strong);
+}
+
 /* THE OPERATIONAL CARDS — the deliberate counterweight to the atmosphere behind
    them. The ordinary elevation grammar (a tight contact shadow plus a soft
    diffuse one), tuned a shade cooler than pure grey so it belongs to the shell's
@@ -630,6 +639,13 @@ header[data-app-header="card"] [data-testid="global-search-trigger"] [class*="te
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 10px 24px -16px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Installer surfaces intentionally promote the neutral edge, including inside
+   `.workspace-body`, whose general operational-card rule above otherwise owns
+   the border colour with greater specificity. */
+.installer-surface .workspace-body .bg-surface {
+  border-color: var(--border-strong) !important;
 }
 
 /* FILTER CHIPS — flat and borderless rather than bordered buttons competing with

@@ -100,7 +100,7 @@ export function OpportunityFilters({
           value={maxBudget}
           onChange={(event) => onBudgetChange(Number(event.target.value))}
           aria-label={ar ? "الحد الأقصى للميزانية" : "Maximum budget"}
-          className="w-full accent-accent-solid"
+          className="w-full cursor-pointer accent-accent-solid"
         />
       </FilterSection>
 

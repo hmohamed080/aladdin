@@ -4,6 +4,35 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Align installer opportunities with shared craftsman visuals
+
+**Date:** 2026-09-22 · **Branch:** `feature/installer-job-opportunities-preview` · **Base:** `f0a31d4`.
+
+Applied the second browser-feedback pass to the installer opportunities preview.
+Opportunity save states and the saved-opportunities control now use the same
+semantic danger-red heart as the approved installer dashboard. Match indicators
+now reuse its solid success pill, target icon, white foreground, and locale-aware
+percentage. Grid cards fill their rows consistently, keep actions anchored to the
+bottom, and remain equal height when titles wrap. The budget range retains its
+native draggable thumb and keyboard behavior while using the same semantic
+accent colour as profile completion.
+
+Added the durable `installer-surface` rule for installer/craftsman roots. It
+promotes ordinary borders to the existing neutral `border-strong` token across
+both themes, improving separation for cards, panels, controls, maps, dividers,
+and action rows without thicker strokes, hardcoded colours, or stronger shadows.
+The rule is recorded in `UI_UX_SYSTEM_GUIDE.md`; the opportunities preview opts
+into it now and future installer roots must do the same. The wide opportunities root is fixed to the viewport so the
+workspace and sidebar terminate together while the jobs region alone scrolls.
+
+Browser verification confirmed exact colour parity with the dashboard, equal
+first-row card heights, live keyboard range input, visible light/dark borders,
+no wide document overflow, sidebar/root bottoms at the 912px viewport edge, and
+no mobile horizontal overflow. Impeccable detection reports zero findings.
+Production routes and data remain untouched; no push, deployment, or merge.
+
+---
+
 ## Session — Refine installer opportunities preview viewport
 
 **Date:** 2026-09-22 · **Branch:** `feature/installer-job-opportunities-preview` · **Base:** `779ca57`.
