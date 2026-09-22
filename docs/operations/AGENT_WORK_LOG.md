@@ -4,6 +4,42 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Align installer dashboard lower modules
+
+**Date:** 2026-09-22 · **Branch:** `feature/installer-job-opportunities-preview` · **Base:** `2e5c261`.
+
+Refined only `/preview/installer-dashboard`'s four lower modules. The desktop
+grid now uses one stretched fractional row, every outer module opts into full
+height, shared module footers are anchored after flexible content, and the
+rewards utility row is independently anchored at the bottom. Measured in the
+rendered page, all four cards are exactly `503.156px` high and share the same
+bottom coordinate in both light and dark mode.
+
+Header icon containers increased from 32px to 40px and their glyphs from 18px
+to 22px. Learning-row icon containers increased from 32px to 36px and glyphs
+from 15px to 19px; reward utility glyphs increased from 14px to 18px. The
+raster appointment/message/upload artwork is optically cropped and enlarged
+inside its existing 44px slot so its visible glyph no longer disappears inside
+the source image's transparent padding. Brand logo tiles also gained a modest
+size increase.
+
+Rebuilt the featured learning item as a compact, playable-looking media
+thumbnail using the existing SPC-flooring asset: a real landscape image,
+token-compatible dark overlay, in-image category, title, duration/source line,
+and circular play control. No dependency, route, data calculation, sidebar,
+topbar, job-opportunity page, or production data behavior changed.
+
+Validation: frontend typecheck passed; direct ESLint on the eight touched
+feature files passed; Impeccable detector returned zero findings. The feature
+folder currently has no unit test files. Headless Edge verified identical card
+heights/bottoms, 40px/22px header icon geometry, loaded video imagery, zero
+horizontal overflow, and zero console errors in both themes. Review captures:
+`.impeccable/review/installer-dashboard-lower-light.png` and
+`.impeccable/review/installer-dashboard-lower-dark.png`. No push, deployment,
+or merge occurred.
+
+---
+
 ## Session — Align installer opportunities with shared craftsman visuals
 
 **Date:** 2026-09-22 · **Branch:** `feature/installer-job-opportunities-preview` · **Base:** `f0a31d4`.

@@ -200,7 +200,8 @@ export const FEATURED_LEARNING = {
   title: { ar: "٣ أخطاء شائعة في تركيب أرضيات SPC", en: "3 common mistakes in SPC flooring installation" },
   source: { ar: "أكاديمية علاء الدين", en: "Aladdin Academy" },
   duration: { ar: "١٢ دقيقة", en: "12 min" },
-} satisfies { title: Bi; source: Bi; duration: Bi };
+  image: "/assets/installer-dashboard/jobs/spc-flooring.jpg",
+} satisfies { title: Bi; source: Bi; duration: Bi; image: string };
 
 export const LEARNING_ITEMS: LearningItem[] = [
   {

@@ -53,8 +53,8 @@ function BrandRow({ item }: { item: InstallerBrandItemVM }) {
 
   return (
     <li className="flex items-center gap-2.5 rounded-md py-1.5">
-      <span className="grid h-9 w-12 shrink-0 place-items-center rounded-sm border bg-surface p-1">
-        <Image src={item.logo} alt={item.brand} width={80} height={32} className="h-auto max-h-7 w-full object-contain" />
+      <span className="grid h-10 w-14 shrink-0 place-items-center rounded-sm border border-strong bg-surface p-1">
+        <Image src={item.logo} alt={item.brand} width={80} height={32} className="h-auto max-h-8 w-full object-contain" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-caption leading-snug text-fg-secondary">
@@ -72,7 +72,7 @@ function BrandRow({ item }: { item: InstallerBrandItemVM }) {
 
 function Empty({ text }: { text: string }) {
   return (
-    <div className="flex min-h-28 flex-1 items-center justify-center rounded-md border border-dashed bg-surface-2/30 p-4 text-center text-body text-fg-muted">
+    <div className="flex min-h-28 flex-1 items-center justify-center rounded-md border border-dashed border-strong bg-surface-2/30 p-4 text-center text-body text-fg-muted">
       {text}
     </div>
   );

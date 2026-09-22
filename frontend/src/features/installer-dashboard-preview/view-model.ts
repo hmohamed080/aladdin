@@ -58,7 +58,7 @@ export type InstallerLearningItemVM = {
   icon: "training" | "video" | "workshop";
 };
 
-export type InstallerFeaturedLearningVM = { title: Bi; source: Bi; duration: Bi } | null;
+export type InstallerFeaturedLearningVM = { title: Bi; source: Bi; duration: Bi; image: string } | null;
 
 export type InstallerRewardsVM = {
   points: number;

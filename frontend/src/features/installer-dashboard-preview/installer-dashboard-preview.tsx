@@ -21,6 +21,7 @@ import {
   mockRewards,
   mockWelcome,
 } from "./mock-data";
+import "./installer-theme.css";
 
 /**
  * THE PREVIEW ROOT — ported onto the SAME shell contract as staging's AppShell.
@@ -36,6 +37,9 @@ import {
  * The preview does not use the production SidebarShell (no gutter), so the main
  * column uses logical `ps`/`pe` for equal bilateral gaps that work in BOTH LTR
  * and RTL — `ps` is always the side facing the sidebar, `pe` the viewport edge.
+ *
+ * `installer-dashboard` on the root is what scopes `installer-theme.css`'s
+ * black-CTA tokens to this page alone (see that file's own doc comment).
  */
 export function InstallerDashboardPreview({
   theme,
@@ -49,7 +53,7 @@ export function InstallerDashboardPreview({
   const learning = mockLearning();
 
   return (
-    <div dir={dir} className="flex min-h-dvh bg-workspace">
+    <div dir={dir} className="installer-dashboard flex min-h-dvh bg-workspace">
       <InstallerSidebar
         initialMode={sidebarMode}
         mobileOpen={mobileNavOpen}
@@ -68,7 +72,10 @@ export function InstallerDashboardPreview({
             emptyBody={locale === "ar" ? "حاول تغيير الفلاتر أو راجع لاحقًا." : "Try different filters or check back later."}
           />
 
-          <div className="grid items-stretch gap-4 tablet:grid-cols-2 desktop:grid-cols-4">
+          <div
+            data-lower-module-grid=""
+            className="grid items-stretch gap-4 tablet:grid-cols-2 desktop:auto-rows-fr desktop:grid-cols-4"
+          >
             <NeedsAttentionSection items={mockNeedsAction()} />
             <BrandEcosystemSection items={mockBrandEcosystem()} />
             <LearningSection featured={learning.featured} items={learning.items} />

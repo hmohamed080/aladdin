@@ -65,7 +65,15 @@ function ActionRow({ item }: { item: InstallerNeedsActionItemVM }) {
 
   return (
     <li className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 rounded-md py-2">
-      <Image src={ICON_SRC[item.icon]} alt="" width={44} height={44} className="h-11 w-11 shrink-0" />
+      <span className="relative h-11 w-11 shrink-0 overflow-hidden" aria-hidden="true">
+        <Image
+          src={ICON_SRC[item.icon]}
+          alt=""
+          width={64}
+          height={64}
+          className="absolute start-1/2 top-1/2 h-16 w-16 max-w-none -translate-x-1/2 -translate-y-1/2 rtl:translate-x-1/2"
+        />
+      </span>
       <div className="min-w-0 flex-1">
         <p className="text-body-lg font-medium leading-snug text-fg">{pick(locale, item.title)}</p>
         <p className="text-caption leading-snug text-fg-secondary">{pick(locale, item.subtitle)}</p>
@@ -86,7 +94,7 @@ function ActionRow({ item }: { item: InstallerNeedsActionItemVM }) {
 
 function Empty({ text }: { text: string }) {
   return (
-    <div className="flex min-h-28 flex-1 items-center justify-center rounded-md border border-dashed bg-surface-2/30 p-4 text-center text-body text-fg-muted">
+    <div className="flex min-h-28 flex-1 items-center justify-center rounded-md border border-dashed border-strong bg-surface-2/30 p-4 text-center text-body text-fg-muted">
       {text}
     </div>
   );

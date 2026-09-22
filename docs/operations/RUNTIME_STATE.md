@@ -1,5 +1,22 @@
 # Runtime State
 
+## Current continuation — 2026-09-22: installer dashboard lower-module refinement
+
+- `/preview/installer-dashboard` keeps its section order and data behavior, but
+  the four lower desktop modules now share one stretched row and identical
+  outer height; shared footers and the rewards utility footer are bottom-anchored.
+- Header icon geometry is 40px/22px; compact learning rows use 36px/19px; reward
+  utilities use 18px glyphs. Raster action artwork is optically enlarged inside
+  its existing slot so transparent source padding no longer makes it look tiny.
+- The featured learning item is now a real SPC image thumbnail with an in-image
+  overlay title, duration/source line, category badge, and circular play control.
+- Headless Edge verified light and dark at desktop: every card measured
+  `503.156px` high with identical bottom coordinates, no horizontal overflow,
+  and no console errors. Typecheck, targeted ESLint, and Impeccable detection
+  pass; this feature folder has no unit test files.
+- Production data behavior, backend, Supabase, other personas, and the Job
+  Opportunities page are unchanged. No push, deployment, or merge occurred.
+
 ## Current continuation — 2026-09-22: installer visual-consistency pass
 
 - Installer/craftsman roots now have the documented `installer-surface` border

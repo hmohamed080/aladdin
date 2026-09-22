@@ -1,0 +1,31 @@
+/*
+ * Scoped tokens for this dashboard's primary-action colour — kept local to
+ * this feature rather than touching the shared `tokens.css`, per the
+ * founder's explicit instruction: a shared token that would move other
+ * screens stays out of scope; this dashboard gets its own.
+ *
+ * WHY THIS EXISTS AT ALL, RATHER THAN REUSING `--primary`
+ * The shared `--primary` token deliberately INVERTS between themes (the
+ * site-wide Ink-Action Rule: ink on light, limestone on dark) — correct for
+ * every other authenticated surface, and exactly the behaviour this one
+ * dashboard was asked NOT to have. The founder wants the same near-black
+ * family in both themes, never purple and never a light dark-mode button.
+ *
+ * WHY THE DARK VALUE ISN'T THE SAME HEX AS THE LIGHT ONE
+ * `--ink` (#17191a) sits almost exactly on top of the dark surfaces this
+ * button renders against (`--carbon-2` #1a1c1d, `--carbon-3` #212425) — a
+ * literally-black button on a near-black card would have no visible edge at
+ * all, which is the exact "disappears into the surface" failure the brief
+ * calls out. The dark value is lifted a few steps past the lightest card
+ * tone (`--carbon-4` #282c2d) so the fill still reads as "the dark button"
+ * rather than "part of the card".
+ */
+.installer-dashboard {
+  --installer-cta: #141414;
+  --installer-cta-hover: #2b2b2b;
+}
+
+:where(.dark) .installer-dashboard {
+  --installer-cta: #35383b;
+  --installer-cta-hover: #454850;
+}

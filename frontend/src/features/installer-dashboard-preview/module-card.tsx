@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import { cn } from "@/lib/ui/cn";
 
-const MODULE_HEADER_ICON_SIZE = 18;
+const MODULE_HEADER_ICON_SIZE = 22;
 
 function ModuleHeaderIcon({
   icon: Icon,
@@ -13,7 +13,7 @@ function ModuleHeaderIcon({
   return (
     <span
       data-module-header-icon=""
-      className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-sm", className)}
+      className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-sm", className)}
     >
       <Icon size={MODULE_HEADER_ICON_SIZE} />
     </span>
@@ -33,6 +33,14 @@ function ModuleHeaderIcon({
  * at any reasonable size. Ellipsis there hid real words from a section whose
  * whole job is telling the reader what it is; two lines costs a little
  * vertical rhythm and keeps every title fully readable.
+ *
+ * BORDER IS `border-strong`, NOT THE DEFAULT `border`. The default hairline
+ * (`--border`) reads as almost invisible on this dashboard's flat workspace
+ * ground — a card sitting directly on a same-lightness page needs a stronger
+ * edge than one sitting inside a bordered table. `border-strong` is an
+ * existing, already-theme-aware token (used elsewhere for exactly this
+ * "needs to actually separate" case); this is a scoped visual pass, not a
+ * new colour.
  */
 export function ModuleCard({
   id,
@@ -54,9 +62,16 @@ export function ModuleCard({
   className?: string;
 }) {
   return (
-    <div id={id} className={cn("flex h-full scroll-mt-24 flex-col gap-3 rounded-lg border bg-surface p-4 shadow-card", className)}>
+    <div
+      id={id}
+      data-module-card=""
+      className={cn(
+        "flex h-full min-h-0 scroll-mt-24 flex-col gap-3 rounded-lg border border-strong bg-surface p-4 shadow-card",
+        className,
+      )}
+    >
       <div className="flex h-14 shrink-0 items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-center gap-3">
           <ModuleHeaderIcon icon={Icon} className={iconClassName} />
           <h2 className="text-title leading-snug text-fg">{title}</h2>
         </div>
@@ -65,7 +80,7 @@ export function ModuleCard({
 
       <div className="flex flex-1 flex-col gap-2">{children}</div>
 
-      {footer ? <div className="border-t pt-3">{footer}</div> : null}
+      {footer ? <div className="mt-auto shrink-0 border-t border-strong pt-3">{footer}</div> : null}
     </div>
   );
 }

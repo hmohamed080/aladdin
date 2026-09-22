@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useI18n } from "@/lib/i18n/context";
 import { PlayIcon, ScrollIcon, VideoIcon } from "@/components/ui/icons";
 import { ModuleCard, ModuleFooterLink } from "./module-card";
@@ -37,20 +38,35 @@ export function LearningSection({
       {featured ? (
         <button
           type="button"
-          className="group relative flex min-h-36 flex-col justify-end overflow-hidden rounded-md border bg-gradient-to-br from-lapis/25 via-lapis/10 to-transparent p-3 text-start"
+          className="group relative isolate aspect-[16/8] min-h-32 overflow-hidden rounded-md border border-strong bg-surface-2 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
-          <span className="absolute start-3 top-3 inline-flex h-7 items-center gap-1.5 rounded-sm bg-surface/90 px-2 text-label font-medium text-lapis shadow-sm">
-            <VideoIcon size={14} />
+          <Image
+            src={featured.image}
+            alt=""
+            fill
+            sizes="(min-width: 1280px) 24vw, (min-width: 768px) 48vw, 100vw"
+            className="object-cover transition-transform duration-base ease-out-expo group-hover:scale-[1.025]"
+          />
+          <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/10" aria-hidden="true" />
+
+          <span className="absolute start-3 top-3 inline-flex h-7 items-center gap-1.5 rounded-sm border border-white/30 bg-black/60 px-2 text-label font-medium text-white backdrop-blur-sm">
+            <VideoIcon size={16} />
             {locale === "ar" ? "فيديو تعليمي" : "Video lesson"}
           </span>
-          <span className="absolute end-3 top-3 inline-flex h-7 items-center rounded-sm bg-surface/90 px-2 text-label font-medium text-fg-secondary shadow-sm">
-            {pick(locale, featured.duration)}
+
+          <span className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-3 text-white">
+            <span className="min-w-0">
+              <span className="block text-body-lg font-semibold leading-snug">{pick(locale, featured.title)}</span>
+              <span className="mt-1 flex items-center gap-2 text-caption text-white/80">
+                <span>{pick(locale, featured.duration)}</span>
+                <span aria-hidden="true">·</span>
+                <span className="truncate">{pick(locale, featured.source)}</span>
+              </span>
+            </span>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-pill border border-white/40 bg-white text-primary shadow-card transition-transform group-hover:scale-105">
+              <PlayIcon size={20} />
+            </span>
           </span>
-          <span className="absolute start-1/2 top-[46%] grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-pill bg-surface/95 text-lapis shadow-card transition-transform group-hover:scale-105 rtl:translate-x-1/2">
-            <PlayIcon size={22} />
-          </span>
-          <p className="mt-2 max-w-[80%] text-body-lg font-semibold leading-snug text-fg">{pick(locale, featured.title)}</p>
-          <p className="text-caption text-fg-secondary">{pick(locale, featured.source)}</p>
         </button>
       ) : items.length === 0 ? (
         <Empty
@@ -81,10 +97,10 @@ function LearningRow({ item }: { item: InstallerLearningItemVM }) {
     <li>
       <button
         type="button"
-        className="flex w-full items-center gap-2.5 rounded-md py-1.5 text-start transition-colors hover:bg-surface-2"
+        className="flex w-full items-center gap-3 rounded-md py-1.5 text-start transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-sm bg-lapis/10 text-lapis">
-          <Icon size={15} />
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-sm bg-lapis/10 text-lapis">
+          <Icon size={19} />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-caption text-fg-muted">{pick(locale, item.kindLabel)}</span>
@@ -97,7 +113,7 @@ function LearningRow({ item }: { item: InstallerLearningItemVM }) {
 
 function Empty({ text }: { text: string }) {
   return (
-    <div className="flex min-h-28 flex-1 items-center justify-center rounded-md border border-dashed bg-surface-2/30 p-4 text-center text-body text-fg-muted">
+    <div className="flex min-h-28 flex-1 items-center justify-center rounded-md border border-dashed border-strong bg-surface-2/30 p-4 text-center text-body text-fg-muted">
       {text}
     </div>
   );
