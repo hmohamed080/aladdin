@@ -1,5 +1,19 @@
 # Runtime State
 
+## Current continuation — 2026-09-22: installer opportunities viewport refinement
+
+- On `feature/installer-job-opportunities-preview`, the wide preview now uses a
+  viewport-bound workspace: the opportunities region is the only scrolling
+  content area, while the filter rail stays aligned, fixed, and fully visible.
+  Header/chrome spacing is compacted; tablet/mobile keep normal page scrolling.
+- The mock map illustration was replaced by a real interactive OpenStreetMap
+  embed centered on New Cairo, lazy-loaded with a no-referrer policy. No mapping
+  package, API key, backend path, or database integration was added.
+- Browser measurements at 1519×912: 6px chrome gap, 0px column offset, 670px jobs
+  viewport with independent overflow, filter `scrollHeight === clientHeight`,
+  and no document overflow. Typecheck and Impeccable detection pass.
+- Production routes and data remain untouched. No push, deployment, or merge.
+
 ## Current session — 2026-09-21: installer job-opportunities preview
 
 - Branch `feature/installer-job-opportunities-preview`, based on `0ba7fa6` from

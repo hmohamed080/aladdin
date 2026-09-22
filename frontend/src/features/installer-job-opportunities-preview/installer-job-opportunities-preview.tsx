@@ -77,7 +77,7 @@ export function InstallerJobOpportunitiesPreview({
   };
 
   return (
-    <div dir={dir} className="flex min-h-dvh bg-workspace">
+    <div dir={dir} className="flex min-h-dvh bg-workspace wide:h-dvh wide:overflow-hidden">
       <InstallerSidebar
         initialMode={sidebarMode}
         mobileOpen={mobileNavOpen}
@@ -85,14 +85,14 @@ export function InstallerJobOpportunitiesPreview({
         previewActiveItemId="jobs"
       />
 
-      <div className="flex min-w-0 flex-1 flex-col gap-6 pb-10 pe-3 ps-3 pt-6 desktop:pe-4 desktop:ps-4 desktop:pt-8">
+      <div className="flex min-w-0 flex-1 flex-col gap-sm pb-md pe-3 ps-3 pt-sm desktop:pe-4 desktop:ps-4">
         <InstallerTopbar theme={theme} onMenuClick={() => setMobileNavOpen(true)} />
 
-        <main id="opportunities" className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-lg p-4 tablet:p-6 desktop:p-7">
-          <header className="flex flex-col gap-md tablet:flex-row tablet:items-end tablet:justify-between">
+        <main id="opportunities" className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col gap-md px-md pb-md pt-xs tablet:px-lg tablet:pb-lg wide:overflow-hidden">
+          <header className="flex shrink-0 flex-col gap-sm tablet:flex-row tablet:items-end tablet:justify-between">
             <div>
               <h1 className="text-headline text-fg">{ar ? "فرص الشغل" : "Job opportunities"}</h1>
-              <p className="mt-2 max-w-2xl text-body text-fg-secondary">
+              <p className="mt-1 max-w-2xl text-body text-fg-secondary">
                 {ar ? "اكتشف فرص الشغل المناسبة لمهاراتك وقدّم عليها بسهولة" : "Discover work opportunities that fit your skills and apply with ease."}
               </p>
             </div>
@@ -111,7 +111,7 @@ export function InstallerJobOpportunitiesPreview({
             </Button>
           </header>
 
-          <div className="flex flex-col gap-sm tablet:flex-row tablet:items-center tablet:justify-between">
+          <div className="flex shrink-0 flex-col gap-sm tablet:flex-row tablet:items-center tablet:justify-between">
             <div role="group" aria-label={ar ? "ترتيب الفرص" : "Sort opportunities"} className="flex min-w-0 overflow-x-auto rounded-sm border bg-surface p-1 shadow-card">
               {SORT_OPTIONS.map((option) => (
                 <button
@@ -141,8 +141,8 @@ export function InstallerJobOpportunitiesPreview({
             </div>
           </div>
 
-          <div dir="ltr" className="grid items-start gap-lg wide:grid-cols-[minmax(0,1fr)_18rem]">
-            <section dir={dir} aria-live="polite" className="min-w-0">
+          <div dir="ltr" className="grid min-h-0 flex-1 items-start gap-md wide:grid-cols-[minmax(0,1fr)_18rem] wide:overflow-hidden">
+            <section dir={dir} aria-live="polite" className="min-w-0 wide:h-full wide:min-h-0 wide:overflow-y-auto wide:pe-sm">
               <div className="mb-sm flex items-center justify-between gap-sm">
                 <p className="text-label text-fg-secondary">
                   {ar ? `${formatCount(opportunities.length, locale)} فرصة متاحة` : `${formatCount(opportunities.length, locale)} opportunities available`}
@@ -183,7 +183,7 @@ export function InstallerJobOpportunitiesPreview({
               ) : null}
             </section>
 
-            <div dir={dir} className={cn(filtersOpen ? "block" : "hidden", "wide:block")}>
+            <div dir={dir} className={cn(filtersOpen ? "block" : "hidden", "wide:block wide:h-full wide:min-h-0 wide:overflow-hidden")}>
               <OpportunityFilters
                 locale={locale}
                 selectedTrades={trades}

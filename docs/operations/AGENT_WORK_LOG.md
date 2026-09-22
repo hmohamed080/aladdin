@@ -4,6 +4,28 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Refine installer opportunities preview viewport
+
+**Date:** 2026-09-22 · **Branch:** `feature/installer-job-opportunities-preview` · **Base:** `779ca57`.
+
+Applied the approved browser-feedback pass to
+`/preview/installer-job-opportunities`: tightened the chrome-to-content spacing,
+aligned the jobs region with the filter rail, constrained the wide workspace to
+the viewport, and made only the opportunities region scroll while the complete
+filter rail remains visible. Replaced the illustrative map with an interactive,
+lazy-loaded OpenStreetMap embed centered on New Cairo; it sends no referrer and
+adds no mapping dependency or backend integration. Tablet and mobile retain
+normal document scrolling.
+
+Browser verification at 1519×912 measured a 6px chrome gap, 0px jobs/filter
+alignment offset, a 670px independently scrollable jobs viewport, a fully
+visible non-scrolling filter rail, and a 912px document height. The OpenStreetMap
+frame loaded successfully and mobile retained document scrolling. Typecheck and
+the Impeccable detector pass with zero findings. No production route, backend,
+Supabase resource, deployment, push, or merge was changed.
+
+---
+
 ## Session — Build installer job-opportunities reference preview
 
 **Date:** 2026-09-21 · **Branch:** `feature/installer-job-opportunities-preview` · **Base:** `0ba7fa6`.
