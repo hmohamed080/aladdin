@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { Button } from "@/components/ui/controls";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import type { Locale } from "@/lib/i18n/locales";
@@ -36,6 +37,8 @@ export function OpportunityFilters({
   onApply: () => void;
 }) {
   const ar = locale === "ar";
+  const budgetProgress = ((maxBudget - 2000) / (12000 - 2000)) * 100;
+
   return (
     <aside aria-label={ar ? "تصفية النتائج" : "Filter results"} className="overflow-hidden rounded-md border bg-surface shadow-card wide:h-full wide:overflow-y-auto">
       <div className="flex items-center justify-between border-b px-md py-3">
@@ -100,7 +103,9 @@ export function OpportunityFilters({
           value={maxBudget}
           onChange={(event) => onBudgetChange(Number(event.target.value))}
           aria-label={ar ? "الحد الأقصى للميزانية" : "Maximum budget"}
-          className="w-full cursor-pointer accent-accent-solid"
+          dir={ar ? "rtl" : "ltr"}
+          style={{ "--range-progress": `${budgetProgress}%` } as CSSProperties}
+          className="installer-budget-range w-full cursor-pointer rounded-pill focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         />
       </FilterSection>
 

@@ -648,6 +648,66 @@ header[data-app-header="card"] [data-testid="global-search-trigger"] [class*="te
   border-color: var(--border-strong) !important;
 }
 
+/* Budget range: preserve the native interaction while giving its unfilled rail
+   a quieter, lighter surface-derived tone. The progress and thumb keep the
+   approved Lumen accent, and logical direction follows the active locale. */
+.installer-budget-range {
+  --range-track-bg: color-mix(in srgb, var(--surface-2) 38%, var(--surface));
+  appearance: none;
+  height: 1.25rem;
+  background: transparent;
+}
+
+.installer-budget-range::-webkit-slider-runnable-track {
+  height: 0.25rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--accent-solid) 0 var(--range-progress),
+    var(--range-track-bg) var(--range-progress) 100%
+  );
+}
+
+.installer-budget-range[dir="rtl"]::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to left,
+    var(--accent-solid) 0 var(--range-progress),
+    var(--range-track-bg) var(--range-progress) 100%
+  );
+}
+
+.installer-budget-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-top: -0.3125rem;
+  border: 2px solid var(--surface);
+  border-radius: 9999px;
+  background: var(--accent-solid);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+.installer-budget-range::-moz-range-track {
+  height: 0.25rem;
+  border-radius: 9999px;
+  background: var(--range-track-bg);
+}
+
+.installer-budget-range::-moz-range-progress {
+  height: 0.25rem;
+  border-radius: 9999px;
+  background: var(--accent-solid);
+}
+
+.installer-budget-range::-moz-range-thumb {
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 2px solid var(--surface);
+  border-radius: 9999px;
+  background: var(--accent-solid);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
 /* FILTER CHIPS — flat and borderless rather than bordered buttons competing with
    the page's primary action. The hierarchy is deliberate: one solid primary, one
    outlined secondary, and everything else a quiet chip. */
