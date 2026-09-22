@@ -38,7 +38,7 @@ export function BrandEcosystemSection({ items }: { items: readonly InstallerBran
           }
         />
       ) : (
-        <ul className="flex flex-1 flex-col justify-between gap-0.5">
+        <ul className="flex flex-col gap-0.5">
           {items.map((item) => (
             <BrandRow key={item.id} item={item} />
           ))}

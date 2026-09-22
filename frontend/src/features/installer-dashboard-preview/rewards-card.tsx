@@ -73,7 +73,7 @@ export function RewardsCard({ data, viewAllHref }: { data: InstallerRewardsVM; v
         </div>
       ) : null}
 
-      <div className="flex flex-1 flex-col justify-center rounded-md border border-strong bg-surface px-3 py-2.5">
+      <div className="rounded-md border border-strong bg-surface px-3 py-2.5">
         <p className="text-caption text-fg-muted">{locale === "ar" ? "آخر نشاط" : "Recent activity"}</p>
         {data.recentActivity ? (
           <>

@@ -45,7 +45,7 @@ export function NeedsAttentionSection({
           }
         />
       ) : (
-        <ul className="flex flex-1 flex-col justify-between gap-1">
+        <ul className="flex flex-col gap-1">
           {items.map((item) => (
             <ActionRow key={item.id} item={item} />
           ))}

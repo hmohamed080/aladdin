@@ -1,16 +1,5 @@
 # Runtime State
 
-## Current continuation — 2026-09-22: populated lower-module spacing correction
-
-- On `/preview/installer-dashboard`, populated attention and brand rows now use
-  the full flexible card body instead of leaving a large dead block above the
-  shared footer. The rewards recent-activity surface expands through the same
-  space, matching the staging composition without invented content.
-- Equal outer heights, aligned footer baselines, the SPC video thumbnail, icon
-  sizing, borders, and black primary-action treatment remain unchanged.
-- Targeted typecheck, ESLint, Impeccable detection, and whitespace validation
-  pass. No backend, data behavior, route, deployment, push, or merge changed.
-
 ## Current continuation — 2026-09-22: installer dashboard lower-module refinement
 
 - `/preview/installer-dashboard` keeps its section order and data behavior, but
