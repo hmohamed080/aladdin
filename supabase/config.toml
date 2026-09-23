@@ -267,15 +267,25 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-# Kept `false` — the revision-3 signUp()-first experiment and the pre-push
-# verification pass's deeper enumeration/notification experiment
-# (docs/frontend/auth-password-preview.md §Registration architecture) both
-# required flipping this to `true` temporarily to run; neither recorded
-# result led to promoting Architecture B, so this stays at the
-# OTP-first-compatible default. The [auth.email.template.confirmation] entry
-# above is kept in place (harmless while this is `false`) so either
-# experiment can be reproduced.
-enable_confirmations = false
+# REVISION 4 — Architecture B is now the implemented registration flow for
+# the password-auth preview (docs/frontend/auth-password-preview.md
+# §Registration architecture): `signUp({email,password})` withholds a
+# session until the 6-digit `{{.Token}}` code from
+# `[auth.email.template.confirmation]` is verified via
+# `verifyOtp({type:"signup"})`. This setting MUST be `true` locally for that
+# to work at all — without it, `signUp()` returns a session immediately with
+# no confirmation step. LOCAL ONLY, same as every other [auth.email]/
+# [auth.rate_limit] entry in this file — the hosted `aladdin-staging`/
+# production dashboard's own "Confirm email" toggle is separate and is NOT
+# changed by this file; it must be flipped there (Auth → Sign In / Providers
+# → Email, "Confirm email") before Architecture B could ever run against a
+# hosted project. Confirmed empirically (revision 3's investigation, kept
+# below) that this only reroutes the email TEMPLATE for NEW-ACCOUNT creation
+# (`signUp()` and the canonical `signInWithOtp({shouldCreateUser:true})`) —
+# a RETURNING passwordless user's ordinary sign-in is unaffected. See the
+# doc's §"enable_confirmations impact map" for the full audit of every
+# canonical call site this could affect before any hosted promotion.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -310,16 +320,15 @@ content_path = "./supabase/templates/magic_link.html"
 subject = "رمز إعادة تعيين كلمة المرور لعلاء الدين"
 content_path = "./supabase/templates/recovery.html"
 
-# Local Confirm-Signup template for the revision-3 signUp()-first experiment
+# Local Confirm-Signup template — REQUIRED by revision 4's Architecture B
 # (docs/frontend/auth-password-preview.md §Registration architecture): shows
 # the 6-digit {{ .Token }}, matching magic_link.html/recovery.html, instead of
 # the default link-only template. This is the template GoTrue uses for BOTH
-# `signUp()` confirmation AND, if `enable_confirmations=true`, the EXISTING
-# passwordless `signInWithOtp({shouldCreateUser:true})` flow (that flow uses
-# `magic_link` only while `enable_confirmations=false`). `enable_confirmations`
-# stays `false` below except during that isolated experiment — see the doc's
-# §Registration architecture for the recorded run and result. Production uses
-# its own template/setting.
+# this preview's `signUp()` confirmation AND, since `enable_confirmations=true`
+# above, the EXISTING canonical passwordless `signInWithOtp({shouldCreateUser:
+# true})` Sign Up flow too — confirmed empirically that a RETURNING,
+# already-confirmed user's ordinary sign-in still uses `magic_link` and is
+# unaffected. Production uses its own template/setting.
 [auth.email.template.confirmation]
 subject = "رمز تأكيد إنشاء الحساب في علاء الدين"
 content_path = "./supabase/templates/confirmation.html"

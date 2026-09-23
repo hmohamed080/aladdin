@@ -75,7 +75,7 @@ export const resetPasswordSchema = z
     addWeakPasswordIssues(value.password, [value.email], ["password"], ctx);
   });
 
-/** For flows where the account's email is already known server-side (finishPasswordSignUp, change-password) but isn't a form field. */
+/** For flows where the account's email is already known server-side (migration, recovery reset, change-password) but isn't a form field. */
 export function passwordWithContextSchema(context: readonly string[]) {
   return passwordSchema.superRefine((password, ctx) => addWeakPasswordIssues(password, context, [], ctx));
 }

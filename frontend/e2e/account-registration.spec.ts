@@ -48,7 +48,16 @@ test.describe("account registration", () => {
     await expect(page.getByRole("button", { name: /resend|resend in/i })).toBeVisible();
 
     const code = await readNewOtp(request, email, seen);
-    await page.getByLabel(/one-time code/i).fill(code);
+    // The canonical OTP control is one box per digit (`maxLength=1`);
+    // `.fill()` only ever lands the first character in box zero and never
+    // triggers the real auto-advance keyboard contract, leaving boxes 2-6
+    // empty and the submission rejected client-side — pre-existing bug,
+    // unrelated to any auth-architecture change (helpers/auth.ts's `signIn()`
+    // already documents and works around this exact issue). Found while
+    // live-regression-testing the canonical passwordless flow under
+    // `enable_confirmations=true` for the password-auth preview
+    // (docs/frontend/auth-password-preview.md).
+    await page.getByLabel(/one-time code/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify/i }).click();
 
     // Verified + consented new account resumes at the first onboarding step

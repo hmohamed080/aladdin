@@ -1,11 +1,15 @@
 import { test, expect } from "@playwright/test";
-import { messageIdsFor, readNewOtp } from "./helpers/auth";
+import { messageIdsFor, readNewOtp, newMessageSubjectsFor } from "./helpers/auth";
 
 /**
  * Real, no-bypass E2E coverage for the isolated password-auth preview
  * (docs/frontend/auth-password-preview.md). Every email/OTP round trip goes
  * through the REAL local Supabase + Mailpit, exactly like the existing
  * passwordless suite's `helpers/auth.ts` — no mocked Supabase client here.
+ *
+ * Architecture B (revision 4): registration submits email+password directly
+ * to `signUp()`; the OTP step that follows only ever collects the 6-digit
+ * confirmation code — no password field exists on it at all.
  */
 
 function uniqueEmail(tag: string): string {
@@ -26,8 +30,11 @@ async function waitForCaptchaToken(page: import("@playwright/test").Page): Promi
 
 const STRONG_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
 
-test.describe("Password registration — golden path", () => {
-  test("weak password is rejected in place (no OTP sent, fields preserved)", async ({ page, request }) => {
+/** The neutral Step-2 copy (§Account enumeration) — deliberately never an unconditional "we sent a code to X". */
+const NEXT_STEP_TEXT = /next step|الخطوة التالية/i;
+
+test.describe("Password registration — golden path (Architecture B: signUp() sets the password atomically)", () => {
+  test("weak password is rejected in place (no signUp sent, fields preserved)", async ({ page, request }) => {
     const email = uniqueEmail("weakpw");
     await page.goto("/preview/auth-password/sign-up");
 
@@ -42,17 +49,17 @@ test.describe("Password registration — golden path", () => {
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
 
-    // Weak-password rejection keeps the caller on step 1 — never sends an OTP.
+    // Weak-password rejection keeps the caller on step 1 — never calls signUp().
     // (The full weak-password decision matrix — common / sequential /
-    // account-related / mismatch — is covered by the 22 unit tests in
+    // account-related / mismatch — is covered by the unit tests in
     // server/actions/auth-password-preview.test.ts; this just proves the
     // browser round-trip surfaces it and does not advance to the OTP step.)
     await expect(page.getByText(/common or easy to guess|شائعة جدًا أو يسهل تخمينها/i)).toBeVisible();
-    await expect(page.getByText(/enter the code we sent|أدخل الرمز الذي أرسلناه/i)).toHaveCount(0);
+    await expect(page.getByText(NEXT_STEP_TEXT)).toHaveCount(0);
     expect((await messageIdsFor(request, email)).size).toBe(seen.size);
   });
 
-  test("a strong password registers, verifies by OTP, and reaches onboarding", async ({ page, request }) => {
+  test("a strong password registers via signUp(), verifies by OTP alone (no password field on this step), and reaches onboarding", async ({ page, request }) => {
     const email = uniqueEmail("signup");
     await page.goto("/preview/auth-password/sign-up");
 
@@ -67,7 +74,13 @@ test.describe("Password registration — golden path", () => {
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
 
-    await expect(page.getByText(/enter the code we sent|أدخل الرمز الذي أرسلناه/i)).toBeVisible();
+    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+
+    // §1/§12B — the password never survives past this point: no password-type
+    // input anywhere on the OTP step, and no hidden input carrying its value.
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
+    await expect(page.locator(`input[value="${STRONG_PASSWORD}"]`)).toHaveCount(0);
+
     const code = await readNewOtp(request, email, seen);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
@@ -77,7 +90,7 @@ test.describe("Password registration — golden path", () => {
 });
 
 test.describe("CAPTCHA — required on Create Account and Forgot Password, against the REAL Supabase auth.captcha check", () => {
-  test("Create Account is refused when the captcha token is missing, and never sends an OTP", async ({ page, request }) => {
+  test("Create Account is refused when the captcha token is missing, and never calls signUp", async ({ page, request }) => {
     const email = uniqueEmail("nocaptcha-signup");
     // Block Cloudflare's script entirely — deterministic "no token was ever
     // produced," not a "solve then clear the DOM" race. Turnstile refreshes
@@ -124,7 +137,7 @@ test.describe("CAPTCHA — required on Create Account and Forgot Password, again
     // ERROR text, not in the widget's always-present sr-only label ("Human
     // verification challenge") — a strict-mode-safe, distinguishing match.
     await expect(page.getByText(/before continuing|قبل المتابعة/i)).toBeVisible();
-    await expect(page.getByText(/enter the code we sent|أدخل الرمز الذي أرسلناه/i)).toHaveCount(0);
+    await expect(page.getByText(NEXT_STEP_TEXT)).toHaveCount(0);
     expect((await messageIdsFor(request, email)).size).toBe(seen.size);
   });
 
@@ -158,13 +171,259 @@ async function registerAccount(page: import("@playwright/test").Page, request: i
   const seen = await messageIdsFor(request, email);
   await waitForCaptchaToken(page);
   await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-  await expect(page.getByText(/enter the code we sent|أدخل الرمز الذي أرسلناه/i)).toBeVisible();
+  await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
   const code = await readNewOtp(request, email, seen);
   await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
   await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
   await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
   return email;
 }
+
+test.describe("Account enumeration normalization (§Account enumeration)", () => {
+  test("registering with an email that already belongs to a CONFIRMED account gets the SAME neutral response and the SAME OTP screen as a genuine new registration — never 'already exists'", async ({ page, request }) => {
+    const existingEmail = await registerAccount(page, request, "enum-existing");
+    await page.getByRole("button", { name: /sign out|تسجيل الخروج/i }).click();
+    await page.waitForURL(/\/sign-in/, { waitUntil: "commit" });
+
+    await page.goto("/preview/auth-password/sign-up");
+    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(existingEmail);
+    await page.getByLabel(/^password$|^كلمة المرور$/i).fill("SomeOtherStrongPassword9!");
+    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill("SomeOtherStrongPassword9!");
+    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
+    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
+    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await waitForCaptchaToken(page);
+    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+
+    // Identical UI outcome to a genuine new signup — the neutral Step-2
+    // screen, never "user already exists" / "email already registered" or
+    // any equivalent.
+    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    await expect(page.getByText(/already exists|already registered|موجود بالفعل|مسجل بالفعل/i)).toHaveCount(0);
+
+    // §5 — the neutral "no code hint" + a real way out (Forgot password) is
+    // visible right there, rather than leaving the caller waiting forever.
+    await expect(page.getByRole("link", { name: /forgot your password|هل نسيت كلمة المرور/i })).toBeVisible();
+
+    // The original account's password is UNCHANGED — this never silently
+    // overwrote it or created a second identity.
+    await page.getByRole("link", { name: /forgot your password|هل نسيت كلمة المرور/i }).click();
+    await page.waitForURL(/\/forgot-password$/, { waitUntil: "commit" });
+  });
+});
+
+test.describe("Resend signup code (never re-submits the password, never re-registers)", () => {
+  test("resend delivers a fresh, working code without ever asking for the password again", async ({ page, request }) => {
+    const email = uniqueEmail("resend");
+    await page.goto("/preview/auth-password/sign-up");
+    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
+    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
+    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    const seenAtSignup = await messageIdsFor(request, email);
+    await waitForCaptchaToken(page);
+    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    // Wait for the first confirmation email to actually land (a
+    // synchronization point, not a code this test intends to use) before
+    // snapshotting `seenBeforeResend` below — resend must supersede it with
+    // a fresh code that actually verifies, never reusing this original one.
+    await readNewOtp(request, email, seenAtSignup);
+
+    // No password field anywhere on this screen for resend to submit.
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
+
+    const seenBeforeResend = await messageIdsFor(request, email);
+    await waitForCaptchaToken(page);
+    await page.getByRole("button", { name: /resend code|إعادة إرسال الرمز/i }).click();
+    const freshCode = await readNewOtp(request, email, seenBeforeResend);
+
+    await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(freshCode);
+    await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
+    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+  });
+});
+
+test.describe("Session creation guarantee (§Session creation) — no session exists before OTP confirmation", () => {
+  test("after signUp() but before verifying, protected routes are denied exactly like a signed-out caller; after verifying, they resolve normally", async ({ page, request, context }) => {
+    const email = uniqueEmail("session-guarantee");
+    await page.goto("/preview/auth-password/sign-up");
+    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
+    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
+    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await waitForCaptchaToken(page);
+    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+
+    // BEFORE verifying: no real SESSION cookie exists yet. `@supabase/ssr`'s
+    // server client defaults to `flowType:"pkce"` (confirmed by reading
+    // createServerClient.js directly), so `signUp()` legitimately leaves a
+    // `sb-*-auth-token-code-verifier` cookie behind — a PKCE artifact used
+    // later to exchange the emailed code, not a session — so the check below
+    // explicitly excludes that suffix rather than matching any `sb-*-auth-token*`.
+    const cookiesBefore = await context.cookies();
+    expect(cookiesBefore.some((c) => /^sb-.*-auth-token/.test(c.name) && !c.name.includes("code-verifier"))).toBe(false);
+
+    // The real production middleware must deny every protected surface
+    // exactly like a fully signed-out caller.
+    await page.goto("/b2b");
+    await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
+    await page.goto("/admin");
+    await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
+    await page.goto("/home");
+    await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
+    await page.goto("/onboarding");
+    await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
+
+    // The unverified signup itself is untouched by those denied detours —
+    // completing it now still works normally. Re-snapshot `seen` immediately
+    // before THIS submission (rather than reusing the very first snapshot)
+    // so `readNewOtp` deterministically reads the code this resubmission
+    // actually generates, not whichever of two pending messages happens to
+    // sort first.
+    await page.goto("/preview/auth-password/sign-up");
+    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
+    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
+    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    const seenBeforeRetry = await messageIdsFor(request, email);
+    await waitForCaptchaToken(page);
+    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    const code = await readNewOtp(request, email, seenBeforeRetry);
+    await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
+    await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
+
+    // AFTER verifying: a real session exists and the correct resolver runs.
+    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+    const cookiesAfter = await context.cookies();
+    expect(cookiesAfter.some((c) => /^sb-.*-auth-token/.test(c.name))).toBe(true);
+  });
+});
+
+test.describe("Refresh / interruption behavior (§Refresh, back, interruption)", () => {
+  test("refreshing on the OTP step returns to Step 1 with no crash and no password anywhere in storage — resubmitting proceeds normally", async ({ page, request }) => {
+    const email = uniqueEmail("refresh");
+    await page.goto("/preview/auth-password/sign-up");
+    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
+    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
+    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await waitForCaptchaToken(page);
+    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+
+    // No password ever reaches localStorage/sessionStorage at any point.
+    const storageSnapshot = await page.evaluate(() => ({
+      local: JSON.stringify(window.localStorage),
+      session: JSON.stringify(window.sessionStorage),
+    }));
+    expect(storageSnapshot.local).not.toContain(STRONG_PASSWORD);
+    expect(storageSnapshot.session).not.toContain(STRONG_PASSWORD);
+
+    // Hard refresh — this component holds step state only in React memory
+    // (no URL/cookie step marker), so a refresh deliberately lands back at
+    // Step 1. Never crashes, never asks to re-enter a password it doesn't have.
+    await page.reload({ waitUntil: "commit" });
+    await expect(page.getByLabel(/email address|البريد الإلكتروني/i)).toBeVisible();
+    await expect(page.getByLabel(/one-time code|الرمز لمرة واحدة/i)).toHaveCount(0);
+
+    // Resubmitting the SAME email (still unconfirmed from the first attempt)
+    // is exactly GoTrue's own obfuscated re-signup case — succeeds again,
+    // re-sending a new usable code, no corruption.
+    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
+    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
+    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    const seenBeforeResubmit = await messageIdsFor(request, email);
+    await waitForCaptchaToken(page);
+    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+
+    const code = await readNewOtp(request, email, seenBeforeResubmit);
+    await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
+    await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
+    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+  });
+
+  test("a wrong/garbage code is rejected with a clear error, and Resend still works from the same screen", async ({ page, request }) => {
+    const email = uniqueEmail("badcode");
+    await page.goto("/preview/auth-password/sign-up");
+    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
+    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
+    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    const seen = await messageIdsFor(request, email);
+    await waitForCaptchaToken(page);
+    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+
+    await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially("000000");
+    await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
+    // Verified directly against local GoTrue: a wrong/never-issued signup
+    // code returns `error_code:"otp_expired"` — the SAME code as a genuinely
+    // time-expired one (GoTrue does not distinguish "wrong" from "expired"
+    // for this endpoint) — so the app's existing `verifyFailureCode` mapping
+    // correctly surfaces the "expired" copy here, not a distinct "incorrect"
+    // message this codebase has no real signal to produce.
+    await expect(page.getByText(/expired|انتهت صلاحية/i)).toBeVisible();
+
+    const code = await readNewOtp(request, email, seen);
+    await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).fill("");
+    await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
+    await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
+    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+  });
+});
+
+test.describe("Password-changed notification is absent on initial registration (§Password-changed notification)", () => {
+  test("signUp() + verifyOtp(signup) sends ONLY the confirmation email — never a 'password changed' security notification", async ({ page, request }) => {
+    // Inspect EVERY message this fresh account receives end-to-end and
+    // assert there is never a "password changed" notification email —
+    // Architecture A fired one during ordinary first-time registration
+    // (see the module doc comment and docs/frontend/auth-password-preview.md
+    // §Password-changed notification), because it attached the password via
+    // `updateUser({password})`, which GoTrue cannot distinguish from a real
+    // password change. Architecture B's `signUp()` sets the password as part
+    // of account creation itself, which GoTrue does not treat as a "change".
+    const target = uniqueEmail("no-pwchanged-check");
+    const seenFromStart = await messageIdsFor(request, target);
+    await page.goto("/preview/auth-password/sign-up");
+    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(target);
+    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
+    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
+    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    const seenAtStart = await messageIdsFor(request, target);
+    await waitForCaptchaToken(page);
+    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    const code = await readNewOtp(request, target, seenAtStart);
+    await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
+    await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
+    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+
+    // Give any (unwanted) notification a moment to land before asserting its absence.
+    await page.waitForTimeout(1500);
+    const subjects = await newMessageSubjectsFor(request, target, seenFromStart);
+    const passwordChangedSubjects = subjects.filter((s) => /تم تغيير كلمة مرور|password.*changed/i.test(s));
+    expect(passwordChangedSubjects).toEqual([]);
+  });
+});
 
 test.describe("Password sign-in", () => {
   test("wrong password shows the generic error; the correct one signs in", async ({ page, request }) => {
@@ -329,7 +588,7 @@ async function registerPasswordlessAccount(
   return email;
 }
 
-test.describe("Existing-passwordless-user migration — real E2E against a genuinely passwordless account", () => {
+test.describe("Existing-passwordless-user migration — real E2E against a genuinely passwordless account (regression check: Architecture B's signup confirmation changes must not affect this flow)", () => {
   test("passwordless login → migrate → reauthentication → set password → logout → Email+Password login succeeds", async ({ page, request, context }) => {
     const email = await registerPasswordlessAccount(page, request, "migrate-golden");
     const newPassword = "Hd4#Nq8!Tz2$WuY7fR";

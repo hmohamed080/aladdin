@@ -26,6 +26,8 @@ vi.mock("next/headers", () => ({
 
 // --- The normal, cookie-backed client (getServerSupabase()) ----------------
 const signInWithOtp = vi.fn();
+const signUp = vi.fn();
+const resend = vi.fn();
 const verifyOtp = vi.fn();
 const updateUser = vi.fn();
 const signInWithPassword = vi.fn();
@@ -37,7 +39,7 @@ const { resolveActiveLanding } = vi.hoisted(() => ({
   resolveActiveLanding: vi.fn(),
 }));
 const supabase = {
-  auth: { signInWithOtp, verifyOtp, updateUser, signInWithPassword, getUser, signOut, reauthenticate },
+  auth: { signInWithOtp, signUp, resend, verifyOtp, updateUser, signInWithPassword, getUser, signOut, reauthenticate },
   rpc,
 };
 
@@ -104,9 +106,8 @@ vi.mock("@/lib/supabase/recovery-grant", () => ({
 
 import {
   requestPasswordSignUp,
+  resendPasswordSignUpCode,
   verifyPasswordSignUp,
-  finishPasswordSignUp,
-  resumePasswordSignUpEmail,
   migrationEligibility,
   passwordSignIn,
   requestRecoveryCode,
@@ -176,7 +177,7 @@ describe("10-character minimum enforced everywhere", () => {
   });
 
   it("accepts a 10-character (non-weak) password at registration", async () => {
-    signInWithOtp.mockResolvedValueOnce({ error: null });
+    signUp.mockResolvedValueOnce({ error: null });
     const pw = "Xk7#mLp2Qz"; // 10 chars, not common/sequential/account-related
     const res = await requestPasswordSignUp(
       { ok: false },
@@ -194,7 +195,7 @@ describe("weak-password rejection", () => {
     );
     expect(res.ok).toBe(false);
     expect(res.code).toBe("authPasswordPreview.error.passwordCommon");
-    expect(signInWithOtp).not.toHaveBeenCalled();
+    expect(signUp).not.toHaveBeenCalled();
   });
 
   it("rejects a sequential/repetitive password", async () => {
@@ -216,13 +217,14 @@ describe("weak-password rejection", () => {
   });
 });
 
-describe("requestPasswordSignUp", () => {
+describe("requestPasswordSignUp (Architecture B — signUp() sets the password atomically)", () => {
   it("rejects a mismatched password confirmation", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
       consented({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: "a-totally-different-value" }),
     );
     expect(res.code).toBe("authPasswordPreview.error.passwordMismatch");
+    expect(signUp).not.toHaveBeenCalled();
   });
 
   it("requires all three consents", async () => {
@@ -231,117 +233,180 @@ describe("requestPasswordSignUp", () => {
       fd({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, consent_terms: "on" }),
     );
     expect(res.code).toBe("authPasswordPreview.error.consentRequired");
+    expect(signUp).not.toHaveBeenCalled();
   });
 
-  it("sends a verification code (email-verification-pending state) and never leaks whether the account already existed", async () => {
-    signInWithOtp.mockResolvedValueOnce({ error: null });
+  it("submits email AND password directly to signUp() in one call", async () => {
+    signUp.mockResolvedValueOnce({ error: null });
     const res = await requestPasswordSignUp(
       { ok: false },
       consented({ email: "new-person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
     );
     expect(res.ok).toBe(true);
-    expect(signInWithOtp).toHaveBeenCalledWith({
+    expect(signUp).toHaveBeenCalledWith({
       email: "new-person@example.test",
-      options: { shouldCreateUser: true, captchaToken: "test-captcha-token" },
+      password: GOOD_PASSWORD,
+      options: { captchaToken: "test-captcha-token" },
     });
+    // Never the passwordless OTP endpoint — Architecture B never calls it.
+    expect(signInWithOtp).not.toHaveBeenCalled();
   });
 
-  it("refuses without a captcha token — never calls signInWithOtp", async () => {
+  it("refuses without a captcha token — never calls signUp", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
       fd({ consent_terms: "on", consent_privacy: "on", consent_pilot: "on", email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
     );
     expect(res.code).toBe("authPasswordPreview.error.captchaRequired");
-    expect(signInWithOtp).not.toHaveBeenCalled();
+    expect(signUp).not.toHaveBeenCalled();
   });
 
   it("surfaces a rejected captcha token distinctly from a generic send failure", async () => {
-    signInWithOtp.mockResolvedValueOnce({ error: { code: "captcha_failed" } });
+    signUp.mockResolvedValueOnce({ error: { code: "captcha_failed" } });
     const res = await requestPasswordSignUp(
       { ok: false },
       consented({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
     );
     expect(res.code).toBe("authPasswordPreview.error.captchaRejected");
   });
+
+  it("a genuine unexpected failure surfaces the generic sendFailed code, never a distinguishing one", async () => {
+    signUp.mockResolvedValueOnce({ error: { message: "network blip" } });
+    const res = await requestPasswordSignUp(
+      { ok: false },
+      consented({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+    );
+    expect(res.code).toBe("authPasswordPreview.error.sendFailed");
+  });
+
+  describe("account-enumeration normalization (§Account enumeration)", () => {
+    it("an existing, CONFIRMED account (signUp() returns user_already_exists) gets the EXACT SAME success response as a genuine new registration — never a distinguishing message", async () => {
+      signUp.mockResolvedValueOnce({ error: { code: "user_already_exists", status: 422 } });
+      const existing = await requestPasswordSignUp(
+        { ok: false },
+        consented({ email: "already-has-account@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      );
+
+      signUp.mockResolvedValueOnce({ error: null });
+      const fresh = await requestPasswordSignUp(
+        { ok: false },
+        consented({ email: "genuinely-new@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      );
+
+      expect(existing.ok).toBe(true);
+      expect(existing.code).toBe(fresh.code);
+      expect(existing.ok).toBe(fresh.ok);
+    });
+
+    it("also normalizes GoTrue's alternate `email_exists` error code the same way", async () => {
+      signUp.mockResolvedValueOnce({ error: { code: "email_exists", status: 422 } });
+      const res = await requestPasswordSignUp(
+        { ok: false },
+        consented({ email: "already-has-account@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      );
+      expect(res.ok).toBe(true);
+      expect(res.code).toBe("authPasswordPreview.info.codeSent");
+    });
+
+    it("a rate limit is still allowed to differ from the enumeration-safe response (never reveals existence, just an abuse signal)", async () => {
+      signUp.mockResolvedValueOnce({ error: { status: 429 } });
+      const res = await requestPasswordSignUp(
+        { ok: false },
+        consented({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      );
+      expect(res.code).toBe("authPasswordPreview.error.rateLimited");
+    });
+  });
 });
 
-describe("verifyPasswordSignUp — registration interruption between OTP and password completion", () => {
-  it("successful verification confirms the email, attaches the password, and stamps the AUTHORITATIVE (app_metadata) flag via the admin path — not user_metadata", async () => {
+describe("resendPasswordSignUpCode — never re-submits the password, never re-registers", () => {
+  it("resends via GoTrue's resend({type:'signup'}) with just the email — no password field exists on this action's input at all", async () => {
+    resend.mockResolvedValueOnce({ error: null });
+    const res = await resendPasswordSignUpCode({ ok: false }, withCaptcha({ email: "person@example.test" }));
+    expect(res.ok).toBe(true);
+    expect(resend).toHaveBeenCalledWith({
+      type: "signup",
+      email: "person@example.test",
+      options: { captchaToken: "test-captcha-token" },
+    });
+    // Never signUp() again — resend must not re-create the account or re-set the password.
+    expect(signUp).not.toHaveBeenCalled();
+  });
+
+  it("refuses without a captcha token", async () => {
+    const res = await resendPasswordSignUpCode({ ok: false }, fd({ email: "person@example.test" }));
+    expect(res.code).toBe("authPasswordPreview.error.captchaRequired");
+    expect(resend).not.toHaveBeenCalled();
+  });
+
+  it("preserves rate-limit surfacing", async () => {
+    resend.mockResolvedValueOnce({ error: { status: 429 } });
+    const res = await resendPasswordSignUpCode({ ok: false }, withCaptcha({ email: "person@example.test" }));
+    expect(res.code).toBe("authPasswordPreview.error.rateLimited");
+  });
+
+  it("also enumeration-normalizes an already-confirmed account's resend failure into the same success response", async () => {
+    resend.mockResolvedValueOnce({ error: { code: "user_already_exists" } });
+    const res = await resendPasswordSignUpCode({ ok: false }, withCaptcha({ email: "already-has-account@example.test" }));
+    expect(res.ok).toBe(true);
+    expect(res.code).toBe("authPasswordPreview.info.codeSent");
+  });
+});
+
+describe("verifyPasswordSignUp (Architecture B — OTP-only, no password)", () => {
+  it("verifies with type:'signup' (the EmailOtpType the installed @supabase/auth-js defines for this exact case) — never 'email'", async () => {
     verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test" } } });
-    updateUser.mockResolvedValueOnce({ error: null });
     rpc.mockResolvedValueOnce({ data: undefined });
     await expect(
-      verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456", password: GOOD_PASSWORD })),
+      verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456" })),
     ).rejects.toThrow("REDIRECT:/onboarding");
-    // Plain password update — no security-relevant data ever passed through user_metadata.
-    expect(updateUser).toHaveBeenCalledWith({ password: GOOD_PASSWORD });
-    // The authoritative flag is stamped separately, via the service-role admin path.
+    expect(verifyOtp).toHaveBeenCalledWith({ email: "person@example.test", token: "123456", type: "signup" });
+  });
+
+  it("never calls updateUser — the password was already set by signUp() in step 1, not here", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test" } } });
+    rpc.mockResolvedValueOnce({ data: undefined });
+    await expect(
+      verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456" })),
+    ).rejects.toThrow("REDIRECT:/onboarding");
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
+  it("still stamps the authoritative (app_metadata) flag on success — now purely for migrationEligibility() bookkeeping, not interruption-resume", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test" } } });
+    rpc.mockResolvedValueOnce({ data: undefined });
+    await expect(
+      verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456" })),
+    ).rejects.toThrow("REDIRECT:/onboarding");
     expect(markPasswordAttachedAuthoritatively).toHaveBeenCalledWith("u1");
   });
 
-  it("keeps the confirmed session when GoTrue itself rejects the password — the interrupted state", async () => {
-    verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test" } } });
-    updateUser.mockResolvedValueOnce({ error: { message: "rejected" } });
-    const res = await verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456", password: GOOD_PASSWORD }));
+  it("a wrong/garbage code never creates a session and never stamps the flag", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: { message: "Token has expired or is invalid" }, data: { user: null } });
+    const res = await verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "000000" }));
     expect(res.ok).toBe(false);
-    expect(res.code).toBe("authPasswordPreview.error.passwordRejected");
+    expect(res.code).toBe("authPasswordPreview.error.verifyFailed");
     expect(markPasswordAttachedAuthoritatively).not.toHaveBeenCalled();
   });
 
-  it("resumePasswordSignUpEmail detects an interrupted session via app_metadata (confirmed, no authoritative flag yet)", async () => {
-    getUser.mockResolvedValueOnce({ data: { user: { email: "person@example.test", app_metadata: {} } } });
-    expect(await resumePasswordSignUpEmail()).toBe("person@example.test");
+  it("distinguishes an expired code", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: { code: "otp_expired" }, data: { user: null } });
+    const res = await verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "000000" }));
+    expect(res.code).toBe("authPasswordPreview.error.otpExpired");
   });
 
-  it("resumePasswordSignUpEmail returns null once the app_metadata flag is stamped", async () => {
-    getUser.mockResolvedValueOnce({
-      data: { user: { email: "person@example.test", app_metadata: { [PASSWORD_SET_FLAG]: true } } },
-    });
-    expect(await resumePasswordSignUpEmail()).toBeNull();
-  });
-
-  it("resumePasswordSignUpEmail is NOT fooled by a user forging the flag into their own user_metadata", async () => {
-    getUser.mockResolvedValueOnce({
-      data: {
-        user: {
-          email: "person@example.test",
-          app_metadata: {},
-          user_metadata: { [PASSWORD_SET_FLAG]: true },
-        },
-      },
-    });
-    expect(await resumePasswordSignUpEmail()).toBe("person@example.test");
-  });
-
-  it("resumePasswordSignUpEmail returns null when signed out", async () => {
-    getUser.mockResolvedValueOnce({ data: { user: null } });
-    expect(await resumePasswordSignUpEmail()).toBeNull();
+  it("rejects a malformed (non-6-digit) token before ever calling verifyOtp", async () => {
+    const res = await verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "12" }));
+    expect(res.code).toBe("authPasswordPreview.error.invalidCode");
+    expect(verifyOtp).not.toHaveBeenCalled();
   });
 });
 
-describe("finishPasswordSignUp (interrupted-state completion)", () => {
-  it("requires an existing session", async () => {
-    getUser.mockResolvedValueOnce({ data: { user: null } });
-    const res = await finishPasswordSignUp({ ok: false }, fd({ password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }));
-    expect(res.code).toBe("authPasswordPreview.error.sessionExpired");
-    expect(updateUser).not.toHaveBeenCalled();
-  });
-
-  it("rejects a weak password even on the resume path", async () => {
-    getUser.mockResolvedValueOnce({ data: { user: { id: "u1", email: "person@example.test" } } });
-    const res = await finishPasswordSignUp({ ok: false }, fd({ password: "abcdefghijzz", confirmPassword: "abcdefghijzz" }));
-    expect(res.code).toBe("authPasswordPreview.error.passwordSequential");
-    expect(updateUser).not.toHaveBeenCalled();
-  });
-
-  it("succeeds, stamps the authoritative flag via the admin path, and reaches onboarding", async () => {
-    getUser.mockResolvedValueOnce({ data: { user: { id: "u1", email: "person@example.test" } } });
-    updateUser.mockResolvedValueOnce({ error: null });
-    await expect(
-      finishPasswordSignUp({ ok: false }, fd({ password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD })),
-    ).rejects.toThrow("REDIRECT:/onboarding");
-    expect(updateUser).toHaveBeenCalledWith({ password: GOOD_PASSWORD });
-    expect(markPasswordAttachedAuthoritatively).toHaveBeenCalledWith("u1");
+describe("resumePasswordSignUpEmail / finishPasswordSignUp — Architecture-A-only machinery, removed", () => {
+  it("no longer exported — Architecture B's signUp() sets the password atomically, so there is no interrupted 'confirmed but no password' state left to resume", async () => {
+    const actions = await import("./auth-password-preview");
+    expect((actions as Record<string, unknown>).resumePasswordSignUpEmail).toBeUndefined();
+    expect((actions as Record<string, unknown>).finishPasswordSignUp).toBeUndefined();
   });
 });
 

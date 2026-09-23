@@ -42,6 +42,16 @@ export async function messageIdsFor(request: APIRequestContext, email: string): 
   return new Set((await messagesFor(request, email)).map((m) => m.ID));
 }
 
+/** Subject lines of messages for `email` that arrived AFTER `seen` was captured. */
+export async function newMessageSubjectsFor(
+  request: APIRequestContext,
+  email: string,
+  seen: Set<string>,
+): Promise<string[]> {
+  const all = await messagesFor(request, email);
+  return all.filter((m) => !seen.has(m.ID)).map((m) => (m as unknown as { Subject: string }).Subject);
+}
+
 /**
  * Deterministically read the OTP from the message that arrived AFTER `seen` was
  * captured — never a stale code from a previous test. Exercises the REAL

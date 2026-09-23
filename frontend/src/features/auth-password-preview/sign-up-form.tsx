@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import {
   requestPasswordSignUp,
+  resendPasswordSignUpCode,
   verifyPasswordSignUp,
-  finishPasswordSignUp,
   type PasswordAuthState,
 } from "@/server/actions/auth-password-preview";
 import { AuthCard } from "@/features/auth/auth-card";
@@ -20,32 +20,38 @@ const initial: PasswordAuthState = { ok: false };
 const RESEND_COOLDOWN_SECONDS = 30;
 
 /**
- * Registration preview — email + password + confirm, gated by the three
- * required consents (mirrors the live Sign Up's consent gate), then email
- * verification via the SAME 6-digit OTP mechanism the passwordless flow
- * already uses. The OTP step is what confirms the email; the password is
- * attached only after that succeeds (`verifyPasswordSignUp`), stamping a
- * resume flag in the same call.
+ * Registration — Architecture B (docs/frontend/auth-password-preview.md
+ * §Registration architecture): email + password + confirm, gated by the
+ * three required consents, submitted in ONE call to `signUp()`
+ * (`requestPasswordSignUp`), which sets the password atomically. The OTP
+ * step that follows ONLY ever collects the 6-digit confirmation code — there
+ * is no password field on it, no hidden `<input type="hidden" name="password">`,
+ * and resend (`resendPasswordSignUpCode`) takes just the email. The password
+ * therefore never survives past this component's own Step-1 submit; it is
+ * never held in React state across a step transition, never in the URL,
+ * never in a cookie, never in `localStorage`/`sessionStorage`.
  *
- * `resumeEmail`: set by the sign-up PAGE (`resumePasswordSignUpEmail()`) when
- * a signed-in session's email is confirmed but never got that flag — the
- * interrupted-state case (network/browser failure between OTP verify and
- * `updateUser`). When present, this form skips straight to the password-only
- * completion step; no code, no email field, nothing already proven is asked
- * for twice.
+ * The Step-2 message is deliberately NEUTRAL ("if this email can continue
+ * registration…"), never an unconditional "we sent a code to {email}" — an
+ * email that already belongs to a CONFIRMED account is normalized by the
+ * server action into the exact same response a genuine new signup gets (see
+ * `isAccountExistsError` in the server action module), so the UI must never
+ * imply a code was definitely sent. The same screen always keeps the "Sign
+ * in" link visible (via `AuthCard`'s footer) and adds an explicit hint +
+ * "Forgot password?" link, so someone who already has a confirmed account
+ * and never receives a code has an immediate, non-suspicious way out instead
+ * of waiting indefinitely on a code that GoTrue never actually sent.
  */
-export function PasswordSignUpForm({ resumeEmail }: { resumeEmail?: string }) {
+export function PasswordSignUpForm() {
   const { t } = useI18n();
   const [sendState, dispatchSend] = useActionState(requestPasswordSignUp, initial);
+  const [resendState, dispatchResend] = useActionState(resendPasswordSignUpCode, initial);
   const [verifyState, dispatchVerify] = useActionState(verifyPasswordSignUp, initial);
-  const [finishState, dispatchFinish] = useActionState(finishPasswordSignUp, initial);
 
   const [editingEmail, setEditingEmail] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [retryPassword, setRetryPassword] = useState("");
-  const [retryConfirm, setRetryConfirm] = useState("");
   const [consents, setConsents] = useState({ terms: false, privacy: false, pilot: false });
 
   const emailRef = useRef<HTMLInputElement>(null);
@@ -53,15 +59,22 @@ export function PasswordSignUpForm({ resumeEmail }: { resumeEmail?: string }) {
   const codeSent = sendState.ok && !editingEmail;
   const email = sendState.email ?? "";
   const allConsented = consents.terms && consents.privacy && consents.pilot;
-  const passwordStage = Boolean(resumeEmail) || verifyState.code === "authPasswordPreview.error.passwordRejected";
-  const contextEmail = resumeEmail ?? email;
 
   useEffect(() => {
     if (sendState.ok) {
       setEditingEmail(false);
       setCooldown(RESEND_COOLDOWN_SECONDS);
+      // The password only ever needs to exist for the ONE signUp() submit
+      // above — clear it from React state immediately once that step is
+      // behind us, rather than merely leaving it unused.
+      setPassword("");
+      setConfirmPassword("");
     }
   }, [sendState]);
+
+  useEffect(() => {
+    if (resendState.ok) setCooldown(RESEND_COOLDOWN_SECONDS);
+  }, [resendState]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -88,45 +101,7 @@ export function PasswordSignUpForm({ resumeEmail }: { resumeEmail?: string }) {
         </p>
       }
     >
-      {passwordStage ? (
-        <form action={dispatchFinish} className="flex flex-col gap-md" noValidate>
-          <p role="status" className="rounded-md border border-success/40 bg-success/10 px-md py-2.5 text-body text-success">
-            {t("authPasswordPreview.signUp.passwordStepSubtitle")}
-          </p>
-          <LabeledField
-            label={t("authPasswordPreview.passwordLabel")}
-            htmlFor="retryPassword"
-            error={finishState.code && finishState.code !== "authPasswordPreview.error.passwordMismatch" ? t(finishState.code) : undefined}
-          >
-            <PasswordInput
-              id="retryPassword"
-              name="password"
-              autoComplete="new-password"
-              required
-              value={retryPassword}
-              onChange={(e) => setRetryPassword(e.target.value)}
-            />
-          </LabeledField>
-          <PasswordStrengthMeter value={retryPassword} context={[contextEmail]} />
-          <LabeledField
-            label={t("authPasswordPreview.confirmPasswordLabel")}
-            htmlFor="retryConfirmPassword"
-            error={retryConfirm.length > 0 && retryConfirm !== retryPassword ? t("authPasswordPreview.error.passwordMismatch") : undefined}
-          >
-            <PasswordInput
-              id="retryConfirmPassword"
-              name="confirmPassword"
-              autoComplete="new-password"
-              required
-              value={retryConfirm}
-              onChange={(e) => setRetryConfirm(e.target.value)}
-            />
-          </LabeledField>
-          <SubmitButton className="w-full" pendingLabel={t("authPasswordPreview.resetPassword.submitting")} disabled={retryPassword.length === 0 || retryPassword !== retryConfirm}>
-            {t("authPasswordPreview.resetPassword.submit")}
-          </SubmitButton>
-        </form>
-      ) : !codeSent ? (
+      {!codeSent ? (
         <form action={dispatchSend} className="flex flex-col gap-md" noValidate>
           <LabeledField
             label={t("authPasswordPreview.emailLabel")}
@@ -167,7 +142,7 @@ export function PasswordSignUpForm({ resumeEmail }: { resumeEmail?: string }) {
               onChange={(e) => setPassword(e.target.value)}
             />
           </LabeledField>
-          <PasswordStrengthMeter value={password} context={[contextEmail]} />
+          <PasswordStrengthMeter value={password} context={[email]} />
 
           <LabeledField
             label={t("authPasswordPreview.confirmPasswordLabel")}
@@ -221,13 +196,15 @@ export function PasswordSignUpForm({ resumeEmail }: { resumeEmail?: string }) {
             {t("authPasswordPreview.signUp.codeStepSubtitle", { email })}
           </p>
 
+          {/* No password field exists anywhere on this step — verifyPasswordSignUp
+              only ever takes the email + the 6-digit code (see the module doc
+              comment). */}
           <form action={dispatchVerify} className="flex flex-col gap-md" noValidate>
             <input type="hidden" name="email" value={email} />
-            <input type="hidden" name="password" value={password} />
             <LabeledField
               label={t("authPasswordPreview.codeLabel")}
               htmlFor="token"
-              error={verifyState.code && !verifyState.ok && !passwordStage ? t(verifyState.code) : undefined}
+              error={verifyState.code && !verifyState.ok ? t(verifyState.code) : undefined}
             >
               <OtpInput id="token" name="token" autoFocus error={Boolean(verifyState.code) && !verifyState.ok} />
             </LabeledField>
@@ -237,20 +214,26 @@ export function PasswordSignUpForm({ resumeEmail }: { resumeEmail?: string }) {
           </form>
 
           <div className="flex items-center justify-between gap-sm border-t pt-md">
-            <form action={dispatchSend} className="flex items-center gap-sm">
+            <form action={dispatchResend} className="flex items-center gap-sm">
               <input type="hidden" name="email" value={email} />
-              <input type="hidden" name="password" value={password} />
-              <input type="hidden" name="confirmPassword" value={confirmPassword} />
-              <input type="hidden" name="consent_terms" value="on" />
-              <input type="hidden" name="consent_privacy" value="on" />
-              <input type="hidden" name="consent_pilot" value="on" />
-              <TurnstileWidget resetKey={sendState} />
+              <TurnstileWidget resetKey={resendState} />
               <ResendButton cooldown={cooldown} />
             </form>
             <Button type="button" variant="ghost" size="sm" onClick={() => setEditingEmail(true)}>
               {t("authPasswordPreview.changeEmail")}
             </Button>
           </div>
+
+          {/* §5 — never leave the caller waiting indefinitely on a code that,
+              for an email that already belongs to a confirmed account, GoTrue
+              never actually sent. A visible, neutral way out — never phrased
+              as "you already have an account." */}
+          <p className="text-label text-fg-muted">
+            {t("authPasswordPreview.signUp.noCodeHint")}{" "}
+            <Link href="/preview/auth-password/forgot-password" className="font-medium text-accent hover:underline">
+              {t("authPasswordPreview.signIn.forgotPassword")}
+            </Link>
+          </p>
         </div>
       )}
     </AuthCard>

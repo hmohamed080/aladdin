@@ -31,35 +31,33 @@ import {
  * inventing a parallel session/authorization model; only the credential
  * mechanism (password instead of a second OTP round-trip) is new.
  *
- * REGISTRATION ARCHITECTURE DECISION (revision 2): the OTP-first design is
- * KEPT, not replaced with `signUp()`-first. Empirically tested locally:
- * flipping `enable_confirmations=true` (required for `signUp()` to withhold a
- * session until confirmed) changes which GoTrue email TEMPLATE the existing
- * production passwordless Sign Up uses for `shouldCreateUser:true` — from
- * `magic_link` (customized locally to show the 6-digit `{{.Token}}`) to
- * `confirmation` (link-only by default, no code). That would silently break
- * the existing OTP-code UI's "enter the 6-digit code" step for EVERY
- * passwordless registration, project-wide, the moment the setting changes —
- * `enable_confirmations` is a single global project setting, not scoped per
- * flow. Promoting to `signUp()`-first later remains viable, but requires
- * ALSO customizing the `confirmation` template (locally AND on the hosted
- * dashboard) and re-running the full existing passwordless test/e2e suite
- * first — not something an isolated preview should do unilaterally. See
- * docs/frontend/auth-password-preview.md §Registration architecture for the
- * full investigation record.
- *
- * Because OTP-first remains, the interrupted-state window between a
- * successful `verifyOtp` (email confirmed, session exists) and the
- * `updateUser({password})` call that follows it is real (a dropped
- * connection, a crashed tab). This is closed by stamping the AUTHORITATIVE
- * `app_metadata.aladdin_pw_preview_password_set` flag (REVISION 3: via
- * `markPasswordAttachedAuthoritatively`, `lib/supabase/admin-server.ts` — a
- * service-role write, NOT `user_metadata`, which any signed-in caller can
- * forge on their own account) right after `updateUser` sets the password,
- * and `resumePasswordSignUpEmail()` (called from the sign-up page) detects a
- * signed-in session that is missing that flag and routes straight to the
- * password-only completion step (`finishPasswordSignUp`) — no new code, no
- * lost verification.
+ * REGISTRATION ARCHITECTURE (revision 4 — promoted to Architecture B,
+ * replacing revision 1-3's OTP-first Architecture A): `signUp({email,
+ * password})` (`requestPasswordSignUp`) sets the password ATOMICALLY as part
+ * of that one call, before any confirmation email is sent and before any
+ * session exists (`enable_confirmations=true`, LOCAL ONLY — see
+ * `supabase/config.toml`). The confirmation email carries a 6-digit
+ * `{{.Token}}` (`[auth.email.template.confirmation]`, same code-based UX as
+ * every other OTP in this app); `verifyPasswordSignUp` verifies it with
+ * `verifyOtp({type:"signup"})` — the EmailOtpType the installed
+ * `@supabase/auth-js` actually defines for this exact case, confirmed by
+ * reading its shipped `.d.ts`, not assumed — and that call alone produces a
+ * fully authenticated, fully password-usable session. The password is
+ * therefore submitted exactly ONCE, to `signUp()`; the OTP step that follows
+ * only ever handles the 6-digit code and NEVER re-collects, re-holds, or
+ * re-submits the password (no hidden password field, no query/cookie/storage
+ * persistence) — see `sign-up-form.tsx`. This has no equivalent of
+ * Architecture A's interrupted "confirmed but no password" window, so the
+ * `resumePasswordSignUpEmail`/`finishPasswordSignUp` resume machinery
+ * revisions 1-3 needed for that gap is gone; `markPasswordAttachedAuthoritatively`
+ * is still stamped after a successful verify, but now purely so
+ * `migrationEligibility()` (the SEPARATE, unrelated existing-passwordless-user
+ * migration flow below) correctly reports "already has a password" for an
+ * account that registered through this path — see that function's doc
+ * comment. Full investigation, the enumeration-normalization design
+ * (`isAccountExistsError` below), and the `enable_confirmations` impact map
+ * across every canonical call site: docs/frontend/auth-password-preview.md
+ * §Registration architecture.
  *
  * Recovery follows the same OTP-native pattern: `resetPasswordForEmail`
  * sends a 6-digit code (not a magic link). REVISION 3: `verifyOtp({type:
@@ -140,6 +138,60 @@ function isCaptchaError(error: GoTrueError): boolean {
   return error.code === "captcha_failed";
 }
 
+/**
+ * `signUp()`/`resend({type:"signup"})` on an email with an existing,
+ * CONFIRMED account — the one case GoTrue does NOT obfuscate on its own
+ * (verified directly against local GoTrue): a still-UNCONFIRMED re-signup
+ * IS already obfuscated by GoTrue itself (returns success, the same user id,
+ * re-sends the same confirmation email — indistinguishable from a fresh
+ * signup with no application code needed). This distinguishing error is the
+ * ONE thing application code must catch and collapse into the same generic
+ * response a genuine new registration gets — see `requestPasswordSignUp`'s
+ * and `resendPasswordSignUpCode`'s doc comments and
+ * docs/frontend/auth-password-preview.md §Account enumeration.
+ */
+function isAccountExistsError(error: GoTrueError): boolean {
+  return error.code === "user_already_exists" || error.code === "email_exists";
+}
+
+/**
+ * Minimum wall-clock duration `requestPasswordSignUp`/`resendPasswordSignUpCode`
+ * enforce for their enumeration-relevant outcomes — closes the timing
+ * side-channel the enumeration normalization above does not, on its own,
+ * close (docs/frontend/auth-password-preview.md §Account enumeration has the
+ * full before/after measurement). Measured directly against the REAL public
+ * Server Action (click-to-UI-settled, not raw GoTrue — 4 samples per state,
+ * local dev machine under normal load), unpadded: genuine-success (fresh OR
+ * GoTrue-obfuscated-unconfirmed-resignup) topped out at 371ms; the
+ * `isAccountExistsError`-normalized confirmed-existing path topped out at
+ * 277ms. 500ms is comfortably above every observed sample in every state —
+ * once every relevant outcome is padded up to this same floor, the
+ * previously observed gap collapses into scheduler jitter (single-digit to
+ * low-double-digit ms) rather than a deterministic tens-of-ms signal an
+ * attacker could statistically distinguish. Deliberately NOT larger: 500ms
+ * is still within the range that reads as "the app is doing something," not
+ * "the app is slow," for a registration submit (a once-per-account action,
+ * not a hot path) — this is a floor for THIS specific pair of outcomes, not
+ * a general rate limit or a substitute for one.
+ */
+const REGISTRATION_RESPONSE_FLOOR_MS = 500;
+
+/**
+ * Pads the wall-clock time since `callStart` up to
+ * `REGISTRATION_RESPONSE_FLOOR_MS` — never shortens a call that was already
+ * slower than the floor (a real rate-limit/network-retry delay is left
+ * alone; this only ever adds time, never removes it). Call ONLY for the
+ * outcomes the floor is meant to normalize — see each call site's comment
+ * for why rate-limit/captcha-rejected/generic-failure responses are
+ * deliberately excluded.
+ */
+async function padToRegistrationFloor(callStart: number): Promise<void> {
+  const remaining = REGISTRATION_RESPONSE_FLOOR_MS - (Date.now() - callStart);
+  if (remaining > 0) {
+    await new Promise((resolve) => setTimeout(resolve, remaining));
+  }
+}
+
 /** Maps a `verifyOtp` failure to GoTrue's own documented codes; anything else stays generic. */
 function verifyFailureCode(error: GoTrueError): string {
   if (error.code === "otp_expired") return "authPasswordPreview.error.otpExpired";
@@ -186,7 +238,9 @@ async function postSessionRedirect(supabase: SupabaseClient<Database>, next: str
 }
 
 // ---------------------------------------------------------------------------
-// Registration — step 1: collect email + password, send the email-verify code.
+// Registration — step 1: collect email + password + confirm, submit BOTH to
+// `signUp()` in one call (Architecture B). No session is created yet
+// (`enable_confirmations=true`); GoTrue emails the 6-digit confirmation code.
 // ---------------------------------------------------------------------------
 export async function requestPasswordSignUp(
   _prev: PasswordAuthState,
@@ -213,9 +267,11 @@ export async function requestPasswordSignUp(
   }
 
   const supabase = await getServerSupabase();
-  const { error } = await supabase.auth.signInWithOtp({
+  const callStart = Date.now();
+  const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
-    options: { shouldCreateUser: true, captchaToken },
+    password: parsed.data.password,
+    options: { captchaToken },
   });
   if (error) {
     if (isRateLimitError(error as GoTrueError)) {
@@ -224,14 +280,82 @@ export async function requestPasswordSignUp(
     if (isCaptchaError(error as GoTrueError)) {
       return { ok: false, code: "authPasswordPreview.error.captchaRejected", email: parsed.data.email };
     }
+    // ENUMERATION NORMALIZATION (§Account enumeration) — see
+    // `isAccountExistsError`'s doc comment. Collapse into the exact same
+    // success response a genuine new registration gets; never a different
+    // code path, never GoTrue's own wording. Response-time normalized too
+    // (`padToRegistrationFloor`) — the enumeration-safe response SHAPE alone
+    // is not enough if the two paths remain distinguishable by how fast they
+    // arrive.
+    if (isAccountExistsError(error as GoTrueError)) {
+      await padToRegistrationFloor(callStart);
+      return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
+    }
     return { ok: false, code: "authPasswordPreview.error.sendFailed", email: parsed.data.email };
   }
+  await padToRegistrationFloor(callStart);
   return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
 }
 
 // ---------------------------------------------------------------------------
-// Registration — step 2: verify the code (confirms the email), then attach
-// the password to the now-confirmed identity.
+// Registration — resend the signup confirmation code. Calls GoTrue's own
+// `resend()` endpoint — NEVER a second `signUp()` call, which would
+// needlessly resubmit (and require re-collecting) the password; `resend()`
+// only re-sends the pending confirmation email for an identity that already
+// exists from step 1. Takes just the email — the password is never
+// resubmitted after its one `signUp()` call above.
+//
+// Enumeration-normalized the same way as `requestPasswordSignUp`, though
+// verified directly against local GoTrue that `resend({type:"signup"})` on
+// an ALREADY-CONFIRMED account is already safe on its own: it returns an
+// empty `{}` success body with no error and sends no new mail (confirmed via
+// Mailpit) — GoTrue itself never surfaces a distinguishing error here. The
+// `isAccountExistsError` branch below is defense-in-depth for a future
+// GoTrue version that might start erroring on this case, not a currently
+// exercised path.
+// ---------------------------------------------------------------------------
+export async function resendPasswordSignUpCode(
+  _prev: PasswordAuthState,
+  formData: FormData,
+): Promise<PasswordAuthState> {
+  const email = emailSchema.safeParse(formData.get("email"));
+  if (!email.success) return { ok: false, code: "authPasswordPreview.error.invalidEmail" };
+
+  const captchaToken = formData.get("captchaToken");
+  if (typeof captchaToken !== "string" || captchaToken.length === 0) {
+    return { ok: false, code: "authPasswordPreview.error.captchaRequired", email: email.data };
+  }
+
+  const supabase = await getServerSupabase();
+  const callStart = Date.now();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: email.data,
+    options: { captchaToken },
+  });
+  if (error) {
+    if (isRateLimitError(error as GoTrueError)) {
+      return { ok: false, code: "authPasswordPreview.error.rateLimited", email: email.data };
+    }
+    if (isCaptchaError(error as GoTrueError)) {
+      return { ok: false, code: "authPasswordPreview.error.captchaRejected", email: email.data };
+    }
+    if (isAccountExistsError(error as GoTrueError)) {
+      await padToRegistrationFloor(callStart);
+      return { ok: true, code: "authPasswordPreview.info.codeSent", email: email.data };
+    }
+    return { ok: false, code: "authPasswordPreview.error.sendFailed", email: email.data };
+  }
+  await padToRegistrationFloor(callStart);
+  return { ok: true, code: "authPasswordPreview.info.codeSent", email: email.data };
+}
+
+// ---------------------------------------------------------------------------
+// Registration — step 2: verify the confirmation code. The password was
+// already set atomically by `signUp()` in step 1 — this call ONLY confirms
+// the email and exchanges the code for a session; the password is NEVER
+// re-collected, re-held, or re-submitted here (no password form field exists
+// on this step at all — see `sign-up-form.tsx`).
 // ---------------------------------------------------------------------------
 export async function verifyPasswordSignUp(
   _prev: PasswordAuthState,
@@ -243,37 +367,24 @@ export async function verifyPasswordSignUp(
   if (typeof token !== "string" || !otpSchema.test(token)) {
     return { ok: false, code: "authPasswordPreview.error.invalidCode", email: email.data };
   }
-  const password = passwordWithContextSchema([email.data]).safeParse(formData.get("password"));
-  if (!password.success) {
-    return { ok: false, code: passwordIssueCode(password), email: email.data };
-  }
 
   const supabase = await getServerSupabase();
   const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
     email: email.data,
     token,
-    type: "email",
+    type: "signup",
   });
   if (verifyError || !verifyData.user) {
     return { ok: false, code: verifyFailureCode((verifyError ?? {}) as GoTrueError), email: email.data };
   }
 
-  // The identity is now confirmed and a session exists. Attach the password —
-  // if GoTrue's own policy rejects it (defense in depth; the client already
-  // enforced the same policy) or the request never completes, the caller
-  // keeps the confirmed session and `resumePasswordSignUp()`/
-  // `finishPasswordSignUp` recover it without re-verifying the code (see the
-  // module doc comment).
-  const { error: passwordError } = await supabase.auth.updateUser({ password: password.data });
-  if (passwordError) {
-    return { ok: false, code: passwordSetFailureCode(passwordError as GoTrueError), email: email.data };
-  }
-
-  // Authoritative, server-controlled stamp — NOT user_metadata (see the
-  // module doc comment and `lib/supabase/admin-server.ts`). A separate call
-  // from `updateUser` above, so this IS itself a second, narrower
-  // interruption window (password attached, flag not yet stamped) — see
-  // `resumePasswordSignUpEmail`'s doc comment for how that's handled safely.
+  // Authoritative, server-controlled stamp (see `lib/supabase/admin-server.ts`
+  // and the module doc comment) — under Architecture B this is no longer
+  // covering an interrupted-signup window (signUp() sets the password
+  // atomically; there is nothing to resume here). It is stamped purely so
+  // `migrationEligibility()` below — a SEPARATE, unrelated flow — correctly
+  // reports "already has a password" if this account later reaches the
+  // existing-passwordless-user migration page.
   await markPasswordAttachedAuthoritatively(verifyData.user.id);
 
   const store = await cookies();
@@ -286,30 +397,14 @@ export async function verifyPasswordSignUp(
 }
 
 /**
- * Interrupted-state check for the sign-up PAGE (Server Component): a signed-in
- * session whose email is confirmed but never got the `PASSWORD_SET_FLAG`
- * stamp means `verifyPasswordSignUp` succeeded at the OTP step but never
- * completed `updateUser` (dropped connection, crashed tab, etc.). Returns the
- * email to resume with, or `null` when there is nothing to resume (no
- * session, or the session already has a password).
- */
-export async function resumePasswordSignUpEmail(): Promise<string | null> {
-  const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email) return null;
-  if (user.app_metadata?.[PASSWORD_SET_FLAG] === true) return null;
-  return user.email;
-}
-
-/**
  * Migration-page guard: is the current caller signed in, and does their
- * account already have a password attached (via any path — sign-up,
- * migration, or a past reset all stamp the same flag)? Distinct from
- * `resumePasswordSignUpEmail`, which is specifically about an INTERRUPTED
- * sign-up — this is the general "does this account have a password"
- * question, asked for an ordinary already-signed-in passwordless user.
+ * account already have a password attached (via any path — Architecture-B
+ * sign-up, migration, or a past reset all stamp the same flag)? Unlike
+ * revisions 1-3, there is no "interrupted sign-up" state left to distinguish
+ * this from — Architecture B's `signUp()` sets the password atomically, so
+ * this is simply the general "does this account have a password" question,
+ * asked for an ordinary already-signed-in passwordless user reaching the
+ * migration page.
  */
 export async function migrationEligibility(): Promise<{ email: string; hasPassword: boolean } | null> {
   const supabase = await getServerSupabase();
@@ -318,47 +413,6 @@ export async function migrationEligibility(): Promise<{ email: string; hasPasswo
   } = await supabase.auth.getUser();
   if (!user?.email) return null;
   return { email: user.email, hasPassword: user.app_metadata?.[PASSWORD_SET_FLAG] === true };
-}
-
-/**
- * Fallback retry for the rare case `verifyPasswordSignUp` confirmed the email
- * but GoTrue rejected the password itself, AND the resume path for a
- * genuinely interrupted session (browser/network failure between OTP verify
- * and `updateUser`). Requires the session already established by the OTP
- * step — never re-sends or re-verifies a code.
- */
-export async function finishPasswordSignUp(
-  _prev: PasswordAuthState,
-  formData: FormData,
-): Promise<PasswordAuthState> {
-  const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { ok: false, code: "authPasswordPreview.error.sessionExpired" };
-  }
-
-  const parsed = passwordWithContextSchema([user.email ?? ""]).safeParse(formData.get("password"));
-  const confirm = formData.get("confirmPassword");
-  if (!parsed.success) {
-    return { ok: false, code: passwordIssueCode(parsed) };
-  }
-  if (parsed.data !== confirm) {
-    return { ok: false, code: "authPasswordPreview.error.passwordMismatch" };
-  }
-
-  const { error } = await supabase.auth.updateUser({ password: parsed.data });
-  if (error) {
-    return { ok: false, code: passwordSetFailureCode(error as GoTrueError) };
-  }
-  await markPasswordAttachedAuthoritatively(user.id);
-
-  const store = await cookies();
-  const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
-  await supabase.rpc("record_consent", { p_types: [...CONSENT_TYPES], p_locale: locale });
-
-  return postSessionRedirect(supabase, "/onboarding");
 }
 
 // ---------------------------------------------------------------------------

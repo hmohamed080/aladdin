@@ -6,8 +6,8 @@ import { ar } from "@/lib/i18n/messages/ar";
 
 vi.mock("@/server/actions/auth-password-preview", () => ({
   requestPasswordSignUp: vi.fn(),
+  resendPasswordSignUpCode: vi.fn(),
   verifyPasswordSignUp: vi.fn(),
-  finishPasswordSignUp: vi.fn(),
 }));
 
 describe("PasswordSignUpForm", () => {

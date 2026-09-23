@@ -1,16 +1,27 @@
 # Password authentication preview
 
-**Revision 3** (auth architecture hardening pass). Revision 1 established the
+**Revision 5** (Architecture B closure pass). Revision 1 established the
 isolated preview; revision 2 changed the password policy to 10 characters +
 weak-password rejection, rebuilt Forgot Password into four separate screens,
 added a first pass at recovery-session security, the existing-user migration
-flow, the authenticated Change Password flow, and Playwright E2E coverage.
-**Revision 3 replaces revision 2's `user_metadata`-based password-state flag
-with an authoritative, server-only `app_metadata` write, and replaces
-revision 2's cookie-marker recovery gate with full session isolation** — see
-the two sections below for what changed and why. **Still an isolated preview.
-Nothing here has been pushed, merged, or deployed, and production `/auth/*`
-remains byte-for-byte unchanged.**
+flow, the authenticated Change Password flow, and Playwright E2E coverage;
+revision 3 replaced revision 2's `user_metadata`-based password-state flag
+with an authoritative, server-only `app_metadata` write, and replaced
+revision 2's cookie-marker recovery gate with full session isolation;
+revision 4 promoted registration internally from Architecture A (OTP-first)
+to Architecture B (`signUp()`-first) — see *Registration architecture* below
+for the implementation, the enumeration-normalization design, and the
+`enable_confirmations` impact map. **Revision 5 closes Architecture B's two
+remaining open items**: an application-level response-time floor now closes
+the account-enumeration timing side-channel revision 4 found and left open
+(measured before/after — see *Account enumeration* below), and the canonical
+passwordless `/auth/sign-up` and `/auth/sign-in` flows have now been
+independently re-tested live against `enable_confirmations=true` (found and
+fixed one unrelated, pre-existing test bug along the way — see *Remaining
+blockers* below). Recovery, migration, and change-password are all
+**unchanged**. **Still an isolated preview. Nothing here has been pushed,
+merged, or deployed, and production `/auth/*` remains byte-for-byte
+unchanged.**
 
 ## Purpose and current decision
 
@@ -34,7 +45,31 @@ UI (`b2b/settings/page.tsx:258`). No ADR has ever evaluated password login.
 in-code "passwordless" assertions (full list in the revision-1 review report)
 updated. This file does not make that change.
 
-## Registration architecture — re-investigated in revision 3 (kept OTP-first, with a recorded reason to revisit)
+## Registration architecture — Architecture B, implemented (revision 4)
+
+**Architecture B is now implemented in this preview**, replacing revisions
+1-3's OTP-first Architecture A. The flow:
+
+```
+Email + Password + Confirm Password
+  → supabase.auth.signUp({ email, password, options:{captchaToken} })   (requestPasswordSignUp)
+  → NO application session before email confirmation
+  → Confirm-Signup email contains a 6-digit {{ .Token }}
+  → user enters the code
+  → supabase.auth.verifyOtp({ email, token, type:"signup" })            (verifyPasswordSignUp)
+  → authenticated session, password already usable
+  → canonical postSessionRedirect() → registration-state resolver → onboarding
+```
+
+The password is submitted **exactly once**, to `signUp()`. It is never
+placed in a hidden field for the OTP step, never in the URL/search params,
+never in `localStorage`/`sessionStorage`, never in a cookie, never persisted
+to `user_metadata`, and never re-submitted after the OTP step — see
+`sign-up-form.tsx` (no password-type input exists anywhere on Step 2 at all)
+and the server action module's doc comment
+(`server/actions/auth-password-preview.ts`).
+
+### Why B replaced A — history (revisions 2-3's investigation, condensed)
 
 **Revision 2's investigation** flipped `enable_confirmations=true` (required
 for `signUp()` to withhold a session until confirmed) and found it changes
@@ -172,62 +207,236 @@ re-running local Supabase). Findings:
   Password, the authenticated Change Password flow, and migration — this
   finding is specific to the FIRST-registration moment only.)
 
-**Final recommendation: Architecture B, for the eventual canonical
-implementation — not kept as A merely because A already exists in this
-preview.** Weighing the full set of findings from both passes:
-- **B wins on**: atomicity (no interrupted "confirmed but no password"
-  state, so the `app_metadata` flag / resume-screen machinery shrinks to
-  just the migration path), session-creation timing (no
-  signed-in-but-incomplete window), plaintext-password handling (submitted
-  once, never re-held across a screen transition), the initial-registration
-  notification false-positive (avoided entirely), and net code complexity
-  once promoted.
-- **A wins on**: nothing structural remains once B's enumeration gap is
-  closed — A's only structural advantage (native anti-enumeration via
-  `signInWithOtp`) is fully matched by B once the SAME catch-and-generalize
-  handling is added for `signUp()`'s `user_already_exists` error, which is a
-  small, well-scoped, already-understood piece of application code (not a
-  GoTrue limitation to work around).
-- **What A was actually protecting against** (the original blocker) —
-  breaking the passwordless flow's OTP-code UX and needing an
-  `enable_confirmations` change — is **resolved**, not merely mitigated: the
-  custom `confirmation.html` template keeps the code-based UX intact, and
-  the blast radius of `enable_confirmations=true` is now known precisely
-  (new-account creation only, confirmed via direct testing, not assumed).
+**Decision acted on in revision 4**: Architecture B, for the reasons above —
+atomicity (no interrupted "confirmed but no password" window), session-
+creation timing (no signed-in-but-incomplete session), plaintext-password
+handling (submitted once, never re-held across a screen transition), the
+initial-registration notification false-positive (avoided entirely,
+re-confirmed below), and net code complexity. A's one structural advantage —
+native anti-enumeration via `signInWithOtp` — is matched by adding the same
+catch-and-generalize handling for `signUp()`'s `user_already_exists`, below.
+**Still only implemented in this isolated preview** — the conditions the
+revision-3 recommendation listed before this could ever move beyond it are
+now partially addressed (enumeration normalization is implemented and
+tested) but not all closed — see *Remaining blockers before hosted
+promotion* at the end of this section.
 
-**Still NOT promoted by this pass** — this is a recommendation for a FUTURE
-pass, conditioned explicitly on: (1) implementing the `user_already_exists`
-→ generic-response mapping before any real registration traffic hits
-`signUp()`, (2) auditing and re-testing every OTHER
-`enable_confirmations`-sensitive call site project-wide (this preview is not
-the only caller of the passwordless OTP endpoints), and (3) re-running the
-full existing passwordless E2E suite against `enable_confirmations=true`
-before it is ever proposed for staging or production. Architecture A stays
-the implementation in this preview for now; the recommendation above is the
-answer to "which one for the real, eventual canonical implementation,"
-which is a decision for product/engineering ownership to act on, not
-something this pass changes.
+### Confirmation type — verified against the installed SDK, not assumed
 
-**Interrupted-state hardening** (the explicit fallback the brief asked for):
-`verifyPasswordSignUp` calls `updateUser({password})`, then makes a SEPARATE,
-server-only call — `markPasswordAttachedAuthoritatively(userId)`
-(`lib/supabase/admin-server.ts`) — to stamp the authoritative
-`app_metadata.aladdin_pw_preview_password_set: true` flag (see *Authoritative
-password-state tracking* below; this is a revision-3 change from revision 2,
-which stamped the same-named flag into `user_metadata` inside the `updateUser`
-call itself). `resumePasswordSignUpEmail()` (called from the sign-up page)
-detects a signed-in, email-confirmed session missing that flag — proof a
-prior visit either never called `updateUser`, or called it but never reached
-the authoritative stamp — and routes straight to the password-only completion
-step (`finishPasswordSignUp`), never re-sending or re-verifying a code.
-Because the stamp is now a second, separate call, the interruption window is
-narrower but not zero (password attached, flag not yet stamped is now itself
-a possible interrupted state) — `finishPasswordSignUp` covers it: it always
-re-stamps the flag via the same admin path, whether or not the password call
-in front of it actually changed anything, so re-entering the resume path is
-always safe and idempotent. Tested:
-`src/server/actions/auth-password-preview.test.ts` ("registration
-interruption" describe block).
+`verifyPasswordSignUp` calls `verifyOtp({email, token, type:"signup"})`.
+`"signup"` is not a guess: the installed `@supabase/auth-js` (`2.111.0`,
+resolved via `@supabase/supabase-js@^2.48.1`) defines
+`EmailOtpType = 'signup' | 'invite' | 'magiclink' | 'recovery' |
+'email_change' | 'email'` in its own shipped `.d.ts` — confirmed by reading
+that file directly, not inferred from behavior alone. Empirically verified
+end-to-end against real local GoTrue (`curl` against `/auth/v1/signup` then
+`/auth/v1/verify`, `type:"signup"`): the call succeeds, returns a full
+session (access + refresh tokens), and a subsequent
+`POST /auth/v1/token?grant_type=password` with the SAME password the caller
+typed at `signUp()` succeeds immediately — no separate `updateUser({password})`
+step exists or is needed. Also directly confirmed no `password_changed`
+notification email arrives after this sequence (see *Password-changed
+notification* below) — only the one confirmation email.
+
+**A wrong/never-issued code returns the SAME error as an actually-expired
+one** — verified directly (`curl .../auth/v1/verify` with a garbage 6-digit
+token against a real pending signup): GoTrue returns
+`{"error_code":"otp_expired", ...}`, not a distinct "invalid"/"incorrect"
+code. GoTrue does not distinguish "wrong" from "expired" for this endpoint.
+The pre-existing `verifyFailureCode` mapping (shared shape with the
+canonical `server/actions/auth.ts`) already surfaces this correctly as the
+"expired" copy — there is no GoTrue signal available to show a more specific
+"that code is wrong" message instead.
+
+### Account enumeration — normalized (implemented, tested)
+
+`signUp()`'s two sub-cases (revision 3's investigation, re-confirmed by
+direct `curl` probing this revision, same local GoTrue image the CLI
+bundles):
+- An email with an existing but still-**UNCONFIRMED** account: GoTrue itself
+  already obfuscates this — returns success, the SAME `user.id`, and
+  re-sends the SAME confirmation email. No application code needed.
+- An email with an existing, **CONFIRMED** account: GoTrue returns a real,
+  distinguishing `user_already_exists`/422 (also handles the alternate
+  `email_exists` code some GoTrue versions use for the same case).
+
+`isAccountExistsError()` (`server/actions/auth-password-preview.ts`) catches
+this ONE distinguishing case in both `requestPasswordSignUp` and
+`resendPasswordSignUpCode`, and collapses it into the **exact same** success
+response (`{ok:true, code:"authPasswordPreview.info.codeSent"}`) a genuine
+new registration gets — same code path, same copy, same OTP screen. The
+Step-2 UI copy was changed from an unconditional "Enter the code we sent to
+{email}" to a hedged, neutral phrasing:
+
+> EN: *"If this email can continue registration, we've sent the next step to
+> {email}."*
+> AR: *"إذا كان بالإمكان متابعة التسجيل بهذا البريد الإلكتروني، فقد أرسلنا
+> الخطوة التالية إلى {email}."*
+
+Never displays "User already exists" / "Email already registered" or any
+equivalent, in either language, in any of: the visible message, the
+`PasswordAuthState.ok`/`.code` result, the redirect target, or button
+behavior — all four are identical between the two cases. Tested: unit tests
+assert the existing-confirmed-account response is `.ok`/`.code`-identical to
+a genuine new registration's; a live Playwright test registers a real
+account, signs out, re-submits the SAME email through Create Account again,
+and asserts the identical neutral screen (never "already exists" text)
+renders, with the escape-hatch link (below) visible.
+
+**Timing side-channel — closed (revision 5: application-level response-time
+normalization).** Originally found and left open in revision 4: measured
+directly against local GoTrue (5 samples each, `POST /auth/v1/signup`,
+`Date.now()` around the raw `curl` call), the already-confirmed-account error
+path averaged ~283ms vs a genuinely new registration's ~368ms — a consistent
+~85ms gap. Revision 5 re-measured at the level that actually matters — the
+**complete public Server Action**, click-to-UI-settled, not raw GoTrue (4
+samples per state, real browser, local dev machine under normal load):
+
+| State | min | median | max |
+|---|---|---|---|
+| Fresh signup | 255ms | 319ms | 371ms |
+| Unconfirmed-existing (obfuscated by GoTrue) | 247ms | 262ms | 277ms |
+| Confirmed-existing (`isAccountExistsError`-normalized) | 265ms | 273ms | 277ms |
+
+A real, measurable gap at this level too (max-to-max: 371ms vs 277ms, ~94ms;
+median-to-median: 319ms vs 273ms, ~46ms) — smaller than the raw-GoTrue figure
+once browser/render overhead is mixed in, but not noise, and not something
+this pass should claim was already safe.
+
+**Fix**: `padToRegistrationFloor()` (`server/actions/auth-password-preview.ts`)
+enforces a **500ms minimum wall-clock duration** from immediately before the
+`signUp()`/`resend()` call to the response, applied to exactly the three
+outcomes above (never to rate-limit/captcha-rejected responses, which are an
+existing, intentional exception — they signal abuse, not account existence,
+and are still allowed to differ). 500ms was chosen because it sits
+comfortably above every sample observed in every state above (max observed:
+371ms) — once every relevant outcome is padded up to the SAME floor, a
+genuinely faster call is held to wait, so response time stops being a
+function of which internal branch executed. It is deliberately not larger:
+500ms is a one-time cost on a once-per-account action, not a hot path, and
+stays within the range that reads as "the app is doing something" rather
+than "the app is broken."
+
+**Re-measured after the fix** (identical methodology, same 4-samples-per-state protocol):
+
+| State | min | median | max |
+|---|---|---|---|
+| Fresh signup | 863ms | 866.5ms | 909ms |
+| Unconfirmed-existing | 865ms | 875ms | 894ms |
+| Confirmed-existing | 867ms | 893.5ms | 906ms |
+
+The three states now overlap almost entirely (867-909ms band shared by all
+three), with the remaining spread — max-to-max 3ms, median-to-median as low
+as 7ms and as high as 27ms — consistent with ordinary scheduler/network
+jitter rather than a deterministic branch signal. **Not claiming exact
+equality** — the numbers above are the actual measurement, not a rounded
+claim — but the previously consistent, reproducible 46-94ms gap is gone;
+what remains is noise-scale and did not hold a consistent direction/magnitude
+across the samples the way the pre-fix gap did.
+
+Unit tests (`auth-password-preview.test.ts`) cover the padding's LOGIC
+(never shortens a slower call, applies only to the two intended branches);
+they do not re-assert the live timing numbers above — those depend on real
+network/GoTrue conditions and are recorded here as a point-in-time
+measurement, not a repeatable automated assertion (a hard-bounded timing
+assertion in the permanent suite would itself be a source of flakes).
+
+### Existing, already-confirmed account UX — no endless wait
+
+Because a confirmed-existing-account attempt normalizes to the SAME OTP
+screen but GoTrue genuinely sends no new mail for it, the Step-2 screen was
+designed so it never strands the caller waiting indefinitely:
+- The neutral copy above never promises a code was definitely sent.
+- `AuthCard`'s footer keeps the "Sign in" link visible on every step,
+  including Step 2 (unchanged from before this revision).
+- A new, always-visible hint + "Forgot your password?" link sits directly
+  under the OTP field: *"No code arriving? You may already have an
+  account."* / *"لم يصلك رمز؟ قد يكون لديك حساب بالفعل."* — shown
+  identically regardless of whether THIS attempt's email is new or existing,
+  so it carries no distinguishing signal on its own; it only ever gives every
+  caller the same generic, always-available way out.
+
+Tested live: after the enumeration-normalization Playwright test lands on
+the neutral Step-2 screen, it clicks that "Forgot your password?" link and
+confirms it reaches Screen 1 of the real Forgot Password flow.
+
+### Removed — Architecture-A-only machinery
+
+Architecture B's `signUp()` sets the password atomically, so there is no
+longer an interrupted "confirmed but no password" window to resume. Deleted
+entirely (not deprecated, not left dead in the tree):
+- `resumePasswordSignUpEmail()` and the sign-up page's call to it (the page
+  now renders `<PasswordSignUpForm/>` directly, no server call first).
+- `finishPasswordSignUp()` (the password-only completion/retry action).
+- The `passwordStage` branch, `retryPassword`/`retryConfirm` state, and the
+  hidden `<input type="hidden" name="password">` field on `sign-up-form.tsx`'s
+  OTP step and its resend form.
+
+**Kept, role narrowed, NOT removed**: `markPasswordAttachedAuthoritatively`
+is still called after a successful `verifyPasswordSignUp` — no longer to
+cover an interruption window (there isn't one for signup anymore), but
+purely so `migrationEligibility()` — the SEPARATE, unrelated
+existing-passwordless-user migration flow — correctly reports "already has a
+password" if an Architecture-B-registered account later reaches
+`/preview/auth-password/migrate`. See *Authoritative password-state
+tracking* below, which is otherwise **completely unchanged** by this
+revision: migration's own interruption window (abandon a migration
+mid-flow, resume later) is untouched and re-verified by rerunning its E2E
+this revision (see *Existing-passwordless-user migration* below).
+
+### `enable_confirmations` impact map — every canonical call site sensitive to it
+
+`enable_confirmations=true` was flipped **locally only**
+(`supabase/config.toml`, same local-only convention as every other
+`[auth.*]`/`[auth.rate_limit]` entry in this file) so Architecture B's
+`signUp()` withholds a session until confirmed. Audited every repository
+call site sensitive to it — **none were modified**:
+
+| Call site | File | Sensitive how | Impact of `enable_confirmations=true` |
+|---|---|---|---|
+| `signInWithOtp({shouldCreateUser:false})` — canonical Sign In | `server/actions/auth.ts:85` | Not new-account creation | **None** — confirmed unaffected in revision 3's investigation (still uses `magic_link` template) and unchanged by this revision. |
+| `signInWithOtp({shouldCreateUser:true})` — canonical Sign Up | `server/actions/auth.ts:~155` | New-account creation | Email template reroutes from `magic_link` to `confirmation` — **UX preserved**: `confirmation.html` (already present, previously inert) carries the same `{{.Token}}` code format. **Independently re-tested live in revision 5**: `e2e/account-registration.spec.ts`'s "sign up: consent gate → create → verify → resume at /onboarding" test — real `/auth/sign-up`, real Mailpit-delivered code, real `verifyOtp`, real `/onboarding/profile` landing — passes against this exact `enable_confirmations=true` local config. (Found and fixed one PRE-EXISTING, unrelated bug in that test while doing this: line 51 used `.fill(code)` on the per-digit OTP control, which only ever lands the first digit and never triggers the auto-advance keyboard contract — same class of issue `helpers/auth.ts`'s `signIn()` already documents and works around; fixed to `.pressSequentially(code)`, not a canonical-source change.) |
+| `verifyOtp({type:"email"})` — canonical Sign Up/Sign In verification | `server/actions/auth.ts:111,182` | Reads whichever OTP GoTrue generated | GoTrue's `"email"` type is a generic alias that already covers signup/magiclink code-based OTPs regardless of `enable_confirmations` — confirmed working live by the same re-test above (Sign Up) and by `account-registration.spec.ts`'s "existing user sign in still reaches the workspace" test (canonical Sign In, `shouldCreateUser:false`), both passing. |
+| `signUp({email,password})` — this preview's registration | `server/actions/auth-password-preview.ts` | New-account creation, password-based | This is the new, intentional caller — the entire point of this revision. |
+| `resend({type:"signup"})` — this preview's registration resend | `server/actions/auth-password-preview.ts` | Resends a pending signup confirmation | New this revision; enumeration-normalized (see above). |
+
+**Hosted setting that will separately need changing before any hosted
+promotion**: `aladdin-staging`'s Supabase dashboard → Auth → Sign In / Providers
+→ Email → "Confirm email" toggle. This file's `config.toml` change is
+**local only** and has no effect on any hosted project.
+
+### Remaining blockers before this leaves the isolated preview
+
+Revision 4's two open items are now addressed:
+1. ~~Re-run the full existing passwordless E2E suite against
+   `enable_confirmations=true`.~~ **Narrowed and closed for the two exact
+   scenarios this matters for** (revision 5): the canonical NEW-user
+   `/auth/sign-up` flow and the canonical RETURNING-user passwordless
+   `/auth/sign-in` flow both re-tested live against this local config and
+   pass (`e2e/account-registration.spec.ts`). **Not exhaustively re-run**:
+   every OTHER e2e spec file in the repo that happens to call the shared
+   `signIn()` helper (dozens of files) was not individually re-executed this
+   pass — since the underlying canonical Sign In path itself is now
+   confirmed working under this config, those are LOW risk but not
+   individually confirmed. A genuinely full `pnpm e2e` sweep remains
+   recommended before any hosted promotion.
+2. ~~The timing side-channel.~~ **Closed** — see *Account enumeration* above
+   for the fix and the measured before/after numbers.
+3. Everything already listed under *CAPTCHA architecture — corrected* (the
+   Option A/B decision), the recovery-grant JTI proposal, and the live
+   hosted `aladdin-staging` Auth-config audit — all **unrelated to this
+   registration-architecture change** and untouched by it.
+4. **New, revision 5, unrelated observation**: while re-testing the
+   canonical flow, `e2e/account-registration.spec.ts`'s "a valid invitation
+   is accepted by the matching account" test failed — NOT an OTP/email
+   issue (the sign-in inside it succeeded); the signed-in Cairo rep landed
+   at `/home` instead of the expected `/b2b`. That test is explicitly
+   documented in its own comments as "state-consuming" and order-dependent
+   (a single shared seeded invitation). Left uninvestigated and unfixed —
+   out of scope for a registration-architecture pass (it concerns
+   post-acceptance membership/landing resolution, a different subsystem)
+   and appears environment/ordering-related rather than caused by this
+   revision's changes.
 
 ## Authoritative password-state tracking (revision 3 — replaces `user_metadata`)
 
@@ -255,18 +464,26 @@ session, regardless of what `updateUser({data})` they call.
   already lives in the same `app_metadata` object.
 
 Every place that sets the flag now calls this — `verifyPasswordSignUp`,
-`finishPasswordSignUp`, `completeMigration`, `resetPasswordAndSignOut` — and
-every place that reads it (`resumePasswordSignUpEmail`,
-`migrationEligibility`) reads `user.app_metadata?.[PASSWORD_SET_FLAG]`, never
-`user_metadata`. `user_metadata` is still used elsewhere in this preview
-purely for non-security presentation data (none currently), matching the
-brief's explicit allowance.
+`completeMigration`, `resetPasswordAndSignOut` — and the one place that reads
+it (`migrationEligibility`) reads `user.app_metadata?.[PASSWORD_SET_FLAG]`,
+never `user_metadata`. `user_metadata` is still used elsewhere in this
+preview purely for non-security presentation data (none currently), matching
+the brief's explicit allowance.
+
+> **Revision 4 note**: this paragraph originally also named
+> `finishPasswordSignUp` (a setter) and `resumePasswordSignUpEmail` (a
+> reader) — both **removed** in revision 4's promotion to Architecture B (see
+> *Registration architecture* → *Removed — Architecture-A-only machinery*
+> above), since `signUp()` sets the password atomically and there is no
+> interrupted-signup state left for either to cover. `migrationEligibility`
+> is the only reader now; the flag's write-side list above reflects the
+> current, revision-4 call sites.
 
 **Tested** (`auth-password-preview.test.ts`): the flag is read from and
 written to `app_metadata` throughout; a dedicated test seeds a user whose
 `user_metadata` carries a forged flag with an empty `app_metadata` and
-confirms both `resumePasswordSignUpEmail()` and `migrationEligibility()`
-still report "no password set" — proving the forged value is ignored.
+confirms `migrationEligibility()` still reports "no password set" — proving
+the forged value is ignored.
 
 **Local testing note**: this admin path requires `SUPABASE_SERVICE_ROLE_KEY`
 in `.env.local`. **Treat this value as a secret regardless of environment** —
@@ -313,11 +530,19 @@ there.
 - Byte/max length, spaces, Unicode, paste, and password-manager autocomplete
   (`new-password`/`current-password`) are all preserved; `PasswordInput`
   never intercepts paste or blocks IME/Unicode input.
-- Never logged, never sent to analytics, never in `localStorage`/
-  `sessionStorage`; passed between registration steps only via a hidden
-  `type="password"`-adjacent form field re-submitted over the same HTTPS
-  request, matching how the existing codebase already resubmits non-secret
-  fields across steps.
+- **Never logged, never sent to analytics, never in `localStorage`/
+  `sessionStorage`.** Stale as of Architecture A (revisions 1-3): the
+  password used to be held in React state and re-submitted as a hidden
+  `<input type="hidden" name="password">` field on the OTP screen, because
+  `verifyPasswordSignUp`'s `updateUser({password})` call needed it there.
+  **Under Architecture B (revision 4+), this no longer applies**: the
+  password is submitted exactly once, directly to `signUp()`
+  (`requestPasswordSignUp`) — it is set atomically as part of account
+  creation, before any confirmation email is even sent. It does not survive
+  into the OTP step at all: `verifyPasswordSignUp` takes only the email and
+  the 6-digit code, and no password-type input, hidden or otherwise, exists
+  anywhere on that screen or its resend form (`sign-up-form.tsx`). It is
+  never stored or resubmitted between registration screens.
 - `supabase/config.toml`: `minimum_password_length = 10` (**local only**).
 
 ## Forgot Password — rebuilt into 4 separate screens/routes
@@ -1024,6 +1249,20 @@ gap (closed architecturally, not by touching `middleware.ts`), CAPTCHA wiring
 (implemented, with the Sign In finding above), and the password-changed
 notification's "inconclusive" status (root-caused and confirmed firing).
 
+Resolved in revision 4: registration promoted to Architecture B
+(`signUp()`-first), `signUp()`'s `user_already_exists` account-enumeration
+leak closed (`isAccountExistsError` normalization, tested unit + live), and
+the Architecture-A-only interrupted-signup machinery
+(`resumePasswordSignUpEmail`/`finishPasswordSignUp`/hidden password field)
+removed.
+
+Resolved in revision 5: the registration response-time side-channel closed
+(`padToRegistrationFloor`, 500ms, measured before/after — see *Account
+enumeration* above), and the canonical passwordless `/auth/sign-up` +
+`/auth/sign-in` flows independently re-tested live against
+`enable_confirmations=true` (found/fixed one unrelated pre-existing OTP-fill
+test bug along the way).
+
 Still open:
 - The emailed-link variant of password recovery (OTP code is the only wired
   path).
@@ -1031,9 +1270,17 @@ Still open:
   module with `server/actions/auth.ts`.
 - HaveIBeenPwned/Pro-plan leaked-password integration (recommendation
   recorded, pending approval — unchanged from revision 2).
-- Fixing `signUp()`'s account-enumeration leak (`user_already_exists`) —
-  only relevant if Architecture B is promoted later (see *Registration
-  architecture* above); not applicable to the kept Architecture A.
+- **New, revision 5**: a genuinely full `pnpm e2e` sweep (every spec file,
+  not just the two canonical scenarios this pass targeted) against
+  `enable_confirmations=true`, before any hosted promotion.
+- **New, revision 5, unrelated**: `account-registration.spec.ts`'s "a valid
+  invitation is accepted by the matching account" test's landing-resolution
+  flake (`/home` instead of `/b2b`) — appears pre-existing/environment-order
+  related, not an OTP/email issue; not investigated (out of scope — see
+  *Remaining blockers* above).
+- **New, revision 4**: flipping `aladdin-staging`'s hosted "Confirm email"
+  dashboard setting — required before Architecture B could run against a
+  hosted project at all; not done from an isolated preview session.
 - Live hosted `aladdin-staging` Auth-config audit (see that section) —
   blocked this session on credential access; safe alternatives offered
   there.
