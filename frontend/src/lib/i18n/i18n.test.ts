@@ -43,6 +43,8 @@ const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   "certificates.fileType.pdf",
   // Same reasoning, for the avatar upload's accepted image formats.
   "profileIdentity.avatar.errorType",
+  // HDF is a board-material name, written HDF in Arabic trade usage.
+  "onboarding.professional.specializations.hdf_flooring_installation",
 ]);
 
 describe("i18n catalogs", () => {

@@ -5,7 +5,10 @@ import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import { AvailabilityControl } from "@/features/profile/availability-control";
 import { signOut } from "@/server/actions/auth";
 import type { PersonalHomeData } from "@/server/queries/personal-home";
+import type { MyIdentity, ProfileCompletion } from "@/server/queries/profile-identity";
 import type { TranslateFn } from "@/lib/i18n/translate";
+import { IdentityCard } from "@/features/settings/identity-card";
+import { CompleteProfileCard } from "@/features/profile/complete-profile-card";
 
 /**
  * `/home/settings` — the personal surface's Settings (D7 / Increment 14).
@@ -33,12 +36,18 @@ export function PersonalSettings({
   signInEmail,
   theme,
   t,
+  identity = null,
+  completion = null,
 }: {
   home: PersonalHomeData;
   /** Already masked (or null when the auth read failed) — never the raw address. */
   signInEmail: string | null;
   theme: "light" | "dark";
   t: TranslateFn;
+  /** Shared identity fields (display name / photo / phone) — every audience, not only professionals. */
+  identity?: MyIdentity | null;
+  /** my_profile_completion() — informational only; the card hides itself at 100%. */
+  completion?: ProfileCompletion | null;
 }) {
   const isProfessional = home.variant === "professional";
 
@@ -49,6 +58,14 @@ export function PersonalSettings({
         title={t("personalSettings.title")}
         lead={t("personalSettings.subtitle")}
       />
+
+      {completion ? <CompleteProfileCard completion={completion} /> : null}
+
+      {identity ? (
+        <HomeSection title={t("profileIdentity.title")}>
+          <IdentityCard identity={identity} />
+        </HomeSection>
+      ) : null}
 
       {isProfessional ? (
         <HomeSection title={t("personalSettings.profile.title")}>
