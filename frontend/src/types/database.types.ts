@@ -2495,6 +2495,164 @@ export type Database = {
           },
         ]
       }
+      // ===================================================================
+      // TEMPORARY HAND-WRITTEN ADDITIONS — staging-prep Increments 3/5, not
+      // machine-generated. Real DB execution (`supabase db reset` + `supabase
+      // gen types`) was unavailable in this pass (Docker image pulls blocked
+      // by the sandbox's egress proxy — see AGENT_WORK_LOG.md). Regenerate
+      // this file from a real migrated database and remove this block, then
+      // diff against it to confirm no unexpected schema drift.
+      // ===================================================================
+      activities: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          organization_type: Database["public"]["Enums"]["organization_type"] | null
+          persona_type: Database["public"]["Enums"]["persona_type"] | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          organization_type?: Database["public"]["Enums"]["organization_type"] | null
+          persona_type?: Database["public"]["Enums"]["persona_type"] | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          organization_type?: Database["public"]["Enums"]["organization_type"] | null
+          persona_type?: Database["public"]["Enums"]["persona_type"] | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      organization_activities: {
+        Row: {
+          activity_id: string
+          created_at: string
+          organization_id: string
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string
+          organization_id: string
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_activities_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_activities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_activities: {
+        Row: {
+          activity_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_activities_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_activities_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      avatar_uploads: {
+        Row: {
+          content_type: string
+          created_at: string
+          id: string
+          object_key: string
+          owner_user_id: string
+          state: Database["public"]["Enums"]["professional_asset_state"]
+          updated_at: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          id?: string
+          object_key: string
+          owner_user_id: string
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          updated_at?: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          id?: string
+          object_key?: string
+          owner_user_id?: string
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avatar_uploads_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reserved_usernames: {
+        Row: {
+          normalized: string
+        }
+        Insert: {
+          normalized: string
+        }
+        Update: {
+          normalized?: string
+        }
+        Relationships: []
+      }
+      // =================== end temporary hand-written block ===============
       profiles: {
         Row: {
           availability_updated_at: string | null
@@ -2505,14 +2663,20 @@ export type Database = {
           deleted_at: string | null
           display_name: string
           display_name_ar: string | null
+          display_name_confirmed_at: string | null
           display_name_en: string | null
           headline: string | null
           id: string
           languages: string[] | null
           locality_id: string | null
+          phone_country_iso2: string | null
+          phone_e164: string | null
+          phone_national: string | null
           public_profile_status: Database["public"]["Enums"]["public_profile_status"]
           updated_at: string
           user_id: string
+          username: string | null
+          username_normalized: string | null
         }
         Insert: {
           availability_updated_at?: string | null
@@ -2523,14 +2687,19 @@ export type Database = {
           deleted_at?: string | null
           display_name: string
           display_name_ar?: string | null
+          display_name_confirmed_at?: string | null
           display_name_en?: string | null
           headline?: string | null
           id?: string
           languages?: string[] | null
           locality_id?: string | null
+          phone_country_iso2?: string | null
+          phone_e164?: string | null
+          phone_national?: string | null
           public_profile_status?: Database["public"]["Enums"]["public_profile_status"]
           updated_at?: string
           user_id: string
+          username?: string | null
         }
         Update: {
           availability_updated_at?: string | null
@@ -2541,14 +2710,19 @@ export type Database = {
           deleted_at?: string | null
           display_name?: string
           display_name_ar?: string | null
+          display_name_confirmed_at?: string | null
           display_name_en?: string | null
           headline?: string | null
           id?: string
           languages?: string[] | null
           locality_id?: string | null
+          phone_country_iso2?: string | null
+          phone_e164?: string | null
+          phone_national?: string | null
           public_profile_status?: Database["public"]["Enums"]["public_profile_status"]
           updated_at?: string
           user_id?: string
+          username?: string | null
         }
         Relationships: [
           {
@@ -2556,6 +2730,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_profiles_avatar_media_id"
+            columns: ["avatar_media_id"]
+            isOneToOne: false
+            referencedRelation: "avatar_uploads"
             referencedColumns: ["id"]
           },
         ]
