@@ -152,8 +152,12 @@ select lives_ok(
 select is(
   (select selected_org_type from public.onboarding_progress where user_id = 'e3000000-0000-4000-8000-0000000000e3'),
   null, 'owner/manager records no concrete business type (it is a relationship, not a business type)');
-select is(public.my_registration_state(), 'organization_setup_pending',
-  'the owner/manager resumes into business onboarding');
+-- Staging-prep Increment 7 (20260924090007_registration_state_access_ready.sql)
+-- removed organization_setup_pending as a return value of
+-- my_registration_state() — once account_type_completed_at is set, the only
+-- remaining gate before access_ready is the mandatory username step.
+select is(public.my_registration_state(), 'username_pending',
+  'the owner/manager with no username yet resolves to username_pending');
 -- The real organization type is chosen (and validated) during business onboarding.
 select lives_ok(
   $$ select public.business_save('Zayed Marble LLC', 'Zayed Marble', 'wholesaler'::public.organization_type,
