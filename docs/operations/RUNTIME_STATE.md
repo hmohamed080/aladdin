@@ -2,8 +2,8 @@
 
 ## Current continuation — 2026-09-24 (later): registration persona assignment + /settings/profile
 
-- Branch `claude/tender-bell-h0ec72`, 17 commits on `8fcb81c`; `main` and `feature/auth-password-staging-prep` untouched. Not merged; no PR.
-- Migrations: 73 local (`…090011_registration_persona_assignment` added). **Hosted `aladdin-staging` untouched; nothing applied remotely; hosted Auth unchanged.**
+- Branch `claude/tender-bell-h0ec72`, 20 commits on `8fcb81c` (later pass: `…090012` declared-persona lock, final trade labels; pgTAP 2400/2400); `main` and `feature/auth-password-staging-prep` untouched. Not merged; no PR.
+- Migrations: 74 local (`…090011_registration_persona_assignment`, `…090012_lock_declared_persona` added). **Hosted `aladdin-staging` untouched; nothing applied remotely; hosted Auth unchanged.**
 - pgTAP 2372/2372 (61 files) from a clean `db reset`; `database.types.ts` regenerated — identical. Unit 1646/1646; typecheck ✓; lint 0 errors; production build ✓.
 - Registration Tradespeople/Sales now yield a usable declared persona; business-intent accounts enter with zero organizations and edit their identity at `/settings/profile`. Locality is out of completion until a locality UX exists (column kept).
 - Playwright: CAPTCHA-independent registration specs green; Turnstile-gated specs must run locally; 21 legacy-wizard-helper and 5 base-identical failures remain (see AGENT_WORK_LOG).

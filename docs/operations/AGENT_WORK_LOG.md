@@ -4,6 +4,17 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Staging-prep: declared-persona lock + final trade labels
+
+**Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (unmodified; `main` unmodified). No PR.
+
+- **`20260924090012_lock_declared_persona.sql`:** `individual_save_professional` is a profile-data writer, not an account-type switch. After the unchanged gate and type allow-list it resolves the caller's established persona (declared `prof_concrete_type`, else a professional canonical `primary_account_type`) and raises 42501 before any write if there is none (`select an account type first`) or if `p_concrete_type` differs (`the account type cannot be changed here`). Coming Soon types are unreachable through direct calls; `users.primary_account_type` is never written; signature/ACL/types unchanged. Persona selection stays with `onboarding_select_account_type`.
+- Tests: new `61_declared_persona_lock_test.sql` (26); fixtures in `11`/`25` carry the declared persona; `39` §D selects the account type through the RPC instead of the track-only bypass.
+- Labels: `painting` Painter / decorator · نقاش ودهانات; `spray_paint_and_foundation` Spray painting & surface prep · رش وتأسيس دهانات; `decorative_paints` Decorative finishes · تشطيبات ودهانات ديكورية; `astarji` Wood finishing & polishing (Astarji) · أسترجي وتشطيب أخشاب.
+- Validation: pgTAP 2400/2400 (62 files) from clean reset · db lint 0 errors · types identical · typecheck ✓ · lint 0 errors · unit 1646/1646 · build ✓ · Playwright (no Turnstile) 47 passed, 1 skipped by design.
+
+---
+
 ## Session — Staging-prep: registration persona assignment, workspace-independent profile settings
 
 **Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (`feature/auth-password-staging-prep`, unmodified; `main` unmodified). No PR, no merge, nothing applied to hosted Supabase or hosted Auth.
