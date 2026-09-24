@@ -2,7 +2,7 @@
 
 ## Current continuation — 2026-09-24 (later): registration persona assignment + /settings/profile
 
-- Branch `claude/tender-bell-h0ec72`, 23 commits on `8fcb81c` (later passes: `…090012` declared-persona lock, `…090013` Coming Soon DB enforcement, final trade labels; pgTAP 2447/2447); `main` and `feature/auth-password-staging-prep` untouched. Not merged; no PR.
+- Branch `claude/tender-bell-h0ec72`, 25 commits on `8fcb81c` (later passes: `…090012` declared-persona lock, `…090013` Coming Soon DB enforcement, final trade labels, application-scoped CAPTCHA via Cloudflare Siteverify — `TURNSTILE_SECRET_KEY` must be set in Vercel before the preview is exposed; pgTAP 2447/2447); `main` and `feature/auth-password-staging-prep` untouched. Not merged; no PR.
 - Migrations: 75 local (`…090011_registration_persona_assignment`, `…090012_lock_declared_persona`, `…090013_coming_soon_account_types` added). **Hosted `aladdin-staging` untouched; nothing applied remotely; hosted Auth unchanged.**
 - pgTAP 2372/2372 (61 files) from a clean `db reset`; `database.types.ts` regenerated — identical. Unit 1646/1646; typecheck ✓; lint 0 errors; production build ✓.
 - Registration Tradespeople/Sales now yield a usable declared persona; business-intent accounts enter with zero organizations and edit their identity at `/settings/profile`. Locality is out of completion until a locality UX exists (column kept).

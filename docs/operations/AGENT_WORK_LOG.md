@@ -4,6 +4,16 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Staging-prep: application-scoped CAPTCHA (Cloudflare Siteverify)
+
+**Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (unmodified; `main` unmodified). No PR.
+
+- **Security fix:** the preview's Create Account / resend / Forgot Password accepted any non-empty `captchaToken` (Supabase's `[auth.captcha]` is off, so nothing verified it). Now `frontend/src/server/auth/turnstile.ts` verifies every token with Cloudflare Siteverify, fail-closed, before Supabase Auth is called; `TURNSTILE_SECRET_KEY` is server-only. Sign In has no CAPTCHA (invisible widget and `NEXT_PUBLIC_TURNSTILE_INVISIBLE_SITE_KEY` removed). `[auth.captcha]` stays permanently off; canonical passwordless flows untouched.
+- Mawan signed off: key `building_and_finishing_supplies_retailer`, EN *Building & finishing supplies retailer*, AR *موان* (already implemented; no migration).
+- Validation: typecheck ✓ · lint 0 errors · unit 1700/1700 · build ✓ · pgTAP 2447/2447 · Playwright (no Turnstile): Sign-In-no-CAPTCHA 2/2, missing-token CAPTCHA 4/4, persona/onboarding/registration 37 passed + 1 skipped by design, profile 10/10. Cloudflare unreachable from the sandbox (HTTP 000) — Turnstile-dependent E2E not run here.
+
+---
+
 ## Session — Staging-prep: Coming Soon DB enforcement + final trade labels (corrected)
 
 **Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (unmodified; `main` unmodified). No PR.
