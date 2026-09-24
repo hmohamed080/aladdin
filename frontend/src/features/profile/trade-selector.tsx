@@ -56,6 +56,11 @@ export function TradeSelector({
 
   const [selected, setSelected] = useState<string[]>(mine.keys);
   const [primary, setPrimary] = useState<string | null>(mine.primaryKey);
+  // Retired trades the caller already holds. Never toggleable, never part of
+  // `selected` — but always carried into the submitted set below, because
+  // `user_trades_set` deletes any held trade missing from that set (see
+  // trades.ts's MyTrades.legacyKeys doc comment).
+  const legacyKeys = mine.legacyKeys ?? [];
 
   const toggle = (key: string) => {
     setSelected((prev) => {
@@ -147,13 +152,31 @@ export function TradeSelector({
         </p>
       )}
 
+      {legacyKeys.length > 0 ? (
+        <div className="flex flex-col gap-sm border-t pt-sm" data-testid="trade-selector-legacy">
+          <h3 className="text-label font-medium text-fg-secondary">{t("profile.trades.legacyTitle")}</h3>
+          <ul className="flex flex-wrap gap-2">
+            {legacyKeys.map((key) => (
+              <li key={key}>
+                <Badge tone="neutral">{tradeLabel(t, key)}</Badge>
+              </li>
+            ))}
+          </ul>
+          <p className="text-label text-fg-muted">{t("profile.trades.legacyHint")}</p>
+        </div>
+      ) : null}
+
       {/* O5, said once where the choice is made. A tester who reads a trade list
           as a permission list will not take work outside it, and the platform
           would have taught them a restriction it does not impose. */}
       <p className="max-w-prose text-label text-fg-muted">{t("profile.trades.note")}</p>
 
       <form action={submit} className="flex flex-wrap items-center gap-sm">
-        <input type="hidden" name="keys" value={ordered.join("\n")} />
+        {/* Legacy (retired-but-held) keys ride along unconditionally — they are
+            never in `ordered` (built from the active catalog only) and
+            user_trades_set deletes any held trade missing from the submitted
+            set, so omitting them here would silently erase them on every save. */}
+        <input type="hidden" name="keys" value={[...ordered, ...legacyKeys].join("\n")} />
         <input type="hidden" name="primary" value={primary ?? ""} />
         <SubmitButton variant="primary" size="sm" pendingLabel={t("profile.trades.saving")}>
           {t("profile.trades.save")}

@@ -492,6 +492,8 @@ export const en = {
       notProfessional: "Trades are part of a professional profile, and this account does not have one.",
       unavailable: "That trade is no longer offered. Please choose another.",
       note: "Choosing a trade does not restrict you. You can still take on work outside it.",
+      legacyTitle: "Past trades you still hold",
+      legacyHint: "These are no longer offered as a new choice, but they stay on your profile as they are.",
     },
     availability: {
       title: "Are you taking work?",

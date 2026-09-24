@@ -118,6 +118,7 @@ describe("loadMyTrades", () => {
 
     expect(await loadMyTrades()).toEqual({
       keys: ["marble_granite", "plumbing", "tiling"],
+      legacyKeys: [],
       primaryKey: "marble_granite",
     });
   });
@@ -132,24 +133,30 @@ describe("loadMyTrades", () => {
   });
 
   /**
-   * A retired trade the person still holds is not shown as a current claim. The
-   * ROW survives — a retirement does not rewrite history — but the profile stops
-   * publishing a trade the platform has withdrawn, matching what the public
-   * projection does on the same data.
+   * A retired trade the person still holds is not offered as a current, newly-
+   * selectable claim (kept out of `keys`) — but it is NOT dropped entirely: it
+   * comes back in `legacyKeys` so the editor can render it read-only and carry
+   * it through the next `user_trades_set` whole-set write instead of silently
+   * deleting it (that RPC deletes any held trade missing from the submitted
+   * set — see 20260901090001_trade_taxonomy.sql).
    */
-  it("hides an inactive trade the person still holds", async () => {
+  it("separates an inactive trade the person still holds into legacyKeys", async () => {
     state.rows = [row("plumbing", 20, true), row("legacy_trade", 99, false, false)];
-    expect(await loadMyTrades()).toEqual({ keys: ["plumbing"], primaryKey: "plumbing" });
+    expect(await loadMyTrades()).toEqual({
+      keys: ["plumbing"],
+      legacyKeys: ["legacy_trade"],
+      primaryKey: "plumbing",
+    });
   });
 
   it("returns an empty selection rather than null when there is none", async () => {
     state.rows = [];
-    expect(await loadMyTrades()).toEqual({ keys: [], primaryKey: null });
+    expect(await loadMyTrades()).toEqual({ keys: [], legacyKeys: [], primaryKey: null });
   });
 
   it("returns nothing at all when there is no session", async () => {
     getUser.mockResolvedValue({ data: { user: null } });
-    expect(await loadMyTrades()).toEqual({ keys: [], primaryKey: null });
+    expect(await loadMyTrades()).toEqual({ keys: [], legacyKeys: [], primaryKey: null });
     expect(asked.from).toEqual([]);
   });
 
@@ -160,7 +167,11 @@ describe("loadMyTrades", () => {
    */
   it("reports a missing primary as null instead of guessing", async () => {
     state.rows = [row("plumbing", 20, false), row("tiling", 60, false)];
-    expect(await loadMyTrades()).toEqual({ keys: ["plumbing", "tiling"], primaryKey: null });
+    expect(await loadMyTrades()).toEqual({
+      keys: ["plumbing", "tiling"],
+      legacyKeys: [],
+      primaryKey: null,
+    });
   });
 
   /**
