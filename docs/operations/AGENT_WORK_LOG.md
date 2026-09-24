@@ -4,6 +4,31 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Staging-prep: real-DB validation + profile-completion UI
+
+**Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (`feature/auth-password-staging-prep`, unmodified).
+
+**Database — validated against a real local Postgres for the first time.** `supabase db reset` (pinned CLI 2.110.0) applies all 70 migrations. The first full `supabase test db` run was red; every failure was root-caused:
+
+- **Real bugs in the staging-prep migrations** (fixed): `ck_audit_action_known` never gained the five new audit actions, so every new write RPC — including `profile_set_username`, the mandatory registration step — raised 23514 (`20260924090009`); `my_profile_completion()` raised 22P02 on its first call (`v_missing || 'key'` resolved as array||array) and could never reach 100% (it required `user_activities` from Tradespeople/contractors/designers, who have no persona activities, and counted `locality`, which nothing can write) — fixed in `20260924090010`.
+- **Stale pre-existing pgTAP fixtures** (updated, not weakened): five files asserted registration sub-states Increment 7 removed; seven used trades Increment 3 retired as "any active trade"; one counted storage policies before the avatars bucket existed.
+- **New** `59_staging_prep_profile_completion_test.sql` (49 assertions) for what `58_…` did not cover.
+
+Result: **2225/2225 across 60 files, from a clean reset.** `db lint`: 0 errors (warnings are the 3 pre-existing plus one unused-variable style warning in `organization_activities_set`). `database.types.ts` regenerated with `supabase gen types --local` and diffed against the temporary hand-written block: no schema mismatches.
+
+**Frontend.** Registration account type is a 9-card `ChoiceCard` grid. `TradeSelector` no longer silently deletes retired trades on save (whole-set write). Profile completion UI: identity card (explicit display-name confirmation, libphonenumber-js country picker, react-easy-crop avatar with the pending→ready ownership model), `Complete your profile` card driven only by `my_profile_completion()`, persona subtypes on `/home/profile/edit`, org subtypes on `/b2b/settings`, labels for the 14 active trades. Password-registration E2E updated for username + account type; new `profile-completion.spec.ts`.
+
+**Validation:** typecheck ✓ · lint 0 errors (1 pre-existing warning) · unit 1621/1621 ✓ · production build ✓ · Playwright: new profile/9-card specs 10/10 on desktop + mobile. **Not runnable here:** every test that submits registration — the sandbox egress proxy denies `challenges.cloudflare.com` (real Turnstile). `account-registration`/`shared-onboarding` show the same 7 failures on an untouched build of `8fcb81c` (pre-existing, stale legacy-wizard expectations).
+
+**Unfinished / blockers before PR:**
+1. Registration-driven E2E (golden path, `username_pending` recovery, direct entry) must run where Turnstile loads.
+2. **Design gap (not changed):** account type at registration is intent only, so a new Tradesperson is `access_ready` with `primary_account_type = NULL` — lands on the consumer home, cannot open the professional editor, and `user_trades_set` refuses them.
+3. An org-less business account cannot reach any identity-editing surface (`/home/settings` needs a personal workspace, `/b2b` an organization).
+4. Dropping `locality` from completion needs product sign-off; the 14 trade labels need copy review.
+5. Hosted staging unverified (no credentials): runbook says Confirm email **off**, Architecture B needs it **on**.
+
+---
+
 ## Session — Promote the approved installer dashboard and wire production reads
 
 **Date:** 2026-09-20 · **Branch:** `claude/aladdin-craftsman-redesign-0bb1b2` · **Base:** `2393334`.

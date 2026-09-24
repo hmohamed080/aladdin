@@ -1,5 +1,13 @@
 # Runtime State
 
+## Current continuation — 2026-09-24: staging-prep real-DB validation + profile-completion UI
+
+- Branch `claude/tender-bell-h0ec72` on top of `feature/auth-password-staging-prep` @ `8fcb81c` (that branch and `main` untouched). Not merged; no PR.
+- Migrations: 72 local (`…090009` audit allow-list, `…090010` profile-completion fixes added). **Hosted `aladdin-staging` still stops at `20260917090001`; nothing applied remotely.**
+- pgTAP 2225/2225 (60 files) from a clean `db reset`; `database.types.ts` regenerated from the real schema.
+- Frontend: typecheck ✓, lint 0 errors, unit 1621/1621, production build ✓. Playwright: registration-dependent specs cannot run in the cloud sandbox (Turnstile host blocked); 7 `account-registration`/`shared-onboarding` failures are pre-existing on `8fcb81c`.
+- Open blockers: see the 2026-09-24 AGENT_WORK_LOG entry (registration E2E, Tradesperson intent-only persona, org-less identity editing, locality sign-off, hosted Confirm email).
+
 ## Current continuation — 2026-09-20: installer dashboard production promotion
 
 - Branch `claude/aladdin-craftsman-redesign-0bb1b2`, based at `2393334` before
