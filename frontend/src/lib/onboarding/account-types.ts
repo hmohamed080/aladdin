@@ -156,6 +156,27 @@ export const CHOICES_BY_KEY: Record<string, AccountTypeChoice> = Object.fromEntr
  * "Organization owner / manager", because owner is a relationship created by
  * making a business, not something to pick from a list.
  */
+/**
+ * The 9 approved top-level audiences in the exact order the streamlined
+ * registration screen (sign-up-form.tsx) presents them as a single flat
+ * ChoiceCard grid — not grouped by personal/business the way the legacy
+ * onboarding wizard's `CHOICE_GROUPS` still is. Membership is identical to
+ * `CHOICE_GROUPS` flattened; only the presentation order differs, per the
+ * approved registration-screen ordering (Showroom, Supplier, Manufacturer,
+ * Importer, Contractor, Engineer, Tradespeople, Sales, Personal).
+ */
+export const REGISTRATION_CHOICE_ORDER: string[] = [
+  "showroom_dealer",
+  "supplier",
+  "manufacturer",
+  "importer",
+  "contractor",
+  "engineer",
+  "installer_technician",
+  "salesperson",
+  "end_consumer",
+];
+
 export const CHOICE_GROUPS: { group: "personal" | "business"; keys: string[] }[] = [
   {
     group: "personal",
