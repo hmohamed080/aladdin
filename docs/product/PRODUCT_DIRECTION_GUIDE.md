@@ -101,6 +101,17 @@ User (unchanged)
      └─ Primary Branch
 ```
 
+*When* that operation runs is the explicit *Add a business* step, never the registration submit itself — see *Registration account type: persona vs. intended business* below.
+
+### Registration account type: persona vs. intended business (approved 2026-09-24)
+The self-service registration choice is **not decorative**. What it means depends on which taxonomy it belongs to:
+
+- **Personal persona choices (Tradespeople & Technicians, Sales Team)** become the account's **authoritative personal persona immediately after verified registration** — recorded server-side by `onboarding_select_account_type` as the *declared* persona (`individual_onboarding.prof_concrete_type`), the same value every professional authority already reads (`app.is_professional_persona`, `app.is_sales_persona`, the personal home). A new Tradesperson can open the professional profile editor and declare trades at once, with no six-step wizard. `users.primary_account_type` stays the **trust-reviewed canonical** persona written only by an Admin-applied upgrade (*Activation vs. Verification*).
+- **Sales Team** gets the user-level Sales classification **only**: no organization, no membership, no Sales Rep / Sales Manager capability. Those stay membership-scoped and are reached through the affiliation request an Owner/Manager approves. The user-level Sales subtype (*Sales representative / Sales manager*) is a profile label, not a permission.
+- **Business choices (Showroom, Supplier, Manufacturer, Importer)** record the **intended** `organizations.org_type` only. **No organization is created automatically.** The account becomes `access_ready` with zero organizations and enters the app; the business is created by the explicit *Add a business* flow (`/business/new`), which pre-selects the intended type. Organization access still requires a real organization + membership + capabilities.
+- **Coming Soon** choices (Contractor, Engineer, Personal Account) remain visible and disabled; the server actions refuse them.
+- A user's **own identity** (display name, photo, phone) is editable from the workspace-independent `/settings/profile`, which needs neither a personal workspace nor an organization — so a business-intent account with zero organizations is never stranded.
+
 ### The separation is enforced by the type system (Sprint 13)
 The two taxonomies now live in **two disjoint database types**, so the rule above is no longer a convention that code must remember:
 
@@ -193,6 +204,7 @@ Recorded as approved direction only; **no deletion feature is in current scope.*
 - Verification is reported alongside the account, never folded into it: *not verified · pending review · more info needed · verified · rejected*. It gates **trust and public discoverability**, not access.
 - An Admin decision may add trust — the approved-and-applied review is still the only thing that writes `users.primary_account_type` and sets `profiles.public_profile_status = 'listed'` — but it must never be what lets someone in.
 - **Profile completeness** is a separate, always-DERIVED signal computed from the applicable profile fields for that persona. It is never a stored percentage, never includes verification, and never blocks usage.
+- **Locality is not a completion item — for now (product-owner decision, 2026-09-24).** No product UI or write path for a person's locality/city exists yet, so `my_profile_completion()` does not count it: counting it would make 100% unreachable for everyone. `profiles.locality_id` and the locality concept **stay in the domain unchanged**; locality becomes a completion item again in the same change that ships a real locality/city UX. Every item the checklist can show must have a reachable write path for that caller — completion is never faked for an unavailable field.
 
 ## The Salesperson Pilot Rule (Sprint 13, 2026-08-15)
 **A Salesperson has a usable personal Aladdin account immediately. A showroom's Sales / B2B tools require an ACTIVE affiliation with that showroom.**
