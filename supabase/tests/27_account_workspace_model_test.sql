@@ -85,7 +85,9 @@ select public.record_consent(array['terms','privacy','pilot']::public.consent_ty
 select public.onboarding_save_profile('Ahmed Hassan', 'en');
 select public.onboarding_save_contact('01012345678');
 -- He registers as an ENGINEER: a personal persona, chosen for himself.
-select public.onboarding_select_account_type('professional', 'engineer');
+-- (Engineer is Coming Soon since Increment 13; the story only needs SOME
+-- personal persona, so he registers with an active one.)
+select public.onboarding_select_account_type('professional', 'installer_technician');
 
 -- Draft 1 → AH Design Studio (showroom_dealer).
 select isnt(public.business_draft_save(

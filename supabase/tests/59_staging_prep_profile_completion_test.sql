@@ -39,7 +39,14 @@ set local request.jwt.claims = '{"sub":"59000000-0000-4000-8000-00000000000a","r
 select is(public.username_available('Admin'), false, 'a reserved name is not available, case-insensitively');
 select throws_ok($$ select public.profile_set_username('Support') $$, '23505', 'username is unavailable',
   'claiming a reserved name fails exactly like a taken one — no enumeration signal');
-select lives_ok($$ select public.onboarding_select_account_type('consumer', null) $$, 'A records the consumer track');
+-- The Personal (consumer) account is Coming Soon since Increment 13, so A is a
+-- LEGACY consumer-track holder resuming — exactly the case that stays allowed.
+reset role;
+insert into public.onboarding_progress (user_id, selected_track)
+values ('59000000-0000-4000-8000-00000000000a', 'consumer');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"59000000-0000-4000-8000-00000000000a","role":"authenticated"}';
+select lives_ok($$ select public.onboarding_select_account_type('consumer', null) $$, 'A (legacy consumer holder) resumes the consumer track');
 select lives_ok($$ select public.profile_set_username('p59consumer') $$, 'A claims a normal username');
 select is(public.my_registration_state(), 'access_ready', 'A is access_ready');
 

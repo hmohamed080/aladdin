@@ -44,7 +44,7 @@ select throws_ok(
 -- gone. Reset immediately after so the rest of this file's step-by-step
 -- narrative is unaffected by this early, out-of-order write.
 select lives_ok(
-  $$ select public.onboarding_select_account_type('professional','engineer') $$,
+  $$ select public.onboarding_select_account_type('professional','installer_technician') $$,
   'account type CAN now be selected before the contact step (Increment 7 removed that precondition)');
 reset role;
 delete from public.onboarding_progress where user_id='44444444-4444-4444-8444-444444444444';
@@ -98,12 +98,12 @@ select is((select public.my_registration_state()), 'account_type_pending',
 select throws_ok(
   $$ select public.onboarding_select_account_type('professional', null) $$,
   '22023', null, 'a professional track requires a concrete account type');
--- record engineer intent
+-- record Tradespeople intent (Engineer is Coming Soon since Increment 13)
 select lives_ok(
-  $$ select public.onboarding_select_account_type('professional','engineer') $$,
+  $$ select public.onboarding_select_account_type('professional','installer_technician') $$,
   'account-type step records the professional intent');
 select is((select selected_persona::text from public.onboarding_progress where user_id='44444444-4444-4444-8444-444444444444'),
-  'engineer', 'the selected account type is recorded as intent');
+  'installer_technician', 'the selected account type is recorded as intent');
 -- CRITICAL: intent never changes the canonical account type this sprint
 select is((select primary_account_type::text from public.users where id='44444444-4444-4444-8444-444444444444'),
   'end_consumer', 'onboarding never mutates users.primary_account_type');

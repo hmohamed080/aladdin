@@ -249,7 +249,7 @@ update public.individual_onboarding set professional_completed_at = now()
  where user_id = '60000000-0000-4000-8000-000000000001';
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"60000000-0000-4000-8000-000000000001","role":"authenticated"}';
-select lives_ok($$ select public.onboarding_select_account_type('professional', 'engineer') $$, 'the RPC itself still accepts a re-selection');
+select throws_ok($$ select public.onboarding_select_account_type('professional', 'engineer') $$, '22023', 'this account type is not available yet', 'a Coming Soon persona cannot be freshly selected (Increment 13)');
 reset role;
 select is((select prof_concrete_type::text from public.individual_onboarding where user_id = '60000000-0000-4000-8000-000000000001'), 'installer_technician', 'a SUBMITTED declaration is not overwritten');
 insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data, email_confirmed_at, created_at, updated_at)
