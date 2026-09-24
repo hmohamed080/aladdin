@@ -4,6 +4,17 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Staging-prep: Coming Soon DB enforcement + final trade labels (corrected)
+
+**Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (unmodified; `main` unmodified). No PR.
+
+- **`20260924090013_coming_soon_account_types.sql`:** `onboarding_select_account_type` refuses a fresh selection of a Coming Soon type (Personal Account/consumer track, Engineer, Contractor — `app.coming_soon_account_types()`) with 22023 before any write; existing holders of that exact type (selected, declared, completed or canonical) may resume/re-select. Business types and active personas unchanged; no activation/membership change. A vitest parity test fails if the DB list and the frontend `comingSoon` set diverge.
+- **Labels (keys unchanged, no data migration):** `foutek_installation` → Futec installation · تركيب فيوتك; `spray_paint_and_foundation` AR → رش دوكو وتأسيس دهانات. All 14 EN/AR labels are pinned by `trade-label.test.ts`; pgTAP `63_…` proves exactly 14 active + 7 inactive, `plastering_and_gypsum` active, `foutek_installation` unrenamed, all 14 selectable by a fresh Tradesperson.
+- Tests `21`/`27`/`59`/`60` no longer freshly select a closed type (active type, legacy holder, or asserted refusal).
+- Validation: pgTAP 2447/2447 (64 files) · db lint 0 errors · types identical · typecheck ✓ · lint 0 errors · unit 1663/1663 · build ✓ · Playwright (no Turnstile) 47 passed, 1 skipped by design.
+
+---
+
 ## Session — Staging-prep: declared-persona lock + final trade labels
 
 **Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (unmodified; `main` unmodified). No PR.
