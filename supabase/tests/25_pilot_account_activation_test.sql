@@ -58,6 +58,11 @@ values
   ('e1000000-0000-4000-8000-0000000000e1', '01012345678', 'consumer',     null,       now(), now(), now(), now()),
   ('e2000000-0000-4000-8000-0000000000e2', '01512345678', 'professional', 'engineer', now(), now(), now(), now()),
   ('e4000000-0000-4000-8000-0000000000e4', '01212345678', 'consumer',     null,       now(), now(), now(), now());
+-- What onboarding_select_account_type('professional', 'engineer') records
+-- alongside the professional row above since Increment 11 — the DECLARED
+-- persona, which Increment 12 requires individual_save_professional to match.
+insert into public.individual_onboarding (user_id, prof_concrete_type)
+values ('e2000000-0000-4000-8000-0000000000e2', 'engineer');
 -- The owner/manager fixture only reaches the contact step — the account-type
 -- step is the RPC under test.
 insert into public.onboarding_progress

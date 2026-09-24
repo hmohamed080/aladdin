@@ -39,7 +39,14 @@ insert into public.onboarding_progress
    profile_completed_at, contact_completed_at, account_type_completed_at, completed_at)
 values
   ('c0000000-0000-4000-8000-0000000000c1', '01012345678', 'consumer', null, now(), now(), now(), now()),
-  ('d0000000-0000-4000-8000-0000000000d1', '01512345678', 'professional', 'engineer', now(), now(), now(), now());
+  ('d0000000-0000-4000-8000-0000000000d1', '01512345678', 'professional', 'interior_designer', now(), now(), now(), now());
+-- What onboarding_select_account_type('professional', 'interior_designer')
+-- records alongside the row above since Increment 11: the DECLARED persona.
+-- Increment 12 locks individual_save_professional to it — the wizard's profile
+-- step saves data for the chosen persona and can no longer switch it (this
+-- fixture used to select 'engineer' and then save 'interior_designer').
+insert into public.individual_onboarding (user_id, prof_concrete_type)
+values ('d0000000-0000-4000-8000-0000000000d1', 'interior_designer');
 
 -- ===========================================================================
 -- Consumer branch
