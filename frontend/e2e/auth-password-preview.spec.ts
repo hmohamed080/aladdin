@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { messageIdsFor, readNewOtp, newMessageSubjectsFor } from "./helpers/auth";
 
 /**
@@ -16,9 +18,17 @@ function uniqueEmail(tag: string): string {
   return `pw-e2e-${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 }
 
-/** A syntactically valid, almost-certainly-unused username per test run (3-24 chars, letters/digits). */
+/**
+ * A syntactically valid, almost-certainly-unused username per call. The
+ * descriptive TEST tag is sanitized for test-data generation only (letters and
+ * digits, starts with a letter) — production validation is never relaxed, it
+ * would correctly refuse a tag like "enum-existing". A base-36 timestamp plus
+ * randomness keeps it unique within 3-24 characters.
+ */
 function uniqueUsername(tag: string): string {
-  return `${tag}${Date.now()}${Math.floor(Math.random() * 1e4)}`.slice(0, 24);
+  const safe = tag.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/^[0-9]+/, "").slice(0, 10) || "user";
+  const suffix = `${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 4).toString(36)}`;
+  return `${safe}${suffix}`.slice(0, 24);
 }
 
 /**
@@ -496,7 +506,9 @@ test.describe("Password sign-in", () => {
 
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
     await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
-    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+    // A registered (access_ready) Tradesperson lands straight in the app —
+    // there is no mandatory onboarding to pass through any more.
+    await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
   });
 });
 
@@ -539,7 +551,8 @@ test.describe("Forgot password — full 4-screen journey", () => {
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(newPassword);
     await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
-    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+    // The resolved authenticated landing for this access_ready account.
+    await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
   });
 
   test("direct navigation to Screen 3 without a recovery session redirects to Screen 1", async ({ page }) => {
@@ -606,6 +619,20 @@ test.describe("Forgot password — full 4-screen journey", () => {
     await expect(page.getByLabel(/new password|كلمة المرور الجديدة/i)).toBeVisible();
   });
 });
+
+/**
+ * GoTrue's per-user minimum interval between auth emails, read from the local
+ * config the stack actually runs with (`[auth.email] max_frequency`, e.g.
+ * "1s" / "60s" / "1m"). Tests wait it out; they never lower it.
+ */
+function emailResendCooldownMs(): number {
+  const config = readFileSync(path.resolve(process.cwd(), "..", "supabase", "config.toml"), "utf8");
+  const section = config.split(/^\[auth\.email\]\s*$/m)[1]?.split(/^\[/m)[0] ?? "";
+  const m = section.match(/^max_frequency\s*=\s*"(\d+)(ms|s|m)"/m);
+  if (!m) return 60_000; // GoTrue's default when unset
+  const n = Number(m[1]);
+  return m[2] === "ms" ? n : m[2] === "s" ? n * 1_000 : n * 60_000;
+}
 
 /**
  * Registers a GENUINELY passwordless account through the CANONICAL,
@@ -706,15 +733,26 @@ test.describe("Existing-passwordless-user migration — real E2E against a genui
     await page.goto("/preview/auth-password/migrate");
     await page.getByRole("button", { name: /send verification code|إرسال رمز التحقق/i }).click();
     await expect(page.getByLabel(/one-time code|الرمز لمرة واحدة/i)).toBeVisible();
+    const firstCodeRequestedAt = Date.now();
     await page.goto("/preview/auth-password/sign-in"); // abandon mid-flow
 
     // The account is untouched — still eligible, no partial/corrupted state.
     await page.goto("/preview/auth-password/migrate");
     await expect(page.getByText(/set a password for your account|عيّن كلمة مرور لحسابك/i)).toBeVisible();
 
-    // Second attempt: request a FRESH code and complete it normally.
+    // Second attempt: request a FRESH code and complete it normally. A real
+    // user resuming later is never inside GoTrue's per-user email cooldown
+    // ([auth.email] max_frequency); this test is, by ~1s, and GoTrue then
+    // correctly answers 429 over_email_send_rate_limit — which the page shows
+    // as its rate-limit message. Wait out exactly the CONFIGURED cooldown (read
+    // from config.toml, never weakened) so the test models "resume later".
+    const cooldownMs = emailResendCooldownMs() + 500;
+    await expect
+      .poll(() => Date.now() - firstCodeRequestedAt, { timeout: cooldownMs + 5_000 })
+      .toBeGreaterThanOrEqual(cooldownMs);
     const seen = await messageIdsFor(request, email);
     await page.getByRole("button", { name: /send verification code|إرسال رمز التحقق/i }).click();
+    await expect(page.getByText(/too many attempts|محاولات كثيرة/i)).toHaveCount(0);
     const code = await readNewOtp(request, email, seen);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(newPassword);

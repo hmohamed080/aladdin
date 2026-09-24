@@ -18,8 +18,17 @@ function uniq(): string {
 function uniqueEmail(tag: string): string {
   return `pc-e2e-${tag}-${uniq()}@example.test`;
 }
+/**
+ * A syntactically valid, almost-certainly-unused username per call. The
+ * descriptive TEST tag is sanitized for test-data generation only (letters and
+ * digits, starts with a letter) — production validation is never relaxed, it
+ * would correctly refuse a tag like "enum-existing". A base-36 timestamp plus
+ * randomness keeps it unique within 3-24 characters.
+ */
 function uniqueUsername(tag: string): string {
-  return `${tag}${uniq()}`.slice(0, 24);
+  const safe = tag.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/^[0-9]+/, "").slice(0, 10) || "user";
+  const suffix = `${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 4).toString(36)}`;
+  return `${safe}${suffix}`.slice(0, 24);
 }
 /** An Egyptian mobile national number unlikely to collide across runs. */
 function uniqueEgMobile(): string {
@@ -158,7 +167,9 @@ test.describe("Direct entry after registration", () => {
 });
 
 test.describe("Complete your profile", () => {
-  test("display name, phone and avatar each complete an item and persist across reload; the card never blocks the page", async ({ page, request }) => {
+  test("display name, phone and avatar each complete an item and persist across reload; the card never blocks the page", async ({ page, request, context }) => {
+    // English-specific assertions: pin the locale (Arabic/RTL has its own test).
+    await setLocale(context, "en");
     await register(page, request, "complete");
     await page.goto("/home/settings");
     const percent = page.getByTestId("complete-profile-percent");
@@ -235,7 +246,9 @@ test.describe("Complete your profile", () => {
 
   test("a phone number already held by another account gets a neutral 'unavailable' message", async ({ browser, request }) => {
     const national = uniqueEgMobile();
+    // English-specific assertions: pin the locale on both contexts.
     const a = await browser.newContext();
+    await setLocale(a, "en");
     const pageA = await a.newPage();
     await register(pageA, request, "dupa");
     await pageA.goto("/home/settings");
@@ -245,6 +258,7 @@ test.describe("Complete your profile", () => {
     await a.close();
 
     const b = await browser.newContext();
+    await setLocale(b, "en");
     const pageB = await b.newPage();
     await register(pageB, request, "dupb");
     await pageB.goto("/home/settings");
