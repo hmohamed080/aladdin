@@ -16,6 +16,21 @@ function uniqueEmail(tag: string): string {
   return `pw-e2e-${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 }
 
+/** A syntactically valid, almost-certainly-unused username per test run (3-24 chars, letters/digits). */
+function uniqueUsername(tag: string): string {
+  return `${tag}${Date.now()}${Math.floor(Math.random() * 1e4)}`.slice(0, 24);
+}
+
+/**
+ * The account-type step is now a ChoiceCard grid (frontend/src/components/ui/
+ * choice-card.tsx), not a <select> — fills the required hidden field by
+ * clicking a real, non-"Coming soon" card by its visible label. Tradespeople
+ * is picked arbitrarily among the selectable (non-disabled) options.
+ */
+async function selectAccountType(page: import("@playwright/test").Page): Promise<void> {
+  await page.getByRole("button", { name: /tradespeople & technicians|الصنايعية/i }).click();
+}
+
 /**
  * Waits for Cloudflare Turnstile's REAL widget (loaded from
  * challenges.cloudflare.com, using the published always-pass TEST site key —
@@ -39,6 +54,8 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
     await page.goto("/preview/auth-password/sign-up");
 
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("weakpw"));
+    await selectAccountType(page);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill("qwerty12345");
     await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill("qwerty12345");
     await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -64,6 +81,8 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
     await page.goto("/preview/auth-password/sign-up");
 
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("signup"));
+    await selectAccountType(page);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -113,6 +132,8 @@ test.describe("CAPTCHA — required on Create Account and Forgot Password, again
     await page.goto("/preview/auth-password/sign-up");
 
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("nocaptcha"));
+    await selectAccountType(page);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -163,6 +184,8 @@ async function registerAccount(page: import("@playwright/test").Page, request: i
   const email = uniqueEmail(tag);
   await page.goto("/preview/auth-password/sign-up");
   await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+  await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername(tag));
+  await selectAccountType(page);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
   await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
   await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -187,6 +210,8 @@ test.describe("Account enumeration normalization (§Account enumeration)", () =>
 
     await page.goto("/preview/auth-password/sign-up");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(existingEmail);
+    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("enum-resubmit"));
+    await selectAccountType(page);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill("SomeOtherStrongPassword9!");
     await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill("SomeOtherStrongPassword9!");
     await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -217,6 +242,8 @@ test.describe("Resend signup code (never re-submits the password, never re-regis
     const email = uniqueEmail("resend");
     await page.goto("/preview/auth-password/sign-up");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("resend"));
+    await selectAccountType(page);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -251,6 +278,8 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
     const email = uniqueEmail("session-guarantee");
     await page.goto("/preview/auth-password/sign-up");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("session1"));
+    await selectAccountType(page);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -288,6 +317,8 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
     // sort first.
     await page.goto("/preview/auth-password/sign-up");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("session2"));
+    await selectAccountType(page);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -313,6 +344,8 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     const email = uniqueEmail("refresh");
     await page.goto("/preview/auth-password/sign-up");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("refresh1"));
+    await selectAccountType(page);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -341,6 +374,8 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     // is exactly GoTrue's own obfuscated re-signup case — succeeds again,
     // re-sending a new usable code, no corruption.
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("refresh2"));
+    await selectAccountType(page);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -361,6 +396,8 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     const email = uniqueEmail("badcode");
     await page.goto("/preview/auth-password/sign-up");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("badcode"));
+    await selectAccountType(page);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -403,6 +440,8 @@ test.describe("Password-changed notification is absent on initial registration (
     const seenFromStart = await messageIdsFor(request, target);
     await page.goto("/preview/auth-password/sign-up");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(target);
+    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("pwchanged"));
+    await selectAccountType(page);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
     await page.getByLabel(/terms of service|شروط الخدمة/i).check();
