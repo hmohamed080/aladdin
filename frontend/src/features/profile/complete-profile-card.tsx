@@ -6,13 +6,30 @@ import { useI18n } from "@/lib/i18n/context";
 import { Card, ProgressMeter } from "@/components/ui/primitives";
 import type { ProfileCompletion, ProfileCompletionItem } from "@/server/queries/profile-identity";
 
-/** Where each missing item is completed. Anchors land on the matching settings/editor section. */
-const ITEM_HREF: Record<ProfileCompletionItem, string> = {
+/**
+ * Where each missing item is completed. Every target must be reachable by
+ * every caller `my_profile_completion()` can return that item for:
+ *
+ *   * identity items → `/settings/profile`, the workspace-independent route
+ *     (a business-intent account with zero organizations has neither `/home`
+ *     nor `/b2b` settings);
+ *   * username → `/onboarding/username`, the only state it is ever missing in
+ *     (`username_pending`);
+ *   * professional items → `/home/profile/edit` — only returned for a
+ *     professional persona, which always has a Personal workspace;
+ *   * organization_setup → `/business/new` (any caller with app access);
+ *   * organization_activities → `/b2b/settings` — only returned to a caller
+ *     holding org.manage, the capability that page's editor requires.
+ *
+ * `locality` is kept in the type for the RPC's stable vocabulary but is never
+ * returned today (no locality write path exists yet).
+ */
+export const ITEM_HREF: Record<ProfileCompletionItem, string> = {
   username: "/onboarding/username",
-  avatar: "/home/settings#identity",
-  phone: "/home/settings#phone",
-  display_name: "/home/settings#display-name",
-  locality: "/home/profile/edit",
+  avatar: "/settings/profile#identity",
+  phone: "/settings/profile#phone",
+  display_name: "/settings/profile#display-name",
+  locality: "/settings/profile",
   headline: "/home/profile/edit",
   years_experience: "/home/profile/edit",
   activities: "/home/profile/edit",

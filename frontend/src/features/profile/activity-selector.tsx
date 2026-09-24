@@ -48,33 +48,36 @@ export function ActivitySelector({
 
   return (
     <Card className="flex flex-col gap-md">
-      <div className="flex flex-col gap-1" data-testid="activity-selector">
-        <h2 className="text-title text-fg">{t("profileActivities.title")}</h2>
-        <p className="max-w-prose text-body text-fg-secondary">{t("profileActivities.body")}</p>
+      {/* Test hook on a real element wrapping the WHOLE selector (Card forwards no data-*). */}
+      <div className="flex flex-col gap-md" data-testid="activity-selector">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-title text-fg">{t("profileActivities.title")}</h2>
+          <p className="max-w-prose text-body text-fg-secondary">{t("profileActivities.body")}</p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {catalog.map((key) => (
+            <ChoiceChip
+              key={key}
+              selected={selected.includes(key)}
+              label={activityLabel(t, key)}
+              onToggle={() => toggle(key)}
+            />
+          ))}
+        </div>
+
+        {selected.length === 0 ? <p className="text-label text-fg-muted">{t("profileActivities.empty")}</p> : null}
+
+        <form action={submit} className="flex flex-wrap items-center gap-sm">
+          {orgId ? <input type="hidden" name="orgId" value={orgId} /> : null}
+          <input type="hidden" name="keys" value={catalog.filter((k) => selected.includes(k)).join("\n")} />
+          <SubmitButton variant="primary" size="sm" pendingLabel={t("profileActivities.saving")}>
+            {t("profileActivities.save")}
+          </SubmitButton>
+          {state.ok ? <InlineSuccess>{t("profileActivities.saved")}</InlineSuccess> : null}
+          {!state.ok && state.code ? <InlineError>{t(state.code)}</InlineError> : null}
+        </form>
       </div>
-
-      <div className="flex flex-wrap gap-2">
-        {catalog.map((key) => (
-          <ChoiceChip
-            key={key}
-            selected={selected.includes(key)}
-            label={activityLabel(t, key)}
-            onToggle={() => toggle(key)}
-          />
-        ))}
-      </div>
-
-      {selected.length === 0 ? <p className="text-label text-fg-muted">{t("profileActivities.empty")}</p> : null}
-
-      <form action={submit} className="flex flex-wrap items-center gap-sm">
-        {orgId ? <input type="hidden" name="orgId" value={orgId} /> : null}
-        <input type="hidden" name="keys" value={catalog.filter((k) => selected.includes(k)).join("\n")} />
-        <SubmitButton variant="primary" size="sm" pendingLabel={t("profileActivities.saving")}>
-          {t("profileActivities.save")}
-        </SubmitButton>
-        {state.ok ? <InlineSuccess>{t("profileActivities.saved")}</InlineSuccess> : null}
-        {!state.ok && state.code ? <InlineError>{t(state.code)}</InlineError> : null}
-      </form>
     </Card>
   );
 }

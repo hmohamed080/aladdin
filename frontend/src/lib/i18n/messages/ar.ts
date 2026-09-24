@@ -65,6 +65,7 @@ export const ar: Messages = {
     switch: "تبديل مساحة العمل",
     personal: "الحساب الشخصي",
     addBusiness: "إضافة نشاط تجاري",
+    editProfile: "تعديل ملفك الشخصي",
     connectShowroom: "اربط معرضًا",
     relationship: {
       owner: "مالك",
@@ -1376,6 +1377,11 @@ export const ar: Messages = {
     invalid: "أدخل رقم هاتف صالحًا للدولة المختارة.",
   },
   profileIdentity: {
+    page: {
+      title: "ملفك الشخصي",
+      subtitle: "اسمك وصورتك ورقم هاتفك — مشتركة في كل مساحات العمل التي تستخدمها.",
+      back: "رجوع",
+    },
     title: "هويتك",
     displayName: {
       label: "الاسم الظاهر",

@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
-import { CompleteProfileCard } from "./complete-profile-card";
+import { CompleteProfileCard, ITEM_HREF } from "./complete-profile-card";
+vi.mock("server-only", () => ({}));
+import { PROFILE_COMPLETION_ITEMS } from "@/server/queries/profile-identity";
 
 describe("CompleteProfileCard", () => {
   it("shows the authoritative percentage and one link per missing item", () => {
@@ -12,8 +16,8 @@ describe("CompleteProfileCard", () => {
     expect(screen.getByText("Complete your profile")).toBeTruthy();
     expect(screen.getByTestId("complete-profile-percent").textContent).toBe("40% complete");
     expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("40");
-    expect(screen.getByRole("link", { name: "Add a profile photo" }).getAttribute("href")).toBe("/home/settings#identity");
-    expect(screen.getByRole("link", { name: "Add your phone number" }).getAttribute("href")).toBe("/home/settings#phone");
+    expect(screen.getByRole("link", { name: "Add a profile photo" }).getAttribute("href")).toBe("/settings/profile#identity");
+    expect(screen.getByRole("link", { name: "Add your phone number" }).getAttribute("href")).toBe("/settings/profile#phone");
     expect(screen.getByRole("link", { name: "Confirm your display name" })).toBeTruthy();
   });
 
@@ -36,5 +40,21 @@ describe("CompleteProfileCard", () => {
     );
     expect(screen.getByText("أكمل حسابك")).toBeTruthy();
     expect(container.textContent).not.toMatch(/completeProfile\./);
+  });
+
+  it("links every identity item to the workspace-independent /settings/profile", () => {
+    // A business-intent account with zero organizations has neither /home nor
+    // /b2b settings — these must never point there.
+    for (const item of ["avatar", "phone", "display_name"] as const) {
+      expect(ITEM_HREF[item].startsWith("/settings/profile")).toBe(true);
+    }
+  });
+
+  it("points every checklist item at a route that actually exists", () => {
+    const appDir = path.resolve(__dirname, "../../app");
+    for (const item of PROFILE_COMPLETION_ITEMS) {
+      const route = ITEM_HREF[item].split("#")[0] ?? "";
+      expect(existsSync(path.join(appDir, route, "page.tsx")), `${item} -> ${route}`).toBe(true);
+    }
   });
 });

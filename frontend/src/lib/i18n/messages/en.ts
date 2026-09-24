@@ -73,6 +73,7 @@ export const en = {
     switch: "Switch workspace",
     personal: "Personal",
     addBusiness: "Add business",
+    editProfile: "Edit your profile",
     connectShowroom: "Connect a showroom",
     relationship: {
       owner: "Owner",
@@ -1435,6 +1436,11 @@ export const en = {
     invalid: "Enter a valid phone number for the selected country.",
   },
   profileIdentity: {
+    page: {
+      title: "Your profile",
+      subtitle: "Your name, photo and phone number — shared across every workspace you use.",
+      back: "Back",
+    },
     title: "Your identity",
     displayName: {
       label: "Display name",
