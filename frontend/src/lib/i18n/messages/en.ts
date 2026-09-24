@@ -1767,7 +1767,7 @@ export const en = {
         plastering_and_gypsum: "Plastering & gypsum",
         epoxy_flooring: "Epoxy flooring",
         door_installation: "Door installation",
-        foutek_installation: "Foutek installation",
+        foutek_installation: "Futec installation",
         full_finishing: "Full finishing",
         renovation: "Renovation",
         turnkey: "Turnkey",
