@@ -41,6 +41,8 @@ const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   // format, not a word — and transliterating it would tell a reader less about
   // the file they are looking at, not more.
   "certificates.fileType.pdf",
+  // Same reasoning, for the avatar upload's accepted image formats.
+  "profileIdentity.avatar.errorType",
 ]);
 
 describe("i18n catalogs", () => {

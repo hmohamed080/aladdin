@@ -44,3 +44,69 @@ export function toE164(input: string): string | null {
 export function isE164(value: string): boolean {
   return E164.test(value);
 }
+
+// ===========================================================================
+// Canonical profile phone (staging-prep Increment 2,
+// 20260924090002_canonical_phone.sql) — a real ISO-3166 country picker, ANY
+// country selectable (Egypt pre-selected), backed by `libphonenumber-js`'s
+// real numbering-plan parsing/validation rather than the pragmatic EG-only
+// heuristic above. That heuristic stays exactly as it is for the WhatsApp
+// invite form (`normalizePhone`/`toE164`/`isE164`) — a different caller with a
+// different, narrower need — this section is additive, not a replacement.
+//
+// The database is never asked to validate a calling code or numbering plan
+// (see the migration's header comment): this module does the real parse and
+// produces the canonical E.164 string; `profile_set_phone` only re-checks the
+// outer E.164 shape as a backstop.
+// ===========================================================================
+import {
+  getCountries,
+  getCountryCallingCode,
+  parsePhoneNumberFromString,
+  type CountryCode,
+} from "libphonenumber-js";
+
+export const DEFAULT_PHONE_COUNTRY: CountryCode = "EG";
+
+export type PhoneCountryOption = {
+  iso2: CountryCode;
+  callingCode: string;
+};
+
+/**
+ * Every ISO-3166 country libphonenumber-js knows a numbering plan for, Egypt
+ * first (the approved default), then the rest in ISO2 order. Display names are
+ * resolved by the caller via `Intl.DisplayNames` (a platform API, not a second
+ * dependency) rather than baked in here, so the label follows the UI's locale.
+ */
+export function listPhoneCountries(): PhoneCountryOption[] {
+  const rest = getCountries()
+    .filter((iso2) => iso2 !== DEFAULT_PHONE_COUNTRY)
+    .sort((a, b) => a.localeCompare(b));
+  return [DEFAULT_PHONE_COUNTRY, ...rest].map((iso2) => ({
+    iso2,
+    callingCode: getCountryCallingCode(iso2),
+  }));
+}
+
+export type CanonicalPhone = {
+  countryIso2: CountryCode;
+  /** National significant number, as libphonenumber-js reports it back (no calling code, no '+'). */
+  national: string;
+  /** Canonical E.164 — what `profile_set_phone` persists verbatim. */
+  e164: string;
+};
+
+/**
+ * Parses a national number against the chosen country's real numbering plan.
+ * Returns null for anything libphonenumber-js cannot validate — never a
+ * best-effort guess, since a wrong "successful" parse would write a phone
+ * number to `profiles.phone_e164` that does not actually reach the caller.
+ */
+export function toCanonicalPhone(national: string, countryIso2: CountryCode): CanonicalPhone | null {
+  const trimmed = national.trim();
+  if (trimmed === "") return null;
+  const parsed = parsePhoneNumberFromString(trimmed, countryIso2);
+  if (!parsed || !parsed.isValid()) return null;
+  return { countryIso2, national: parsed.nationalNumber, e164: parsed.number };
+}
