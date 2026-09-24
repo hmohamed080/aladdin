@@ -103,10 +103,26 @@ test.describe("Registration — account-type step", () => {
 
 test.describe("Direct entry after registration", () => {
   test("OTP verification lands in the app directly — no six-step onboarding wizard", async ({ page, request }) => {
+    const visited: string[] = [];
+    page.on("framenavigated", (f) => {
+      if (f === page.mainFrame()) visited.push(new URL(f.url()).pathname);
+    });
     await register(page, request, "direct");
     await expect(page).toHaveURL(/\/home(\/|$|\?)/);
     await expect(page.getByTestId("complete-profile-card")).toBeVisible();
     await expect(page.getByText(/setting up your account|جارٍ إعداد حسابك/i)).toHaveCount(0);
+    expect(visited.filter((p) => /^\/onboarding\/(profile|contact|professional|consumer|business)/.test(p))).toEqual([]);
+  });
+
+  test("the Tradespeople choice becomes an authoritative professional persona — trades are editable", async ({ page, request }) => {
+    await register(page, request, "persona");
+    await page.goto("/home/profile/edit");
+    await expect(page.getByTestId("trade-selector")).toBeVisible();
+    const painting = page.getByRole("button", { name: /^(painting|نقاشة)$/i });
+    await painting.click();
+    await page.getByRole("button", { name: /save trades|حفظ المهن/i }).click();
+    await page.reload();
+    await expect(page.getByRole("button", { name: /^(painting|نقاشة)$/i })).toHaveAttribute("aria-pressed", "true");
   });
 
   test("a username lost during the OTP window goes to the narrow username screen, then into the app", async ({ browser, request }) => {
@@ -133,6 +149,9 @@ test.describe("Direct entry after registration", () => {
     await pageA.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("racefix"));
     await pageA.getByRole("button", { name: /continue|متابعة/i }).click();
     await pageA.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
+    // Recovery keeps the registration choice: A is still a Tradesperson.
+    await pageA.goto("/home/profile/edit");
+    await expect(pageA.getByTestId("trade-selector")).toBeVisible();
     await a.close();
     await b.close();
   });

@@ -329,6 +329,70 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
   });
 });
 
+describe("requestPasswordSignUp — account type is resolved on the SERVER, never trusted from the client", () => {
+  it.each(["end_consumer", "engineer", "contractor", "organization_owner_manager", "wholesaler", "interior_designer", "not_a_type"])(
+    "refuses %s (Coming Soon / transitional / not offered) before signUp() or any staging",
+    async (accountType) => {
+      const res = await requestPasswordSignUp(
+        { ok: false },
+        consented({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, accountType }),
+      );
+      expect(res.ok).toBe(false);
+      expect(signUp).not.toHaveBeenCalled();
+      expect(savePendingRegistration).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["installer_technician", "persona_type", "installer_technician"],
+    ["salesperson", "persona_type", "sales"],
+    ["showroom_dealer", "organization_type", "showroom_dealer"],
+    ["supplier", "organization_type", "supplier"],
+    ["manufacturer", "organization_type", "manufacturer"],
+    ["importer", "organization_type", "importer"],
+  ])("stages %s as %s=%s from the server-side catalog", async (accountType, audienceKind, audienceValue) => {
+    signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "new-user-id" } } });
+    const res = await requestPasswordSignUp(
+      { ok: false },
+      consented({ email: "new-person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, accountType }),
+    );
+    expect(res.ok).toBe(true);
+    expect(savePendingRegistration).toHaveBeenCalledWith({
+      userId: "new-user-id",
+      username: "validuser123",
+      audienceKind,
+      audienceValue,
+    });
+  });
+});
+
+describe("verifyPasswordSignUp — applies the staged account type through the authoritative RPC", () => {
+  it.each([
+    ["persona_type", "installer_technician", "professional"],
+    ["persona_type", "sales", "professional"],
+    ["organization_type", "importer", "business"],
+  ])("%s=%s → onboarding_select_account_type(%s) then profile_set_username", async (audienceKind, audienceValue, track) => {
+    verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test" } } });
+    rpc.mockImplementation(async (fn: string) =>
+      fn === "pending_registration_consume"
+        ? { data: [{ username: "staged_name", audience_kind: audienceKind, audience_value: audienceValue }], error: null }
+        : fn === "my_registration_state"
+          ? { data: "access_ready", error: null }
+          : { data: null, error: null },
+    );
+    await expect(
+      verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456" })),
+    ).rejects.toThrow(/REDIRECT:/);
+    const calls = rpc.mock.calls.map((c) => c[0]);
+    expect(calls.indexOf("onboarding_select_account_type")).toBeGreaterThan(calls.indexOf("pending_registration_consume"));
+    expect(rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: track, p_account_type: audienceValue });
+    expect(rpc).toHaveBeenCalledWith("profile_set_username", { p_username: "staged_name" });
+    // No client-side persona or membership write exists — the RPC is the only authority.
+    expect(calls).not.toContain("individual_save_professional");
+    expect(calls).not.toContain("business_draft_submit");
+  });
+});
+
 describe("resendPasswordSignUpCode — never re-submits the password, never re-registers", () => {
   it("resends via GoTrue's resend({type:'signup'}) with just the email — no password field exists on this action's input at all", async () => {
     resend.mockResolvedValueOnce({ error: null });
