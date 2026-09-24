@@ -364,12 +364,17 @@ select is(
 -- Adding a name here is the ONLY way to make this test pass, which is the point:
 -- a capability helper or a can_* predicate that started reading `user_trades`
 -- would have to be written into this list by someone, in a review, on purpose.
+-- `my_profile_completion` joined it in staging-prep Increment 10: a
+-- Tradesperson's "activities" checklist item is satisfied by holding an active
+-- trade. That function is INFORMATIONAL ONLY — never consulted by
+-- my_registration_state() or any capability/can_* predicate — so it reads the
+-- relation to describe the caller to themselves, and gates nothing.
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('app', 'public')
       and p.prosrc like '%user_trades%'
       and p.proname not in ('user_trades_set', '_profile_public_directory',
-                            '_job_applicants')),
+                            '_job_applicants', 'my_profile_completion')),
   0::bigint,
   'and the ONLY functions that mention it are its writer and two DISPLAY projections — no capability, no can_* predicate');
 
