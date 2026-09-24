@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getRegistrationState } from "@/server/queries/registration";
+import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadWorkspaces } from "@/server/queries/workspace";
 import { personalEntry } from "@/lib/workspace/model";
@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 export default async function EditProfilePage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state !== "active_personal") redirect("/onboarding");
+  if (!hasAppAccess(state)) redirect("/onboarding");
 
   const supabase = await getServerSupabase();
   const { entries } = await loadWorkspaces(supabase);

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { getRegistrationState } from "@/server/queries/registration";
+import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { loadPlatformRole } from "@/server/queries/platform";
 import { loadWorkspaces } from "@/server/queries/workspace";
 import { personalEntry, businessEntries } from "@/lib/workspace/model";
@@ -65,7 +65,7 @@ const HOME_OPPORTUNITIES_PREVIEW = 3;
 export default async function PersonalHomePage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state !== "active_personal") redirect("/onboarding");
+  if (!hasAppAccess(state)) redirect("/onboarding");
 
   const supabase = await getServerSupabase();
   if (await loadPlatformRole(supabase)) redirect("/admin");

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { getRegistrationState } from "@/server/queries/registration";
+import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { loadPersonalHome } from "@/server/queries/personal-home";
 import { listMyReviews, loadMyReviewSummary } from "@/server/queries/reviews";
 import { createTranslator } from "@/lib/i18n/translate";
@@ -28,7 +28,7 @@ export default async function ReviewsRoute({
 }) {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state !== "active_personal") redirect("/onboarding");
+  if (!hasAppAccess(state)) redirect("/onboarding");
 
   const data = await loadPersonalHome();
   if (!data) redirect("/auth/sign-in");
