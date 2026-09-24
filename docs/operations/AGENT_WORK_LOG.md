@@ -4,6 +4,26 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Staging-prep: registration persona assignment, workspace-independent profile settings
+
+**Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (`feature/auth-password-staging-prep`, unmodified; `main` unmodified). No PR, no merge, nothing applied to hosted Supabase or hosted Auth.
+
+**Product decisions recorded (product owner, 2026-09-24):**
+- **Locality** is removed from the profile-completion percentage *for now* — no locality/city UX or write path exists. `profiles.locality_id` and the locality concept are unchanged; it returns as an item with a real locality UX. (PRODUCT_DIRECTION_GUIDE, *Activation vs. Verification*.)
+- **Registration account type is authoritative for personas**: Tradespeople / Sales become the declared persona at verified registration; Sales gets no membership or capability; Showroom/Supplier/Manufacturer/Importer record the intended `org_type` only and create no organization. (PRODUCT_DIRECTION_GUIDE, *Registration account type: persona vs. intended business*.)
+
+**Database — `20260924090011_registration_persona_assignment.sql`:** `onboarding_select_account_type` writes `individual_onboarding.prof_concrete_type` for professional-track choices (never `users.primary_account_type`; never over a different canonical persona or a submitted declaration). New internal `app.effective_persona` (declared ?? canonical) scopes `user_activities_set` and `my_profile_completion()`. Completion asks for `organization_activities` only from `org.manage` holders. Idempotent backfill. `my_registration_state()` untouched.
+
+**Frontend:** `/settings/profile` (AppShell/AppHeader, no workspace prerequisite) renders the existing `IdentityCard`; checklist identity links and the no-workspace terminal point there.
+
+**Tests:** new pgTAP `60_registration_persona_assignment_test.sql` (145 assertions; every active registration type reaches 100% through real RPCs); `59_…` no longer fakes the declared persona. Unit: route guard + link-reachability tests; server-action tests for Coming Soon refusal and server-side staging. E2E: new CAPTCHA-free `registration-persona.spec.ts` (canonical passwordless sign-up + real account-type/username steps); the 7 stale legacy-wizard assertions in `shared-onboarding` / `account-registration` rewritten to the direct-entry contract; `profile-completion.spec.ts` (Turnstile-gated) extended with persona assertions.
+
+**Validation:** `db reset` ✓ · pgTAP **2372/2372 (61 files)** · `db lint` 0 errors (4 pre-existing warnings) · `database.types.ts` regenerated — byte-identical (no public signature change) · typecheck ✓ · lint 0 errors (1 pre-existing warning) · unit **1646/1646** · production build ✓ · Playwright: new `registration-persona` 12/12 and rewritten `shared-onboarding` + `account-registration` 25/25 (1 skipped by design), desktop + mobile. Curated desktop run of 11 registration/onboarding/workspace specs: 38 passed, 44 failed — **18** wait for a Turnstile token (`challenges.cloudflare.com` denied by the sandbox proxy), **21** register through a helper that waits for the removed `/onboarding/profile` wizard step (base `8fcb81c` already routes to `/onboarding/account-type`; this branch does not touch onboarding routing), **5** fail identically on an untouched build of `8fcb81c` (verified in a separate worktree: `account-workspace-model:264`, `pilot-uat-round-1:118/177/240`, `auth-password-preview` "abandon and resume").
+
+**Remaining blockers:** see the final report of this session (registration E2E needs a network where Turnstile loads; legacy-wizard specs; trade label copy review; Mawan key sign-off; hosted Confirm-email unverified; `individual_save_professional` still lets a professional change their own declared type via direct RPC — pre-existing).
+
+---
+
 ## Session — Staging-prep: real-DB validation + profile-completion UI
 
 **Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (`feature/auth-password-staging-prep`, unmodified).
