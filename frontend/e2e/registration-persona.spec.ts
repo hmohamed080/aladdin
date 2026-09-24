@@ -106,14 +106,14 @@ test.describe("Registration account type → authoritative persona (no CAPTCHA p
     await page.goto("/home/profile/edit");
     await expect(page.getByTestId("trade-selector")).toBeVisible();
     // TradeSelector's test hook wraps only its heading, so scope by the unique chip name.
-    const painting = page.getByRole("button", { name: "Painting", exact: true });
+    const painting = page.getByRole("button", { name: "Painter / decorator", exact: true });
     await painting.click();
     await expect(painting).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: /save trades/i }).click();
     await expect(page.getByText(/could not save your trades/i)).toHaveCount(0);
     await page.reload();
     await expect(
-      page.getByRole("button", { name: "Painting", exact: true }),
+      page.getByRole("button", { name: "Painter / decorator", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
 
     await page.goto("/home");

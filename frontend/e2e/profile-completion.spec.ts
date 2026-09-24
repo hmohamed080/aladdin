@@ -118,11 +118,11 @@ test.describe("Direct entry after registration", () => {
     await register(page, request, "persona");
     await page.goto("/home/profile/edit");
     await expect(page.getByTestId("trade-selector")).toBeVisible();
-    const painting = page.getByRole("button", { name: /^(painting|نقاشة)$/i });
+    const painting = page.getByRole("button", { name: /^(painter \/ decorator|نقاش ودهانات)$/i });
     await painting.click();
     await page.getByRole("button", { name: /save trades|حفظ المهن/i }).click();
     await page.reload();
-    await expect(page.getByRole("button", { name: /^(painting|نقاشة)$/i })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: /^(painter \/ decorator|نقاش ودهانات)$/i })).toHaveAttribute("aria-pressed", "true");
   });
 
   test("a username lost during the OTP window goes to the narrow username screen, then into the app", async ({ browser, request }) => {
