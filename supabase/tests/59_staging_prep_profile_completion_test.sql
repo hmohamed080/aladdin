@@ -7,7 +7,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(49);
+select plan(51);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures: three fresh, confirmed registrants.
@@ -126,10 +126,12 @@ set local request.jwt.claims = '{"sub":"59000000-0000-4000-8000-00000000000b","r
 select lives_ok($$ select public.onboarding_select_account_type('professional', 'installer_technician') $$, 'B records the Tradesperson intent');
 select lives_ok($$ select public.profile_set_username('p59trade') $$, 'B claims a username');
 select ok((public.my_profile_completion() -> 'missing') ? 'activities', 'a Tradesperson with no trade is asked for one');
--- Declared professional type (the review window) so user_trades_set admits B.
+-- Increment 11: selecting the Tradesperson account type IS the declaration —
+-- no fixture write is needed any more for user_trades_set to admit B.
 reset role;
-insert into public.individual_onboarding (user_id, prof_concrete_type, professional_completed_at)
-values ('59000000-0000-4000-8000-00000000000b', 'installer_technician', now());
+select is((select prof_concrete_type::text from public.individual_onboarding
+            where user_id = '59000000-0000-4000-8000-00000000000b'), 'installer_technician',
+  'B''s registration choice became the declared persona (Increment 11)');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"59000000-0000-4000-8000-00000000000b","role":"authenticated"}';
 select throws_ok($$ select public.user_trades_set(array['plumbing']) $$, '22023', null, 'a retired trade cannot be newly selected');
@@ -141,10 +143,8 @@ select ok(not ((public.my_profile_completion() -> 'missing') ? 'activities'),
 -- 6. Activity scoping through the RPCs
 -- ===========================================================================
 set local request.jwt.claims = '{"sub":"59000000-0000-4000-8000-00000000000c","role":"authenticated"}';
-reset role;
-update public.users set primary_account_type = 'sales' where id = '59000000-0000-4000-8000-00000000000c';
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"59000000-0000-4000-8000-00000000000c","role":"authenticated"}';
+select lives_ok($$ select public.onboarding_select_account_type('professional', 'sales') $$,
+  'C registers as Sales — no canonical persona is written, the declared one is enough (Increment 11)');
 select throws_ok($$ select public.user_activities_set(array['finishing']) $$, '22023', null,
   'a Sales account cannot take an Engineer activity');
 select lives_ok($$ select public.user_activities_set(array['sales_manager']) $$, 'but can take its own');
