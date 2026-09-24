@@ -83,6 +83,7 @@ Token/brand changes follow the design-system edit-order (token JSON first) and u
 - **Affiliation is a membership, not an account type.** A salesperson working in someone else's showroom holds an ACTIVE `memberships` row with the sales capability set — never `org.manage`, and never a business classification on their person. Requests to join (`organization_join_requests`) and referred business candidates (`organization_referrals`) are *requests*: they grant nothing, are decided through the existing `org.members.manage` capability or platform authority respectively, and converge on `app.membership_grant_sales` so "approved" means one thing. Referral provenance (`organizations.source`, `organizations.referred_by_user_id`) is write-once and confers no relationship.
 - **Effective personal persona = declared ?? canonical.** `app.effective_persona(uid)` resolves `individual_onboarding.prof_concrete_type` (declared — written by registration's account-type RPC or the professional editor) before `users.primary_account_type` (canonical — Admin-applied, trust-reviewed). Professional gates (`app.is_professional_persona`, `app.is_sales_persona`) accept either; persona-scoped writes (`user_activities_set`) and `my_profile_completion()` use the resolved value. Registration never writes the canonical column, never overrides a different canonical persona, and never creates a membership or capability (migration `20260924090011`).
 - **User identity settings are workspace-independent.** `/settings/profile` requires only application access (`access_ready` / `active_personal`) — never a personal workspace or a membership. Organization-scoped editing (organization activities/subtypes) stays on `/b2b/settings` behind `org.manage`.
+- **CAPTCHA is application-scoped.** Supabase's project-wide `[auth.captcha]` stays OFF. The password-auth preview's Create Account (incl. resend code) and Forgot Password request verify a Cloudflare Turnstile token server-side via Cloudflare Siteverify (`frontend/src/server/auth/turnstile.ts`, secret in server-only `TURNSTILE_SECRET_KEY`) before calling Supabase Auth, failing closed; Sign In has no CAPTCHA; canonical passwordless flows are untouched.
 - **Authorization is enforced server-side** (RLS + explicit permission checks). The UI never implies access it cannot grant. Identity is always derived from the verified JWT, never from a request body.
 
 ## RLS Strategy
@@ -171,6 +172,10 @@ Every architecture change must, in the same session:
 
 ## Architecture Change History
 Newest first.
+
+### 2026-09-24 — Application-scoped CAPTCHA (Cloudflare Siteverify)
+- **What:** Turnstile tokens are verified by the app via Cloudflare Siteverify (fail closed) on Create Account and Forgot Password; Sign In's invisible CAPTCHA removed; `TURNSTILE_SECRET_KEY` added server-only; `NEXT_PUBLIC_TURNSTILE_INVISIBLE_SITE_KEY` removed; `[auth.captcha]` permanently off.
+- **Why:** With Supabase's CAPTCHA off, the previous wiring only checked that a token was non-empty — any string passed.
 
 ### 2026-09-24 — Registration persona assignment; workspace-independent profile settings
 - **What:** The registration account-type RPC records Tradespeople/Sales as the declared persona (`app.effective_persona` added; `user_activities_set` and `my_profile_completion()` resolve through it); `/settings/profile` added as the user-identity surface with no workspace prerequisite; completion's organization-activities item is asked only of `org.manage` holders; locality removed from completion until a locality write path exists.

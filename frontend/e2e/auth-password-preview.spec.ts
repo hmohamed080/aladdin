@@ -36,8 +36,9 @@ async function selectAccountType(page: import("@playwright/test").Page): Promise
  * challenges.cloudflare.com, using the published always-pass TEST site key —
  * see turnstile-widget.tsx) to auto-solve and populate the hidden
  * `captchaToken` input before submitting Create Account or Forgot Password.
- * No auth bypass: the actual Supabase server action requires this token and
- * GoTrue verifies it against the paired TEST secret in config.toml.
+ * No bypass: the server action verifies the token with Cloudflare Siteverify
+ * (server/auth/turnstile.ts) using the paired always-pass TEST secret locally.
+ * Sign In has no CAPTCHA and never waits for one.
  */
 async function waitForCaptchaToken(page: import("@playwright/test").Page): Promise<void> {
   await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30000 });
@@ -108,7 +109,7 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
   });
 });
 
-test.describe("CAPTCHA — required on Create Account and Forgot Password, against the REAL Supabase auth.captcha check", () => {
+test.describe("CAPTCHA — required on Create Account and Forgot Password, verified by the app via Cloudflare Siteverify", () => {
   test("Create Account is refused when the captcha token is missing, and never calls signUp", async ({ page, request }) => {
     const email = uniqueEmail("nocaptcha-signup");
     // Block Cloudflare's script entirely — deterministic "no token was ever
@@ -464,6 +465,22 @@ test.describe("Password-changed notification is absent on initial registration (
   });
 });
 
+test.describe("Sign In carries no CAPTCHA (application-scoped CAPTCHA, Supabase global CAPTCHA off)", () => {
+  test("renders no Turnstile widget, loads nothing from Cloudflare, and answers a bad login with the generic error", async ({ page }) => {
+    const cloudflare: string[] = [];
+    page.on("request", (req) => {
+      if (/challenges\.cloudflare\.com/.test(req.url())) cloudflare.push(req.url());
+    });
+    await page.goto("/preview/auth-password/sign-in");
+    await expect(page.locator('input[name="captchaToken"]')).toHaveCount(0);
+    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(`no-such-account-${Date.now()}@example.test`);
+    await page.getByLabel(/^password$|^كلمة المرور$/i).fill("definitely-not-a-real-password");
+    await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
+    await expect(page.getByText(/don't match|لا يتطابق/i)).toBeVisible();
+    expect(cloudflare).toEqual([]);
+  });
+});
+
 test.describe("Password sign-in", () => {
   test("wrong password shows the generic error; the correct one signs in", async ({ page, request }) => {
     const email = await registerAccount(page, request, "signin");
@@ -474,12 +491,10 @@ test.describe("Password sign-in", () => {
 
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill("definitely-the-wrong-one");
-    await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
     await expect(page.getByText(/don't match|لا يتطابق/i)).toBeVisible();
 
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-    await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
     await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
   });
@@ -523,7 +538,6 @@ test.describe("Forgot password — full 4-screen journey", () => {
     await page.waitForURL(/\/sign-in$/, { waitUntil: "commit" });
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(newPassword);
-    await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
     await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
   });
@@ -677,7 +691,6 @@ test.describe("Existing-passwordless-user migration — real E2E against a genui
     await page.goto("/preview/auth-password/sign-in");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(newPassword);
-    await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
 
     // Correct canonical landing: reaches an authenticated route, not back at sign-in.
@@ -721,7 +734,6 @@ test.describe("Existing-passwordless-user migration — real E2E against a genui
     await page.goto("/preview/auth-password/sign-in");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(newPassword);
-    await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
     await page.waitForURL((url) => !/sign-in/.test(url.pathname), { waitUntil: "commit" });
   });

@@ -7,7 +7,6 @@ import { passwordSignIn, type PasswordAuthState } from "@/server/actions/auth-pa
 import { AuthCard } from "@/features/auth/auth-card";
 import { Input, LabeledField, SubmitButton } from "@/components/ui/controls";
 import { PasswordInput } from "./password-input";
-import { TurnstileWidget } from "./turnstile-widget";
 
 const initial: PasswordAuthState = { ok: false };
 
@@ -70,11 +69,6 @@ export function PasswordSignInForm({ next }: { next: string }) {
         <LabeledField label={t("authPasswordPreview.passwordLabel")} htmlFor="password">
           <PasswordInput id="password" name="password" autoComplete="current-password" required aria-invalid={Boolean(state.code) || undefined} />
         </LabeledField>
-
-        {/* Invisible, non-interactive — see turnstile-widget.tsx's doc
-            comment: GoTrue's captcha toggle is all-or-nothing, so Sign In
-            needs a token too, but adds no visible challenge or extra click. */}
-        <TurnstileWidget resetKey={state} variant="invisible" />
 
         <SubmitButton className="w-full" pendingLabel={t("authPasswordPreview.signIn.submitting")}>
           {t("authPasswordPreview.signIn.submit")}

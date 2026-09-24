@@ -902,7 +902,45 @@ caller here already proved the current credential).
   `aladdin-staging` or production, which keep GoTrue's real, unmodified
   defaults.
 
-## CAPTCHA / abuse protection (implemented in revision 3)
+## CAPTCHA — implemented architecture (application-scoped, 2026-09-24)
+
+**This section is authoritative; the two sections below are history.** The
+"Option B" recommendation below was approved and is implemented:
+
+- **Supabase global CAPTCHA stays OFF** (`[auth.captcha]` absent from
+  `config.toml`; never enabled on hosted projects).
+- **Create Account** (`requestPasswordSignUp`, and its resend-code step
+  `resendPasswordSignUpCode`) and **Forgot Password request**
+  (`requestRecoveryCode`) require a Turnstile token that the APP verifies
+  server-side with **Cloudflare Siteverify** (`server/auth/turnstile.ts` →
+  `verifyTurnstileToken`) BEFORE Supabase Auth is called. No token is passed
+  to Supabase any more.
+- **Sign In has no CAPTCHA** — no widget, no token, no invisible challenge.
+  The invisible variant and `NEXT_PUBLIC_TURNSTILE_INVISIBLE_SITE_KEY` are
+  removed.
+- **Fail closed**: only an explicit `success: true` passes. A missing or
+  oversized token, a rejected token, a non-2xx response, malformed JSON, a
+  network error, a 5-second timeout, or a missing secret outside local dev all
+  fail. The client IP is forwarded as `remoteip` only when it parses as an IP.
+  Secret and token are never logged; Cloudflare's `error-codes` never reach
+  the user — only the existing neutral `captchaRequired` / `captchaRejected`
+  copy.
+- **Single use**: Cloudflare rejects a replayed token
+  (`timeout-or-duplicate`); the widget remounts after every submission
+  (`resetKey`) to obtain a fresh one.
+- **Secrets**: `TURNSTILE_SECRET_KEY` is server-only (`serverEnvSchema`,
+  never `NEXT_PUBLIC_*`); `NEXT_PUBLIC_TURNSTILE_SITE_KEY` stays public.
+  Locally, with both unset, the widget uses Cloudflare's always-pass TEST
+  site key (`1x00000000000000000000AA`) and the server Cloudflare's
+  always-pass TEST secret (`1x0000000000000000000000000000000AA`) — still a
+  real Siteverify round trip, nothing bypassed. Outside `local` an unset
+  secret fails closed.
+- `hostname`/`action` are not yet checked (the test keys report a fixed
+  hostname); add a hostname allow-list when real staging keys exist.
+- The canonical passwordless flows are unaffected (Supabase's toggle never
+  turns on).
+
+## CAPTCHA / abuse protection (revision 3 — HISTORY, superseded above)
 
 Revision 2 found this unconfigured project-wide (confirmed absent in both
 `config.toml` and code — pre-existing, already-tracked debt,
@@ -1038,7 +1076,7 @@ configured in `[auth.captcha]`; this app never sees or needs that secret.
   security* above) — an unrelated but adjacent finding from the same
   expanded-suite testing pass.
 
-## CAPTCHA architecture — corrected (a fourth pass found the "two widgets, one shared secret" plan was invalid)
+## CAPTCHA architecture — corrected (HISTORY — Option B below is now implemented, see above)
 
 The plan recorded immediately above this section (two Turnstile site keys —
 one visible for Create Account/Forgot Password, one invisible for Sign In —

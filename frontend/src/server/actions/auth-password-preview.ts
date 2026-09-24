@@ -14,6 +14,7 @@ import {
 } from "@/lib/supabase/recovery-grant";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { sanitizeNext } from "@/server/auth/next";
+import { clientIpFrom, verifyTurnstileToken } from "@/server/auth/turnstile";
 import { resolveActiveLanding } from "@/server/queries/landing";
 import { hasAppAccess, type RegistrationState } from "@/server/queries/registration";
 import type { Database } from "@/types/database.types";
@@ -130,14 +131,21 @@ function isRateLimitError(error: GoTrueError): boolean {
 }
 
 /**
- * GoTrue's own captcha-verification failure — a rejected/expired/spent
- * Turnstile token. Matches on `code` only (not a generic status, since 422 is
- * shared with unrelated errors like "user already registered" — see
- * docs/frontend/auth-password-preview.md §Registration architecture's
- * enumeration finding).
+ * APPLICATION-SCOPED CAPTCHA gate (server/auth/turnstile.ts): the token is
+ * verified with Cloudflare Siteverify HERE, before Supabase Auth is called —
+ * Supabase's global `[auth.captcha]` stays OFF, so nothing downstream would
+ * ever judge it. Fails closed. Returns the neutral error code to show, or
+ * null when the token verified. Never exposes Cloudflare's own error codes.
  */
-function isCaptchaError(error: GoTrueError): boolean {
-  return error.code === "captcha_failed";
+async function captchaFailure(formData: FormData): Promise<string | null> {
+  const h = await headers();
+  const verdict = await verifyTurnstileToken(formData.get("captchaToken"), {
+    remoteIp: clientIpFrom((name) => h.get(name)),
+  });
+  if (verdict.ok) return null;
+  return verdict.reason === "missing"
+    ? "authPasswordPreview.error.captchaRequired"
+    : "authPasswordPreview.error.captchaRejected";
 }
 
 /**
@@ -280,24 +288,19 @@ export async function requestPasswordSignUp(
     return { ok: false, code: "authPasswordPreview.error.consentRequired", email: parsed.data.email };
   }
 
-  const captchaToken = formData.get("captchaToken");
-  if (typeof captchaToken !== "string" || captchaToken.length === 0) {
-    return { ok: false, code: "authPasswordPreview.error.captchaRequired", email: parsed.data.email };
-  }
+  // Only a Cloudflare-verified token lets signUp() run at all.
+  const captchaCode = await captchaFailure(formData);
+  if (captchaCode) return { ok: false, code: captchaCode, email: parsed.data.email };
 
   const supabase = await getServerSupabase();
   const callStart = Date.now();
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { captchaToken },
   });
   if (error) {
     if (isRateLimitError(error as GoTrueError)) {
       return { ok: false, code: "authPasswordPreview.error.rateLimited", email: parsed.data.email };
-    }
-    if (isCaptchaError(error as GoTrueError)) {
-      return { ok: false, code: "authPasswordPreview.error.captchaRejected", email: parsed.data.email };
     }
     // ENUMERATION NORMALIZATION (§Account enumeration) — see
     // `isAccountExistsError`'s doc comment. Collapse into the exact same
@@ -359,24 +362,18 @@ export async function resendPasswordSignUpCode(
   const email = emailSchema.safeParse(formData.get("email"));
   if (!email.success) return { ok: false, code: "authPasswordPreview.error.invalidEmail" };
 
-  const captchaToken = formData.get("captchaToken");
-  if (typeof captchaToken !== "string" || captchaToken.length === 0) {
-    return { ok: false, code: "authPasswordPreview.error.captchaRequired", email: email.data };
-  }
+  const captchaCode = await captchaFailure(formData);
+  if (captchaCode) return { ok: false, code: captchaCode, email: email.data };
 
   const supabase = await getServerSupabase();
   const callStart = Date.now();
   const { error } = await supabase.auth.resend({
     type: "signup",
     email: email.data,
-    options: { captchaToken },
   });
   if (error) {
     if (isRateLimitError(error as GoTrueError)) {
       return { ok: false, code: "authPasswordPreview.error.rateLimited", email: email.data };
-    }
-    if (isCaptchaError(error as GoTrueError)) {
-      return { ok: false, code: "authPasswordPreview.error.captchaRejected", email: email.data };
     }
     if (isAccountExistsError(error as GoTrueError)) {
       await padToRegistrationFloor(callStart);
@@ -493,28 +490,22 @@ export async function passwordSignIn(
     return { ok: false, code: "authPasswordPreview.error.invalidCredentials" };
   }
 
-  // GoTrue's `[auth.captcha]` toggle is all-or-nothing across
-  // signup/recovery/password-grant sign-in — see turnstile-widget.tsx's doc
-  // comment. Whatever token the invisible widget produced (possibly none yet,
-  // on a very fast submit) is passed through; a resulting `captcha_failed`
-  // deliberately falls into the SAME generic bucket below, not a distinct
-  // message — Sign In never surfaces "captcha" wording, matching its
-  // anti-enumeration policy and staying visually frictionless either way.
-  const captchaToken = formData.get("captchaToken");
-
+  // No CAPTCHA on Sign In, by design: CAPTCHA is application-scoped to
+  // Create Account and Forgot Password (server/auth/turnstile.ts), and
+  // Supabase's global [auth.captcha] stays OFF, so password sign-in carries
+  // no token and no added friction. Brute force is bounded by GoTrue's own
+  // rate limits.
   const supabase = await getServerSupabase();
   const { error } = await supabase.auth.signInWithPassword({
     email: email.data,
     password,
-    options: typeof captchaToken === "string" && captchaToken.length > 0 ? { captchaToken } : undefined,
   });
   if (error) {
     if (isRateLimitError(error as GoTrueError)) {
       return { ok: false, code: "authPasswordPreview.error.rateLimited", email: email.data };
     }
     // Deliberately identical for "no such account", "wrong password", "email
-    // not confirmed", "user_banned", AND a missing/invalid captcha token —
-    // see the module doc comment and the captcha note just above.
+    // not confirmed" and "user_banned" — see the module doc comment.
     return { ok: false, code: "authPasswordPreview.error.invalidCredentials", email: email.data };
   }
 
@@ -534,14 +525,14 @@ export async function requestRecoveryCode(
   const email = emailSchema.safeParse(formData.get("email"));
   if (!email.success) return { ok: false, code: "authPasswordPreview.error.invalidEmail" };
 
-  const captchaToken = formData.get("captchaToken");
-  if (typeof captchaToken !== "string" || captchaToken.length === 0) {
-    return { ok: false, code: "authPasswordPreview.error.captchaRequired", email: email.data };
-  }
+  // Same application-scoped gate as Create Account: no recovery email is ever
+  // requested for an unverified token.
+  const captchaCode = await captchaFailure(formData);
+  if (captchaCode) return { ok: false, code: captchaCode, email: email.data };
 
   const isolated = createIsolatedAuthClient();
   const redirectTo = await absoluteUrl(`${RECOVERY_FLOW_PATH}/reset`);
-  const { error } = await isolated.auth.resetPasswordForEmail(email.data, { redirectTo, captchaToken });
+  const { error } = await isolated.auth.resetPasswordForEmail(email.data, { redirectTo });
 
   // Rate limiting and a rejected captcha are the only signals allowed to
   // differ (§Forgot-password privacy) — neither reveals whether the account
@@ -552,9 +543,6 @@ export async function requestRecoveryCode(
   // from which branch ran.
   if (error && isRateLimitError(error as GoTrueError)) {
     return { ok: false, code: "authPasswordPreview.error.rateLimited", email: email.data };
-  }
-  if (error && isCaptchaError(error as GoTrueError)) {
-    return { ok: false, code: "authPasswordPreview.error.captchaRejected", email: email.data };
   }
 
   const store = await cookies();
