@@ -111,17 +111,26 @@ select ok(not has_table_privilege('authenticated', 'public.user_trades', 'UPDATE
 select ok(not has_table_privilege('authenticated', 'public.user_trades', 'DELETE'),
   'authenticated may NOT delete from user_trades directly');
 
--- The seeded Pilot vocabulary, exactly.
+-- The seeded Pilot vocabulary — the original 7 (retired by staging-prep
+-- Increment 3, 20260924090003_audience_activities.sql, kept for history) plus
+-- the 14 product-approved specializations that replaced them as the
+-- selectable set.
 select set_eq(
   $$ select key from public.trades $$,
   $$ values ('kitchens_doors'), ('plumbing'), ('electrical'), ('hvac'),
-            ('gypsum_paint'), ('tiling'), ('marble_granite') $$,
-  'the seeded vocabulary is the five installer chips plus the two the demo world already contains');
+            ('gypsum_paint'), ('tiling'), ('marble_granite'),
+            ('wallpaper_installation'), ('gypsum_board_installation'),
+            ('wood_alternative_installation'), ('marble_alternative_installation'),
+            ('vinyl_flooring_installation'), ('hdf_flooring_installation'),
+            ('painting'), ('spray_paint_and_foundation'), ('decorative_paints'),
+            ('astarji'), ('plastering_and_gypsum'), ('epoxy_flooring'),
+            ('door_installation'), ('foutek_installation') $$,
+  'the seeded vocabulary is the original 7 (retired) plus the 14 approved active specializations');
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
-select is((select count(*) from public.trades), 7::bigint,
-  'a professional sees every ACTIVE trade');
+select is((select count(*) from public.trades), 14::bigint,
+  'a professional sees every ACTIVE trade (the 14 approved specializations — the original 7 are retired)');
 select throws_ok(
   $$ insert into public.trades (key) values ('invented_trade') $$,
   '42501', null, 'and cannot add one of their own');
@@ -136,13 +145,19 @@ set local request.jwt.claims = '{"sub":"70000009-0000-4000-8000-000000000009","r
 select is((select count(*) from public.user_trades), 1::bigint,
   'the seeded fixture gave this installer exactly one trade');
 
+-- Sections C/D/E test the SELECTION MECHANICS (whole-set replace, primary
+-- invariant, duplicate convergence) — generic behaviour that does not depend
+-- on which specific trades are used, so they use three of the 14 currently-
+-- ACTIVE specializations rather than the now-retired plumbing/electrical/
+-- hvac/tiling (kept only for the dedicated retirement scenarios below, where
+-- the retirement itself is what is under test).
 select lives_ok(
-  $$ select public.user_trades_set(array['plumbing','electrical']) $$,
+  $$ select public.user_trades_set(array['wallpaper_installation','gypsum_board_installation']) $$,
   'a canonical professional replaces their whole selection in one call');
 
 select set_eq(
   $$ select t.key from public.user_trades ut join public.trades t on t.id = ut.trade_id $$,
-  $$ values ('plumbing'), ('electrical') $$,
+  $$ values ('wallpaper_installation'), ('gypsum_board_installation') $$,
   'the submitted set REPLACED the previous one — the call is a description, not a delta');
 
 -- THE FIRST SUBMITTED KEY BECOMES PRIMARY when none is named. That is the rule
@@ -150,51 +165,51 @@ select set_eq(
 select is(
   (select t.key from public.user_trades ut join public.trades t on t.id = ut.trade_id
     where ut.is_primary),
-  'plumbing', 'with no primary named, the FIRST submitted key is primary');
+  'wallpaper_installation', 'with no primary named, the FIRST submitted key is primary');
 
 -- ===========================================================================
 -- D. The primary-trade invariant, from both sides
 -- ===========================================================================
 select lives_ok(
-  $$ select public.user_trades_set(array['plumbing','electrical'], 'electrical') $$,
+  $$ select public.user_trades_set(array['wallpaper_installation','gypsum_board_installation'], 'gypsum_board_installation') $$,
   'the primary can be changed without touching the selection');
 select is(
   (select t.key from public.user_trades ut join public.trades t on t.id = ut.trade_id
     where ut.is_primary),
-  'electrical', 'and the named key is now primary');
+  'gypsum_board_installation', 'and the named key is now primary');
 select is((select count(*) from public.user_trades where is_primary), 1::bigint,
   'still exactly one primary — the old one was cleared in the same transaction');
 
 -- REMOVING A NON-PRIMARY leaves the primary alone.
 select lives_ok(
-  $$ select public.user_trades_set(array['electrical','hvac'], 'electrical') $$,
+  $$ select public.user_trades_set(array['gypsum_board_installation','wood_alternative_installation'], 'gypsum_board_installation') $$,
   'a non-primary trade can be dropped and another added at once');
 select is(
   (select t.key from public.user_trades ut join public.trades t on t.id = ut.trade_id
     where ut.is_primary),
-  'electrical', 'and the primary is untouched');
+  'gypsum_board_installation', 'and the primary is untouched');
 
 -- REMOVING THE PRIMARY falls to the first remaining submitted key. The caller
 -- controls that order, so the outcome is predictable rather than arbitrary.
 select lives_ok(
-  $$ select public.user_trades_set(array['hvac','tiling']) $$,
+  $$ select public.user_trades_set(array['wood_alternative_installation','marble_alternative_installation']) $$,
   'the primary trade itself can be removed');
 select is(
   (select t.key from public.user_trades ut join public.trades t on t.id = ut.trade_id
     where ut.is_primary),
-  'hvac', 'and the first REMAINING key becomes primary — never zero primaries on a non-empty set');
+  'wood_alternative_installation', 'and the first REMAINING key becomes primary — never zero primaries on a non-empty set');
 
 -- DUPLICATES CONVERGE. A double-submitted chip is a client bug, not a reason to
 -- refuse a save the person can see nothing wrong with.
 select lives_ok(
-  $$ select public.user_trades_set(array['tiling','tiling','plumbing','tiling']) $$,
+  $$ select public.user_trades_set(array['marble_alternative_installation','marble_alternative_installation','wallpaper_installation','marble_alternative_installation']) $$,
   'duplicate keys are accepted');
 select is((select count(*) from public.user_trades), 2::bigint,
   'and deduplicated — two rows, not four');
 select is(
   (select t.key from public.user_trades ut join public.trades t on t.id = ut.trade_id
     where ut.is_primary),
-  'tiling', 'the first occurrence still decides the primary');
+  'marble_alternative_installation', 'the first occurrence still decides the primary');
 
 -- AN EMPTY SET IS LEGAL, and leaves no primary behind rather than a dangling one.
 select lives_ok(
@@ -213,26 +228,29 @@ select lives_ok(
 -- E. What the writer refuses
 -- ===========================================================================
 select throws_ok(
-  $$ select public.user_trades_set(array['plumbing','not_a_trade']) $$,
+  $$ select public.user_trades_set(array['wallpaper_installation','not_a_trade']) $$,
   '22023', null,
   'an unknown key refuses the WHOLE call — silently dropping it would leave the person believing they saved it');
 select is((select count(*) from public.user_trades), 0::bigint,
   'and nothing was written — the call is atomic in failure too');
 
 select throws_ok(
-  $$ select public.user_trades_set(array['plumbing'], 'electrical') $$,
+  $$ select public.user_trades_set(array['wallpaper_installation'], 'gypsum_board_installation') $$,
   '22023', null, 'a primary that is not in the submitted set is a contradiction, not a hint');
 
+-- Retire one of the currently-ACTIVE specializations mid-test (not one of the
+-- 7 already retired by Increment 3 — those are already inactive before this
+-- file even runs, so deactivating one again would prove nothing).
 reset role;
-update public.trades set is_active = false where key = 'hvac';
+update public.trades set is_active = false where key = 'epoxy_flooring';
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
 
-select is((select count(*) from public.trades), 6::bigint,
+select is((select count(*) from public.trades), 13::bigint,
   'a retired trade disappears from the vocabulary a professional can see');
 select throws_ok(
-  $$ select public.user_trades_set(array['hvac']) $$,
+  $$ select public.user_trades_set(array['epoxy_flooring']) $$,
   '22023', null, 'and cannot be newly selected, even by a client that still knows the key');
 
 -- BUT A RETIRED TRADE ALREADY HELD IS NOT A TRAP. Refusing it outright would
@@ -245,16 +263,16 @@ select '70000009-0000-4000-8000-000000000009', id, true from public.trades where
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
 select lives_ok(
-  $$ select public.user_trades_set(array['legacy_trade','plumbing'], 'plumbing') $$,
+  $$ select public.user_trades_set(array['legacy_trade','wallpaper_installation'], 'wallpaper_installation') $$,
   'an INACTIVE trade the person already holds may be kept');
 select lives_ok(
-  $$ select public.user_trades_set(array['plumbing']) $$,
+  $$ select public.user_trades_set(array['wallpaper_installation']) $$,
   'and dropped');
 select is((select count(*) from public.user_trades), 1::bigint,
   'leaving the active selection alone');
 
 reset role;
-update public.trades set is_active = true where key = 'hvac';
+update public.trades set is_active = true where key = 'epoxy_flooring';
 delete from public.user_trades ut using public.trades t
   where t.id = ut.trade_id and t.key = 'legacy_trade';
 delete from public.trades where key = 'legacy_trade';
@@ -267,7 +285,7 @@ delete from public.trades where key = 'legacy_trade';
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000005-0000-4000-8000-000000000005","role":"authenticated"}';
 select lives_ok(
-  $$ select public.user_trades_set(array['gypsum_paint']) $$,
+  $$ select public.user_trades_set(array['wallpaper_installation']) $$,
   'a DECLARED professional may declare trades while the upgrade is under review');
 reset role;
 select is(
@@ -401,15 +419,21 @@ grant select on fx to anon, authenticated;
 set local role anon;
 set local request.jwt.claims = '';
 
+-- `marble_granite` is one of the 7 trades staging-prep Increment 3 retired
+-- (20260924090003_audience_activities.sql) — already inactive by the time this
+-- file runs, not merely "about to be retired" as originally written. Per the
+-- very next section's own rule ("INACTIVE TRADES DO NOT REACH THE PUBLIC"),
+-- an already-retired trade was never going to be published in the first
+-- place — the seed fixture's canonical trade is invisible here from the start.
 select is(
   (select trade_keys from public.profile_public_directory
     where id = (select id from fx where user_id = '71000006-0000-4000-8000-000000000006')),
-  array['marble_granite'],
-  'anon sees the canonical trade the seed fixture mapped by hand');
+  '{}'::text[],
+  'the seed fixture''s canonical trade is already retired, so it was never published to anon');
 select is(
   (select primary_trade_key from public.profile_public_directory
     where id = (select id from fx where user_id = '71000006-0000-4000-8000-000000000006')),
-  'marble_granite', 'and the primary key on its own, so no caller re-derives it');
+  null, 'and no primary key either — nothing to re-derive from an unpublished trade');
 
 -- A professional with NO trades is still listed. Trades filter nothing (O5).
 select ok(
