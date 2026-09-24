@@ -13,22 +13,25 @@ export const PASSWORD_SET_FLAG = "aladdin_pw_preview_password_set";
  * guard above makes importing this file from a Client Component a build
  * error, not just a convention).
  *
- * Introduced by this preview for exactly ONE narrow purpose: writing
- * `app_metadata`. Supabase's regular (non-admin) client can only write
- * `user_metadata`, which the account's own owner can edit via
- * `auth.updateUser({data})` — it is NOT authoritative for any
- * security-sensitive resume decision (docs/frontend/auth-password-preview.md
- * §Authoritative password-state tracking). `app_metadata` can only be
- * written through the Auth admin API, which requires the service-role key.
+ * Introduced by this preview for writing `app_metadata`. Supabase's regular
+ * (non-admin) client can only write `user_metadata`, which the account's own
+ * owner can edit via `auth.updateUser({data})` — it is NOT authoritative for
+ * any security-sensitive resume decision
+ * (docs/frontend/auth-password-preview.md §Authoritative password-state
+ * tracking). `app_metadata` can only be written through the Auth admin API,
+ * which requires the service-role key.
  *
  * This is the FIRST service-role caller in this codebase —
  * `frontend/.env.example` previously documented "no runtime caller today;
  * leave UNSET in staging" for `SUPABASE_SERVICE_ROLE_KEY`. Flagged
  * explicitly here and in the review report, not introduced silently. Usage
- * is restricted to the narrow, explicitly-scoped
- * `markPasswordAttachedAuthoritatively` in
- * `server/actions/auth-password-preview.ts` — never used for anything else,
- * never for reading/writing anything but that one `app_metadata` key.
+ * is restricted to two narrow, explicitly-scoped call sites: writing that one
+ * `app_metadata` key (`markPasswordAttachedAuthoritatively`) and staging a
+ * pre-confirmation pending-registration row via the `service_role`-only
+ * `public.pending_registration_save` RPC (`savePendingRegistration`,
+ * Increment 6 — needed because the caller has no session yet at that point,
+ * so no RLS-scoped RPC call could reach `auth.uid()`). Never used for
+ * anything else.
  */
 function getAdminClient(): SupabaseClient<Database> {
   const publicEnv = readPublicEnv();
@@ -46,6 +49,37 @@ function getAdminClient(): SupabaseClient<Database> {
   return createClient<Database>(publicEnv.NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+}
+
+/**
+ * Stages a pending-registration row (username + chosen top-level account
+ * type) for a just-`signUp()`'d, still-unconfirmed user, via
+ * `public.pending_registration_save` — granted to `service_role` ONLY (see
+ * `supabase/migrations/20260924090006_pending_registrations.sql`), so this
+ * admin client is the only caller that can ever exercise it. Never stores a
+ * password. Best-effort by design: a failure here does not fail
+ * registration — `verifyPasswordSignUp` falls back to the
+ * `username_pending`/`account_type_pending` recovery screen
+ * (`finish-registration/page.tsx`) if nothing was staged, or staging was
+ * lost to a slow/failed write, exactly as it does for a genuinely expired
+ * pending row.
+ */
+export async function savePendingRegistration(params: {
+  userId: string;
+  username: string;
+  audienceKind: "organization_type" | "persona_type";
+  audienceValue: string;
+}): Promise<void> {
+  const admin = getAdminClient();
+  const { error } = await admin.rpc("pending_registration_save", {
+    p_user_id: params.userId,
+    p_username: params.username,
+    p_audience_kind: params.audienceKind,
+    p_audience_value: params.audienceValue,
+  });
+  if (error) {
+    console.error(`Failed to stage pending registration for ${params.userId}: ${error.message}`);
+  }
 }
 
 /**

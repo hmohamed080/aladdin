@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { evaluatePasswordStrength } from "./password-strength";
+import { isUsernameWellFormed } from "@/lib/identity/username";
 
 /**
  * Length-first password policy (NIST SP 800-63B-aligned) PLUS weak-password
@@ -48,9 +49,24 @@ function addWeakPasswordIssues(password: string, context: readonly string[], pat
   }
 }
 
+/**
+ * Username + account-type shape validation only — this schema exists purely
+ * for immediate client-side feedback before a round-trip. Both are
+ * REVALIDATED, from scratch, server-side against the live database
+ * (`username_available`, the account-type enums) at the moment they are
+ * actually applied (`verifyPasswordSignUp`, after `verifyOtp` succeeds) —
+ * this schema's job is only to keep an obviously-invalid submission from
+ * ever reaching `signUp()` in the first place, never to be trusted as the
+ * final word on availability.
+ */
 export const registrationSchema = z
   .object({
     email: emailSchema,
+    username: z
+      .string()
+      .trim()
+      .refine((value) => isUsernameWellFormed(value), { message: "registration.error.usernameShape" }),
+    accountType: z.string().trim().min(1, { message: "authPasswordPreview.error.accountTypeRequired" }),
     password: passwordSchema,
     confirmPassword: z.string(),
   })

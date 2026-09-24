@@ -10,11 +10,12 @@ import {
   type PasswordAuthState,
 } from "@/server/actions/auth-password-preview";
 import { AuthCard } from "@/features/auth/auth-card";
-import { Input, LabeledField, SubmitButton, Checkbox, ResendButton, Button } from "@/components/ui/controls";
+import { Input, LabeledField, Select, SubmitButton, Checkbox, ResendButton, Button } from "@/components/ui/controls";
 import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "./password-input";
 import { PasswordStrengthMeter } from "./password-strength-meter";
 import { TurnstileWidget } from "./turnstile-widget";
+import { CHOICE_GROUPS, CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
 
 const initial: PasswordAuthState = { ok: false };
 const RESEND_COOLDOWN_SECONDS = 30;
@@ -50,6 +51,8 @@ export function PasswordSignUpForm() {
 
   const [editingEmail, setEditingEmail] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [username, setUsername] = useState("");
+  const [accountTypeKey, setAccountTypeKey] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [consents, setConsents] = useState({ terms: false, privacy: false, pilot: false });
@@ -126,6 +129,56 @@ export function PasswordSignUpForm() {
               placeholder={t("authPasswordPreview.emailPlaceholder")}
               aria-invalid={sendState.code === "authPasswordPreview.error.invalidEmail" ? true : undefined}
             />
+          </LabeledField>
+
+          <LabeledField
+            label={t("registration.username.label")}
+            htmlFor="username"
+            hint={t("registration.username.hint")}
+            error={
+              sendState.code === "registration.error.usernameShape" || sendState.code === "registration.error.usernameUnavailable"
+                ? t(sendState.code)
+                : undefined
+            }
+          >
+            <Input
+              id="username"
+              name="username"
+              type="text"
+              autoComplete="username"
+              required
+              dir="ltr"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder={t("registration.username.placeholder")}
+            />
+          </LabeledField>
+
+          <LabeledField
+            label={t("authPasswordPreview.accountTypeLabel")}
+            htmlFor="accountType"
+            error={sendState.code === "authPasswordPreview.error.accountTypeRequired" ? t(sendState.code) : undefined}
+          >
+            <Select
+              id="accountType"
+              name="accountType"
+              required
+              value={accountTypeKey}
+              onChange={(e) => setAccountTypeKey(e.target.value)}
+            >
+              <option value="" disabled>
+                {t("authPasswordPreview.accountTypePlaceholder")}
+              </option>
+              {CHOICE_GROUPS.flatMap((group) => group.keys).map((key) => {
+                const choice = CHOICES_BY_KEY[key];
+                return (
+                  <option key={key} value={key} disabled={choice?.comingSoon}>
+                    {t(`onboarding.accountType.types.${key}`)}
+                    {choice?.comingSoon ? ` (${t("onboarding.accountType.comingSoon")})` : ""}
+                  </option>
+                );
+              })}
+            </Select>
           </LabeledField>
 
           <LabeledField

@@ -5354,6 +5354,60 @@ export type Database = {
         Args: { p_primary_key?: string; p_trade_keys: string[] }
         Returns: undefined
       }
+      username_available: {
+        Args: { p_username: string }
+        Returns: boolean
+      }
+      profile_set_username: {
+        Args: { p_username: string }
+        Returns: undefined
+      }
+      profile_set_phone: {
+        Args: { p_country_iso2: string | null; p_national: string | null; p_e164: string }
+        Returns: undefined
+      }
+      profile_set_display_name: {
+        Args: { p_display_name: string }
+        Returns: undefined
+      }
+      organization_activities_set: {
+        Args: { p_org_id: string; p_activity_keys: string[] }
+        Returns: undefined
+      }
+      user_activities_set: {
+        Args: { p_activity_keys: string[] }
+        Returns: undefined
+      }
+      pending_registration_save: {
+        Args: {
+          p_user_id: string
+          p_username: string
+          p_audience_kind: "organization_type" | "persona_type"
+          p_audience_value: string
+          p_ttl_minutes?: number
+        }
+        Returns: undefined
+      }
+      pending_registration_consume: {
+        Args: never
+        Returns: {
+          username: string
+          audience_kind: "organization_type" | "persona_type"
+          audience_value: string
+        }[]
+      }
+      avatar_request_upload: {
+        Args: { p_content_type: string }
+        Returns: string
+      }
+      avatar_confirm_upload: {
+        Args: { p_object_key: string }
+        Returns: string | null
+      }
+      my_profile_completion: {
+        Args: never
+        Returns: Json
+      }
     }
     Enums: {
       affiliation_request_status:

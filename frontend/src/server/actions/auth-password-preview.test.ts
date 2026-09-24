@@ -72,10 +72,12 @@ vi.mock("@/server/queries/landing", () => ({
 }));
 
 const markPasswordAttachedAuthoritatively = vi.fn();
+const savePendingRegistration = vi.fn();
 // Inlined literal (not a shared const) — referencing an outer const directly inside a
 // hoisted vi.mock factory hits the TDZ, since the factory runs before the const initializes.
 vi.mock("@/lib/supabase/admin-server", () => ({
   markPasswordAttachedAuthoritatively: (...args: unknown[]) => markPasswordAttachedAuthoritatively(...args),
+  savePendingRegistration: (...args: unknown[]) => savePendingRegistration(...args),
   PASSWORD_SET_FLAG: "aladdin_pw_preview_password_set",
 }));
 const PASSWORD_SET_FLAG = "aladdin_pw_preview_password_set";
@@ -133,7 +135,15 @@ function fd(entries: Record<string, string>): FormData {
 }
 
 function consented(entries: Record<string, string> = {}) {
-  return fd({ consent_terms: "on", consent_privacy: "on", consent_pilot: "on", captchaToken: "test-captcha-token", ...entries });
+  return fd({
+    consent_terms: "on",
+    consent_privacy: "on",
+    consent_pilot: "on",
+    captchaToken: "test-captcha-token",
+    username: "validuser123",
+    accountType: "installer_technician",
+    ...entries,
+  });
 }
 
 /** For requestRecoveryCode — a Turnstile token is the only new requirement there. */
@@ -230,7 +240,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
   it("requires all three consents", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
-      fd({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, consent_terms: "on" }),
+      fd({ email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, consent_terms: "on" }),
     );
     expect(res.code).toBe("authPasswordPreview.error.consentRequired");
     expect(signUp).not.toHaveBeenCalled();
@@ -255,7 +265,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
   it("refuses without a captcha token — never calls signUp", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
-      fd({ consent_terms: "on", consent_privacy: "on", consent_pilot: "on", email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      fd({ consent_terms: "on", consent_privacy: "on", consent_pilot: "on", email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
     );
     expect(res.code).toBe("authPasswordPreview.error.captchaRequired");
     expect(signUp).not.toHaveBeenCalled();
@@ -356,7 +366,7 @@ describe("resendPasswordSignUpCode — never re-submits the password, never re-r
 describe("verifyPasswordSignUp (Architecture B — OTP-only, no password)", () => {
   it("verifies with type:'signup' (the EmailOtpType the installed @supabase/auth-js defines for this exact case) — never 'email'", async () => {
     verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test" } } });
-    rpc.mockResolvedValueOnce({ data: undefined });
+    rpc.mockResolvedValue({ data: null, error: null }); // covers record_consent + pending_registration_consume
     await expect(
       verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456" })),
     ).rejects.toThrow("REDIRECT:/onboarding");
@@ -365,7 +375,7 @@ describe("verifyPasswordSignUp (Architecture B — OTP-only, no password)", () =
 
   it("never calls updateUser — the password was already set by signUp() in step 1, not here", async () => {
     verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test" } } });
-    rpc.mockResolvedValueOnce({ data: undefined });
+    rpc.mockResolvedValue({ data: null, error: null }); // covers record_consent + pending_registration_consume
     await expect(
       verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456" })),
     ).rejects.toThrow("REDIRECT:/onboarding");
@@ -374,7 +384,7 @@ describe("verifyPasswordSignUp (Architecture B — OTP-only, no password)", () =
 
   it("still stamps the authoritative (app_metadata) flag on success — now purely for migrationEligibility() bookkeeping, not interruption-resume", async () => {
     verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test" } } });
-    rpc.mockResolvedValueOnce({ data: undefined });
+    rpc.mockResolvedValue({ data: null, error: null }); // covers record_consent + pending_registration_consume
     await expect(
       verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456" })),
     ).rejects.toThrow("REDIRECT:/onboarding");

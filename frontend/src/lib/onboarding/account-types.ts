@@ -31,12 +31,22 @@ export type PersonalPersona =
   | "contractor"
   | "sales";
 
+/**
+ * `organization_type` values that are no longer offered to a new
+ * registration but can still be stored on a legacy `onboarding_progress`
+ * row (registration INTENT, never remapped by Increment 4 — that migration
+ * only remaps `organizations.org_type`). Needed purely so a transitional
+ * choice's `accountType` still type-checks against what a legacy row can
+ * genuinely hold.
+ */
+type LegacyBusinessOrgType = "wholesaler";
+
 export type AccountTypeChoice = {
   /** Stable key used as the form value + i18n key suffix. */
   key: string;
   track: OnboardingTrack;
   /** Concrete DB account_type — a persona (personal) or an org_type (business). */
-  accountType: PersonalPersona | BusinessOrgType | null;
+  accountType: PersonalPersona | BusinessOrgType | LegacyBusinessOrgType | null;
   /**
    * Superseded choices kept ONLY so a saved draft still resolves to a label on
    * resume. Never rendered as a new-registration option.
@@ -62,12 +72,19 @@ export const INVITED_EMPLOYEE_KEY = "invited_employee";
  * PERSONAL persona, not a business type; there is no contractor `org_type`, so
  * none is offered here.)
  */
+/**
+ * `wholesaler` is deliberately absent — Staging-prep Increment 4
+ * (20260924090004_wholesaler_supplier_remap.sql) remaps every existing
+ * wholesaler organization to `supplier` + a `wholesaler` activity row and
+ * stops offering it as a new choice. The enum value itself still exists in
+ * the database (unused, same precedent as `contractor_company`/
+ * `design_office`) — only this picker changed.
+ */
 export const BUSINESS_ORG_TYPES = [
   "showroom_dealer",
   "supplier",
   "manufacturer",
   "importer",
-  "wholesaler",
 ] as const;
 export type BusinessOrgType = (typeof BUSINESS_ORG_TYPES)[number];
 
@@ -85,11 +102,25 @@ export function businessOrgTypeFromAccountType(
   return isBusinessOrgType(accountType) ? accountType : null;
 }
 
+/**
+ * The 9 approved top-level audiences (staging-prep taxonomy correction). Key
+ * names are unchanged from before to avoid a wider blast radius — only the
+ * MEMBERSHIP of this list and its i18n labels changed:
+ *
+ *   1. Showroom (showroom_dealer, business)      6. Engineer — Coming Soon
+ *   2. Supplier (business)                       7. Tradespeople & Technicians
+ *   3. Manufacturer (business)                       (key: installer_technician —
+ *   4. Importer (business)                            relabeled only, never a
+ *   5. Contractor — Coming Soon                        standalone "Installer" type)
+ *                                                 8. Sales Team (key: salesperson)
+ *                                                 9. Personal Account — Coming Soon
+ *                                                    (key: end_consumer; means ONLY
+ *                                                    homeowner/end-consumer)
+ */
 export const ACCOUNT_TYPE_CHOICES: AccountTypeChoice[] = [
   // ---- Personal: a persona the person claims for themselves. ----
   { key: "end_consumer", track: "consumer", accountType: "end_consumer", comingSoon: true },
   { key: "engineer", track: "professional", accountType: "engineer", comingSoon: true },
-  { key: "interior_designer", track: "professional", accountType: "interior_designer" },
   { key: "installer_technician", track: "professional", accountType: "installer_technician" },
   { key: "contractor", track: "professional", accountType: "contractor", comingSoon: true },
   { key: "salesperson", track: "professional", accountType: "sales" },
@@ -98,9 +129,14 @@ export const ACCOUNT_TYPE_CHOICES: AccountTypeChoice[] = [
   { key: "supplier", track: "business", accountType: "supplier" },
   { key: "manufacturer", track: "business", accountType: "manufacturer" },
   { key: "importer", track: "business", accountType: "importer" },
-  { key: "wholesaler", track: "business", accountType: "wholesaler" },
-  // ---- Transitional: resume-only, never offered. ----
+  // ---- Transitional: resume-only, never offered to a new registration. ----
+  { key: "interior_designer", track: "professional", accountType: "interior_designer", transitional: true },
   { key: "engineer_designer", track: "professional", accountType: "engineer", transitional: true },
+  // accountType stays literally "wholesaler" (not remapped to "supplier")
+  // because this resolves onboarding_progress.selected_org_type — registration
+  // INTENT, a different, untouched table from organizations.org_type, which
+  // Increment 4 remaps. A legacy row genuinely still holds "wholesaler" here.
+  { key: "wholesaler", track: "business", accountType: "wholesaler", transitional: true },
   {
     key: "manufacturer_importer_wholesaler",
     track: "business",
@@ -126,7 +162,6 @@ export const CHOICE_GROUPS: { group: "personal" | "business"; keys: string[] }[]
     keys: [
       "end_consumer",
       "engineer",
-      "interior_designer",
       "installer_technician",
       "contractor",
       "salesperson",

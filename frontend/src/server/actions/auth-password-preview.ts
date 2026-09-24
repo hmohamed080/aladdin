@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { markPasswordAttachedAuthoritatively, PASSWORD_SET_FLAG } from "@/lib/supabase/admin-server";
+import { markPasswordAttachedAuthoritatively, savePendingRegistration, PASSWORD_SET_FLAG } from "@/lib/supabase/admin-server";
+import { CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
 import {
   createIsolatedAuthClient,
   encryptRecoveryGrant,
@@ -14,6 +15,7 @@ import {
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { sanitizeNext } from "@/server/auth/next";
 import { resolveActiveLanding } from "@/server/queries/landing";
+import { hasAppAccess, type RegistrationState } from "@/server/queries/registration";
 import type { Database } from "@/types/database.types";
 import {
   emailSchema,
@@ -226,11 +228,18 @@ async function absoluteUrl(path: string): Promise<string> {
  * shared helper (see docs/frontend/auth-password-preview.md).
  */
 async function postSessionRedirect(supabase: SupabaseClient<Database>, next: string): Promise<never> {
-  if (next.startsWith("/onboarding") || next.startsWith("/auth/invite/")) {
+  if (next.startsWith("/onboarding") || next.startsWith("/preview/auth-password/finish-registration") || next.startsWith("/auth/invite/")) {
     redirect(next);
   }
   const { data: state } = await supabase.rpc("my_registration_state");
-  if (state !== "active_personal") redirect("/onboarding");
+  const registrationState = state as RegistrationState;
+  // A verified-but-not-yet-access_ready caller (missing account type or
+  // username) is sent to THIS preview's own minimal recovery screen, not the
+  // legacy six-step /onboarding wizard — see finish-registration/page.tsx.
+  if (registrationState === "account_type_pending" || registrationState === "username_pending") {
+    redirect("/preview/auth-password/finish-registration");
+  }
+  if (!hasAppAccess(registrationState)) redirect("/onboarding");
 
   const landing = await resolveActiveLanding(supabase);
   const destination = next === landing || next.startsWith(`${landing}/`) ? next : landing;
@@ -248,12 +257,22 @@ export async function requestPasswordSignUp(
 ): Promise<PasswordAuthState> {
   const parsed = registrationSchema.safeParse({
     email: formData.get("email"),
+    username: formData.get("username"),
+    accountType: formData.get("accountType"),
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
   });
   if (!parsed.success) {
     const first = parsed.error.issues[0];
     return { ok: false, code: (first?.message as string) ?? "authPasswordPreview.error.invalidEmail" };
+  }
+
+  // Server-side authority for the account-type choice — the client-supplied
+  // key is never trusted beyond looking it up here. A comingSoon/transitional
+  // key (a forged form submission) is rejected exactly like an unknown one.
+  const choice = CHOICES_BY_KEY[parsed.data.accountType];
+  if (!choice || choice.comingSoon || choice.transitional) {
+    return { ok: false, code: "authPasswordPreview.error.accountTypeRequired", email: parsed.data.email };
   }
 
   const consented = CONSENT_TYPES.every((type) => formData.get(`consent_${type}`) === "on");
@@ -268,7 +287,7 @@ export async function requestPasswordSignUp(
 
   const supabase = await getServerSupabase();
   const callStart = Date.now();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: { captchaToken },
@@ -286,13 +305,32 @@ export async function requestPasswordSignUp(
     // code path, never GoTrue's own wording. Response-time normalized too
     // (`padToRegistrationFloor`) — the enumeration-safe response SHAPE alone
     // is not enough if the two paths remain distinguishable by how fast they
-    // arrive.
+    // arrive. Deliberately NO pending-registration write on this branch —
+    // there is no new user id to key it by, and staging state for an
+    // existing account's id would be a foothold for exactly the enumeration
+    // this branch exists to close.
     if (isAccountExistsError(error as GoTrueError)) {
       await padToRegistrationFloor(callStart);
       return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
     }
     return { ok: false, code: "authPasswordPreview.error.sendFailed", email: parsed.data.email };
   }
+
+  // Stage username + account-type NOW, keyed by the user id signUp() just
+  // returned — before any confirmation, so a refresh/restart on the OTP step
+  // does not lose the choice (see Increment 6,
+  // supabase/migrations/20260924090006_pending_registrations.sql). Never the
+  // password. Best-effort: verifyPasswordSignUp falls back to the
+  // finish-registration recovery screen if this is ever lost.
+  if (data?.user) {
+    await savePendingRegistration({
+      userId: data.user.id,
+      username: parsed.data.username,
+      audienceKind: choice.track === "business" ? "organization_type" : "persona_type",
+      audienceValue: choice.accountType ?? "",
+    });
+  }
+
   await padToRegistrationFloor(callStart);
   return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
 }
@@ -392,6 +430,30 @@ export async function verifyPasswordSignUp(
   // Best-effort, matches production sign-up: never block a verified+credentialed
   // session on a consent-write hiccup.
   await supabase.rpc("record_consent", { p_types: [...CONSENT_TYPES], p_locale: locale });
+
+  // Consume the pending registration staged at signUp() time (Increment 6).
+  // A session now exists (verifyOtp succeeded above), so this reads
+  // auth.uid() itself — no user-id parameter, standard pattern. Everything
+  // returned is REVALIDATED by the RPCs it is applied through
+  // (onboarding_select_account_type, profile_set_username) — the pending row
+  // is a convenience cache, never an authority. If nothing is returned (the
+  // row expired, or the earlier best-effort write never landed), or the
+  // username claim loses a race to someone else, postSessionRedirect below
+  // routes to the finish-registration recovery screen based on the
+  // resulting registration state — never the legacy wizard.
+  const { data: pending } = await supabase.rpc("pending_registration_consume");
+  const pendingRow = Array.isArray(pending) ? pending[0] : pending;
+  if (pendingRow) {
+    const track = pendingRow.audience_kind === "organization_type" ? "business" : "professional";
+    await supabase.rpc("onboarding_select_account_type", {
+      p_track: track,
+      p_account_type: pendingRow.audience_value,
+    });
+    // Not racy against itself, but CAN collide with someone else who claimed
+    // the same normalized username in the meantime — that failure is
+    // expected and handled by the finish-registration screen, not here.
+    await supabase.rpc("profile_set_username", { p_username: pendingRow.username });
+  }
 
   return postSessionRedirect(supabase, "/onboarding");
 }
