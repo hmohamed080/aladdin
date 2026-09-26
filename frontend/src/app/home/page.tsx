@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { getRegistrationState } from "@/server/queries/registration";
+import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { loadPlatformRole } from "@/server/queries/platform";
 import { loadWorkspaces } from "@/server/queries/workspace";
 import { personalEntry, businessEntries } from "@/lib/workspace/model";
@@ -20,6 +20,8 @@ import { listJobOpportunities } from "@/server/queries/job-opportunities";
 import { getPointsBalance, listPointsEntries } from "@/server/queries/points";
 import { loadMyReviewSummary } from "@/server/queries/reviews";
 import { listMyNetworkOrganizations } from "@/server/queries/network";
+import { loadMyProfileCompletion } from "@/server/queries/profile-identity";
+import { CompleteProfileCard } from "@/features/profile/complete-profile-card";
 
 export const dynamic = "force-dynamic";
 
@@ -65,15 +67,29 @@ const HOME_OPPORTUNITIES_PREVIEW = 3;
 export default async function PersonalHomePage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state !== "active_personal") redirect("/onboarding");
+  if (!hasAppAccess(state)) redirect("/onboarding");
 
   const supabase = await getServerSupabase();
   if (await loadPlatformRole(supabase)) redirect("/admin");
 
+  // Informational only (never a gate): the persistent "Complete your profile"
+  // card. A failed read yields null and the card simply does not render.
+  const completion = await loadMyProfileCompletion();
+  const completionCard = completion ? <CompleteProfileCard completion={completion} /> : null;
+
   const { entries } = await loadWorkspaces(supabase);
   if (!personalEntry(entries)) {
     if (businessEntries(entries).length > 0) redirect("/b2b");
-    return <NoPersonalWorkspace />;
+    // Typically a business-track account that is access_ready but has not
+    // created its organization yet — it gets NO membership or /b2b access from
+    // that, only this terminal (whose CTA is "create your business") plus the
+    // completion checklist.
+    return (
+      <div className="flex flex-col gap-lg">
+        {completionCard}
+        <NoPersonalWorkspace />
+      </div>
+    );
   }
 
   const data = await loadPersonalHome();
@@ -86,7 +102,14 @@ export default async function PersonalHomePage() {
   // Only a professional has any of this to read — a consumer holds none of it
   // by construction, since every one of these descends from an assignment,
   // review or referral only a professional persona could have.
-  if (data.variant !== "professional") return <ConsumerHome data={data} t={t} />;
+  if (data.variant !== "professional") {
+    return (
+      <div className="flex flex-col gap-lg">
+        {completionCard}
+        <ConsumerHome data={data} t={t} />
+      </div>
+    );
+  }
 
   const [assignments, opportunities, pointsBalance, recentPointsEntries, reviews, network] = await Promise.all([
     listMyAssignments(supabase),
@@ -99,18 +122,21 @@ export default async function PersonalHomePage() {
   const completedJobsCount = countAssignmentsByStatus(assignments).completed;
 
   return (
-    <ProfessionalHome
-      data={data}
-      currentWork={featuredAssignment(assignments)}
-      opportunities={opportunities}
-      pointsBalance={pointsBalance}
-      recentPointsEntry={recentPointsEntries[0] ?? null}
-      reviewsAverage={reviews.average}
-      reviewsTotal={reviews.total}
-      networkCount={network.length}
-      completedJobsCount={completedJobsCount}
-      locale={locale}
-      t={t}
-    />
+    <div className="flex flex-col gap-lg">
+      {completionCard}
+      <ProfessionalHome
+        data={data}
+        currentWork={featuredAssignment(assignments)}
+        opportunities={opportunities}
+        pointsBalance={pointsBalance}
+        recentPointsEntry={recentPointsEntries[0] ?? null}
+        reviewsAverage={reviews.average}
+        reviewsTotal={reviews.total}
+        networkCount={network.length}
+        completedJobsCount={completedJobsCount}
+        locale={locale}
+        t={t}
+      />
+    </div>
   );
 }

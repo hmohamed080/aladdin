@@ -13,15 +13,13 @@ const initialConsent: ConsentState = { ok: false };
 
 /**
  * The post-registration NOTICE surface for the non-step states: outstanding
- * consent, a pending invitation, or a manually-blocked account. The collected
- * onboarding steps and the handoff summary live on their own routes; the router
- * forwards active users to the workspace before this renders.
+ * consent, or a manually-blocked account. Every other state is handled by a
+ * redirect in the router (`/onboarding/page.tsx`) before this ever renders.
  */
 export function OnboardingPanel({ state }: { state: RegistrationState }) {
   const { t } = useI18n();
 
   const copy: Record<string, { title: string; body: string }> = {
-    invitation_pending: { title: t("onboarding.invitationTitle"), body: t("onboarding.invitationBody") },
     manually_blocked: { title: t("onboarding.blockedTitle"), body: t("onboarding.blockedBody") },
   };
 
@@ -44,8 +42,8 @@ export function OnboardingPanel({ state }: { state: RegistrationState }) {
       ) : (
         <div className="flex flex-col gap-1">
           <p className="text-label font-medium uppercase tracking-wide text-fg-muted">{t("onboarding.nextStep")}</p>
-          <h1 className="font-display-ar text-headline text-fg">{copy[state]?.title ?? t("onboarding.invitationTitle")}</h1>
-          <p className="text-body-lg text-fg-secondary">{copy[state]?.body ?? t("onboarding.invitationBody")}</p>
+          <h1 className="font-display-ar text-headline text-fg">{copy[state]?.title ?? t("onboarding.blockedTitle")}</h1>
+          <p className="text-body-lg text-fg-secondary">{copy[state]?.body ?? t("onboarding.blockedBody")}</p>
         </div>
       )}
     </Card>

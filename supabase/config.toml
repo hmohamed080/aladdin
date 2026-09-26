@@ -179,7 +179,14 @@ enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
-minimum_password_length = 6
+# Set to 10 for the password-auth preview (docs/frontend/auth-password-preview.md):
+# length-first policy PLUS application-level weak-password rejection (common /
+# sequential / account-related), NIST-SP-800-63B-aligned. LOCAL ONLY — the
+# hosted staging/production Supabase dashboard's Auth > Policies setting is
+# separate and is not changed by this file; it must be updated there before
+# this preview (or its eventual promotion) is exercised against a hosted
+# project.
+minimum_password_length = 10
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
 password_requirements = ""
@@ -204,17 +211,36 @@ anonymous_users = 30
 # Number of sessions that can be refreshed in a 5 minute interval per IP address.
 token_refresh = 150
 # Number of sign up and sign-in requests that can be made in a 5 minute interval per IP address (excludes anonymous users).
-sign_in_sign_ups = 30
+# LOCAL/TEST-ONLY override (raised from the shipped default of 30): the
+# auth-password-preview's own Playwright suite legitimately performs many
+# real sign-up/sign-in requests from one machine (127.0.0.1) in a short
+# window — registration, forgot-password, CAPTCHA-rejection, and the
+# real-passwordless-migration E2E all send/verify OTPs back to back. Found
+# empirically: at 30, later tests in a full run got a SILENT non-delivery
+# (GoTrue accepts the request and returns success, to avoid a
+# distinguishing rate-limit error, but never actually queues the email) —
+# `readNewOtp` then times out waiting for mail that was never going to
+# arrive. This is local test-infrastructure config only; never applies to
+# hosted `aladdin-staging` or production, which keep GoTrue's real defaults.
+sign_in_sign_ups = 200
 # Number of OTP / Magic link verifications that can be made in a 5 minute interval per IP address.
-token_verifications = 30
+token_verifications = 200
 # Number of Web3 logins that can be made in a 5 minute interval per IP address.
 web3 = 30
 
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
-# [auth.captcha]
-# enabled = true
-# provider = "hcaptcha"
-# secret = ""
+#
+# PERMANENTLY DISABLED — the approved architecture (2026-09-24). CAPTCHA is
+# APPLICATION-SCOPED: the password-auth preview's Create Account and Forgot
+# Password server actions verify the Cloudflare Turnstile token themselves via
+# Cloudflare Siteverify (frontend/src/server/auth/turnstile.ts, secret in the
+# server-only TURNSTILE_SECRET_KEY) BEFORE calling Supabase Auth; Sign In has
+# no CAPTCHA. This switch is a single project-wide GoTrue toggle with no
+# per-endpoint scoping — enabling it would reject every canonical passwordless
+# OTP sign-up/sign-in/recovery and password sign-in that carries no token
+# (confirmed against local GoTrue: `captcha_failed ... no captcha_token
+# found`). Do NOT enable it locally or on hosted projects.
+# [auth.captcha]  -- intentionally absent; see the comment above.
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
@@ -223,7 +249,25 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# REVISION 4 — Architecture B is now the implemented registration flow for
+# the password-auth preview (docs/frontend/auth-password-preview.md
+# §Registration architecture): `signUp({email,password})` withholds a
+# session until the 6-digit `{{.Token}}` code from
+# `[auth.email.template.confirmation]` is verified via
+# `verifyOtp({type:"signup"})`. This setting MUST be `true` locally for that
+# to work at all — without it, `signUp()` returns a session immediately with
+# no confirmation step. LOCAL ONLY, same as every other [auth.email]/
+# [auth.rate_limit] entry in this file — the hosted `aladdin-staging`/
+# production dashboard's own "Confirm email" toggle is separate and is NOT
+# changed by this file; it must be flipped there (Auth → Sign In / Providers
+# → Email, "Confirm email") before Architecture B could ever run against a
+# hosted project. Confirmed empirically (revision 3's investigation, kept
+# below) that this only reroutes the email TEMPLATE for NEW-ACCOUNT creation
+# (`signUp()` and the canonical `signInWithOtp({shouldCreateUser:true})`) —
+# a RETURNING passwordless user's ordinary sign-in is unaffected. See the
+# doc's §"enable_confirmations impact map" for the full audit of every
+# canonical call site this could affect before any hosted promotion.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -250,16 +294,47 @@ otp_expiry = 3600
 subject = "رمز الدخول إلى علاء الدين"
 content_path = "./supabase/templates/magic_link.html"
 
+# Local Recovery template for the password-auth preview: show the 6-digit
+# {{ .Token }} for `verifyOtp({ type: "recovery" })` (this preview stays
+# OTP-code-native rather than the emailed link — see
+# docs/frontend/auth-password-preview.md). Production uses its own template.
+[auth.email.template.recovery]
+subject = "رمز إعادة تعيين كلمة المرور لعلاء الدين"
+content_path = "./supabase/templates/recovery.html"
+
+# Local Confirm-Signup template — REQUIRED by revision 4's Architecture B
+# (docs/frontend/auth-password-preview.md §Registration architecture): shows
+# the 6-digit {{ .Token }}, matching magic_link.html/recovery.html, instead of
+# the default link-only template. This is the template GoTrue uses for BOTH
+# this preview's `signUp()` confirmation AND, since `enable_confirmations=true`
+# above, the EXISTING canonical passwordless `signInWithOtp({shouldCreateUser:
+# true})` Sign Up flow too — confirmed empirically that a RETURNING,
+# already-confirmed user's ordinary sign-in still uses `magic_link` and is
+# unaffected. Production uses its own template/setting.
+[auth.email.template.confirmation]
+subject = "رمز تأكيد إنشاء الحساب في علاء الدين"
+content_path = "./supabase/templates/confirmation.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
-# Uncomment to customize notification email template
-# [auth.email.notification.password_changed]
-# enabled = true
-# subject = "Your password has been changed"
-# content_path = "./templates/password_changed_notification.html"
+# Password-changed security notification — enabled for the password-auth
+# preview (docs/frontend/auth-password-preview.md §Password-change
+# notification). Fires on ANY password update (registration completion,
+# forgot-password reset, authenticated change) — never contains the password
+# itself. LOCAL ONLY; the hosted dashboard has its own equivalent setting.
+[auth.email.notification.password_changed]
+enabled = true
+subject = "تم تغيير كلمة مرور حسابك في علاء الدين"
+# NOTE the different relative base than the [auth.email.template.*] entries
+# above: this CLI config key resolves content_path relative to the supabase/
+# directory itself, not the repo root — confirmed empirically via `supabase
+# status`'s own ENOENT path echo (it reported a doubled `supabase/supabase/`
+# when this used the same "./supabase/templates/..." convention as the
+# template sections).
+content_path = "./templates/password_changed.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.

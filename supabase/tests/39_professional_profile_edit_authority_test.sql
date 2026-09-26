@@ -32,7 +32,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(33);
+select plan(35);
 
 update auth.users set email_confirmed_at = now()
   where id in ('70000009-0000-4000-8000-000000000009', '70000005-0000-4000-8000-000000000005',
@@ -155,12 +155,25 @@ select ok(not app.is_professional_persona('70000010-0000-4000-8000-000000000010'
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000010-0000-4000-8000-000000000010","role":"authenticated"}';
 
-select lives_ok(
+-- Increment 12: a track alone no longer lets the PROFILE RPC pick a persona —
+-- that was a direct-call bypass of the account-type step (and a way to reach
+-- Coming Soon types). The persona comes from onboarding_select_account_type.
+select throws_ok(
   $$ select public.individual_save_professional(
        'engineer'::public.persona_type, 'Structural engineer', 3::smallint,
        'structural', null, array['structural_design'], null, null, null,
        null, false, null, null, null) $$,
-  'and is admitted by the track alone — first-time onboarding still works');
+  '42501', 'select an account type first',
+  'a track alone does not let the profile RPC choose a persona (Increment 12)');
+select lives_ok(
+  $$ select public.onboarding_select_account_type('professional', 'installer_technician') $$,
+  'the persona is chosen through the authoritative account-type RPC');
+select lives_ok(
+  $$ select public.individual_save_professional(
+       'installer_technician'::public.persona_type, 'Finishing installer', 3::smallint,
+       null, null, null, null, null, null,
+       null, false, null, null, null) $$,
+  'and the profile step then saves under that persona — first-time onboarding still works');
 
 -- ===========================================================================
 -- E. Everyone who must still be refused

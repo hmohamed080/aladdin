@@ -10,6 +10,13 @@ vi.mock("@/server/actions/availability", () => ({
 vi.mock("@/server/actions/auth", () => ({
   signOut: async () => {},
 }));
+vi.mock("@/server/actions/profile-identity", () => ({
+  setDisplayNameAction: async () => ({ ok: true }),
+  setPhoneAction: async () => ({ ok: true }),
+  requestAvatarUploadAction: async () => ({ ok: false, code: "profileIdentity.avatar.errorUpload" }),
+  confirmAvatarUploadAction: async () => ({ ok: false, code: "profileIdentity.avatar.errorUpload" }),
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 import { PersonalSettings } from "./personal-settings";
 
@@ -89,5 +96,52 @@ describe("PersonalSettings", () => {
     );
     expect(screen.getAllByText("الإعدادات").length).toBeGreaterThan(0);
     expect(container.textContent).not.toMatch(/personalSettings\.|personalNav\./);
+  });
+
+  const identity = {
+    displayName: "Member",
+    displayNameConfirmed: false,
+    username: "sayed",
+    phoneCountryIso2: null,
+    phoneNational: null,
+    phoneE164: null,
+    avatarUrl: null,
+  };
+
+  it("offers the shared identity fields to EVERY audience, consumers included", () => {
+    renderWithI18n(
+      <PersonalSettings home={home({ variant: "consumer" })} signInEmail={null} theme="light" t={t} identity={identity} />,
+      "en",
+    );
+    expect(screen.getByTestId("identity-card")).toBeTruthy();
+    expect(screen.getByLabelText("Display name")).toBeTruthy();
+    expect(screen.getByTestId("avatar-field")).toBeTruthy();
+    // Egypt is the default country, not the only one.
+    expect((screen.getByLabelText("Country") as HTMLSelectElement).value).toBe("EG");
+    expect(screen.getByLabelText("Country").querySelectorAll("option").length).toBeGreaterThan(200);
+  });
+
+  it("flags an automatic display name as NOT confirmed until it is saved here", () => {
+    renderWithI18n(<PersonalSettings home={home()} signInEmail={null} theme="light" t={t} identity={identity} />, "en");
+    expect(screen.getByTestId("display-name-status").textContent).toMatch(/Not confirmed yet/);
+  });
+
+  it("never shows a Preferred Language field — the AR/EN switch stays the only language control", () => {
+    renderWithI18n(<PersonalSettings home={home()} signInEmail={null} theme="light" t={t} identity={identity} />, "en");
+    expect(screen.queryByText(/preferred language/i)).toBeNull();
+  });
+
+  it("shows the Complete Profile card while incomplete, and not at 100%", () => {
+    const first = renderWithI18n(
+      <PersonalSettings home={home()} signInEmail={null} theme="light" t={t} completion={{ percent: 60, missing: ["phone"] }} />,
+      "en",
+    );
+    expect(screen.getByTestId("complete-profile-card")).toBeTruthy();
+    first.unmount();
+    renderWithI18n(
+      <PersonalSettings home={home()} signInEmail={null} theme="light" t={t} completion={{ percent: 100, missing: [] }} />,
+      "en",
+    );
+    expect(screen.queryByTestId("complete-profile-card")).toBeNull();
   });
 });

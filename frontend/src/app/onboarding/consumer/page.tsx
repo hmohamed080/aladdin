@@ -1,34 +1,28 @@
 import { redirect } from "next/navigation";
-import { getRegistrationState } from "@/server/queries/registration";
-import { activeLandingPath } from "@/server/queries/landing";
+import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { getIndividualOnboardingData } from "@/server/queries/onboarding";
 import { ConsumerFlow, ConsumerComplete } from "@/features/onboarding/consumer-flow";
 
 export const dynamic = "force-dynamic";
 
 /**
- * End Consumer onboarding (05.1.x). Only a consumer-track caller reaches this
- * route; everyone else is bounced to the resolver, which forwards them to their
- * own flow. Finishing activates the account, so this doubles as the consumer's
- * EDIT surface — an active personal caller may re-open it and change their
- * answers. `ConsumerComplete` remains for a legacy row completed before
- * activation existed.
+ * End Consumer questionnaire (05.1.x). No longer a mandatory registration
+ * gate (Increment 7 removed consumer_onboarding_pending/complete as
+ * my_registration_state() return values) — this is now an OPTIONAL surface a
+ * consumer-track caller with app access may open or re-open at any time to
+ * fill in or change their answers. `data.consumer.completedAt` (not
+ * registration state) decides whether to show the flow or the completed
+ * summary.
  */
 export default async function ConsumerOnboardingPage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state === "active_personal") {
-    const landing = await activeLandingPath();
-    if (landing !== "/home") redirect(landing);
-  } else if (state !== "consumer_onboarding_pending" && state !== "consumer_onboarding_complete") {
-    // Anyone not on the consumer branch resolves elsewhere.
-    redirect("/onboarding");
-  }
+  if (!hasAppAccess(state)) redirect("/onboarding");
 
   const data = await getIndividualOnboardingData();
   if (!data || data.selectedTrack !== "consumer") redirect("/onboarding");
 
-  if (state === "consumer_onboarding_complete") {
+  if (data.consumer.completedAt) {
     return <ConsumerComplete answers={data.consumer} />;
   }
   return <ConsumerFlow answers={data.consumer} />;

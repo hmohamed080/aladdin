@@ -36,8 +36,12 @@ select public.record_consent(array['terms','privacy','pilot']::public.consent_ty
 select public.onboarding_save_profile('Omar Hassan', 'en');
 select public.onboarding_save_contact('01012345678');
 select public.onboarding_select_account_type('business', 'supplier');
-select is((select public.my_registration_state()), 'organization_setup_pending',
-  'a business selection lands on the organization-setup handoff');
+-- Staging-prep Increment 7 (20260924090007_registration_state_access_ready.sql)
+-- removed organization_setup_pending as a return value of
+-- my_registration_state() — once account_type_completed_at is set, the only
+-- remaining gate before access_ready is the mandatory username step.
+select is((select public.my_registration_state()), 'username_pending',
+  'a business selection with no username yet lands on username_pending');
 
 -- ===== required-field gates on submit =====
 -- A draft exists but carries no name yet.

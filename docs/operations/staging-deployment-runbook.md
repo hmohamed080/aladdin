@@ -104,7 +104,7 @@ That leaves exactly one hosted setting that the code genuinely depends on, and i
 > **The Magic Link email template must be replaced in the hosted project.**
 > `config.toml` points the local template at `supabase/templates/magic_link.html`, which renders `{{ .Token }}`. `content_path` is a **local-only** setting — a hosted project falls back to Supabase's stock template, which prints a **link, not a code**. The sign-in screen asks for six digits, so staging sign-in silently becomes impossible until the template is replaced. See [step 3](#3-configure-supabase-auth).
 
-**CAPTCHA stays disabled.** `[auth.captcha]` is commented out in `config.toml` and no client passes a `captchaToken`. Enabling CAPTCHA in the hosted dashboard would make every OTP request fail. Revisit only alongside the code change that supplies the token.
+**Supabase CAPTCHA stays disabled — permanently.** CAPTCHA is application-scoped: the password-auth preview's Create Account and Forgot Password server actions verify the Cloudflare Turnstile token themselves with Cloudflare Siteverify (`frontend/src/server/auth/turnstile.ts`) before calling Supabase Auth, and Sign In has no CAPTCHA. The Turnstile **secret goes in the app's server-only env (`TURNSTILE_SECRET_KEY` on Vercel), never in Supabase Auth settings**; the site key is `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. Enabling CAPTCHA in the hosted Supabase dashboard would make every canonical OTP request and every password sign-in fail.
 
 ## Supabase readiness
 
@@ -299,7 +299,7 @@ Set the subject to `رمز الدخول إلى علاء الدين` to match loc
 
 **Authentication → Attack Protection**
 
-- **CAPTCHA: leave OFF.** No client sends a `captchaToken`; enabling it breaks every OTP request.
+- **CAPTCHA: leave OFF.** CAPTCHA is verified by the app (Cloudflare Siteverify, `TURNSTILE_SECRET_KEY` in Vercel), not by Supabase; enabling it here breaks every OTP request and password sign-in.
 - Rate limits: the defaults match `config.toml` closely enough for staging. Note that Supabase's **built-in email service sends only to project team members** and is limited to a few messages per hour — that constraint, not the code, is what makes [custom SMTP](#11-before-client-uat) a prerequisite for client UAT.
 
 ## 4. Load the staging demo data

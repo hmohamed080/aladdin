@@ -82,3 +82,38 @@ describe("specializationLabel", () => {
     expect(specializationLabel(en, "   ")).toBe("");
   });
 });
+
+/**
+ * The FINAL approved labels for the 14 active Tradespeople specializations
+ * (product-owner sign-off, 2026-09-24). Keys are the database `trades.key`
+ * values and never change — `foutek_installation` keeps its key even though
+ * the product name is spelled "Futec". A wording change is a deliberate edit
+ * of this table, never a silent drift.
+ */
+const FINAL_TRADE_LABELS: ReadonlyArray<readonly [key: string, en: string, ar: string]> = [
+  ["wallpaper_installation", "Wallpaper installation", "تركيب ورق حائط"],
+  ["gypsum_board_installation", "Gypsum board installation", "تركيب جبس بورد"],
+  ["wood_alternative_installation", "Wood-alternative installation", "تركيب بديل الخشب"],
+  ["marble_alternative_installation", "Marble-alternative installation", "تركيب بديل الرخام"],
+  ["vinyl_flooring_installation", "Vinyl flooring installation", "تركيب أرضيات فينيل"],
+  ["hdf_flooring_installation", "HDF flooring installation", "تركيب أرضيات HDF"],
+  ["painting", "Painter / decorator", "نقاش ودهانات"],
+  ["spray_paint_and_foundation", "Spray painting & surface prep", "رش دوكو وتأسيس دهانات"],
+  ["decorative_paints", "Decorative finishes", "تشطيبات ودهانات ديكورية"],
+  ["astarji", "Wood finishing & polishing (Astarji)", "أسترجي وتشطيب أخشاب"],
+  ["plastering_and_gypsum", "Plastering & gypsum", "محارة وجبس"],
+  ["epoxy_flooring", "Epoxy flooring", "أرضيات إيبوكسي"],
+  ["door_installation", "Door installation", "تركيب أبواب"],
+  ["foutek_installation", "Futec installation", "تركيب فيوتك"],
+];
+
+describe("final Tradespeople labels", () => {
+  it("covers exactly 14 distinct keys", () => {
+    expect(new Set(FINAL_TRADE_LABELS.map(([k]) => k)).size).toBe(14);
+  });
+
+  it.each(FINAL_TRADE_LABELS)("%s → %s / %s", (key, enLabel, arLabel) => {
+    expect(tradeLabel(en, key)).toBe(enLabel);
+    expect(tradeLabel(ar, key)).toBe(arLabel);
+  });
+});

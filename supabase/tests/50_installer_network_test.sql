@@ -52,7 +52,7 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000006-0000-4000-8000-000000000006","role":"authenticated"}';
 select set_config('test.job_a',
   (select public.job_create(:'orgH'::uuid, 'Marble foyer restoration - Zamalek',
-    'marble_granite', 5000))::text, true);
+    'wallpaper_installation', 5000))::text, true);
 select lives_ok(
   $$select public.job_publish(current_setting('test.job_a')::uuid, 1)$$,
   'and published');
@@ -85,7 +85,7 @@ select lives_ok(
 -- ---- Job B — org H, tiling — the SAME organization, a SECOND completion ---
 select set_config('test.job_b',
   (select public.job_create(:'orgH'::uuid, 'Tiling entrance hall - Zamalek',
-    'tiling', 6200))::text, true);
+    'gypsum_board_installation', 6200))::text, true);
 select lives_ok(
   $$select public.job_publish(current_setting('test.job_b')::uuid, 1)$$, 'and published');
 
@@ -117,7 +117,7 @@ select lives_ok(
 set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
 select set_config('test.job_c',
   (select public.job_create(:'orgN'::uuid, 'Marble reception desk - New Cairo',
-    'marble_granite', 3000))::text, true);
+    'wallpaper_installation', 3000))::text, true);
 select lives_ok(
   $$select public.job_publish(current_setting('test.job_c')::uuid, 1)$$, 'and published');
 
@@ -172,12 +172,12 @@ select is(
 
 select is(
   (select trade_keys from public.my_network_organizations where org_id = :'orgH'::uuid),
-  array['marble_granite', 'tiling'],
+  array['gypsum_board_installation', 'wallpaper_installation'],
   'org H carries BOTH trades actually worked, sorted');
 
 select is(
   (select trade_keys from public.my_network_organizations where org_id = :'orgN'::uuid),
-  array['marble_granite'],
+  array['wallpaper_installation'],
   'org N carries the one trade worked there');
 
 -- All three completions land in the SAME transaction, so now() is literally
@@ -215,7 +215,7 @@ select is(
 set local request.jwt.claims = '{"sub":"70000006-0000-4000-8000-000000000006","role":"authenticated"}';
 select set_config('test.job_d',
   (select public.job_create(:'orgH'::uuid, 'Electrical rewire - Maadi',
-    'electrical', 4000))::text, true);
+    'wood_alternative_installation', 4000))::text, true);
 select lives_ok(
   $$select public.job_publish(current_setting('test.job_d')::uuid, 1)$$, 'and published');
 
@@ -328,7 +328,7 @@ select is(
 -- F. The relationship survives verification loss and trade retirement
 -- ===========================================================================
 reset role;
-update public.trades set is_active = false where key = 'marble_granite';
+update public.trades set is_active = false where key = 'wallpaper_installation';
 update public.organizations set is_verified = false where id = :'orgH'::uuid;
 
 set local role authenticated;
@@ -344,16 +344,16 @@ select is(
 
 select is(
   (select trade_keys from public.my_network_organizations where org_id = :'orgH'::uuid),
-  array['marble_granite', 'tiling'],
+  array['gypsum_board_installation', 'wallpaper_installation'],
   'the retired trade stays labelled on the historical relationship');
 
 select is(
-  (select count(*) from public.trades where key = 'marble_granite')::int,
+  (select count(*) from public.trades where key = 'wallpaper_installation')::int,
   0, 'while the live catalog no longer offers it (not widened)');
 
 select is(
   (select count(*) from public.my_network_work_history
-     where org_id = :'orgH'::uuid and trade_key = 'marble_granite')::int,
+     where org_id = :'orgH'::uuid and trade_key = 'wallpaper_installation')::int,
   1, 'the work history still labels Job A with its retired trade');
 
 -- Job discovery loss: a completed job was never open in the first place from

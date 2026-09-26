@@ -29,6 +29,10 @@ const ARABIC = /[؀-ۿ]/;
 // (neutral placeholders), so they carry Latin/digits and no Arabic script.
 const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   "auth.emailPlaceholder",
+  "authPasswordPreview.emailPlaceholder",
+  // Illustrative bad-pattern examples ("aaaa", "1234") inside an otherwise
+  // Arabic sentence — technical samples, not translated prose.
+  "authPasswordPreview.error.passwordSequential",
   "onboarding.contact.phonePlaceholder",
   // A KEYCAP legend, not prose. The Enter key is engraved "Enter" on Arabic
   // keyboards too, so translating it would name a key the user cannot find.
@@ -37,6 +41,10 @@ const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   // format, not a word — and transliterating it would tell a reader less about
   // the file they are looking at, not more.
   "certificates.fileType.pdf",
+  // Same reasoning, for the avatar upload's accepted image formats.
+  "profileIdentity.avatar.errorType",
+  // HDF is a board-material name, written HDF in Arabic trade usage.
+  "onboarding.professional.specializations.hdf_flooring_installation",
 ]);
 
 describe("i18n catalogs", () => {

@@ -30,8 +30,19 @@ export type Trade = { id: string; key: string };
 
 /** The caller's own selection: every trade they hold, and the one they lead with. */
 export type MyTrades = {
-  /** Active trades only, primary first, then the vocabulary's own order. */
+  /** Active, currently-selectable trades the caller holds, primary first, then the vocabulary's own order. */
   keys: string[];
+  /**
+   * Retired (is_active=false) trades the caller already holds. `user_trades_set`
+   * is a whole-set write — a key missing from the submitted set is deleted, not
+   * merely left unselected (20260901090001_trade_taxonomy.sql). These must ride
+   * along in every resubmission unless the caller deliberately drops one, or an
+   * unrelated active-trade edit would silently erase a legacy trade the platform
+   * never asked the caller to give up. Never offered as a NEW selection.
+   * Optional (defaults to none) so read-only display consumers (`TradeSummary`)
+   * and existing call sites that predate this field are not forced to pass it.
+   */
+  legacyKeys?: string[];
   /** Null when the caller holds no trades at all — a normal, complete state. */
   primaryKey: string | null;
 };
@@ -72,7 +83,7 @@ export const loadMyTrades = cache(async function loadMyTrades(): Promise<MyTrade
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { keys: [], primaryKey: null };
+  if (!user) return { keys: [], legacyKeys: [], primaryKey: null };
 
   const { data, error } = await supabase
     .from("user_trades")
@@ -80,21 +91,20 @@ export const loadMyTrades = cache(async function loadMyTrades(): Promise<MyTrade
     .eq("user_id", user.id);
   if (error) throw error;
 
-  const rows = (data ?? [])
-    // An INACTIVE trade the person still holds is not shown as a current claim.
-    // The row survives — the database keeps history through a retirement — but
-    // the profile stops publishing a trade the platform has withdrawn, exactly
-    // as `profile_public_directory` does.
-    .filter((r) => r.trades?.is_active)
-    .sort(
-      (a, b) =>
-        Number(b.is_primary) - Number(a.is_primary) ||
-        (a.trades?.sort_order ?? 0) - (b.trades?.sort_order ?? 0) ||
-        (a.trades?.key ?? "").localeCompare(b.trades?.key ?? ""),
-    );
+  const rows = (data ?? []).sort(
+    (a, b) =>
+      Number(b.is_primary) - Number(a.is_primary) ||
+      (a.trades?.sort_order ?? 0) - (b.trades?.sort_order ?? 0) ||
+      (a.trades?.key ?? "").localeCompare(b.trades?.key ?? ""),
+  );
 
   return {
-    keys: rows.map((r) => r.trades!.key),
+    keys: rows.filter((r) => r.trades?.is_active).map((r) => r.trades!.key),
+    // Retired but still held — kept out of `keys` (never a NEW selection, never
+    // counted toward the active catalog's UI) but still reported so the editor
+    // can render them read-only and carry them through the next
+    // user_trades_set whole-set write instead of silently dropping them.
+    legacyKeys: rows.filter((r) => r.trades && !r.trades.is_active).map((r) => r.trades!.key),
     primaryKey: rows.find((r) => r.is_primary)?.trades?.key ?? null,
   };
 });
