@@ -10,6 +10,7 @@ import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { THEME_COOKIE } from "@/lib/theme/config";
 import { maskEmail } from "@/lib/ui/mask-email";
 import { PersonalSettings } from "@/features/settings/personal-settings";
+import { loadMyIdentity, loadMyProfileCompletion } from "@/server/queries/profile-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +32,21 @@ export default async function PersonalSettingsPage() {
   const t = createTranslator(locale);
   const theme = store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light";
 
-  const { data: auth } = await supabase.auth.getUser();
+  const [{ data: auth }, identity, completion] = await Promise.all([
+    supabase.auth.getUser(),
+    loadMyIdentity(),
+    loadMyProfileCompletion(),
+  ]);
   const signInEmail = auth?.user?.email ? maskEmail(auth.user.email) : null;
 
-  return <PersonalSettings home={home} signInEmail={signInEmail} theme={theme} t={t} />;
+  return (
+    <PersonalSettings
+      home={home}
+      signInEmail={signInEmail}
+      theme={theme}
+      t={t}
+      identity={identity}
+      completion={completion}
+    />
+  );
 }

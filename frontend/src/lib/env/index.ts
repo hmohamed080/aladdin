@@ -20,26 +20,14 @@ export const publicEnvSchema = z.object({
   // (e.g. "support@aladdin.eg" or a help-desk URL). OPTIONAL: when unset, the
   // support page shows a safe "unavailable" state instead of a fabricated contact.
   NEXT_PUBLIC_SUPPORT_CONTACT: z.string().trim().min(1).optional(),
-  // Cloudflare Turnstile site key (PUBLIC by design — embedded in the widget's
-  // HTML, not a secret). Only the isolated password-auth preview's Create
-  // Account / Forgot Password screens read this
-  // (features/auth-password-preview/turnstile-widget.tsx). The matching
-  // SECRET key lives server-side only, in Supabase's own [auth.captcha]
-  // config — never in this app's env at all, since GoTrue verifies the token
-  // itself. Optional because unset locally falls back to Cloudflare's
-  // published always-pass TEST site key so local dev never needs a real
-  // Cloudflare account.
+  // Cloudflare Turnstile SITE key (PUBLIC by design — embedded in the widget).
+  // Used on the password-auth preview's Create Account and Forgot Password
+  // screens only; Sign In has no CAPTCHA. The matching SECRET is the
+  // server-only TURNSTILE_SECRET_KEY below — the APP verifies every token with
+  // Cloudflare Siteverify (server/auth/turnstile.ts); Supabase's global
+  // [auth.captcha] stays OFF. Optional: unset locally falls back to
+  // Cloudflare's published always-pass TEST site key.
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().trim().min(1).optional(),
-  // A SEPARATE Turnstile site key for Sign In's invisible/non-interactive
-  // check (see turnstile-widget.tsx's doc comment — GoTrue's `[auth.captcha]`
-  // is all-or-nothing across signup/recovery/password sign-in, so Sign In
-  // needs a token too, but must stay visually frictionless). A real
-  // Cloudflare site key's widget mode is fixed at creation time on
-  // Cloudflare's dashboard, so this must be a DIFFERENT key from
-  // NEXT_PUBLIC_TURNSTILE_SITE_KEY above, created in invisible mode. Optional
-  // because unset locally falls back to Cloudflare's published always-pass
-  // invisible TEST key.
-  NEXT_PUBLIC_TURNSTILE_INVISIBLE_SITE_KEY: z.string().trim().min(1).optional(),
 });
 
 export const serverEnvSchema = z.object({
@@ -53,6 +41,12 @@ export const serverEnvSchema = z.object({
   // cookie (AES-256-GCM — see lib/supabase/recovery-grant.ts). Optional
   // because only that preview's recovery flow needs it; unset anywhere else.
   AUTH_PASSWORD_PREVIEW_GRANT_SECRET: z.string().min(32).optional(),
+  // Cloudflare Turnstile SECRET key — server-only, never NEXT_PUBLIC_*. Read
+  // solely by server/auth/turnstile.ts to call Cloudflare Siteverify. Unset is
+  // allowed only locally (falls back to Cloudflare's always-pass TEST secret);
+  // in staging/production an unset secret makes every CAPTCHA check fail
+  // closed.
+  TURNSTILE_SECRET_KEY: z.string().trim().min(1).optional(),
 });
 
 /**

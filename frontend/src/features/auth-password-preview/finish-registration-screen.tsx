@@ -21,12 +21,31 @@ const initial: AccountTypeChoiceState = { ok: false };
  * renders the same minimal `UsernameStep` the canonical
  * `/onboarding/username` page uses.
  */
-export function FinishRegistrationScreen({ needsAccountType }: { needsAccountType: boolean }) {
+export function FinishRegistrationScreen({
+  needsAccountType,
+  usernameUnavailable = false,
+}: {
+  needsAccountType: boolean;
+  /**
+   * The username chosen at sign-up lost the post-OTP claim (23505). Only
+   * changes the explanation — never whether the name was reserved or taken.
+   */
+  usernameUnavailable?: boolean;
+}) {
   const { t } = useI18n();
   const [state, dispatch] = useActionState(chooseAccountTypeAction, initial);
   const [accountTypeKey, setAccountTypeKey] = useState("");
 
-  if (!needsAccountType) return <UsernameStep />;
+  if (!needsAccountType) {
+    return usernameUnavailable ? (
+      <UsernameStep
+        titleKey="registration.username.unavailableTitle"
+        subtitleKey="registration.username.unavailableSubtitle"
+      />
+    ) : (
+      <UsernameStep />
+    );
+  }
 
   return (
     <Card className="flex flex-col gap-lg p-lg tablet:p-xl">

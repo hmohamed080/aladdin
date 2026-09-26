@@ -10,12 +10,13 @@ import {
   type PasswordAuthState,
 } from "@/server/actions/auth-password-preview";
 import { AuthCard } from "@/features/auth/auth-card";
-import { Input, LabeledField, Select, SubmitButton, Checkbox, ResendButton, Button } from "@/components/ui/controls";
+import { Input, LabeledField, SubmitButton, Checkbox, ResendButton, Button } from "@/components/ui/controls";
 import { OtpInput } from "@/components/ui/otp-input";
+import { ChoiceCard } from "@/components/ui/choice-card";
 import { PasswordInput } from "./password-input";
 import { PasswordStrengthMeter } from "./password-strength-meter";
 import { TurnstileWidget } from "./turnstile-widget";
-import { CHOICE_GROUPS, CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
+import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
 
 const initial: PasswordAuthState = { ok: false };
 const RESEND_COOLDOWN_SECONDS = 30;
@@ -159,26 +160,28 @@ export function PasswordSignUpForm() {
             htmlFor="accountType"
             error={sendState.code === "authPasswordPreview.error.accountTypeRequired" ? t(sendState.code) : undefined}
           >
-            <Select
-              id="accountType"
-              name="accountType"
-              required
-              value={accountTypeKey}
-              onChange={(e) => setAccountTypeKey(e.target.value)}
-            >
-              <option value="" disabled>
-                {t("authPasswordPreview.accountTypePlaceholder")}
-              </option>
-              {CHOICE_GROUPS.flatMap((group) => group.keys).map((key) => {
+            <input type="hidden" id="accountType" name="accountType" value={accountTypeKey} />
+            <div className="grid gap-2.5 tablet:grid-cols-2">
+              {REGISTRATION_CHOICE_ORDER.map((key) => {
                 const choice = CHOICES_BY_KEY[key];
+                const comingSoon = choice?.comingSoon === true;
                 return (
-                  <option key={key} value={key} disabled={choice?.comingSoon}>
-                    {t(`onboarding.accountType.types.${key}`)}
-                    {choice?.comingSoon ? ` (${t("onboarding.accountType.comingSoon")})` : ""}
-                  </option>
+                  <ChoiceCard
+                    key={key}
+                    selected={accountTypeKey === key}
+                    disabled={comingSoon}
+                    badge={comingSoon ? t("onboarding.accountType.comingSoon") : undefined}
+                    title={t(`onboarding.accountType.types.${key}`)}
+                    description={
+                      comingSoon
+                        ? t("onboarding.accountType.comingSoonHint")
+                        : t(`onboarding.accountType.types.${key}Desc`)
+                    }
+                    onSelect={() => setAccountTypeKey(key)}
+                  />
                 );
               })}
-            </Select>
+            </div>
           </LabeledField>
 
           <LabeledField

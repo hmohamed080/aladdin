@@ -67,7 +67,7 @@ async function signInWorks(browser: import("@playwright/test").Browser, email: s
   await page.goto("/preview/auth-password/sign-in");
   await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
-  await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30000 });
+  // Sign In has no CAPTCHA.
   await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
   await page.waitForTimeout(1500);
   const works = !/sign-in/.test(page.url());

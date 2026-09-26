@@ -14,8 +14,16 @@ const initial: UsernameState = { ok: false };
  * Deliberately minimal — one field, no wizard chrome. See this route's page
  * doc comment (`app/onboarding/username/page.tsx`) for why this exists as
  * its own narrow screen rather than a step inside the legacy wizard.
+ *
+ * `titleKey` / `subtitleKey` let the password-registration recovery path say
+ * WHY it is asking (the name chosen at sign-up is no longer available) instead
+ * of looking as if the product forgot it. Defaults keep every other caller
+ * unchanged.
  */
-export function UsernameStep() {
+export function UsernameStep({
+  titleKey = "registration.username.title",
+  subtitleKey = "registration.username.subtitle",
+}: { titleKey?: string; subtitleKey?: string } = {}) {
   const { t } = useI18n();
   const [state, dispatch] = useActionState(chooseUsernameAction, initial);
   const [value, setValue] = useState("");
@@ -33,8 +41,8 @@ export function UsernameStep() {
       <div className="flex flex-col gap-md">
         <Brand name={t("common.appName")} size="sm" wordmark={false} />
         <div className="flex flex-col gap-1">
-          <h1 className="font-display-ar text-headline text-fg">{t("registration.username.title")}</h1>
-          <p className="text-body-lg text-fg-secondary">{t("registration.username.subtitle")}</p>
+          <h1 className="font-display-ar text-headline text-fg">{t(titleKey)}</h1>
+          <p className="text-body-lg text-fg-secondary">{t(subtitleKey)}</p>
         </div>
       </div>
       <form action={dispatch} className="flex flex-col gap-md" noValidate>

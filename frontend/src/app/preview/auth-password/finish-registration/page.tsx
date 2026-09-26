@@ -17,7 +17,11 @@ export const dynamic = "force-dynamic";
  * possible gaps (account_type_pending, username_pending), re-derived fresh
  * from `my_registration_state()` on every load, never from client state.
  */
-export default async function FinishRegistrationPage() {
+export default async function FinishRegistrationPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ reason?: string | string[] }>;
+}) {
   const supabase = await getServerSupabase();
   const {
     data: { user },
@@ -28,5 +32,15 @@ export default async function FinishRegistrationPage() {
   if (state === "active_personal" || state === "access_ready") redirect(await activeLandingPath());
   if (state !== "account_type_pending" && state !== "username_pending") redirect("/onboarding");
 
-  return <FinishRegistrationScreen needsAccountType={state === "account_type_pending"} />;
+  // `reason` only chooses explanatory copy (allow-listed literal); it never
+  // grants or skips anything — the state above is re-derived from the DB.
+  const reason = (await searchParams)?.reason;
+  const usernameUnavailable = state === "username_pending" && reason === "username_unavailable";
+
+  return (
+    <FinishRegistrationScreen
+      needsAccountType={state === "account_type_pending"}
+      usernameUnavailable={usernameUnavailable}
+    />
+  );
 }

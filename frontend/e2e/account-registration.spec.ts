@@ -60,14 +60,14 @@ test.describe("account registration", () => {
     await page.getByLabel(/one-time code/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify/i }).click();
 
-    // Verified + consented new account resumes at the first onboarding step
-    // (Sprint 7.3: /onboarding forwards to the next incomplete step).
-    await page.waitForURL(/\/onboarding\/profile$/, { waitUntil: "commit" });
-    await expect(page.getByText(/step 1 of 3/i)).toBeVisible();
+    // Verified + consented new account resumes at the first INCOMPLETE step —
+    // since Increment 7 that is the account type (the profile/contact wizard
+    // steps are no longer on the path).
+    await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
 
     // Resume: a signed-in caller visiting Sign In is funnelled back into onboarding.
     await page.goto("/auth/sign-in");
-    await page.waitForURL(/\/onboarding\/profile$/, { waitUntil: "commit" });
+    await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
   });
 
   test("sign up in Arabic renders RTL with no mixed-language leakage", async ({ page }) => {
@@ -128,14 +128,21 @@ test.describe("account registration", () => {
     // pending invitation shared across projects.
     test.skip(testInfo.project.name !== "chromium-desktop", "runs once on desktop");
     await prefs(page, "en", "light");
-    // a-cairo@example.test matches the seeded invitation email.
-    await signIn(page, request, IDENTITIES.branchLimited);
+    // a-cairo@example.test matches the seeded invitation email. It holds a
+    // canonical Sales persona AND a membership, so its landing follows the
+    // selected work context — either surface is a valid start here.
+    await signIn(page, request, IDENTITIES.branchLimited, /\/(b2b|home)(\/|$)/);
 
     await page.goto(`/auth/invite/${E2E_INVITE_TOKEN}`);
     await noOverflow(page);
     await expect(page.getByText(/this invitation is for your account/i)).toBeVisible();
     await page.getByRole("button", { name: /accept invitation/i }).click();
-    // Acceptance bridges to an active membership and lands in the workspace.
-    await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
+    // Acceptance bridges to an active membership. The landing follows the
+    // selected work context (this account also has a Personal one), so prove
+    // the membership directly: the B2B workspace now renders instead of
+    // bouncing back to /home.
+    await page.waitForURL(/\/(b2b|home)(\/|$)/, { waitUntil: "commit" });
+    await page.goto("/b2b");
+    await expect(page).toHaveURL(/\/b2b(\/|$)/);
   });
 });

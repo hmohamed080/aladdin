@@ -206,17 +206,27 @@ select ok(
 -- ===========================================================================
 -- D. The policies -- the exact set, and the absences that are the design
 -- ===========================================================================
+-- Staging-prep Increment 5 (20260924090005_avatars_storage.sql) added a third
+-- bucket (avatars), mirroring this exact same 3-certificates/3-portfolio shape
+-- plus its own public door: 4 more policies (insert/select-own/delete-own/
+-- select-published), for 11 total. Updated here rather than left stale,
+-- since this file's own point is to name every policy explicitly so a NEW
+-- one cannot pass quietly — the avatars bucket is a reviewed addition, named.
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects'),
-  7,
-  'Seven policies on storage.objects: three for certificates, three for portfolio, and ONE public door'
+  11,
+  'Eleven policies on storage.objects: three each for certificates/portfolio/avatars, plus two public doors'
 );
 
 select is(
   (select array_agg(policyname::text order by policyname::text collate "C")
      from pg_policies where schemaname = 'storage' and tablename = 'objects'),
   array[
+    'avatars_delete_own',
+    'avatars_insert_authorized',
+    'avatars_select_own',
+    'avatars_select_published',
     'professional_certificates_delete_own',
     'professional_certificates_insert_own',
     'professional_certificates_select_own',
@@ -225,7 +235,7 @@ select is(
     'professional_portfolio_select_own',
     'professional_portfolio_select_published'
   ],
-  'Each policy still names ONE bucket in its own name, so widening portfolio reads cannot silently widen certificates'
+  'Each policy still names ONE bucket in its own name, so widening one bucket''s reads cannot silently widen another''s'
 );
 
 select is(
@@ -235,15 +245,15 @@ select is(
   'NO UPDATE POLICY EXISTS, in either bucket. Still the overwrite rule: upsert has nothing to ask for, so object keys are immutable'
 );
 
--- The one anon policy in the product. The assertion names WHICH one rather than
--- counting, because a second is the change worth catching and naming this one
--- means adding another cannot pass quietly.
+-- The anon policies in the product. The assertion names WHICH ones rather than
+-- counting, because an unnamed addition is the change worth catching — Increment
+-- 5's avatars_select_published is a reviewed, named second door, not a silent one.
 select is(
   (select array_agg(policyname::text order by policyname::text collate "C")
      from pg_policies where schemaname = 'storage' and tablename = 'objects'
       and ('anon' = any(roles) or 'public' = any(roles))),
-  array['professional_portfolio_select_published'],
-  'EXACTLY ONE policy admits anon, it is a SELECT, and it is the published-portfolio door'
+  array['avatars_select_published', 'professional_portfolio_select_published'],
+  'EXACTLY TWO policies admit anon, both SELECT sign-only public doors — portfolio and avatars, certificates has none'
 );
 
 select is(

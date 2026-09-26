@@ -318,6 +318,19 @@ select is(
 -- ===========================================================================
 -- E. Cancellation — either party, and history survives it
 -- ===========================================================================
+-- Job 2's seeded trade ('plumbing') is one of the 7 retired by staging-prep
+-- Increment 3 (20260924090003_audience_activities.sql) — already inactive by
+-- the time this file runs, unlike job 1's 'marble_granite' (still active until
+-- §B above deliberately retires it). job_publish refuses to publish a job
+-- whose trade is no longer active (20260902090001_jobs_domain.sql, pre-dating
+-- this pass), which job 1 never hit because it was already 'open' from seed
+-- data directly, never published live in this file. Job 2 IS published live
+-- here, so its trade is reassigned to an active one first — nothing else in
+-- this file references 'plumbing' by name.
+reset role;
+update public.jobs set trade_id = (select id from public.trades where key = 'wallpaper_installation')
+  where id = 'f1000002-0000-4000-8000-000000000002';
+
 -- A second engagement on the draft job, so the terminal states do not collide.
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000006-0000-4000-8000-000000000006","role":"authenticated"}';

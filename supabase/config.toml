@@ -230,35 +230,17 @@ web3 = 30
 
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
 #
-# DELIBERATELY LEFT DISABLED, even though this preview's Create Account,
-# Forgot Password, and Sign In screens all implement and require a
-# `captchaToken` (docs/frontend/auth-password-preview.md §CAPTCHA) —
-# **found empirically, not by choice**: `[auth.captcha]` is a single
-# project-wide GoTrue switch with NO per-endpoint or per-caller scoping.
-# Enabling it locally to live-test this preview's captcha wiring was tried
-# and DIRECTLY BROKE the CANONICAL, unmodified, already-shipped passwordless
-# flows — confirmed via curl against local GoTrue, each returning
-# `{"error_code":"captcha_failed","msg":"captcha protection: request
-# disallowed (no captcha_token found)"}`:
-#   - POST /auth/v1/otp  {create_user:true}   (canonical /auth/sign-up)
-#   - POST /auth/v1/otp  {create_user:false}  (canonical /auth/sign-in)
-#   - POST /auth/v1/recover                   (canonical recovery)
-# None of that canonical code passes a `captchaToken` (correctly — it is
-# production code this preview must never modify), so ALL THREE fail
-# outright the moment this toggle is on, for every caller, not just this
-# preview's own new screens — which also silently broke every OTHER
-# Playwright spec in this repo that signs in via the canonical passwordless
-# flow (discovered because the new real-passwordless-migration E2E is the
-# first test in this repo to exercise that flow with captcha enabled).
-# Uncomment ONLY for a short, isolated, throwaway local verification run of
-# this preview's own captcha-rejection behavior against live GoTrue
-# enforcement (see that doc section for the exact secret/site-key pairing) —
-# never commit it enabled, and `supabase stop && supabase start` again
-# immediately after to restore normal local dev.
-# [auth.captcha]
-# enabled = true
-# provider = "turnstile"
-# secret = "1x0000000000000000000000000000000AA"
+# PERMANENTLY DISABLED — the approved architecture (2026-09-24). CAPTCHA is
+# APPLICATION-SCOPED: the password-auth preview's Create Account and Forgot
+# Password server actions verify the Cloudflare Turnstile token themselves via
+# Cloudflare Siteverify (frontend/src/server/auth/turnstile.ts, secret in the
+# server-only TURNSTILE_SECRET_KEY) BEFORE calling Supabase Auth; Sign In has
+# no CAPTCHA. This switch is a single project-wide GoTrue toggle with no
+# per-endpoint scoping — enabling it would reject every canonical passwordless
+# OTP sign-up/sign-in/recovery and password sign-in that carries no token
+# (confirmed against local GoTrue: `captcha_failed ... no captcha_token
+# found`). Do NOT enable it locally or on hosted projects.
+# [auth.captcha]  -- intentionally absent; see the comment above.
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
