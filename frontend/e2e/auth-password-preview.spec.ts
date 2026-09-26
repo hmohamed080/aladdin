@@ -239,7 +239,11 @@ async function claimUsernameViaCanonicalSignUp(
 }
 
 test.describe("Username availability is checked BEFORE signUp() (entered once; no Auth user or email for an unavailable name)", () => {
-  const UNAVAILABLE = /isn't available|غير متاح/i;
+  // The exact username-field error (registration.error.usernameUnavailable),
+  // anchored — a loose /غير متاح/ also matches the three Arabic "Coming
+  // Soon" account-type descriptions on the same form.
+  const USERNAME_UNAVAILABLE =
+    /^(That username isn't available\. Try another\.|اسم المستخدم هذا غير متاح\. جرّب اسمًا آخر\.)$/i;
 
   async function submitWithUsername(page: import("@playwright/test").Page, email: string, username: string) {
     await page.goto("/preview/auth-password/sign-up");
@@ -256,7 +260,9 @@ test.describe("Username availability is checked BEFORE signUp() (entered once; n
   }
 
   async function expectStillOnStep1(page: import("@playwright/test").Page, request: import("@playwright/test").APIRequestContext, email: string, username: string) {
-    await expect(page.getByText(UNAVAILABLE)).toBeVisible({ timeout: SIGNUP_STEP2_TIMEOUT_MS });
+    await expect(page.getByRole("alert").filter({ hasText: USERNAME_UNAVAILABLE })).toBeVisible({
+      timeout: SIGNUP_STEP2_TIMEOUT_MS,
+    });
     await expect(page.getByText(NEXT_STEP_TEXT)).toHaveCount(0);
     await expect(page.locator('input[autocomplete="one-time-code"]')).toHaveCount(0);
     // The user's values are still there to correct.
