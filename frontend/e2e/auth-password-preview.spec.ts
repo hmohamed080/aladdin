@@ -59,6 +59,31 @@ const STRONG_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
 /** The neutral Step-2 copy (§Account enumeration) — deliberately never an unconditional "we sent a code to X". */
 const NEXT_STEP_TEXT = /next step|الخطوة التالية/i;
 
+/**
+ * The real Create Account → Step-2 transition is an external round trip:
+ * Cloudflare Siteverify → Server Action → Supabase signUp() → confirmation
+ * email. On a real network it has been observed at ~8.6s on the mobile
+ * project, so the default 10s expect window is too tight. The longer timeout
+ * is scoped to THIS transition only: a server error still renders its own
+ * message instead of the Step-2 copy, so a real failure is never hidden.
+ */
+const SIGNUP_STEP2_TIMEOUT_MS = 20_000;
+async function expectSignUpStep2(page: import("@playwright/test").Page): Promise<void> {
+  await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible({ timeout: SIGNUP_STEP2_TIMEOUT_MS });
+}
+
+/**
+ * Verified password registration → registration resolver → final app
+ * landing. For these Tradespeople fixtures (access_ready, personal
+ * workspace) that is /home. The resolver may pass through /onboarding for a
+ * few milliseconds; that hop is an implementation detail and is deliberately
+ * NOT asserted — on mobile it can complete before Playwright observes it.
+ */
+const TRADESPERSON_APP_LANDING = /\/home(\/|$|\?)/;
+async function expectAppLanding(page: import("@playwright/test").Page): Promise<void> {
+  await page.waitForURL(TRADESPERSON_APP_LANDING, { waitUntil: "commit" });
+}
+
 test.describe("Password registration — golden path (Architecture B: signUp() sets the password atomically)", () => {
   test("weak password is rejected in place (no signUp sent, fields preserved)", async ({ page, request }) => {
     const email = uniqueEmail("weakpw");
@@ -87,7 +112,7 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
     expect((await messageIdsFor(request, email)).size).toBe(seen.size);
   });
 
-  test("a strong password registers via signUp(), verifies by OTP alone (no password field on this step), and reaches onboarding", async ({ page, request }) => {
+  test("a strong password registers via signUp(), verifies by OTP alone (no password field on this step), and enters the app", async ({ page, request }) => {
     const email = uniqueEmail("signup");
     await page.goto("/preview/auth-password/sign-up");
 
@@ -104,7 +129,7 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
 
-    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    await expectSignUpStep2(page);
 
     // §1/§12B — the password never survives past this point: no password-type
     // input anywhere on the OTP step, and no hidden input carrying its value.
@@ -115,7 +140,7 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
 
-    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+    await expectAppLanding(page);
   });
 });
 
@@ -205,11 +230,11 @@ async function registerAccount(page: import("@playwright/test").Page, request: i
   const seen = await messageIdsFor(request, email);
   await waitForCaptchaToken(page);
   await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-  await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+  await expectSignUpStep2(page);
   const code = await readNewOtp(request, email, seen);
   await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
   await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
-  await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+  await expectAppLanding(page);
   return email;
 }
 
@@ -234,7 +259,7 @@ test.describe("Account enumeration normalization (§Account enumeration)", () =>
     // Identical UI outcome to a genuine new signup — the neutral Step-2
     // screen, never "user already exists" / "email already registered" or
     // any equivalent.
-    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    await expectSignUpStep2(page);
     await expect(page.getByText(/already exists|already registered|موجود بالفعل|مسجل بالفعل/i)).toHaveCount(0);
 
     // §5 — the neutral "no code hint" + a real way out (Forgot password) is
@@ -263,7 +288,7 @@ test.describe("Resend signup code (never re-submits the password, never re-regis
     const seenAtSignup = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    await expectSignUpStep2(page);
     // Wait for the first confirmation email to actually land (a
     // synchronization point, not a code this test intends to use) before
     // snapshotting `seenBeforeResend` below — resend must supersede it with
@@ -280,7 +305,7 @@ test.describe("Resend signup code (never re-submits the password, never re-regis
 
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(freshCode);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
-    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+    await expectAppLanding(page);
   });
 });
 
@@ -298,7 +323,7 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
     await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    await expectSignUpStep2(page);
 
     // BEFORE verifying: no real SESSION cookie exists yet. `@supabase/ssr`'s
     // server client defaults to `flowType:"pkce"` (confirmed by reading
@@ -338,13 +363,13 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
     const seenBeforeRetry = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    await expectSignUpStep2(page);
     const code = await readNewOtp(request, email, seenBeforeRetry);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
 
-    // AFTER verifying: a real session exists and the correct resolver runs.
-    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+    // AFTER verifying: a real session exists and the resolver lands in the app.
+    await expectAppLanding(page);
     const cookiesAfter = await context.cookies();
     expect(cookiesAfter.some((c) => /^sb-.*-auth-token/.test(c.name))).toBe(true);
   });
@@ -364,7 +389,7 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    await expectSignUpStep2(page);
 
     // No password ever reaches localStorage/sessionStorage at any point.
     const storageSnapshot = await page.evaluate(() => ({
@@ -395,12 +420,12 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     const seenBeforeResubmit = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    await expectSignUpStep2(page);
 
     const code = await readNewOtp(request, email, seenBeforeResubmit);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
-    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+    await expectAppLanding(page);
   });
 
   test("a wrong/garbage code is rejected with a clear error, and Resend still works from the same screen", async ({ page, request }) => {
@@ -417,7 +442,7 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     const seen = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    await expectSignUpStep2(page);
 
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially("000000");
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
@@ -433,7 +458,7 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).fill("");
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
-    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+    await expectAppLanding(page);
   });
 });
 
@@ -461,11 +486,11 @@ test.describe("Password-changed notification is absent on initial registration (
     const seenAtStart = await messageIdsFor(request, target);
     await waitForCaptchaToken(page);
     await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-    await expect(page.getByText(NEXT_STEP_TEXT)).toBeVisible();
+    await expectSignUpStep2(page);
     const code = await readNewOtp(request, target, seenAtStart);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
-    await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+    await expectAppLanding(page);
 
     // Give any (unwanted) notification a moment to land before asserting its absence.
     await page.waitForTimeout(1500);

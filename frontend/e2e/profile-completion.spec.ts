@@ -51,7 +51,9 @@ async function fillSignUp(page: Page, email: string, username: string): Promise<
 async function submitSignUp(page: Page, request: APIRequestContext, email: string): Promise<Set<string>> {
   const seen = await messageIdsFor(request, email);
   await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-  await expect(page.getByText(/next step|الخطوة التالية/i)).toBeVisible();
+  // Real Siteverify → Server Action → signUp() → email round trip; scoped
+  // longer timeout for this transition only (see auth-password-preview.spec.ts).
+  await expect(page.getByText(/next step|الخطوة التالية/i)).toBeVisible({ timeout: 20_000 });
   return seen;
 }
 
