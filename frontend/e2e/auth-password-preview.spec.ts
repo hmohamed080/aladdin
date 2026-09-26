@@ -80,8 +80,45 @@ async function expectSignUpStep2(page: import("@playwright/test").Page): Promise
  * NOT asserted — on mobile it can complete before Playwright observes it.
  */
 const TRADESPERSON_APP_LANDING = /\/home(\/|$|\?)/;
+const APP_LANDING_TIMEOUT_MS = 20_000;
 async function expectAppLanding(page: import("@playwright/test").Page): Promise<void> {
-  await page.waitForURL(TRADESPERSON_APP_LANDING, { waitUntil: "commit" });
+  try {
+    await page.waitForURL(TRADESPERSON_APP_LANDING, { waitUntil: "commit", timeout: APP_LANDING_TIMEOUT_MS });
+  } catch {
+    // Fail fast with the evidence needed to tell the causes apart: an
+    // expired/invalid code or a rate limit leaves us on the OTP step with an
+    // alert; a username problem lands on finish-registration / username; any
+    // other route is unexpected.
+    const path = new URL(page.url()).pathname;
+    const alerts = (await page.getByRole("alert").allInnerTexts()).map((t) => t.trim()).filter(Boolean);
+    throw new Error(
+      `Expected the app landing (/home) after OTP verification but the page is at ${path}. ` +
+        `Visible alerts: ${JSON.stringify(alerts)}.`,
+    );
+  }
+}
+
+/**
+ * Deterministic entry for the segmented 6-box OtpInput, through the REAL
+ * visible boxes. `getByLabel("One-time code")` names only box 0, so
+ * `.fill("")` + `pressSequentially()` on it cleared one box and then relied on
+ * React moving focus between keystrokes — a keystroke landing before focus
+ * moved hit a full `maxLength=1` box and was dropped (the mobile flake).
+ * Here every box is cleared and filled by index, and the hidden `token` field
+ * the form actually submits must equal the exact code before returning.
+ */
+async function enterOtp(page: import("@playwright/test").Page, code: string): Promise<void> {
+  expect(code, "an OTP is exactly six digits").toMatch(/^\d{6}$/);
+  const boxes = page.locator('input[autocomplete="one-time-code"]');
+  const token = page.locator('input[type="hidden"][name="token"]');
+  await expect(boxes).toHaveCount(6);
+  for (let i = 0; i < 6; i++) await boxes.nth(i).fill("");
+  await expect(token).toHaveValue("");
+  for (let i = 0; i < 6; i++) {
+    await boxes.nth(i).fill(code[i]!);
+    await expect(boxes.nth(i)).toHaveValue(code[i]!);
+  }
+  await expect(token).toHaveValue(code);
 }
 
 test.describe("Password registration — golden path (Architecture B: signUp() sets the password atomically)", () => {
@@ -428,7 +465,7 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     await expectAppLanding(page);
   });
 
-  test("a wrong/garbage code is rejected with a clear error, and Resend still works from the same screen", async ({ page, request }) => {
+  test("a wrong/garbage code is rejected and the valid code can still be entered from the same screen", async ({ page, request }) => {
     const email = uniqueEmail("badcode");
     await page.goto("/preview/auth-password/sign-up");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
@@ -444,7 +481,7 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
     await expectSignUpStep2(page);
 
-    await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially("000000");
+    await enterOtp(page, "000000");
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
     // Verified directly against local GoTrue: a wrong/never-issued signup
     // code returns `error_code:"otp_expired"` — the SAME code as a genuinely
@@ -454,9 +491,10 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     // message this codebase has no real signal to produce.
     await expect(page.getByText(/expired|انتهت صلاحية/i)).toBeVisible();
 
+    // Still on the same screen: replace the rejected code with the REAL one
+    // issued at sign-up (fresh-code resend has its own dedicated test).
     const code = await readNewOtp(request, email, seen);
-    await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).fill("");
-    await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
+    await enterOtp(page, code);
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
     await expectAppLanding(page);
   });
