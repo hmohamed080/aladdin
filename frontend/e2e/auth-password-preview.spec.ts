@@ -99,6 +99,20 @@ async function expectAppLanding(page: import("@playwright/test").Page): Promise<
 }
 
 /**
+ * Sign out through the REAL account menu of whichever signed-in shell is
+ * rendered. Sign out is never a permanently visible button: in the
+ * Tradespeople /home shell (InstallerDashboardShell → InstallerTopbar) and in
+ * the canonical ProfileMenu it lives inside the account dropdown. Both shells
+ * expose the same stable test contract: `profile-menu-trigger` opens the menu,
+ * `profile-sign-out` submits the real signOut server action.
+ */
+async function signOutViaAccountMenu(page: import("@playwright/test").Page): Promise<void> {
+  await page.getByTestId("profile-menu-trigger").filter({ visible: true }).first().click();
+  await page.getByTestId("profile-sign-out").filter({ visible: true }).first().click();
+  await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
+}
+
+/**
  * Deterministic entry for the segmented 6-box OtpInput, through the REAL
  * visible boxes. `getByLabel("One-time code")` names only box 0, so
  * `.fill("")` + `pressSequentially()` on it cleared one box and then relied on
@@ -278,7 +292,7 @@ async function registerAccount(page: import("@playwright/test").Page, request: i
 test.describe("Account enumeration normalization (§Account enumeration)", () => {
   test("registering with an email that already belongs to a CONFIRMED account gets the SAME neutral response and the SAME OTP screen as a genuine new registration — never 'already exists'", async ({ page, request }) => {
     const existingEmail = await registerAccount(page, request, "enum-existing");
-    await page.getByRole("button", { name: /sign out|تسجيل الخروج/i }).click();
+    await signOutViaAccountMenu(page);
     await page.waitForURL(/\/sign-in/, { waitUntil: "commit" });
 
     await page.goto("/preview/auth-password/sign-up");
@@ -559,7 +573,7 @@ test.describe("Password sign-in", () => {
     const email = await registerAccount(page, request, "signin");
 
     // Sign out (production onboarding chrome) and exercise sign-in.
-    await page.getByRole("button", { name: /sign out|تسجيل الخروج/i }).click();
+    await signOutViaAccountMenu(page);
     await page.goto("/preview/auth-password/sign-in");
 
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
@@ -578,7 +592,7 @@ test.describe("Password sign-in", () => {
 test.describe("Forgot password — full 4-screen journey", () => {
   test("request → verify → reset → success, then the NEW password actually signs in", async ({ page, request }) => {
     const email = await registerAccount(page, request, "forgot");
-    await page.getByRole("button", { name: /sign out|تسجيل الخروج/i }).click();
+    await signOutViaAccountMenu(page);
 
     // SCREEN 1 — request.
     await page.goto("/preview/auth-password/forgot-password");
@@ -635,7 +649,7 @@ test.describe("Forgot password — full 4-screen journey", () => {
     context,
   }) => {
     const email = await registerAccount(page, request, "recovery-isolation");
-    await page.getByRole("button", { name: /sign out|تسجيل الخروج/i }).click();
+    await signOutViaAccountMenu(page);
     // Wait for the sign-out redirect to actually land before navigating away
     // again — otherwise this test's own navigation can race the sign-out
     // response's Set-Cookie (clearing the session), leaving a stale sb-*
