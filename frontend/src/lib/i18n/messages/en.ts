@@ -1418,6 +1418,8 @@ export const en = {
     username: {
       title: "Choose a username",
       subtitle: "Pick a unique handle for your account. You can't change this later without contacting support.",
+      unavailableTitle: "The username you selected is no longer available.",
+      unavailableSubtitle: "Choose another username to continue.",
       label: "Username",
       hint: "3-24 characters. Letters and numbers only, plus . or _ in the middle.",
       placeholder: "yourname",

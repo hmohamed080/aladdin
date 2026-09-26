@@ -136,7 +136,7 @@ test.describe("Direct entry after registration", () => {
     await expect(page.getByRole("button", { name: /^(painter \/ decorator|نقاش ودهانات)$/i })).toHaveAttribute("aria-pressed", "true");
   });
 
-  test("a username lost during the OTP window goes to the narrow username screen, then into the app", async ({ browser, request }) => {
+  test("a username lost during the OTP window goes to the explicit recovery screen, then into the app", async ({ browser, request }) => {
     const shared = uniqueUsername("race");
     const a = await browser.newContext();
     const b = await browser.newContext();
@@ -153,10 +153,23 @@ test.describe("Direct entry after registration", () => {
     // B verifies first and claims the name; A's claim now collides.
     await verify(pageB, request, emailB, seenB);
     await pageB.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
+    // Both passed the Step-1 pre-flight (it is not a reservation); the
+    // post-OTP claim is the authority, so A — verifying second — collides.
     await verify(pageA, request, emailA, seenA);
-    await pageA.waitForURL(/\/onboarding\/username/, { waitUntil: "commit" });
-    await expect(pageA.getByText(/choose a username|اختر اسم مستخدم/i).first()).toBeVisible();
+    await pageA.waitForURL(/\/preview\/auth-password\/finish-registration\?reason=username_unavailable/, { waitUntil: "commit" });
+    const noLongerAvailable = /no longer available|لم يعد متاحًا/;
+    await expect(pageA.getByRole("heading", { level: 1 })).toHaveText(noLongerAvailable);
 
+    // Refresh keeps the recovery screen; direct navigation cannot skip it.
+    await pageA.reload();
+    await expect(pageA.getByRole("heading", { level: 1 })).toHaveText(noLongerAvailable);
+    await pageA.goto("/home");
+    await pageA.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
+    await pageA.goto("/preview/auth-password/finish-registration?reason=username_unavailable");
+
+    // Only the username is asked for — never email, password or account type.
+    await expect(pageA.getByLabel(/^password$|^كلمة المرور$/i)).toHaveCount(0);
+    await expect(pageA.getByLabel(/email address|البريد الإلكتروني/i)).toHaveCount(0);
     await pageA.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("racefix"));
     await pageA.getByRole("button", { name: /continue|متابعة/i }).click();
     await pageA.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });

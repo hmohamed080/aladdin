@@ -177,6 +177,11 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   vi.stubEnv("TURNSTILE_SECRET_KEY", "test-turnstile-secret");
   siteverifyReplies({ success: true });
+  // Default DB answers: the username pre-flight says "available"; every other
+  // RPC succeeds with no data. Individual tests override.
+  rpc.mockImplementation(async (fn: string) =>
+    fn === "username_available" ? { data: true, error: null } : { data: null, error: null },
+  );
 });
 
 afterEach(() => {
@@ -428,6 +433,107 @@ describe("requestPasswordSignUp — account type is resolved on the SERVER, neve
       audienceKind,
       audienceValue,
     });
+  });
+});
+
+describe("requestPasswordSignUp — username pre-flight BEFORE signUp() (no Auth user, no email)", () => {
+  function submit(username = "validuser123") {
+    return requestPasswordSignUp(
+      { ok: false },
+      consented({ email: "new-person@example.test", username, password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+    );
+  }
+  function availability(answer: { data: unknown; error: unknown }) {
+    rpc.mockImplementation(async (fn: string) => (fn === "username_available" ? answer : { data: null, error: null }));
+  }
+
+  it("asks the authoritative username_available RPC with the submitted username", async () => {
+    signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "u-new" } } });
+    await submit("freshname42");
+    expect(rpc).toHaveBeenCalledWith("username_available", { p_username: "freshname42" });
+    expect(rpc.mock.invocationCallOrder[0]!).toBeLessThan(signUp.mock.invocationCallOrder[0]!);
+  });
+
+  it("an unavailable username stays on Step 1 with the neutral error — signUp() never runs, nothing is staged", async () => {
+    availability({ data: false, error: null });
+    const res = await submit("takenname");
+    expect(res).toEqual({ ok: false, code: "registration.error.usernameUnavailable", email: "new-person@example.test" });
+    expect(signUp).not.toHaveBeenCalled();
+    expect(savePendingRegistration).not.toHaveBeenCalled();
+  });
+
+  it("reserved and taken usernames get the IDENTICAL response (the RPC answers false for both)", async () => {
+    availability({ data: false, error: null });
+    const reserved = await submit("admin");
+    const taken = await submit("takenname");
+    expect(reserved).toEqual(taken);
+    expect(JSON.stringify(reserved)).not.toMatch(/reserved/i);
+  });
+
+  it.each([
+    ["an RPC error", { data: null, error: { code: "PGRST000", message: "boom" } }],
+    ["a non-boolean answer", { data: null, error: null }],
+  ])("%s is a neutral retry — never 'unavailable', never signUp()", async (_label, answer) => {
+    availability(answer);
+    const res = await submit();
+    expect(res.code).toBe("authPasswordPreview.error.sendFailed");
+    expect(signUp).not.toHaveBeenCalled();
+  });
+
+  it("runs only after the CAPTCHA gate — a rejected token never reaches the DB", async () => {
+    siteverifyReplies({ success: false });
+    const res = await submit();
+    expect(res.code).toBe("authPasswordPreview.error.captchaRejected");
+    expect(rpc).not.toHaveBeenCalledWith("username_available", expect.anything());
+  });
+});
+
+describe("verifyPasswordSignUp — the post-OTP username claim is never ignored", () => {
+  function stage(
+    usernameResult: { data: unknown; error: unknown },
+    accountTypeResult: { data: unknown; error: unknown } = { data: null, error: null },
+  ) {
+    verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test" } } });
+    rpc.mockImplementation(async (fn: string) => {
+      if (fn === "pending_registration_consume")
+        return { data: [{ username: "staged_name", audience_kind: "persona_type", audience_value: "installer_technician" }], error: null };
+      if (fn === "onboarding_select_account_type") return accountTypeResult;
+      if (fn === "profile_set_username") return usernameResult;
+      if (fn === "my_registration_state") return { data: "access_ready", error: null };
+      return { data: null, error: null };
+    });
+  }
+  const verify = () => verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456" }));
+
+  it("a 23505 collision keeps the session and account type and routes to the explicit recovery screen", async () => {
+    stage({ data: null, error: { code: "23505", message: "username is unavailable" } });
+    await expect(verify()).rejects.toThrow("REDIRECT:/preview/auth-password/finish-registration?reason=username_unavailable");
+    expect(rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "professional", p_account_type: "installer_technician" });
+    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("any other claim failure is not treated as success: safe log (no username), then the state-derived recovery screen", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    stage({ data: null, error: { code: "XX000", message: "internal" } });
+    await expect(verify()).rejects.toThrow(/^REDIRECT:\/preview\/auth-password\/finish-registration$/);
+    expect(log).toHaveBeenCalledTimes(1);
+    const line = String(log.mock.calls[0]![0]);
+    expect(line).toContain("XX000");
+    expect(line).not.toMatch(/staged_name|person@example\.test|123456/);
+    log.mockRestore();
+  });
+
+  it("an account-type failure is not ignored either — the recovery screen asks for what is missing", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    stage({ data: null, error: null }, { data: null, error: { code: "22023", message: "x" } });
+    await expect(verify()).rejects.toThrow(/^REDIRECT:\/preview\/auth-password\/finish-registration$/);
+    log.mockRestore();
+  });
+
+  it("the golden path (claim succeeds) is unchanged — straight into the app", async () => {
+    stage({ data: null, error: null });
+    await expect(verify()).rejects.toThrow(/^REDIRECT:\/onboarding/);
+    expect(rpc).toHaveBeenCalledWith("profile_set_username", { p_username: "staged_name" });
   });
 });
 

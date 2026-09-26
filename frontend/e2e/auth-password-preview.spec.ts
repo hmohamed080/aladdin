@@ -165,6 +165,10 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
 
   test("a strong password registers via signUp(), verifies by OTP alone (no password field on this step), and enters the app", async ({ page, request }) => {
     const email = uniqueEmail("signup");
+    const visited: string[] = [];
+    page.on("framenavigated", (f) => {
+      if (f === page.mainFrame()) visited.push(new URL(f.url()).pathname);
+    });
     await page.goto("/preview/auth-password/sign-up");
 
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
@@ -192,6 +196,91 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
     await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
 
     await expectAppLanding(page);
+    // The username was entered ONCE: no recovery screen was ever shown...
+    expect(visited.filter((p) => /finish-registration|\/onboarding\/username/.test(p))).toEqual([]);
+    // ...and it was persisted: the username step now refuses this account.
+    await page.goto("/onboarding/username");
+    await expectAppLanding(page);
+  });
+});
+
+/**
+ * Claims a username through the CANONICAL passwordless sign-up (no CAPTCHA)
+ * in its own browser context, so a later password registration can collide
+ * with a genuinely taken name. Returns the claimed username.
+ */
+async function claimUsernameViaCanonicalSignUp(
+  browser: import("@playwright/test").Browser,
+  request: import("@playwright/test").APIRequestContext,
+): Promise<string> {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const email = uniqueEmail("owner");
+  const username = uniqueUsername("owner");
+  const seen = await messageIdsFor(request, email);
+  await page.goto("/auth/sign-up");
+  await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
+  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
+  await page.getByLabel(/pilot release|نسخة تجريبية|إصدار تجريبي/i).check();
+  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+  const code = await readNewOtp(request, email, seen);
+  await enterOtp(page, code);
+  await page.getByRole("button", { name: /verify and continue|confirm and continue|تحقق وتابع|تأكيد ومتابعة/i }).click();
+  await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
+  await selectAccountType(page);
+  await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
+  await page.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
+  await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
+  await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
+  await expectAppLanding(page);
+  await context.close();
+  return username;
+}
+
+test.describe("Username availability is checked BEFORE signUp() (entered once; no Auth user or email for an unavailable name)", () => {
+  const UNAVAILABLE = /isn't available|غير متاح/i;
+
+  async function submitWithUsername(page: import("@playwright/test").Page, email: string, username: string) {
+    await page.goto("/preview/auth-password/sign-up");
+    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
+    await selectAccountType(page);
+    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
+    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
+    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
+    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await waitForCaptchaToken(page);
+    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+  }
+
+  async function expectStillOnStep1(page: import("@playwright/test").Page, request: import("@playwright/test").APIRequestContext, email: string, username: string) {
+    await expect(page.getByText(UNAVAILABLE)).toBeVisible({ timeout: SIGNUP_STEP2_TIMEOUT_MS });
+    await expect(page.getByText(NEXT_STEP_TEXT)).toHaveCount(0);
+    await expect(page.locator('input[autocomplete="one-time-code"]')).toHaveCount(0);
+    // The user's values are still there to correct.
+    await expect(page.getByLabel(/email address|البريد الإلكتروني/i)).toHaveValue(email);
+    await expect(page.getByLabel(/^username$|^اسم المستخدم$/i)).toHaveValue(username);
+    // signUp() never ran: no confirmation email exists for this address.
+    expect(await messageIdsFor(request, email)).toEqual(new Set());
+    // Neutral: never says why.
+    await expect(page.getByText(/reserved|محجوز/i)).toHaveCount(0);
+  }
+
+  test("a username another account already owns is refused on Step 1 — no OTP step, no email", async ({ page, request, browser }) => {
+    const taken = await claimUsernameViaCanonicalSignUp(browser, request);
+    const email = uniqueEmail("taken");
+    // Uniqueness is case-insensitive, so a case variant is equally unavailable.
+    const attempt = taken.toUpperCase();
+    await submitWithUsername(page, email, attempt);
+    await expectStillOnStep1(page, request, email, attempt);
+  });
+
+  test("a reserved username gets the SAME neutral unavailable response", async ({ page, request }) => {
+    const email = uniqueEmail("reserved");
+    await submitWithUsername(page, email, "admin");
+    await expectStillOnStep1(page, request, email, "admin");
   });
 });
 

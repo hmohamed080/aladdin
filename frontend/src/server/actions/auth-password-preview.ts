@@ -227,6 +227,17 @@ async function absoluteUrl(path: string): Promise<string> {
   return `${proto}://${host}${path}`;
 }
 
+const FINISH_REGISTRATION_PATH = "/preview/auth-password/finish-registration";
+
+/**
+ * Safe diagnostics for a post-OTP registration step that failed: the step and
+ * the Postgres error code only — never the username, email, password, OTP,
+ * session or CAPTCHA token.
+ */
+function logRegistrationStepFailure(step: "account_type" | "username", error: { code?: string }): void {
+  console.error(`password registration: post-OTP ${step} step failed (code ${error.code ?? "unknown"})`);
+}
+
 /**
  * The same post-session redirect chain `verifyEmailOtp` uses in production
  * (registration/invitation continuation → registration-state gate → derived
@@ -293,6 +304,24 @@ export async function requestPasswordSignUp(
   if (captchaCode) return { ok: false, code: captchaCode, email: parsed.data.email };
 
   const supabase = await getServerSupabase();
+
+  // USERNAME PRE-FLIGHT — before any Auth user or confirmation email exists.
+  // `username_available` is the authoritative, anon-callable boolean check; it
+  // answers false for reserved AND taken names alike, so this reveals nothing
+  // beyond the intended "unavailable" contract (and nothing about the EMAIL).
+  // It is NOT a reservation: the post-OTP `profile_set_username` claim in
+  // verifyPasswordSignUp stays the final authority for the OTP-window race.
+  // An RPC failure is never reported as "unavailable" — it is a neutral retry.
+  const { data: usernameAvailable, error: availabilityError } = await supabase.rpc("username_available", {
+    p_username: parsed.data.username,
+  });
+  if (availabilityError || typeof usernameAvailable !== "boolean") {
+    return { ok: false, code: "authPasswordPreview.error.sendFailed", email: parsed.data.email };
+  }
+  if (!usernameAvailable) {
+    return { ok: false, code: "registration.error.usernameUnavailable", email: parsed.data.email };
+  }
+
   const callStart = Date.now();
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
@@ -442,14 +471,28 @@ export async function verifyPasswordSignUp(
   const pendingRow = Array.isArray(pending) ? pending[0] : pending;
   if (pendingRow) {
     const track = pendingRow.audience_kind === "organization_type" ? "business" : "professional";
-    await supabase.rpc("onboarding_select_account_type", {
+    const { error: accountTypeError } = await supabase.rpc("onboarding_select_account_type", {
       p_track: track,
       p_account_type: pendingRow.audience_value,
     });
-    // Not racy against itself, but CAN collide with someone else who claimed
-    // the same normalized username in the meantime — that failure is
-    // expected and handled by the finish-registration screen, not here.
-    await supabase.rpc("profile_set_username", { p_username: pendingRow.username });
+    if (accountTypeError) logRegistrationStepFailure("account_type", accountTypeError);
+
+    // The AUTHORITATIVE username claim. The Step-1 pre-flight made a collision
+    // rare, but another registrant can still claim the same normalized name
+    // during this one's OTP window. Never ignored:
+    //   * 23505 (unavailable — reserved or taken, deliberately not told
+    //     apart) → the narrow recovery screen, which explains that the chosen
+    //     name is no longer available. The session and the account type
+    //     recorded above are kept; nothing else is asked again.
+    //   * anything else → safe diagnostics, then the same recovery screen
+    //     (state-derived, so it asks only for what is actually missing).
+    const { error: usernameError } = await supabase.rpc("profile_set_username", { p_username: pendingRow.username });
+    if (usernameError) {
+      if (usernameError.code === "23505") redirect(`${FINISH_REGISTRATION_PATH}?reason=username_unavailable`);
+      logRegistrationStepFailure("username", usernameError);
+      redirect(FINISH_REGISTRATION_PATH);
+    }
+    if (accountTypeError) redirect(FINISH_REGISTRATION_PATH);
   }
 
   return postSessionRedirect(supabase, "/onboarding");
