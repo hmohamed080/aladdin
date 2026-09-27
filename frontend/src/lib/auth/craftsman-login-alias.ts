@@ -1,10 +1,10 @@
 /**
- * TEMPORARY craftsman phone + password flow (docs/frontend/temporary-craftsman-auth.md).
+ * Installer/technician phone + password flow (docs/frontend/installer-phone-auth.md).
  *
  * Supabase Auth has no phone identity in this project (the phone provider is
  * off and no SMS/WhatsApp sender exists), and every "verified caller" gate in
  * the database reads `auth.users.email_confirmed_at`. So an account created by
- * `/temporary/craftsman/sign-up` signs in with an INTERNAL login alias derived
+ * `/installer/sign-up` signs in with an INTERNAL login alias derived
  * from its canonical E.164 phone — e.g. `+201012345678` →
  * `p201012345678@craftsman-login.aladdin.invalid`. The real phone is stored
  * canonically in `profiles.phone_e164` (via `profile_set_phone`) like any other
@@ -15,7 +15,8 @@
  * to anyone. Every place that renders the auth user's email passes it through
  * `userFacingEmail()` below, which drops the alias.
  *
- * Remove this module together with the temporary flow.
+ * The alias domain is a stable login key for every existing phone account —
+ * never change it.
  */
 
 export const CRAFTSMAN_LOGIN_ALIAS_DOMAIN = "craftsman-login.aladdin.invalid";

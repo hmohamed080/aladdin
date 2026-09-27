@@ -1091,6 +1091,7 @@ export const en = {
     signInLink: "Sign in",
     signUpLink: "Create an account",
     troubleSigningIn: "Trouble signing in?",
+    installerPhoneSignIn: "Installer or technician? Sign in with your phone number",
     lostEmailAccess: "Lost access to your email?",
     getHelp: "Get help",
     info: { codeSent: "We sent a code to {email}. It may take a moment to arrive." },

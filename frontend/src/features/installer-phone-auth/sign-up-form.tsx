@@ -5,17 +5,17 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { Checkbox, SubmitButton } from "@/components/ui/controls";
 import { TurnstileWidget } from "@/features/auth-password-preview/turnstile-widget";
-import { craftsmanSignUp, type CraftsmanAuthState, type CraftsmanField } from "@/server/actions/temporary-craftsman-auth";
+import { craftsmanSignUp, type CraftsmanAuthState, type CraftsmanField } from "@/server/actions/installer-phone-auth";
 import { IconField, PasswordField } from "./fields";
 import { PhoneIcon, UserIcon } from "./icons";
 import { checkNewPassword, parseFullName, parsePhone } from "./validation";
-import { CRAFTSMAN_SIGN_IN_PATH } from "./routes";
+import { INSTALLER_SIGN_IN_PATH } from "./routes";
 
 const initial: CraftsmanAuthState = { ok: false };
 type ClientErrors = Partial<Record<CraftsmanField, string>>;
 
 /**
- * TEMPORARY craftsman sign-up — full name, phone, password, one consent
+ * Installer/technician phone + password sign-up — full name, phone, password, one consent
  * checkbox (covering the three consent receipts the account needs), and the
  * application-scoped Turnstile check. No email, no OTP, no username, no role
  * picker: the server action creates an ordinary installer/technician account.
@@ -61,7 +61,7 @@ export function CraftsmanSignUpForm() {
     errors.phone === "temporaryCraftsman.error.phoneExists" ? (
       <span>
         {t(errors.phone)}{" "}
-        <Link href={CRAFTSMAN_SIGN_IN_PATH} className="font-medium text-brand-lapis underline dark:text-brand-lapis-bright">
+        <Link href={INSTALLER_SIGN_IN_PATH} className="font-medium text-brand-lapis underline dark:text-brand-lapis-bright">
           {t("temporaryCraftsman.error.phoneExistsAction")}
         </Link>
       </span>

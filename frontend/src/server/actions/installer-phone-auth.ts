@@ -11,15 +11,16 @@ import {
 } from "@/lib/supabase/admin-server";
 import { craftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 import { clientIpFrom, verifyTurnstileToken } from "@/server/auth/turnstile";
+import { sanitizeNext } from "@/server/auth/next";
 import { resolveActiveLanding } from "@/server/queries/landing";
 import { hasAppAccess, type RegistrationState } from "@/server/queries/registration";
-import { checkNewPassword, parseFullName, parsePhone } from "@/features/temporary-craftsman-auth/validation";
-import { generateCraftsmanUsername } from "@/features/temporary-craftsman-auth/username";
+import { checkNewPassword, parseFullName, parsePhone } from "@/features/installer-phone-auth/validation";
+import { generateCraftsmanUsername } from "@/features/installer-phone-auth/username";
 import type { Database } from "@/types/database.types";
 
 /**
- * TEMPORARY craftsman (installer/technician) phone + password entry point
- * (docs/frontend/temporary-craftsman-auth.md). A parallel ENTRY POINT only —
+ * Installer/technician phone + password entry point (approved, role-specific)
+ * (docs/frontend/installer-phone-auth.md). A parallel ENTRY POINT only —
  * it creates an ordinary account through the existing infrastructure and
  * hands it to the existing installer experience:
  *
@@ -73,7 +74,7 @@ function isRateLimited(error: { code?: string; status?: number }): boolean {
 
 /** Safe diagnostics only: the step and a Postgres/GoTrue error code. */
 function logStepFailure(step: string, error: { code?: string } | null | undefined): void {
-  console.error(`temporary craftsman sign-up: ${step} failed (code ${error?.code ?? "unknown"})`);
+  console.error(`installer phone sign-up: ${step} failed (code ${error?.code ?? "unknown"})`);
 }
 
 class InitializationError extends Error {
@@ -236,9 +237,16 @@ export async function craftsmanSignIn(_prev: CraftsmanAuthState, formData: FormD
     return fail("invalidCredentials", "form", values);
   }
 
-  // The same post-session gate every sign-in uses: an account that is not
-  // yet access_ready resumes the canonical /onboarding funnel.
+  // The SAME post-session rule as the shared email sign-in (verifyEmailOtp):
+  // `next` is re-validated server-side (sanitizeNext: same-origin allow-list,
+  // never `//host` or an absolute URL), onboarding/invitation continuations keep
+  // their handoff, everything else passes the registration gate, and a deep
+  // link survives only when it belongs to the caller's own landing surface.
+  const next = sanitizeNext(formData.get("next"));
+  if (next.startsWith("/onboarding") || next.startsWith("/auth/invite/")) redirect(next);
+
   const { data: state } = await supabase.rpc("my_registration_state");
   if (!hasAppAccess(state as RegistrationState)) redirect("/onboarding");
-  redirect(await resolveActiveLanding(supabase));
+  const landing = await resolveActiveLanding(supabase);
+  redirect(next === landing || next.startsWith(`${landing}/`) ? next : landing);
 }

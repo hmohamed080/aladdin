@@ -28,7 +28,7 @@ vi.mock("@/server/queries/landing", () => ({ resolveActiveLanding }));
 vi.mock("@/server/auth/turnstile", () => ({ verifyTurnstileToken, clientIpFrom: () => null }));
 vi.mock("@/lib/supabase/admin-server", () => ({ isCanonicalPhoneTaken, createCraftsmanPasswordUser, deleteCraftsmanPasswordUser }));
 
-import { craftsmanSignIn, craftsmanSignUp } from "./temporary-craftsman-auth";
+import { craftsmanSignIn, craftsmanSignUp } from "./installer-phone-auth";
 
 const ALIAS = "p201093817264@craftsman-login.aladdin.invalid";
 const PASSWORD = "green-tiles-on-roof";
@@ -220,6 +220,28 @@ describe("craftsmanSignIn", () => {
       code: "temporaryCraftsman.error.phoneInvalid",
     });
     expect(signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["/home/points", "/home/points"],
+    ["/home", "/home"],
+    ["/b2b/customers", "/home"],
+    ["//evil.example/home", "/home"],
+    ["https://evil.example/home", "/home"],
+    ["/\\evil.example", "/home"],
+    ["/admin", "/home"],
+    [undefined, "/home"],
+  ])("keeps a validated next=%s only inside the caller's own surface → %s", async (next, destination) => {
+    const data = form({ phone: "01093817264", password: PASSWORD });
+    if (next !== undefined) data.set("next", next);
+    expect(await run(() => craftsmanSignIn({ ok: false }, data))).toBe(`REDIRECT:${destination}`);
+  });
+
+  it("hands onboarding and invitation continuations straight through, like the email sign-in", async () => {
+    for (const next of ["/onboarding/username", "/auth/invite/abc123"]) {
+      const data = form({ phone: "01093817264", password: PASSWORD, next });
+      expect(await run(() => craftsmanSignIn({ ok: false }, data))).toBe(`REDIRECT:${next}`);
+    }
   });
 
   it("resumes /onboarding for an account that is not access_ready", async () => {

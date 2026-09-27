@@ -3,7 +3,7 @@
 import { useActionState, useState, type FormEvent } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { SubmitButton } from "@/components/ui/controls";
-import { craftsmanSignIn, type CraftsmanAuthState, type CraftsmanField } from "@/server/actions/temporary-craftsman-auth";
+import { craftsmanSignIn, type CraftsmanAuthState, type CraftsmanField } from "@/server/actions/installer-phone-auth";
 import { IconField, PasswordField } from "./fields";
 import { PhoneIcon } from "./icons";
 import { parsePhone } from "./validation";
@@ -12,14 +12,14 @@ const initial: CraftsmanAuthState = { ok: false };
 type ClientErrors = Partial<Record<CraftsmanField, string>>;
 
 /**
- * TEMPORARY craftsman sign-in — phone + password, no OTP, no CAPTCHA (sign-in
+ * Installer/technician phone + password sign-in — phone + password, no OTP, no CAPTCHA (sign-in
  * never carries one in this project; GoTrue's own rate limits bound it).
  * Every credential failure renders ONE generic message — never which of the
  * phone or the password was wrong. There is deliberately no "forgot password"
  * link: the existing recovery flow is email-based and cannot reach these
- * accounts (docs/frontend/temporary-craftsman-auth.md).
+ * accounts (docs/frontend/installer-phone-auth.md).
  */
-export function CraftsmanSignInForm() {
+export function CraftsmanSignInForm({ next }: { next: string }) {
   const { t } = useI18n();
   const [state, dispatch] = useActionState(craftsmanSignIn, initial);
   const [clientErrors, setClientErrors] = useState<ClientErrors>({});
@@ -46,6 +46,7 @@ export function CraftsmanSignInForm() {
 
   return (
     <form action={dispatch} onSubmit={onSubmit} className="flex flex-col gap-md" noValidate>
+      <input type="hidden" name="next" value={next} />
       {errors.form ? (
         <p role="alert" className="rounded-md border border-danger/40 bg-danger/10 px-md py-2.5 text-body text-danger">
           {t(errors.form)}

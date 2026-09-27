@@ -9,7 +9,7 @@ const { craftsmanSignUp, craftsmanSignIn } = vi.hoisted(() => ({
   craftsmanSignUp: vi.fn(async () => ({ ok: false })),
   craftsmanSignIn: vi.fn(async () => ({ ok: false })),
 }));
-vi.mock("@/server/actions/temporary-craftsman-auth", () => ({ craftsmanSignUp, craftsmanSignIn }));
+vi.mock("@/server/actions/installer-phone-auth", () => ({ craftsmanSignUp, craftsmanSignIn }));
 // Turnstile loads a third-party script; not under test here.
 vi.mock("@/features/auth-password-preview/turnstile-widget", () => ({ TurnstileWidget: () => null }));
 
@@ -51,16 +51,18 @@ describe("CraftsmanSignUpForm", () => {
 
 describe("CraftsmanSignInForm", () => {
   it("asks only for phone + password and has no forgot-password link", () => {
-    renderWithI18n(<CraftsmanSignInForm />);
-    const inputs = Array.from(document.querySelectorAll("input")).map((i) => i.name).filter(Boolean);
-    expect(inputs.sort()).toEqual(["password", "phone"]);
+    renderWithI18n(<CraftsmanSignInForm next="/b2b" />);
+    const visible = Array.from(document.querySelectorAll('input:not([type="hidden"])')).map((i) => (i as HTMLInputElement).name);
+    expect(visible.sort()).toEqual(["password", "phone"]);
+    // The validated deep link rides along as a hidden field, never as a visible input.
+    expect(document.querySelector('input[type="hidden"][name="next"]')).toHaveValue("/b2b");
     expect(screen.getByLabelText(c.fields.passwordLabel)).toHaveAttribute("autocomplete", "current-password");
     expect(screen.queryByText(ar.authPasswordPreview.signIn.forgotPassword)).toBeNull();
     expect(document.querySelectorAll("a")).toHaveLength(0);
   });
 
   it("toggles password visibility with an accessible button", () => {
-    renderWithI18n(<CraftsmanSignInForm />);
+    renderWithI18n(<CraftsmanSignInForm next="/b2b" />);
     const password = screen.getByLabelText(c.fields.passwordLabel);
     expect(password).toHaveAttribute("type", "password");
     fireEvent.click(screen.getByRole("button", { name: ar.authPasswordPreview.showPassword }));
@@ -68,7 +70,7 @@ describe("CraftsmanSignInForm", () => {
   });
 
   it("validates the phone before submitting", () => {
-    renderWithI18n(<CraftsmanSignInForm />);
+    renderWithI18n(<CraftsmanSignInForm next="/b2b" />);
     fireEvent.change(screen.getByLabelText(c.fields.phoneLabel), { target: { value: "12" } });
     fireEvent.submit(screen.getByRole("button", { name: c.signIn.submit }).closest("form")!);
     expect(screen.getByText(c.error.phoneInvalid)).toBeInTheDocument();

@@ -358,7 +358,7 @@ During every account review, Landing Page review, Registration review, and featu
 
 ## What Agents Must NEVER Do
 - **Never** build commerce/marketplace framing (add-to-cart, checkout, price-war bidding) — this is consultation-first.
-- **Never** add password/forgot/reset UI or flows — the product is **passwordless** (WhatsApp/Email OTP). *(One approved, time-boxed exception: the temporary craftsman phone + password entry point — see the 2026-09-27 Change History entry. It does not change the canonical model.)*
+- **Never** add password/forgot/reset UI or flows — the product is **passwordless** (WhatsApp/Email OTP). *(One approved, role-specific exception: installer/technician accounts may register and sign in with phone + password at `/installer/sign-up` / `/installer/sign-in` — see the 2026-09-27 Change History entries. Every other account type stays passwordless.)*
 - **Never** merge roles, and **never** add a Profile Switcher / "Use As" mode or any persona/account-identity-switching UI — roles stay separate in the taxonomy; navigation is **derived**, not toggled. One current primary account type at a time. *(Switching the active **work context** between the personal surface and organizations where the user has an active membership is a different, allowed concept — see [Switching](#switching-what-is-forbidden-what-is-allowed).)*
 - **Never** create a second user/auth identity for the same person — not for another role, another contact channel, or another business. A business is an **Organization**, never a second account.
 - **Never** copy business identity onto the user, or personal identity into organization records, as a second source of truth; after a draft is committed, read from the owning entity.
@@ -376,10 +376,16 @@ During every account review, Landing Page review, Registration review, and featu
 ## Change History
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
 
+### 2026-09-27 — Installer phone + password entry point made permanent
+- **What:** The phone + password flow approved earlier the same day as a temporary exception is now the **permanent, role-specific authentication entry point for installer/technician accounts**: `/installer/sign-up` and `/installer/sign-in` (the old `/temporary/craftsman/*` URLs redirect there). The homepage's installer tile/role CTA links to it, and the shared `/auth/sign-in` carries a small secondary link for installers. Forgot-password stays hidden until phone OTP recovery (SMS/WhatsApp → verification → new password) exists.
+- **Unchanged:** the global authentication strategy. `/auth/sign-up` and `/auth/sign-in` keep serving the email/passwordless flow for every account type — including installers who registered by email, who keep using it (no account merging or identity linking). Showroom/Supplier/Manufacturer/Importer/Sales/Admin registration is untouched.
+- **Details:** [`../frontend/installer-phone-auth.md`](../frontend/installer-phone-auth.md).
+- **Approved by:** User (installer route promotion task, 2026-09-27).
+
 ### 2026-09-27 — Temporary craftsman phone + password entry point (scoped exception)
-- **What:** A TEMPORARY, parallel registration/sign-in entry point for installer/technician (الصنايعي) accounts at `/temporary/craftsman/sign-up` and `/temporary/craftsman/sign-in`: full name + phone + password (+ consent + Turnstile), **no OTP**. Accounts are ordinary `professional / installer_technician` accounts on the one canonical identity model (same user ID model, same RPCs, same `/home` experience). The phone is canonicalized to E.164 and the account signs in with an internal, never-displayed login alias derived from it. Duplicate phones are disclosed ("يوجد حساب مسجل بالفعل بهذا الرقم"). Forgot password is hidden for these accounts.
+- **What:** A TEMPORARY, parallel registration/sign-in entry point for installer/technician (الصنايعي) accounts at `/installer/sign-up` and `/installer/sign-in`: full name + phone + password (+ consent + Turnstile), **no OTP**. Accounts are ordinary `professional / installer_technician` accounts on the one canonical identity model (same user ID model, same RPCs, same `/home` experience). The phone is canonicalized to E.164 and the account signs in with an internal, never-displayed login alias derived from it. Duplicate phones are disclosed ("يوجد حساب مسجل بالفعل بهذا الرقم"). Forgot password is hidden for these accounts.
 - **Why:** Craftsman registration through the canonical email-OTP flow is blocked for this audience; this unblocks it without changing the canonical flow.
-- **Scope:** The canonical passwordless model, `/auth/*`, email-OTP behavior, other account types and the hosted phone provider are **unchanged**. The "passwordless" guardrail stands for everything else. Implementation and limitations: [`../frontend/temporary-craftsman-auth.md`](../frontend/temporary-craftsman-auth.md).
+- **Scope:** The canonical passwordless model, `/auth/*`, email-OTP behavior, other account types and the hosted phone provider are **unchanged**. The "passwordless" guardrail stands for everything else. Implementation and limitations: [`../frontend/installer-phone-auth.md`](../frontend/installer-phone-auth.md).
 - **Deferred:** removal of the temporary flow and migration of its accounts to a verified phone (WhatsApp OTP) or email identity; a recovery path for these accounts.
 - **Approved by:** User (temporary craftsman auth task, Option B, 2026-09-27).
 

@@ -3,7 +3,7 @@ import { isUsernameWellFormed } from "@/lib/identity/username";
 import { checkNewPassword, parseFullName, parsePhone, toAsciiDigits } from "./validation";
 import { GENERATED_USERNAME_PREFIX, generateCraftsmanUsername } from "./username";
 
-describe("temporary craftsman validation", () => {
+describe("installer phone auth validation", () => {
   it("requires a name and collapses whitespace", () => {
     expect(parseFullName("  ")).toEqual({ ok: false, code: "temporaryCraftsman.error.nameRequired" });
     expect(parseFullName(null)).toEqual({ ok: false, code: "temporaryCraftsman.error.nameRequired" });

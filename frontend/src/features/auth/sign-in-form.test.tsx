@@ -72,4 +72,16 @@ describe("SignInForm (Arabic-first passwordless)", () => {
       expect(document.activeElement).toBe(email);
     });
   });
+
+  it("offers a secondary phone sign-in link for installers, carrying the page's validated href", () => {
+    renderWithI18n(<SignInForm next="/home/points" installerSignInHref="/installer/sign-in?next=%2Fhome%2Fpoints" />);
+    const link = screen.getByRole("link", { name: ar.auth.installerPhoneSignIn });
+    expect(link).toHaveAttribute("href", "/installer/sign-in?next=%2Fhome%2Fpoints");
+    expect(ar.auth.installerPhoneSignIn).toBe("صنايعي؟ سجّل الدخول برقم الهاتف");
+  });
+
+  it("defaults the installer link to /installer/sign-in", () => {
+    renderWithI18n(<SignInForm next="/b2b" />);
+    expect(screen.getByRole("link", { name: ar.auth.installerPhoneSignIn })).toHaveAttribute("href", "/installer/sign-in");
+  });
 });

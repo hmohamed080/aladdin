@@ -1,5 +1,5 @@
 /**
- * Internal username for the TEMPORARY craftsman flow. `my_registration_state()`
+ * Internal username for the installer phone + password flow. `my_registration_state()`
  * requires a stored username before an account is `access_ready`, but this
  * flow deliberately asks for none — so one is generated.
  *

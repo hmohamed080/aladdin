@@ -23,7 +23,7 @@ export function LandingDetails({ detail, onClose }: { detail: LandingDetail | nu
     onClick={(event) => { if (event.target === event.currentTarget) ref.current?.close(); }}>
     <div className={styles.panel}>
       <header><h2 id="landing-detail-title">{title}</h2><button type="button" onClick={() => ref.current?.close()}>{locale === "ar" ? "إغلاق" : "Close"}</button></header>
-      {role ? <><ul className={styles.features}>{role.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul><ButtonLink href="/auth/sign-up" variant="accent">{t.register}</ButtonLink></> : null}
+      {role ? <><ul className={styles.features}>{role.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul><ButtonLink href={role.signUpHref ?? "/auth/sign-up"} variant="accent">{t.register}</ButtonLink></> : null}
       {detail === "partners" ? <><p>{t.brandNote}</p><ul className={styles.logos}>{landingLogos.map(({file,name}) => <li key={file}><Image src={`/preview/landing/partners/${file}`} alt={name} width={160} height={100} /><span>{name}</span></li>)}</ul></> : null}
     </div>
   </dialog>;

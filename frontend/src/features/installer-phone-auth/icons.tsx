@@ -1,7 +1,7 @@
 import type { SVGProps } from "react";
 
 /**
- * Inline line icons for the temporary craftsman auth pages (Lucide-compatible
+ * Inline line icons for the installer phone + password auth pages (Lucide-compatible
  * 24px geometry, `currentColor` strokes — the repository has no icon package
  * installed yet, so screens draw their few glyphs inline as elsewhere).
  */

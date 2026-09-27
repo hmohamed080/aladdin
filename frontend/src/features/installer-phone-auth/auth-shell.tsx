@@ -46,7 +46,7 @@ function FeatureTile({ asset }: { asset: CraftsmanAsset }) {
 }
 
 /**
- * Full-screen shell for the TEMPORARY craftsman auth pages — no navbar, no
+ * Full-screen shell for the installer phone + password auth pages — no navbar, no
  * footer. Composition and breakpoints live in `craftsman-auth.module.css`;
  * imagery comes from the approved assets in `assets.ts`.
  */

@@ -7,8 +7,8 @@ import {
 } from "@/features/auth-password-preview/password-policy";
 
 /**
- * Field rules for the TEMPORARY craftsman phone + password flow
- * (docs/frontend/temporary-craftsman-auth.md). Pure and client-safe: the form
+ * Field rules for the installer/technician phone + password flow
+ * (docs/frontend/installer-phone-auth.md). Pure and client-safe: the form
  * uses it for immediate feedback, and the server action re-runs it from
  * scratch — the client result is never trusted.
  *

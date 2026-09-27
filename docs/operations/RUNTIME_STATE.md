@@ -1,5 +1,11 @@
 # Runtime State
 
+## Current continuation — 2026-09-27 (latest): installer phone + password routes permanent
+
+- Branch `claude/vigilant-cori-471vck`. Permanent routes `/installer/sign-up`, `/installer/sign-in`; `/temporary/craftsman/*` 308-redirect there. Shared `/auth/*` unchanged except a secondary installer link on `/auth/sign-in`; `signOut` returns phone accounts to `/installer/sign-in`. See [installer phone auth](../frontend/installer-phone-auth.md).
+- No schema/migration change in this step. Hosted Supabase untouched; nothing deployed; no PR.
+- Open (separate decisions): `app.mask_email` migration vs app-level filter; hidden `pilot` consent receipt; Terms/Privacy content; phone OTP password recovery; hosted migrations + Vercel secrets.
+
 ## Current continuation — 2026-09-27 (later): craftsman auth UI approved
 
 - Branch `claude/vigilant-cori-471vck`. Temporary craftsman sign-up/sign-in **visual implementation approved** by the product owner; no further visual passes.

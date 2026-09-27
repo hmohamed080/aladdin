@@ -4,6 +4,19 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Installer phone + password routes promoted to permanent
+
+**Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted Supabase untouched; no schema/migration change.
+
+- **Naming:** `installer` is canonical (DB persona `installer_technician`, "Installer/Technician Pilot", `installer-dashboard`/`installer-home`); `craftsman` only existed in the temporary code. Routes `/installer/sign-up`, `/installer/sign-in`; code in `features/installer-phone-auth`, `server/actions/installer-phone-auth.ts`, assets `public/installer-auth/`. Kept on purpose: `temporaryCraftsman` i18n keys, `Craftsman*` identifiers, alias domain and stored `registration_source` value.
+- **Compatibility:** `/temporary/craftsman/{sign-up,sign-in}` → 308 to `/installer/*` (`next.config.ts`), query kept. No duplicate pages.
+- **Entry points:** production/local homepage installer audience tile → `/installer/sign-up`; staging homepage installers role dialog → `/installer/sign-up`; all other roles unchanged. Shared `/auth/sign-in` gains a secondary link "صنايعي؟ سجّل الدخول برقم الهاتف" forwarding an explicit, re-validated `next`.
+- **Session rules:** `signOut` sends a phone-alias account to `/installer/sign-in` (identity read before sign-out), every other account to `/auth/sign-in`. Protected-route redirects unchanged (`/auth/sign-in?next=…`) — no route is installer-only, so no guessing. Middleware bounces signed-in visitors off `/installer/sign-*` like `/auth/*`. Installer sign-in applies the exact `verifyEmailOtp` `next` rule.
+- **Docs:** feature doc → `docs/frontend/installer-phone-auth.md` (stub left at the old path for historical links); PRODUCT_DIRECTION_GUIDE + ARCHITECTURE_GUIDE record the permanent, role-specific exception.
+- **Validation:** typecheck ✓ · lint 0 errors · unit 1781/1781 · build ✓ · Playwright: installer-phone-auth, account-registration, registration-persona all green (desktop + mobile). Also ran shared/individual/business onboarding, account-workspace-model, installer-dashboard, recovery-replay: 35 failures, all pre-existing — the same 15 desktop failures reproduce identically on the unmodified base (stashed comparison), plus the known installer-dashboard mobile selector issue.
+
+---
+
 ## Session — Temporary craftsman auth: visual calibration to the reference proportions
 
 **Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Visual-only; no auth/validation/database/consent/legal/route change; not merged; no PR; nothing deployed.
