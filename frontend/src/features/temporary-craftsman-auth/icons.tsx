@@ -60,13 +60,3 @@ export const EyeOffIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="M2 2l20 20" />
   </Icon>
 );
-
-export const ChartIcon = (p: SVGProps<SVGSVGElement>) => (
-  <Icon {...p}>
-    <path d="M4 20V14" />
-    <path d="M10 20V9" />
-    <path d="M16 20V5" />
-    <path d="M22 20H2" />
-  </Icon>
-);
-

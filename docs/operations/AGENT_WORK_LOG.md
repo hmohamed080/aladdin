@@ -4,6 +4,17 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Temporary craftsman auth: final visual refinement
+
+**Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Visual-only; no auth/validation/database/consent/legal change; not merged; no PR; nothing deployed.
+
+- Supplied chart tile replaces the stand-in (stand-in code removed). Desktop/tablet corner logo removed (mobile branding kept).
+- Desktop card enlarged (580px max, 72px fields, 64px CTA, 42px heading, more internal spacing); left content scaled up (headline to 68px, lede, benefit titles/bodies, 76px tiles, 30px row gap). A 1024–1279 step keeps the same composition one size smaller.
+- Mobile: the intro tint flows into the white form area as one surface (no floating card); compact illustration; taller fields; more space around consent and above the CTA; link separated.
+- Validation: typecheck ✓ · lint 0 errors · unit 1759/1759 · clean build ✓ · Playwright craftsman + account-registration + registration-persona 37 passed / 1 skipped (by design) · no horizontal overflow at 390×844, 430×932, 768×1024, 1024×768, 1440×900.
+
+---
+
 ## Session — Temporary craftsman auth: final visual pass with the approved assets
 
 **Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted untouched; no database or legal change.

@@ -30,14 +30,14 @@ export function IconField({ id, name, label, icon, error, hint, trailing, classN
     <div className="flex flex-col gap-1.5">
       <div
         className={cn(
-          "flex min-h-16 items-center gap-sm rounded-lg border bg-surface px-md py-2.5 transition-[border-color,box-shadow] duration-fast focus-within:ring-2",
+          "flex min-h-[4.5rem] items-center gap-sm rounded-lg border bg-surface px-md py-3 transition-[border-color,box-shadow] duration-fast focus-within:ring-2",
           error
             ? "border-danger focus-within:border-danger focus-within:ring-danger/30"
             : "border-strong focus-within:border-accent focus-within:ring-focus/40",
         )}
       >
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <label htmlFor={id} className="text-label font-medium text-fg">
+          <label htmlFor={id} className="text-body font-medium text-fg">
             {label}
           </label>
           <input

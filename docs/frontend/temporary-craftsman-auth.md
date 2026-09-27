@@ -117,9 +117,8 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
 - **Imagery is the approved, supplied artwork** (product owner, 2026-09-27) in
   `public/temporary/craftsman/`: `worksite-hero.webp` (desktop/tablet scene — craftsman and bands are part of
   the artwork), `craftsman-sign-up.webp` / `craftsman-sign-in.webp` (mobile headers), and the briefcase / bell /
-  people tiles split losslessly from the supplied icon sheet. All are referenced only through
-  `features/temporary-craftsman-auth/assets.ts`. **No chart/growth tile was supplied**: the sign-up "develop your
-  skills" benefit shows a token-coloured stand-in tile until `icons.chart` is set.
+  people / chart benefit tiles (split or cropped losslessly from the supplied files, no redraw). All are
+  referenced only through `features/temporary-craftsman-auth/assets.ts`.
 - **Consent receipts vs. displayed text.** The page shows one checkbox: "أوافق على شروط الخدمة وسياسة
   الخصوصية." `my_registration_state()` still requires three receipts (terms, privacy, pilot), so the flow
   records `pilot` too, although the pilot-release sentence is no longer displayed (product decision,

@@ -59,9 +59,9 @@
   width: 100%;
   max-width: 1440px;
   margin-inline: auto;
-  padding: 56px 64px;
+  padding: 48px 64px;
   /* RTL: the first column is the inline START (right) — the card. */
-  grid-template-columns: minmax(440px, 500px) minmax(0, 1fr) minmax(360px, 440px);
+  grid-template-columns: minmax(440px, 580px) minmax(0, 1fr) minmax(340px, 480px);
   column-gap: 32px;
   align-items: center;
 }
@@ -76,8 +76,8 @@
 .card {
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding: 48px 44px 40px;
+  gap: 32px;
+  padding: 56px 52px 48px;
   border-radius: 14px;
   background: var(--surface);
   box-shadow: var(--shadow-overlay);
@@ -99,12 +99,6 @@
   padding-top: 5vh;
 }
 
-.pageBrand {
-  position: absolute;
-  z-index: 2;
-  top: 28px;
-  left: 64px; /* physical: the page's top-left corner, above the headline */
-}
 
 .brand {
   display: inline-flex;
@@ -123,7 +117,7 @@
   margin: 0;
   font-family: var(--font-readex), system-ui, sans-serif;
   font-weight: 700;
-  font-size: clamp(2.75rem, 3.9vw, 3.75rem);
+  font-size: clamp(3rem, 4.3vw, 4.25rem);
   line-height: 1.3;
   letter-spacing: 0;
 }
@@ -138,7 +132,7 @@
 
 .lede {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   line-height: 1.75;
   color: var(--fg);
   max-width: 30ch;
@@ -155,7 +149,7 @@
 .features {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 30px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -170,33 +164,23 @@
 }
 .featureTile {
   flex-shrink: 0;
-  width: 68px;
-  height: 68px;
+  width: 76px;
+  height: 76px;
 }
 .featureTile img {
   width: 100%;
   height: 100%;
 }
-/* Stand-in tile (no supplied chart asset yet) — matches the supplied tiles. */
-.featureTileFallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 14px;
-  background: var(--surface);
-  color: var(--lapis);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 60%, transparent);
-}
 .featureTitle {
   display: block;
   font-weight: 700;
-  font-size: 1.3125rem;
+  font-size: 1.5rem;
   line-height: 1.5;
   color: var(--lapis);
 }
 .featureBody {
   display: block;
-  font-size: 1.0625rem;
+  font-size: 1.1875rem;
   line-height: 1.6;
   color: var(--fg);
 }
@@ -205,20 +189,20 @@
 .cardHeader {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   text-align: center;
 }
 .cardTitle {
   margin: 0;
   font-family: var(--font-readex), system-ui, sans-serif;
   font-weight: 700;
-  font-size: 2.25rem;
+  font-size: 2.625rem;
   line-height: 1.4;
   color: var(--shell);
 }
 .cardSubtitle {
   margin: 0;
-  font-size: 1.0625rem;
+  font-size: 1.1875rem;
   line-height: 1.7;
   color: var(--fg-secondary);
 }
@@ -229,6 +213,37 @@
 
 .mobileHeader {
   display: none;
+}
+
+/* ---- Small desktop (1024–1279): same composition, one step smaller. ------- */
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  .content {
+    padding: 40px 40px;
+    grid-template-columns: minmax(400px, 460px) minmax(0, 1fr) minmax(320px, 400px);
+    column-gap: 24px;
+  }
+  .card {
+    padding: 44px 36px 40px;
+  }
+  .cardTitle {
+    font-size: 2.25rem;
+  }
+  .headline {
+    font-size: 2.625rem;
+  }
+  .lede {
+    font-size: 1.125rem;
+  }
+  .featureTitle {
+    font-size: 1.25rem;
+  }
+  .featureBody {
+    font-size: 1rem;
+  }
+  .featureTile {
+    width: 64px;
+    height: 64px;
+  }
 }
 
 /* ---- Tablet ----------------------------------------------------------------
@@ -261,22 +276,20 @@
   .hero {
     display: none;
   }
-  .pageBrand {
-    top: 24px;
-    left: 24px;
-    padding: 6px 18px;
-    border-radius: 999px;
-    background: var(--surface);
-    box-shadow: var(--shadow-card);
-  }
 }
 
-/* ---- Mobile ---------------------------------------------------------------- */
+/* ---- Mobile ----------------------------------------------------------------
+ * The reference rhythm: a compact intro (logo, illustration) on a soft tint
+ * that fades into the white form area — one continuous surface, not a card
+ * floating under the artwork. Scrolling is expected; nothing is squeezed to
+ * fit the first viewport. */
 @media (max-width: 767.98px) {
+  .stage {
+    background: var(--surface);
+  }
   .backdrop,
   .veil,
-  .hero,
-  .pageBrand {
+  .hero {
     display: none;
   }
   .content {
@@ -290,28 +303,31 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
-    padding: 28px 24px 44px;
+    gap: 20px;
+    padding: 32px 24px 12px;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--lapis-bright) 14%, var(--surface)) 0%,
+      var(--surface) 100%
+    );
   }
   .mobileArt {
-    width: min(78%, 300px);
+    width: min(64%, 250px);
     height: auto;
   }
   .cardColumn {
-    position: relative;
     display: flex;
     flex: 1;
-    margin-top: -20px;
   }
   .card {
     flex: 1;
-    gap: 32px;
-    padding: 36px 20px 48px;
-    border-radius: 14px 14px 0 0;
-    box-shadow: var(--shadow-overlay);
+    gap: 36px;
+    padding: 28px 24px 56px;
+    border-radius: 0;
+    box-shadow: none;
   }
   .cardHeader {
-    gap: 12px;
+    gap: 14px;
   }
   .cardTitle {
     font-size: 1.875rem;

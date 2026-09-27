@@ -4,7 +4,6 @@ import Link from "next/link";
 import { Brand } from "@/components/layout/brand";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import { CRAFTSMAN_AUTH_ASSETS, type CraftsmanAsset } from "./assets";
-import { ChartIcon } from "./icons";
 import styles from "./craftsman-auth.module.css";
 
 type Variant = "signUp" | "signIn";
@@ -38,17 +37,10 @@ function CraftsmanBrand({ name }: { name: string }) {
   );
 }
 
-function FeatureTile({ asset }: { asset: CraftsmanAsset | null }) {
-  if (asset) {
-    return (
-      <span aria-hidden="true" className={styles.featureTile}>
-        <Image src={asset.src} alt="" width={asset.width} height={asset.height} sizes="68px" />
-      </span>
-    );
-  }
+function FeatureTile({ asset }: { asset: CraftsmanAsset }) {
   return (
-    <span aria-hidden="true" className={`${styles.featureTile} ${styles.featureTileFallback}`}>
-      <ChartIcon width={34} height={34} strokeWidth={2.6} />
+    <span aria-hidden="true" className={styles.featureTile}>
+      <Image src={asset.src} alt="" width={asset.width} height={asset.height} sizes="76px" />
     </span>
   );
 }
@@ -90,10 +82,6 @@ export function CraftsmanAuthShell({
         <Image src={worksiteHero.src} alt="" fill priority sizes="100vw" />
       </div>
       <div aria-hidden="true" className={styles.veil} />
-
-      <div className={styles.pageBrand}>
-        <CraftsmanBrand name={appName} />
-      </div>
 
       <main className={styles.content}>
         {/* Mobile intro: logo + supplied illustration, above the form sheet. */}
