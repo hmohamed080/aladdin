@@ -1,0 +1,463 @@
+/*
+ * Composition for the TEMPORARY craftsman auth pages (approved desktop + mobile
+ * references). Geometry only — every colour is a design token.
+ *
+ * Three layouts:
+ *   desktop  ≥1024  worksite backdrop · card (inline start) · craftsman standing
+ *                   on the bottom edge between card and headline · headline +
+ *                   benefits (inline end) · lapis/navy bands top, lumen/lapis
+ *                   bands bottom
+ *   tablet   768–1023  backdrop + bands, brand on top, card centred, craftsman
+ *                   anchored bottom at the inline end
+ *   mobile   <768   illustrated header (sky, bands, brand, craftsman in a lapis
+ *                   halo) and the form on a raised sheet that overlaps it
+ */
+
+.stage {
+  position: relative;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: var(--canvas);
+  color: var(--fg);
+}
+
+/* ---- Backdrop ------------------------------------------------------------ */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.backdrop img {
+  object-fit: cover;
+  object-position: center bottom;
+}
+/* Readability wash behind the headline (inline end = physical left in RTL). */
+.veil {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    to left,
+    transparent 30%,
+    color-mix(in srgb, var(--canvas) 55%, transparent) 62%,
+    color-mix(in srgb, var(--canvas) 88%, transparent) 100%
+  );
+}
+
+/* ---- Diagonal bands (physical placement: the reference is a fixed picture) - */
+.band {
+  position: absolute;
+  z-index: 0;
+  transform: rotate(38deg);
+  transform-origin: center;
+  pointer-events: none;
+}
+.bandLapisTop {
+  top: -22%;
+  left: 60%;
+  width: 150px;
+  height: 78%;
+  background: var(--lapis);
+  opacity: 0.92;
+}
+.bandNavyTop {
+  top: -22%;
+  left: calc(60% - 70px);
+  width: 46px;
+  height: 70%;
+  background: var(--shell);
+}
+.bandLumenBottom {
+  bottom: -30%;
+  left: 71%;
+  width: 150px;
+  height: 78%;
+  background: var(--lumen);
+}
+.bandLapisBottom {
+  bottom: -34%;
+  left: calc(71% + 190px);
+  width: 64px;
+  height: 70%;
+  background: var(--lapis);
+  opacity: 0.85;
+}
+.bandLapisLow {
+  bottom: -40%;
+  left: 26%;
+  width: 90px;
+  height: 70%;
+  background: var(--lapis);
+  opacity: 0.8;
+}
+
+/* ---- Desktop grid --------------------------------------------------------- */
+.content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 1400px;
+  margin-inline: auto;
+  padding: 32px 48px 0;
+  /* RTL: first column is the inline START (right) — the card. */
+  grid-template-columns: minmax(420px, 540px) minmax(200px, 1fr) minmax(340px, 440px);
+  column-gap: 24px;
+  align-items: center;
+}
+
+.cardColumn {
+  position: relative;
+  z-index: 2;
+  padding-bottom: 32px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 44px 40px 36px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  box-shadow: var(--shadow-overlay);
+}
+
+.figureColumn {
+  position: relative;
+  z-index: 1;
+  align-self: end;
+  display: flex;
+  justify-content: center;
+  height: 100%;
+}
+.figure {
+  position: absolute;
+  bottom: 0;
+  /* Extended toward the card (inline start) so the figure tucks behind the
+     card's edge, never into the headline and benefits. */
+  inset-inline-start: -38%;
+  inset-inline-end: 4%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  height: min(72dvh, 640px);
+}
+.figure img {
+  height: 100%;
+  width: auto;
+  max-width: none;
+}
+
+.hero {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding-bottom: 32px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.brandName {
+  font-family: var(--font-readex), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 1.5rem;
+  line-height: 1.5;
+  color: var(--shell);
+}
+
+.headline {
+  margin: 0;
+  font-family: var(--font-readex), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(2.5rem, 3.4vw, 3.5rem);
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+.headlineLead {
+  display: block;
+  color: var(--shell);
+}
+.headlineAccent {
+  display: block;
+  color: var(--lapis);
+}
+
+.lede {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.8;
+  color: var(--fg-secondary);
+  max-width: 34ch;
+}
+
+.rule {
+  display: block;
+  width: 56px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--lumen);
+}
+
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.featureIcon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--shell);
+  box-shadow: var(--shadow-card);
+}
+.featureTitle {
+  display: block;
+  font-weight: 700;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--lapis);
+}
+.featureBody {
+  display: block;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--fg-secondary);
+}
+
+/* ---- Card heading (shared by every layout) ------------------------------- */
+.cardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+.cardTitle {
+  margin: 0;
+  font-family: var(--font-readex), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 2.25rem;
+  line-height: 1.45;
+  color: var(--shell);
+}
+.cardSubtitle {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--fg-secondary);
+}
+
+/* Mobile-only header pieces are hidden by default. */
+.mobileHeader {
+  display: none;
+}
+.tabletBrand {
+  display: none;
+}
+
+/* ---- Tablet --------------------------------------------------------------- */
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .content {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    align-content: start;
+    row-gap: 24px;
+    padding: 64px 32px 48px;
+  }
+  .tabletBrand {
+    display: inline-flex;
+    padding: 6px 18px;
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+  }
+  .cardColumn {
+    width: min(100%, 480px);
+    padding-bottom: 0;
+  }
+  .hero {
+    display: none;
+  }
+  .figureColumn {
+    position: absolute;
+    inset: auto auto 0 0; /* physical bottom-left: the inline end in RTL */
+    height: 38dvh;
+    width: 34%;
+    align-self: auto;
+  }
+  .figure {
+    inset-inline: 0;
+    height: 100%;
+  }
+  .bandLapisTop {
+    left: 74%;
+  }
+  .bandNavyTop {
+    left: calc(74% - 70px);
+  }
+  .bandLumenBottom {
+    left: 80%;
+  }
+  .bandLapisBottom {
+    left: calc(80% + 170px);
+  }
+  .bandLapisLow {
+    left: 6%;
+  }
+}
+
+/* ---- Mobile --------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+  .backdrop,
+  .veil,
+  .band,
+  .figureColumn,
+  .hero {
+    display: none;
+  }
+  .content {
+    display: block;
+    min-height: 100dvh;
+    padding: 0;
+  }
+  .mobileHeader {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 16px 48px;
+    overflow: hidden;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--lapis-bright) 22%, var(--canvas)) 0%,
+      var(--canvas) 100%
+    );
+  }
+  .mobileBandLapis,
+  .mobileBandLumen {
+    position: absolute;
+    transform: rotate(38deg);
+    pointer-events: none;
+  }
+  .mobileBandLapis {
+    top: -60px;
+    left: -30px;
+    width: 56px;
+    height: 220px;
+    background: var(--lapis);
+    opacity: 0.85;
+  }
+  .mobileBandLumen {
+    top: -80px;
+    right: -10px;
+    width: 40px;
+    height: 240px;
+    background: var(--lumen);
+    opacity: 0.9;
+  }
+  .halo {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    width: 188px;
+    height: 188px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: radial-gradient(
+      circle at 50% 40%,
+      color-mix(in srgb, var(--lapis-bright) 45%, var(--surface)) 0%,
+      color-mix(in srgb, var(--lapis-bright) 22%, var(--surface)) 70%
+    );
+    box-shadow: var(--shadow-card);
+  }
+  .halo img {
+    width: 176px;
+    height: auto;
+    margin-bottom: -6px;
+  }
+  .haloBadge {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--lapis);
+    box-shadow: var(--shadow-card);
+  }
+  .haloBadgeStart {
+    top: 96px;
+    inset-inline-start: calc(50% - 140px);
+  }
+  .haloBadgeEnd {
+    top: 150px;
+    inset-inline-end: calc(50% - 136px);
+    color: var(--lumen-deep);
+  }
+  .cardColumn {
+    position: relative;
+    margin-top: -28px;
+    padding: 0;
+  }
+  .card {
+    min-height: calc(100dvh - 260px);
+    gap: 20px;
+    padding: 28px 16px 32px;
+    border-radius: 14px 14px 0 0;
+    border-inline: none;
+    border-bottom: none;
+  }
+  .cardTitle {
+    font-size: 1.75rem;
+  }
+  .brandName {
+    font-size: 1.25rem;
+  }
+  .cardSubtitle {
+    font-size: 0.9375rem;
+  }
+}
+
+/* ---- Dark theme ------------------------------------------------------------
+ * `--shell` is near-black in dark mode, so navy text/fills fall back to the
+ * theme's foreground, lapis text to its bright step, and the daylight backdrop
+ * is dimmed rather than glaring behind the card. */
+:global(.dark) .brandName,
+:global(.dark) .headlineLead,
+:global(.dark) .cardTitle,
+:global(.dark) .featureIcon {
+  color: var(--fg);
+}
+:global(.dark) .headlineAccent,
+:global(.dark) .featureTitle {
+  color: var(--lapis-bright);
+}
+:global(.dark) .backdrop {
+  filter: brightness(0.32) saturate(0.8);
+}
+:global(.dark) .bandNavyTop {
+  background: var(--shell-lit);
+}

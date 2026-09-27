@@ -137,7 +137,7 @@ test.describe("temporary craftsman auth", () => {
     await fillSignUp(page, { name: "صنايعي", phone: "0100", password: "abc" });
     await page.getByRole("button", { name: "إنشاء الحساب" }).click();
     await expect(page.getByText("من فضلك أدخل رقم هاتف صحيح")).toBeVisible();
-    await expect(page.getByText("يجب أن تكون كلمة المرور من ١٠ أحرف على الأقل.")).toBeVisible();
+    await expect(page.getByText("يجب أن تتكون كلمة المرور من 10 أحرف على الأقل")).toBeVisible();
 
     // Duplicate (same number typed in international form) — server-side check.
     await page.getByLabel("رقم الهاتف").fill(`+20${phone.slice(1)}`);

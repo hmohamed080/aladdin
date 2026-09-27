@@ -144,7 +144,7 @@ export function CraftsmanSignUpForm() {
       ) : null}
 
       <SubmitButton
-        className="min-h-12 w-full rounded-lg bg-shell text-body-lg text-shell-fg hover:opacity-90"
+        className="min-h-14 w-full rounded-lg bg-shell text-body-lg font-semibold text-shell-fg shadow-card hover:opacity-90 dark:bg-brand-lapis"
         pendingLabel={t("temporaryCraftsman.signUp.submitting")}
       >
         {t("temporaryCraftsman.signUp.submit")}

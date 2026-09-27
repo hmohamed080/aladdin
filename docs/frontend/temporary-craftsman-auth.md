@@ -114,9 +114,16 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
   identity is admin work when the flow is removed.
 - Phone invitations still bind by email/bearer token; the alias never matches an
   email invitation.
-- Missing approved imagery (worksite background, craftsman photo, mobile illustration)
-  renders token-only placeholders. Drop files into `public/temporary/craftsman/` and set
-  them in `features/temporary-craftsman-auth/assets.ts`.
+- **Imagery is interim, original artwork.** The approved worksite photo and craftsman photo are not in the
+  repository (and are not cropped from the mockups). `public/temporary/craftsman/worksite.svg` and
+  `craftsman.svg` are original vector art in the Aladdin palette, wired through
+  `features/temporary-craftsman-auth/assets.ts`; the composition (`craftsman-auth.module.css`) does not change
+  when an approved file replaces them.
+- **Consent receipts vs. displayed text.** The page shows one checkbox: "أوافق على شروط الخدمة وسياسة
+  الخصوصية." `my_registration_state()` still requires three receipts (terms, privacy, pilot), so the flow
+  records `pilot` too, although the pilot-release sentence is no longer displayed (product decision,
+  2026-09-27). `/legal/terms` and `/legal/privacy` are still placeholder pages; the pilot clause should live in
+  the Terms text when it is written.
 
 ## Hosted requirements (not done)
 

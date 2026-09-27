@@ -94,11 +94,17 @@ export const BellIcon = (p: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
-export const HardHatIcon = (p: SVGProps<SVGSVGElement>) => (
+export const WrenchIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
-    <path d="M2 18h20" />
-    <path d="M4 18v-2a8 8 0 0 1 16 0v2" />
-    <path d="M10 8V5h4v3" />
-    <path d="M10 10v3M14 10v3" />
+    <path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-2-2 8-8-1.3-1.3a4 4 0 0 1-5-5L11 3" />
+    <path d="M7 17l-4 4" />
+    <path d="M9.5 4.5 4.5 9.5l3 3 5-5" />
+  </Icon>
+);
+
+export const ShieldCheckIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+    <path d="m9 12 2 2 4-4" />
   </Icon>
 );

@@ -4,6 +4,18 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Temporary craftsman auth: UI revision to the approved composition
+
+**Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted untouched.
+
+- **UI:** rebuilt the page shell (`craftsman-auth.module.css`, tokens only) to the approved composition — desktop: worksite backdrop, card at inline start, craftsman standing on the bottom edge, headline + benefits at inline end, lapis/navy/lumen bands; tablet: card + figure below; mobile: illustrated header (brand, craftsman in a halo, badges, bands) with the form on a raised sheet. Dashed placeholder removed. Interim original SVG artwork (`public/temporary/craftsman/`) behind replaceable slots.
+- **Typography:** headings moved from Reem Kufi at tight line-height (clipped marks) to Readex Pro bold at 1.35–1.45; the page brand uses the shared emblem with the name in Readex (the shared wordmark is `leading-none`). Radii stay on the 14px token.
+- **Copy:** pilot sentence removed from consent ("أوافق على شروط الخدمة وسياسة الخصوصية."); password hint/error "يجب أن تتكون كلمة المرور من 10 أحرف على الأقل". The `pilot` receipt is still recorded (DB requirement) — flagged.
+- **Migration `20260927090001` review requested:** analysis reported; migration unchanged pending decision.
+- **Validation:** typecheck ✓ · lint 0 errors · unit 1759/1759 · build ✓ · Playwright craftsman 12/12 (desktop + mobile), account-registration + registration-persona 25 passed / 1 skipped (by design) · no horizontal overflow at 1440/834/390.
+
+---
+
 ## Session — Temporary craftsman phone + password auth (Option B)
 
 **Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · **Base:** `main` @ `e6c75d3`. No PR. Nothing deployed; hosted Supabase untouched.

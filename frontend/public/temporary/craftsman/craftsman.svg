@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 600" role="img" aria-hidden="true">
+  <!-- Original flat illustration for the temporary craftsman auth pages (Aladdin palette).
+       Interim artwork: replace with the approved craftsman photo/illustration via
+       features/temporary-craftsman-auth/assets.ts. -->
+  <defs>
+    <linearGradient id="shirt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#34597f"/>
+      <stop offset="1" stop-color="#24384d"/>
+    </linearGradient>
+    <linearGradient id="helmet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7c674"/>
+      <stop offset="0.55" stop-color="#f3ab3e"/>
+      <stop offset="1" stop-color="#c77f1c"/>
+    </linearGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d49a6e"/>
+      <stop offset="1" stop-color="#bf845a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- torso -->
+  <path d="M44 600 L44 486 C44 420 88 392 150 374 L204 358 L276 358 L330 374 C392 392 436 420 436 486 L436 600 Z" fill="url(#shirt)"/>
+  <!-- neck -->
+  <path d="M206 300 L274 300 L280 372 C262 390 218 390 200 372 Z" fill="#b27850"/>
+  <!-- collar -->
+  <path d="M196 356 L240 400 L214 420 L178 372 Z" fill="#2b4a6b"/>
+  <path d="M284 356 L240 400 L266 420 L302 372 Z" fill="#2b4a6b"/>
+  <!-- placket + pocket -->
+  <path d="M240 400 L240 600" stroke="#1d3046" stroke-width="4"/>
+  <rect x="286" y="436" width="62" height="54" rx="8" fill="#2b4a6b"/>
+  <rect x="302" y="424" width="8" height="30" rx="3" fill="#f3ab3e"/>
+  <!-- straps (overalls) -->
+  <path d="M150 380 L176 380 L190 600 L162 600 Z" fill="#2f6088"/>
+  <path d="M330 380 L304 380 L290 600 L318 600 Z" fill="#2f6088"/>
+
+  <!-- upper arms -->
+  <path d="M60 470 C60 430 92 400 132 392 L150 520 L70 540 Z" fill="#2b4a6b"/>
+  <path d="M420 470 C420 430 388 400 348 392 L330 520 L410 540 Z" fill="#2b4a6b"/>
+  <!-- back forearm (right → left) -->
+  <rect x="96" y="452" width="300" height="60" rx="30" transform="rotate(-9 246 482)" fill="#a86e47"/>
+  <!-- front forearm (left → right) -->
+  <rect x="92" y="498" width="296" height="62" rx="31" transform="rotate(7 240 529)" fill="url(#skin)"/>
+  <path d="M150 506 C200 500 260 504 330 520" fill="none" stroke="#a86e47" stroke-width="3" opacity="0.5"/>
+  <!-- rolled cuffs -->
+  <rect x="62" y="486" width="58" height="76" rx="22" transform="rotate(8 91 524)" fill="#34597f"/>
+  <rect x="360" y="478" width="58" height="76" rx="22" transform="rotate(-8 389 516)" fill="#34597f"/>
+  <!-- tucked fists -->
+  <ellipse cx="352" cy="532" rx="30" ry="26" fill="#c98f65"/>
+  <ellipse cx="124" cy="498" rx="28" ry="24" fill="#a86e47"/>
+
+  <!-- ears -->
+  <ellipse cx="170" cy="252" rx="14" ry="20" fill="#bf845a"/>
+  <ellipse cx="310" cy="252" rx="14" ry="20" fill="#bf845a"/>
+  <!-- head -->
+  <ellipse cx="240" cy="244" rx="70" ry="84" fill="url(#skin)"/>
+  <!-- beard -->
+  <path d="M172 238 C170 300 196 346 240 350 C284 346 310 300 308 238 C300 262 294 290 276 300 C262 290 218 290 204 300 C186 290 180 262 172 238 Z" fill="#3b2a20"/>
+  <!-- mouth / smile -->
+  <path d="M214 300 C224 318 256 318 266 300 C252 306 228 306 214 300 Z" fill="#fbf9f4"/>
+  <!-- moustache -->
+  <path d="M206 296 C216 282 234 284 240 292 C246 284 264 282 274 296 C262 292 250 294 240 300 C230 294 218 292 206 296 Z" fill="#2c1f17"/>
+  <!-- nose -->
+  <path d="M240 236 C236 256 232 266 234 272 C238 276 246 276 250 272" fill="none" stroke="#a86e47" stroke-width="4" stroke-linecap="round"/>
+  <!-- eyes -->
+  <ellipse cx="212" cy="234" rx="7" ry="8" fill="#2c1f17"/>
+  <ellipse cx="268" cy="234" rx="7" ry="8" fill="#2c1f17"/>
+  <circle cx="214" cy="231" r="2" fill="#fbf9f4"/>
+  <circle cx="270" cy="231" r="2" fill="#fbf9f4"/>
+  <!-- brows -->
+  <path d="M194 214 C204 204 222 204 230 212" fill="none" stroke="#2c1f17" stroke-width="7" stroke-linecap="round"/>
+  <path d="M286 214 C276 204 258 204 250 212" fill="none" stroke="#2c1f17" stroke-width="7" stroke-linecap="round"/>
+  <!-- hair at temples -->
+  <path d="M172 214 C172 196 178 188 186 184 L186 226 Z" fill="#3b2a20"/>
+  <path d="M308 214 C308 196 302 188 294 184 L294 226 Z" fill="#3b2a20"/>
+
+  <!-- hard hat -->
+  <path d="M160 184 C160 118 198 90 240 90 C282 90 320 118 320 184 Z" fill="url(#helmet)"/>
+  <rect x="226" y="90" width="28" height="94" rx="10" fill="#f7c674" opacity="0.9"/>
+  <path d="M178 164 C182 130 200 110 222 102" fill="none" stroke="#fbf9f4" stroke-width="6" stroke-linecap="round" opacity="0.55"/>
+  <rect x="140" y="176" width="200" height="24" rx="12" fill="#c77f1c"/>
+  <rect x="148" y="176" width="184" height="8" rx="4" fill="#f3ab3e"/>
+</svg>

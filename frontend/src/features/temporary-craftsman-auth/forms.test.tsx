@@ -29,7 +29,7 @@ describe("CraftsmanSignUpForm", () => {
   it("shows the project's 10-character hint, not the mockup's 6", () => {
     renderWithI18n(<CraftsmanSignUpForm />);
     expect(screen.getByText(c.fields.passwordHint)).toBeInTheDocument();
-    expect(c.fields.passwordHint).toContain("١٠");
+    expect(c.fields.passwordHint).toBe("يجب أن تتكون كلمة المرور من 10 أحرف على الأقل");
   });
 
   it("shows Arabic validation messages and never submits an invalid form", () => {
