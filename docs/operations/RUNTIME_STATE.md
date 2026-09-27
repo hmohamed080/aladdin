@@ -1,5 +1,11 @@
 # Runtime State
 
+## Current continuation — 2026-09-27 (later): craftsman auth UI approved
+
+- Branch `claude/vigilant-cori-471vck`. Temporary craftsman sign-up/sign-in **visual implementation approved** by the product owner; no further visual passes.
+- **Pending auth item:** craftsman forgot-password stays hidden until phone OTP (SMS/WhatsApp) recovery exists — see [temporary craftsman auth](../frontend/temporary-craftsman-auth.md). Email recovery flows unchanged.
+- Next step under review: route promotion/replacement plan (no change made). Hosted Supabase untouched; nothing deployed; no PR.
+
 ## Current continuation — 2026-09-27: temporary craftsman phone + password auth
 
 - Branch `claude/vigilant-cori-471vck` on `main` @ `e6c75d3`. Not merged; no PR; nothing deployed.

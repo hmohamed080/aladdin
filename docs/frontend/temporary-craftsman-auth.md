@@ -104,9 +104,15 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
 
 ## Known limitations
 
-- **Forgot password is hidden.** Recovery is email-based (`resetPasswordForEmail`) and
-  cannot reach an alias; there is no SMS/WhatsApp sender. The production recovery flow
-  is unchanged. A forgotten password needs an admin-assisted reset for now.
+- **Forgot password is hidden — PENDING authentication item (product decision, 2026-09-27).**
+  Every existing recovery flow is email-based (`/auth/recovery` email OTP;
+  `/preview/auth-password/forgot-password` → `resetPasswordForEmail`) and cannot reach a
+  phone/alias account; there is no SMS/WhatsApp sender. These flows must NOT be linked
+  from the craftsman pages, no interim workaround (support link, admin shortcut) is to be
+  built, and the email recovery flows stay unchanged. The intended recovery flow, to be
+  implemented once an OTP provider is integrated: phone number → OTP via SMS/WhatsApp →
+  identity verification → set new password. Until then a craftsman who forgets their
+  password cannot recover it self-service.
 - **The generated username cannot be changed** — the product has no username-edit UI
   after registration. It is `craftsman.` + 8 random characters.
 - These accounts cannot self-serve a change to a real email: `double_confirm_changes`
