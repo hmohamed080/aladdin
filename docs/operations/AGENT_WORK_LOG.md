@@ -4,6 +4,17 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Temporary craftsman auth: final visual pass with the approved assets
+
+**Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted untouched; no database or legal change.
+
+- Replaced the interim generated artwork with the supplied assets (desktop worksite hero, two mobile illustrations, three benefit tiles split from the supplied sheet). Generated SVGs deleted. No supplied chart tile — stand-in kept and flagged.
+- Desktop matched to the reference's hierarchy: headline + benefits flush to the outer (left) edge over the sky with larger type and spacing, icons at the outer edge, the artwork's craftsman between text and card, card at the inline start. Tablet: the scene as a photo header with the card rising over it. Mobile: logo + supplied illustration intro, full-width raised form sheet filling the screen, generous group spacing; sign-in heading on mobile is "مرحبًا بعودتك" (desktop card keeps "تسجيل الدخول").
+- Validation: typecheck ✓ · lint 0 errors · unit 1759/1759 · build ✓ · Playwright craftsman + account-registration + registration-persona 37 passed / 1 skipped (by design) · no horizontal overflow at 390×844, 430×932, 768×1024, 1440×900.
+- Still open for separate decisions: migration `20260927090001` (mask_email) vs. app-level filtering; the hidden `pilot` consent receipt; placeholder Terms/Privacy pages.
+
+---
+
 ## Session — Temporary craftsman auth: UI revision to the approved composition
 
 **Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted untouched.

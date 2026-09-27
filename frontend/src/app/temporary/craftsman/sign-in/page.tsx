@@ -25,6 +25,7 @@ export default async function TemporaryCraftsmanSignInPage() {
       variant="signIn"
       t={t}
       title={t("temporaryCraftsman.signIn.title")}
+      mobileTitle={t("temporaryCraftsman.signIn.mobileTitle")}
       subtitle={t("temporaryCraftsman.signIn.subtitle")}
       footer={{
         prompt: t("temporaryCraftsman.signIn.noAccount"),

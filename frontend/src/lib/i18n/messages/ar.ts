@@ -4190,6 +4190,7 @@ export const ar: Messages = {
     },
     signIn: {
       title: "تسجيل الدخول",
+      mobileTitle: "مرحبًا بعودتك",
       subtitle: "أدخل رقم الهاتف وكلمة المرور للوصول إلى حسابك",
       submit: "تسجيل الدخول",
       submitting: "جارٍ تسجيل الدخول…",

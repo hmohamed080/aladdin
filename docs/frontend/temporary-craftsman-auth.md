@@ -114,11 +114,12 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
   identity is admin work when the flow is removed.
 - Phone invitations still bind by email/bearer token; the alias never matches an
   email invitation.
-- **Imagery is interim, original artwork.** The approved worksite photo and craftsman photo are not in the
-  repository (and are not cropped from the mockups). `public/temporary/craftsman/worksite.svg` and
-  `craftsman.svg` are original vector art in the Aladdin palette, wired through
-  `features/temporary-craftsman-auth/assets.ts`; the composition (`craftsman-auth.module.css`) does not change
-  when an approved file replaces them.
+- **Imagery is the approved, supplied artwork** (product owner, 2026-09-27) in
+  `public/temporary/craftsman/`: `worksite-hero.webp` (desktop/tablet scene — craftsman and bands are part of
+  the artwork), `craftsman-sign-up.webp` / `craftsman-sign-in.webp` (mobile headers), and the briefcase / bell /
+  people tiles split losslessly from the supplied icon sheet. All are referenced only through
+  `features/temporary-craftsman-auth/assets.ts`. **No chart/growth tile was supplied**: the sign-up "develop your
+  skills" benefit shows a token-coloured stand-in tile until `icons.chart` is set.
 - **Consent receipts vs. displayed text.** The page shows one checkbox: "أوافق على شروط الخدمة وسياسة
   الخصوصية." `my_registration_state()` still requires three receipts (terms, privacy, pilot), so the flow
   records `pilot` too, although the pilot-release sentence is no longer displayed (product decision,

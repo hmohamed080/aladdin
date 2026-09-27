@@ -117,7 +117,7 @@ export function CraftsmanSignUpForm() {
         error={errors.password ? t(errors.password) : undefined}
       />
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 pt-xs">
         <Checkbox id="craftsman-consent" name="consent" checked={consented} onChange={setConsented}>
           {t("temporaryCraftsman.signUp.consentPrefix")}{" "}
           <Link href="/legal/terms" target="_blank" className="text-brand-lapis underline dark:text-brand-lapis-bright">

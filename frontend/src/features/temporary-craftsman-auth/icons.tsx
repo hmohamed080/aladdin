@@ -61,23 +61,6 @@ export const EyeOffIcon = (p: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
-export const BriefcaseIcon = (p: SVGProps<SVGSVGElement>) => (
-  <Icon {...p}>
-    <rect x="2" y="7" width="20" height="14" rx="2" />
-    <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-    <path d="M2 13h20" />
-  </Icon>
-);
-
-export const UsersIcon = (p: SVGProps<SVGSVGElement>) => (
-  <Icon {...p}>
-    <circle cx="9" cy="8" r="3.5" />
-    <path d="M2 20a7 7 0 0 1 14 0" />
-    <path d="M16 4.5a3.5 3.5 0 0 1 0 7" />
-    <path d="M18 14a6 6 0 0 1 4 6" />
-  </Icon>
-);
-
 export const ChartIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
     <path d="M4 20V14" />
@@ -87,24 +70,3 @@ export const ChartIcon = (p: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
-export const BellIcon = (p: SVGProps<SVGSVGElement>) => (
-  <Icon {...p}>
-    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-    <path d="M10.3 21a1.9 1.9 0 0 0 3.4 0" />
-  </Icon>
-);
-
-export const WrenchIcon = (p: SVGProps<SVGSVGElement>) => (
-  <Icon {...p}>
-    <path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-2-2 8-8-1.3-1.3a4 4 0 0 1-5-5L11 3" />
-    <path d="M7 17l-4 4" />
-    <path d="M9.5 4.5 4.5 9.5l3 3 5-5" />
-  </Icon>
-);
-
-export const ShieldCheckIcon = (p: SVGProps<SVGSVGElement>) => (
-  <Icon {...p}>
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
-    <path d="m9 12 2 2 4-4" />
-  </Icon>
-);

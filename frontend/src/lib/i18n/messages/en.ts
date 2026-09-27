@@ -4343,6 +4343,7 @@ export const en = {
     },
     signIn: {
       title: "Sign in",
+      mobileTitle: "Welcome back",
       subtitle: "Enter your phone number and password to access your account",
       submit: "Sign in",
       submitting: "Signing in…",

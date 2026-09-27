@@ -3,30 +3,31 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Brand } from "@/components/layout/brand";
 import type { TranslateFn } from "@/lib/i18n/translate";
-import { CRAFTSMAN_AUTH_ASSETS } from "./assets";
-import { BellIcon, BriefcaseIcon, ChartIcon, ShieldCheckIcon, UsersIcon, WrenchIcon } from "./icons";
+import { CRAFTSMAN_AUTH_ASSETS, type CraftsmanAsset } from "./assets";
+import { ChartIcon } from "./icons";
 import styles from "./craftsman-auth.module.css";
 
 type Variant = "signUp" | "signIn";
+type IconKey = keyof typeof CRAFTSMAN_AUTH_ASSETS.icons;
 
-const FEATURES: Record<Variant, { icon: ReactNode; title: string; body: string }[]> = {
+const FEATURES: Record<Variant, { icon: IconKey; title: string; body: string }[]> = {
   signUp: [
-    { icon: <BriefcaseIcon width={26} height={26} />, title: "realJobsTitle", body: "realJobsBody" },
-    { icon: <UsersIcon width={26} height={26} />, title: "networkTitle", body: "networkBody" },
-    { icon: <ChartIcon width={26} height={26} />, title: "skillsTitle", body: "skillsBody" },
+    { icon: "briefcase", title: "realJobsTitle", body: "realJobsBody" },
+    { icon: "people", title: "networkTitle", body: "networkBody" },
+    { icon: "chart", title: "skillsTitle", body: "skillsBody" },
   ],
   signIn: [
-    { icon: <BriefcaseIcon width={26} height={26} />, title: "followJobsTitle", body: "followJobsBody" },
-    { icon: <BellIcon width={26} height={26} />, title: "updatesTitle", body: "updatesBody" },
-    { icon: <UsersIcon width={26} height={26} />, title: "connectTitle", body: "connectBody" },
+    { icon: "briefcase", title: "followJobsTitle", body: "followJobsBody" },
+    { icon: "bell", title: "updatesTitle", body: "updatesBody" },
+    { icon: "people", title: "connectTitle", body: "connectBody" },
   ],
 };
 
 /**
  * The Aladdin lockup for these pages: the approved emblem (shared `Brand`,
- * emblem only) beside the name set in the UI face at a normal line height.
- * The shared wordmark uses the display face at `leading-none`, which clips
- * Arabic dots at this size — so it is not used here.
+ * emblem only) beside the name in the UI face at a normal line height — the
+ * shared wordmark is set `leading-none` in the display face, which clips Arabic
+ * marks at this size.
  */
 function CraftsmanBrand({ name }: { name: string }) {
   return (
@@ -37,15 +38,31 @@ function CraftsmanBrand({ name }: { name: string }) {
   );
 }
 
+function FeatureTile({ asset }: { asset: CraftsmanAsset | null }) {
+  if (asset) {
+    return (
+      <span aria-hidden="true" className={styles.featureTile}>
+        <Image src={asset.src} alt="" width={asset.width} height={asset.height} sizes="68px" />
+      </span>
+    );
+  }
+  return (
+    <span aria-hidden="true" className={`${styles.featureTile} ${styles.featureTileFallback}`}>
+      <ChartIcon width={34} height={34} strokeWidth={2.6} />
+    </span>
+  );
+}
+
 /**
  * Full-screen shell for the TEMPORARY craftsman auth pages — no navbar, no
  * footer. Composition and breakpoints live in `craftsman-auth.module.css`;
- * imagery comes from the replaceable slots in `assets.ts`.
+ * imagery comes from the approved assets in `assets.ts`.
  */
 export function CraftsmanAuthShell({
   variant,
   t,
   title,
+  mobileTitle,
   subtitle,
   footer,
   children,
@@ -53,6 +70,8 @@ export function CraftsmanAuthShell({
   variant: Variant;
   t: TranslateFn;
   title: string;
+  /** Heading on the mobile composition when it differs from the card's (sign-in: "welcome back"). */
+  mobileTitle?: string;
   subtitle: string;
   footer: { prompt: string; linkLabel: string; href: string };
   children: ReactNode;
@@ -61,40 +80,35 @@ export function CraftsmanAuthShell({
     variant === "signUp"
       ? { lead: "signUpTitleLead", accent: "signUpTitleAccent", body: "signUpBody" }
       : { lead: "signInTitleLead", accent: "signInTitleAccent", body: "signInBody" };
-  const { worksiteBackground, craftsman } = CRAFTSMAN_AUTH_ASSETS;
+  const { worksiteHero, icons } = CRAFTSMAN_AUTH_ASSETS;
+  const mobileArt = variant === "signUp" ? CRAFTSMAN_AUTH_ASSETS.craftsmanSignUp : CRAFTSMAN_AUTH_ASSETS.craftsmanSignIn;
   const appName = t("common.appName");
 
   return (
     <div dir="rtl" lang="ar" className={styles.stage}>
       <div aria-hidden="true" className={styles.backdrop}>
-        <Image src={worksiteBackground.src} alt="" fill priority sizes="100vw" />
+        <Image src={worksiteHero.src} alt="" fill priority sizes="100vw" />
       </div>
       <div aria-hidden="true" className={styles.veil} />
-      <span aria-hidden="true" className={`${styles.band} ${styles.bandNavyTop}`} />
-      <span aria-hidden="true" className={`${styles.band} ${styles.bandLapisTop}`} />
-      <span aria-hidden="true" className={`${styles.band} ${styles.bandLapisLow}`} />
-      <span aria-hidden="true" className={`${styles.band} ${styles.bandLumenBottom}`} />
-      <span aria-hidden="true" className={`${styles.band} ${styles.bandLapisBottom}`} />
+
+      <div className={styles.pageBrand}>
+        <CraftsmanBrand name={appName} />
+      </div>
 
       <main className={styles.content}>
-        <div className={styles.tabletBrand}>
-          <CraftsmanBrand name={appName} />
-        </div>
-
-        {/* Mobile: illustrated header above the form sheet. */}
+        {/* Mobile intro: logo + supplied illustration, above the form sheet. */}
         <div className={styles.mobileHeader}>
-          <span aria-hidden="true" className={styles.mobileBandLapis} />
-          <span aria-hidden="true" className={styles.mobileBandLumen} />
           <CraftsmanBrand name={appName} />
-          <div aria-hidden="true" className={styles.halo}>
-            <Image src={craftsman.src} alt="" width={craftsman.width} height={craftsman.height} priority />
-          </div>
-          <span aria-hidden="true" className={`${styles.haloBadge} ${styles.haloBadgeStart}`}>
-            <WrenchIcon width={22} height={22} />
-          </span>
-          <span aria-hidden="true" className={`${styles.haloBadge} ${styles.haloBadgeEnd}`}>
-            <ShieldCheckIcon width={22} height={22} />
-          </span>
+          <Image
+            src={mobileArt.src}
+            alt=""
+            aria-hidden="true"
+            width={mobileArt.width}
+            height={mobileArt.height}
+            sizes="300px"
+            priority
+            className={styles.mobileArt}
+          />
         </div>
 
         {/* The card — first in DOM order (the form is the page's purpose), inline start (right in RTL). */}
@@ -102,14 +116,21 @@ export function CraftsmanAuthShell({
           <section aria-labelledby="craftsman-auth-title" className={styles.card}>
             <header className={styles.cardHeader}>
               <h1 id="craftsman-auth-title" className={styles.cardTitle}>
-                {title}
+                {mobileTitle && mobileTitle !== title ? (
+                  <>
+                    <span className={styles.titleDesktop}>{title}</span>
+                    <span className={styles.titleMobile}>{mobileTitle}</span>
+                  </>
+                ) : (
+                  title
+                )}
               </h1>
               <p className={styles.cardSubtitle}>{subtitle}</p>
             </header>
 
             {children}
 
-            <p className="text-center text-body text-fg-secondary">
+            <p className="text-center text-body-lg text-fg-secondary">
               {footer.prompt}{" "}
               <Link
                 href={footer.href}
@@ -121,16 +142,8 @@ export function CraftsmanAuthShell({
           </section>
         </div>
 
-        {/* The craftsman, standing on the bottom edge between the card and the headline. */}
-        <div aria-hidden="true" className={styles.figureColumn}>
-          <div className={styles.figure}>
-            <Image src={craftsman.src} alt="" width={craftsman.width} height={craftsman.height} priority />
-          </div>
-        </div>
-
-        {/* Headline + benefits — desktop, inline end (left in RTL). */}
+        {/* Headline + benefits — desktop, inline end (left in RTL), over the artwork's sky. */}
         <aside className={styles.hero}>
-          <CraftsmanBrand name={appName} />
           <h2 className={styles.headline}>
             <span className={styles.headlineLead}>{t(`temporaryCraftsman.hero.${hero.lead}`)}</span>
             <span className={styles.headlineAccent}>{t(`temporaryCraftsman.hero.${hero.accent}`)}</span>
@@ -140,9 +153,7 @@ export function CraftsmanAuthShell({
           <ul className={styles.features}>
             {FEATURES[variant].map((feature) => (
               <li key={feature.title} className={styles.feature}>
-                <span aria-hidden="true" className={styles.featureIcon}>
-                  {feature.icon}
-                </span>
+                <FeatureTile asset={icons[feature.icon]} />
                 <span>
                   <span className={styles.featureTitle}>{t(`temporaryCraftsman.features.${feature.title}`)}</span>
                   <span className={styles.featureBody}>{t(`temporaryCraftsman.features.${feature.body}`)}</span>
