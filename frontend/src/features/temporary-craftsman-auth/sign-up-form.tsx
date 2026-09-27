@@ -117,7 +117,7 @@ export function CraftsmanSignUpForm() {
         error={errors.password ? t(errors.password) : undefined}
       />
 
-      <div className="flex flex-col gap-1.5 py-sm">
+      <div className="flex flex-col gap-1.5">
         <Checkbox id="craftsman-consent" name="consent" checked={consented} onChange={setConsented}>
           {t("temporaryCraftsman.signUp.consentPrefix")}{" "}
           <Link href="/legal/terms" target="_blank" className="text-brand-lapis underline dark:text-brand-lapis-bright">
@@ -144,7 +144,7 @@ export function CraftsmanSignUpForm() {
       ) : null}
 
       <SubmitButton
-        className="mt-sm min-h-16 w-full rounded-lg bg-shell text-title font-semibold text-shell-fg shadow-card hover:opacity-90 dark:bg-brand-lapis"
+        className="mt-sm min-h-14 w-full rounded-lg bg-shell text-body-lg font-semibold text-shell-fg shadow-card hover:opacity-90 tablet:min-h-16 tablet:text-title dark:bg-brand-lapis"
         pendingLabel={t("temporaryCraftsman.signUp.submitting")}
       >
         {t("temporaryCraftsman.signUp.submit")}

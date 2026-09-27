@@ -4,6 +4,18 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Temporary craftsman auth: visual calibration to the reference proportions
+
+**Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Visual-only; no auth/validation/database/consent/legal/route change; not merged; no PR; nothing deployed.
+
+- Desktop recalibrated to measured reference geometry at 1440 (card ≈ 250px from the right edge, max 540px; headline ≈ 112px from the left, 48px; benefit type/tiles reduced; artwork at natural cover scale — the lowest the supplied image can sit without uncovering the top — slid so the craftsman sits between headline and card).
+- 1024–1279: breakpoint-specific composition (artwork repositioned, columns narrowed) so the card no longer covers the craftsman's face.
+- Mobile: compact reference rhythm on a subtle cool Lapis-tinted surface (no gradient/card/shadow), 64px fields, 56px CTA; tablet+ sizes unchanged.
+- "نسيت كلمة المرور؟" NOT restored: the only existing recovery flows (`/auth/recovery`, `/preview/auth-password/forgot-password`) are email-based and cannot reach phone/alias accounts — reported for a product decision.
+- Validation: typecheck ✓ · lint 0 errors · unit 1759/1759 · clean build ✓ · Playwright craftsman + account-registration + registration-persona 37 passed / 1 skipped (by design) · no horizontal overflow at 390×844, 430×932, 768×1024, 1024×768, 1440×900.
+
+---
+
 ## Session — Temporary craftsman auth: final visual refinement
 
 **Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Visual-only; no auth/validation/database/consent/legal change; not merged; no PR; nothing deployed.
