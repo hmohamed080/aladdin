@@ -341,7 +341,7 @@ select is(
 set local request.jwt.claims = '{"sub":"70000006-0000-4000-8000-000000000006","role":"authenticated"}';
 select set_config('test.job_h',
   (select public.job_create(:'orgH'::uuid, 'Marble hallway - referred relationship test',
-     'marble_granite', 4500))::text, true);
+     'wallpaper_installation', 4500))::text, true);
 select public.job_publish(current_setting('test.job_h')::uuid, 1);
 
 set local request.jwt.claims = '{"sub":"71000006-0000-4000-8000-000000000006","role":"authenticated"}';

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getRegistrationState } from "@/server/queries/registration";
+import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadWorkspaces } from "@/server/queries/workspace";
 import { personalEntry } from "@/lib/workspace/model";
@@ -9,6 +9,25 @@ import { loadTradeCatalog, loadMyTrades } from "@/server/queries/trades";
 import { TradeSelector } from "@/features/profile/trade-selector";
 import { ProfessionalProfileEditor } from "@/features/profile/professional-profile-editor";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
+import { ActivitySelector } from "@/features/profile/activity-selector";
+import { loadMyActivities, loadPersonaActivityCatalog } from "@/server/queries/activities";
+import { setMyActivitiesAction } from "@/server/actions/activities";
+import type { Database } from "@/types/database.types";
+
+type PersonaType = Database["public"]["Enums"]["persona_type"];
+const PERSONAS: readonly PersonaType[] = [
+  "end_consumer",
+  "engineer",
+  "interior_designer",
+  "installer_technician",
+  "contractor",
+  "sales",
+  "trainer",
+  "trainee",
+];
+function asPersona(value: string | null | undefined): PersonaType | null {
+  return value && (PERSONAS as readonly string[]).includes(value) ? (value as PersonaType) : null;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +49,7 @@ export const dynamic = "force-dynamic";
 export default async function EditProfilePage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state !== "active_personal") redirect("/onboarding");
+  if (!hasAppAccess(state)) redirect("/onboarding");
 
   const supabase = await getServerSupabase();
   const { entries } = await loadWorkspaces(supabase);
@@ -49,7 +68,16 @@ export default async function EditProfilePage() {
 
   // Two reads, one round trip each, both scoped to the caller — neither takes a
   // user id, because neither could act on one.
-  const [catalog, mine] = await Promise.all([loadTradeCatalog(), loadMyTrades()]);
+  // Persona-scoped subtypes (Engineer: finishing · Sales: rep/manager).
+  // Tradespeople use the trade taxonomy above instead and have no persona
+  // activities, so their catalog is empty and the selector renders nothing.
+  const persona = asPersona(concreteType);
+  const [catalog, mine, activityCatalog, myActivities] = await Promise.all([
+    loadTradeCatalog(),
+    loadMyTrades(),
+    persona ? loadPersonaActivityCatalog(persona) : Promise.resolve([] as string[]),
+    loadMyActivities(),
+  ]);
 
   return (
     <div className="flex flex-col gap-xl">
@@ -60,6 +88,7 @@ export default async function EditProfilePage() {
           first because the canonical trade is now the profile's category, and the
           free-text fields below it are description. */}
       <TradeSelector catalog={catalog} mine={mine} />
+      <ActivitySelector catalog={activityCatalog} selected={myActivities} action={setMyActivitiesAction} />
       <ProfessionalProfileEditor answers={individual.professional} concreteType={concreteType} />
     </div>
   );

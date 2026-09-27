@@ -25,12 +25,20 @@ export function NoPersonalWorkspace() {
         body={t("workspace.none.body")}
         tone="warning"
       />
-      <Link href="/business/new">
-        <Button type="button" variant="primary">
-          <PlusIcon size={16} />
-          {t("workspace.addBusiness")}
-        </Button>
-      </Link>
+      <div className="flex flex-wrap items-center justify-center gap-sm">
+        <Link href="/business/new">
+          <Button type="button" variant="primary">
+            <PlusIcon size={16} />
+            {t("workspace.addBusiness")}
+          </Button>
+        </Link>
+        {/* The person's own identity needs no workspace — /settings/profile. */}
+        <Link href="/settings/profile" data-testid="no-workspace-edit-profile">
+          <Button type="button" variant="outline">
+            {t("workspace.editProfile")}
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }

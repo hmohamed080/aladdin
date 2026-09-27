@@ -161,7 +161,11 @@ seed_local = "khaled"
 name     = "Khaled Roushdy"
 persona  = ""
 org      = "Delta Wholesale Supply"
-org_type = "wholesaler"
+# org_type is "supplier" as of the wholesaler->supplier remap
+# (20260924090004_wholesaler_supplier_remap.sql) — the original
+# classification is preserved as the "wholesaler" activity, not the
+# top-level org_type.
+org_type = "supplier"
 role     = "owner"
 landing  = "/b2b"
 data     = "3 published products; 3 inbound RFQs from Cairo Ceramics; 3 quotations — two accepted, one rejected on price; 2 orders (one completed, one in progress) and an active ceiling-board delivery project."

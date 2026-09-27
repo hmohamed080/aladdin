@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getRegistrationState } from "@/server/queries/registration";
+import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { getBusinessOnboardingData } from "@/server/queries/onboarding";
 import { businessOrgTypeFromAccountType } from "@/lib/onboarding/account-types";
 import { BusinessFlow } from "@/features/onboarding/business-flow";
@@ -19,9 +19,12 @@ export const dynamic = "force-dynamic";
 export default async function AddBusinessPage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  // Someone still mid-registration finishes that first; the shared steps (consent,
-  // profile, contact) are prerequisites for creating anything.
-  if (state !== "active_personal" && state !== "organization_setup_pending") redirect("/onboarding");
+  // Someone still mid-registration finishes that first — consent and a known
+  // account type are prerequisites for creating anything. organization_setup_pending
+  // no longer exists as a registration state (Increment 7): access_ready and
+  // active_personal both mean "may enter the app," and creating a business is
+  // now an optional in-app action available from either, not a gated step.
+  if (!hasAppAccess(state)) redirect("/onboarding");
 
   const data = await getBusinessOnboardingData();
   if (!data) redirect("/auth/sign-in");

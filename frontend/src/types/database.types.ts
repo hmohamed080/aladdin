@@ -34,6 +34,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      activities: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          organization_type:
+            | Database["public"]["Enums"]["organization_type"]
+            | null
+          persona_type: Database["public"]["Enums"]["persona_type"] | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          organization_type?:
+            | Database["public"]["Enums"]["organization_type"]
+            | null
+          persona_type?: Database["public"]["Enums"]["persona_type"] | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          organization_type?:
+            | Database["public"]["Enums"]["organization_type"]
+            | null
+          persona_type?: Database["public"]["Enums"]["persona_type"] | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string
@@ -81,6 +120,44 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      avatar_uploads: {
+        Row: {
+          content_type: string
+          created_at: string
+          id: string
+          object_key: string
+          owner_user_id: string
+          state: Database["public"]["Enums"]["professional_asset_state"]
+          updated_at: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          id?: string
+          object_key: string
+          owner_user_id: string
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          updated_at?: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          id?: string
+          object_key?: string
+          owner_user_id?: string
+          state?: Database["public"]["Enums"]["professional_asset_state"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avatar_uploads_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -1824,6 +1901,39 @@ export type Database = {
           },
         ]
       }
+      organization_activities: {
+        Row: {
+          activity_id: string
+          created_at: string
+          organization_id: string
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string
+          organization_id: string
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_activities_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_activities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_activity_events: {
         Row: {
           actor_user_id: string | null
@@ -2505,14 +2615,20 @@ export type Database = {
           deleted_at: string | null
           display_name: string
           display_name_ar: string | null
+          display_name_confirmed_at: string | null
           display_name_en: string | null
           headline: string | null
           id: string
           languages: string[] | null
           locality_id: string | null
+          phone_country_iso2: string | null
+          phone_e164: string | null
+          phone_national: string | null
           public_profile_status: Database["public"]["Enums"]["public_profile_status"]
           updated_at: string
           user_id: string
+          username: string | null
+          username_normalized: string | null
         }
         Insert: {
           availability_updated_at?: string | null
@@ -2523,14 +2639,20 @@ export type Database = {
           deleted_at?: string | null
           display_name: string
           display_name_ar?: string | null
+          display_name_confirmed_at?: string | null
           display_name_en?: string | null
           headline?: string | null
           id?: string
           languages?: string[] | null
           locality_id?: string | null
+          phone_country_iso2?: string | null
+          phone_e164?: string | null
+          phone_national?: string | null
           public_profile_status?: Database["public"]["Enums"]["public_profile_status"]
           updated_at?: string
           user_id: string
+          username?: string | null
+          username_normalized?: string | null
         }
         Update: {
           availability_updated_at?: string | null
@@ -2541,16 +2663,29 @@ export type Database = {
           deleted_at?: string | null
           display_name?: string
           display_name_ar?: string | null
+          display_name_confirmed_at?: string | null
           display_name_en?: string | null
           headline?: string | null
           id?: string
           languages?: string[] | null
           locality_id?: string | null
+          phone_country_iso2?: string | null
+          phone_e164?: string | null
+          phone_national?: string | null
           public_profile_status?: Database["public"]["Enums"]["public_profile_status"]
           updated_at?: string
           user_id?: string
+          username?: string | null
+          username_normalized?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_profiles_avatar_media_id"
+            columns: ["avatar_media_id"]
+            isOneToOne: false
+            referencedRelation: "avatar_uploads"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_user_id_fkey"
             columns: ["user_id"]
@@ -2841,6 +2976,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reserved_usernames: {
+        Row: {
+          normalized: string
+        }
+        Insert: {
+          normalized: string
+        }
+        Update: {
+          normalized?: string
+        }
+        Relationships: []
       }
       rfq_items: {
         Row: {
@@ -3158,6 +3305,39 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      user_activities: {
+        Row: {
+          activity_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_activities_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_activities_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_trades: {
         Row: {
@@ -4540,6 +4720,11 @@ export type Database = {
         }
         Returns: number
       }
+      avatar_confirm_upload: { Args: { p_object_key: string }; Returns: string }
+      avatar_request_upload: {
+        Args: { p_content_type: string }
+        Returns: string
+      }
       branch_assign: {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: string
@@ -4922,6 +5107,7 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      my_profile_completion: { Args: never; Returns: Json }
       my_registration_state: { Args: never; Returns: string }
       my_showroom_affiliations: {
         Args: never
@@ -5051,12 +5237,34 @@ export type Database = {
           user_id: string
         }[]
       }
+      organization_activities_set: {
+        Args: { p_activity_keys: string[]; p_org_id: string }
+        Returns: undefined
+      }
       organization_update_i18n: {
         Args: {
           p_name_ar: string
           p_name_en: string
           p_org_id: string
           p_timezone: string
+        }
+        Returns: undefined
+      }
+      pending_registration_consume: {
+        Args: never
+        Returns: {
+          audience_kind: Database["public"]["Enums"]["activity_audience_kind"]
+          audience_value: string
+          username: string
+        }[]
+      }
+      pending_registration_save: {
+        Args: {
+          p_audience_kind: Database["public"]["Enums"]["activity_audience_kind"]
+          p_audience_value: string
+          p_ttl_minutes?: number
+          p_user_id: string
+          p_username: string
         }
         Returns: undefined
       }
@@ -5086,6 +5294,15 @@ export type Database = {
         Args: { p_description: string; p_item_id: string; p_title: string }
         Returns: undefined
       }
+      profile_set_display_name: {
+        Args: { p_display_name: string }
+        Returns: undefined
+      }
+      profile_set_phone: {
+        Args: { p_country_iso2: string; p_e164: string; p_national: string }
+        Returns: undefined
+      }
+      profile_set_username: { Args: { p_username: string }; Returns: undefined }
       public_portfolio_media_key: {
         Args: { p_item_id: string }
         Returns: string
@@ -5350,12 +5567,18 @@ export type Database = {
         }
         Returns: number
       }
+      user_activities_set: {
+        Args: { p_activity_keys: string[] }
+        Returns: undefined
+      }
       user_trades_set: {
         Args: { p_primary_key?: string; p_trade_keys: string[] }
         Returns: undefined
       }
+      username_available: { Args: { p_username: string }; Returns: boolean }
     }
     Enums: {
+      activity_audience_kind: "organization_type" | "persona_type"
       affiliation_request_status:
         | "pending"
         | "approved"
@@ -5504,12 +5727,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5533,11 +5756,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5558,11 +5781,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5583,11 +5806,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5600,11 +5823,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5619,6 +5842,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      activity_audience_kind: ["organization_type", "persona_type"],
       affiliation_request_status: [
         "pending",
         "approved",

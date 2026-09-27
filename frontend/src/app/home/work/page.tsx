@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { getRegistrationState } from "@/server/queries/registration";
+import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadWorkspaces } from "@/server/queries/workspace";
 import { personalEntry } from "@/lib/workspace/model";
@@ -47,7 +47,7 @@ export default async function MyWorkPage({
 }) {
   const registration = await getRegistrationState();
   if (registration === "unverified") redirect("/auth/sign-in");
-  if (registration !== "active_personal") redirect("/onboarding");
+  if (!hasAppAccess(registration)) redirect("/onboarding");
 
   const supabase = await getServerSupabase();
   const { entries } = await loadWorkspaces(supabase);

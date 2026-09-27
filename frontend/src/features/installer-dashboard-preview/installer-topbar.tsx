@@ -144,6 +144,8 @@ export function InstallerTopbar({
           onClick={() => setAccountOpen((v) => !v)}
           aria-haspopup="menu"
           aria-expanded={accountOpen}
+          // Same stable test contract as the canonical ProfileMenu.
+          data-testid="profile-menu-trigger"
           className="flex items-center gap-1.5 rounded-sm py-1 pe-1 ps-1 hover:bg-surface-2"
         >
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-pill bg-accent-solid text-label font-semibold text-on-accent">
@@ -168,7 +170,7 @@ export function InstallerTopbar({
                 <MenuLink href="/home/profile" icon={UserIcon} label={locale === "ar" ? "ملفي الشخصي" : "My profile"} />
                 <MenuLink href="/home/settings" icon={SettingsIcon} label={locale === "ar" ? "الإعدادات" : "Settings"} />
                 <div className="my-1 border-t" />
-                <form action={signOut}><MenuRow icon={LogOutIcon} label={locale === "ar" ? "تسجيل خروج" : "Sign out"} tone="danger" submit /></form>
+                <form action={signOut}><MenuRow icon={LogOutIcon} label={locale === "ar" ? "تسجيل خروج" : "Sign out"} tone="danger" submit testId="profile-sign-out" /></form>
               </>
             ) : (
               <>
@@ -191,16 +193,19 @@ function MenuRow({
   label,
   tone = "default",
   submit = false,
+  testId,
 }: {
   icon: typeof UserIcon;
   label: string;
   tone?: "default" | "danger";
   submit?: boolean;
+  testId?: string;
 }) {
   return (
     <button
       type={submit ? "submit" : "button"}
       role="menuitem"
+      data-testid={testId}
       className={cn(
         "flex w-full items-center gap-2.5 px-3 py-2 text-label font-medium transition-colors",
         tone === "danger" ? "text-danger hover:bg-danger/10" : "text-fg-secondary hover:bg-surface-2 hover:text-fg",

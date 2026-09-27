@@ -39,7 +39,14 @@ insert into public.onboarding_progress
    profile_completed_at, contact_completed_at, account_type_completed_at, completed_at)
 values
   ('c0000000-0000-4000-8000-0000000000c1', '01012345678', 'consumer', null, now(), now(), now(), now()),
-  ('d0000000-0000-4000-8000-0000000000d1', '01512345678', 'professional', 'engineer', now(), now(), now(), now());
+  ('d0000000-0000-4000-8000-0000000000d1', '01512345678', 'professional', 'interior_designer', now(), now(), now(), now());
+-- What onboarding_select_account_type('professional', 'interior_designer')
+-- records alongside the row above since Increment 11: the DECLARED persona.
+-- Increment 12 locks individual_save_professional to it — the wizard's profile
+-- step saves data for the chosen persona and can no longer switch it (this
+-- fixture used to select 'engineer' and then save 'interior_designer').
+insert into public.individual_onboarding (user_id, prof_concrete_type)
+values ('d0000000-0000-4000-8000-0000000000d1', 'interior_designer');
 
 -- ===========================================================================
 -- Consumer branch
@@ -47,9 +54,13 @@ values
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"c0000000-0000-4000-8000-0000000000c1","role":"authenticated"}';
 
--- Before finishing, the derived state is the consumer flow (not activated).
-select is(public.my_registration_state(), 'consumer_onboarding_pending',
-  'consumer with the account-type step done resolves to consumer_onboarding_pending');
+-- Before finishing, the derived state is the mandatory username step.
+-- Staging-prep Increment 7 (20260924090007_registration_state_access_ready.sql)
+-- removed consumer_onboarding_pending/persona_onboarding_pending as return
+-- values of my_registration_state() — once account_type_completed_at is set,
+-- the only remaining gate before access_ready/active_personal is username.
+select is(public.my_registration_state(), 'username_pending',
+  'consumer with the account-type step done but no username resolves to username_pending');
 
 select lives_ok(
   $$ select public.individual_save_consumer('planning', array['flooring','lighting'], 'cairo', 'new_cairo', '100_250k') $$,
@@ -84,8 +95,8 @@ reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"d0000000-0000-4000-8000-0000000000d1","role":"authenticated"}';
 
-select is(public.my_registration_state(), 'persona_onboarding_pending',
-  'professional with the account-type step done resolves to persona_onboarding_pending');
+select is(public.my_registration_state(), 'username_pending',
+  'professional with the account-type step done but no username resolves to username_pending');
 
 -- A professional cannot complete the consumer branch.
 select throws_ok(

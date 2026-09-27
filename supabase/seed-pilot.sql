@@ -127,12 +127,27 @@ values
    'manufacturer', 'pending_verification', false, 'en', '70000003-0000-4000-8000-000000000003', null, null),
   ('9e000000-eeee-4eee-8eee-000000000003', 'Nile Import & Trade', 'nile-import',
    'importer', 'pending_verification', false, 'en', '70000004-0000-4000-8000-000000000004', null, null),
+  -- org_type is 'supplier' (not 'wholesaler') — Increment 4
+  -- (20260924090004_wholesaler_supplier_remap.sql) remaps every existing
+  -- wholesaler org, and this seed script runs AFTER migrations replay, so
+  -- seeding 'wholesaler' directly here would create a NEW org that
+  -- migration's UPDATE could never see. The 'wholesaler' activity row
+  -- (attached below) is what preserves the original classification.
   ('9f000000-ffff-4fff-8fff-000000000004', 'Delta Wholesale Supply', 'delta-wholesale',
-   'wholesaler', 'active', false, 'en', '70000005-0000-4000-8000-000000000005', null, null),
+   'supplier', 'active', false, 'en', '70000005-0000-4000-8000-000000000005', null, null),
   -- A contracting BUSINESS is `contractor_company`; its owner is separately an
   -- individual `contractor` PERSONA (two enums since Sprint 13, never one value).
   ('9a000000-aaaa-4aaa-8aaa-000000000005', 'Horizon Contracting', 'horizon-contracting',
    'contractor_company', 'active', false, 'en', '70000006-0000-4000-8000-000000000006', null, null);
+
+-- Delta Wholesale Supply is seeded above with org_type='supplier' — this
+-- attaches the 'wholesaler' activity so its original classification is still
+-- visible, matching what Increment 4's remap produces for a real pre-existing
+-- wholesaler org.
+insert into public.organization_activities (organization_id, activity_id)
+select '9f000000-ffff-4fff-8fff-000000000004', a.id
+  from public.activities a
+ where a.organization_type = 'supplier' and a.key = 'wholesaler';
 
 -- ---------------------------------------------------------------------------
 -- 3. Branches (one per new org)
@@ -655,7 +670,7 @@ values
    'In-wall cistern with dual-flush plate.', 'set',
    '/demo/products/sanitary-basin.svg', 'published', now() - interval '48 days', '71000003-0000-4000-8000-000000000003'),
 
-  -- Delta Wholesale Supply (wholesaler)
+  -- Delta Wholesale Supply (supplier; wholesaler activity)
   ('d7000008-0000-4000-8000-000000000008', '9f000000-ffff-4fff-8fff-000000000004',
    'Silicone Sealant - Neutral', 'SUP-SIL', 'supply', 'DeltaSupply',
    'Neutral-cure silicone for sanitary and glazing joints.', 'piece',

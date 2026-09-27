@@ -7,6 +7,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { sanitizeNext } from "@/server/auth/next";
 import { resolveActiveLanding } from "@/server/queries/landing";
+import { hasAppAccess, type RegistrationState } from "@/server/queries/registration";
 
 /**
  * Passwordless Email-OTP account access (Supabase Auth). Two steps: request a
@@ -127,7 +128,7 @@ export async function verifyEmailOtp(_prev: AuthState, formData: FormData): Prom
   // An indeterminate state is safest at /onboarding, whose route re-derives the
   // exact pending step; it must never fall through into an active surface.
   const { data: state } = await supabase.rpc("my_registration_state");
-  if (state !== "active_personal") redirect("/onboarding");
+  if (!hasAppAccess(state as RegistrationState)) redirect("/onboarding");
 
   // This is the real post-OTP landing path. Resolve the caller's canonical
   // surface, then retain a safe deep link only when it belongs to that surface.

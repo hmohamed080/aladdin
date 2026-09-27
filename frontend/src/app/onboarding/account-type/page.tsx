@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getRegistrationState } from "@/server/queries/registration";
+import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { activeLandingPath } from "@/server/queries/landing";
 import { getOnboardingData } from "@/server/queries/onboarding";
 import { AccountTypeStep } from "@/features/onboarding/account-type-step";
@@ -7,16 +7,22 @@ import { ACCOUNT_TYPE_CHOICES } from "@/lib/onboarding/account-types";
 
 export const dynamic = "force-dynamic";
 
-/** Step 3 route. Requires the earlier steps; pre-selects a prior choice if any. */
+/**
+ * The account-type step — now the ONLY mandatory step `/onboarding` routes a
+ * new registrant through before consent-only/username-only recovery
+ * (Increment 7). No longer requires the profile/contact steps first — those
+ * are no longer gating states at all.
+ */
 export default async function OnboardingAccountTypePage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state === "active_personal") redirect(await activeLandingPath());
-  if (state === "consent_pending" || state === "invitation_pending" || state === "manually_blocked") {
+  if (hasAppAccess(state)) redirect(await activeLandingPath());
+  if (state === "consent_pending" || state === "manually_blocked") {
     redirect("/onboarding");
   }
-  if (state === "profile_pending") redirect("/onboarding/profile");
-  if (state === "contact_pending") redirect("/onboarding/contact");
+  // An account type is already recorded once state has advanced past this
+  // step — re-showing the picker here would be confusing/wrong.
+  if (state === "username_pending") redirect("/onboarding/username");
 
   const data = await getOnboardingData();
   // Recover the previously-chosen key from the stored track + concrete type so the

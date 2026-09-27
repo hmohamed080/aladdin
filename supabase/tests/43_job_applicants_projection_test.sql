@@ -81,13 +81,19 @@ select is(
     where note = 'Free from Sunday.'),
   null, 'the hidden one carries NULL — the UI must not offer a link that 404s');
 
+-- `marble_granite` is one of the 7 trades staging-prep Increment 3 retired
+-- (20260924090003_audience_activities.sql) — already inactive by the time
+-- this file runs. Same rule 41_trade_taxonomy_test.sql §I proves for the
+-- public directory projection applies here: an inactive trade does not reach
+-- ANY projection, including this poster-facing one, even though the
+-- underlying user_trades row survives untouched.
 select is(
   (select primary_trade_key from public.job_applicants where display_name like 'Sayed%'),
-  'marble_granite', 'the applicant''s canonical primary trade is projected');
+  null, 'the applicant''s only declared trade is retired, so no primary trade is projected');
 
-select cmp_ok(
+select is(
   (select array_length(trade_keys, 1) from public.job_applicants where display_name like 'Sayed%'),
-  '>', 0, 'and their full active trade list');
+  null, 'and their active trade list is empty for the same reason');
 
 select is(
   (select status::text from public.job_applicants where display_name like 'Sayed%'),

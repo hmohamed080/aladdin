@@ -158,6 +158,34 @@ describe("TradeSelector", () => {
     expect(screen.getByText(/You can still take on work outside it/)).toBeTruthy();
   });
 
+  /**
+   * `user_trades_set` is a whole-set write that DELETES any held trade missing
+   * from the submitted set. A legacy (retired) trade the caller already holds
+   * must therefore ride along in every submission, or an unrelated active-trade
+   * edit would silently erase it on save.
+   */
+  it("carries a legacy trade through the submission without offering it as a new choice", () => {
+    // The retired trade is deliberately absent from `catalog` — matching real
+    // usage, where `loadTradeCatalog()` only ever returns active trades (RLS).
+    const activeOnlyCatalog = catalog.filter((c) => c.key !== "kitchens_doors");
+    const { container } = renderWithI18n(
+      <TradeSelector
+        catalog={activeOnlyCatalog}
+        mine={{ keys: ["plumbing"], legacyKeys: ["kitchens_doors"], primaryKey: "plumbing" }}
+      />,
+      "en",
+    );
+    // Not a togglable chip among the active catalog...
+    expect(screen.queryByRole("button", { name: "Kitchens & doors" })).toBeNull();
+    // ...but still read-only visible, and still in the submitted set.
+    expect(screen.getByText("Kitchens & doors")).toBeTruthy();
+    expect(posted(container).keys.sort()).toEqual(["kitchens_doors", "plumbing"]);
+
+    // Editing an unrelated active trade must not drop the legacy one.
+    fireEvent.click(chip("Electrical"));
+    expect(posted(container).keys.sort()).toEqual(["electrical", "kitchens_doors", "plumbing"]);
+  });
+
   it("renders in Arabic with no key leak", () => {
     const { container } = renderWithI18n(
       <TradeSelector

@@ -4,6 +4,83 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Staging-prep: application-scoped CAPTCHA (Cloudflare Siteverify)
+
+**Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (unmodified; `main` unmodified). No PR.
+
+- **Security fix:** the preview's Create Account / resend / Forgot Password accepted any non-empty `captchaToken` (Supabase's `[auth.captcha]` is off, so nothing verified it). Now `frontend/src/server/auth/turnstile.ts` verifies every token with Cloudflare Siteverify, fail-closed, before Supabase Auth is called; `TURNSTILE_SECRET_KEY` is server-only. Sign In has no CAPTCHA (invisible widget and `NEXT_PUBLIC_TURNSTILE_INVISIBLE_SITE_KEY` removed). `[auth.captcha]` stays permanently off; canonical passwordless flows untouched.
+- Mawan signed off: key `building_and_finishing_supplies_retailer`, EN *Building & finishing supplies retailer*, AR *موان* (already implemented; no migration).
+- Validation: typecheck ✓ · lint 0 errors · unit 1700/1700 · build ✓ · pgTAP 2447/2447 · Playwright (no Turnstile): Sign-In-no-CAPTCHA 2/2, missing-token CAPTCHA 4/4, persona/onboarding/registration 37 passed + 1 skipped by design, profile 10/10. Cloudflare unreachable from the sandbox (HTTP 000) — Turnstile-dependent E2E not run here.
+
+---
+
+## Session — Staging-prep: Coming Soon DB enforcement + final trade labels (corrected)
+
+**Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (unmodified; `main` unmodified). No PR.
+
+- **`20260924090013_coming_soon_account_types.sql`:** `onboarding_select_account_type` refuses a fresh selection of a Coming Soon type (Personal Account/consumer track, Engineer, Contractor — `app.coming_soon_account_types()`) with 22023 before any write; existing holders of that exact type (selected, declared, completed or canonical) may resume/re-select. Business types and active personas unchanged; no activation/membership change. A vitest parity test fails if the DB list and the frontend `comingSoon` set diverge.
+- **Labels (keys unchanged, no data migration):** `foutek_installation` → Futec installation · تركيب فيوتك; `spray_paint_and_foundation` AR → رش دوكو وتأسيس دهانات. All 14 EN/AR labels are pinned by `trade-label.test.ts`; pgTAP `63_…` proves exactly 14 active + 7 inactive, `plastering_and_gypsum` active, `foutek_installation` unrenamed, all 14 selectable by a fresh Tradesperson.
+- Tests `21`/`27`/`59`/`60` no longer freshly select a closed type (active type, legacy holder, or asserted refusal).
+- Validation: pgTAP 2447/2447 (64 files) · db lint 0 errors · types identical · typecheck ✓ · lint 0 errors · unit 1663/1663 · build ✓ · Playwright (no Turnstile) 47 passed, 1 skipped by design.
+
+---
+
+## Session — Staging-prep: declared-persona lock + final trade labels
+
+**Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (unmodified; `main` unmodified). No PR.
+
+- **`20260924090012_lock_declared_persona.sql`:** `individual_save_professional` is a profile-data writer, not an account-type switch. After the unchanged gate and type allow-list it resolves the caller's established persona (declared `prof_concrete_type`, else a professional canonical `primary_account_type`) and raises 42501 before any write if there is none (`select an account type first`) or if `p_concrete_type` differs (`the account type cannot be changed here`). Coming Soon types are unreachable through direct calls; `users.primary_account_type` is never written; signature/ACL/types unchanged. Persona selection stays with `onboarding_select_account_type`.
+- Tests: new `61_declared_persona_lock_test.sql` (26); fixtures in `11`/`25` carry the declared persona; `39` §D selects the account type through the RPC instead of the track-only bypass.
+- Labels: `painting` Painter / decorator · نقاش ودهانات; `spray_paint_and_foundation` Spray painting & surface prep · رش وتأسيس دهانات; `decorative_paints` Decorative finishes · تشطيبات ودهانات ديكورية; `astarji` Wood finishing & polishing (Astarji) · أسترجي وتشطيب أخشاب.
+- Validation: pgTAP 2400/2400 (62 files) from clean reset · db lint 0 errors · types identical · typecheck ✓ · lint 0 errors · unit 1646/1646 · build ✓ · Playwright (no Turnstile) 47 passed, 1 skipped by design.
+
+---
+
+## Session — Staging-prep: registration persona assignment, workspace-independent profile settings
+
+**Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (`feature/auth-password-staging-prep`, unmodified; `main` unmodified). No PR, no merge, nothing applied to hosted Supabase or hosted Auth.
+
+**Product decisions recorded (product owner, 2026-09-24):**
+- **Locality** is removed from the profile-completion percentage *for now* — no locality/city UX or write path exists. `profiles.locality_id` and the locality concept are unchanged; it returns as an item with a real locality UX. (PRODUCT_DIRECTION_GUIDE, *Activation vs. Verification*.)
+- **Registration account type is authoritative for personas**: Tradespeople / Sales become the declared persona at verified registration; Sales gets no membership or capability; Showroom/Supplier/Manufacturer/Importer record the intended `org_type` only and create no organization. (PRODUCT_DIRECTION_GUIDE, *Registration account type: persona vs. intended business*.)
+
+**Database — `20260924090011_registration_persona_assignment.sql`:** `onboarding_select_account_type` writes `individual_onboarding.prof_concrete_type` for professional-track choices (never `users.primary_account_type`; never over a different canonical persona or a submitted declaration). New internal `app.effective_persona` (declared ?? canonical) scopes `user_activities_set` and `my_profile_completion()`. Completion asks for `organization_activities` only from `org.manage` holders. Idempotent backfill. `my_registration_state()` untouched.
+
+**Frontend:** `/settings/profile` (AppShell/AppHeader, no workspace prerequisite) renders the existing `IdentityCard`; checklist identity links and the no-workspace terminal point there.
+
+**Tests:** new pgTAP `60_registration_persona_assignment_test.sql` (145 assertions; every active registration type reaches 100% through real RPCs); `59_…` no longer fakes the declared persona. Unit: route guard + link-reachability tests; server-action tests for Coming Soon refusal and server-side staging. E2E: new CAPTCHA-free `registration-persona.spec.ts` (canonical passwordless sign-up + real account-type/username steps); the 7 stale legacy-wizard assertions in `shared-onboarding` / `account-registration` rewritten to the direct-entry contract; `profile-completion.spec.ts` (Turnstile-gated) extended with persona assertions.
+
+**Validation:** `db reset` ✓ · pgTAP **2372/2372 (61 files)** · `db lint` 0 errors (4 pre-existing warnings) · `database.types.ts` regenerated — byte-identical (no public signature change) · typecheck ✓ · lint 0 errors (1 pre-existing warning) · unit **1646/1646** · production build ✓ · Playwright: new `registration-persona` 12/12 and rewritten `shared-onboarding` + `account-registration` 25/25 (1 skipped by design), desktop + mobile. Curated desktop run of 11 registration/onboarding/workspace specs: 38 passed, 44 failed — **18** wait for a Turnstile token (`challenges.cloudflare.com` denied by the sandbox proxy), **21** register through a helper that waits for the removed `/onboarding/profile` wizard step (base `8fcb81c` already routes to `/onboarding/account-type`; this branch does not touch onboarding routing), **5** fail identically on an untouched build of `8fcb81c` (verified in a separate worktree: `account-workspace-model:264`, `pilot-uat-round-1:118/177/240`, `auth-password-preview` "abandon and resume").
+
+**Remaining blockers:** see the final report of this session (registration E2E needs a network where Turnstile loads; legacy-wizard specs; trade label copy review; Mawan key sign-off; hosted Confirm-email unverified; `individual_save_professional` still lets a professional change their own declared type via direct RPC — pre-existing).
+
+---
+
+## Session — Staging-prep: real-DB validation + profile-completion UI
+
+**Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (`feature/auth-password-staging-prep`, unmodified).
+
+**Database — validated against a real local Postgres for the first time.** `supabase db reset` (pinned CLI 2.110.0) applies all 70 migrations. The first full `supabase test db` run was red; every failure was root-caused:
+
+- **Real bugs in the staging-prep migrations** (fixed): `ck_audit_action_known` never gained the five new audit actions, so every new write RPC — including `profile_set_username`, the mandatory registration step — raised 23514 (`20260924090009`); `my_profile_completion()` raised 22P02 on its first call (`v_missing || 'key'` resolved as array||array) and could never reach 100% (it required `user_activities` from Tradespeople/contractors/designers, who have no persona activities, and counted `locality`, which nothing can write) — fixed in `20260924090010`.
+- **Stale pre-existing pgTAP fixtures** (updated, not weakened): five files asserted registration sub-states Increment 7 removed; seven used trades Increment 3 retired as "any active trade"; one counted storage policies before the avatars bucket existed.
+- **New** `59_staging_prep_profile_completion_test.sql` (49 assertions) for what `58_…` did not cover.
+
+Result: **2225/2225 across 60 files, from a clean reset.** `db lint`: 0 errors (warnings are the 3 pre-existing plus one unused-variable style warning in `organization_activities_set`). `database.types.ts` regenerated with `supabase gen types --local` and diffed against the temporary hand-written block: no schema mismatches.
+
+**Frontend.** Registration account type is a 9-card `ChoiceCard` grid. `TradeSelector` no longer silently deletes retired trades on save (whole-set write). Profile completion UI: identity card (explicit display-name confirmation, libphonenumber-js country picker, react-easy-crop avatar with the pending→ready ownership model), `Complete your profile` card driven only by `my_profile_completion()`, persona subtypes on `/home/profile/edit`, org subtypes on `/b2b/settings`, labels for the 14 active trades. Password-registration E2E updated for username + account type; new `profile-completion.spec.ts`.
+
+**Validation:** typecheck ✓ · lint 0 errors (1 pre-existing warning) · unit 1621/1621 ✓ · production build ✓ · Playwright: new profile/9-card specs 10/10 on desktop + mobile. **Not runnable here:** every test that submits registration — the sandbox egress proxy denies `challenges.cloudflare.com` (real Turnstile). `account-registration`/`shared-onboarding` show the same 7 failures on an untouched build of `8fcb81c` (pre-existing, stale legacy-wizard expectations).
+
+**Unfinished / blockers before PR:**
+1. Registration-driven E2E (golden path, `username_pending` recovery, direct entry) must run where Turnstile loads.
+2. **Design gap (not changed):** account type at registration is intent only, so a new Tradesperson is `access_ready` with `primary_account_type = NULL` — lands on the consumer home, cannot open the professional editor, and `user_trades_set` refuses them.
+3. An org-less business account cannot reach any identity-editing surface (`/home/settings` needs a personal workspace, `/b2b` an organization).
+4. Dropping `locality` from completion needs product sign-off; the 14 trade labels need copy review.
+5. Hosted staging unverified (no credentials): runbook says Confirm email **off**, Architecture B needs it **on**.
+
+---
+
 ## Session — Promote the approved installer dashboard and wire production reads
 
 **Date:** 2026-09-20 · **Branch:** `claude/aladdin-craftsman-redesign-0bb1b2` · **Base:** `2393334`.

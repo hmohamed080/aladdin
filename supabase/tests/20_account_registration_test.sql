@@ -72,11 +72,15 @@ select throws_ok(
   '42501', null, 'direct client insert into consent_receipts is denied');
 
 -- ===== my_registration_state (derived) =====
--- Omar: verified + consent, no onboarding progress -> profile_pending (Sprint 7.3
--- refined the shared-onboarding state machine to resolve the next incomplete step).
+-- Omar: verified + consent, no onboarding progress -> account_type_pending.
+-- Staging-prep Increment 7 (20260924090007_registration_state_access_ready.sql)
+-- removed profile_pending/contact_pending/every track-specific sub-state as
+-- return values of this function — that informational value now lives in the
+-- non-gating public.my_profile_completion() RPC instead. account_type_pending
+-- is the earliest state that still exists in the new model.
 select is(
   (select public.my_registration_state()),
-  'profile_pending', 'a verified, consented user with no onboarding progress is profile_pending');
+  'account_type_pending', 'a verified, consented user with no onboarding progress is account_type_pending');
 
 -- Amina (Org A owner, active membership) -> active_personal
 set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';

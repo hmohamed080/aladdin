@@ -14,6 +14,11 @@ import { maskEmail } from "@/lib/ui/mask-email";
 import { resolveBilingualText } from "@/lib/i18n/bilingual";
 import { OrganizationIdentityDialog } from "@/features/organization/organization-identity-dialog";
 import { BranchIdentityDialog } from "@/features/organization/branch-identity-dialog";
+import { ActivitySelector } from "@/features/profile/activity-selector";
+import { IdentityCard } from "@/features/settings/identity-card";
+import { loadOrganizationActivities, loadOrganizationActivityCatalog } from "@/server/queries/activities";
+import { loadMyIdentity } from "@/server/queries/profile-identity";
+import { setOrganizationActivitiesAction } from "@/server/actions/activities";
 import {
   BuildingIcon,
   SettingsIcon,
@@ -81,6 +86,15 @@ export default async function SettingsPage() {
   const pending = record?.status === "pending_verification";
   const signInEmail = auth?.user?.email ? maskEmail(auth.user.email) : null;
   const branchDetails = new Map((branchRows ?? []).map((b) => [b.id, b]));
+
+  // Organization subtypes (Showroom/Supplier/Manufacturer/Importer activities).
+  // Editable only with org.manage — organization_activities_set enforces the
+  // same capability itself; the selector is simply not offered without it.
+  const [activityCatalog, orgActivities, identity] = await Promise.all([
+    canManageOrg && record?.org_type ? loadOrganizationActivityCatalog(record.org_type) : Promise.resolve([] as string[]),
+    canManageOrg ? loadOrganizationActivities(org.organizationId) : Promise.resolve([] as string[]),
+    loadMyIdentity(),
+  ]);
 
   return (
     <div className="flex flex-col gap-lg pb-16 tablet:pb-0">
@@ -155,6 +169,17 @@ export default async function SettingsPage() {
             {pending ? <p className="text-label text-fg-muted">{m.settings.verificationPending}</p> : null}
           </div>
         </Card>
+
+        {activityCatalog.length > 0 ? (
+          <div className="desktop:col-span-2">
+            <ActivitySelector
+              catalog={activityCatalog}
+              selected={orgActivities}
+              action={setOrganizationActivitiesAction}
+              orgId={org.organizationId}
+            />
+          </div>
+        ) : null}
 
         <Card className="desktop:col-span-2">
           <SectionTitle icon={<MapPinIcon size={18} />}>
@@ -244,6 +269,11 @@ export default async function SettingsPage() {
 
       {/* -------------------------- Account & access ---------------------- */}
       <SectionTitle icon={<ShieldIcon size={18} />}>{m.settings.group.account}</SectionTitle>
+
+      {/* The person's own shared identity (display name / photo / phone) — the
+          same card and RPCs as /home/settings, so a business user without a
+          personal workspace can still complete their profile. */}
+      {identity ? <IdentityCard identity={identity} /> : null}
 
       <div className="grid gap-lg desktop:grid-cols-2 [&>*]:min-w-0">
         <Card>

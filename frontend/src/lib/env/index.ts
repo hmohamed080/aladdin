@@ -20,6 +20,14 @@ export const publicEnvSchema = z.object({
   // (e.g. "support@aladdin.eg" or a help-desk URL). OPTIONAL: when unset, the
   // support page shows a safe "unavailable" state instead of a fabricated contact.
   NEXT_PUBLIC_SUPPORT_CONTACT: z.string().trim().min(1).optional(),
+  // Cloudflare Turnstile SITE key (PUBLIC by design — embedded in the widget).
+  // Used on the password-auth preview's Create Account and Forgot Password
+  // screens only; Sign In has no CAPTCHA. The matching SECRET is the
+  // server-only TURNSTILE_SECRET_KEY below — the APP verifies every token with
+  // Cloudflare Siteverify (server/auth/turnstile.ts); Supabase's global
+  // [auth.captcha] stays OFF. Optional: unset locally falls back to
+  // Cloudflare's published always-pass TEST site key.
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().trim().min(1).optional(),
 });
 
 export const serverEnvSchema = z.object({
@@ -29,6 +37,16 @@ export const serverEnvSchema = z.object({
   // the web app reaches Postgres only through @supabase/ssr — so this stays
   // optional and is NOT provisioned for the first staging deployment.
   AI_SERVICE_URL: z.string().url().optional(),
+  // Symmetric key for the isolated password-auth preview's recovery-grant
+  // cookie (AES-256-GCM — see lib/supabase/recovery-grant.ts). Optional
+  // because only that preview's recovery flow needs it; unset anywhere else.
+  AUTH_PASSWORD_PREVIEW_GRANT_SECRET: z.string().min(32).optional(),
+  // Cloudflare Turnstile SECRET key — server-only, never NEXT_PUBLIC_*. Read
+  // solely by server/auth/turnstile.ts to call Cloudflare Siteverify. Unset is
+  // allowed only locally (falls back to Cloudflare's always-pass TEST secret);
+  // in staging/production an unset secret makes every CAPTCHA check fail
+  // closed.
+  TURNSTILE_SECRET_KEY: z.string().trim().min(1).optional(),
 });
 
 /**
@@ -77,5 +95,6 @@ export function readPublicEnv(): PublicEnv {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_SUPPORT_CONTACT: process.env.NEXT_PUBLIC_SUPPORT_CONTACT,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   });
 }

@@ -116,7 +116,7 @@ set local request.jwt.claims = '{"sub":"70000006-0000-4000-8000-000000000006","r
 
 select lives_ok(
   $$select public.job_create('9a000000-aaaa-4aaa-8aaa-000000000005', 'Tiling - villa terrace',
-      'tiling', 9000.00, 'Terrace and steps.', 'Cairo', 'New Cairo')$$,
+      'wallpaper_installation', 9000.00, 'Terrace and steps.', 'Cairo', 'New Cairo')$$,
   'org.manage creates a draft through the blanket unlock');
 
 insert into ids
@@ -132,7 +132,7 @@ set local request.jwt.claims = '{"sub":"70000007-0000-4000-8000-000000000007","r
 
 select lives_ok(
   $$select public.job_create('9a000000-aaaa-4aaa-8aaa-000000000005', 'Electrical second fix',
-      'electrical', 7000.00)$$,
+      'gypsum_board_installation', 7000.00)$$,
   'job.post alone creates a draft — the capability works without org.manage');
 
 reset role;
@@ -141,7 +141,7 @@ set local request.jwt.claims = '{"sub":"70000008-0000-4000-8000-000000000008","r
 
 select throws_ok(
   $$select public.job_create('9a000000-aaaa-4aaa-8aaa-000000000005', 'Unauthorized',
-      'tiling', 1000.00)$$,
+      'wallpaper_installation', 1000.00)$$,
   '42501', null, 'a member WITHOUT job.post or org.manage cannot create a job');
 
 -- An installer who happens to be a member of the posting organization gains no
@@ -152,7 +152,7 @@ set local request.jwt.claims = '{"sub":"70000009-0000-4000-8000-000000000009","r
 
 select throws_ok(
   $$select public.job_create('9a000000-aaaa-4aaa-8aaa-000000000005', 'Installer posting',
-      'tiling', 1000.00)$$,
+      'wallpaper_installation', 1000.00)$$,
   '42501', null, 'an installer who is also an org member still cannot post a job');
 
 -- A different organization's owner has no reach into Horizon's jobs at all.
@@ -162,7 +162,7 @@ set local request.jwt.claims = '{"sub":"70000003-0000-4000-8000-000000000003","r
 
 select throws_ok(
   $$select public.job_create('9a000000-aaaa-4aaa-8aaa-000000000005', 'Cross tenant',
-      'tiling', 1000.00)$$,
+      'wallpaper_installation', 1000.00)$$,
   '42501', null, 'another organization cannot create a job for Horizon');
 
 select throws_ok(
@@ -178,7 +178,7 @@ select throws_ok(
 -- discoverability, never workspace access.
 select lives_ok(
   $$select public.job_create('9d000000-dddd-4ddd-8ddd-000000000002', 'Unverified opening',
-      'tiling', 5000.00)$$,
+      'wallpaper_installation', 5000.00)$$,
   'an UNVERIFIED organization may still DRAFT a job (verification is not workspace access)');
 
 insert into ids select 'draft_unverified', id from public.jobs where title = 'Unverified opening';
@@ -195,11 +195,11 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000006-0000-4000-8000-000000000006","role":"authenticated"}';
 
 select throws_ok(
-  $$select public.job_create('9a000000-aaaa-4aaa-8aaa-000000000005', 'Free work', 'tiling', 0)$$,
+  $$select public.job_create('9a000000-aaaa-4aaa-8aaa-000000000005', 'Free work', 'wallpaper_installation', 0)$$,
   '23514', null, 'a zero-value job is refused — there is no negotiable job in the Pilot');
 
 select throws_ok(
-  $$select public.job_create('9a000000-aaaa-4aaa-8aaa-000000000005', 'Negative', 'tiling', -5)$$,
+  $$select public.job_create('9a000000-aaaa-4aaa-8aaa-000000000005', 'Negative', 'wallpaper_installation', -5)$$,
   '23514', null, 'a negative offer is refused');
 
 select throws_ok(
@@ -219,7 +219,7 @@ select throws_ok(
 
 -- A retired trade cannot be NEWLY published under, and retiring it destroys no
 -- history: the job that already names it is untouched.
-update public.trades set is_active = false where key = 'tiling';
+update public.trades set is_active = false where key = 'wallpaper_installation';
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000006-0000-4000-8000-000000000006","role":"authenticated"}';
@@ -233,7 +233,7 @@ select isnt(
   (select trade_id from public.jobs where id = (select v from ids where k = 'draft_a')),
   null, 'retiring a trade leaves the historical job''s trade_id intact');
 
-update public.trades set is_active = true where key = 'tiling';
+update public.trades set is_active = true where key = 'wallpaper_installation';
 
 -- ===========================================================================
 -- D. Discovery — derived suppression, and what is never projected
@@ -1067,7 +1067,7 @@ set local request.jwt.claims = '{"sub":"70000006-0000-4000-8000-000000000006","r
 
 select lives_ok(
   $$select public.job_create('9a000000-aaaa-4aaa-8aaa-000000000005',
-      'Ceramic wall tiling - Zayed', 'tiling', 11000.00)$$,
+      'Ceramic wall tiling - Zayed', 'wallpaper_installation', 11000.00)$$,
   'a fresh opening is created for the resubmission rules');
 
 reset role;

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getRegistrationState } from "@/server/queries/registration";
+import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { activeLandingPath } from "@/server/queries/landing";
 import { getOnboardingData } from "@/server/queries/onboarding";
 import { currentOnboardingLocale } from "@/server/actions/onboarding";
@@ -7,12 +7,18 @@ import { ProfileStep } from "@/features/onboarding/profile-step";
 
 export const dynamic = "force-dynamic";
 
-/** Step 1 route. Guarded so only an onboarding user in/at-or-before this step lands here. */
+/**
+ * Legacy wizard step. No longer part of the mandatory registration path
+ * (Increment 7 dropped profile_pending as a gating state — display name now
+ * lives in the persistent profile-completion UI) but left reachable by
+ * direct navigation rather than deleted, since nothing currently forces a
+ * user here.
+ */
 export default async function OnboardingProfilePage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state === "active_personal") redirect(await activeLandingPath());
-  if (state === "consent_pending" || state === "invitation_pending" || state === "manually_blocked") {
+  if (hasAppAccess(state)) redirect(await activeLandingPath());
+  if (state === "consent_pending" || state === "manually_blocked") {
     redirect("/onboarding");
   }
   const data = await getOnboardingData();

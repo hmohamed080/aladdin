@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getRegistrationState } from "@/server/queries/registration";
+import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { loadPersonalHome } from "@/server/queries/personal-home";
 import { listMyPortfolio } from "@/server/queries/portfolio";
 import { createAssetReadUrl } from "@/server/actions/professional-assets";
@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 export default async function PortfolioPage() {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
-  if (state !== "active_personal") redirect("/onboarding");
+  if (!hasAppAccess(state)) redirect("/onboarding");
 
   const data = await loadPersonalHome();
   if (!data) redirect("/auth/sign-in");
