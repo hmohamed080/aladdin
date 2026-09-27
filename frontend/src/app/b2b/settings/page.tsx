@@ -11,6 +11,7 @@ import { Card, SectionTitle, Field, Badge } from "@/components/ui/primitives";
 import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import { formatCount } from "@/lib/ui/format";
 import { maskEmail } from "@/lib/ui/mask-email";
+import { userFacingEmail } from "@/lib/auth/craftsman-login-alias";
 import { resolveBilingualText } from "@/lib/i18n/bilingual";
 import { OrganizationIdentityDialog } from "@/features/organization/organization-identity-dialog";
 import { BranchIdentityDialog } from "@/features/organization/branch-identity-dialog";
@@ -84,7 +85,9 @@ export default async function SettingsPage() {
   const reachable = allowedNavKeys(org.capabilities).filter((k) => k !== "home" && k !== "settings");
   const verified = record?.is_verified ?? false;
   const pending = record?.status === "pending_verification";
-  const signInEmail = auth?.user?.email ? maskEmail(auth.user.email) : null;
+  // The temporary craftsman flow's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
+  const visibleEmail = userFacingEmail(auth?.user?.email);
+  const signInEmail = visibleEmail ? maskEmail(visibleEmail) : null;
   const branchDetails = new Map((branchRows ?? []).map((b) => [b.id, b]));
 
   // Organization subtypes (Showroom/Supplier/Manufacturer/Importer activities).

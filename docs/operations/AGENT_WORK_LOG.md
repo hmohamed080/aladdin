@@ -4,6 +4,19 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Temporary craftsman phone + password auth (Option B)
+
+**Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · **Base:** `main` @ `e6c75d3`. No PR. Nothing deployed; hosted Supabase untouched.
+
+- **What:** TEMPORARY entry point for installer/technician accounts: `/temporary/craftsman/sign-up` (name, phone, password, consent, Turnstile; no OTP/email/username/role) and `/temporary/craftsman/sign-in` (phone + password). Creates an ordinary `professional / installer_technician` account through the existing RPCs and lands on `/home`. Product-owner approved (Option B); recorded in PRODUCT_DIRECTION_GUIDE / ARCHITECTURE_GUIDE change history. Full design: [temporary craftsman auth](../frontend/temporary-craftsman-auth.md).
+- **Identity:** canonical E.164 via `toCanonicalPhone` → internal undeliverable login alias `p<digits>@craftsman-login.aladdin.invalid` on the existing Supabase email identity (`email_confirm: true`, `app_metadata.registration_source = temporary_craftsman_password_flow`). No schema change to any table. Alias hidden via `userFacingEmail()` (identity menu, `/home/settings`, `/b2b/settings`, onboarding contact) and `app.mask_email` (migration `20260927090001`).
+- **Initialization (as the user, under RLS):** `record_consent` ×3 → `onboarding_select_account_type(professional, installer_technician)` → `profile_set_phone` → `profile_set_username('craftsman.<8 random>')` (retried) → must be `access_ready`. Any failure after `createUser` signs out and deletes the user (cascade verified).
+- **Security:** GoTrue bcrypt only; 10-char policy + weak-password rejection; Turnstile on sign-up; generic sign-in failure; logs carry step + error code only. Duplicate phone disclosed by product decision. Forgot password hidden (recovery is email-based).
+- **Validation:** pgTAP 2452/2452 (65 files, clean start) · typecheck ✓ · lint 0 errors (1 pre-existing warning) · unit 1759/1759 · `next build` ✓ · Playwright against local Supabase with `E2E_TURNSTILE_STUB=1` + local Siteverify stand-in (challenges.cloudflare.com is blocked here): `temporary-craftsman-auth` 12/12 (desktop + mobile), `account-registration` 14/14, `registration-persona` 12/12, `installer-dashboard` desktop ✓, mobile ✗ — **pre-existing**, reproduced on unmodified `e6c75d3` (first `Hossam` match is the hidden desktop sidebar label).
+- **Not done / open:** hosted migration preflight and Vercel secret check (no credentials; `api.supabase.com`/`api.vercel.com` blocked by this environment's network policy); hosted needs `20260924090001`–`…090013` + `20260927090001`, `SUPABASE_SERVICE_ROLE_KEY`, `TURNSTILE_SECRET_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`; approved imagery (placeholder slots in `features/temporary-craftsman-auth/assets.ts`); generated username not user-editable (no product UI); password reset for these accounts needs an admin path.
+
+---
+
 ## Session — Staging-prep: application-scoped CAPTCHA (Cloudflare Siteverify)
 
 **Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (unmodified; `main` unmodified). No PR.

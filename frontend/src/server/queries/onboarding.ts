@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getServerSupabase } from "@/lib/supabase/server";
+import { userFacingEmail } from "@/lib/auth/craftsman-login-alias";
 import type { Database } from "@/types/database.types";
 
 export type OnboardingTrack = Database["public"]["Enums"]["onboarding_track"];
@@ -52,7 +53,7 @@ export async function getOnboardingData(): Promise<OnboardingData | null> {
   ]);
 
   return {
-    email: user.email ?? "",
+    email: userFacingEmail(user.email) ?? "",
     displayName: profile?.display_name ?? "",
     locale: userRow?.locale === "ar" ? "ar" : "en",
     phone: progress?.phone ?? null,

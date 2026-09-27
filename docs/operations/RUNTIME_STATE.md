@@ -1,5 +1,13 @@
 # Runtime State
 
+## Current continuation — 2026-09-27: temporary craftsman phone + password auth
+
+- Branch `claude/vigilant-cori-471vck` on `main` @ `e6c75d3`. Not merged; no PR; nothing deployed.
+- New routes: `/temporary/craftsman/sign-up`, `/temporary/craftsman/sign-in` (Arabic RTL, noindex). `/auth/*` and the email-OTP flow unchanged. See [temporary craftsman auth](../frontend/temporary-craftsman-auth.md).
+- Migrations: 76 local (`20260927090001_mask_craftsman_login_alias` added — `app.mask_email` only). **Hosted `aladdin-staging` not inspected (no Supabase/Vercel credentials or network access in this session); nothing applied remotely; hosted Auth unchanged.**
+- Validation: pgTAP 2452/2452 (65 files) · typecheck ✓ · lint 0 errors · unit 1759/1759 · production build ✓ · Playwright (local Supabase, Turnstile stand-in) craftsman 12/12, account-registration 14/14, registration-persona 12/12, installer-dashboard desktop ✓ / mobile ✗ (pre-existing: fails identically on `e6c75d3`).
+- Open: hosted migration preflight, Vercel secrets check, approved imagery, admin-assisted password reset for these accounts.
+
 ## Current continuation — 2026-09-24 (later): registration persona assignment + /settings/profile
 
 - Branch `claude/tender-bell-h0ec72`, 25 commits on `8fcb81c` (later passes: `…090012` declared-persona lock, `…090013` Coming Soon DB enforcement, final trade labels, application-scoped CAPTCHA via Cloudflare Siteverify — `TURNSTILE_SECRET_KEY` must be set in Vercel before the preview is exposed; pgTAP 2447/2447); `main` and `feature/auth-password-staging-prep` untouched. Not merged; no PR.

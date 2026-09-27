@@ -103,3 +103,78 @@ export async function markPasswordAttachedAuthoritatively(userId: string): Promi
     throw new Error(`Failed to record authoritative password-set state for ${userId}: ${error.message}`);
   }
 }
+
+// ---------------------------------------------------------------------------
+// TEMPORARY craftsman phone + password flow
+// (docs/frontend/temporary-craftsman-auth.md,
+// server/actions/temporary-craftsman-auth.ts). Three more narrowly-scoped
+// service-role call sites, removable with that flow:
+//   * a phone-uniqueness pre-check that must see EVERY account's canonical
+//     phone (the caller has no session yet, and RLS rightly hides other
+//     people's profiles);
+//   * creating the Auth user with its internal login alias already confirmed
+//     and the audit-only `registration_source` in `app_metadata`;
+//   * deleting that same just-created user when initialization fails, so a
+//     half-initialized account is never left behind.
+// None of them ever logs the phone, the alias, or the password.
+// ---------------------------------------------------------------------------
+
+export const TEMPORARY_CRAFTSMAN_REGISTRATION_SOURCE = "temporary_craftsman_password_flow";
+
+/** True when ANY profile already holds this canonical E.164 phone. Throws on a lookup failure (never guesses "free"). */
+export async function isCanonicalPhoneTaken(e164: string): Promise<boolean> {
+  const admin = getAdminClient();
+  const { data, error } = await admin.from("profiles").select("user_id").eq("phone_e164", e164).limit(1);
+  if (error) throw new Error(`canonical phone lookup failed (code ${error.code ?? "unknown"})`);
+  return (data ?? []).length > 0;
+}
+
+export type CraftsmanUserCreation =
+  | { ok: true; userId: string }
+  | { ok: false; reason: "exists" | "rate_limited" | "rejected" | "failed" };
+
+/**
+ * Creates the Supabase Auth user for the temporary flow. The password goes to
+ * GoTrue exactly once, here, and is hashed by GoTrue (bcrypt) — it is never
+ * stored or logged by this application. `email_confirm: true` marks the
+ * INTERNAL alias as confirmed (it is a login key the server derived itself,
+ * never a mailbox), which is what lets the account pass the existing
+ * verified-caller gates without any schema change. `full_name` feeds the
+ * existing `app.handle_new_user` trigger, which creates `public.users` +
+ * `public.profiles` exactly as for every other account.
+ */
+export async function createCraftsmanPasswordUser(params: {
+  loginAlias: string;
+  password: string;
+  fullName: string;
+}): Promise<CraftsmanUserCreation> {
+  const admin = getAdminClient();
+  const { data, error } = await admin.auth.admin.createUser({
+    email: params.loginAlias,
+    password: params.password,
+    email_confirm: true,
+    user_metadata: { full_name: params.fullName, locale: "ar" },
+    app_metadata: { registration_source: TEMPORARY_CRAFTSMAN_REGISTRATION_SOURCE },
+  });
+  if (error || !data.user) {
+    const code = (error as { code?: string } | null)?.code;
+    const status = (error as { status?: number } | null)?.status;
+    if (code === "email_exists" || code === "user_already_exists") return { ok: false, reason: "exists" };
+    if (status === 429 || code?.startsWith("over_")) return { ok: false, reason: "rate_limited" };
+    if (code === "weak_password") return { ok: false, reason: "rejected" };
+    console.error(`temporary craftsman sign-up: auth user creation failed (code ${code ?? "unknown"})`);
+    return { ok: false, reason: "failed" };
+  }
+  return { ok: true, userId: data.user.id };
+}
+
+/** Compensating delete for a user THIS flow just created. Returns false (after a safe diagnostic) if it could not. */
+export async function deleteCraftsmanPasswordUser(userId: string): Promise<boolean> {
+  const admin = getAdminClient();
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) {
+    console.error(`temporary craftsman sign-up: rollback delete failed for user ${userId} (code ${(error as { code?: string }).code ?? "unknown"})`);
+    return false;
+  }
+  return true;
+}

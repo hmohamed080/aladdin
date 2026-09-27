@@ -358,7 +358,7 @@ During every account review, Landing Page review, Registration review, and featu
 
 ## What Agents Must NEVER Do
 - **Never** build commerce/marketplace framing (add-to-cart, checkout, price-war bidding) — this is consultation-first.
-- **Never** add password/forgot/reset UI or flows — the product is **passwordless** (WhatsApp/Email OTP).
+- **Never** add password/forgot/reset UI or flows — the product is **passwordless** (WhatsApp/Email OTP). *(One approved, time-boxed exception: the temporary craftsman phone + password entry point — see the 2026-09-27 Change History entry. It does not change the canonical model.)*
 - **Never** merge roles, and **never** add a Profile Switcher / "Use As" mode or any persona/account-identity-switching UI — roles stay separate in the taxonomy; navigation is **derived**, not toggled. One current primary account type at a time. *(Switching the active **work context** between the personal surface and organizations where the user has an active membership is a different, allowed concept — see [Switching](#switching-what-is-forbidden-what-is-allowed).)*
 - **Never** create a second user/auth identity for the same person — not for another role, another contact channel, or another business. A business is an **Organization**, never a second account.
 - **Never** copy business identity onto the user, or personal identity into organization records, as a second source of truth; after a draft is committed, read from the owning entity.
@@ -375,6 +375,13 @@ During every account review, Landing Page review, Registration review, and featu
 
 ## Change History
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
+
+### 2026-09-27 — Temporary craftsman phone + password entry point (scoped exception)
+- **What:** A TEMPORARY, parallel registration/sign-in entry point for installer/technician (الصنايعي) accounts at `/temporary/craftsman/sign-up` and `/temporary/craftsman/sign-in`: full name + phone + password (+ consent + Turnstile), **no OTP**. Accounts are ordinary `professional / installer_technician` accounts on the one canonical identity model (same user ID model, same RPCs, same `/home` experience). The phone is canonicalized to E.164 and the account signs in with an internal, never-displayed login alias derived from it. Duplicate phones are disclosed ("يوجد حساب مسجل بالفعل بهذا الرقم"). Forgot password is hidden for these accounts.
+- **Why:** Craftsman registration through the canonical email-OTP flow is blocked for this audience; this unblocks it without changing the canonical flow.
+- **Scope:** The canonical passwordless model, `/auth/*`, email-OTP behavior, other account types and the hosted phone provider are **unchanged**. The "passwordless" guardrail stands for everything else. Implementation and limitations: [`../frontend/temporary-craftsman-auth.md`](../frontend/temporary-craftsman-auth.md).
+- **Deferred:** removal of the temporary flow and migration of its accounts to a verified phone (WhatsApp OTP) or email identity; a recovery path for these accounts.
+- **Approved by:** User (temporary craftsman auth task, Option B, 2026-09-27).
 
 ### 2026-09-07 — Staging-to-launch completion order recorded; Admin Control Requirements backlog established
 - **What:** Added the *Staging-to-launch completion order* — an 11-item sequencing decision covering everything from staging readiness through the final release/security/UAT gate, starting from the current state (PR #40 Installer/Technician Pilot merged, hosted staging reconciled to full migration parity). Order: staging readiness → non-admin account review (starting with Hana Mansour, not Platform Admin) → cross-account journeys → Landing Page/public surfaces → registration/onboarding/identity/auth → a dedicated authentication-and-identity-security hardening pass (password-login return, OTP channels incl. provider/cost comparison, TOTP, recovery codes, trusted-device/session policy, step-up auth) → a global UI/UX audit → a full application-security audit → remaining product features (incl. Full Chat) → Platform Admin last (expanded into a controlled CMS) → the final release gate. Also established the **Admin Control Requirements** backlog convention: record admin-manageable candidates during every review in items 2–9, but do not build the Admin CMS until item 10 — and Admin is explicitly scoped as a controlled, permissioned CMS, never unrestricted SQL/code editing.

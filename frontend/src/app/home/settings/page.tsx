@@ -9,6 +9,7 @@ import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { THEME_COOKIE } from "@/lib/theme/config";
 import { maskEmail } from "@/lib/ui/mask-email";
+import { userFacingEmail } from "@/lib/auth/craftsman-login-alias";
 import { PersonalSettings } from "@/features/settings/personal-settings";
 import { loadMyIdentity, loadMyProfileCompletion } from "@/server/queries/profile-identity";
 
@@ -37,7 +38,9 @@ export default async function PersonalSettingsPage() {
     loadMyIdentity(),
     loadMyProfileCompletion(),
   ]);
-  const signInEmail = auth?.user?.email ? maskEmail(auth.user.email) : null;
+  // The temporary craftsman flow's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
+  const visibleEmail = userFacingEmail(auth?.user?.email);
+  const signInEmail = visibleEmail ? maskEmail(visibleEmail) : null;
 
   return (
     <PersonalSettings
