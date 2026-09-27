@@ -1,11 +1,20 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { messageIdsFor, readNewOtp, newMessageSubjectsFor } from "./helpers/auth";
+import {
+  messageIdsFor,
+  readNewOtp,
+  newMessageSubjectsFor,
+  registerWithPassword,
+  selectAccountType,
+  waitForCaptchaToken,
+} from "./helpers/auth";
+import { createConfirmedAccount } from "./helpers/fixtures";
 
 /**
- * Real, no-bypass E2E coverage for the isolated password-auth preview
- * (docs/frontend/auth-password-preview.md). Every email/OTP round trip goes
+ * Real, no-bypass E2E coverage for the password auth flow, now CANONICAL at
+ * `/auth/*` (docs/frontend/auth-password-preview.md — the file keeps its
+ * historical name). Every email/OTP round trip goes
  * through the REAL local Supabase + Mailpit, exactly like the existing
  * passwordless suite's `helpers/auth.ts` — no mocked Supabase client here.
  *
@@ -29,29 +38,6 @@ function uniqueUsername(tag: string): string {
   const safe = tag.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/^[0-9]+/, "").slice(0, 10) || "user";
   const suffix = `${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 4).toString(36)}`;
   return `${safe}${suffix}`.slice(0, 24);
-}
-
-/**
- * The account-type step is now a ChoiceCard grid (frontend/src/components/ui/
- * choice-card.tsx), not a <select> — fills the required hidden field by
- * clicking a real, non-"Coming soon" card by its visible label. Tradespeople
- * is picked arbitrarily among the selectable (non-disabled) options.
- */
-async function selectAccountType(page: import("@playwright/test").Page): Promise<void> {
-  await page.getByRole("button", { name: /tradespeople & technicians|الصنايعية/i }).click();
-}
-
-/**
- * Waits for Cloudflare Turnstile's REAL widget (loaded from
- * challenges.cloudflare.com, using the published always-pass TEST site key —
- * see turnstile-widget.tsx) to auto-solve and populate the hidden
- * `captchaToken` input before submitting Create Account or Forgot Password.
- * No bypass: the server action verifies the token with Cloudflare Siteverify
- * (server/auth/turnstile.ts) using the paired always-pass TEST secret locally.
- * Sign In has no CAPTCHA and never waits for one.
- */
-async function waitForCaptchaToken(page: import("@playwright/test").Page): Promise<void> {
-  await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30000 });
 }
 
 const STRONG_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
@@ -138,8 +124,8 @@ async function enterOtp(page: import("@playwright/test").Page, code: string): Pr
 test.describe("Password registration — golden path (Architecture B: signUp() sets the password atomically)", () => {
   test("weak password is rejected in place (no signUp sent, fields preserved)", async ({ page, request }) => {
     const email = uniqueEmail("weakpw");
-    await page.goto("/preview/auth-password/sign-up");
-
+    await page.goto("/auth/sign-up");
+    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("weakpw"));
     await selectAccountType(page);
@@ -169,8 +155,8 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
     page.on("framenavigated", (f) => {
       if (f === page.mainFrame()) visited.push(new URL(f.url()).pathname);
     });
-    await page.goto("/preview/auth-password/sign-up");
-
+    await page.goto("/auth/sign-up");
+    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("signup"));
     await selectAccountType(page);
@@ -201,13 +187,18 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
     // ...and it was persisted: the username step now refuses this account.
     await page.goto("/onboarding/username");
     await expectAppLanding(page);
+    // The Full Name entered at Step 1 is the CONFIRMED display name.
+    await page.goto("/settings/profile");
+    await expect(page.getByTestId("identity-card")).toBeVisible();
+    await expect(page.locator("#display-name").locator("input").first()).toHaveValue("E2E Tester");
+    await expect(page.getByTestId("display-name-status")).toHaveText(/^(confirmed|مؤكَّد)$/i);
   });
 });
 
 /**
- * Claims a username through the CANONICAL passwordless sign-up (no CAPTCHA)
- * in its own browser context, so a later password registration can collide
- * with a genuinely taken name. Returns the claimed username.
+ * Claims a username through the canonical password sign-up in its own
+ * browser context, so a later registration can collide with a genuinely taken
+ * name. Returns the claimed username.
  */
 async function claimUsernameViaCanonicalSignUp(
   browser: import("@playwright/test").Browser,
@@ -215,25 +206,8 @@ async function claimUsernameViaCanonicalSignUp(
 ): Promise<string> {
   const context = await browser.newContext();
   const page = await context.newPage();
-  const email = uniqueEmail("owner");
   const username = uniqueUsername("owner");
-  const seen = await messageIdsFor(request, email);
-  await page.goto("/auth/sign-up");
-  await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-  await page.getByLabel(/pilot release|نسخة تجريبية|إصدار تجريبي/i).check();
-  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-  const code = await readNewOtp(request, email, seen);
-  await enterOtp(page, code);
-  await page.getByRole("button", { name: /verify and continue|confirm and continue|تحقق وتابع|تأكيد ومتابعة/i }).click();
-  await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
-  await selectAccountType(page);
-  await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
-  await page.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
-  await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
-  await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
-  await expectAppLanding(page);
+  await registerWithPassword(page, request, { email: uniqueEmail("owner"), username });
   await context.close();
   return username;
 }
@@ -246,7 +220,8 @@ test.describe("Username availability is checked BEFORE signUp() (entered once; n
     /^(That username isn't available\. Try another\.|اسم المستخدم هذا غير متاح\. جرّب اسمًا آخر\.)$/i;
 
   async function submitWithUsername(page: import("@playwright/test").Page, email: string, username: string) {
-    await page.goto("/preview/auth-password/sign-up");
+    await page.goto("/auth/sign-up");
+    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
     await selectAccountType(page);
@@ -311,8 +286,8 @@ test.describe("CAPTCHA — required on Create Account and Forgot Password, verif
     // bug — its one field already used a catch-all `state.code ? t(state.code)
     // : undefined`, which happened to cover the new codes for free.
     await page.route("https://challenges.cloudflare.com/**", (route) => route.abort());
-    await page.goto("/preview/auth-password/sign-up");
-
+    await page.goto("/auth/sign-up");
+    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("nocaptcha"));
     await selectAccountType(page);
@@ -347,7 +322,7 @@ test.describe("CAPTCHA — required on Create Account and Forgot Password, verif
   test("Forgot Password request is refused when the captcha token is missing, and never advances to Screen 2", async ({ page, request }) => {
     const email = uniqueEmail("nocaptcha-forgot");
     await page.route("https://challenges.cloudflare.com/**", (route) => route.abort());
-    await page.goto("/preview/auth-password/forgot-password");
+    await page.goto("/auth/forgot-password");
 
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await expect(page.locator('input[name="captchaToken"]')).toHaveValue("");
@@ -364,7 +339,8 @@ test.describe("CAPTCHA — required on Create Account and Forgot Password, verif
 /** Registers a fresh account with a strong password and returns its email, leaving the browser signed in. */
 async function registerAccount(page: import("@playwright/test").Page, request: import("@playwright/test").APIRequestContext, tag: string): Promise<string> {
   const email = uniqueEmail(tag);
-  await page.goto("/preview/auth-password/sign-up");
+  await page.goto("/auth/sign-up");
+  await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
   await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
   await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername(tag));
   await selectAccountType(page);
@@ -390,7 +366,8 @@ test.describe("Account enumeration normalization (§Account enumeration)", () =>
     await signOutViaAccountMenu(page);
     await page.waitForURL(/\/sign-in/, { waitUntil: "commit" });
 
-    await page.goto("/preview/auth-password/sign-up");
+    await page.goto("/auth/sign-up");
+    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(existingEmail);
     await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("enum-resubmit"));
     await selectAccountType(page);
@@ -422,7 +399,8 @@ test.describe("Account enumeration normalization (§Account enumeration)", () =>
 test.describe("Resend signup code (never re-submits the password, never re-registers)", () => {
   test("resend delivers a fresh, working code without ever asking for the password again", async ({ page, request }) => {
     const email = uniqueEmail("resend");
-    await page.goto("/preview/auth-password/sign-up");
+    await page.goto("/auth/sign-up");
+    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("resend"));
     await selectAccountType(page);
@@ -458,7 +436,8 @@ test.describe("Resend signup code (never re-submits the password, never re-regis
 test.describe("Session creation guarantee (§Session creation) — no session exists before OTP confirmation", () => {
   test("after signUp() but before verifying, protected routes are denied exactly like a signed-out caller; after verifying, they resolve normally", async ({ page, request, context }) => {
     const email = uniqueEmail("session-guarantee");
-    await page.goto("/preview/auth-password/sign-up");
+    await page.goto("/auth/sign-up");
+    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("session1"));
     await selectAccountType(page);
@@ -497,7 +476,8 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
     // so `readNewOtp` deterministically reads the code this resubmission
     // actually generates, not whichever of two pending messages happens to
     // sort first.
-    await page.goto("/preview/auth-password/sign-up");
+    await page.goto("/auth/sign-up");
+    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("session2"));
     await selectAccountType(page);
@@ -524,7 +504,8 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
 test.describe("Refresh / interruption behavior (§Refresh, back, interruption)", () => {
   test("refreshing on the OTP step returns to Step 1 with no crash and no password anywhere in storage — resubmitting proceeds normally", async ({ page, request }) => {
     const email = uniqueEmail("refresh");
-    await page.goto("/preview/auth-password/sign-up");
+    await page.goto("/auth/sign-up");
+    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("refresh1"));
     await selectAccountType(page);
@@ -576,7 +557,8 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
 
   test("a wrong/garbage code is rejected and the valid code can still be entered from the same screen", async ({ page, request }) => {
     const email = uniqueEmail("badcode");
-    await page.goto("/preview/auth-password/sign-up");
+    await page.goto("/auth/sign-up");
+    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("badcode"));
     await selectAccountType(page);
@@ -621,7 +603,8 @@ test.describe("Password-changed notification is absent on initial registration (
     // of account creation itself, which GoTrue does not treat as a "change".
     const target = uniqueEmail("no-pwchanged-check");
     const seenFromStart = await messageIdsFor(request, target);
-    await page.goto("/preview/auth-password/sign-up");
+    await page.goto("/auth/sign-up");
+    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(target);
     await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("pwchanged"));
     await selectAccountType(page);
@@ -653,7 +636,7 @@ test.describe("Sign In carries no CAPTCHA (application-scoped CAPTCHA, Supabase 
     page.on("request", (req) => {
       if (/challenges\.cloudflare\.com/.test(req.url())) cloudflare.push(req.url());
     });
-    await page.goto("/preview/auth-password/sign-in");
+    await page.goto("/auth/sign-in");
     await expect(page.locator('input[name="captchaToken"]')).toHaveCount(0);
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(`no-such-account-${Date.now()}@example.test`);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill("definitely-not-a-real-password");
@@ -669,7 +652,7 @@ test.describe("Password sign-in", () => {
 
     // Sign out (production onboarding chrome) and exercise sign-in.
     await signOutViaAccountMenu(page);
-    await page.goto("/preview/auth-password/sign-in");
+    await page.goto("/auth/sign-in");
 
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill("definitely-the-wrong-one");
@@ -690,7 +673,7 @@ test.describe("Forgot password — full 4-screen journey", () => {
     await signOutViaAccountMenu(page);
 
     // SCREEN 1 — request.
-    await page.goto("/preview/auth-password/forgot-password");
+    await page.goto("/auth/forgot-password");
     await expect(page).toHaveURL(/\/forgot-password$/);
     const seen = await messageIdsFor(request, email);
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
@@ -728,13 +711,13 @@ test.describe("Forgot password — full 4-screen journey", () => {
   });
 
   test("direct navigation to Screen 3 without a recovery session redirects to Screen 1", async ({ page }) => {
-    await page.goto("/preview/auth-password/forgot-password/reset");
+    await page.goto("/auth/forgot-password/reset");
     await page.waitForURL(/\/forgot-password$/, { waitUntil: "commit" });
   });
 
   test("direct navigation to Screen 2 without requesting a code redirects to Screen 1", async ({ page, context }) => {
     await context.clearCookies();
-    await page.goto("/preview/auth-password/forgot-password/verify");
+    await page.goto("/auth/forgot-password/verify");
     await page.waitForURL(/\/forgot-password$/, { waitUntil: "commit" });
   });
 
@@ -753,7 +736,7 @@ test.describe("Forgot password — full 4-screen journey", () => {
 
     // Reach Screen 3 for real: Screen 1 request + Screen 2 OTP verify against
     // the live local Supabase instance, exactly like the golden-path test.
-    await page.goto("/preview/auth-password/forgot-password");
+    await page.goto("/auth/forgot-password");
     const seen = await messageIdsFor(request, email);
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await waitForCaptchaToken(page);
@@ -787,7 +770,7 @@ test.describe("Forgot password — full 4-screen journey", () => {
     // The recovery grant itself must still be intact and usable for its ONE
     // legitimate purpose after these denied detours — proving the denial
     // above was a route guard, not an accidental consumption of the grant.
-    await page.goto("/preview/auth-password/forgot-password/reset");
+    await page.goto("/auth/forgot-password/reset");
     await expect(page.getByLabel(/new password|كلمة المرور الجديدة/i)).toBeVisible();
   });
 });
@@ -807,12 +790,13 @@ function emailResendCooldownMs(): number {
 }
 
 /**
- * Registers a GENUINELY passwordless account through the CANONICAL,
- * already-shipped `/auth/sign-up` flow (production `server/actions/auth.ts`
- * — not this preview's own registration). `verifySignUpOtp` never calls
- * `updateUser({password})`, so this account's `encrypted_password` stays
- * null — a real passwordless user with no usable password, not a stand-in.
- * Leaves the browser signed in and returns the email.
+ * A GENUINELY passwordless, confirmed, consented account (`encrypted_password`
+ * null — a real passwordless user, not a stand-in), created as a local-DB
+ * fixture: the canonical `/auth/sign-up` is password-based now and can no
+ * longer produce one. It is then signed in through the REAL legacy
+ * passwordless Email-OTP path that existing accounts still have
+ * (`/auth/recovery`, production `server/actions/auth.ts`, unchanged). Leaves
+ * the browser signed in and returns the email.
  */
 async function registerPasswordlessAccount(
   page: import("@playwright/test").Page,
@@ -820,23 +804,15 @@ async function registerPasswordlessAccount(
   tag: string,
 ): Promise<string> {
   const email = uniqueEmail(tag);
-  await page.goto("/auth/sign-up");
-  await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-  // The CANONICAL flow's Arabic pilot-consent wording ("نسخة تجريبية") differs
-  // from this preview's own ("إصدار تجريبي") — different `auth.*` vs.
-  // `authPasswordPreview.*` i18n namespace, same English string. Match both.
-  await page.getByLabel(/pilot release|نسخة تجريبية|إصدار تجريبي/i).check();
+  createConfirmedAccount(email, { password: false });
   const seen = await messageIdsFor(request, email);
-  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+  await page.goto("/auth/recovery");
+  await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+  await page.getByRole("button", { name: /send code|إرسال الرمز/i }).click();
   const code = await readNewOtp(request, email, seen);
-  await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
-  // Same cross-namespace wording split for the verify button: canonical
-  // "تأكيد ومتابعة" ("Confirm and continue") vs. preview's "تحقق وتابع"
-  // ("Verify and continue") — identical English, different Arabic.
-  await page.getByRole("button", { name: /verify and continue|confirm and continue|تحقق وتابع|تأكيد ومتابعة/i }).click();
-  await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
+  await page.getByLabel(/one-time code|الرمز/i).pressSequentially(code);
+  await page.getByRole("button", { name: /verify|confirm and continue|تحقق|تأكيد/i }).click();
+  await page.waitForURL((url) => !/\/auth\/recovery/.test(url.pathname), { waitUntil: "commit" });
   return email;
 }
 
@@ -887,7 +863,7 @@ test.describe("Existing-passwordless-user migration — real E2E against a genui
     // pragmatic equivalent here; the REAL sign-out mechanism is already
     // covered by the other tests in this file that do click a real button.
     await context.clearCookies();
-    await page.goto("/preview/auth-password/sign-in");
+    await page.goto("/auth/sign-in");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(newPassword);
     await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
@@ -906,7 +882,7 @@ test.describe("Existing-passwordless-user migration — real E2E against a genui
     await page.getByRole("button", { name: /send verification code|إرسال رمز التحقق/i }).click();
     await expect(page.getByLabel(/one-time code|الرمز لمرة واحدة/i)).toBeVisible();
     const firstCodeRequestedAt = Date.now();
-    await page.goto("/preview/auth-password/sign-in"); // abandon mid-flow
+    await page.goto("/auth/sign-in"); // abandon mid-flow
 
     // The account is untouched — still eligible, no partial/corrupted state.
     await page.goto("/preview/auth-password/migrate");
@@ -941,10 +917,42 @@ test.describe("Existing-passwordless-user migration — real E2E against a genui
     // See the golden-path test's comment above re: no sign-out control on
     // this page's layout — clearing cookies is the pragmatic equivalent.
     await context.clearCookies();
-    await page.goto("/preview/auth-password/sign-in");
+    await page.goto("/auth/sign-in");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(newPassword);
     await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
     await page.waitForURL((url) => !/sign-in/.test(url.pathname), { waitUntil: "commit" });
+  });
+});
+
+test.describe("Legacy /preview/auth-password/* URLs redirect to the canonical /auth/* routes", () => {
+  test("sign-up, forgot-password and sign-in (with a safe next) land on /auth/*; an unsafe next is dropped", async ({ page }) => {
+    await page.goto("/preview/auth-password/sign-up");
+    await expect(page).toHaveURL(/\/auth\/sign-up$/);
+    await expect(page.getByLabel(/^full name$|^الاسم الكامل$/i)).toBeVisible();
+
+    await page.goto("/preview/auth-password/forgot-password");
+    await expect(page).toHaveURL(/\/auth\/forgot-password$/);
+
+    await page.goto("/preview/auth-password/forgot-password/reset");
+    // No recovery session → the canonical reset route sends it to Screen 1.
+    await expect(page).toHaveURL(/\/auth\/forgot-password$/);
+
+    await page.goto(`/preview/auth-password/sign-in?next=${encodeURIComponent("/b2b/leads")}`);
+    await expect(page).toHaveURL(/\/auth\/sign-in\?next=%2Fb2b%2Fleads$/);
+
+    await page.goto(`/preview/auth-password/sign-in?next=${encodeURIComponent("https://evil.example")}`);
+    await expect(page).toHaveURL(/\/auth\/sign-in$/);
+  });
+
+  test("the canonical auth screens carry no preview / security-review wording", async ({ page, context }) => {
+    for (const locale of ["en", "ar"] as const) {
+      await context.addCookies([{ name: "NEXT_LOCALE", value: locale, url: "http://127.0.0.1:3100" }]);
+      for (const path of ["/auth/sign-up", "/auth/sign-in", "/auth/forgot-password"]) {
+        await page.goto(path);
+        const body = (await page.locator("body").innerText()).toLowerCase();
+        expect(body, `${locale} ${path}`).not.toMatch(/preview|security review|not the live|معاينة|المراجعة الأمنية/);
+      }
+    }
   });
 });

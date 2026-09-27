@@ -28,11 +28,11 @@ describe("PasswordSignInForm", () => {
     renderWithI18n(<PasswordSignInForm next="/b2b" />);
     expect(screen.getByRole("link", { name: ar.authPasswordPreview.signIn.signUpLink })).toHaveAttribute(
       "href",
-      "/preview/auth-password/sign-up",
+      "/auth/sign-up",
     );
     expect(screen.getByRole("link", { name: ar.authPasswordPreview.signIn.forgotPassword })).toHaveAttribute(
       "href",
-      "/preview/auth-password/forgot-password",
+      "/auth/forgot-password",
     );
   });
 });

@@ -4,6 +4,21 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Canonical password auth promotion (`/auth/*`)
+
+**Date:** 2026-09-27 · **Branch:** `feature/canonical-password-auth` · **Base:** `main` @ `e6c75d3`. PR to `main` opened, **not merged**; no deploy; no hosted Supabase / Cloudflare / Vercel change.
+
+- **Routes:** the tested password flow now serves `/auth/sign-up`, `/auth/sign-in`, `/auth/forgot-password{,/verify,/reset,/success}`, `/auth/finish-registration` (pages moved with `git mv`; same components/actions). The old `/preview/auth-password/*` URLs are server-side redirect stubs (sign-in forwards `next` only when `sanitizeNext` accepts it unchanged; finish-registration forwards only `reason=username_unavailable`). `migrate` / `change-password` stay under `/preview`; their fallback is `/auth/sign-in`.
+- **Recovery path only:** `RECOVERY_FLOW_PATH` → `/auth/forgot-password` (cookie paths + `redirectTo`), `FINISH_REGISTRATION_PATH` → `/auth/finish-registration`. Recovery isolation, grant encryption, CAPTCHA scope and enumeration protections unchanged.
+- **Preview banner + `previewBanner` key removed** (AR/EN); no user-visible "preview" wording.
+- **Full Name** (first sign-up field, 1–80, server-authoritative) → `signUp()` user metadata `{display_name, locale}` (read by the existing `app.handle_new_user()`); after the OTP it is re-read from the verified user's metadata and confirmed via `profile_set_display_name` (failure logs the code only, never undoes the account). **No migration.**
+- **Account type** is one shared `Select` (Coming Soon options disabled, localized "— Coming soon" suffix); server validation unchanged.
+- **E2E:** `helpers/auth.ts` `signIn()` is now password-based (`E2E_PASSWORD`, stamped by `global-setup.ts` onto seeded `@example.test` identities with no password — local test DB only); new `registerWithPassword` / `selectAccountType` / `waitForCaptchaToken` helpers; `helpers/fixtures.ts` seeds confirmed accounts for specs whose subject is not registration (legacy onboarding steps, passwordless migration).
+- **Validation:** see the PR description (typecheck, lint, unit, build, Playwright CAPTCHA-independent subsets). Turnstile-gated E2E cannot run in this sandbox (`challenges.cloudflare.com` blocked) — must run locally.
+- **Open before merge:** add `https://aladdindecore.com/auth/forgot-password/reset` to Supabase Auth Redirect URLs; decide how existing passwordless accounts are told to use Forgot Password (the legacy OTP `/auth/recovery` still signs them in, unlinked); the binding project-memory guides (`CLAUDE.md`, `PRODUCT_DIRECTION_GUIDE.md`, `ARCHITECTURE_GUIDE.md`) still describe passwordless as canonical and need an approved update. Specs still waiting on the removed `/onboarding/profile` step (pre-existing, stale on `main` too) were not rewritten.
+
+---
+
 ## Session — Staging-prep: application-scoped CAPTCHA (Cloudflare Siteverify)
 
 **Date:** 2026-09-24 · **Branch:** `claude/tender-bell-h0ec72` · **Base:** `8fcb81c` (unmodified; `main` unmodified). No PR.

@@ -26,7 +26,7 @@ export function ForgotPasswordForm() {
       title={t("authPasswordPreview.forgotPassword.title")}
       subtitle={t("authPasswordPreview.forgotPassword.subtitle")}
       footer={
-        <Link href="/preview/auth-password/sign-in" className="text-fg-muted hover:text-fg hover:underline">
+        <Link href="/auth/sign-in" className="text-fg-muted hover:text-fg hover:underline">
           {t("authPasswordPreview.forgotPassword.backToSignIn")}
         </Link>
       }

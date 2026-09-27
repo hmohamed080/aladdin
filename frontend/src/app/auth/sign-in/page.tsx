@@ -1,4 +1,4 @@
-import { SignInForm } from "@/features/auth/sign-in-form";
+import { PasswordSignInForm } from "@/features/auth-password-preview/sign-in-form";
 import { sanitizeNext } from "@/server/auth/next";
 
 export const dynamic = "force-dynamic";
@@ -9,5 +9,5 @@ export default async function SignInPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  return <SignInForm next={sanitizeNext(next)} />;
+  return <PasswordSignInForm next={sanitizeNext(next)} />;
 }

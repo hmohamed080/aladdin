@@ -1,5 +1,69 @@
 # Password authentication preview
 
+> **Status (2026-09-27): PROMOTED to the canonical `/auth/*` routes** on
+> branch `feature/canonical-password-auth`. The password flow below is now
+> the canonical Aladdin sign-up / sign-in / recovery. Everything after this
+> box is kept as the historical record of how the flow was designed and
+> reviewed; where it says "preview" or `/preview/auth-password/*`, read the
+> canonical route from the map below.
+>
+> **Route map**
+>
+> | Canonical route | Renders | Legacy URL (server-side redirect) |
+> |---|---|---|
+> | `/auth/sign-up` | `PasswordSignUpForm` | `/preview/auth-password/sign-up` |
+> | `/auth/sign-in` | `PasswordSignInForm` (`next` sanitized) | `/preview/auth-password/sign-in` — forwards `next` only when `sanitizeNext` accepts it unchanged |
+> | `/auth/forgot-password` | Screen 1 | `/preview/auth-password/forgot-password` |
+> | `/auth/forgot-password/verify` | Screen 2 | `/preview/auth-password/forgot-password/verify` |
+> | `/auth/forgot-password/reset` | Screen 3 | `/preview/auth-password/forgot-password/reset` (old recovery `redirectTo`; kept temporarily) |
+> | `/auth/forgot-password/success` | Screen 4 | `/preview/auth-password/forgot-password/success` |
+> | `/auth/finish-registration` | Finish-registration recovery | `/preview/auth-password/finish-registration` — forwards only `reason=username_unavailable` |
+>
+> `/preview/auth-password/migrate` and `/change-password` (passwordless →
+> password migration, authenticated change) stay where they are; their
+> unauthenticated fallback is now `/auth/sign-in`. There is one
+> implementation: the canonical pages render the same tested components
+> (`features/auth-password-preview/*`) and server actions
+> (`server/actions/auth-password-preview.ts` — historical names kept). The
+> legacy URLs are redirect stubs only. The visible preview banner and its
+> `previewBanner` i18n key are removed.
+>
+> **Recovery path change only — no security-architecture change.**
+> `RECOVERY_FLOW_PATH` is now `/auth/forgot-password`: the `pwr_email` /
+> `pwr_grant` / `pwr_success` cookies are path-scoped to it and
+> `resetPasswordForEmail`'s `redirectTo` is `<origin>/auth/forgot-password/reset`.
+> The isolated non-persisting recovery client, the AES-256-GCM `pwr_grant`
+> (HttpOnly, short TTL), "no privileged session between OTP and reset", and
+> the global sign-out after reset are unchanged. `FINISH_REGISTRATION_PATH`
+> is `/auth/finish-registration`. CAPTCHA scope is unchanged (Create Account,
+> resend code, Forgot Password request: yes; Sign In: no; Supabase global
+> CAPTCHA off), as are the enumeration protections.
+>
+> **Sign-up UX added in the promotion.**
+> *Full Name* (first field; AR «الاسم الكامل» / «اكتب اسمك الكامل», EN
+> "Full name" / "Enter your full name"; trimmed, required, 1–80, server
+> authoritative) rides in `signUp()` **user metadata** (`display_name`,
+> `locale` — which `app.handle_new_user()` already reads; no migration, never
+> `app_metadata`, never a cookie or URL). After `verifyOtp({type:"signup"})`
+> the name is re-read from the *verified user's* metadata, revalidated, and
+> confirmed through `profile_set_display_name`; a failure logs the error code
+> only and never undoes the verified account (the trigger-seeded name stays
+> as the fallback). The account-type card grid is replaced by one shared
+> `Select` over the same `REGISTRATION_CHOICE_ORDER`; Coming Soon types are
+> visible but disabled options ("المقاول — قريبًا" / "Contractor — Coming
+> soon"); the server still rejects forged Coming Soon / transitional /
+> unknown keys.
+>
+> **Before merging to Production:** add
+> `https://aladdindecore.com/auth/forgot-password/reset` to Supabase Auth →
+> Redirect URLs (keep the old `/preview/auth-password/forgot-password/reset`
+> entry until in-flight recovery emails have expired). Existing accounts
+> created by the passwordless flow have no password: the canonical Sign In
+> is password-only, so they set one through Forgot Password (the legacy
+> Email-OTP `/auth/recovery` route still exists, unlinked, and still signs
+> them in with a code). The legacy passwordless code (`server/actions/auth.ts`,
+> `EmailOtpFlow`, the onboarding pages) is intentionally left in place.
+
 **Revision 5** (Architecture B closure pass). Revision 1 established the
 isolated preview; revision 2 changed the password policy to 10 characters +
 weak-password rejection, rebuilt Forgot Password into four separate screens,

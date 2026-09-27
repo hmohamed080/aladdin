@@ -1,5 +1,11 @@
 # Runtime State
 
+## Current continuation — 2026-09-27: canonical password auth (`feature/canonical-password-auth`)
+
+- Branch `feature/canonical-password-auth` from `main` @ `e6c75d3`; PR to `main` open, **not merged**, nothing deployed.
+- Canonical auth is now Email + Password at `/auth/sign-up`, `/auth/sign-in`, `/auth/forgot-password/*`, `/auth/finish-registration`; `/preview/auth-password/*` are redirects (migrate/change-password remain). Sign-up collects Full Name (confirmed via `profile_set_display_name` after OTP) and the account type from a dropdown. No new migration.
+- Pre-merge: Supabase Auth Redirect URL `https://aladdindecore.com/auth/forgot-password/reset`; passwordless-account messaging; project-memory guides still say passwordless (needs approved update).
+
 ## Current continuation — 2026-09-24 (later): registration persona assignment + /settings/profile
 
 - Branch `claude/tender-bell-h0ec72`, 25 commits on `8fcb81c` (later passes: `…090012` declared-persona lock, `…090013` Coming Soon DB enforcement, final trade labels, application-scoped CAPTCHA via Cloudflare Siteverify — `TURNSTILE_SECRET_KEY` must be set in Vercel before the preview is exposed; pgTAP 2447/2447); `main` and `feature/auth-password-staging-prep` untouched. Not merged; no PR.

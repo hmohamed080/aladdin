@@ -33,12 +33,12 @@ export function PasswordSignInForm({ next }: { next: string }) {
         <div className="flex flex-col gap-1.5">
           <p>
             {t("authPasswordPreview.signIn.noAccount")}{" "}
-            <Link href="/preview/auth-password/sign-up" className="font-medium text-accent hover:underline">
+            <Link href="/auth/sign-up" className="font-medium text-accent hover:underline">
               {t("authPasswordPreview.signIn.signUpLink")}
             </Link>
           </p>
           <p>
-            <Link href="/preview/auth-password/forgot-password" className="text-fg-muted hover:text-fg hover:underline">
+            <Link href="/auth/forgot-password" className="text-fg-muted hover:text-fg hover:underline">
               {t("authPasswordPreview.signIn.forgotPassword")}
             </Link>
           </p>
