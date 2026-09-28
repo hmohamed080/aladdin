@@ -4,6 +4,18 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — mask_email audit decision; phone accounts kept out of the email password-migration flow
+
+**Date:** 2026-09-28 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted Supabase not inspected or touched.
+
+- **QA:** all 35 E2E failures on this branch reproduce identically on `origin/main` `e6c75d3` (same test, same failing line; desktop + mobile, with the local DB reset to the base migrations): stale legacy-wizard waits, the mobile workspace-switcher selector, a stale sign-out selector, the installer-dashboard hidden-name selector, and Turnstile blocked in the sandbox. Not fixed here (out of scope).
+- **Audit → decision:** `app.mask_email` (the only change in `20260927090001`) and `userFacingEmail()` cover different paths — SQL RPCs vs. `auth.getUser()` — and stay together. Migration SQL unchanged (function definition md5 identical); header + `COMMENT ON` wording now say Installer/Technician phone authentication. pgTAP `64` also pins the four callers' response shapes and checks `org_members_list` end to end.
+- **Exposure fixed:** `/preview/auth-password/migrate` passed the raw alias to a client component (runtime-confirmed). `redirectPhoneLoginAccount` in `server/actions/auth-password-preview.ts` now runs in `migrationEligibility`, `requestMigrationCode`, `completeMigration` and `changePassword`: alias accounts go to `/home/settings` (app access) or `/onboarding`. Chosen because no account/security or password destination exists, `/home/settings` is the canonical personal account page (it already hides the alias), and it enforces the same onboarding gate — no loop.
+- **Documented, not built:** raw auth identifiers are internal; future phone-OTP/social accounts may have no usable email.
+- **Validation:** typecheck ✓ · lint 0 errors · unit 1788/1788 · pgTAP `64` 13/13 · Playwright installer-phone-auth 24/24, account-registration 13 + 1 skipped (by design), password-preview migration 4/4 (the other 26 preview tests are Turnstile-blocked in this sandbox, identical on `origin/main`).
+
+---
+
 ## Session — Installer phone + password routes promoted to permanent
 
 **Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted Supabase untouched; no schema/migration change.
