@@ -1,5 +1,10 @@
 # Runtime State
 
+## Current continuation — 2026-09-28 (latest): PR #66 carries main + the installer link
+
+- Branch `feature/canonical-password-auth` (PR #66) now contains `main` @ `52bee52` (PR #67). Canonical `/auth/sign-in` (Email + Password) keeps the secondary installer link to `/installer/sign-in`, forwarding only an unchanged-valid `next`. Installer phone auth unchanged. Not merged; nothing deployed.
+- Known before merge: the `auth-password-preview` refresh E2E omits the required Full Name on re-submit (test bug from `ef2a69f`); the product/hosted items in the PR description still apply.
+
 ## Current continuation — 2026-09-28: mask_email kept; phone accounts out of the email migration flow
 
 - Branch `claude/vigilant-cori-471vck`. Decision: keep `app.mask_email` (migration `20260927090001`, SQL unchanged — comment wording only) **and** `userFacingEmail()` as defense in depth. The password preview's `/migrate` and `/change-password` pages and actions now turn phone-alias accounts away on the server (`/home/settings`, or `/onboarding` without app access) before the alias is read into any response.
@@ -27,6 +32,12 @@
 - Migrations: 76 local (`20260927090001_mask_craftsman_login_alias` added — `app.mask_email` only). **Hosted `aladdin-staging` not inspected (no Supabase/Vercel credentials or network access in this session); nothing applied remotely; hosted Auth unchanged.**
 - Validation: pgTAP 2452/2452 (65 files) · typecheck ✓ · lint 0 errors · unit 1759/1759 · production build ✓ · Playwright (local Supabase, Turnstile stand-in) craftsman 12/12, account-registration 14/14, registration-persona 12/12, installer-dashboard desktop ✓ / mobile ✗ (pre-existing: fails identically on `e6c75d3`).
 - Open: hosted migration preflight, Vercel secrets check, approved imagery, admin-assisted password reset for these accounts.
+
+## Current continuation — 2026-09-27: canonical password auth (`feature/canonical-password-auth`)
+
+- Branch `feature/canonical-password-auth` from `main` @ `e6c75d3`; PR to `main` open, **not merged**, nothing deployed.
+- Canonical auth is now Email + Password at `/auth/sign-up`, `/auth/sign-in`, `/auth/forgot-password/*`, `/auth/finish-registration`; `/preview/auth-password/*` are redirects (migrate/change-password remain). Sign-up collects Full Name (confirmed via `profile_set_display_name` after OTP) and the account type from a dropdown. No new migration.
+- Pre-merge: Supabase Auth Redirect URL `https://aladdindecore.com/auth/forgot-password/reset`; passwordless-account messaging; project-memory guides still say passwordless (needs approved update).
 
 ## Current continuation — 2026-09-24 (later): registration persona assignment + /settings/profile
 

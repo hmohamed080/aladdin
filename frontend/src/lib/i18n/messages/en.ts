@@ -4157,13 +4157,15 @@ export const en = {
      `auth.*`, which remains the live passwordless copy, so this preview can
      be deleted or promoted without touching production strings. */
   authPasswordPreview: {
-    previewBanner: "Preview — password sign-in under security review. Not the live registration flow.",
     showPassword: "Show password",
     hidePassword: "Hide password",
+    fullNameLabel: "Full name",
+    fullNamePlaceholder: "Enter your full name",
     emailLabel: "Email address",
     emailPlaceholder: "you@company.com",
     accountTypeLabel: "How will you use Aladdin?",
     accountTypePlaceholder: "Choose an account type",
+    accountTypeComingSoonOption: "{label} — Coming soon",
     passwordLabel: "Password",
     confirmPasswordLabel: "Confirm password",
     newPasswordLabel: "New password",
@@ -4269,6 +4271,8 @@ export const en = {
       resetSent: "If an account exists for {email}, we sent a password reset code.",
     },
     error: {
+      fullNameRequired: "Enter your full name.",
+      fullNameTooLong: "Full name must be 80 characters or fewer.",
       invalidEmail: "Enter a valid email address.",
       invalidCode: "Enter the 6-digit code from your email.",
       invalidCredentials: "That email and password don't match. Check them and try again.",

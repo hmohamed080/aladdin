@@ -59,9 +59,15 @@ It is deliberately **not**:
 
 ## Capabilities and Constraints
 
-**MVP capability areas:** passwordless Authentication · Onboarding & Profiles · Roles & derived navigation · Portfolio · Product Catalog · Smart Search · AI Assistant · Notifications · Subscription · Advertisement · Admin — plus the core value journey (AI consult → intent → discovery → search → matching → profile → product → RFQ → quote → project).
+**MVP capability areas:** Authentication (Email + Password; installer Phone + Password) · Onboarding & Profiles · Roles & derived navigation · Portfolio · Product Catalog · Smart Search · AI Assistant · Notifications · Subscription · Advertisement · Admin — plus the core value journey (AI consult → intent → discovery → search → matching → profile → product → RFQ → quote → project).
 
-**Authentication (canonical, hard constraint):** Passwordless. Register / sign in via **WhatsApp OTP** or **Email OTP / verification link**. WhatsApp OTP only for phone (no SMS). The user verifies exactly **one** primary contact at account creation; a secondary is added later from profile settings. **No passwords, and no password / forgot / reset flows anywhere.** reCAPTCHA only on Create Account. One canonical identity regardless of verification method.
+**Authentication (canonical, hard constraint — since 2026-09-28):** Email + Password.
+- **General accounts:** sign up with Full Name + Email + Username + Account Type + Password, then verify the email with a one-time code (Email OTP). Sign in with Email + Password. Forgot Password recovers access through an Email OTP.
+- **Installer/Technician exception:** `/installer/sign-up` takes Full Name + Phone + Password (no email, OTP or username in that flow); `/installer/sign-in` takes Phone + Password. Same canonical user/persona model. Installer Forgot Password is deferred.
+- **CAPTCHA:** Supabase's global CAPTCHA stays off. Application-scoped Turnstile protects Create Account, Resend Signup and the Forgot Password request; Sign In has no CAPTCHA.
+- One canonical identity regardless of sign-in method.
+
+*Superseded (kept for history):* the earlier passwordless rule — WhatsApp OTP or Email OTP / verification link only, no passwords and no password / forgot / reset flows, reCAPTCHA only on Create Account.
 
 **Identity model (hard constraint):** **One person = one user ID** — one canonical identity per person, never a second user for another role, contact channel, or business. Roles stay separate in the taxonomy; they are merged only by an explicit, recorded decision. **One current primary account type at a time — no Profile Switcher, no "Use As" mode, no persona/account-identity-switching UI.** Organization membership, branch assignment, and permission capabilities attach to the canonical account; they do not fork it.
 

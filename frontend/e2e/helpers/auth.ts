@@ -77,30 +77,98 @@ export async function readNewOtp(
   throw new Error(`No new OTP code arrived in Mailpit for ${email}`);
 }
 
-/** Sign in through the real Email-OTP flow and wait for the expected landing. */
+/**
+ * The known password every E2E identity signs in with. LOCAL TEST DB ONLY:
+ * `global-setup.ts` stamps it onto the seeded synthetic `@example.test`
+ * identities (the product seeds carry no passwords), and fixtures registered
+ * through `/auth/sign-up` choose it themselves. Never a production credential.
+ */
+export const E2E_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
+
+/**
+ * Sign in through the REAL canonical Email + Password flow (`/auth/sign-in`,
+ * no CAPTCHA by design) and wait for the expected landing. No auth bypass:
+ * the credential goes through the real server action and Supabase Auth.
+ */
 export async function signIn(
   page: Page,
-  request: APIRequestContext,
+  _request: APIRequestContext,
   email: string,
   expectedLanding: RegExp = /\/b2b(\/|$)/,
+  password: string = E2E_PASSWORD,
 ): Promise<void> {
-  // Snapshot existing messages BEFORE requesting a new code so we never reuse a
-  // stale OTP from an earlier test/run.
-  const seen = await messageIdsFor(request, email);
-
   await page.goto("/auth/sign-in");
-  await page.getByLabel(/email|البريد/i).fill(email);
-  await page.getByRole("button", { name: /send code|إرسال الرمز/i }).click();
-  await expect(page.getByText(/we sent a code|أرسلنا رمزًا/i)).toBeVisible();
-
-  const code = await readNewOtp(request, email, seen);
-  // The canonical OTP control is one box per digit. Keyboard input exercises
-  // its real auto-advance contract; `fill(code)` targets only box zero and is
-  // rejected by that box's `maxLength=1`.
-  await page.getByLabel(/one-time code|الرمز/i).pressSequentially(code);
-  await page.getByRole("button", { name: /verify|تأكيد/i }).click();
+  await page.getByLabel(/^email address$|^البريد الإلكتروني$/i).fill(email);
+  // Anchored: the "Show password" toggle is labelled too.
+  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
+  await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
 
   // Wait on the URL committing, not the full "load" event — under sustained
   // full-suite load the load event can lag far behind an interactive page.
   await page.waitForURL(expectedLanding, { waitUntil: "commit" });
+}
+
+/**
+ * Waits for Cloudflare Turnstile's REAL widget (always-pass TEST site key
+ * locally — see turnstile-widget.tsx) to populate the hidden `captchaToken`
+ * input. No bypass: the server verifies it with Cloudflare Siteverify. Needs
+ * challenges.cloudflare.com to be reachable.
+ */
+export async function waitForCaptchaToken(page: Page): Promise<void> {
+  await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30_000 });
+}
+
+/**
+ * Picks an account type from the canonical sign-up dropdown by its visible
+ * (localized) label. Coming Soon options are disabled and cannot be picked.
+ */
+export async function selectAccountType(page: Page, label: RegExp = /tradespeople & technicians|الصنايعية/i): Promise<void> {
+  const select = page.locator('select[name="accountType"]');
+  const value = await select.locator("option").evaluateAll(
+    (options, source) => {
+      const re = new RegExp(source.pattern, source.flags);
+      const match = (options as HTMLOptionElement[]).find((o) => !o.disabled && o.value && re.test(o.textContent ?? ""));
+      return match?.value ?? null;
+    },
+    { pattern: label.source, flags: label.flags },
+  );
+  if (!value) throw new Error(`No selectable account type matches ${label}`);
+  await select.selectOption(value);
+}
+
+/**
+ * Register a brand-new account through the REAL canonical `/auth/sign-up`
+ * (Full Name, email, username, account type, password, consents, Turnstile)
+ * and its OTP confirmation, then wait for the app landing. Leaves the browser
+ * signed in; the account's password is `E2E_PASSWORD`.
+ */
+export async function registerWithPassword(
+  page: Page,
+  request: APIRequestContext,
+  {
+    email,
+    username,
+    displayName = "E2E Tester",
+    accountType = /tradespeople & technicians|الصنايعية/i,
+    landing = /\/(home|b2b)(\/|$|\?)/,
+  }: { email: string; username: string; displayName?: string; accountType?: RegExp; landing?: RegExp },
+): Promise<void> {
+  await page.goto("/auth/sign-up");
+  await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill(displayName);
+  await page.getByLabel(/^email address$|^البريد الإلكتروني$/i).fill(email);
+  await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
+  await selectAccountType(page, accountType);
+  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(E2E_PASSWORD);
+  await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(E2E_PASSWORD);
+  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
+  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
+  await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+  const seen = await messageIdsFor(request, email);
+  await waitForCaptchaToken(page);
+  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+  await expect(page.getByText(/next step|الخطوة التالية/i)).toBeVisible({ timeout: 20_000 });
+  const code = await readNewOtp(request, email, seen);
+  await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
+  await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
+  await page.waitForURL(landing, { waitUntil: "commit", timeout: 20_000 });
 }

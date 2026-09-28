@@ -45,7 +45,7 @@ export function RecoveryVerifyForm({ email }: { email: string }) {
   useEffect(() => {
     // Client-side navigation, not a server redirect — see the doc comment on
     // `verifyRecoveryCode` for why (cookie-propagation race on Screen 3).
-    if (verifyState.ok) router.push("/preview/auth-password/forgot-password/reset");
+    if (verifyState.ok) router.push("/auth/forgot-password/reset");
   }, [verifyState, router]);
 
   return (
@@ -53,7 +53,7 @@ export function RecoveryVerifyForm({ email }: { email: string }) {
       title={t("authPasswordPreview.recoveryVerify.title")}
       subtitle={t("authPasswordPreview.recoveryVerify.subtitle")}
       footer={
-        <Link href="/preview/auth-password/forgot-password" className="text-fg-muted hover:text-fg hover:underline">
+        <Link href="/auth/forgot-password" className="text-fg-muted hover:text-fg hover:underline">
           {t("authPasswordPreview.recoveryVerify.changeEmail")}
         </Link>
       }

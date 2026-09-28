@@ -20,8 +20,18 @@ const GENERIC_ERROR_CODES = new Set([
  * renders the SAME generic message (`passwordSignIn` never distinguishes
  * "no such account" from "wrong password" from "unconfirmed"/"disabled") —
  * see the server action's doc comment for why.
+ *
+ * A secondary link sends installer/technician accounts, which sign in with
+ * phone + password, to `/installer/sign-in`; the page passes a href carrying
+ * only a validated `next` (app/auth/sign-in/installer-sign-in-href.ts).
  */
-export function PasswordSignInForm({ next }: { next: string }) {
+export function PasswordSignInForm({
+  next,
+  installerSignInHref = "/installer/sign-in",
+}: {
+  next: string;
+  installerSignInHref?: string;
+}) {
   const { t } = useI18n();
   const [state, dispatch] = useActionState(passwordSignIn, initial);
 
@@ -33,13 +43,18 @@ export function PasswordSignInForm({ next }: { next: string }) {
         <div className="flex flex-col gap-1.5">
           <p>
             {t("authPasswordPreview.signIn.noAccount")}{" "}
-            <Link href="/preview/auth-password/sign-up" className="font-medium text-accent hover:underline">
+            <Link href="/auth/sign-up" className="font-medium text-accent hover:underline">
               {t("authPasswordPreview.signIn.signUpLink")}
             </Link>
           </p>
           <p>
-            <Link href="/preview/auth-password/forgot-password" className="text-fg-muted hover:text-fg hover:underline">
+            <Link href="/auth/forgot-password" className="text-fg-muted hover:text-fg hover:underline">
               {t("authPasswordPreview.signIn.forgotPassword")}
+            </Link>
+          </p>
+          <p>
+            <Link href={installerSignInHref} className="text-fg-muted hover:text-fg hover:underline">
+              {t("auth.installerPhoneSignIn")}
             </Link>
           </p>
         </div>

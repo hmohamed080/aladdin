@@ -1065,7 +1065,7 @@ export const ar: Messages = {
     signInLink: "تسجيل الدخول",
     signUpLink: "أنشئ حسابًا",
     troubleSigningIn: "تواجه مشكلة في تسجيل الدخول؟",
-    installerPhoneSignIn: "صنايعي؟ سجّل الدخول برقم الهاتف",
+    installerPhoneSignIn: "صنايعي أو فني؟ سجل الدخول برقم الهاتف",
     lostEmailAccess: "فقدت الوصول إلى بريدك الإلكتروني؟",
     getHelp: "احصل على المساعدة",
     info: { codeSent: "أرسلنا رمزًا إلى {email}. قد يستغرق وصوله لحظات." },
@@ -4004,13 +4004,15 @@ export const ar: Messages = {
   /* معاينة معزولة فقط (docs/frontend/auth-password-preview.md) — تسجيل الدخول
      بكلمة المرور قيد المراجعة الأمنية. منفصلة عمدًا عن auth.* الحيّة. */
   authPasswordPreview: {
-    previewBanner: "معاينة — تسجيل الدخول بكلمة المرور قيد المراجعة الأمنية. هذا ليس تدفق التسجيل الفعلي.",
     showPassword: "إظهار كلمة المرور",
     hidePassword: "إخفاء كلمة المرور",
+    fullNameLabel: "الاسم الكامل",
+    fullNamePlaceholder: "اكتب اسمك الكامل",
     emailLabel: "البريد الإلكتروني",
     emailPlaceholder: "you@company.com",
     accountTypeLabel: "كيف ستستخدم علاء الدين؟",
     accountTypePlaceholder: "اختر نوع الحساب",
+    accountTypeComingSoonOption: "{label} — قريبًا",
     passwordLabel: "كلمة المرور",
     confirmPasswordLabel: "تأكيد كلمة المرور",
     newPasswordLabel: "كلمة المرور الجديدة",
@@ -4116,6 +4118,8 @@ export const ar: Messages = {
       resetSent: "إذا كان هناك حساب لـ {email}، فقد أرسلنا رمز إعادة تعيين كلمة المرور.",
     },
     error: {
+      fullNameRequired: "اكتب اسمك الكامل.",
+      fullNameTooLong: "يجب ألا يزيد الاسم الكامل عن ٨٠ حرفًا.",
       invalidEmail: "أدخل بريدًا إلكترونيًا صالحًا.",
       invalidCode: "أدخل الرمز المكوّن من ٦ أرقام من بريدك الإلكتروني.",
       invalidCredentials: "لا يتطابق البريد الإلكتروني وكلمة المرور. تحقق منهما وحاول مجددًا.",

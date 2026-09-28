@@ -1,5 +1,6 @@
 import { test, expect, chromium } from "@playwright/test";
 import { messageIdsFor, readNewOtp } from "./helpers/auth";
+import { createConfirmedAccount } from "./helpers/fixtures";
 
 /**
  * Recovery-grant hardening checks (pre-push architecture verification pass):
@@ -12,7 +13,6 @@ function uniqueEmail(tag: string): string {
   return `pw-replay-${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 }
 
-const STRONG_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
 const BASE_URL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${process.env.E2E_PORT ?? 3100}`;
 
 /** Real local browser cookie limits this repo cares about (RFC 6265 practical minimums; Chrome/Firefox both enforce ~4096 bytes per cookie). */
@@ -26,31 +26,18 @@ async function reachRecoveryScreen3(
   const context = await browser.newContext({ baseURL: BASE_URL });
   const page = await context.newPage();
 
+  // An existing, confirmed account is all recovery needs; registration itself
+  // is covered by auth-password-preview.spec.ts.
   const email = uniqueEmail(tag);
-  await page.goto("/preview/auth-password/sign-up");
-  await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-  await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-  await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
-  await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30000 });
-  let seen = await messageIdsFor(request, email);
-  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-  let code = await readNewOtp(request, email, seen);
-  await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
-  await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
-  await page.waitForURL(/\/onboarding/, { waitUntil: "commit" });
-  await page.getByRole("button", { name: /sign out|تسجيل الخروج/i }).click();
-  await page.waitForURL(/\/sign-in/, { waitUntil: "commit" });
+  createConfirmedAccount(email);
 
-  await page.goto("/preview/auth-password/forgot-password");
-  seen = await messageIdsFor(request, email);
+  await page.goto("/auth/forgot-password");
+  const seen = await messageIdsFor(request, email);
   await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
   await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30000 });
   await page.getByRole("button", { name: /send code|إرسال الرمز/i }).click();
   await page.waitForURL(/\/forgot-password\/verify$/, { waitUntil: "commit" });
-  code = await readNewOtp(request, email, seen);
+  const code = await readNewOtp(request, email, seen);
   await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
   await page.getByRole("button", { name: /^verify$|^تحقق$/i }).click();
   await page.waitForURL(/\/forgot-password\/reset$/, { waitUntil: "commit" });
@@ -64,7 +51,7 @@ async function reachRecoveryScreen3(
 async function signInWorks(browser: import("@playwright/test").Browser, email: string, password: string): Promise<boolean> {
   const context = await browser.newContext({ baseURL: BASE_URL });
   const page = await context.newPage();
-  await page.goto("/preview/auth-password/sign-in");
+  await page.goto("/auth/sign-in");
   await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
   // Sign In has no CAPTCHA.
@@ -82,7 +69,7 @@ test("pwr_grant cookie stays well below practical browser cookie size limits (me
   const rawByteLength = Buffer.byteLength(grantValue, "utf8");
   // Approximate full Set-Cookie wire line: name + value + the actual attributes this app sets.
   const setCookieLineLength = Buffer.byteLength(
-    `pwr_grant=${grantValue}; Path=/preview/auth-password/forgot-password; Max-Age=300; HttpOnly; SameSite=Lax`,
+    `pwr_grant=${grantValue}; Path=/auth/forgot-password; Max-Age=300; HttpOnly; SameSite=Lax`,
     "utf8",
   );
   console.log(`MEASURED pwr_grant cookie VALUE byte length: ${rawByteLength} bytes`);
@@ -108,13 +95,13 @@ test("recovery grant: at most one of two concurrent replays (copied into isolate
       name: "pwr_grant",
       value: grantValue,
       domain: "127.0.0.1",
-      path: "/preview/auth-password/forgot-password",
+      path: "/auth/forgot-password",
       httpOnly: true,
       sameSite: "Lax",
     },
   ]);
   const pageB = await ctxB.newPage();
-  await pageB.goto("/preview/auth-password/forgot-password/reset");
+  await pageB.goto("/auth/forgot-password/reset");
   await expect(pageB.getByLabel(/new password|كلمة المرور الجديدة/i)).toBeVisible();
 
   const passwordA = "Aa1!ReplayCandidateOne9Xy";

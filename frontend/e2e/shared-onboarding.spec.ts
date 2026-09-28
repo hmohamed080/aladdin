@@ -1,15 +1,22 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
-import { signIn, IDENTITIES, messageIdsFor, readNewOtp } from "./helpers/auth";
+import { signIn, IDENTITIES } from "./helpers/auth";
+import { createConfirmedAccount } from "./helpers/fixtures";
 
 /**
- * Shared onboarding, CURRENT contract (staging-prep Increment 7 + 11): a fresh
- * Email-OTP sign-up with consent goes straight to the account-type step, then
- * the one-field username step, then INTO THE APP — the legacy profile →
+ * Shared onboarding, CURRENT contract (staging-prep Increment 7 + 11): a
+ * verified, consented account with no account type goes to the account-type
+ * step, then the one-field username step, then INTO THE APP — the legacy profile →
  * contact → persona wizard is no longer on the path (its pages survive only
  * for direct navigation). Resume, deep-link guards, the business-intent
  * terminal and the active-member skip are asserted against persisted state.
  * Rewritten from the Sprint 7.3 wizard assertions, which the base branch's
  * Increment 7 made permanently stale (they waited for /onboarding/profile).
+ *
+ * The canonical `/auth/sign-up` now takes the account type and username on
+ * Step 1, so it never produces an account_type_pending account. These steps
+ * still serve accounts in that state (e.g. pre-password registrations), so
+ * the state is seeded as a local-DB fixture and entered through the real
+ * password sign-in.
  */
 
 async function prefs(page: Page, locale: "en" | "ar", theme: "light" | "dark") {
@@ -25,22 +32,17 @@ async function noOverflow(page: Page) {
   expect(o).toBeLessThanOrEqual(1);
 }
 
-/** Register a brand-new user through the real sign-up + consent + OTP path. */
+/**
+ * A verified, consented account with no account type yet (local-DB fixture),
+ * signed in through the REAL password sign-in. The password flow's own
+ * recovery screen is where such an account lands; `/onboarding` then routes
+ * it to the account-type step these tests exercise.
+ */
 async function registerFreshUser(page: Page, request: APIRequestContext): Promise<string> {
   const email = `onb+${Date.now()}${Math.floor(Math.random() * 1000)}@example.test`;
-  const seen = await messageIdsFor(request, email);
-  // Bilingual label regexes so the same helper works in en and ar.
-  await page.goto("/auth/sign-up");
-  await page.getByLabel(/email address|البريد/i).fill(email);
-  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-  await page.getByLabel(/pilot release|نسخة تجريبية/i).check();
-  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-  await expect(page.getByText(/we sent a code|أرسلنا رمزًا/i)).toBeVisible();
-  const code = await readNewOtp(request, email, seen);
-  // One box per digit — keyboard input exercises the real auto-advance contract.
-  await page.getByLabel(/one-time code|الرمز/i).pressSequentially(code);
-  await page.getByRole("button", { name: /verify|تأكيد/i }).click();
+  createConfirmedAccount(email);
+  await signIn(page, request, email, /\/auth\/finish-registration$/);
+  await page.goto("/onboarding");
   await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
   return email;
 }
@@ -119,20 +121,15 @@ test.describe("shared onboarding", () => {
     await page.getByRole("button", { name: /^continue$/i }).click();
     await page.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
 
-    // Sign out from the onboarding chrome, then sign back in via the real OTP path.
+    // Sign out from the onboarding chrome, then sign back in with the password.
     await page.getByRole("button", { name: /sign out|تسجيل الخروج/i }).click();
     await page.waitForURL(/\/auth\/sign-in$/, { waitUntil: "commit" });
 
-    const seen = await messageIdsFor(request, email);
-    await page.getByLabel(/email address|البريد/i).fill(email);
-    await page.getByRole("button", { name: /send code|إرسال الرمز/i }).click();
-    await expect(page.getByText(/we sent a code|أرسلنا رمزًا/i)).toBeVisible();
-    const code = await readNewOtp(request, email, seen);
-    await page.getByLabel(/one-time code|الرمز/i).pressSequentially(code);
-    await page.getByRole("button", { name: /verify|تأكيد/i }).click();
-
-    // An incomplete account signing in resumes exactly where it stopped.
-    await page.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
+    // An incomplete account signing in resumes exactly where it stopped: the
+    // password flow's recovery screen asks for the missing username only.
+    await signIn(page, request, email, /\/auth\/finish-registration$/);
+    await expect(page.getByLabel(/^username$/i)).toBeVisible();
+    await expect(page.getByLabel(/^password$/i)).toHaveCount(0);
   });
 
   test("an active existing member skips onboarding and reaches /b2b", async ({ page, request }) => {

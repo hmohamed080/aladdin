@@ -20,16 +20,20 @@ import { hasAppAccess, type RegistrationState } from "@/server/queries/registrat
 import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 import type { Database } from "@/types/database.types";
 import {
+  displayNameSchema,
   emailSchema,
   registrationSchema,
   passwordWithContextSchema,
 } from "@/features/auth-password-preview/password-policy";
 
 /**
- * ISOLATED PREVIEW server actions for password-based registration/sign-in
- * (docs/frontend/auth-password-preview.md). NOT wired to the canonical
- * `/auth/*` routes or `server/actions/auth.ts` — this file exists so the new
- * flow can be reviewed end-to-end before promotion. It deliberately reuses the
+ * Server actions for password-based registration/sign-in/recovery
+ * (docs/frontend/auth-password-preview.md). Originally an isolated preview;
+ * now PROMOTED to the canonical `/auth/*` routes (sign-up, sign-in,
+ * forgot-password/*, finish-registration). The module keeps its historical
+ * name; the old `/preview/auth-password/*` URLs are server-side redirects to
+ * the canonical ones. The legacy passwordless actions in
+ * `server/actions/auth.ts` are untouched. It deliberately reuses the
  * same primitives production auth already uses (`getServerSupabase`,
  * `sanitizeNext`, `resolveActiveLanding`, `my_registration_state`) rather than
  * inventing a parallel session/authorization model; only the credential
@@ -114,7 +118,7 @@ const RECOVERY_SUCCESS_COOKIE = "pwr_success";
  * `/b2b`/`/admin`/RLS-denial tests.
  */
 const RECOVERY_GRANT_COOKIE = "pwr_grant";
-const RECOVERY_FLOW_PATH = "/preview/auth-password/forgot-password";
+const RECOVERY_FLOW_PATH = "/auth/forgot-password";
 /** UX target ~10 minutes (§7) — Supabase's own `otp_expiry` is a single project-wide value shared with the existing
  * passwordless flow's OTP (currently 3600s) and cannot be scoped per-type in `supabase/config.toml`; this cookie
  * lifetime (and the "may be stale" hint it drives) is an application-level UX target, not a security boundary —
@@ -228,14 +232,14 @@ async function absoluteUrl(path: string): Promise<string> {
   return `${proto}://${host}${path}`;
 }
 
-const FINISH_REGISTRATION_PATH = "/preview/auth-password/finish-registration";
+const FINISH_REGISTRATION_PATH = "/auth/finish-registration";
 
 /**
  * Safe diagnostics for a post-OTP registration step that failed: the step and
- * the Postgres error code only — never the username, email, password, OTP,
- * session or CAPTCHA token.
+ * the Postgres error code only — never the name, username, email, password,
+ * OTP, session or CAPTCHA token.
  */
-function logRegistrationStepFailure(step: "account_type" | "username", error: { code?: string }): void {
+function logRegistrationStepFailure(step: "account_type" | "username" | "display_name", error: { code?: string }): void {
   console.error(`password registration: post-OTP ${step} step failed (code ${error.code ?? "unknown"})`);
 }
 
@@ -248,7 +252,7 @@ function logRegistrationStepFailure(step: "account_type" | "username", error: { 
  * shared helper (see docs/frontend/auth-password-preview.md).
  */
 async function postSessionRedirect(supabase: SupabaseClient<Database>, next: string): Promise<never> {
-  if (next.startsWith("/onboarding") || next.startsWith("/preview/auth-password/finish-registration") || next.startsWith("/auth/invite/")) {
+  if (next.startsWith("/onboarding") || next.startsWith(FINISH_REGISTRATION_PATH) || next.startsWith("/auth/invite/")) {
     redirect(next);
   }
   const { data: state } = await supabase.rpc("my_registration_state");
@@ -257,7 +261,7 @@ async function postSessionRedirect(supabase: SupabaseClient<Database>, next: str
   // username) is sent to THIS preview's own minimal recovery screen, not the
   // legacy six-step /onboarding wizard — see finish-registration/page.tsx.
   if (registrationState === "account_type_pending" || registrationState === "username_pending") {
-    redirect("/preview/auth-password/finish-registration");
+    redirect(FINISH_REGISTRATION_PATH);
   }
   if (!hasAppAccess(registrationState)) redirect("/onboarding");
 
@@ -276,6 +280,7 @@ export async function requestPasswordSignUp(
   formData: FormData,
 ): Promise<PasswordAuthState> {
   const parsed = registrationSchema.safeParse({
+    displayName: formData.get("displayName"),
     email: formData.get("email"),
     username: formData.get("username"),
     accountType: formData.get("accountType"),
@@ -323,10 +328,17 @@ export async function requestPasswordSignUp(
     return { ok: false, code: "registration.error.usernameUnavailable", email: parsed.data.email };
   }
 
+  // The Full Name rides in user METADATA (raw_user_meta_data), which
+  // `app.handle_new_user()` already reads to seed profiles.display_name —
+  // no new column, no migration. Never app_metadata: the name is profile
+  // data, not authorization. It is confirmed through profile_set_display_name
+  // only after the OTP proves the email (verifyPasswordSignUp).
+  const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
   const callStart = Date.now();
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
+    options: { data: { display_name: parsed.data.displayName, locale } },
   });
   if (error) {
     if (isRateLimitError(error as GoTrueError)) {
@@ -457,6 +469,20 @@ export async function verifyPasswordSignUp(
   // Best-effort, matches production sign-up: never block a verified+credentialed
   // session on a consent-write hiccup.
   await supabase.rpc("record_consent", { p_types: [...CONSENT_TYPES], p_locale: locale });
+
+  // Confirm the Full Name collected at Step 1. It is RE-READ from the verified
+  // user's own metadata (written by signUp() above, never from this request's
+  // form data) and revalidated before the authoritative RPC marks it
+  // confirmed. Best-effort: a failure is logged with the error code only and
+  // never undoes the verified account/session — the trigger-seeded
+  // profiles.display_name stays as the fallback.
+  const displayName = displayNameSchema.safeParse(verifyData.user.user_metadata?.display_name);
+  if (displayName.success) {
+    const { error: displayNameError } = await supabase.rpc("profile_set_display_name", {
+      p_display_name: displayName.data,
+    });
+    if (displayNameError) logRegistrationStepFailure("display_name", displayNameError);
+  }
 
   // Consume the pending registration staged at signUp() time (Increment 6).
   // A session now exists (verifyOtp succeeded above), so this reads
@@ -891,9 +917,9 @@ export async function changePassword(
   return { ok: true, code: "authPasswordPreview.changePassword.done" };
 }
 
-/** Sign out and return to the preview's own sign-in screen. */
+/** Sign out and return to the canonical sign-in screen. */
 export async function previewSignOut(): Promise<void> {
   const supabase = await getServerSupabase();
   await supabase.auth.signOut();
-  redirect("/preview/auth-password/sign-in");
+  redirect("/auth/sign-in");
 }

@@ -4,6 +4,16 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — PR #66: main merged in; installer phone link kept on canonical `/auth/sign-in`
+
+**Date:** 2026-09-28 · **Branch:** `feature/canonical-password-auth` (PR #66) · Not merged to `main`; nothing deployed; hosted Supabase/Vercel untouched.
+
+- **Merge:** `origin/main` @ `52bee52` (PR #67, installer phone + password auth) merged into the branch. Conflicts: this log and `RUNTIME_STATE.md` (both sides kept, newest first); `app/auth/sign-in/page.tsx` (resolved to `PasswordSignInForm`, then fixed below).
+- **Installer entry kept:** `PasswordSignInForm` gains the secondary link «صنايعي أو فني؟ سجل الدخول برقم الهاتف» / "Installer or technician? Sign in with your phone number" → `/installer/sign-in` (reuses `auth.installerPhoneSignIn`; Arabic copy updated). `app/auth/sign-in/installer-sign-in-href.ts` forwards `?next=` only when `sanitizeNext` accepts it unchanged; otherwise the plain link. Installer routes, actions, alias model, sign-out routing and redirects unchanged. "Tradespeople & Technicians" stays selectable in `/auth/sign-up`.
+- **Validation:** typecheck ✓ · lint 0 errors (1 pre-existing warning) · unit 148 files / 1839 ✓ · `next build` ✓ · Playwright desktop against local Supabase: `installer-phone-auth` 12 passed + 2 failed only in the spec's `docker exec … -F '|'` helper under Windows `cmd.exe` (UI steps passed; the same DB assertions verified manually) · `auth-password-preview` 21/22 — the failing refresh test (pre-existing in `ef2a69f`) re-fills the form without the now-required Full Name.
+
+---
+
 ## Session — mask_email audit decision; phone accounts kept out of the email password-migration flow
 
 **Date:** 2026-09-28 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted Supabase not inspected or touched.
@@ -86,6 +96,21 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 - **Security:** GoTrue bcrypt only; 10-char policy + weak-password rejection; Turnstile on sign-up; generic sign-in failure; logs carry step + error code only. Duplicate phone disclosed by product decision. Forgot password hidden (recovery is email-based).
 - **Validation:** pgTAP 2452/2452 (65 files, clean start) · typecheck ✓ · lint 0 errors (1 pre-existing warning) · unit 1759/1759 · `next build` ✓ · Playwright against local Supabase with `E2E_TURNSTILE_STUB=1` + local Siteverify stand-in (challenges.cloudflare.com is blocked here): `temporary-craftsman-auth` 12/12 (desktop + mobile), `account-registration` 14/14, `registration-persona` 12/12, `installer-dashboard` desktop ✓, mobile ✗ — **pre-existing**, reproduced on unmodified `e6c75d3` (first `Hossam` match is the hidden desktop sidebar label).
 - **Not done / open:** hosted migration preflight and Vercel secret check (no credentials; `api.supabase.com`/`api.vercel.com` blocked by this environment's network policy); hosted needs `20260924090001`–`…090013` + `20260927090001`, `SUPABASE_SERVICE_ROLE_KEY`, `TURNSTILE_SECRET_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`; approved imagery (placeholder slots in `features/temporary-craftsman-auth/assets.ts`); generated username not user-editable (no product UI); password reset for these accounts needs an admin path.
+
+---
+
+## Session — Canonical password auth promotion (`/auth/*`)
+
+**Date:** 2026-09-27 · **Branch:** `feature/canonical-password-auth` · **Base:** `main` @ `e6c75d3`. PR to `main` opened, **not merged**; no deploy; no hosted Supabase / Cloudflare / Vercel change.
+
+- **Routes:** the tested password flow now serves `/auth/sign-up`, `/auth/sign-in`, `/auth/forgot-password{,/verify,/reset,/success}`, `/auth/finish-registration` (pages moved with `git mv`; same components/actions). The old `/preview/auth-password/*` URLs are server-side redirect stubs (sign-in forwards `next` only when `sanitizeNext` accepts it unchanged; finish-registration forwards only `reason=username_unavailable`). `migrate` / `change-password` stay under `/preview`; their fallback is `/auth/sign-in`.
+- **Recovery path only:** `RECOVERY_FLOW_PATH` → `/auth/forgot-password` (cookie paths + `redirectTo`), `FINISH_REGISTRATION_PATH` → `/auth/finish-registration`. Recovery isolation, grant encryption, CAPTCHA scope and enumeration protections unchanged.
+- **Preview banner + `previewBanner` key removed** (AR/EN); no user-visible "preview" wording.
+- **Full Name** (first sign-up field, 1–80, server-authoritative) → `signUp()` user metadata `{display_name, locale}` (read by the existing `app.handle_new_user()`); after the OTP it is re-read from the verified user's metadata and confirmed via `profile_set_display_name` (failure logs the code only, never undoes the account). **No migration.**
+- **Account type** is one shared `Select` (Coming Soon options disabled, localized "— Coming soon" suffix); server validation unchanged.
+- **E2E:** `helpers/auth.ts` `signIn()` is now password-based (`E2E_PASSWORD`, stamped by `global-setup.ts` onto seeded `@example.test` identities with no password — local test DB only); new `registerWithPassword` / `selectAccountType` / `waitForCaptchaToken` helpers; `helpers/fixtures.ts` seeds confirmed accounts for specs whose subject is not registration (legacy onboarding steps, passwordless migration).
+- **Validation:** see the PR description (typecheck, lint, unit, build, Playwright CAPTCHA-independent subsets). Turnstile-gated E2E cannot run in this sandbox (`challenges.cloudflare.com` blocked) — must run locally.
+- **Open before merge:** add `https://aladdindecore.com/auth/forgot-password/reset` to Supabase Auth Redirect URLs; decide how existing passwordless accounts are told to use Forgot Password (the legacy OTP `/auth/recovery` still signs them in, unlinked); the binding project-memory guides (`CLAUDE.md`, `PRODUCT_DIRECTION_GUIDE.md`, `ARCHITECTURE_GUIDE.md`) still describe passwordless as canonical and need an approved update. Specs still waiting on the removed `/onboarding/profile` step (pre-existing, stale on `main` too) were not rewritten.
 
 ---
 

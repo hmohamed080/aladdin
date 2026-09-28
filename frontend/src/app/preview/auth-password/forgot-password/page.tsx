@@ -1,7 +1,11 @@
-import { ForgotPasswordForm } from "@/features/auth-password-preview/forgot-password-form";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default function AuthPasswordPreviewForgotPasswordPage() {
-  return <ForgotPasswordForm />;
+/**
+ * Legacy preview URL — the password recovery flow is canonical at
+ * /auth/forgot-password now. Kept during rollout so recovery emails sent with the old
+ * link still land on the real flow. No query parameters are forwarded: the
+ * recovery flow never reads any (its state lives in HttpOnly cookies).
+ */
+export default function LegacyPreviewRecoveryRedirect(): never {
+  redirect("/auth/forgot-password");
 }

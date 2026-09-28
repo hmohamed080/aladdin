@@ -1,19 +1,11 @@
 import { redirect } from "next/navigation";
-import { consumeRecoverySuccess } from "@/server/actions/auth-password-preview";
-import { RecoverySuccess } from "@/features/auth-password-preview/recovery-success";
-
-export const dynamic = "force-dynamic";
 
 /**
- * SCREEN 4 route boundary: reachable only immediately after a real reset
- * completed in THIS browser (a short-lived cookie set by
- * `resetPasswordAndSignOut`, checked here read-only — see
- * `consumeRecoverySuccess`'s doc comment for why it cannot delete it). No
- * session exists at this point (Screen 3 already ended it), so this cannot
- * be gated by `getUser()` the way Screen 3 is.
+ * Legacy preview URL — the password recovery flow is canonical at
+ * /auth/forgot-password/success now. Kept during rollout so recovery emails sent with the old
+ * link still land on the real flow. No query parameters are forwarded: the
+ * recovery flow never reads any (its state lives in HttpOnly cookies).
  */
-export default async function AuthPasswordPreviewRecoverySuccessPage() {
-  const reachedHonestly = await consumeRecoverySuccess();
-  if (!reachedHonestly) redirect("/preview/auth-password/forgot-password");
-  return <RecoverySuccess />;
+export default function LegacyPreviewRecoveryRedirect(): never {
+  redirect("/auth/forgot-password/success");
 }

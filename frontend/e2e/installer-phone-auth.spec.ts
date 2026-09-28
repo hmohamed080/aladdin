@@ -196,11 +196,11 @@ test.describe("installer phone + password auth", () => {
     await expectNoAlias(page);
   });
 
-  test("the canonical /auth flow is unchanged (email OTP, no phone/password); sign-in gains one installer link", async ({ page }) => {
+  test("the canonical /auth flow is email + password (never phone); sign-in keeps one installer link", async ({ page }) => {
     for (const path of ["/auth/sign-up", "/auth/sign-in"]) {
       await page.goto(path);
       await expect(page.locator('input[type="email"]')).toHaveCount(1);
-      await expect(page.locator('input[type="password"]')).toHaveCount(0);
+      await expect(page.locator('input[name="password"]')).toHaveCount(1);
       await expect(page.locator('input[type="tel"]')).toHaveCount(0);
     }
     await page.goto("/auth/sign-up");
@@ -209,6 +209,16 @@ test.describe("installer phone + password auth", () => {
     const installerLink = page.locator('a[href^="/installer/"]');
     await expect(installerLink).toHaveCount(1);
     await expect(installerLink).toHaveAttribute("href", "/installer/sign-in");
+    await expect(installerLink).toHaveText("صنايعي أو فني؟ سجل الدخول برقم الهاتف");
+  });
+
+  test("/auth/sign-in forwards only a validated next to the installer link", async ({ page }) => {
+    await page.goto("/auth/sign-in?next=%2Fhome%2Fpoints");
+    await expect(page.locator('a[href^="/installer/"]')).toHaveAttribute("href", "/installer/sign-in?next=%2Fhome%2Fpoints");
+    for (const unsafe of ["%2F%2Fevil.example", "https%3A%2F%2Fevil.example", "%2F%5Cevil.example"]) {
+      await page.goto(`/auth/sign-in?next=${unsafe}`);
+      await expect(page.locator('a[href^="/installer/"]')).toHaveAttribute("href", "/installer/sign-in");
+    }
   });
 
   test("old /temporary/craftsman URLs permanently redirect to /installer, keeping the query", async ({ page, request }) => {

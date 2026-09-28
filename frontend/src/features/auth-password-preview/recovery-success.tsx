@@ -22,7 +22,7 @@ export function RecoverySuccess() {
   return (
     <AuthCard title={t("authPasswordPreview.recoverySuccess.title")} subtitle={t("authPasswordPreview.recoverySuccess.body")}>
       <Link
-        href="/preview/auth-password/sign-in"
+        href="/auth/sign-in"
         className="block w-full rounded-sm bg-primary px-md py-2 text-center text-label font-medium text-primary-foreground shadow-sm hover:opacity-90"
       >
         {t("authPasswordPreview.recoverySuccess.signIn")}

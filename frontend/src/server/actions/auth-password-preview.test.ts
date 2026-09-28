@@ -140,6 +140,7 @@ function consented(entries: Record<string, string> = {}) {
     consent_privacy: "on",
     consent_pilot: "on",
     captchaToken: "test-captcha-token",
+    displayName: "Mona Adel",
     username: "validuser123",
     accountType: "installer_technician",
     ...entries,
@@ -267,7 +268,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
   it("requires all three consents", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
-      fd({ email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, consent_terms: "on" }),
+      fd({ displayName: "Mona Adel", email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, consent_terms: "on" }),
     );
     expect(res.code).toBe("authPasswordPreview.error.consentRequired");
     expect(signUp).not.toHaveBeenCalled();
@@ -284,6 +285,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
     expect(signUp).toHaveBeenCalledWith({
       email: "new-person@example.test",
       password: GOOD_PASSWORD,
+      options: { data: { display_name: "Mona Adel", locale: "ar" } },
     });
     // Never the passwordless OTP endpoint — Architecture B never calls it.
     expect(signInWithOtp).not.toHaveBeenCalled();
@@ -292,7 +294,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
   it("refuses without a captcha token — never calls signUp", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
-      fd({ consent_terms: "on", consent_privacy: "on", consent_pilot: "on", email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      fd({ consent_terms: "on", consent_privacy: "on", consent_pilot: "on", displayName: "Mona Adel", email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
     );
     expect(res.code).toBe("authPasswordPreview.error.captchaRequired");
     expect(signUp).not.toHaveBeenCalled();
@@ -507,7 +509,7 @@ describe("verifyPasswordSignUp — the post-OTP username claim is never ignored"
 
   it("a 23505 collision keeps the session and account type and routes to the explicit recovery screen", async () => {
     stage({ data: null, error: { code: "23505", message: "username is unavailable" } });
-    await expect(verify()).rejects.toThrow("REDIRECT:/preview/auth-password/finish-registration?reason=username_unavailable");
+    await expect(verify()).rejects.toThrow("REDIRECT:/auth/finish-registration?reason=username_unavailable");
     expect(rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "professional", p_account_type: "installer_technician" });
     expect(signOut).not.toHaveBeenCalled();
   });
@@ -515,7 +517,7 @@ describe("verifyPasswordSignUp — the post-OTP username claim is never ignored"
   it("any other claim failure is not treated as success: safe log (no username), then the state-derived recovery screen", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     stage({ data: null, error: { code: "XX000", message: "internal" } });
-    await expect(verify()).rejects.toThrow(/^REDIRECT:\/preview\/auth-password\/finish-registration$/);
+    await expect(verify()).rejects.toThrow(/^REDIRECT:\/auth\/finish-registration$/);
     expect(log).toHaveBeenCalledTimes(1);
     const line = String(log.mock.calls[0]![0]);
     expect(line).toContain("XX000");
@@ -526,7 +528,7 @@ describe("verifyPasswordSignUp — the post-OTP username claim is never ignored"
   it("an account-type failure is not ignored either — the recovery screen asks for what is missing", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     stage({ data: null, error: null }, { data: null, error: { code: "22023", message: "x" } });
-    await expect(verify()).rejects.toThrow(/^REDIRECT:\/preview\/auth-password\/finish-registration$/);
+    await expect(verify()).rejects.toThrow(/^REDIRECT:\/auth\/finish-registration$/);
     log.mockRestore();
   });
 
@@ -534,6 +536,121 @@ describe("verifyPasswordSignUp — the post-OTP username claim is never ignored"
     stage({ data: null, error: null });
     await expect(verify()).rejects.toThrow(/^REDIRECT:\/onboarding/);
     expect(rpc).toHaveBeenCalledWith("profile_set_username", { p_username: "staged_name" });
+  });
+});
+
+describe("requestPasswordSignUp — Full Name (profile data, server-authoritative)", () => {
+  function submit(displayName: string | null, entries: Record<string, string> = {}) {
+    const form = consented({ email: "new-person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, ...entries });
+    if (displayName === null) form.delete("displayName");
+    else form.set("displayName", displayName);
+    return requestPasswordSignUp({ ok: false }, form);
+  }
+
+  it.each([
+    ["missing", null, "authPasswordPreview.error.fullNameRequired"],
+    ["empty", "", "authPasswordPreview.error.fullNameRequired"],
+    ["whitespace-only", "   \t  ", "authPasswordPreview.error.fullNameRequired"],
+    ["81 characters", "a".repeat(81), "authPasswordPreview.error.fullNameTooLong"],
+  ])("rejects a %s name before the username pre-flight, CAPTCHA, or signUp()", async (_label, displayName, code) => {
+    const res = await submit(displayName);
+    expect(res).toEqual({ ok: false, code });
+    expect(signUp).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalledWith("username_available", expect.anything());
+    expect(siteverifyCalls()).toHaveLength(0);
+  });
+
+  it("accepts exactly 80 characters", async () => {
+    signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "u-new" } } });
+    const res = await submit("a".repeat(80));
+    expect(res.ok).toBe(true);
+  });
+
+  it("sends the TRIMMED name and the caller's locale as signUp() user metadata — never app_metadata", async () => {
+    cookieStore.set("NEXT_LOCALE", "en");
+    signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "u-new" } } });
+    await submit("  منى عادل  ");
+    const call = signUp.mock.calls[0]![0] as { options: { data: Record<string, unknown> } } & Record<string, unknown>;
+    expect(call.options).toEqual({ data: { display_name: "منى عادل", locale: "en" } });
+    expect(JSON.stringify(call)).not.toContain("app_metadata");
+  });
+
+  it("the name never changes the account-type, username, or enumeration handling", async () => {
+    signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "u-new" } } });
+    await submit("Mona Adel", { accountType: "salesperson" });
+    expect(savePendingRegistration).toHaveBeenCalledWith({
+      userId: "u-new",
+      username: "validuser123",
+      audienceKind: "persona_type",
+      audienceValue: "sales",
+    });
+    // A Coming Soon account type is still refused with a valid name.
+    signUp.mockClear();
+    const refused = await submit("Mona Adel", { accountType: "contractor" });
+    expect(refused.ok).toBe(false);
+    expect(signUp).not.toHaveBeenCalled();
+  });
+});
+
+describe("verifyPasswordSignUp — confirms the Full Name from the VERIFIED user's metadata", () => {
+  function stage(metadata: Record<string, unknown> | undefined, displayNameResult: { data: unknown; error: unknown } = { data: null, error: null }) {
+    verifyOtp.mockResolvedValueOnce({
+      error: null,
+      data: { user: { id: "u1", email: "person@example.test", user_metadata: metadata } },
+    });
+    rpc.mockImplementation(async (fn: string) => {
+      if (fn === "pending_registration_consume")
+        return { data: [{ username: "staged_name", audience_kind: "persona_type", audience_value: "installer_technician" }], error: null };
+      if (fn === "profile_set_display_name") return displayNameResult;
+      if (fn === "my_registration_state") return { data: "access_ready", error: null };
+      return { data: null, error: null };
+    });
+  }
+  const verify = (extra: Record<string, string> = {}) =>
+    verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456", ...extra }));
+
+  it("calls profile_set_display_name with the trimmed metadata name after the OTP succeeds", async () => {
+    stage({ display_name: "  Mona Adel " });
+    await expect(verify()).rejects.toThrow(/^REDIRECT:\/onboarding/);
+    expect(rpc).toHaveBeenCalledWith("profile_set_display_name", { p_display_name: "Mona Adel" });
+    const calls = rpc.mock.calls.map((c) => c[0]);
+    expect(calls).toContain("profile_set_username");
+  });
+
+  it("ignores any display name in the verify request — only the verified user's metadata counts", async () => {
+    stage({ display_name: "Mona Adel" });
+    await expect(verify({ displayName: "Forged Name" })).rejects.toThrow(/REDIRECT:/);
+    expect(rpc).toHaveBeenCalledWith("profile_set_display_name", { p_display_name: "Mona Adel" });
+    expect(rpc).not.toHaveBeenCalledWith("profile_set_display_name", { p_display_name: "Forged Name" });
+  });
+
+  it.each([
+    ["absent metadata", undefined],
+    ["no display_name", { locale: "en" }],
+    ["a non-string value", { display_name: 42 }],
+    ["an over-long value", { display_name: "a".repeat(81) }],
+    ["a blank value", { display_name: "   " }],
+  ])("skips the confirmation for %s — the trigger-seeded profile name stays the fallback", async (_label, metadata) => {
+    stage(metadata);
+    await expect(verify()).rejects.toThrow(/^REDIRECT:\/onboarding/);
+    expect(rpc).not.toHaveBeenCalledWith("profile_set_display_name", expect.anything());
+    expect(rpc).toHaveBeenCalledWith("profile_set_username", { p_username: "staged_name" });
+  });
+
+  it("an RPC failure logs only the error code and never destroys the verified session", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    stage({ display_name: "Mona Adel" }, { data: null, error: { code: "P0002", message: "profile not found for Mona Adel" } });
+    await expect(verify()).rejects.toThrow(/^REDIRECT:\/onboarding/);
+    expect(log).toHaveBeenCalledTimes(1);
+    const line = String(log.mock.calls[0]![0]);
+    expect(line).toContain("display_name");
+    expect(line).toContain("P0002");
+    expect(line).not.toMatch(/Mona|person@example\.test|123456|staged_name/);
+    expect(signOut).not.toHaveBeenCalled();
+    // Registration still completes: account type + username are applied.
+    expect(rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "professional", p_account_type: "installer_technician" });
+    expect(rpc).toHaveBeenCalledWith("profile_set_username", { p_username: "staged_name" });
+    log.mockRestore();
   });
 });
 
@@ -729,7 +846,7 @@ describe("Forgot Password — Screen 1: requestRecoveryCode (ISOLATED client —
   it("redirects to Screen 2 for a known email", async () => {
     isolatedResetPasswordForEmail.mockResolvedValueOnce({ error: null });
     await expect(requestRecoveryCode({ ok: false }, withCaptcha({ email: "a-owner@example.test" }))).rejects.toThrow(
-      "REDIRECT:/preview/auth-password/forgot-password/verify",
+      "REDIRECT:/auth/forgot-password/verify",
     );
     expect(cookieStore.get("pwr_email")).toBe("a-owner@example.test");
     expect(createIsolatedAuthClient).toHaveBeenCalled();
@@ -739,7 +856,7 @@ describe("Forgot Password — Screen 1: requestRecoveryCode (ISOLATED client —
     isolatedResetPasswordForEmail.mockResolvedValueOnce({ error: { message: "User not found" } });
     await expect(
       requestRecoveryCode({ ok: false }, withCaptcha({ email: "never-registered@example.test" })),
-    ).rejects.toThrow("REDIRECT:/preview/auth-password/forgot-password/verify");
+    ).rejects.toThrow("REDIRECT:/auth/forgot-password/verify");
     expect(cookieStore.get("pwr_email")).toBe("never-registered@example.test");
   });
 
@@ -755,7 +872,7 @@ describe("Forgot Password — Screen 1: requestRecoveryCode (ISOLATED client —
     isolatedResetPasswordForEmail.mockResolvedValueOnce({ error: null });
     await expect(requestRecoveryCode({ ok: false }, withCaptcha({ email: "a-owner@example.test" }))).rejects.toThrow();
     expect(isolatedResetPasswordForEmail).toHaveBeenCalledWith("a-owner@example.test", {
-      redirectTo: "http://127.0.0.1:3000/preview/auth-password/forgot-password/reset",
+      redirectTo: "http://127.0.0.1:3000/auth/forgot-password/reset",
     });
   });
 
@@ -904,7 +1021,7 @@ describe("Forgot Password — Screen 3: requireRecoverySession / resetPasswordAn
     isolatedUpdateUser.mockResolvedValueOnce({ error: null, data: { user: { id: "u1" } } });
     await expect(
       resetPasswordAndSignOut({ ok: false }, fd({ password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD })),
-    ).rejects.toThrow("REDIRECT:/preview/auth-password/forgot-password/success");
+    ).rejects.toThrow("REDIRECT:/auth/forgot-password/success");
 
     expect(isolatedSetSession).toHaveBeenCalledWith({
       access_token: "isolated-access-token",

@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * valid username is stored yet, whether because the caller never had one
  * (a direct RPC path) or their pending-registration username claim collided
  * with someone else's during the verification window (see
- * `frontend/src/app/preview/auth-password/finish-registration/page.tsx` for
+ * `frontend/src/app/auth/finish-registration/page.tsx` for
  * the isolated preview's equivalent recovery screen — same underlying RPCs,
  * same error-code shape). A refresh or direct navigation cannot bypass this:
  * `my_registration_state()` is re-derived from the database on every call,

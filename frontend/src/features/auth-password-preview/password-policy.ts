@@ -59,8 +59,22 @@ function addWeakPasswordIssues(password: string, context: readonly string[], pat
  * ever reaching `signUp()` in the first place, never to be trusted as the
  * final word on availability.
  */
+/**
+ * The registrant's Full Name — PROFILE data, never authorization. Trimmed,
+ * 1..80 characters: the same bounds `profile_set_display_name` enforces and
+ * `app.handle_new_user()` truncates to. The server action is authoritative;
+ * the form mirrors it only for early feedback.
+ */
+export const DISPLAY_NAME_MAX_LENGTH = 80;
+export const displayNameSchema = z
+  .string({ invalid_type_error: "authPasswordPreview.error.fullNameRequired", required_error: "authPasswordPreview.error.fullNameRequired" })
+  .trim()
+  .min(1, { message: "authPasswordPreview.error.fullNameRequired" })
+  .max(DISPLAY_NAME_MAX_LENGTH, { message: "authPasswordPreview.error.fullNameTooLong" });
+
 export const registrationSchema = z
   .object({
+    displayName: displayNameSchema,
     email: emailSchema,
     username: z
       .string()
