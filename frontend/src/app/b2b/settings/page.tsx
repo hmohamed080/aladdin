@@ -11,6 +11,7 @@ import { Card, SectionTitle, Field, Badge } from "@/components/ui/primitives";
 import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import { formatCount } from "@/lib/ui/format";
 import { maskEmail } from "@/lib/ui/mask-email";
+import { isCraftsmanLoginAlias, userFacingEmail } from "@/lib/auth/craftsman-login-alias";
 import { resolveBilingualText } from "@/lib/i18n/bilingual";
 import { OrganizationIdentityDialog } from "@/features/organization/organization-identity-dialog";
 import { BranchIdentityDialog } from "@/features/organization/branch-identity-dialog";
@@ -84,7 +85,10 @@ export default async function SettingsPage() {
   const reachable = allowedNavKeys(org.capabilities).filter((k) => k !== "home" && k !== "settings");
   const verified = record?.is_verified ?? false;
   const pending = record?.status === "pending_verification";
-  const signInEmail = auth?.user?.email ? maskEmail(auth.user.email) : null;
+  // An installer phone account's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
+  const visibleEmail = userFacingEmail(auth?.user?.email);
+  const signInEmail = visibleEmail ? maskEmail(visibleEmail) : null;
+  const phonePasswordAccount = isCraftsmanLoginAlias(auth?.user?.email);
   const branchDetails = new Map((branchRows ?? []).map((b) => [b.id, b]));
 
   // Organization subtypes (Showroom/Supplier/Manufacturer/Importer activities).
@@ -284,11 +288,16 @@ export default async function SettingsPage() {
                 <span dir="ltr">{signInEmail}</span>
               </Field>
             ) : null}
-            {/* No password row, no "change password", no 2FA toggle: Aladdin is
-                passwordless, and offering controls for a credential that does not
-                exist would be the clearest possible lie about the security model. */}
-            <p className="text-body text-fg-secondary">{m.settings.signInBody}</p>
-            <p className="text-label text-fg-muted">{m.settings.signInContactHint}</p>
+            {/* No password row, no "change password", no 2FA toggle: email accounts
+                are passwordless, and a phone + password account has no self-service
+                password management yet — offering controls that do not exist would
+                misstate the security model. */}
+            <p className="text-body text-fg-secondary">
+              {phonePasswordAccount ? m.settings.signInBodyPhonePassword : m.settings.signInBody}
+            </p>
+            {/* The contact hint is about the email sign-in contact; a phone account's
+                sign-in number is not changed by a profile edit. */}
+            {phonePasswordAccount ? null : <p className="text-label text-fg-muted">{m.settings.signInContactHint}</p>}
           </div>
         </Card>
 

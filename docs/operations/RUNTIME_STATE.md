@@ -1,5 +1,33 @@
 # Runtime State
 
+## Current continuation — 2026-09-28: mask_email kept; phone accounts out of the email migration flow
+
+- Branch `claude/vigilant-cori-471vck`. Decision: keep `app.mask_email` (migration `20260927090001`, SQL unchanged — comment wording only) **and** `userFacingEmail()` as defense in depth. The password preview's `/migrate` and `/change-password` pages and actions now turn phone-alias accounts away on the server (`/home/settings`, or `/onboarding` without app access) before the alias is read into any response.
+- Settings sign-in copy now matches the account (`/home/settings`, `/b2b/settings`): phone + password text for phone accounts, the one-time-code text for email accounts.
+- Rule recorded: raw authentication identifiers are internal; `user.email` is not a user-facing contact identity (ARCHITECTURE_GUIDE 2026-09-28, `frontend/AGENTS.md`).
+- Hosted not inspected (no credentials/linked project in this environment); `20260927090001` exists only on this unmerged branch; nothing applied remotely; no PR; nothing deployed.
+- Validation: typecheck ✓ · lint 0 errors · unit 1788/1788 · pgTAP `64` 13/13 · Playwright installer-phone-auth 24/24, account-registration 13 + 1 skipped (by design), password-preview migration 4/4; the 26 Turnstile-blocked preview tests fail identically on `origin/main` (sandbox).
+
+## Current continuation — 2026-09-27 (latest): installer phone + password routes permanent
+
+- Branch `claude/vigilant-cori-471vck`. Permanent routes `/installer/sign-up`, `/installer/sign-in`; `/temporary/craftsman/*` 308-redirect there. Shared `/auth/*` unchanged except a secondary installer link on `/auth/sign-in`; `signOut` returns phone accounts to `/installer/sign-in`. See [installer phone auth](../frontend/installer-phone-auth.md).
+- No schema/migration change in this step. Hosted Supabase untouched; nothing deployed; no PR.
+- Open (separate decisions): `app.mask_email` migration vs app-level filter; hidden `pilot` consent receipt; Terms/Privacy content; phone OTP password recovery; hosted migrations + Vercel secrets.
+
+## Current continuation — 2026-09-27 (later): craftsman auth UI approved
+
+- Branch `claude/vigilant-cori-471vck`. Temporary craftsman sign-up/sign-in **visual implementation approved** by the product owner; no further visual passes.
+- **Pending auth item:** craftsman forgot-password stays hidden until phone OTP (SMS/WhatsApp) recovery exists — see [temporary craftsman auth](../frontend/temporary-craftsman-auth.md). Email recovery flows unchanged.
+- Next step under review: route promotion/replacement plan (no change made). Hosted Supabase untouched; nothing deployed; no PR.
+
+## Current continuation — 2026-09-27: temporary craftsman phone + password auth
+
+- Branch `claude/vigilant-cori-471vck` on `main` @ `e6c75d3`. Not merged; no PR; nothing deployed.
+- New routes: `/temporary/craftsman/sign-up`, `/temporary/craftsman/sign-in` (Arabic RTL, noindex). `/auth/*` and the email-OTP flow unchanged. See [temporary craftsman auth](../frontend/temporary-craftsman-auth.md).
+- Migrations: 76 local (`20260927090001_mask_craftsman_login_alias` added — `app.mask_email` only). **Hosted `aladdin-staging` not inspected (no Supabase/Vercel credentials or network access in this session); nothing applied remotely; hosted Auth unchanged.**
+- Validation: pgTAP 2452/2452 (65 files) · typecheck ✓ · lint 0 errors · unit 1759/1759 · production build ✓ · Playwright (local Supabase, Turnstile stand-in) craftsman 12/12, account-registration 14/14, registration-persona 12/12, installer-dashboard desktop ✓ / mobile ✗ (pre-existing: fails identically on `e6c75d3`).
+- Open: hosted migration preflight, Vercel secrets check, approved imagery, admin-assisted password reset for these accounts.
+
 ## Current continuation — 2026-09-27: canonical password auth (`feature/canonical-password-auth`)
 
 - Branch `feature/canonical-password-auth` from `main` @ `e6c75d3`; PR to `main` open, **not merged**, nothing deployed.

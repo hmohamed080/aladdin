@@ -4,6 +4,91 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — mask_email audit decision; phone accounts kept out of the email password-migration flow
+
+**Date:** 2026-09-28 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted Supabase not inspected or touched.
+
+- **QA:** all 35 E2E failures on this branch reproduce identically on `origin/main` `e6c75d3` (same test, same failing line; desktop + mobile, with the local DB reset to the base migrations): stale legacy-wizard waits, the mobile workspace-switcher selector, a stale sign-out selector, the installer-dashboard hidden-name selector, and Turnstile blocked in the sandbox. Not fixed here (out of scope).
+- **Audit → decision:** `app.mask_email` (the only change in `20260927090001`) and `userFacingEmail()` cover different paths — SQL RPCs vs. `auth.getUser()` — and stay together. Migration SQL unchanged (function definition md5 identical); header + `COMMENT ON` wording now say Installer/Technician phone authentication. pgTAP `64` also pins the four callers' response shapes and checks `org_members_list` end to end.
+- **Exposure fixed:** `/preview/auth-password/migrate` passed the raw alias to a client component (runtime-confirmed). `redirectPhoneLoginAccount` in `server/actions/auth-password-preview.ts` now runs in `migrationEligibility`, `requestMigrationCode`, `completeMigration` and `changePassword`: alias accounts go to `/home/settings` (app access) or `/onboarding`. Chosen because no account/security or password destination exists, `/home/settings` is the canonical personal account page (it already hides the alias), and it enforces the same onboarding gate — no loop.
+- **Settings copy:** `/home/settings` and `/b2b/settings` said "Aladdin has no passwords… one-time code" to phone + password accounts too (now the redirect target). The page picks `signInMethod` on the server (`isCraftsmanLoginAlias`); phone accounts see phone + password copy and no "change it from your profile" hint. Found: a profile phone edit does not change a phone account's sign-in number (documented as a limitation, not changed).
+- **Documented, not built:** raw auth identifiers are internal; future phone-OTP/social accounts may have no usable email.
+- **Validation:** typecheck ✓ · lint 0 errors · unit 1788/1788 · pgTAP `64` 13/13 · Playwright installer-phone-auth 24/24, account-registration 13 + 1 skipped (by design), password-preview migration 4/4 (the other 26 preview tests are Turnstile-blocked in this sandbox, identical on `origin/main`).
+
+---
+
+## Session — Installer phone + password routes promoted to permanent
+
+**Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted Supabase untouched; no schema/migration change.
+
+- **Naming:** `installer` is canonical (DB persona `installer_technician`, "Installer/Technician Pilot", `installer-dashboard`/`installer-home`); `craftsman` only existed in the temporary code. Routes `/installer/sign-up`, `/installer/sign-in`; code in `features/installer-phone-auth`, `server/actions/installer-phone-auth.ts`, assets `public/installer-auth/`. Kept on purpose: `temporaryCraftsman` i18n keys, `Craftsman*` identifiers, alias domain and stored `registration_source` value.
+- **Compatibility:** `/temporary/craftsman/{sign-up,sign-in}` → 308 to `/installer/*` (`next.config.ts`), query kept. No duplicate pages.
+- **Entry points:** production/local homepage installer audience tile → `/installer/sign-up`; staging homepage installers role dialog → `/installer/sign-up`; all other roles unchanged. Shared `/auth/sign-in` gains a secondary link "صنايعي؟ سجّل الدخول برقم الهاتف" forwarding an explicit, re-validated `next`.
+- **Session rules:** `signOut` sends a phone-alias account to `/installer/sign-in` (identity read before sign-out), every other account to `/auth/sign-in`. Protected-route redirects unchanged (`/auth/sign-in?next=…`) — no route is installer-only, so no guessing. Middleware bounces signed-in visitors off `/installer/sign-*` like `/auth/*`. Installer sign-in applies the exact `verifyEmailOtp` `next` rule.
+- **Docs:** feature doc → `docs/frontend/installer-phone-auth.md` (stub left at the old path for historical links); PRODUCT_DIRECTION_GUIDE + ARCHITECTURE_GUIDE record the permanent, role-specific exception.
+- **Validation:** typecheck ✓ · lint 0 errors · unit 1781/1781 · build ✓ · Playwright: installer-phone-auth, account-registration, registration-persona all green (desktop + mobile). Also ran shared/individual/business onboarding, account-workspace-model, installer-dashboard, recovery-replay: 35 failures, all pre-existing — the same 15 desktop failures reproduce identically on the unmodified base (stashed comparison), plus the known installer-dashboard mobile selector issue.
+
+---
+
+## Session — Temporary craftsman auth: visual calibration to the reference proportions
+
+**Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Visual-only; no auth/validation/database/consent/legal/route change; not merged; no PR; nothing deployed.
+
+- Desktop recalibrated to measured reference geometry at 1440 (card ≈ 250px from the right edge, max 540px; headline ≈ 112px from the left, 48px; benefit type/tiles reduced; artwork at natural cover scale — the lowest the supplied image can sit without uncovering the top — slid so the craftsman sits between headline and card).
+- 1024–1279: breakpoint-specific composition (artwork repositioned, columns narrowed) so the card no longer covers the craftsman's face.
+- Mobile: compact reference rhythm on a subtle cool Lapis-tinted surface (no gradient/card/shadow), 64px fields, 56px CTA; tablet+ sizes unchanged.
+- "نسيت كلمة المرور؟" NOT restored: the only existing recovery flows (`/auth/recovery`, `/preview/auth-password/forgot-password`) are email-based and cannot reach phone/alias accounts — reported for a product decision.
+- Validation: typecheck ✓ · lint 0 errors · unit 1759/1759 · clean build ✓ · Playwright craftsman + account-registration + registration-persona 37 passed / 1 skipped (by design) · no horizontal overflow at 390×844, 430×932, 768×1024, 1024×768, 1440×900.
+
+---
+
+## Session — Temporary craftsman auth: final visual refinement
+
+**Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Visual-only; no auth/validation/database/consent/legal change; not merged; no PR; nothing deployed.
+
+- Supplied chart tile replaces the stand-in (stand-in code removed). Desktop/tablet corner logo removed (mobile branding kept).
+- Desktop card enlarged (580px max, 72px fields, 64px CTA, 42px heading, more internal spacing); left content scaled up (headline to 68px, lede, benefit titles/bodies, 76px tiles, 30px row gap). A 1024–1279 step keeps the same composition one size smaller.
+- Mobile: the intro tint flows into the white form area as one surface (no floating card); compact illustration; taller fields; more space around consent and above the CTA; link separated.
+- Validation: typecheck ✓ · lint 0 errors · unit 1759/1759 · clean build ✓ · Playwright craftsman + account-registration + registration-persona 37 passed / 1 skipped (by design) · no horizontal overflow at 390×844, 430×932, 768×1024, 1024×768, 1440×900.
+
+---
+
+## Session — Temporary craftsman auth: final visual pass with the approved assets
+
+**Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted untouched; no database or legal change.
+
+- Replaced the interim generated artwork with the supplied assets (desktop worksite hero, two mobile illustrations, three benefit tiles split from the supplied sheet). Generated SVGs deleted. No supplied chart tile — stand-in kept and flagged.
+- Desktop matched to the reference's hierarchy: headline + benefits flush to the outer (left) edge over the sky with larger type and spacing, icons at the outer edge, the artwork's craftsman between text and card, card at the inline start. Tablet: the scene as a photo header with the card rising over it. Mobile: logo + supplied illustration intro, full-width raised form sheet filling the screen, generous group spacing; sign-in heading on mobile is "مرحبًا بعودتك" (desktop card keeps "تسجيل الدخول").
+- Validation: typecheck ✓ · lint 0 errors · unit 1759/1759 · build ✓ · Playwright craftsman + account-registration + registration-persona 37 passed / 1 skipped (by design) · no horizontal overflow at 390×844, 430×932, 768×1024, 1440×900.
+- Still open for separate decisions: migration `20260927090001` (mask_email) vs. app-level filtering; the hidden `pilot` consent receipt; placeholder Terms/Privacy pages.
+
+---
+
+## Session — Temporary craftsman auth: UI revision to the approved composition
+
+**Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted untouched.
+
+- **UI:** rebuilt the page shell (`craftsman-auth.module.css`, tokens only) to the approved composition — desktop: worksite backdrop, card at inline start, craftsman standing on the bottom edge, headline + benefits at inline end, lapis/navy/lumen bands; tablet: card + figure below; mobile: illustrated header (brand, craftsman in a halo, badges, bands) with the form on a raised sheet. Dashed placeholder removed. Interim original SVG artwork (`public/temporary/craftsman/`) behind replaceable slots.
+- **Typography:** headings moved from Reem Kufi at tight line-height (clipped marks) to Readex Pro bold at 1.35–1.45; the page brand uses the shared emblem with the name in Readex (the shared wordmark is `leading-none`). Radii stay on the 14px token.
+- **Copy:** pilot sentence removed from consent ("أوافق على شروط الخدمة وسياسة الخصوصية."); password hint/error "يجب أن تتكون كلمة المرور من 10 أحرف على الأقل". The `pilot` receipt is still recorded (DB requirement) — flagged.
+- **Migration `20260927090001` review requested:** analysis reported; migration unchanged pending decision.
+- **Validation:** typecheck ✓ · lint 0 errors · unit 1759/1759 · build ✓ · Playwright craftsman 12/12 (desktop + mobile), account-registration + registration-persona 25 passed / 1 skipped (by design) · no horizontal overflow at 1440/834/390.
+
+---
+
+## Session — Temporary craftsman phone + password auth (Option B)
+
+**Date:** 2026-09-27 · **Branch:** `claude/vigilant-cori-471vck` · **Base:** `main` @ `e6c75d3`. No PR. Nothing deployed; hosted Supabase untouched.
+
+- **What:** TEMPORARY entry point for installer/technician accounts: `/temporary/craftsman/sign-up` (name, phone, password, consent, Turnstile; no OTP/email/username/role) and `/temporary/craftsman/sign-in` (phone + password). Creates an ordinary `professional / installer_technician` account through the existing RPCs and lands on `/home`. Product-owner approved (Option B); recorded in PRODUCT_DIRECTION_GUIDE / ARCHITECTURE_GUIDE change history. Full design: [temporary craftsman auth](../frontend/temporary-craftsman-auth.md).
+- **Identity:** canonical E.164 via `toCanonicalPhone` → internal undeliverable login alias `p<digits>@craftsman-login.aladdin.invalid` on the existing Supabase email identity (`email_confirm: true`, `app_metadata.registration_source = temporary_craftsman_password_flow`). No schema change to any table. Alias hidden via `userFacingEmail()` (identity menu, `/home/settings`, `/b2b/settings`, onboarding contact) and `app.mask_email` (migration `20260927090001`).
+- **Initialization (as the user, under RLS):** `record_consent` ×3 → `onboarding_select_account_type(professional, installer_technician)` → `profile_set_phone` → `profile_set_username('craftsman.<8 random>')` (retried) → must be `access_ready`. Any failure after `createUser` signs out and deletes the user (cascade verified).
+- **Security:** GoTrue bcrypt only; 10-char policy + weak-password rejection; Turnstile on sign-up; generic sign-in failure; logs carry step + error code only. Duplicate phone disclosed by product decision. Forgot password hidden (recovery is email-based).
+- **Validation:** pgTAP 2452/2452 (65 files, clean start) · typecheck ✓ · lint 0 errors (1 pre-existing warning) · unit 1759/1759 · `next build` ✓ · Playwright against local Supabase with `E2E_TURNSTILE_STUB=1` + local Siteverify stand-in (challenges.cloudflare.com is blocked here): `temporary-craftsman-auth` 12/12 (desktop + mobile), `account-registration` 14/14, `registration-persona` 12/12, `installer-dashboard` desktop ✓, mobile ✗ — **pre-existing**, reproduced on unmodified `e6c75d3` (first `Hossam` match is the hidden desktop sidebar label).
+- **Not done / open:** hosted migration preflight and Vercel secret check (no credentials; `api.supabase.com`/`api.vercel.com` blocked by this environment's network policy); hosted needs `20260924090001`–`…090013` + `20260927090001`, `SUPABASE_SERVICE_ROLE_KEY`, `TURNSTILE_SECRET_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`; approved imagery (placeholder slots in `features/temporary-craftsman-auth/assets.ts`); generated username not user-editable (no product UI); password reset for these accounts needs an admin path.
+
+---
+
 ## Session — Canonical password auth promotion (`/auth/*`)
 
 **Date:** 2026-09-27 · **Branch:** `feature/canonical-password-auth` · **Base:** `main` @ `e6c75d3`. PR to `main` opened, **not merged**; no deploy; no hosted Supabase / Cloudflare / Vercel change.

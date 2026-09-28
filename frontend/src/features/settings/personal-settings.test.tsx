@@ -84,6 +84,40 @@ describe("PersonalSettings", () => {
     expect(screen.queryByText(/password/i, { selector: "input" })).toBeNull();
   });
 
+  it("keeps the one-time-code copy and the contact hint for an email account (the default)", () => {
+    renderWithI18n(
+      <PersonalSettings home={home()} signInEmail="s••••@example.test" signInMethod="email_code" theme="light" t={t} />,
+      "en",
+    );
+    expect(screen.getByText(/Aladdin has no passwords\. You sign in with a one-time code/)).toBeTruthy();
+    expect(screen.getByText("Change it from your professional profile.")).toBeTruthy();
+    expect(screen.queryByText(/phone number you registered with/)).toBeNull();
+  });
+
+  it("tells an installer phone + password account it signs in with its phone and password — never the OTP copy", () => {
+    const { container } = renderWithI18n(
+      <PersonalSettings home={home()} signInEmail={null} signInMethod="phone_password" theme="light" t={t} />,
+      "en",
+    );
+    expect(screen.getByText("You sign in with the phone number you registered with and your password.")).toBeTruthy();
+    expect(screen.queryByText(/Aladdin has no passwords/)).toBeNull();
+    expect(screen.queryByText(/one-time code/)).toBeNull();
+    // A profile edit does not change the sign-in number, so the hint is not offered.
+    expect(screen.queryByText("Change it from your professional profile.")).toBeNull();
+    // Still no password control, and no identifier beyond what the page passed in.
+    expect(container.querySelector('input[type="password"]')).toBeNull();
+    expect(container.innerHTML).not.toMatch(/craftsman-login|\.invalid/);
+  });
+
+  it("renders the phone + password copy in Arabic", () => {
+    renderWithI18n(
+      <PersonalSettings home={home()} signInEmail={null} signInMethod="phone_password" theme="light" t={createTranslator("ar")} />,
+      "ar",
+    );
+    expect(screen.getByText("تسجّل الدخول برقم الهاتف الذي سجّلت به وكلمة المرور.")).toBeTruthy();
+    expect(screen.queryByText(/لا توجد كلمات مرور/)).toBeNull();
+  });
+
   it("provides a real sign-out control", () => {
     renderWithI18n(<PersonalSettings home={home()} signInEmail={null} theme="light" t={t} />, "en");
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();

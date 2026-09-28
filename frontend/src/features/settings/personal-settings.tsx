@@ -10,6 +10,9 @@ import type { TranslateFn } from "@/lib/i18n/translate";
 import { IdentityCard } from "@/features/settings/identity-card";
 import { CompleteProfileCard } from "@/features/profile/complete-profile-card";
 
+/** How an account signs in — see `signInMethod`. */
+export type SignInMethod = "email_code" | "phone_password";
+
 /**
  * `/home/settings` — the personal surface's Settings (D7 / Increment 14).
  *
@@ -34,6 +37,7 @@ import { CompleteProfileCard } from "@/features/profile/complete-profile-card";
 export function PersonalSettings({
   home,
   signInEmail,
+  signInMethod = "email_code",
   theme,
   t,
   identity = null,
@@ -42,6 +46,13 @@ export function PersonalSettings({
   home: PersonalHomeData;
   /** Already masked (or null when the auth read failed) — never the raw address. */
   signInEmail: string | null;
+  /**
+   * How this account actually signs in, decided on the server from the auth
+   * identity (never from the email string in the client). Installer phone +
+   * password accounts get their own copy — the passwordless one-time-code
+   * text would be false for them.
+   */
+  signInMethod?: SignInMethod;
   theme: "light" | "dark";
   t: TranslateFn;
   /** Shared identity fields (display name / photo / phone) — every audience, not only professionals. */
@@ -116,11 +127,18 @@ export function PersonalSettings({
               <span dir="ltr">{signInEmail}</span>
             </Field>
           ) : null}
-          {/* No password row, no "change password", no 2FA toggle: Aladdin is
-              passwordless, and offering controls for a credential that does
+          {/* No password row, no "change password", no 2FA toggle: email accounts
+              are passwordless, and a phone + password account has no
+              self-service password management yet — offering controls that do
               not exist would misstate the security model. */}
-          <p className="text-body text-fg-secondary">{t("personalSettings.account.signInBody")}</p>
-          {isProfessional ? (
+          <p className="text-body text-fg-secondary">
+            {signInMethod === "phone_password"
+              ? t("personalSettings.account.signInBodyPhonePassword")
+              : t("personalSettings.account.signInBody")}
+          </p>
+          {/* "Change it from your profile" is about the email sign-in contact; a
+              phone account's sign-in number is not changed by a profile edit. */}
+          {isProfessional && signInMethod === "email_code" ? (
             <p className="text-label text-fg-muted">{t("personalSettings.account.signInContactHint")}</p>
           ) : null}
           <form action={signOut} className="border-t pt-sm">
