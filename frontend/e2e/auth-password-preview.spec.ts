@@ -536,6 +536,7 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     // Resubmitting the SAME email (still unconfirmed from the first attempt)
     // is exactly GoTrue's own obfuscated re-signup case — succeeds again,
     // re-sending a new usable code, no corruption.
+    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
     await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
     await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("refresh2"));
     await selectAccountType(page);
