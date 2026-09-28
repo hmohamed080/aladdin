@@ -4001,8 +4001,10 @@ export const ar: Messages = {
     nameLength: "أدخل اسمًا (من ١ إلى ١٦٠ حرفًا).",
     titleLength: "أدخل عنوانًا (من ١ إلى ٢٠٠ حرف).",
   },
-  /* معاينة معزولة فقط (docs/frontend/auth-password-preview.md) — تسجيل الدخول
-     بكلمة المرور قيد المراجعة الأمنية. منفصلة عمدًا عن auth.* الحيّة. */
+  /* Canonical password auth copy (docs/frontend/auth-password-preview.md).
+     The namespace keeps its historical name; `auth.*` holds the legacy
+     passwordless copy (/auth/verify, /auth/recovery) plus strings the canonical pages share
+     (brand panel, installer phone sign-in link). */
   authPasswordPreview: {
     showPassword: "إظهار كلمة المرور",
     hidePassword: "إخفاء كلمة المرور",

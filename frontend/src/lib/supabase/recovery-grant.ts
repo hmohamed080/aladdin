@@ -73,7 +73,7 @@ function getSecret(): Buffer {
   });
   if (!AUTH_PASSWORD_PREVIEW_GRANT_SECRET) {
     throw new Error(
-      "AUTH_PASSWORD_PREVIEW_GRANT_SECRET is not set. Required for the password-auth preview's recovery flow — " +
+      "AUTH_PASSWORD_PREVIEW_GRANT_SECRET is not set. Required for canonical Forgot Password's recovery flow — " +
         "see .env.example and docs/frontend/auth-password-preview.md §Recovery-session isolation.",
     );
   }

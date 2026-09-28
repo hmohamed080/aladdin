@@ -4152,10 +4152,11 @@ export const en = {
     nameLength: "Enter a name (1–160 characters).",
     titleLength: "Enter a title (1–200 characters).",
   },
-  /* ISOLATED PREVIEW ONLY (docs/frontend/auth-password-preview.md) — password
-     registration/sign-in under review. Deliberately namespaced away from
-     `auth.*`, which remains the live passwordless copy, so this preview can
-     be deleted or promoted without touching production strings. */
+  /* Canonical password auth copy (docs/frontend/auth-password-preview.md) —
+     /auth/sign-up, /auth/sign-in, /auth/forgot-password/*, finish-registration.
+     The namespace keeps its historical name; `auth.*` holds the legacy
+     passwordless copy (/auth/verify, /auth/recovery) plus strings the canonical pages share
+     (brand panel, installer phone sign-in link). */
   authPasswordPreview: {
     showPassword: "Show password",
     hidePassword: "Hide password",

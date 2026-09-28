@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
  * already-signed-in NORMAL session reaching this route directly is refused
  * exactly like a signed-out visitor, because it did not come through Screen
  * 2. This is also Supabase's own `redirectTo` target for the emailed
- * recovery link, so a link click lands here too (though this preview's
- * primary, supported path is the OTP code on Screen 2, not the link).
+ * recovery link, so a link click lands here too (though canonical
+ * password auth's primary, supported path is the OTP code on Screen 2, not the link).
  */
 export default async function RecoveryResetPage() {
   const recovery = await requireRecoverySession();

@@ -7,8 +7,8 @@ import { FinishRegistrationScreen } from "@/features/auth-password-preview/finis
 export const dynamic = "force-dynamic";
 
 /**
- * The isolated preview's own minimal recovery screen — correction #2 of the
- * staging-prep plan: "A refresh or direct navigation must NOT allow a
+ * Canonical password auth's own minimal finish-registration screen —
+ * correction #2 of the (historical) staging-prep plan: "A refresh or direct navigation must NOT allow a
  * verified user with no username to bypass this requirement. Do not send
  * this user into the legacy six-step onboarding wizard." Reached from
  * `verifyPasswordSignUp`'s `postSessionRedirect` whenever the caller is
