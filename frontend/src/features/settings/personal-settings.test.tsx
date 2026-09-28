@@ -78,18 +78,18 @@ describe("PersonalSettings", () => {
     expect(screen.getByText("s••••@example.test")).toBeTruthy();
   });
 
-  it("states the passwordless model instead of offering a password control", () => {
+  it("states the email + password model instead of offering a password control", () => {
     renderWithI18n(<PersonalSettings home={home()} signInEmail={null} theme="light" t={t} />, "en");
-    expect(screen.getByText(/Aladdin has no passwords/)).toBeTruthy();
+    expect(screen.getByText(/You sign in with your email address and your password/)).toBeTruthy();
     expect(screen.queryByText(/password/i, { selector: "input" })).toBeNull();
   });
 
-  it("keeps the one-time-code copy and the contact hint for an email account (the default)", () => {
+  it("keeps the email + password copy and the contact hint for an email account (the default)", () => {
     renderWithI18n(
       <PersonalSettings home={home()} signInEmail="s••••@example.test" signInMethod="email_code" theme="light" t={t} />,
       "en",
     );
-    expect(screen.getByText(/Aladdin has no passwords\. You sign in with a one-time code/)).toBeTruthy();
+    expect(screen.getByText(/You sign in with your email address and your password\. If you forget your password/)).toBeTruthy();
     expect(screen.getByText("Change it from your professional profile.")).toBeTruthy();
     expect(screen.queryByText(/phone number you registered with/)).toBeNull();
   });
@@ -100,7 +100,7 @@ describe("PersonalSettings", () => {
       "en",
     );
     expect(screen.getByText("You sign in with the phone number you registered with and your password.")).toBeTruthy();
-    expect(screen.queryByText(/Aladdin has no passwords/)).toBeNull();
+    expect(screen.queryByText(/your email address and your password/)).toBeNull();
     expect(screen.queryByText(/one-time code/)).toBeNull();
     // A profile edit does not change the sign-in number, so the hint is not offered.
     expect(screen.queryByText("Change it from your professional profile.")).toBeNull();
@@ -115,7 +115,7 @@ describe("PersonalSettings", () => {
       "ar",
     );
     expect(screen.getByText("تسجّل الدخول برقم الهاتف الذي سجّلت به وكلمة المرور.")).toBeTruthy();
-    expect(screen.queryByText(/لا توجد كلمات مرور/)).toBeNull();
+    expect(screen.queryByText(/ببريدك الإلكتروني وكلمة المرور/)).toBeNull();
   });
 
   it("provides a real sign-out control", () => {

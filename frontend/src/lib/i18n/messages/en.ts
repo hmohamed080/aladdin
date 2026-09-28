@@ -409,7 +409,7 @@ export const en = {
     account: {
       title: "Sign-in & account",
       signInContact: "Your sign-in contact",
-      signInBody: "Aladdin has no passwords. You sign in with a one-time code sent to your verified contact, so there is nothing to reset or leak.",
+      signInBody: "You sign in with your email address and your password. If you forget your password, reset it from the sign-in page with a code sent to your email.",
       signInBodyPhonePassword: "You sign in with the phone number you registered with and your password.",
       signInContactHint: "Change it from your professional profile.",
       signOut: "Sign out",
@@ -2878,7 +2878,7 @@ export const en = {
     manageTeam: "Manage the team",
     accessNote: "Access comes from your role in this business — an owner or manager changes it on the Team page.",
     signIn: "Sign-in & security",
-    signInBody: "Aladdin has no passwords. You sign in with a one-time code sent to your verified contact, so there is nothing to reset or leak.",
+    signInBody: "You sign in with your email address and your password. If you forget your password, reset it from the sign-in page with a code sent to your email.",
     signInBodyPhonePassword: "You sign in with the phone number you registered with and your password.",
     signInContact: "Your sign-in contact",
     signInContactHint: "Change it from your personal profile.",
