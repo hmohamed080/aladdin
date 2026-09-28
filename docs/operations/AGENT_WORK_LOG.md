@@ -4,6 +4,16 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — PR #66: main merged in; installer phone link kept on canonical `/auth/sign-in`
+
+**Date:** 2026-09-28 · **Branch:** `feature/canonical-password-auth` (PR #66) · Not merged to `main`; nothing deployed; hosted Supabase/Vercel untouched.
+
+- **Merge:** `origin/main` @ `52bee52` (PR #67, installer phone + password auth) merged into the branch. Conflicts: this log and `RUNTIME_STATE.md` (both sides kept, newest first); `app/auth/sign-in/page.tsx` (resolved to `PasswordSignInForm`, then fixed below).
+- **Installer entry kept:** `PasswordSignInForm` gains the secondary link «صنايعي أو فني؟ سجل الدخول برقم الهاتف» / "Installer or technician? Sign in with your phone number" → `/installer/sign-in` (reuses `auth.installerPhoneSignIn`; Arabic copy updated). `app/auth/sign-in/installer-sign-in-href.ts` forwards `?next=` only when `sanitizeNext` accepts it unchanged; otherwise the plain link. Installer routes, actions, alias model, sign-out routing and redirects unchanged. "Tradespeople & Technicians" stays selectable in `/auth/sign-up`.
+- **Validation:** typecheck ✓ · lint 0 errors (1 pre-existing warning) · unit 148 files / 1839 ✓ · `next build` ✓ · Playwright desktop against local Supabase: `installer-phone-auth` 12 passed + 2 failed only in the spec's `docker exec … -F '|'` helper under Windows `cmd.exe` (UI steps passed; the same DB assertions verified manually) · `auth-password-preview` 21/22 — the failing refresh test (pre-existing in `ef2a69f`) re-fills the form without the now-required Full Name.
+
+---
+
 ## Session — mask_email audit decision; phone accounts kept out of the email password-migration flow
 
 **Date:** 2026-09-28 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted Supabase not inspected or touched.

@@ -14,11 +14,14 @@ through the existing infrastructure and hands them to the existing installer exp
 - Compatibility: `/temporary/craftsman/sign-up` and `/temporary/craftsman/sign-in` are
   permanent (308) redirects to the routes above (`next.config.ts`), query string kept.
 
-The shared `/auth/sign-up` and `/auth/sign-in` routes keep serving the email/passwordless
-flow for **every** account type (including installers who registered by email); only a
-secondary link was added to `/auth/sign-in`. `server/actions/auth.ts`'s email-OTP
-behavior, the password preview (`/preview/auth-password/*`), other account types and the
-hosted phone provider are **unchanged**.
+The shared `/auth/sign-up` and `/auth/sign-in` routes serve the canonical Email + Password
+flow (`feature/canonical-password-auth`, PR #66) for **every** account type, and
+"Tradespeople & Technicians" stays selectable there: an installer may register either by
+email (email + username + password + OTP) or here (phone + password). Both resolve to the
+same `installer_technician` persona and `/home`; the two identities are never merged
+automatically. `/auth/sign-in` keeps the secondary link to `/installer/sign-in` (table
+below). This page's routes, actions, alias model and sign-out routing are unchanged by
+that promotion.
 
 **Naming.** `installer` is the canonical product/code term (DB persona
 `installer_technician`, the "Installer/Technician Pilot", `installer-dashboard`,
@@ -36,7 +39,7 @@ never change).
 | Homepage (production/local, `landing-v2`) — "الصنايعية والفنيون" audience tile | explicit role choice | `/installer/sign-up` |
 | Homepage (staging, `landing-preview`) — installers role dialog "إنشاء حساب" | explicit role choice | `/installer/sign-up` |
 | Every other role CTA/card/link | — | unchanged (`/auth/sign-up`) |
-| Shared `/auth/sign-in` | — | secondary link "صنايعي؟ سجّل الدخول برقم الهاتف" → `/installer/sign-in`, carrying `?next=` **only** when the page itself received one, re-validated with `sanitizeNext` |
+| Shared `/auth/sign-in` (Email + Password) | — | secondary link "صنايعي أو فني؟ سجل الدخول برقم الهاتف" / "Installer or technician? Sign in with your phone number" → `/installer/sign-in`, carrying `?next=` **only** when the page received one that `sanitizeNext` accepts unchanged (`app/auth/sign-in/installer-sign-in-href.ts`); otherwise the plain link |
 | Explicit sign-out (`signOut`, `server/actions/auth.ts`) | the signed-in account's own identity, read before the session ends | phone-alias account → `/installer/sign-in`; every other account → `/auth/sign-in` (as before) |
 | Expired session / signed-out visit to a protected route (`middleware.ts`, page guards) | none — no protected route is installer-only (`/home/*` is shared by every personal persona) | unchanged: `/auth/sign-in?next=…`; the installer uses the secondary link, which forwards that `next` |
 | Signed-in visit to `/installer/sign-up` or `/installer/sign-in` | session | `/onboarding` (middleware, same rule as `/auth/*`) → the caller's landing |

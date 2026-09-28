@@ -1,5 +1,10 @@
 # Runtime State
 
+## Current continuation — 2026-09-28 (latest): PR #66 carries main + the installer link
+
+- Branch `feature/canonical-password-auth` (PR #66) now contains `main` @ `52bee52` (PR #67). Canonical `/auth/sign-in` (Email + Password) keeps the secondary installer link to `/installer/sign-in`, forwarding only an unchanged-valid `next`. Installer phone auth unchanged. Not merged; nothing deployed.
+- Known before merge: the `auth-password-preview` refresh E2E omits the required Full Name on re-submit (test bug from `ef2a69f`); the product/hosted items in the PR description still apply.
+
 ## Current continuation — 2026-09-28: mask_email kept; phone accounts out of the email migration flow
 
 - Branch `claude/vigilant-cori-471vck`. Decision: keep `app.mask_email` (migration `20260927090001`, SQL unchanged — comment wording only) **and** `userFacingEmail()` as defense in depth. The password preview's `/migrate` and `/change-password` pages and actions now turn phone-alias accounts away on the server (`/home/settings`, or `/onboarding` without app access) before the alias is read into any response.

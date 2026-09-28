@@ -35,4 +35,24 @@ describe("PasswordSignInForm", () => {
       "/auth/forgot-password",
     );
   });
+
+  it("offers the installer phone sign-in link in Arabic, defaulting to /installer/sign-in", () => {
+    renderWithI18n(<PasswordSignInForm next="/b2b" />);
+    const link = screen.getByRole("link", { name: "صنايعي أو فني؟ سجل الدخول برقم الهاتف" });
+    expect(link).toHaveAttribute("href", "/installer/sign-in");
+  });
+
+  it("offers the installer phone sign-in link in English", () => {
+    renderWithI18n(<PasswordSignInForm next="/b2b" />, "en");
+    const link = screen.getByRole("link", { name: "Installer or technician? Sign in with your phone number" });
+    expect(link).toHaveAttribute("href", "/installer/sign-in");
+  });
+
+  it("uses the href the page validated for the installer link", () => {
+    renderWithI18n(<PasswordSignInForm next="/home/points" installerSignInHref="/installer/sign-in?next=%2Fhome%2Fpoints" />);
+    expect(screen.getByRole("link", { name: ar.auth.installerPhoneSignIn })).toHaveAttribute(
+      "href",
+      "/installer/sign-in?next=%2Fhome%2Fpoints",
+    );
+  });
 });

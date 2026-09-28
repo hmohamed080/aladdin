@@ -1065,7 +1065,7 @@ export const ar: Messages = {
     signInLink: "تسجيل الدخول",
     signUpLink: "أنشئ حسابًا",
     troubleSigningIn: "تواجه مشكلة في تسجيل الدخول؟",
-    installerPhoneSignIn: "صنايعي؟ سجّل الدخول برقم الهاتف",
+    installerPhoneSignIn: "صنايعي أو فني؟ سجل الدخول برقم الهاتف",
     lostEmailAccess: "فقدت الوصول إلى بريدك الإلكتروني؟",
     getHelp: "احصل على المساعدة",
     info: { codeSent: "أرسلنا رمزًا إلى {email}. قد يستغرق وصوله لحظات." },
