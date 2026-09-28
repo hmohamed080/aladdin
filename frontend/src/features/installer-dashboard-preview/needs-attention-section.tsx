@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
-import { ClipboardIcon } from "@/components/ui/icons";
+import { BoltIcon } from "@/components/ui/icons";
 import { ModuleCard, ModuleFooterLink } from "./module-card";
 import { pick } from "./mock-data";
 import type { InstallerNeedsActionItemVM } from "./view-model";
@@ -27,12 +27,15 @@ export function NeedsAttentionSection({
   return (
     <ModuleCard
       id="attention"
-      icon={ClipboardIcon}
-      iconClassName="bg-warning/10 text-warning"
+      icon={BoltIcon}
+      iconClassName="text-iris"
       title={locale === "ar" ? "أعمال تحتاج إجراء" : "Needs your action"}
+      footerClassName="border-t-0 pt-0 desktop:pt-0"
       footer={
         items.length > 0 ? (
-          <ModuleFooterLink href={footerHref}>{locale === "ar" ? "عرض كل الأعمال" : "View all actions"}</ModuleFooterLink>
+          <ModuleFooterLink href={footerHref} boxed>
+            {locale === "ar" ? "عرض كل الأعمال" : "View all actions"}
+          </ModuleFooterLink>
         ) : undefined
       }
     >
@@ -45,7 +48,7 @@ export function NeedsAttentionSection({
           }
         />
       ) : (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-1 flex-col justify-between gap-2">
           {items.map((item) => (
             <ActionRow key={item.id} item={item} />
           ))}
@@ -64,11 +67,14 @@ function ActionRow({ item }: { item: InstallerNeedsActionItemVM }) {
   );
 
   return (
-    <li className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 rounded-md py-2">
-      <Image src={ICON_SRC[item.icon]} alt="" width={44} height={44} className="h-11 w-11 shrink-0" />
+    <li className="grid min-h-20 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md bg-surface-2/45 p-2">
+      {/* Approved visual size: keep these three coloured glyphs large unless the user explicitly asks to resize them. */}
+      <span className="grid h-12 w-12 shrink-0 place-items-center">
+        <Image src={ICON_SRC[item.icon]} alt="" width={48} height={48} className="h-12 w-12 scale-150 object-contain" />
+      </span>
       <div className="min-w-0 flex-1">
-        <p className="text-body-lg font-medium leading-snug text-fg">{pick(locale, item.title)}</p>
-        <p className="text-caption leading-snug text-fg-secondary">{pick(locale, item.subtitle)}</p>
+        <p className="text-body font-semibold leading-snug text-fg">{pick(locale, item.title)}</p>
+        <p className="mt-0.5 line-clamp-2 text-caption leading-snug text-fg-secondary">{pick(locale, item.subtitle)}</p>
         <p className="mt-0.5 text-caption leading-snug text-fg-muted">{pick(locale, item.meta)}</p>
       </div>
       {item.href ? (

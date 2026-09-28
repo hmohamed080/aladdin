@@ -1,0 +1,9 @@
+Use case: stylized-concept
+Asset type: transparent dashboard banner illustration
+Input image: the supplied Aladdin showroom-network page is a visual reference only; isolate and reinterpret the small storefront illustration shown inside its invitation banner.
+Primary request: create one polished compact storefront illustration with a purple-and-blue striped awning, blue shop windows, soft pale-lilac grounding shapes, and a glossy green circular add badge with a white plus at the lower-right of the storefront.
+Style/medium: clean premium 3D-vector hybrid UI illustration, softly shaded, crisp edges, faithful to the visual proportions and finish of the reference banner art.
+Composition/framing: centered isolated object, landscape-friendly footprint, storefront occupies most of the canvas, generous transparent margin, no crop.
+Lighting/mood: bright soft studio light, subtle depth, friendly professional dashboard artwork.
+Color palette: violet, indigo, periwinkle, pale lavender, white, emerald green.
+Constraints: genuinely transparent background with alpha; no text; no letters; no logo; no watermark; no people; no surrounding UI; no card background; preserve a clean silhouette suitable for placement on both light and dark themes.

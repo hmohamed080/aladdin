@@ -29,11 +29,14 @@ export function Stars({
   value,
   size = 16,
   label,
+  filledClassName = "text-warning",
 }: {
   value: number;
   size?: number;
   /** Screen-reader text. Required — a row of glyphs announces nothing on its own. */
   label: string;
+  /** Decorative fill override for reference previews; production defaults stay semantic warning. */
+  filledClassName?: string;
 }) {
   const filled = starFill(value);
   return (
@@ -43,10 +46,10 @@ export function Stars({
         const half = !whole && filled >= star - 0.5;
         return (
           <span key={star} aria-hidden="true" className="relative inline-flex">
-            <StarIcon size={size} className={whole ? "text-warning" : "text-fg-muted/40"} />
+            <StarIcon size={size} className={whole ? filledClassName : "text-fg-muted/40"} />
             {half ? (
               <span className="absolute inset-0 overflow-hidden" style={{ width: "50%" }}>
-                <StarIcon size={size} className="text-warning" />
+                <StarIcon size={size} className={filledClassName} />
               </span>
             ) : null}
           </span>

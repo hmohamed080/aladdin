@@ -1,0 +1,252 @@
+import type { Bi } from "@/features/installer-dashboard-preview/mock-data";
+
+export type ReviewFixture = {
+  id: string;
+  customer: Bi;
+  initials: string;
+  verified: boolean;
+  project: Bi;
+  location: Bi;
+  rating: number;
+  recommended: boolean;
+  date: Bi;
+  dateIso: string;
+  comment: Bi;
+};
+
+export const REVIEW_FIXTURES: readonly ReviewFixture[] = [
+  {
+    id: "review-1",
+    customer: { ar: "محمد أحمد", en: "Mohamed Ahmed" },
+    initials: "M",
+    verified: true,
+    project: { ar: "دهانات داخلية – فيلا", en: "Interior painting – villa" },
+    location: { ar: "القاهرة الجديدة", en: "New Cairo" },
+    rating: 5,
+    recommended: true,
+    date: { ar: "18 مايو 2025", en: "18 May 2025" },
+    dateIso: "2025-05-18",
+    comment: {
+      ar: "شغل ممتاز جدًا، محترف في المواعيد وفي التفاصيل، وتعامل راقٍ جدًا.",
+      en: "Excellent work, punctual, highly attentive to detail, and very professional.",
+    },
+  },
+  {
+    id: "review-2",
+    customer: { ar: "سارة عبد الله", en: "Sara Abdallah" },
+    initials: "S",
+    verified: true,
+    project: { ar: "بديل رخام – حمام", en: "Marble alternative – bathroom" },
+    location: { ar: "التجمع الخامس", en: "Fifth Settlement" },
+    rating: 4.5,
+    recommended: true,
+    date: { ar: "12 مايو 2025", en: "12 May 2025" },
+    dateIso: "2025-05-12",
+    comment: {
+      ar: "العمل جميل جدًا ونظافة الشغل ممتازة. أنصح بالتعامل معه.",
+      en: "Beautiful result and excellent site cleanliness. I recommend working with him.",
+    },
+  },
+  {
+    id: "review-3",
+    customer: { ar: "أحمد أيمن", en: "Ahmed Ayman" },
+    initials: "A",
+    verified: true,
+    project: { ar: "تركيب SPC – شقة", en: "SPC installation – apartment" },
+    location: { ar: "الشيخ زايد", en: "Sheikh Zayed" },
+    rating: 5,
+    recommended: true,
+    date: { ar: "5 مايو 2025", en: "5 May 2025" },
+    dateIso: "2025-05-05",
+    comment: {
+      ar: "دقة في التنفيذ والتشطيب أكثر من رائع، ملتزم ومهندس في شغله.",
+      en: "Precise installation and excellent finishing; reliable and highly skilled.",
+    },
+  },
+  {
+    id: "review-4",
+    customer: { ar: "هاني محمود", en: "Hany Mahmoud" },
+    initials: "H",
+    verified: false,
+    project: { ar: "دهانات خارجية – واجهة", en: "Exterior painting – facade" },
+    location: { ar: "6 أكتوبر", en: "6th of October" },
+    rating: 4,
+    recommended: true,
+    date: { ar: "28 أبريل 2025", en: "28 Apr 2025" },
+    dateIso: "2025-04-28",
+    comment: {
+      ar: "جودة الشغل كويسة جدًا، فقط تأخر يومًا عن الموعد المتفق عليه.",
+      en: "Very good work quality; delivery was only one day later than agreed.",
+    },
+  },
+  {
+    id: "review-5",
+    customer: { ar: "نوران علي", en: "Nouran Ali" },
+    initials: "N",
+    verified: true,
+    project: { ar: "بديل خشب WPC – تراس", en: "WPC wood alternative – terrace" },
+    location: { ar: "القاهرة الجديدة", en: "New Cairo" },
+    rating: 5,
+    recommended: true,
+    date: { ar: "15 أبريل 2025", en: "15 Apr 2025" },
+    dateIso: "2025-04-15",
+    comment: {
+      ar: "شغل احترافي وسرعة في التنفيذ. شكرًا جدًا.",
+      en: "Professional work and fast execution. Thank you very much.",
+    },
+  },
+  {
+    id: "review-6",
+    customer: { ar: "ريم خالد", en: "Reem Khaled" },
+    initials: "R",
+    verified: true,
+    project: { ar: "تركيب باركيه – غرفة معيشة", en: "Parquet installation – living room" },
+    location: { ar: "مدينة نصر", en: "Nasr City" },
+    rating: 4.5,
+    recommended: true,
+    date: { ar: "8 أبريل 2025", en: "8 Apr 2025" },
+    dateIso: "2025-04-08",
+    comment: { ar: "التنفيذ منظم والنتيجة ممتازة، وكان التواصل واضحًا طوال فترة العمل.", en: "Organized execution, excellent result, and clear communication throughout the work." },
+  },
+  {
+    id: "review-7",
+    customer: { ar: "عمر حسن", en: "Omar Hassan" },
+    initials: "O",
+    verified: true,
+    project: { ar: "دهانات داخلية – مكتب", en: "Interior painting – office" },
+    location: { ar: "المعادي", en: "Maadi" },
+    rating: 5,
+    recommended: true,
+    date: { ar: "2 أبريل 2025", en: "2 Apr 2025" },
+    dateIso: "2025-04-02",
+    comment: { ar: "ألوان دقيقة وتسليم في الموعد مع اهتمام واضح بنظافة المكان.", en: "Accurate colors, on-time delivery, and excellent care for site cleanliness." },
+  },
+  {
+    id: "review-8",
+    customer: { ar: "منى شريف", en: "Mona Sherif" },
+    initials: "M",
+    verified: false,
+    project: { ar: "بديل رخام – مطبخ", en: "Marble alternative – kitchen" },
+    location: { ar: "الرحاب", en: "Rehab City" },
+    rating: 4,
+    recommended: true,
+    date: { ar: "27 مارس 2025", en: "27 Mar 2025" },
+    dateIso: "2025-03-27",
+    comment: { ar: "الخامات جيدة والتشطيب مرتب، واحتجنا تعديلًا بسيطًا تم تنفيذه بسرعة.", en: "Good materials and tidy finishing; one small adjustment was handled quickly." },
+  },
+  {
+    id: "review-9",
+    customer: { ar: "خالد سمير", en: "Khaled Samir" },
+    initials: "K",
+    verified: true,
+    project: { ar: "دهانات داخلية – دوبلكس", en: "Interior painting – duplex" },
+    location: { ar: "الشيخ زايد", en: "Sheikh Zayed" },
+    rating: 4.5,
+    recommended: true,
+    date: { ar: "19 مارس 2025", en: "19 Mar 2025" },
+    dateIso: "2025-03-19",
+    comment: { ar: "التزام جيد بالألوان المتفق عليها وتسليم مرتب في الموعد.", en: "Good adherence to the agreed colors and a tidy, on-time handover." },
+  },
+  {
+    id: "review-10",
+    customer: { ar: "دينا أشرف", en: "Dina Ashraf" },
+    initials: "D",
+    verified: true,
+    project: { ar: "بديل رخام – مدخل", en: "Marble alternative – entrance" },
+    location: { ar: "مدينتي", en: "Madinaty" },
+    rating: 5,
+    recommended: true,
+    date: { ar: "11 مارس 2025", en: "11 Mar 2025" },
+    dateIso: "2025-03-11",
+    comment: { ar: "اختيار الخامة والتنفيذ كانا ممتازين والنتيجة مطابقة للتصور.", en: "Material selection and installation were excellent, and the result matched the concept." },
+  },
+  {
+    id: "review-11",
+    customer: { ar: "يوسف رامي", en: "Youssef Ramy" },
+    initials: "Y",
+    verified: false,
+    project: { ar: "أرضيات SPC – مكتب", en: "SPC flooring – office" },
+    location: { ar: "مصر الجديدة", en: "Heliopolis" },
+    rating: 4,
+    recommended: true,
+    date: { ar: "3 مارس 2025", en: "3 Mar 2025" },
+    dateIso: "2025-03-03",
+    comment: { ar: "تنفيذ دقيق وتنظيم جيد للموقع مع ملاحظة بسيطة تم علاجها فورًا.", en: "Precise execution and an organized site, with one minor note resolved immediately." },
+  },
+  {
+    id: "review-12",
+    customer: { ar: "مي عبد الرحمن", en: "Mai Abdelrahman" },
+    initials: "M",
+    verified: true,
+    project: { ar: "دهانات خارجية – تاون هاوس", en: "Exterior painting – townhouse" },
+    location: { ar: "العاصمة الإدارية", en: "New Administrative Capital" },
+    rating: 5,
+    recommended: true,
+    date: { ar: "24 فبراير 2025", en: "24 Feb 2025" },
+    dateIso: "2025-02-24",
+    comment: { ar: "تشطيب نظيف واهتمام بالتفاصيل مع متابعة مستمرة حتى التسليم.", en: "Clean finishing, strong attention to detail, and consistent follow-up through handover." },
+  },
+  {
+    id: "review-13",
+    customer: { ar: "عمرو نبيل", en: "Amr Nabil" },
+    initials: "A",
+    verified: true,
+    project: { ar: "بديل خشب – حائط تلفزيون", en: "Wood alternative – TV wall" },
+    location: { ar: "المعادي", en: "Maadi" },
+    rating: 4.5,
+    recommended: true,
+    date: { ar: "16 فبراير 2025", en: "16 Feb 2025" },
+    dateIso: "2025-02-16",
+    comment: { ar: "القياسات دقيقة والتركيب متناسق، والتواصل كان واضحًا طوال العمل.", en: "Measurements were precise, installation was consistent, and communication stayed clear." },
+  },
+  {
+    id: "review-14",
+    customer: { ar: "ليلى فؤاد", en: "Laila Fouad" },
+    initials: "L",
+    verified: true,
+    project: { ar: "تركيب باركيه – غرفة نوم", en: "Parquet installation – bedroom" },
+    location: { ar: "التجمع الأول", en: "First Settlement" },
+    rating: 5,
+    recommended: true,
+    date: { ar: "8 فبراير 2025", en: "8 Feb 2025" },
+    dateIso: "2025-02-08",
+    comment: { ar: "التركيب ممتاز والفواصل شبه غير ظاهرة، والمكان تُرك نظيفًا.", en: "Excellent installation with nearly invisible joints, and the room was left clean." },
+  },
+  {
+    id: "review-15",
+    customer: { ar: "طارق منصور", en: "Tarek Mansour" },
+    initials: "T",
+    verified: false,
+    project: { ar: "دهانات داخلية – عيادة", en: "Interior painting – clinic" },
+    location: { ar: "الدقي", en: "Dokki" },
+    rating: 4,
+    recommended: true,
+    date: { ar: "30 يناير 2025", en: "30 Jan 2025" },
+    dateIso: "2025-01-30",
+    comment: { ar: "النتيجة جيدة جدًا وتم الحفاظ على نظافة المكان أثناء التنفيذ.", en: "The result was very good, and the site stayed clean throughout execution." },
+  },
+];
+
+export const DISTRIBUTION = [
+  { stars: 5, percent: 89, count: 114 },
+  { stars: 4, percent: 8, count: 10 },
+  { stars: 3, percent: 2, count: 2 },
+  { stars: 2, percent: 1, count: 1 },
+  { stars: 1, percent: 0, count: 0 },
+] as const;
+
+export const CUSTOMER_HIGHLIGHTS = [
+  { label: { ar: "جودة العمل", en: "Work quality" }, value: 96, icon: "quality" },
+  { label: { ar: "الالتزام بالمواعيد", en: "Punctuality" }, value: 94, icon: "time" },
+  { label: { ar: "التعامل والاحترافية", en: "Professional conduct" }, value: 93, icon: "professional" },
+  { label: { ar: "النظافة والترتيب", en: "Cleanliness and order" }, value: 92, icon: "clean" },
+  { label: { ar: "القيمة مقابل السعر", en: "Value for money" }, value: 90, icon: "value" },
+] as const;
+
+export const TREND_POINTS = [3.4, 3.7, 3.65, 3.95, 3.85, 4.05, 4.25, 4.15, 4.5, 4.8] as const;
+
+export const IMPROVEMENT_TIPS = [
+  { label: { ar: "التزم بالمواعيد المتفق عليها", en: "Keep every agreed deadline" }, icon: "time" },
+  { label: { ar: "حافظ على النظافة أثناء وبعد العمل", en: "Keep the site clean during and after work" }, icon: "clean" },
+  { label: { ar: "تواصل مع العميل بشكل مستمر", en: "Keep the client updated consistently" }, icon: "contact" },
+] as const;

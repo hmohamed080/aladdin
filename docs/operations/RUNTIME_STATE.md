@@ -1,5 +1,12 @@
 # Runtime State
 
+## Current continuation — 2026-09-28: approved installer previews isolated for promotion
+
+- Branch `feature/installer-experience-promotion`, cleanly based on `origin/main` `52bee525d1e705a9272308e127dc61048475c3a0`. The original `feature/auth-password-preview` worktree and its unrelated dirty auth/Supabase files remain untouched.
+- Preserved preview routes: `/preview/installer-dashboard`, `/preview/installer-job-opportunities`, `/preview/installer-my-work`, `/preview/installer-network`, `/preview/installer-reviews`, and `/preview/installer-account`, with their shared installer shell, fixtures, assets, provenance and tests.
+- Latest-main reconciliation is limited to the installer preview: the approved topbar presentation and the newer auth test hooks both remain. No production installer route was added or modified; preview routes and mock fixtures were not deleted.
+- Validation: frontend typecheck ✓ · lint 0 errors (one pre-existing `sidebar-shell.tsx` hook warning) · installer tests 22/22 ✓ · production build ✓. Browser QA on all six routes: Arabic RTL, sidebar and topbar/search present, no broken images, no error overlay, and 0 console errors.
+
 ## Current continuation — 2026-09-28: mask_email kept; phone accounts out of the email migration flow
 
 - Branch `claude/vigilant-cori-471vck`. Decision: keep `app.mask_email` (migration `20260927090001`, SQL unchanged — comment wording only) **and** `userFacingEmail()` as defense in depth. The password preview's `/migrate` and `/change-password` pages and actions now turn phone-alias accounts away on the server (`/home/settings`, or `/onboarding` without app access) before the alias is read into any response.

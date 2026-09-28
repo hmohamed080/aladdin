@@ -200,7 +200,8 @@ export const FEATURED_LEARNING = {
   title: { ar: "٣ أخطاء شائعة في تركيب أرضيات SPC", en: "3 common mistakes in SPC flooring installation" },
   source: { ar: "أكاديمية علاء الدين", en: "Aladdin Academy" },
   duration: { ar: "١٢ دقيقة", en: "12 min" },
-} satisfies { title: Bi; source: Bi; duration: Bi };
+  image: "/assets/installer-dashboard/learning-spc-install.png",
+} satisfies { title: Bi; source: Bi; duration: Bi; image: string };
 
 export const LEARNING_ITEMS: LearningItem[] = [
   {
@@ -345,7 +346,7 @@ export function mockRewards(locale: Locale): InstallerRewardsVM {
       title: pick(locale, REWARDS.recentReward),
       body: null,
       dateLabel: pick(locale, REWARDS.recentRewardAgo),
-      deltaLabel: "",
+      deltaLabel: locale === "ar" ? "+٢٠٠ جنيه" : "+EGP 200",
     },
     rating: PROFILE.rating,
     ratingCount: PROFILE.ratingCount,

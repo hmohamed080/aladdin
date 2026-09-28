@@ -12,6 +12,7 @@ import { NeedsAttentionSection } from "./needs-attention-section";
 import { BrandEcosystemSection } from "./brand-ecosystem-section";
 import { LearningSection } from "./learning-section";
 import { RewardsCard } from "./rewards-card";
+import { INSTALLER_CONTENT_FRAME_CLASS, INSTALLER_SHELL_GUTTER_CLASS } from "./installer-layout";
 import {
   mockBrandEcosystem,
   mockLearning,
@@ -49,30 +50,34 @@ export function InstallerDashboardPreview({
   const learning = mockLearning();
 
   return (
-    <div dir={dir} className="flex min-h-dvh bg-workspace">
+    <div dir={dir} className="installer-surface flex min-h-dvh bg-workspace">
       <InstallerSidebar
         initialMode={sidebarMode}
         mobileOpen={mobileNavOpen}
         onCloseMobile={() => setMobileNavOpen(false)}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col tablet:ps-3 tablet:pe-3 tablet:pt-6 tablet:gap-6 tablet:pb-10 desktop:ps-4 desktop:pe-4 desktop:pt-8">
+      <div className={`${INSTALLER_SHELL_GUTTER_CLASS} flex min-w-0 flex-1 flex-col tablet:gap-6 tablet:pb-10 tablet:pt-6 desktop:pt-8`}>
         <InstallerTopbar theme={theme} onMenuClick={() => setMobileNavOpen(true)} />
 
-        <main id="top" className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-5 p-4 tablet:p-6 desktop:p-7">
-          <InstallerWelcome data={mockWelcome(locale)} />
+        <main id="top" className={`${INSTALLER_CONTENT_FRAME_CLASS} flex flex-1 flex-col gap-5 py-4 tablet:py-6 desktop:py-7`}>
           <ProfileCompletionBanner data={mockProfileCompletion()} />
+          <InstallerWelcome data={mockWelcome(locale)} />
           <JobOpportunitiesSection
             opportunities={mockOpportunities()}
             emptyTitle={locale === "ar" ? "لا توجد فرص مطابقة" : "No matching opportunities"}
             emptyBody={locale === "ar" ? "حاول تغيير الفلاتر أو راجع لاحقًا." : "Try different filters or check back later."}
+            viewAllHref="https://aladdindecore.com/home/jobs"
           />
 
-          <div className="grid items-stretch gap-4 tablet:grid-cols-2 desktop:grid-cols-4">
-            <NeedsAttentionSection items={mockNeedsAction()} />
-            <BrandEcosystemSection items={mockBrandEcosystem()} />
-            <LearningSection featured={learning.featured} items={learning.items} />
+          <div
+            data-lower-module-grid=""
+            className="grid min-h-0 items-stretch gap-4 tablet:grid-cols-2 desktop:grid-cols-[minmax(0,0.95fr)_minmax(0,0.95fr)_minmax(0,1.55fr)_minmax(0,0.95fr)] desktop:grid-rows-1"
+          >
             <RewardsCard data={mockRewards(locale)} />
+            <LearningSection featured={learning.featured} items={learning.items} />
+            <BrandEcosystemSection items={mockBrandEcosystem()} />
+            <NeedsAttentionSection items={mockNeedsAction()} />
           </div>
         </main>
       </div>

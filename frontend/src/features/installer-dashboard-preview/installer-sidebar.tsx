@@ -29,6 +29,8 @@ import { signOut } from "@/server/actions/auth";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 const MENU_HOVER_DELAY_MS = 350;
+const PREVIEW_HIDDEN_PRIMARY_NAV_IDS = new Set(["messages", "account"]);
+const PREVIEW_HIDDEN_QUICK_NAV_IDS = new Set(["search-jobs", "learn"]);
 
 /**
  * The craftsman's own navigation on the writing direction's start edge.
@@ -41,11 +43,13 @@ export function InstallerSidebar({
   mobileOpen,
   onCloseMobile,
   production = false,
+  previewActiveItemId = "home",
 }: {
   initialMode: SidebarMode;
   mobileOpen: boolean;
   onCloseMobile: () => void;
   production?: boolean;
+  previewActiveItemId?: string;
 }) {
   const { locale, dir, t } = useI18n();
   const pathname = usePathname();
@@ -108,8 +112,23 @@ export function InstallerSidebar({
           )}
         >
           <ul className="flex flex-col gap-0.5">
-            {INSTALLER_PRIMARY_NAV.filter((item) => !production || Boolean(item.href)).map((item, index) => (
-              <NavRow key={item.id} item={item} locale={locale} active={production && item.href ? pathname === item.href || (item.href !== "/home" && pathname.startsWith(`${item.href}/`)) : index === 0} narrow={narrow} production={production} />
+            {INSTALLER_PRIMARY_NAV.filter((item) =>
+              production
+                ? Boolean(item.href)
+                : !PREVIEW_HIDDEN_PRIMARY_NAV_IDS.has(item.id) || item.id === previewActiveItemId,
+            ).map((item) => (
+              <NavRow
+                key={item.id}
+                item={item}
+                locale={locale}
+                active={
+                  production && item.href
+                    ? pathname === item.href || (item.href !== "/home" && pathname.startsWith(`${item.href}/`))
+                    : item.id === previewActiveItemId
+                }
+                narrow={narrow}
+                production={production}
+              />
             ))}
           </ul>
 
@@ -121,7 +140,9 @@ export function InstallerSidebar({
             </p>
           )}
           <ul className="flex flex-col gap-0.5">
-            {INSTALLER_QUICK_NAV.filter((item) => !production || Boolean(item.href)).map((item) => (
+            {INSTALLER_QUICK_NAV.filter((item) =>
+              production ? Boolean(item.href) : !PREVIEW_HIDDEN_QUICK_NAV_IDS.has(item.id),
+            ).map((item) => (
               <NavRow key={item.id} item={item} locale={locale} active={false} narrow={narrow} production={production} />
             ))}
           </ul>
@@ -185,21 +206,23 @@ export function InstallerSidebar({
             </a>
           )}
 
-          <form action={production ? signOut : undefined}>
-          <button
-            type={production ? "submit" : "button"}
-            title={locale === "ar" ? "تسجيل خروج" : "Sign out"}
-            className={cn(
-              "mt-2 flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-label font-medium text-shell-fg-secondary",
-              "hover:bg-shell-2 hover:text-shell-fg",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-shell",
-              narrow && "justify-center px-0",
-            )}
-          >
-            <LogOutIcon size={16} />
-            {narrow ? null : locale === "ar" ? "تسجيل خروج" : "Sign out"}
-          </button>
-          </form>
+          {production ? (
+            <form action={signOut}>
+              <button
+                type="submit"
+                title={locale === "ar" ? "تسجيل خروج" : "Sign out"}
+                className={cn(
+                  "mt-2 flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-label font-medium text-shell-fg-secondary",
+                  "hover:bg-shell-2 hover:text-shell-fg",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-shell",
+                  narrow && "justify-center px-0",
+                )}
+              >
+                <LogOutIcon size={16} />
+                {narrow ? null : locale === "ar" ? "تسجيل خروج" : "Sign out"}
+              </button>
+            </form>
+          ) : null}
         </div>
       </div>
     );

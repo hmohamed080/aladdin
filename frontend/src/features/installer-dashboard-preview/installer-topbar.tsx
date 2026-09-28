@@ -107,7 +107,6 @@ export function InstallerTopbar({
       <div className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm px-1.5 py-1 text-label font-medium text-fg-secondary tablet:flex">
         <MapPinIcon size={15} className="text-fg-muted" />
         {production ? location || (locale === "ar" ? "منطقة الخدمة غير محددة" : "Service area not set") : locale === "ar" ? "الشيخ زايد، الجيزة" : "Sheikh Zayed, Giza"}
-        {production ? null : <ChevronDownIcon size={13} className="text-fg-muted" />}
       </div>
 
       <div className={dividerClass} aria-hidden="true" />

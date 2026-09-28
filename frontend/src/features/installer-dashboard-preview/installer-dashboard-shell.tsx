@@ -5,6 +5,7 @@ import type { SidebarMode } from "@/lib/ui/sidebar-mode";
 import { InstallerSidebar } from "./installer-sidebar";
 import { InstallerTopbar } from "./installer-topbar";
 import type { InstallerOpportunityVM } from "./view-model";
+import { INSTALLER_CONTENT_FRAME_CLASS, INSTALLER_SHELL_GUTTER_CLASS } from "./installer-layout";
 
 /** Production shell for every installer route under `/home`. */
 export function InstallerDashboardShell({
@@ -35,7 +36,7 @@ export function InstallerDashboardShell({
         onCloseMobile={() => setMobileNavOpen(false)}
         production
       />
-      <div className="flex min-w-0 flex-1 flex-col tablet:gap-6 tablet:pb-10 tablet:pe-3 tablet:ps-3 tablet:pt-6 desktop:pe-4 desktop:ps-4 desktop:pt-8">
+      <div className={`${INSTALLER_SHELL_GUTTER_CLASS} flex min-w-0 flex-1 flex-col tablet:gap-6 tablet:pb-10 tablet:pt-6 desktop:pt-8`}>
         <InstallerTopbar
           theme={theme}
           onMenuClick={() => setMobileNavOpen(true)}
@@ -45,7 +46,7 @@ export function InstallerDashboardShell({
           context={context}
           production
         />
-        <main id="top" className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col p-4 tablet:p-6 desktop:p-7">
+        <main id="top" className={`${INSTALLER_CONTENT_FRAME_CLASS} flex flex-1 flex-col py-4 tablet:py-6 desktop:py-7`}>
           {children}
         </main>
       </div>
