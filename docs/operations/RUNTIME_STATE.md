@@ -3,6 +3,7 @@
 ## Current continuation — 2026-09-28: mask_email kept; phone accounts out of the email migration flow
 
 - Branch `claude/vigilant-cori-471vck`. Decision: keep `app.mask_email` (migration `20260927090001`, SQL unchanged — comment wording only) **and** `userFacingEmail()` as defense in depth. The password preview's `/migrate` and `/change-password` pages and actions now turn phone-alias accounts away on the server (`/home/settings`, or `/onboarding` without app access) before the alias is read into any response.
+- Settings sign-in copy now matches the account (`/home/settings`, `/b2b/settings`): phone + password text for phone accounts, the one-time-code text for email accounts.
 - Rule recorded: raw authentication identifiers are internal; `user.email` is not a user-facing contact identity (ARCHITECTURE_GUIDE 2026-09-28, `frontend/AGENTS.md`).
 - Hosted not inspected (no credentials/linked project in this environment); `20260927090001` exists only on this unmerged branch; nothing applied remotely; no PR; nothing deployed.
 - Validation: typecheck ✓ · lint 0 errors · unit 1788/1788 · pgTAP `64` 13/13 · Playwright installer-phone-auth 24/24, account-registration 13 + 1 skipped (by design), password-preview migration 4/4; the 26 Turnstile-blocked preview tests fail identically on `origin/main` (sandbox).

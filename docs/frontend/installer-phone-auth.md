@@ -141,6 +141,12 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
   before the alias can reach a page payload or an action response: to `/home/settings`
   with app access, otherwise to `/onboarding`. These flows email the account's address,
   which a phone account does not have; no password change for phone accounts exists yet.
+- **Settings copy follows the account's sign-in method.** `/home/settings` and `/b2b/settings`
+  pick the sign-in text on the server from the same alias check: phone accounts read "You sign
+  in with the phone number you registered with and your password." (AR: "تسجّل الدخول برقم الهاتف
+  الذي سجّلت به وكلمة المرور."); email accounts keep the passwordless one-time-code text. The
+  "change it from your profile" hint is not shown to phone accounts — a profile phone edit does
+  not change the number they sign in with (the alias is fixed at creation; see Known limitations).
 - Admin lists read `public.users`/`profiles`, never `auth.users.email`.
 - E2E asserts the full HTML (including the RSC payload) of `/home`, `/home/settings`,
   `/settings/profile`, `/admin/users` and the user detail never contains the alias.
@@ -156,6 +162,9 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
   implemented once an OTP provider is integrated: phone number → OTP via SMS/WhatsApp →
   identity verification → set new password. Until then a craftsman who forgets their
   password cannot recover it self-service.
+- **Profile phone vs. sign-in phone.** A phone account can edit its profile phone
+  (`profile_set_phone`), but its login alias — and so the number it signs in with — stays the
+  one it registered with. Aligning them (or locking the edit) is a follow-up decision.
 - **The generated username cannot be changed** — the product has no username-edit UI
   after registration. It is `craftsman.` + 8 random characters.
 - These accounts cannot self-serve a change to a real email: `double_confirm_changes`

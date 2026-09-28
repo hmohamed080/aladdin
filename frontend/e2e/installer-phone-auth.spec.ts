@@ -3,7 +3,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { IDENTITIES, signIn } from "./helpers/auth";
 
 /**
- * TEMPORARY craftsman phone + password flow (docs/frontend/installer-phone-auth.md),
+ * Installer/Technician phone + password flow (docs/frontend/installer-phone-auth.md),
  * end to end against the REAL local Supabase (GoTrue + Postgres + RLS) and the
  * real server actions. No auth bypass: the account is created by the app,
  * signed in by GoTrue's password grant, and initialized through the canonical
@@ -287,8 +287,21 @@ test.describe("installer phone + password auth", () => {
       await page.waitForURL(/\/home\/settings$/, { waitUntil: "commit" });
       await expect(page.locator('form input[name="token"], input[name="confirmPassword"], input[name="currentPassword"]')).toHaveCount(0);
       await expectNoAlias(page);
-      expect(await page.locator("body").innerText()).not.toContain(ALIAS_MARKER);
+      const text = await page.locator("body").innerText();
+      expect(text).not.toContain(ALIAS_MARKER);
+      // The settings copy states how THIS account signs in: phone + password,
+      // never the passwordless one-time-code text (either locale).
+      expect(text).toMatch(/phone number you registered with and your password|برقم الهاتف الذي سجّلت به وكلمة المرور/);
+      expect(text).not.toMatch(/Aladdin has no passwords|لا توجد كلمات مرور/);
     }
+  });
+
+  test("an email account keeps the one-time-code sign-in copy in settings", async ({ page, request }) => {
+    await signIn(page, request, "hossam@example.test", /\/home$/);
+    await page.goto("/home/settings");
+    const text = await page.locator("body").innerText();
+    expect(text).toMatch(/Aladdin has no passwords|لا توجد كلمات مرور/);
+    expect(text).not.toMatch(/phone number you registered with|برقم الهاتف الذي سجّلت به/);
   });
 
   test("layout: no horizontal overflow, RTL, no navbar/footer", async ({ page }) => {
