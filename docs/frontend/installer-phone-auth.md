@@ -1,10 +1,10 @@
 # Installer/technician phone + password authentication
 
 **Status:** the approved, permanent, role-specific authentication entry point for
-installer/technician (الصنايعية) accounts — the one documented exception to the
-passwordless model (PRODUCT_DIRECTION_GUIDE, Change History 2026-09-27). Visual
-implementation approved. Verified against local Supabase. **Not deployed; hosted
-Supabase untouched.** It creates ordinary `professional / installer_technician` accounts
+installer/technician (الصنايعية) accounts. The current authentication model is
+**General = Email + Password** (`/auth/*`) and **Installer = Phone + Password**
+(this flow) — PRODUCT_DIRECTION_GUIDE, Change History 2026-09-28. Visual
+implementation approved. **Live in Production and smoke-tested (2026-09-28).** It creates ordinary `professional / installer_technician` accounts
 through the existing infrastructure and hands them to the existing installer experience.
 
 - Sign up: **`/installer/sign-up`** — full name, phone, password, one consent checkbox
@@ -137,7 +137,7 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
   through the SQL RPCs — and each layer covers one. Neither replaces the other. The raw
   alias stays available internally wherever authentication needs it (alias derivation,
   `createUser`, `signInWithPassword`, `auth.users.email`); masking is presentation only.
-- **Phone accounts never enter the password-preview email flows.** `/preview/auth-password/migrate`
+- **Phone accounts never enter the password-auth email flows.** `/preview/auth-password/migrate`
   and `/change-password` (which delegates to it), plus their server actions
   (`requestMigrationCode`, `completeMigration`, `changePassword`), turn an alias account
   away on the server (`redirectPhoneLoginAccount` in `server/actions/auth-password-preview.ts`)
@@ -147,7 +147,7 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
 - **Settings copy follows the account's sign-in method.** `/home/settings` and `/b2b/settings`
   pick the sign-in text on the server from the same alias check: phone accounts read "You sign
   in with the phone number you registered with and your password." (AR: "تسجّل الدخول برقم الهاتف
-  الذي سجّلت به وكلمة المرور."); email accounts keep the passwordless one-time-code text. The
+  الذي سجّلت به وكلمة المرور."); email accounts read the email + password text. The
   "change it from your profile" hint is not shown to phone accounts — a profile phone edit does
   not change the number they sign in with (the alias is fixed at creation; see Known limitations).
 - Admin lists read `public.users`/`profiles`, never `auth.users.email`.
@@ -157,8 +157,8 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
 ## Known limitations
 
 - **Forgot password is hidden — PENDING authentication item (product decision, 2026-09-27).**
-  Every existing recovery flow is email-based (`/auth/recovery` email OTP;
-  `/preview/auth-password/forgot-password` → `resetPasswordForEmail`) and cannot reach a
+  Every existing recovery flow is email-based (`/auth/forgot-password` →
+  `resetPasswordForEmail`; the legacy `/auth/recovery` email OTP) and cannot reach a
   phone/alias account; there is no SMS/WhatsApp sender. These flows must NOT be linked
   from the craftsman pages, no interim workaround (support link, admin shortcut) is to be
   built, and the email recovery flows stay unchanged. The intended recovery flow, to be

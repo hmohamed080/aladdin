@@ -57,7 +57,7 @@ The phase plan for Aladdin. **Source of truth for scope/order is [`mvp-scope.md`
 ## Implementation phases (ahead)
 
 ### Phase 1 — Identity & Multi-tenancy
-- **Objective:** the canonical passwordless identity and the tenant model everything else depends on.
+- **Objective:** the canonical passwordless identity and the tenant model everything else depends on. *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 - **Deliverables:** `users/profiles/contacts`; orgs/branches/memberships/capabilities; passwordless OTP (WhatsApp/Email) auth; RLS helper functions + JWT claims; **organization-isolation tests**; account-type + platform-role model.
 - **Dependencies:** Phase 0.9; product sign-off on auth/verification `⚑ OPEN` items.
 - **Success criteria:** two orgs fully isolated (all four verbs) with passing tests; passwordless sign-in works Local; capability-derived access; 0 cross-tenant leakage.

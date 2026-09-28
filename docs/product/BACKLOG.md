@@ -15,7 +15,7 @@ Prioritized backlog for the Private Pilot MVP. **Source of truth for scope is [`
 
 | Feature | Priority | Phase | Dependencies | Status | Owner | Notes |
 |---|---|---|---|---|---|---|
-| Passwordless auth (WhatsApp/Email OTP) | P0 | 1 | — | Not started | TBD (auth) | No passwords/reset; reCAPTCHA on create ([`08_api_contracts`](../technical/08_api_contracts.md)) |
+| Passwordless auth (WhatsApp/Email OTP) | P0 | 1 | — | Not started | TBD (auth) | No passwords/reset; reCAPTCHA on create ([`08_api_contracts`](../technical/08_api_contracts.md)) *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)* |
 | Canonical identity + account types | P0 | 1 | auth | Not started | TBD (accounts) | one primary type; no switcher |
 | Organizations / branches / memberships / capabilities | P0 | 1 | identity | Not started | TBD (organizations) | tenant model |
 | RLS + organization-isolation tests | P0 | 1 | tenancy | Not started | TBD (supabase) | blocking per table ([`06_rls_strategy`](../technical/06_rls_strategy.md)) |
@@ -71,7 +71,7 @@ Explicitly out of the pilot — see [`14_future_extensions.md`](../technical/14_
 | Profile (persona) switcher / "Use As" / role toggle | **never** (derived nav) — note: switching the active **work context** between the personal surface and organizations with an active membership is a *different*, allowed concept | Never |
 | A second user/auth identity per business, or a generic `workspaces` table | **never** (one person = one user ID; workspaces are derived) | Never |
 | Work-context (workspace) switcher · "add a business" for an existing user · account deactivate/delete lifecycle | approved direction, **not** in current scope | Deferred |
-| Passwords / forgot / reset | **never** (passwordless) | Never |
+| Passwords / forgot / reset | **never** (passwordless) | Never *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)* |
 
 ## Maintenance
 

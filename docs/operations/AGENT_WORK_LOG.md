@@ -4,6 +4,19 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Post-rollout cleanup of canonical password auth
+
+**Date:** 2026-09-28 · **Branch:** `chore/post-auth-rollout-cleanup` (from `main` @ `233b738`) · PR to `main`; not merged; nothing deployed; hosted Supabase/Cloudflare/Vercel untouched; no migration.
+
+- **Context:** PR #66 merged; Production smoke tests passed for General (Email + Password) and Installer (Phone + Password).
+- **Code comments:** "isolated preview" / "this preview" / "unreviewed preview" wording in canonical auth code (`app/auth/*`, `features/auth-password-preview/*`, `server/actions/auth-password-preview.ts`, `server/actions/registration.ts`, `lib/supabase/{admin-server,recovery-grant}.ts`, `lib/env`, i18n namespace headers) now says "canonical password auth". File/module names, the `AUTH_PASSWORD_PREVIEW_GRANT_SECRET` env var and the `aladdin_pw_preview_password_set` flag are kept (hosted config + stored data).
+- **User-visible copy:** `/home/settings` and `/b2b/settings` told email accounts "Aladdin has no passwords… nothing to reset" (EN + AR). Replaced with email + password copy; unit + E2E assertions updated. No logic change.
+- **Docs:** current-policy "passwordless" lines in ~20 supporting docs marked *Superseded by the canonical password-auth rollout on 2026-09-28*; `installer-phone-auth.md` no longer calls installers "the exception to the passwordless model"; `.env.example` documents the auth secrets as required. Earlier entries in this log that describe the passwordless model are history and are superseded by this rollout.
+- **Audit (no deletion):** route table + legacy-code classification in `docs/frontend/auth-password-preview.md §Post-rollout audit`. Dead: legacy `features/auth/sign-in-form.tsx`, `features/auth/sign-up-form.tsx`, `requestSignUpOtp` / `verifySignUpOtp`, `auth.passwordless`. Compatibility: `/auth/recovery`, `/auth/verify`, `/preview/auth-password/migrate`; `/preview/auth-password/change-password` is the only authenticated change-password flow.
+- **Open:** `DESIGN.md` (§ passwordless line) and `design/COMPONENT_INVENTORY.md` (OTP field row) still state the passwordless rule — left untouched because any edit there is a design-system PATCH release (`design/GOVERNANCE.md`: version bump + CHANGELOG + tokens); do it through that process. Delete category-C code in a dedicated PR; remove legacy redirects after ≥ 90 days; move change-password into Settings (product decision); remove the old Supabase preview Redirect URL once in-flight recovery emails have expired.
+
+---
+
 ## Session — PR #66: main merged in; installer phone link kept on canonical `/auth/sign-in`
 
 **Date:** 2026-09-28 · **Branch:** `feature/canonical-password-auth` (PR #66) · Not merged to `main`; nothing deployed; hosted Supabase/Vercel untouched.

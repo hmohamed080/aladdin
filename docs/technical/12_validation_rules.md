@@ -25,7 +25,7 @@ Every business validation for the MVP. **Validation is Zod-first** (`frontend/sr
 | Primary account type | ∈ `account_type` enum; exactly one |
 | One primary contact | exactly one verified `is_primary` contact at creation |
 | Rate limits | OTP requests per contact/IP throttled → `429` ([13](13_integrations.md)) |
-| Passwordless | **reject** any password/confirm/forgot field — they must not exist |
+| Passwordless | **reject** any password/confirm/forgot field — they must not exist *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)* |
 | Display name | required, `[2,80]`, no control chars |
 
 ## 2. Profile

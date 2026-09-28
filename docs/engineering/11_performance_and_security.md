@@ -40,7 +40,7 @@ Covers **Performance Guidelines (22)** and **Security Checklist (23)**. Operatio
 - [ ] No `.env`/secrets/`.pen` committed; config via the validated settings module; fail-fast on missing
 
 ### Auth model
-- [ ] Passwordless preserved — **no password/forgot/reset** anywhere; OTP via WhatsApp/Email; reCAPTCHA only on account creation
+- [ ] Passwordless preserved — **no password/forgot/reset** anywhere; OTP via WhatsApp/Email; reCAPTCHA only on account creation *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 - [ ] No self-approval on verification/moderation decisions; admin/support cross-tenant actions **audited**
 
 ### AI

@@ -66,7 +66,7 @@ bucket is declared and no code calls `.storage.from(...)`.
 | Area | What exists | Where |
 |---|---|---|
 | **Canonical taxonomy** | `persona_type` enum incl. `installer_technician` | `20260815090001` |
-| **Registration / account-type selection** | Passwordless OTP; the account-type step already offers Installer/Technician | `/auth/sign-up`, `/onboarding/account-type` |
+| **Registration / account-type selection** | Passwordless OTP; the account-type step already offers Installer/Technician | `/auth/sign-up`, `/onboarding/account-type` *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)* |
 | **Persona onboarding engine** | Shared wizard + professional track; `installer_technician` is a **fixed** concrete type | `src/features/onboarding/professional-flow.tsx` |
 | **Onboarding persistence** | `individual_onboarding` stores experience, specialization, services, availability band, service areas, remote flag, location, travel km | `20260808100000` |
 | **Write paths** | `individual_save_professional` / `individual_submit_professional` (track-guarded, re-entrant) | same migration |

@@ -1,5 +1,12 @@
 # Runtime State
 
+## Current continuation — 2026-09-28 (latest): post-rollout auth cleanup
+
+- Canonical password auth (PR #66) is **merged and smoke-tested on Production**: General = Email + Password (`/auth/sign-up`, `/auth/sign-in`, `/auth/forgot-password/*`, `/auth/finish-registration`); Installer = Phone + Password (`/installer/sign-up`, `/installer/sign-in`).
+- Branch `chore/post-auth-rollout-cleanup` from `main` @ `233b738`: stale "preview"/passwordless comments and docs cleaned; `.env.example` now says `SUPABASE_SERVICE_ROLE_KEY`, `AUTH_PASSWORD_PREVIEW_GRANT_SECRET` and `TURNSTILE_SECRET_KEY` are **required** in staging/production; settings copy for email accounts no longer claims "Aladdin has no passwords". No behavior, schema, RLS, auth-provider or hosted change; no migration.
+- Route audit + legacy-code classification (still required / compatibility / dead): [auth-password-preview.md §Post-rollout audit](../frontend/auth-password-preview.md#post-rollout-audit-2026-09-28). Legacy redirects `/preview/auth-password/*` and `/temporary/craftsman/*` stay ≥ 90 days.
+- Local branch `feature/auth-password-preview` in the main checkout is **not** merged (32 unique commits + uncommitted work) — do not delete it.
+
 ## Current continuation — 2026-09-28 (latest): PR #66 carries main + the installer link
 
 - Branch `feature/canonical-password-auth` (PR #66) now contains `main` @ `52bee52` (PR #67). Canonical `/auth/sign-in` (Email + Password) keeps the secondary installer link to `/installer/sign-in`, forwarding only an unchanged-valid `next`. Installer phone auth unchanged. Not merged; nothing deployed.
@@ -8,7 +15,7 @@
 ## Current continuation — 2026-09-28: mask_email kept; phone accounts out of the email migration flow
 
 - Branch `claude/vigilant-cori-471vck`. Decision: keep `app.mask_email` (migration `20260927090001`, SQL unchanged — comment wording only) **and** `userFacingEmail()` as defense in depth. The password preview's `/migrate` and `/change-password` pages and actions now turn phone-alias accounts away on the server (`/home/settings`, or `/onboarding` without app access) before the alias is read into any response.
-- Settings sign-in copy now matches the account (`/home/settings`, `/b2b/settings`): phone + password text for phone accounts, the one-time-code text for email accounts.
+- Settings sign-in copy now matches the account (`/home/settings`, `/b2b/settings`): phone + password text for phone accounts, the one-time-code text for email accounts. *(Superseded by the canonical password-auth rollout on 2026-09-28 — email accounts now read the email + password text.)*
 - Rule recorded: raw authentication identifiers are internal; `user.email` is not a user-facing contact identity (ARCHITECTURE_GUIDE 2026-09-28, `frontend/AGENTS.md`).
 - Hosted not inspected (no credentials/linked project in this environment); `20260927090001` exists only on this unmerged branch; nothing applied remotely; no PR; nothing deployed.
 - Validation: typecheck ✓ · lint 0 errors · unit 1788/1788 · pgTAP `64` 13/13 · Playwright installer-phone-auth 24/24, account-registration 13 + 1 skipped (by design), password-preview migration 4/4; the 26 Turnstile-blocked preview tests fail identically on `origin/main` (sandbox).
@@ -37,7 +44,7 @@
 
 - Branch `feature/canonical-password-auth` from `main` @ `e6c75d3`; PR to `main` open, **not merged**, nothing deployed.
 - Canonical auth is now Email + Password at `/auth/sign-up`, `/auth/sign-in`, `/auth/forgot-password/*`, `/auth/finish-registration`; `/preview/auth-password/*` are redirects (migrate/change-password remain). Sign-up collects Full Name (confirmed via `profile_set_display_name` after OTP) and the account type from a dropdown. No new migration.
-- Pre-merge: Supabase Auth Redirect URL `https://aladdindecore.com/auth/forgot-password/reset`; passwordless-account messaging; project-memory guides still say passwordless (needs approved update).
+- Pre-merge: Supabase Auth Redirect URL `https://aladdindecore.com/auth/forgot-password/reset`; passwordless-account messaging; project-memory guides still say passwordless (needs approved update). *(Resolved 2026-09-28: core guides updated in PR #66; remaining supporting docs marked superseded in `chore/post-auth-rollout-cleanup`.)*
 
 ## Current continuation — 2026-09-24 (later): registration persona assignment + /settings/profile
 

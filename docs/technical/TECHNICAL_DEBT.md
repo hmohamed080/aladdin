@@ -49,7 +49,7 @@ Full list + rationale in [`14_future_extensions.md`](14_future_extensions.md) an
 
 ## 4. Security improvements (deferred; spine already enforced)
 
-The RLS/isolation spine, passwordless model, and tenant filtering are **not** debt — they are enforced from day one ([`security-model.md`](../security/security-model.md), [`11_performance_and_security`](../engineering/11_performance_and_security.md)). Deferred hardening:
+The RLS/isolation spine, passwordless model, and tenant filtering are **not** debt — they are enforced from day one ([`security-model.md`](../security/security-model.md), [`11_performance_and_security`](../engineering/11_performance_and_security.md)). Deferred hardening: *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 
 | Item | Trigger |
 |---|---|
