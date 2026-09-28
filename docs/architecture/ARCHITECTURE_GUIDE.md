@@ -174,6 +174,11 @@ Every architecture change must, in the same session:
 ## Architecture Change History
 Newest first.
 
+### 2026-09-28 — Raw authentication identifiers are internal (rule)
+- **Rule:** Raw authentication identifiers (e.g. `auth.users.email`, which for an installer phone account is an internal login alias) are internal identity data and must not be passed directly to user-facing components. User-facing identity data must pass through a presentation-safe boundary — today `userFacingEmail()` in application code and `app.mask_email` in SQL, kept together as defense in depth. A server boundary that serves a flow which does not apply to an account (e.g. an email-only flow for a phone account) refuses that account before any identifier is read into a response.
+- **Why:** Aladdin will support accounts with no usable email address — phone + password today; WhatsApp/SMS OTP and social providers later. Future UI must not assume `user.email` is the user-facing contact identity. (Documented only: no identity abstraction, provider table, OTP, social login, account linking or security settings were built.)
+- **Details:** [`../frontend/installer-phone-auth.md`](../frontend/installer-phone-auth.md) → "Alias is never exposed".
+
 ### 2026-09-27 — Installer phone + password routes promoted
 - **What:** `/installer/sign-up` / `/installer/sign-in` are the permanent installer entry point (`/temporary/craftsman/*` → 308 redirects in `next.config.ts`). `signOut` returns a phone-alias account to `/installer/sign-in` (identity read before sign-out); protected-route redirects stay on the shared `/auth/sign-in?next=…`, which offers a secondary installer link forwarding the validated `next`. Installer sign-in applies the exact `verifyEmailOtp` `next` rule. No schema change.
 - **Details:** [`../frontend/installer-phone-auth.md`](../frontend/installer-phone-auth.md).

@@ -270,6 +270,27 @@ test.describe("installer phone + password auth", () => {
     await expect(page).toHaveURL(/\/auth\/sign-in/);
   });
 
+  test("a phone account never enters the email password-migration flow, and its alias never reaches the client", async ({ page }) => {
+    const phone = uniquePhone();
+    await register(page, "صنايعي ترحيل", phone);
+
+    for (const path of ["/preview/auth-password/migrate", "/preview/auth-password/change-password"]) {
+      // The server's raw answer, redirects NOT followed — a document request and
+      // a client-navigation (RSC) request. Neither may carry the alias.
+      for (const headers of [{}, { RSC: "1" }] as Record<string, string>[]) {
+        const res = await page.request.get(path, { maxRedirects: 0, headers });
+        expect(await res.text(), `${path} response leaked the alias`).not.toContain(ALIAS_MARKER);
+        if (res.status() >= 300 && res.status() < 400) expect(res.headers().location).toBe("/home/settings");
+      }
+      // Direct navigation lands on the account's own settings, not the migration form.
+      await page.goto(path);
+      await page.waitForURL(/\/home\/settings$/, { waitUntil: "commit" });
+      await expect(page.locator('form input[name="token"], input[name="confirmPassword"], input[name="currentPassword"]')).toHaveCount(0);
+      await expectNoAlias(page);
+      expect(await page.locator("body").innerText()).not.toContain(ALIAS_MARKER);
+    }
+  });
+
   test("layout: no horizontal overflow, RTL, no navbar/footer", async ({ page }) => {
     for (const path of ["/installer/sign-up", "/installer/sign-in"]) {
       await stubTurnstile(page);

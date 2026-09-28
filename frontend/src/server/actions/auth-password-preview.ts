@@ -17,6 +17,7 @@ import { sanitizeNext } from "@/server/auth/next";
 import { clientIpFrom, verifyTurnstileToken } from "@/server/auth/turnstile";
 import { resolveActiveLanding } from "@/server/queries/landing";
 import { hasAppAccess, type RegistrationState } from "@/server/queries/registration";
+import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 import type { Database } from "@/types/database.types";
 import {
   emailSchema,
@@ -514,7 +515,23 @@ export async function migrationEligibility(): Promise<{ email: string; hasPasswo
     data: { user },
   } = await supabase.auth.getUser();
   if (!user?.email) return null;
+  await redirectPhoneLoginAccount(supabase, user.email);
   return { email: user.email, hasPassword: user.app_metadata?.[PASSWORD_SET_FLAG] === true };
+}
+
+/**
+ * Installer phone + password accounts (docs/frontend/installer-phone-auth.md)
+ * keep an INTERNAL login alias in `auth.users.email`: a login key, not an
+ * address. None of this preview's email flows (migration, change password)
+ * apply to them, so they are turned away HERE, on the server, before the alias
+ * can reach a page payload or an action response. Destination: the account's
+ * own settings page once it has app access, otherwise the onboarding gate —
+ * the same split every signed-in route in the app already enforces.
+ */
+async function redirectPhoneLoginAccount(supabase: SupabaseClient<Database>, email: string | null | undefined): Promise<void> {
+  if (!isCraftsmanLoginAlias(email)) return;
+  const { data: state } = await supabase.rpc("my_registration_state");
+  redirect(hasAppAccess(state as RegistrationState) ? "/home/settings" : "/onboarding");
 }
 
 // ---------------------------------------------------------------------------
@@ -786,6 +803,7 @@ export async function requestMigrationCode(_prev: PasswordAuthState, _formData: 
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, code: "authPasswordPreview.error.sessionExpired" };
+  await redirectPhoneLoginAccount(supabase, user.email);
 
   const { error } = await supabase.auth.reauthenticate();
   if (error) {
@@ -806,6 +824,7 @@ export async function completeMigration(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, code: "authPasswordPreview.error.sessionExpired" };
+  await redirectPhoneLoginAccount(supabase, user.email);
 
   const nonce = formData.get("token");
   if (typeof nonce !== "string" || !otpSchema.test(nonce)) {
@@ -839,6 +858,7 @@ export async function changePassword(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user?.email) return { ok: false, code: "authPasswordPreview.error.sessionExpired" };
+  await redirectPhoneLoginAccount(supabase, user.email);
 
   const currentPassword = formData.get("currentPassword");
   if (typeof currentPassword !== "string" || currentPassword.length === 0) {

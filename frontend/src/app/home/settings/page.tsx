@@ -38,7 +38,7 @@ export default async function PersonalSettingsPage() {
     loadMyIdentity(),
     loadMyProfileCompletion(),
   ]);
-  // The temporary craftsman flow's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
+  // An installer phone account's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
   const visibleEmail = userFacingEmail(auth?.user?.email);
   const signInEmail = visibleEmail ? maskEmail(visibleEmail) : null;
 

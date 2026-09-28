@@ -85,7 +85,7 @@ export default async function SettingsPage() {
   const reachable = allowedNavKeys(org.capabilities).filter((k) => k !== "home" && k !== "settings");
   const verified = record?.is_verified ?? false;
   const pending = record?.status === "pending_verification";
-  // The temporary craftsman flow's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
+  // An installer phone account's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
   const visibleEmail = userFacingEmail(auth?.user?.email);
   const signInEmail = visibleEmail ? maskEmail(visibleEmail) : null;
   const branchDetails = new Map((branchRows ?? []).map((b) => [b.id, b]));

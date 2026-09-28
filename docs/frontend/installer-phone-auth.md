@@ -129,6 +129,18 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
   for the alias domain (migration `20260927090001_mask_craftsman_login_alias.sql`,
   pgTAP `64_mask_craftsman_login_alias_test.sql`). No table, column, policy or grant
   changed.
+- The two layers are **defense in depth** (decision, 2026-09-28): the email reaches the
+  screen by two independent paths — straight from Supabase Auth (`auth.getUser()`), and
+  through the SQL RPCs — and each layer covers one. Neither replaces the other. The raw
+  alias stays available internally wherever authentication needs it (alias derivation,
+  `createUser`, `signInWithPassword`, `auth.users.email`); masking is presentation only.
+- **Phone accounts never enter the password-preview email flows.** `/preview/auth-password/migrate`
+  and `/change-password` (which delegates to it), plus their server actions
+  (`requestMigrationCode`, `completeMigration`, `changePassword`), turn an alias account
+  away on the server (`redirectPhoneLoginAccount` in `server/actions/auth-password-preview.ts`)
+  before the alias can reach a page payload or an action response: to `/home/settings`
+  with app access, otherwise to `/onboarding`. These flows email the account's address,
+  which a phone account does not have; no password change for phone accounts exists yet.
 - Admin lists read `public.users`/`profiles`, never `auth.users.email`.
 - E2E asserts the full HTML (including the RSC payload) of `/home`, `/home/settings`,
   `/settings/profile`, `/admin/users` and the user detail never contains the alias.
