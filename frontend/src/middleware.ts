@@ -56,10 +56,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // A signed-in caller never needs Sign In / Sign Up — send them through the resume
+  // A signed-in caller never needs Sign In / Sign Up (shared email pages or the
+  // installer phone pages) — send them through the resume
   // funnel (/onboarding forwards active users on to the workspace). Recovery,
   // support, verify, and invitation entry stay reachable while signed in.
-  if ((path === "/auth/sign-in" || path === "/auth/sign-up") && user) {
+  if (
+    (path === "/auth/sign-in" ||
+      path === "/auth/sign-up" ||
+      path === "/installer/sign-in" ||
+      path === "/installer/sign-up") &&
+    user
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = "/onboarding";
     url.search = "";

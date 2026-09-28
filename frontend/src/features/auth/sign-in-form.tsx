@@ -11,9 +11,11 @@ import { EmailOtpFlow } from "@/features/auth/email-otp-flow";
  * flow (send → verify, sibling forms, resend cooldown, change-email) lives in the
  * shared `EmailOtpFlow`; Sign In never creates a user (`requestEmailOtp` sends with
  * `shouldCreateUser: false`). Distinct from Sign Up, with clear links to it and to
- * account-access recovery.
+ * account-access recovery — and a secondary link for installer/technician
+ * accounts that sign in with phone + password (`/installer/sign-in`), carrying
+ * the caller's validated `next` when there is one.
  */
-export function SignInForm({ next }: { next: string }) {
+export function SignInForm({ next, installerSignInHref = "/installer/sign-in" }: { next: string; installerSignInHref?: string }) {
   const { t } = useI18n();
   return (
     <AuthCard
@@ -30,6 +32,11 @@ export function SignInForm({ next }: { next: string }) {
           <p>
             <Link href="/auth/recovery" className="text-fg-muted hover:text-fg hover:underline">
               {t("auth.troubleSigningIn")}
+            </Link>
+          </p>
+          <p>
+            <Link href={installerSignInHref} className="text-fg-muted hover:text-fg hover:underline">
+              {t("auth.installerPhoneSignIn")}
             </Link>
           </p>
         </div>

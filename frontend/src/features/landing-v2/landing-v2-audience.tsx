@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Reveal } from "@/components/ui/reveal";
 import {
   UserIcon,
@@ -27,14 +28,16 @@ import styles from "./landing-v2-audience.module.css";
 const items = [
   { icon: UserIcon, ar: "حساب شخصي", en: "Personal Account", comingSoon: true },
   { icon: BriefcaseIcon, ar: "فريق المبيعات", en: "Sales Team", comingSoon: false },
-  { icon: WrenchIcon, ar: "الصنايعية والفنيون", en: "Technicians & Installers", comingSoon: false },
+  // The one tile with its own registration entry: installers/technicians sign
+  // up with phone + password (/installer/sign-up). Every other tile stays text.
+  { icon: WrenchIcon, ar: "الصنايعية والفنيون", en: "Technicians & Installers", comingSoon: false, href: "/installer/sign-up" },
   { icon: PencilIcon, ar: "المهندسون", en: "Engineers", comingSoon: true },
   { icon: BuildingIcon, ar: "المقاولون", en: "Contractors", comingSoon: true },
   { icon: PackageIcon, ar: "المستوردون", en: "Importers", comingSoon: false },
   { icon: LayersIcon, ar: "المصنّعون", en: "Manufacturers", comingSoon: false },
   { icon: TruckIcon, ar: "الموردون", en: "Suppliers", comingSoon: false },
   { icon: StorefrontIcon, ar: "المعارض", en: "Showrooms", comingSoon: false },
-] as const;
+] as const satisfies readonly { icon: unknown; ar: string; en: string; comingSoon: boolean; href?: string }[];
 
 const comingSoonLabel = { ar: "قريباً", en: "Coming Soon" } as const;
 const sectionLabel = { ar: "لمن علاء الدين", en: "Who Aladdin is for" } as const;
@@ -51,15 +54,30 @@ export function LandingV2Audience() {
     >
       <Reveal>
         <ul className={styles.row}>
-          {items.map(({ icon: Icon, ar, en, comingSoon }) => (
-            <li key={en} className={styles.item}>
-              <span className={styles.iconWrap} aria-hidden="true">
-                <Icon size={20} strokeWidth={1.75} />
-              </span>
-              <span className={styles.label} dir={dir}>{locale === "ar" ? ar : en}</span>
-              {comingSoon ? <span className={styles.badge} dir={dir}>{comingSoonLabel[locale]}</span> : null}
-            </li>
-          ))}
+          {items.map((item) => {
+            const { icon: Icon, ar, en, comingSoon } = item;
+            const href = "href" in item ? item.href : undefined;
+            const content = (
+              <>
+                <span className={styles.iconWrap} aria-hidden="true">
+                  <Icon size={20} strokeWidth={1.75} />
+                </span>
+                <span className={styles.label} dir={dir}>{locale === "ar" ? ar : en}</span>
+                {comingSoon ? <span className={styles.badge} dir={dir}>{comingSoonLabel[locale]}</span> : null}
+              </>
+            );
+            return (
+              <li key={en} className={styles.item}>
+                {href ? (
+                  <Link href={href} className={styles.itemLink}>
+                    {content}
+                  </Link>
+                ) : (
+                  content
+                )}
+              </li>
+            );
+          })}
         </ul>
       </Reveal>
     </section>

@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { userFacingEmail } from "@/lib/auth/craftsman-login-alias";
 
 /**
  * The signed-in person, as the account CHROME needs to describe them.
@@ -51,12 +52,15 @@ export const loadAccountIdentity = cache(async function loadAccountIdentity(): P
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, display_name_ar, display_name_en")
+    .select("display_name, display_name_ar, display_name_en, phone_e164")
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const email = user.email?.trim() || null;
-  const phone = user.phone?.trim() || null;
+  // An internal craftsman login alias is a login key, never a contact — it is
+  // dropped here, and such an account is described by its canonical profile
+  // phone instead (lib/auth/craftsman-login-alias.ts).
+  const email = userFacingEmail(user.email);
+  const phone = user.phone?.trim() || profile?.phone_e164?.trim() || null;
 
   return {
     userId: user.id,

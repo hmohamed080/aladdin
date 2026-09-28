@@ -9,5 +9,9 @@ export default async function SignInPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  return <SignInForm next={sanitizeNext(next)} />;
+  const safeNext = sanitizeNext(next);
+  // The installer phone sign-in link forwards an EXPLICIT, validated `next`
+  // only — never a default, never the raw query value.
+  const installerSignInHref = next ? `/installer/sign-in?next=${encodeURIComponent(safeNext)}` : "/installer/sign-in";
+  return <SignInForm next={safeNext} installerSignInHref={installerSignInHref} />;
 }

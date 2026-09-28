@@ -1063,3 +1063,60 @@ describe("Authenticated changePassword", () => {
     expect(markPasswordAttachedAuthoritatively).not.toHaveBeenCalled();
   });
 });
+
+describe("Installer phone + password accounts never enter the email migration / change-password flows", () => {
+  const ALIAS = "p201012345678@craftsman-login.aladdin.invalid";
+  const phoneUser = { id: "u-phone", email: ALIAS, app_metadata: {} };
+
+  it("migrationEligibility sends an access-ready phone account to /home/settings instead of returning its alias", async () => {
+    getUser.mockResolvedValueOnce({ data: { user: phoneUser } });
+    rpc.mockResolvedValueOnce({ data: "access_ready", error: null });
+    await expect(migrationEligibility()).rejects.toThrow("REDIRECT:/home/settings");
+    expect(rpc).toHaveBeenCalledWith("my_registration_state");
+  });
+
+  it("migrationEligibility keeps an incomplete phone account behind the onboarding gate (no settings loop)", async () => {
+    getUser.mockResolvedValueOnce({ data: { user: phoneUser } });
+    rpc.mockResolvedValueOnce({ data: "username_pending", error: null });
+    await expect(migrationEligibility()).rejects.toThrow("REDIRECT:/onboarding");
+  });
+
+  it("the alias match is case-insensitive, like app.mask_email", async () => {
+    getUser.mockResolvedValueOnce({ data: { user: { ...phoneUser, email: ALIAS.toUpperCase() } } });
+    rpc.mockResolvedValueOnce({ data: "active_personal", error: null });
+    await expect(migrationEligibility()).rejects.toThrow("REDIRECT:/home/settings");
+  });
+
+  it("requestMigrationCode redirects BEFORE reauthenticate() and never returns the alias", async () => {
+    getUser.mockResolvedValueOnce({ data: { user: phoneUser } });
+    rpc.mockResolvedValueOnce({ data: "access_ready", error: null });
+    await expect(requestMigrationCode({ ok: false }, fd({}))).rejects.toThrow("REDIRECT:/home/settings");
+    expect(reauthenticate).not.toHaveBeenCalled();
+  });
+
+  it("completeMigration redirects before any password is set or flag stamped", async () => {
+    getUser.mockResolvedValueOnce({ data: { user: phoneUser } });
+    rpc.mockResolvedValueOnce({ data: "access_ready", error: null });
+    await expect(
+      completeMigration({ ok: false }, fd({ token: "123456", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD })),
+    ).rejects.toThrow("REDIRECT:/home/settings");
+    expect(updateUser).not.toHaveBeenCalled();
+    expect(markPasswordAttachedAuthoritatively).not.toHaveBeenCalled();
+  });
+
+  it("changePassword cannot be driven directly by a phone account (no re-sign-in, no password update)", async () => {
+    getUser.mockResolvedValueOnce({ data: { user: phoneUser } });
+    rpc.mockResolvedValueOnce({ data: "access_ready", error: null });
+    await expect(
+      changePassword({ ok: false }, fd({ currentPassword: GOOD_PASSWORD, newPassword: "another-long-passphrase", confirmNewPassword: "another-long-passphrase" })),
+    ).rejects.toThrow("REDIRECT:/home/settings");
+    expect(signInWithPassword).not.toHaveBeenCalled();
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
+  it("an ordinary email account is unaffected: no registration-state lookup, eligibility returned as before", async () => {
+    getUser.mockResolvedValueOnce({ data: { user: { email: "legacy@example.test", app_metadata: {} } } });
+    expect(await migrationEligibility()).toEqual({ email: "legacy@example.test", hasPassword: false });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});

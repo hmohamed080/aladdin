@@ -141,3 +141,23 @@
     max-width: 4.5rem;
   }
 }
+
+/* The installer tile is a link to its phone sign-up. It keeps the tile's own
+   column layout and colours, so the strip looks unchanged; it only gains a
+   focus ring and a hover underline on the label. */
+.itemLink {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: inherit;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 8px;
+}
+.itemLink:hover .label {
+  text-decoration: underline;
+}
+.itemLink:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}

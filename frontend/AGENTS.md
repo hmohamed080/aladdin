@@ -36,6 +36,7 @@ src/
 
 - **Do not** create giant global `components/`, `hooks/`, `utils/`, or `services/` folders full of unrelated business logic. Shared code moves to a shared location only after a genuine second consumer exists.
 - **Keep page and layout files thin**: compose the screen, load route-specific data, call domain services, handle route-level authorization. No hundreds of lines of business logic in a page file.
+- **Raw authentication identifiers are internal.** Never pass `user.email` (or any raw auth identifier) directly to a user-facing component, page payload or action response — route it through a presentation-safe boundary (`userFacingEmail()` today). Do not assume `user.email` is the person's contact identity: installer phone accounts carry an internal login alias there, and future phone-OTP / social accounts may have no usable email. See `docs/architecture/ARCHITECTURE_GUIDE.md` (2026-09-28 rule).
 
 ## Configuration
 

@@ -8,6 +8,7 @@ import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { sanitizeNext } from "@/server/auth/next";
 import { resolveActiveLanding } from "@/server/queries/landing";
 import { hasAppAccess, type RegistrationState } from "@/server/queries/registration";
+import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 
 /**
  * Passwordless Email-OTP account access (Supabase Auth). Two steps: request a
@@ -196,9 +197,19 @@ export async function verifySignUpOtp(_prev: AuthState, formData: FormData): Pro
   redirect("/onboarding");
 }
 
-/** Sign out and return to the sign-in screen. */
+/**
+ * Sign out and return to the sign-in screen THIS account can use. The identity
+ * is read before the session ends — a known fact about the caller, not a guess:
+ * an installer phone + password account (internal login alias,
+ * lib/auth/craftsman-login-alias.ts) cannot sign in on the email page, so it
+ * returns to /installer/sign-in; every other account returns to /auth/sign-in
+ * exactly as before.
+ */
 export async function signOut(): Promise<void> {
   const supabase = await getServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   await supabase.auth.signOut();
-  redirect("/auth/sign-in");
+  redirect(isCraftsmanLoginAlias(user?.email) ? "/installer/sign-in" : "/auth/sign-in");
 }

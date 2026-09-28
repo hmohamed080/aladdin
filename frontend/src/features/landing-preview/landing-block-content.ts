@@ -1,6 +1,6 @@
 type Copy = {
   how: string; flow: { title: string; text: string }[]; rolesTitle: string;
-  roles: { title: string; bullets: string[] }[]; learn: string;
+  roles: { title: string; bullets: string[]; signUpHref?: string }[]; learn: string;
   videos: string; videoAction: string; videoCategories: string[];
   videoPending: string; videoDescription: string; durationPending: string;
   brands: string; brandNote: string; partnerAction: string; stories: string; quotePending: string;
@@ -27,7 +27,7 @@ export const landingBlockContent = {
       { title: "للموزعين", bullets: ["تنظيم كتالوج المنتجات", "متابعة طلبات العملاء", "إعداد عروض الأسعار", "التواصل حول الطلبات"] },
       { title: "للمعارض", bullets: ["اكتشاف المنتجات والموزعين", "إرسال طلبات عروض الأسعار", "مراجعة العروض واتخاذ القرار", "متابعة الطلبات والعملاء"] },
       { title: "لفريق المبيعات", bullets: ["تنظيم العملاء والفرص", "تسجيل احتياجات العميل", "متابعة العروض والمهام", "العمل ضمن فريق المعرض"] },
-      { title: "للصنايعية والفنيين", bullets: ["عرض الأعمال والخبرات", "اكتشاف فرص التنفيذ", "التقدّم للأعمال المناسبة", "متابعة التنفيذ والتقييمات"] },
+      { title: "للصنايعية والفنيين", bullets: ["عرض الأعمال والخبرات", "اكتشاف فرص التنفيذ", "التقدّم للأعمال المناسبة", "متابعة التنفيذ والتقييمات"], signUpHref: "/installer/sign-up" },
     ],
     learn: "اعرف المزيد", videos: "شاهد وتعرّف على المنتجات وتجربة المنصة", videoAction: "عرض كل الفيديوهات",
     videoCategories: ["عن Aladdin", "المنتجات", "التنفيذ", "من القطاع", "تجارب المستخدمين"],
@@ -58,7 +58,7 @@ export const landingBlockContent = {
       { title: "Distributors", bullets: ["Organize your product catalogue", "Follow customer requests", "Prepare quotations", "Discuss orders in context"] },
       { title: "Showrooms", bullets: ["Discover products and distributors", "Request quotations", "Review offers and decide", "Follow orders and customers"] },
       { title: "Sales teams", bullets: ["Organize customers and opportunities", "Capture customer needs", "Follow quotations and tasks", "Work with your showroom team"] },
-      { title: "Installers & technicians", bullets: ["Show your work and expertise", "Discover execution opportunities", "Apply for suitable work", "Track execution and reviews"] },
+      { title: "Installers & technicians", bullets: ["Show your work and expertise", "Discover execution opportunities", "Apply for suitable work", "Track execution and reviews"], signUpHref: "/installer/sign-up" },
     ],
     learn: "Learn more", videos: "Discover products and the platform in action", videoAction: "View all videos",
     videoCategories: ["About Aladdin", "Products", "Execution", "From the sector", "User experiences"],
