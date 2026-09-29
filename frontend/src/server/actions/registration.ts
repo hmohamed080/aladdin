@@ -37,7 +37,7 @@ export type AccountTypeChoiceState = { ok: boolean; code?: string };
 
 /**
  * Shared with the canonical `/onboarding/account-type` picker's own server
- * action — this one exists for the isolated password-auth preview's
+ * action — this one exists for canonical password auth's
  * finish-registration recovery screen, reached when a pending-registration
  * write was lost before `account_type_completed_at` ever got set (see
  * `auth-password-preview.ts`'s `verifyPasswordSignUp`).
@@ -76,8 +76,8 @@ export type UsernameState = { ok: boolean; code?: string };
  * The mandatory username step (`public.profile_set_username`) — reached
  * whenever `my_registration_state()` returns `username_pending`: consent and
  * an account type are already recorded, but no valid username is stored yet.
- * Shared by both the canonical `/onboarding/username` page and the isolated
- * password-auth preview's own finish-registration recovery screen, so the
+ * Shared by both the canonical `/onboarding/username` page and canonical
+ * password auth's own finish-registration recovery screen, so the
  * error-code shape (`registration.error.*`) is the SAME anti-enumeration
  * boundary in both places — `profile_set_username` itself never reveals
  * whether a collision was with a reserved word or another account.

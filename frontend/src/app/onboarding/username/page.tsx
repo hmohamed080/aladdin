@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * (a direct RPC path) or their pending-registration username claim collided
  * with someone else's during the verification window (see
  * `frontend/src/app/auth/finish-registration/page.tsx` for
- * the isolated preview's equivalent recovery screen — same underlying RPCs,
+ * canonical password auth's equivalent recovery screen — same underlying RPCs,
  * same error-code shape). A refresh or direct navigation cannot bypass this:
  * `my_registration_state()` is re-derived from the database on every call,
  * never from client state.

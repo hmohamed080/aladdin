@@ -19,14 +19,14 @@ Show Aladdin's external actors and systems — who and what it talks to.
 | Supabase | Auth, Postgres, Storage, Realtime, Queues, vector search | data platform |
 | OpenAI | LLM + embeddings | FastAPI service |
 | Azure Document Intelligence (candidate) | OCR of uploaded documents | FastAPI service |
-| WhatsApp (OTP + operational messaging) | passwordless auth + notifications | server-side only |
+| WhatsApp (OTP + operational messaging) | passwordless auth + notifications | server-side only *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)* |
 | Email provider | Email OTP / verification links, transactional email | server-side only |
 | Sentry | error monitoring | all services |
 | Vercel (Services: web app + FastAPI) | hosting | ops |
 
 ## Rationale
 
-Auth is **passwordless** (WhatsApp OTP or Email OTP/verification link; one verified primary contact). No SMS, no passwords. Keeping every third-party credential server-side (never in the browser) is a hard boundary — see security docs.
+Auth is **passwordless** (WhatsApp OTP or Email OTP/verification link; one verified primary contact). No SMS, no passwords. Keeping every third-party credential server-side (never in the browser) is a hard boundary — see security docs. *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 
 ## Scope
 

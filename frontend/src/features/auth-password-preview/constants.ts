@@ -1,5 +1,5 @@
 /**
- * Shared client-facing constants for the password-auth preview. Kept out of
+ * Shared client-facing constants for canonical password auth. Kept out of
  * `server/actions/auth-password-preview.ts` because a `"use server"` file may
  * only export async functions (Next.js build-time restriction) — a plain
  * constant there fails the production build even though `tsc` accepts it.

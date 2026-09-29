@@ -42,7 +42,7 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 
 ## UX Principles
 - **Show the next best action.** Screens lead to a real action (a cockpit tile leads to a workflow, not a dead end).
-- **Progressive disclosure.** Ask for the minimum now; defer the rest to profile/settings (mirrors the passwordless one-primary-contact flow).
+- **Progressive disclosure.** Ask for the minimum now; defer the rest to profile/settings (mirrors the passwordless one-primary-contact flow). *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 - **Trust signals over hype.** Verification, ratings, and provenance are surfaced; no pushy pricing pressure.
 - **Bilingual by construction.** Every layout works identically in Arabic (RTL) and English (LTR).
 - **No technical leakage in copy.** Never surface implementation terms ("WhatsApp Business API", "reCAPTCHA verified", "canonical account", server notes).
@@ -250,7 +250,7 @@ The **design language** is global. The **navigation content and the modules are 
 - **React Hook Form + Zod**; the Zod schema is the single validation source shared client/server. Validate at boundaries, trust internal state.
 - Field anatomy: label `$fs-label`, value `$fs-body-lg`, `20` icon, `$radius-md`, height ≈ `64`, `$border-strong` stroke; consistent across the app.
 - **Inline, specific, non-blaming** errors next to the field; summarize only for long forms. Validate on blur/submit, not on every keystroke.
-- **Passwordless:** no password/confirm-password/forgot-password fields anywhere. OTP/verification uses the approved verification-field component.
+- **Passwordless:** no password/confirm-password/forgot-password fields anywhere. OTP/verification uses the approved verification-field component. *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 - Long flows support **autosave / save-and-continue** with a visible indicator; show a `Progress Header` with step count.
 
 ## Modals & Drawers
@@ -313,7 +313,7 @@ The **design language** is global. The **navigation content and the modules are 
 
 ## Anti-Patterns To Avoid
 - **Commerce framing:** add-to-cart, checkout, buy-now — this is consultation-first.
-- **Password UI:** sign-in-with-password, forgot/reset-password — the product is passwordless (WhatsApp/Email OTP).
+- **Password UI:** sign-in-with-password, forgot/reset-password — the product is passwordless (WhatsApp/Email OTP). *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 - **Profile-switching UI:** a Profile Switcher, a "Use As" mode, or any control that swaps a user's persona/account identity — navigation is **derived**, not toggled; one current primary account type at a time. *(A **work-context / workspace** selector across the user's own personal surface and their active organization memberships is **not** this anti-pattern.)*
 - **"Create an account, then create an organization" framing:** a business is created **once**; never make the user feel they are opening a second account, and never present owner/manager as a business type.
 - **Technical copy in UI:** "WhatsApp Business API", "reCAPTCHA verified on server", "canonical account", schema/stack jargon.

@@ -16,7 +16,7 @@ const GENERIC_ERROR_CODES = new Set([
 ]);
 
 /**
- * Sign in preview — email + password. Every failure that isn't a rate limit
+ * Canonical sign in — email + password. Every failure that isn't a rate limit
  * renders the SAME generic message (`passwordSignIn` never distinguishes
  * "no such account" from "wrong password" from "unconfirmed"/"disabled") —
  * see the server action's doc comment for why.

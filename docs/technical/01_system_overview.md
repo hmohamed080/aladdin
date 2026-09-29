@@ -79,7 +79,7 @@ Contexts map 1:1 to the **frontend feature modules** ([`module-boundaries.md`](.
 
 | Context (module) | Responsibility | Core entities (see [02](02_domain_model.md)) |
 |---|---|---|
-| **auth** | Passwordless OTP registration/sign-in, session, JWT | User, OtpChallenge (transient), Session |
+| **auth** | Passwordless OTP registration/sign-in, session, JWT | User, OtpChallenge (transient), Session *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)* |
 | **accounts** | Canonical identity, profile, primary account type, contacts | User, Profile, Contact, AccountType |
 | **organizations** | Tenant orgs, branches, memberships, capabilities | Organization, Branch, Membership, Capability |
 | **verification** | Identity/org/professional verification lifecycle & documents | Verification, VerificationDocument |

@@ -300,17 +300,17 @@ test.describe("installer phone + password auth", () => {
       const text = await page.locator("body").innerText();
       expect(text).not.toContain(ALIAS_MARKER);
       // The settings copy states how THIS account signs in: phone + password,
-      // never the passwordless one-time-code text (either locale).
+      // never the email + password text (either locale).
       expect(text).toMatch(/phone number you registered with and your password|برقم الهاتف الذي سجّلت به وكلمة المرور/);
-      expect(text).not.toMatch(/Aladdin has no passwords|لا توجد كلمات مرور/);
+      expect(text).not.toMatch(/your email address and your password|ببريدك الإلكتروني وكلمة المرور/);
     }
   });
 
-  test("an email account keeps the one-time-code sign-in copy in settings", async ({ page, request }) => {
+  test("an email account keeps the email + password sign-in copy in settings", async ({ page, request }) => {
     await signIn(page, request, "hossam@example.test", /\/home$/);
     await page.goto("/home/settings");
     const text = await page.locator("body").innerText();
-    expect(text).toMatch(/Aladdin has no passwords|لا توجد كلمات مرور/);
+    expect(text).toMatch(/your email address and your password|ببريدك الإلكتروني وكلمة المرور/);
     expect(text).not.toMatch(/phone number you registered with|برقم الهاتف الذي سجّلت به/);
   });
 

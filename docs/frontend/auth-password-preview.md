@@ -1,5 +1,8 @@
-# Password authentication preview
+# Canonical password authentication (historical name: password authentication preview)
 
+> **Status (2026-09-28): LIVE.** Merged to `main` (PR #66) and smoke-tested
+> on Production — see *Post-rollout audit* below.
+>
 > **Status (2026-09-27): PROMOTED to the canonical `/auth/*` routes** on
 > branch `feature/canonical-password-auth`. The password flow below is now
 > the canonical Aladdin sign-up / sign-in / recovery. Everything after this
@@ -54,7 +57,7 @@
 > soon"); the server still rejects forged Coming Soon / transitional /
 > unknown keys.
 >
-> **Before merging to Production:** add
+> **Before merging to Production** *(historical pre-merge checklist — the rollout shipped 2026-09-28)*: add
 > `https://aladdindecore.com/auth/forgot-password/reset` to Supabase Auth →
 > Redirect URLs (keep the old `/preview/auth-password/forgot-password/reset`
 > entry until in-flight recovery emails have expired). Existing accounts
@@ -63,6 +66,78 @@
 > Email-OTP `/auth/recovery` route still exists, unlinked, and still signs
 > them in with a code). The legacy passwordless code (`server/actions/auth.ts`,
 > `EmailOtpFlow`, the onboarding pages) is intentionally left in place.
+
+## Post-rollout audit (2026-09-28)
+
+Canonical password auth (PR #66) is merged to `main` and **smoke-tested on
+Production**. The model is **General = Email + Password** (`/auth/*`, Email
+OTP verification on sign-up, Email OTP Forgot Password) and **Installer =
+Phone + Password** (`/installer/*`, [installer-phone-auth.md](installer-phone-auth.md)).
+The file/module names `auth-password-preview` are historical and kept
+deliberately (a broad rename is out of scope and adds risk); the env var
+`AUTH_PASSWORD_PREVIEW_GRANT_SECRET` and the `app_metadata` flag
+`aladdin_pw_preview_password_set` keep their names because hosted settings
+and existing accounts depend on them.
+
+### Route audit
+
+| Route | Active | User-facing | Compatibility only | Safe to remove later | Dependencies |
+|---|---|---|---|---|---|
+| `/auth/sign-up` | Yes | Yes | No | No — canonical | `PasswordSignUpForm`; `requestPasswordSignUp` / `verifyPasswordSignUp` / `resendPasswordSignUpCode`; Turnstile; `admin-server.ts` (service role); username preflight + timing floor |
+| `/auth/sign-in` | Yes | Yes | No | No — canonical | `PasswordSignInForm`; `passwordSignIn`; `installerSignInHref` (secondary installer link, forwards only an unchanged-valid `next`); no CAPTCHA |
+| `/auth/forgot-password` | Yes | Yes | No | No — canonical | `ForgotPasswordForm`; `requestRecoveryCode` (neutral result); Turnstile; `pwr_email` cookie |
+| `/auth/forgot-password/verify` | Yes | Yes | No | No — canonical | `verifyRecoveryCode` on the isolated non-persisting client; seals `pwr_grant` |
+| `/auth/forgot-password/reset` | Yes | Yes | No | No — canonical; also Supabase recovery `redirectTo` | `requireRecoverySession`; `resetPasswordAndSignOut` (global sign-out) |
+| `/auth/forgot-password/success` | Yes | Yes | No | No — canonical | `consumeRecoverySuccess` (`pwr_success`) |
+| `/auth/finish-registration` | Yes | Yes (redirect target only) | No | No — canonical | `my_registration_state()`; `server/actions/registration.ts` |
+| `/installer/sign-up` | Yes | Yes | No | No — canonical | `installer-phone-auth` actions; craftsman-login alias; E.164 normalization; Turnstile; service role |
+| `/installer/sign-in` | Yes | Yes | No | No — canonical | `installer-phone-auth` actions; alias lookup |
+| `/preview/auth-password/{sign-up,sign-in,forgot-password,forgot-password/verify,forgot-password/reset,forgot-password/success,finish-registration}` | Yes (server redirects) | No UI | **Yes** | Later — see retention below | `sanitizeNext` (sign-in), allow-listed `reason` (finish-registration); `canonical-routes.test.tsx` |
+| `/temporary/craftsman/{sign-up,sign-in}` | Yes (308 in `next.config.ts`) | No UI | **Yes** | Later — see retention below | `next.config.ts` redirects |
+| `/auth/recovery` | Yes | Yes, but **unlinked** (URL only) | Legacy/migration | Later — once no account lacks a password | `RecoveryForm` → `EmailOtpFlow` → `requestEmailOtp` / `verifyEmailOtp`; E2E `account-registration.spec.ts`, `auth-password-preview.spec.ts` |
+| `/auth/verify` | Yes | Yes, but **unlinked** | Legacy | Later — after confirming no hosted email template links here | `VerifyForm` → `requestEmailOtp` / `verifyEmailOtp` |
+| `/preview/auth-password/migrate` | Yes | Yes, but **unlinked** | Legacy/migration | Later — once no account lacks a password (Forgot Password already covers them) | `migrationEligibility`, `requestMigrationCode`, `completeMigration`, `redirectPhoneLoginAccount`; preview `layout.tsx` |
+| `/preview/auth-password/change-password` | Yes | Yes, but **unlinked** | No — the only authenticated change-password flow | **No** — promote into Settings first (product decision) | `changePassword`; `migrationEligibility`; preview `layout.tsx` |
+| `/auth/invite/[token]`, `/auth/support` | Yes | Yes | No | No | `acceptInvitation` (no OTP); `SupportPanel` |
+
+**Retention for compatibility redirects:** keep `/preview/auth-password/*`
+and `/temporary/craftsman/*` for at least **90 days** (to ~2026-12-28) —
+old bookmarks, test links and 308s cached by browsers. The
+`/preview/auth-password/forgot-password/*` stubs must additionally outlive
+the old Supabase Redirect URL. Remove only in a dedicated PR that also
+deletes `app/preview/auth-password/layout.tsx` once migrate and
+change-password have moved.
+
+### Legacy code audit
+
+**A — still required**
+
+- `server/actions/auth.ts` → `signOut` (account/profile menus, settings, installer shell).
+- `features/auth/auth-card.tsx`, `features/auth/brand-panel.tsx` — rendered by every canonical auth screen and both layouts.
+- `features/auth/invite-panel.tsx` + `/auth/invite/[token]` — uses `acceptInvitation`; **invitations do not depend on the legacy OTP actions** (signed-out invitees go to `/auth/sign-in` / `/auth/sign-up`).
+- `features/auth/support-panel.tsx` + `/auth/support` — linked from headers, settings, landing and recovery.
+- `/onboarding/*` — still the gate for verified accounts without app access (`postSessionRedirect`); contains no OTP code.
+- The `auth.*` i18n namespace — holds shared strings (brand panel, `installerPhoneSignIn`) besides legacy copy.
+
+**B — legacy / migration / recovery compatibility only**
+
+- `server/actions/auth.ts` → `requestEmailOtp`, `verifyEmailOtp`.
+- `features/auth/email-otp-flow.tsx`, `recovery-form.tsx`, `verify-form.tsx`; routes `/auth/recovery`, `/auth/verify`.
+- `/preview/auth-password/migrate` (+ `migration-form.tsx`, `already-has-password.tsx`) and `/preview/auth-password/change-password` (+ `change-password-form.tsx`).
+- Removal precondition for all of B: a hosted query confirming no active email account lacks the `aladdin_pw_preview_password_set` flag, and a check that no hosted Supabase email template links `/auth/verify`.
+
+**C — truly dead (not deleted in this PR)**
+
+- `features/auth/sign-in-form.tsx` (`SignInForm`) and its test `sign-in-form.test.tsx` — no importer outside its own test; its `/auth/recovery` link is therefore never rendered.
+- `features/auth/sign-up-form.tsx` (legacy passwordless `SignUpForm`) — no importer.
+- `server/actions/auth.ts` → `requestSignUpOtp`, `verifySignUpOtp` — only called by the dead `SignUpForm`; not unit-tested.
+- i18n key `auth.passwordless` ("No passwords — sign in with a one-time email code.") — only rendered by the dead `SignInForm`.
+
+These were left in place: removing them edits `server/actions/auth.ts`
+(which also exports the live `signOut`) and both message catalogs, which is
+better done in a dedicated, separately reviewed deletion PR.
+
+## History
 
 **Revision 5** (Architecture B closure pass). Revision 1 established the
 isolated preview; revision 2 changed the password policy to 10 characters +
@@ -85,9 +160,11 @@ fixed one unrelated, pre-existing test bug along the way — see *Remaining
 blockers* below). Recovery, migration, and change-password are all
 **unchanged**. **Still an isolated preview. Nothing here has been pushed,
 merged, or deployed, and production `/auth/*` remains byte-for-byte
-unchanged.**
+unchanged.** *Superseded by the canonical password-auth rollout on 2026-09-28.*
 
 ## Purpose and current decision
+
+*Superseded by the canonical password-auth rollout on 2026-09-28.*
 
 An isolated preview of a **password-based** registration/sign-in journey lives
 at `/preview/auth-password/*`, reviewed here before any integration into the
@@ -97,6 +174,8 @@ This preview does **not** decide the product direction. See
 *Documentation conflict — must be resolved before promotion* below.
 
 ## Documentation conflict — must be resolved before promotion
+
+*Superseded by the canonical password-auth rollout on 2026-09-28.* Resolved: the product decision is recorded in `PRODUCT_DIRECTION_GUIDE.md` (Change History 2026-09-28) and reconciled across the core guides; the remaining supporting docs are marked superseded.
 
 Unchanged from revision 1: this repository's canonical, binding project-memory
 files (`CLAUDE.md`, `PRODUCT_DIRECTION_GUIDE.md`, `ARCHITECTURE_GUIDE.md`,
@@ -1231,7 +1310,7 @@ that plan. If Option B is approved, the only new env var needed is a
 server-only `TURNSTILE_SECRET_KEY` (added to `serverEnvSchema`, never
 `NEXT_PUBLIC_*`) alongside the existing single `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
 
-**Documentation conflict, still open**: the canonical passwordless auth model
+**Documentation conflict** *(resolved — Turnstile is canonical; superseded by the canonical password-auth rollout on 2026-09-28)*: the canonical passwordless auth model
 (root `CLAUDE.md`) specifies **reCAPTCHA**, not Turnstile, for the real
 production Create Account flow. This preview uses Turnstile per the original
 revision-3 instruction ("Cloudflare Turnstile preferred unless the repo
@@ -1386,5 +1465,6 @@ Still open:
 - Live hosted `aladdin-staging` Auth-config audit (see that section) —
   blocked this session on credential access; safe alternatives offered
   there.
-- Updating the ~20 supporting docs / in-code "passwordless" assertions
-  (unchanged list from revision 1).
+- ~~Updating the ~20 supporting docs / in-code "passwordless" assertions
+  (unchanged list from revision 1).~~ Done in the post-rollout cleanup
+  (2026-09-28): current-policy lines are marked superseded.

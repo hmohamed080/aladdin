@@ -33,7 +33,9 @@ import {
  * forgot-password/*, finish-registration). The module keeps its historical
  * name; the old `/preview/auth-password/*` URLs are server-side redirects to
  * the canonical ones. The legacy passwordless actions in
- * `server/actions/auth.ts` are untouched. It deliberately reuses the
+ * `server/actions/auth.ts` still serve `/auth/verify` and `/auth/recovery`,
+ * plus the shared `signOut` (see docs/frontend/auth-password-preview.md
+ * §Legacy code audit). It deliberately reuses the
  * same primitives production auth already uses (`getServerSupabase`,
  * `sanitizeNext`, `resolveActiveLanding`, `my_registration_state`) rather than
  * inventing a parallel session/authorization model; only the credential
@@ -103,8 +105,8 @@ const RECOVERY_EMAIL_COOKIE = "pwr_email";
 const RECOVERY_SUCCESS_COOKIE = "pwr_success";
 /**
  * The recovery-grant cookie (`lib/supabase/recovery-grant.ts`) — an
- * AES-256-GCM-encrypted blob, not a boolean flag. Revision 2 of this preview
- * gated Screen 3 on a plain `"1"` marker cookie set after `verifyOtp`
+ * AES-256-GCM-encrypted blob, not a boolean flag. Revision 2 of this flow
+ * (pre-rollout) gated Screen 3 on a plain `"1"` marker cookie set after `verifyOtp`
  * succeeded on the NORMAL cookie-backed client — which meant a fully
  * privileged Supabase session was, in fact, established in the app's real
  * session cookies for the whole window between Screen 2 and Screen 3.
@@ -246,10 +248,11 @@ function logRegistrationStepFailure(step: "account_type" | "username" | "display
 /**
  * The same post-session redirect chain `verifyEmailOtp` uses in production
  * (registration/invitation continuation → registration-state gate → derived
- * landing). Duplicated here rather than imported/extracted: this file is an
- * unreviewed preview and must not change the production action module's
- * shape. Promotion to the canonical flow should fold this back into one
- * shared helper (see docs/frontend/auth-password-preview.md).
+ * landing). Duplicated here rather than imported/extracted: it was written
+ * while this module was still an isolated preview that could not change
+ * `server/actions/auth.ts`'s shape. Folding both copies into one shared
+ * helper is a deliberate, separately-tested follow-up — not a cleanup-only
+ * change (see docs/frontend/auth-password-preview.md).
  */
 async function postSessionRedirect(supabase: SupabaseClient<Database>, next: string): Promise<never> {
   if (next.startsWith("/onboarding") || next.startsWith(FINISH_REGISTRATION_PATH) || next.startsWith("/auth/invite/")) {
@@ -258,7 +261,7 @@ async function postSessionRedirect(supabase: SupabaseClient<Database>, next: str
   const { data: state } = await supabase.rpc("my_registration_state");
   const registrationState = state as RegistrationState;
   // A verified-but-not-yet-access_ready caller (missing account type or
-  // username) is sent to THIS preview's own minimal recovery screen, not the
+  // username) is sent to canonical password auth's own minimal finish-registration screen, not the
   // legacy six-step /onboarding wizard — see finish-registration/page.tsx.
   if (registrationState === "account_type_pending" || registrationState === "username_pending") {
     redirect(FINISH_REGISTRATION_PATH);
@@ -548,7 +551,7 @@ export async function migrationEligibility(): Promise<{ email: string; hasPasswo
 /**
  * Installer phone + password accounts (docs/frontend/installer-phone-auth.md)
  * keep an INTERNAL login alias in `auth.users.email`: a login key, not an
- * address. None of this preview's email flows (migration, change password)
+ * address. None of this module's email flows (migration, change password)
  * apply to them, so they are turned away HERE, on the server, before the alias
  * can reach a page payload or an action response. Destination: the account's
  * own settings page once it has app access, otherwise the onboarding gate —
