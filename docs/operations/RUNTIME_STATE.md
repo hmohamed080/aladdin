@@ -4,6 +4,7 @@
 
 - Branch `feature/admin-blueprint-recovery` (worktree `.claude/worktrees/admin-blueprint-recovery`) from `origin/main` @ `1618386` is now the **authoritative line for Admin work**. The uncommitted 2026-09-19 Admin work in worktree `claude/showroom-approval-workflow-acd3de` (base `2393334`, stale) is being transplanted onto it layer by layer; that old worktree is left intact as a source and must not be continued.
 - Layer A (Network Referral Admin Review): migration `20260929090001_admin_network_referral_review.sql` (one read-only, platform-gated RPC `admin_network_referrals_list`; SQL identical to the never-committed `20260919090001` original), pgTAP `65_admin_network_referral_review_test.sql`, and the review section on `/admin/verifications`. Base `20260911090001_network_referrals.sql` lifecycle, decision RPCs and Points rule unchanged.
+- Layer B: `docs/admin/` (PD register PD-001–013, feature matrix, backlog, PD-011 effects, CRM RBAC gap adoption) and the `docs/README.md` Admin section restored; the 2026-09-19 Admin sections below are recovered from the old worktree.
 - Migrations: 77 in the repo; the local shared stack has all of them applied (`migration up`, no reset). pgTAP files 11 and 20 fail on this un-reset local DB independently of this change (see the work log); a clean-reset run is still owed before any PR. Nothing pushed, applied remotely, or deployed.
 
 ## Current continuation — 2026-09-28: post-rollout auth cleanup
@@ -142,6 +143,118 @@
 - The same four pre-existing dirty CSS files remain excluded from this commit.
   Production homepage unchanged by this work; no deployment or promotion.
 - Approved video/testimonial content and final user visual approval remain pending.
+
+## Current continuation — 2026-09-19: Admin decisions locked, Phase 2 scope approved, Phase 0 Preview built
+
+- Branch `claude/showroom-approval-workflow-acd3de` (worktree), HEAD `2393334f7af9e5c9b5066756322fb5fa83420b77`
+  (unchanged — no migration this session). Product Owner approved the prior Admin audit and asked for two
+  things: lock the decisions/scope into docs, and build a **Phase 0 Admin Frontend Blueprint** before any
+  Phase 1 sensitive backend, per new decision **PD-013** (frontend-first Admin delivery).
+- [`docs/admin/PRODUCT_DECISIONS_REGISTER.md`](../admin/PRODUCT_DECISIONS_REGISTER.md): PD-001–006 and
+  PD-010–013 **APPROVED**; PD-007–009 **DEFERRED**. New: PD-010 (user suspension semantics), PD-011
+  (org suspension — NOT equivalent to suspending members; a module-by-module effect document is now a
+  required, **not-yet-produced**, prerequisite for BL-002's backend), PD-012 (Points adjustment — ratifies
+  the existing ledger, re-tiers `adjust_points`/`reverse_points_entry` to **administrator-only**), PD-013.
+- [`docs/admin/ADMIN_IMPLEMENTATION_BACKLOG.md`](../admin/ADMIN_IMPLEMENTATION_BACKLOG.md): Phase 2 scope
+  is now **locked/approved** (8-tab User Details BL-021, 9-tab Organization Details BL-022, Admin Notes/
+  Entity Timeline/Duplicate-Management moved in from later phases) — still **not implemented**. A new
+  **Phase 0** section documents the Preview built this session.
+- **New, live at `/admin/preview/**`:** a read-only Admin Frontend Blueprint, nested under the existing,
+  unmodified `app/admin/layout.tsx` (same platform-role gate, zero new auth code). Real data throughout
+  (reuses the live Admin console's own query functions, plus a new preview-scoped read-only query file,
+  `frontend/src/server/queries/admin-preview.ts`, for a per-user Points ledger read, a composed Entity
+  Timeline, and organization provenance — all RLS-safe reads, no new access). The one fixture (Admin
+  Notes, no backend yet) is clearly labelled in-UI and confined to `features/admin-preview/fixtures.ts`.
+  Every Suspend/Restore/Approve/Reject/Adjust/Reverse control is a self-contained, non-mutating
+  `PreviewActionDialog` — confirmed live that clicking "Suspend" on a real user does not change their
+  DB row. One additive nav item ("Preview") was added to the existing admin sidebar; the five original
+  items are unchanged.
+- Validation this session: `pnpm typecheck`/`pnpm lint` clean; full `pnpm test` — 123 files / 1465 tests,
+  all green; doc-link checker — 1001 links, 0 broken; live browser QA (real OTP sign-in, both the
+  installer and admin test accounts) covering AR/EN, RTL/LTR, dark mode, and mobile (375×812) — all
+  correct, zero console errors, and the real `/admin` console confirmed fully unaffected.
+- **Next:** Product Owner review of the Phase 0 Preview. Phase 1 backend (BL-001–004: user/org suspend,
+  Points admin UI, RBAC re-tiering) starts only after that review, per PD-013 — and BL-002 specifically
+  also needs PD-011's module-by-module organization-suspension-effect document produced first.
+
+## Current continuation — 2026-09-19: Admin gap analysis vs. `talent-project` (audit only, no implementation)
+
+- Branch `claude/showroom-approval-workflow-acd3de` (worktree), HEAD `2393334f7af9e5c9b5066756322fb5fa83420b77`.
+  Audit-only task: compared Aladdin's Admin system against `bstalent8-ux/talent-project`
+  (private, `main` @ `9da175fc6caeeb723b2a2420bbd45ba420d925df`) as a reference implementation.
+  **No runtime/product code, migration, RLS, or status/points/referral behavior was changed.**
+- New documentation area `docs/admin/`: [`ADMIN_FEATURE_MATRIX.md`](../admin/ADMIN_FEATURE_MATRIX.md)
+  (37 evidence-cited rows, classified A–F), [`PRODUCT_DECISIONS_REGISTER.md`](../admin/PRODUCT_DECISIONS_REGISTER.md)
+  (9 open decisions, all NEEDS OWNER DECISION), [`ADMIN_IMPLEMENTATION_BACKLOG.md`](../admin/ADMIN_IMPLEMENTATION_BACKLOG.md)
+  (20 unbuilt backlog items, 6 phases). Linked from `docs/README.md`. Full findings in the
+  Agent Work Log entry immediately below the prior continuation.
+- **Two confirmed P0 findings, evidence-grep-verified, awaiting the next implementation session
+  (blocked on PD-004's role-tiering decision before building):** (1) `users.status`'s
+  `suspended`/`deactivated` values are fully inert — no write path (no RPC ever sets them) and no
+  enforcement path (`frontend/src/middleware.ts` never references status/suspend/block at all);
+  (2) `public.adjust_points()`/`public.reverse_points_entry()` — already-built, audited,
+  reason-required Points-correction RPCs — have zero admin UI anywhere (same "backend exists, UI
+  doesn't" pattern as the prior session's Network Referrals finding, this time on Points).
+- **Next:** owner review of the 9 Product Decisions (`PRODUCT_DECISIONS_REGISTER.md`), then
+  Phase 1 of the backlog (BL-001–004: user/org suspend, Points admin UI, RBAC re-tiering) once
+  PD-004 is decided. No implementation should start before that review per the task's own
+  explicit instruction to stop after the audit.
+
+## Current continuation — 2026-09-19: Network referral admin review queue
+
+- Branch `claude/showroom-approval-workflow-acd3de` (worktree), base `2393334`.
+  Closed the one real gap in the Installer "Add a showroom I know" flow: the
+  full installer-facing lifecycle and the platform-facing decision RPCs
+  (`network_referral_approve`/`_reject`) already existed
+  (`20260911090001_network_referrals.sql`), but no admin LIST RPC or UI
+  surfaced pending Network referrals for review — the same gap
+  `admin_showroom_referrals_list` already closed for the Sales referral
+  family. Nothing else in the flow was mocked, local-state-only, or missing:
+  submission, persistence, status lifecycle, audit events and Points wiring
+  were already real and DB-backed before this session.
+- New migration `20260919090001_admin_network_referral_review.sql` *(recreated on `main` 2026-09-29 as `20260929090001_…`, SQL identical — see the 2026-09-29 section)*: one
+  read-only, platform-gated RPC, `admin_network_referrals_list`, mirroring
+  `admin_showroom_referrals_list`. No table, column, policy, or audit
+  vocabulary change — `network_referral.*` audit actions already existed.
+- New pgTAP file `58_admin_network_referral_review_test.sql` (17 assertions) *(now `65_…` on `main`)*.
+  Full suite green: 59 files, 2176 tests, `supabase db reset` + `supabase
+  test db` both clean.
+- Frontend: `listAdminNetworkReferrals` (query), `approveNetworkReferral`/
+  `rejectNetworkReferral` (actions, thin wrappers over the existing RPCs),
+  `NetworkReferralReview` (component, mirrors `ReferralReview`), wired into
+  the EXISTING `/admin/verifications` page next to the Sales `ReferralReview`
+  section — no second Admin surface. New bilingual `admin.networkReferrals.*`
+  i18n keys (EN/AR parity verified by the existing i18n test).
+  `database.types.ts` regenerated from the local instance
+  (`supabase gen types typescript --local`); diff is exactly the one new RPC.
+- **Full live E2E validation performed** (not just code inspection), against
+  a local Supabase stack (`supabase db reset` + `supabase start`, Docker) and
+  the Next.js dev server, using real WhatsApp/Email-OTP-equivalent sign-in
+  (local Inbucket-captured Email OTP) as the seeded demo accounts
+  `sayed@example.test` (installer_technician) and `admin@example.test`
+  (administrator): submitted a new-showroom referral → confirmed pending in
+  DB and on `/home/network`, survived a hard reload; it appeared on
+  `/admin/verifications` under "Showroom referrals (Network)" with referrer
+  name/masked email/phone/note; approved it → verified in Postgres the
+  `network_referrals` row flipped to `joined`, a new unowned
+  `showroom_dealer` organization with `installer_referral` provenance was
+  created, exactly one `points_ledger` row awarded the referrer +100
+  (`referral.organization_approved`), and three ordered `audit_log` rows
+  exist (`network_referral.submitted` → `organization.created` →
+  `network_referral.approved`); the installer's `/home/network` then showed
+  the referral as "Joined via you" and Points Level 2/100. Submitted and
+  rejected a second referral with a reason → confirmed in Postgres the row
+  is retained with `status = 'cancelled'` (never deleted) and the reason,
+  `network_referral.rejected` is audited, and the installer's UI no longer
+  shows it as pending. Confirmed the installer account cannot reach
+  `/admin/verifications` (silently redirected to the public site, the same
+  pattern this codebase already uses elsewhere) and, at the data layer, that
+  `admin_network_referrals_list` itself throws `42501` for both an ordinary
+  installer and `anon` (pgTAP).
+- `pnpm --filter frontend typecheck` / `lint` / the network+admin+i18n Vitest
+  files all pass clean (lint: only the pre-existing `sidebar-shell.tsx` hook
+  warning). No other route, table, RLS policy, or business rule (Points
+  formula, auth) was touched.
 
 ## Current continuation — 2026-09-19: preview hero zoom fix
 
