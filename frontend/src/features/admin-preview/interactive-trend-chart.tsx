@@ -15,7 +15,6 @@ export type TrendSeries = {
 // Literal class strings so Tailwind can see every one of them.
 const STROKE = ["", "stroke-series-1", "stroke-series-2", "stroke-series-3", "stroke-series-4", "stroke-series-5", "stroke-series-6"];
 const BG = ["", "bg-series-1", "bg-series-2", "bg-series-3", "bg-series-4", "bg-series-5", "bg-series-6"];
-const FILL = ["", "fill-series-1", "fill-series-2", "fill-series-3", "fill-series-4", "fill-series-5", "fill-series-6"];
 
 const VIEW_W = 100;
 const VIEW_H = 100;
@@ -154,7 +153,7 @@ export function InteractiveTrendChart({
         <svg
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
           preserveAspectRatio="none"
-          className="h-44 w-full touch-none tablet:h-56"
+          className="block h-44 w-full touch-none tablet:h-56"
           onPointerMove={onPointerMove}
           onPointerLeave={() => setHover(null)}
           aria-hidden="true"
@@ -182,15 +181,26 @@ export function InteractiveTrendChart({
           {hover !== null ? (
             <>
               <line x1={xOf(hover)} y1="0" x2={xOf(hover)} y2={VIEW_H} className="stroke-strong" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-              {sliced.map((s) => {
-                const idx = series.findIndex((x) => x.key === s.key);
-                const max = Math.max(1, ...s.points.map((p) => p.value));
-                const p = s.points[hover];
-                return p ? <circle key={s.key} cx={xOf(hover)} cy={yOf(p.value, max)} r="1.6" className={FILL[seriesAt(idx)]} /> : null;
-              })}
             </>
           ) : null}
         </svg>
+
+        {/* Point markers are HTML, not SVG: the plot uses preserveAspectRatio="none", which would stretch an SVG circle into an ellipse. */}
+        {hover !== null
+          ? sliced.map((s) => {
+              const idx = series.findIndex((x) => x.key === s.key);
+              const max = Math.max(1, ...s.points.map((p) => p.value));
+              const p = s.points[hover];
+              return p ? (
+                <span
+                  key={s.key}
+                  aria-hidden="true"
+                  className={cn("pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface", BG[seriesAt(idx)])}
+                  style={{ left: `${xOf(hover)}%`, top: `${yOf(p.value, max)}%` }}
+                />
+              ) : null;
+            })
+          : null}
 
         {hover !== null && labels[hover] ? (
           <div
