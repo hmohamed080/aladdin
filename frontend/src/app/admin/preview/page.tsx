@@ -30,6 +30,9 @@ export const dynamic = "force-dynamic";
  * KPI card is a real count and behaves as a filter link into the surface that
  * owns that data — never a dead number.
  *
+ * Phase 0D: the two distributions are Users by status and Organizations by
+ * status (only states Aladdin supports, zeros included).
+ *
  * Two things this page deliberately does NOT have, both explicit Product
  * Owner direction: the large Recent Activity list (Audit/each subject's own
  * Activity tab already own that surface), and — as of Phase 0C — a separate
@@ -113,12 +116,15 @@ export default async function AdminPreviewDashboardPage() {
     },
   ];
 
-  const typeEntries = Object.entries(s.usersByType)
-    .map(([k, v]) => ({
-      label: k === "unknown" ? m.admin.users.businessOnly : ((m.accountType as Record<string, string>)[k] ?? k),
-      value: v,
-    }))
-    .sort((a, b) => b.value - a.value);
+  // Every status Aladdin actually supports (the `user_status` / `org_status`
+  // enums), in lifecycle order, INCLUDING those with no records yet — an absent
+  // state reads as a real zero rather than a state that does not exist. Nothing
+  // Aladdin does not model (no "Rejected" or "Blocked" account status) is invented.
+  const statusLabels = m.admin.status as Record<string, string>;
+  const USER_STATUSES = ["pending_verification", "active", "suspended", "deactivated"] as const;
+  const ORG_STATUSES = ["draft", "pending_verification", "active", "suspended", "archived"] as const;
+  const userStatusEntries = USER_STATUSES.map((k) => ({ label: statusLabels[k] ?? k, value: s.usersByStatus[k] ?? 0 }));
+  const orgStatusEntries = ORG_STATUSES.map((k) => ({ label: statusLabels[k] ?? k, value: s.orgsByStatus[k] ?? 0 }));
 
   return (
     <div className="flex flex-col gap-xl">
@@ -128,20 +134,15 @@ export default async function AdminPreviewDashboardPage() {
 
       <section className="grid gap-lg tablet:grid-cols-2">
         <Card className="flex flex-col gap-md">
-          <SectionTitle>{m.admin.dashboard.usersByType}</SectionTitle>
-          <DistList locale={locale} entries={typeEntries} />
+          <SectionTitle>{m.admin.preview.dashboard.usersByStatus}</SectionTitle>
+          <DistList locale={locale} entries={userStatusEntries} />
         </Card>
         <Card className="flex flex-col gap-md">
-          <SectionTitle>{m.admin.dashboard.orgsByStatus}</SectionTitle>
-          <DistList
-            locale={locale}
-            entries={Object.entries(s.orgsByStatus).map(([k, v]) => ({
-              label: (m.admin.status as Record<string, string>)[k] ?? k,
-              value: v,
-            }))}
-          />
+          <SectionTitle>{m.admin.preview.dashboard.orgsByStatus}</SectionTitle>
+          <DistList locale={locale} entries={orgStatusEntries} />
         </Card>
       </section>
+      <p className="text-label text-fg-muted">{m.admin.preview.dashboard.statusDistributionNote}</p>
     </div>
   );
 }

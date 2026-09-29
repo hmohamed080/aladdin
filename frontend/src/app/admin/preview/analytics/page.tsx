@@ -2,116 +2,161 @@ import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { adminSummary } from "@/server/queries/admin";
 import {
-  previewTrafficSeriesMulti,
-  PREVIEW_TOP_PAGES_DETAILED,
+  previewTrafficForRange,
+  PREVIEW_PAGE_HITS,
   PREVIEW_TOP_EVENTS,
   previewVisitorRows,
+  type PreviewVisitorRow,
 } from "@/features/admin-preview/fixtures";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
-import { formatAdminDate, formatNumber } from "@/lib/ui/format";
+import { formatAdminDate, formatAdminDateTime, formatNumber } from "@/lib/ui/format";
 import { AdminHeader } from "@/features/admin/parts";
 import { Card, SectionTitle, StatePanel, Badge } from "@/components/ui/primitives";
 import { StatTiles, type Tile } from "@/components/ui/stat-tiles";
-import { MultiTrendLine, DonutSplit, RankedBars } from "@/components/ui/charts";
+import { DonutSplit, RankedBars } from "@/components/ui/charts";
 import { DataTable, RecordCell, Monogram, type Column } from "@/components/ui/data-table";
 import { AutoFilters } from "@/features/admin-preview/auto-filters";
+import { AnalyticsRange, type RangePreset } from "@/features/admin-preview/analytics-range";
+import { InteractiveTrendChart } from "@/features/admin-preview/interactive-trend-chart";
 import { PreviewLegend, PREVIEW_MARK } from "@/features/admin-preview/preview-legend";
-import { EyeIcon, SearchIcon, BriefcaseIcon, UserIcon, LogOutIcon, TrendingUpIcon, UsersIcon } from "@/components/ui/icons";
-import type { PreviewVisitorRow, PreviewTopPageDetailed } from "@/features/admin-preview/fixtures";
+import { canonicalRoute } from "@/features/admin-preview/table-state";
+import { EyeIcon, LogOutIcon, TrendingUpIcon, UsersIcon, ClockIcon } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 
-const RANGE_DAYS = [7, 14, 30] as const;
+const DAY = 86_400_000;
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+type PageRow = { path: string; views: number; clicks: number; avgTimeSeconds: number };
 
 /**
- * Phase 0C — Analytics enrichment. Confirmed (again) before touching this
- * page: no product-usage tracking table exists anywhere in the schema
- * (grepped every migration for `user_events`/`page_view`/`click_event`/
- * `last_active_at`/`ip_address` — zero matches), so every KPI card, the
- * chart, Top Pages and Visitors remain entirely fixture data behind the
- * permanent banner — enriching the PRESENTATION does not manufacture real
- * numbers. "Registrations by account type" and "Total registered" are the
- * two real figures (both reuse `adminSummary()`, already read by the
- * Dashboard). IP address: Aladdin does not capture it anywhere today either
- * — the Visitors column exists to show the INTENDED shape but every cell
- * reads "not tracked" rather than a fabricated address, and this page never
- * starts collecting it (see `PreviewLegend` note below the Visitors table
- * for the retention/authorization considerations a real implementation
- * would need).
+ * Analytics — Phase 0D (revised). Aladdin still has NO product-usage tracking
+ * table (grepped every migration for `user_events`/`page_view`/`click_event`/
+ * `last_active_at`/`ip_address` — zero matches), so everything except "Total
+ * registered" and "Registrations by account type" (both real, from
+ * `adminSummary()`) is fixture data behind a permanent banner. This page never
+ * starts tracking anything and never collects an IP.
+ *
+ * What changed in Phase 0D:
+ *  - **Range presets** Today / Last 7 days / Last 30 days / Custom (From–To).
+ *  - **Landing Page Views** is the primary KPI. Profile Views, Searches, Job
+ *    Applications and Clicks cards are gone; Signups, Logins, Page Engagement,
+ *    Total Registered and visitor-to-signup conversion stay.
+ *  - **Top Pages are grouped by canonical route**: `/profile/1204` and
+ *    `/profile/88` are ONE page, `/profile/[id]`.
+ *  - **Visitors** use `DD/MM/YYYY HH:mm:ss`.
+ *  - **Interactive chart** — legend toggles, hover/keyboard tooltip, range
+ *    controls — that never calls itself "Live".
+ * Admin Audit (admin/system actions) and Analytics (product usage) are never mixed.
  */
 export default async function PreviewAnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; event?: string; persona?: string }>;
+  searchParams: Promise<{ range?: string; from?: string; to?: string; event?: string; persona?: string }>;
 }) {
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const m = getMessages(locale);
-  const { range: rangeParam, event: eventFilter, persona: personaFilter } = await searchParams;
+  const { range: rangeParam, from: fromParam, to: toParam, event: eventFilter, persona: personaFilter } = await searchParams;
   const s = await adminSummary(supabase);
   const totalUsers = Object.values(s.usersByStatus).reduce((a, b) => a + b, 0);
-
-  const days = RANGE_DAYS.includes(Number(rangeParam) as (typeof RANGE_DAYS)[number]) ? Number(rangeParam) : 14;
-  const series = previewTrafficSeriesMulti(days);
-  const topEvents = eventFilter ? PREVIEW_TOP_EVENTS.filter((e) => e.event === eventFilter) : PREVIEW_TOP_EVENTS;
-  const visitors: PreviewVisitorRow[] = previewVisitorRows().filter((v) => !personaFilter || v.personaType === personaFilter);
-
   const t = m.admin.preview.analytics;
   const typeLabels = m.accountType as Record<string, string>;
 
+  // Resolve the range. An unknown preset or a malformed / inverted custom pair
+  // falls back to Last 7 days — never silently to some other window.
+  const now = new Date();
+  const todayIso = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString().slice(0, 10);
+  let preset: RangePreset = rangeParam === "today" || rangeParam === "30" || rangeParam === "custom" ? rangeParam : "7";
+  let fromIso = new Date(Date.parse(todayIso) - 6 * DAY).toISOString().slice(0, 10);
+  let toIso = todayIso;
+  if (preset === "today") fromIso = todayIso;
+  else if (preset === "30") fromIso = new Date(Date.parse(todayIso) - 29 * DAY).toISOString().slice(0, 10);
+  else if (preset === "custom") {
+    if (fromParam && toParam && ISO_DAY.test(fromParam) && ISO_DAY.test(toParam) && fromParam <= toParam && toParam <= todayIso) {
+      fromIso = fromParam;
+      toIso = toParam;
+    } else {
+      preset = "7";
+    }
+  }
+
+  const buckets = previewTrafficForRange(new Date(fromIso), new Date(toIso));
+  const hourly = buckets.length === 24 && fromIso === toIso;
+  const bucketLabel = (iso: string) =>
+    hourly
+      ? `${formatNumber(new Date(iso).getUTCHours(), locale, { minimumIntegerDigits: 2, useGrouping: false })}:00`
+      : formatAdminDate(iso, locale).slice(0, 5);
+
+  const landingPageViews = buckets.reduce((sum, b) => sum + b.landingPageViews, 0);
+  const signups = buckets.reduce((sum, b) => sum + b.signups, 0);
+  const logins = buckets.reduce((sum, b) => sum + b.logins, 0);
+  const engagement = Math.round(buckets.reduce((sum, b) => sum + b.engagementSeconds, 0) / Math.max(1, buckets.length));
+  const conversion = landingPageViews > 0 ? Math.round((signups / landingPageViews) * 1000) / 10 : 0;
+
+  const tiles: Tile[] = [
+    { label: t.kpi.signups, value: signups, Icon: TrendingUpIcon, tone: "success" },
+    { label: t.kpi.logins, value: logins, Icon: LogOutIcon, tone: "neutral" },
+    { label: t.pageEngagement, value: t.engagementValue.replace("{seconds}", formatNumber(engagement, locale)), Icon: ClockIcon, tone: "info" },
+    { label: t.kpi.totalRegistered, value: totalUsers, Icon: UsersIcon, tone: "success", href: "/admin/preview/users" },
+    { label: t.kpi.conversionRate, value: `${formatNumber(conversion, locale)}%`, Icon: TrendingUpIcon, tone: "info" },
+  ];
+
+  // Top pages: group concrete URLs by canonical route, summing views/clicks and
+  // weighting the average time by views.
+  const grouped = new Map<string, { views: number; clicks: number; timeWeighted: number }>();
+  for (const hit of PREVIEW_PAGE_HITS) {
+    const route = canonicalRoute(hit.path);
+    const g = grouped.get(route) ?? { views: 0, clicks: 0, timeWeighted: 0 };
+    g.views += hit.views;
+    g.clicks += hit.clicks;
+    g.timeWeighted += hit.avgTimeSeconds * hit.views;
+    grouped.set(route, g);
+  }
+  const topPages: PageRow[] = [...grouped.entries()]
+    .map(([path, g]) => ({ path, views: g.views, clicks: g.clicks, avgTimeSeconds: Math.round(g.timeWeighted / g.views) }))
+    .sort((a, b) => b.views - a.views);
+
+  const topEvents = eventFilter ? PREVIEW_TOP_EVENTS.filter((e) => e.event === eventFilter) : PREVIEW_TOP_EVENTS;
+  const visitors = previewVisitorRows().filter((v) => !personaFilter || v.personaType === personaFilter);
   const registrationsSlices = Object.entries(s.usersByType).map(([k, v]) => ({
     label: k === "unknown" ? m.admin.users.businessOnly : (typeLabels[k] ?? k),
     value: v,
   }));
 
-  const totalPageViews = series.reduce((sum, p) => sum + p.pageViews, 0);
-  const totalSignups = series.reduce((sum, p) => sum + p.signups, 0);
-  const totalClicks = series.reduce((sum, p) => sum + p.clicks, 0);
-  const totalProfileViews = series.reduce((sum, p) => sum + p.profileViews, 0);
-  const searchCount = PREVIEW_TOP_EVENTS.find((e) => e.event === "search")?.count ?? 0;
-  const jobApplicationCount = PREVIEW_TOP_EVENTS.find((e) => e.event === "job_application")?.count ?? 0;
-  const loginCount = Math.round(totalPageViews * 0.35);
-  const totalVisitors = 480; // deterministic fixture magnitude behind the KPI card, same order as previewVisitorRows()
-  const conversionRate = totalVisitors > 0 ? Math.round((totalSignups / totalVisitors) * 100) : 0;
-
-  const kpiTiles: Tile[] = [
-    { label: t.kpi.pageViews, value: totalPageViews, Icon: EyeIcon, tone: "info" },
-    { label: t.kpi.profileViews, value: totalProfileViews, Icon: UserIcon, tone: "info" },
-    { label: t.kpi.search, value: searchCount, Icon: SearchIcon, tone: "neutral" },
-    { label: t.kpi.jobApplications, value: jobApplicationCount, Icon: BriefcaseIcon, tone: "accent" },
-    { label: t.kpi.signups, value: totalSignups, Icon: TrendingUpIcon, tone: "success" },
-    { label: t.kpi.logins, value: loginCount, Icon: LogOutIcon, tone: "neutral" },
-    { label: t.kpi.clicks, value: totalClicks, Icon: TrendingUpIcon, tone: "neutral" },
-    { label: t.kpi.totalRegistered, value: totalUsers, Icon: UsersIcon, tone: "success", href: "/admin/preview/users" },
-    { label: t.kpi.conversionRate, value: `${formatNumber(conversionRate, locale)}%`, Icon: TrendingUpIcon, tone: "info" },
-  ];
-
-  const topPagesColumns: Column<PreviewTopPageDetailed>[] = [
-    { key: "path", header: t.topPagesColumns.page, grow: true, cell: (p) => <span dir="ltr">{p.path}</span> },
-    { key: "views", header: t.topPagesColumns.views, numeric: true, cell: (p) => formatNumber(p.views, locale) },
-    { key: "clicks", header: t.topPagesColumns.clicks, numeric: true, secondary: true, cell: (p) => formatNumber(p.clicks, locale) },
-    { key: "avgTime", header: t.topPagesColumns.avgTime, numeric: true, secondary: true, cell: (p) => `${formatNumber(p.avgTimeSeconds, locale)}s` },
+  const topPagesColumns: Column<PageRow>[] = [
+    { key: "path", header: t.topPagesColumns.page, minWidth: "14rem", grow: true, cell: (p) => <code dir="ltr" className="text-label">{p.path}</code> },
+    { key: "views", header: t.topPagesColumns.views, minWidth: "6rem", numeric: true, cell: (p) => formatNumber(p.views, locale) },
+    { key: "clicks", header: t.topPagesColumns.clicks, minWidth: "6rem", numeric: true, secondary: true, cell: (p) => formatNumber(p.clicks, locale) },
+    { key: "avgTime", header: t.topPagesColumns.avgTime, minWidth: "7rem", numeric: true, secondary: true, cell: (p) => `${formatNumber(p.avgTimeSeconds, locale)}s` },
   ];
 
   const visitorColumns: Column<PreviewVisitorRow>[] = [
     {
-      key: "visitor",
-      header: t.columns.visitor,
-      grow: true,
-      cell: (v) => <RecordCell title={v.label} avatar={<Monogram name={v.label} size={28} />} />,
-    },
-    {
-      key: "registered",
-      header: t.registeredOrGuest,
+      key: "userOrGuest",
+      header: t.visitorColumns.userOrGuest,
+      minWidth: "9rem",
+      nowrap: true,
       cell: (v) => (v.personaType ? <Badge tone="success">{t.registered}</Badge> : <Badge tone="neutral">{t.guest}</Badge>),
     },
-    { key: "persona", header: t.columns.persona, secondary: true, cell: (v) => (v.personaType ? (typeLabels[v.personaType] ?? v.personaType) : "—") },
-    { key: "ip", header: `${t.ipAddress}${PREVIEW_MARK}`, secondary: true, cell: () => <span className="text-fg-muted">{t.ipNotTracked}</span> },
-    { key: "firstSeen", header: t.columns.firstSeen, secondary: true, cell: (v) => formatAdminDate(v.firstSeen, locale) },
-    { key: "lastActive", header: t.columns.lastActive, cell: (v) => formatAdminDate(v.lastActive, locale) },
-    { key: "totalEvents", header: t.columns.totalEvents, numeric: true, cell: (v) => formatNumber(v.totalEvents, locale) },
+    {
+      key: "identity",
+      header: t.visitorColumns.identity,
+      minWidth: "14rem",
+      grow: true,
+      cell: (v) =>
+        v.personaType ? (
+          <RecordCell wrap title={v.label} meta={typeLabels[v.personaType] ?? v.personaType} avatar={<Monogram name={v.label} size={28} />} />
+        ) : (
+          <span className="text-fg-muted">{t.unresolvedIdentity}</span>
+        ),
+    },
+    { key: "ip", header: `${t.ipAddress}${PREVIEW_MARK}`, minWidth: "9rem", nowrap: true, secondary: true, cell: () => <span className="text-fg-muted">{t.ipNotTracked}</span> },
+    { key: "firstSeen", header: t.visitorColumns.firstSeen, minWidth: "11.5rem", nowrap: true, cell: (v) => formatAdminDateTime(v.firstSeen, locale) },
+    { key: "lastActivity", header: t.visitorColumns.lastActivity, minWidth: "11.5rem", nowrap: true, cell: (v) => formatAdminDateTime(v.lastActive, locale) },
+    { key: "events", header: t.visitorColumns.events, minWidth: "6rem", numeric: true, cell: (v) => formatNumber(v.totalEvents, locale) },
   ];
 
   return (
@@ -122,31 +167,40 @@ export default async function PreviewAnalyticsPage({
         {t.fixtureBanner}
       </p>
 
-      <AutoFilters
-        fields={[
-          { kind: "select", name: "range", anyLabel: `${t.dateRange}: 14`, options: RANGE_DAYS.filter((d) => d !== 14).map((d) => ({ value: String(d), label: String(d) })) },
-          { kind: "select", name: "event", anyLabel: t.anyEvent, options: PREVIEW_TOP_EVENTS.map((e) => ({ value: e.event, label: e.event })) },
-          { kind: "select", name: "persona", anyLabel: t.personaFilter, options: Object.entries(typeLabels).map(([value, label]) => ({ value, label })) },
-        ]}
-      />
+      <AnalyticsRange current={preset} from={fromIso} to={toIso} max={todayIso} />
 
-      <StatTiles tiles={kpiTiles} locale={locale} layout="grid" columns={5} />
+      <section className="grid gap-md desktop:grid-cols-[minmax(0,20rem)_1fr]">
+        {/* The primary KPI: how many people reached the landing page. */}
+        <Card className="flex flex-col justify-center gap-1">
+          <p className="flex items-center gap-1.5 text-label font-medium text-fg-secondary">
+            <EyeIcon size={16} />
+            {t.landingPageViews}
+          </p>
+          <p className="text-display tabular-nums text-fg">{formatNumber(landingPageViews, locale)}</p>
+        </Card>
+        <StatTiles tiles={tiles} locale={locale} layout="grid" columns={3} />
+      </section>
       <PreviewLegend>{t.kpiFixtureNote}</PreviewLegend>
 
       <Card className="flex flex-col gap-md">
         <SectionTitle>{t.trafficOverTime}</SectionTitle>
-        <MultiTrendLine
-          series={[
-            { label: t.pageViews, points: series.map((p) => ({ label: p.date.slice(5), value: p.pageViews })) },
-            { label: t.signups, points: series.map((p) => ({ label: p.date.slice(5), value: p.signups })) },
-            { label: t.kpi.clicks, points: series.map((p) => ({ label: p.date.slice(5), value: p.clicks })) },
-            { label: t.profileViews, points: series.map((p) => ({ label: p.date.slice(5), value: p.profileViews })) },
-          ]}
-          emptyLabel={m.admin.preview.duplicates.none}
+        <InteractiveTrendChart
+          rangeControls={!hourly}
           ariaLabel={t.trafficOverTime}
-          formatValue={(v) => formatNumber(v, locale)}
+          series={[
+            { key: "landing", label: t.landingPageViews, points: buckets.map((b) => ({ label: bucketLabel(b.at), value: b.landingPageViews })) },
+            { key: "signups", label: t.kpi.signups, points: buckets.map((b) => ({ label: bucketLabel(b.at), value: b.signups })) },
+            { key: "logins", label: t.kpi.logins, points: buckets.map((b) => ({ label: bucketLabel(b.at), value: b.logins })) },
+          ]}
         />
       </Card>
+
+      <AutoFilters
+        fields={[
+          { kind: "select", name: "event", anyLabel: t.anyEvent, options: PREVIEW_TOP_EVENTS.map((e) => ({ value: e.event, label: e.event })) },
+          { kind: "select", name: "persona", anyLabel: t.personaFilter, options: Object.entries(typeLabels).map(([value, label]) => ({ value, label })) },
+        ]}
+      />
 
       <section className="grid gap-lg tablet:grid-cols-2">
         <Card className="flex flex-col gap-md">
@@ -163,19 +217,14 @@ export default async function PreviewAnalyticsPage({
 
         <Card className="flex flex-col gap-md">
           <SectionTitle>{t.topEvents}</SectionTitle>
-          <RankedBars
-            items={topEvents.map((e) => ({ label: e.event, value: e.count }))}
-            locale={locale}
-            emptyLabel={m.admin.preview.duplicates.none}
-            bar="iris"
-            rank
-          />
+          <RankedBars items={topEvents.map((e) => ({ label: e.event, value: e.count }))} locale={locale} emptyLabel={m.admin.preview.duplicates.none} bar="iris" rank />
         </Card>
       </section>
 
       <section className="flex flex-col gap-md">
         <SectionTitle>{t.topPages}</SectionTitle>
-        <DataTable columns={topPagesColumns} rows={PREVIEW_TOP_PAGES_DETAILED} rowKey={(p) => p.path} caption={t.topPages} empty={<StatePanel title={m.admin.preview.duplicates.none} />} />
+        <p className="text-label text-fg-muted">{t.canonicalNote}</p>
+        <DataTable columns={topPagesColumns} rows={topPages} rowKey={(p) => p.path} caption={t.topPages} minWidth="34rem" empty={<StatePanel title={m.admin.preview.duplicates.none} />} />
       </section>
 
       <section className="flex flex-col gap-md">
@@ -183,7 +232,7 @@ export default async function PreviewAnalyticsPage({
         {visitors.length === 0 ? (
           <StatePanel title={m.admin.preview.duplicates.none} />
         ) : (
-          <DataTable columns={visitorColumns} rows={visitors} rowKey={(v) => v.id} caption={t.visitorTable} empty={<StatePanel title={m.admin.preview.duplicates.none} />} />
+          <DataTable columns={visitorColumns} rows={visitors} rowKey={(v) => v.id} caption={t.visitorTable} minWidth="62rem" stackBelow="desktop" empty={<StatePanel title={m.admin.preview.duplicates.none} />} />
         )}
         <PreviewLegend>{t.ipPrivacyNote}</PreviewLegend>
       </section>

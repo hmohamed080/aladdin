@@ -9,16 +9,16 @@ import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatAdminDate, formatCount, formatNumber } from "@/lib/ui/format";
 import { AdminHeader, StatusBadge } from "@/features/admin/parts";
 import { StatePanel, Badge, Card } from "@/components/ui/primitives";
-import { ButtonLink } from "@/components/ui/controls";
-import { cn } from "@/lib/ui/cn";
-import { DataTable, RecordCell, Monogram, ListFooter, type Column } from "@/components/ui/data-table";
+import { DataTable, RecordCell, Monogram, type Column } from "@/components/ui/data-table";
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
-import { RowIconLink } from "@/features/admin-preview/row-icon-button";
+import { RowIconLink, RowIconDisabled } from "@/features/admin-preview/row-icon-button";
 import { RowIconAction } from "@/features/admin-preview/row-icon-action";
 import { AutoFilters, SortableHeader } from "@/features/admin-preview/auto-filters";
 import { PreviewLegend, PREVIEW_MARK } from "@/features/admin-preview/preview-legend";
-import { EyeIcon, WhatsAppIcon, CheckIcon, XIcon, AlertIcon } from "@/components/ui/icons";
+import { TablePagination } from "@/features/admin-preview/table-pagination";
+import { clampPageSize, paginate, parseSort, previewRegisteredAt, sortRows } from "@/features/admin-preview/table-state";
+import { EyeIcon, SettingsIcon, WhatsAppIcon, CheckIcon, XIcon, AlertIcon } from "@/components/ui/icons";
 import type { AdminUserRow } from "@/server/queries/admin";
 
 export const dynamic = "force-dynamic";
@@ -37,38 +37,39 @@ type Row = AdminUserRow & {
   verificationStatus: string | null;
   verificationState: "verified" | "pending" | "unverified" | "rejected";
   flags: FlagCode[];
+  /** Preview-only displayed registration date; the real `createdAt` is untouched. */
+  registeredAt: string;
+  profileId: string | null;
+  publicProfileAvailable: boolean;
 };
 
-const PAGE_SIZES = [10, 25, 50, 100] as const;
-
-const disabledPagerClass =
-  "inline-flex min-h-8 select-none items-center justify-center rounded-sm px-3 py-1 text-label font-medium text-fg-muted opacity-50";
-
-function pagerHref(keep: Record<string, string | undefined>, page: number): string {
+function filterHref(keep: Record<string, string | undefined>, overrides: Record<string, string>): string {
   const qs = new URLSearchParams();
-  for (const [k, v] of Object.entries(keep)) if (v) qs.set(k, v);
-  if (page > 1) qs.set("page", String(page));
+  for (const [k, v] of Object.entries({ ...keep, ...overrides })) if (v) qs.set(k, v);
   const s = qs.toString();
   return s ? `?${s}` : "?";
 }
 
 /**
- * Phase 0C — Users Directory final column model, refining Phase 0B's page in
- * place (same route, same real query functions — no parallel surface).
+ * Users Directory — Phase 0D final column model (PD-016: this page is the
+ * foundation of the production directory, so it stays the shared `DataTable`
+ * plus the shared footer, not a one-off).
+ *
+ * Twelve columns: Name · Email · Phone (+ WhatsApp) · Organization · City ·
+ * Verification · Registered · Status · Last active · Profile completion ·
+ * Flags · Actions.
  *
  * Real: `listUsers()`, `previewUsersDirectoryContext()` (organization,
- * verification), `user.status`. Fixture, clearly marked (`PREVIEW_MARK` on
- * the column header + the one `PreviewLegend` below the toolbar, not a badge
- * per cell): email/phone/city (no safe admin read path — see
- * `previewContactFor`'s doc comment), profile completeness (Aladdin's real
- * `lib/profile/completeness.ts` engine needs `individual_onboarding`, which
- * is self-select-only RLS — an admin cannot read another user's onboarding
- * answers to compute it for real today), the duplicate flag.
+ * verification, profile id), `user.status`. Fixture, marked with `PREVIEW_MARK`
+ * on the header and one `PreviewLegend` below the toolbar: email/phone/city,
+ * profile completeness (the real engine needs `individual_onboarding`, which is
+ * self-select-only RLS), the duplicate flag, and the *displayed* Registered
+ * date (varied so a correct sort is visually verifiable; real dates untouched).
  *
- * The 200-row fetch this filters over is a Preview-UX limitation, not a
- * claim of completeness — `previewTotalNote` says so next to the count.
- * Search/filters apply automatically (`AutoFilters`, debounced text, instant
- * selects) — no Search button. Default page size is 10.
+ * The eye icon means **View on platform**: the public profile at
+ * `/p/[profileId]` in a new tab. It is keyed by PROFILE id (a user id there is
+ * a guaranteed 404) and is disabled unless `profile_public_directory` says the
+ * page will actually render. **Manage** opens the Admin details page.
  */
 export default async function PreviewUsersPage({
   searchParams,
@@ -125,6 +126,9 @@ export default async function PreviewUsersPage({
       verificationStatus,
       verificationState,
       flags,
+      registeredAt: previewRegisteredAt(u.id, u.createdAt),
+      profileId: ctx?.profileId ?? null,
+      publicProfileAvailable: ctx?.publicProfileAvailable ?? false,
     };
   });
 
@@ -150,19 +154,19 @@ export default async function PreviewUsersPage({
   if (flag === "duplicate") filtered = filtered.filter((r) => r.duplicate);
   if (flag === "incomplete") filtered = filtered.filter((r) => r.completeness < 70);
 
-  const [sortField, sortDir] = (sort ?? "").split(":");
-  if (sortField === "registered") {
-    filtered = [...filtered].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    if (sortDir === "desc") filtered.reverse();
-  } else if (sortField === "completeness") {
-    filtered = [...filtered].sort((a, b) => a.completeness - b.completeness);
-    if (sortDir === "desc") filtered.reverse();
-  }
+  // ONE sort state, parsed against the declared fields only. Registered and
+  // Profile Completion each own their column; neither ever reads the other's
+  // direction. Default (no `?sort=`) is Registered, newest first.
+  const sortState = parseSort(sort, ["registered", "completeness"] as const) ?? { field: "registered" as const, dir: "desc" as const };
+  filtered = sortRows(
+    filtered,
+    sortState.dir,
+    sortState.field === "registered" ? (r) => new Date(r.registeredAt).getTime() : (r) => r.completeness,
+    (r) => r.id,
+  );
 
-  const pageSize = PAGE_SIZES.includes(Number(pageSizeParam) as (typeof PAGE_SIZES)[number]) ? Number(pageSizeParam) : 10;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const page = Math.min(Math.max(1, Number(pageParam) || 1), totalPages);
-  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const pageSize = clampPageSize(pageSizeParam);
+  const slice = paginate(filtered, pageParam, pageSize);
 
   const typeLabels = m.accountType as Record<string, string>;
   const statusLabels = m.admin.status as Record<string, string>;
@@ -171,16 +175,19 @@ export default async function PreviewUsersPage({
   const cols = m.admin.preview.users.columns;
   const rowActionLabels = m.admin.preview.users.rowActions;
   const warnings = m.admin.preview.users.warnings;
+  const platform = m.admin.preview.platformView;
   const keep = { q, status, type, verification, city, flag, pageSize: pageSizeParam, sort };
 
   const columns: Column<Row>[] = [
     {
       key: "name",
       header: cols.name,
+      minWidth: "15rem",
       grow: true,
       cell: (u) => (
         <span className="flex min-w-0 items-center gap-1.5">
           <RecordCell
+            wrap
             title={u.displayName || m.admin.users.unnamed}
             href={`/admin/preview/users/${u.id}`}
             avatar={<Monogram name={u.displayName || "?"} size={28} />}
@@ -196,15 +203,19 @@ export default async function PreviewUsersPage({
     {
       key: "email",
       header: `${cols.email}${PREVIEW_MARK}`,
+      minWidth: "16rem",
+      nowrap: true,
       secondary: true,
-      cell: (u) => <span dir="ltr" className="truncate text-label">{u.email}</span>,
+      cell: (u) => <span dir="ltr" className="text-label">{u.email}</span>,
     },
     {
       key: "phone",
       header: `${cols.phone}${PREVIEW_MARK}`,
+      minWidth: "11rem",
+      nowrap: true,
       cell: (u) => (
         <span className="flex items-center gap-1.5">
-          <span dir="ltr" className="truncate text-label">{u.phone}</span>
+          <span dir="ltr" className="text-label">{u.phone}</span>
           <RowIconLink
             href={whatsappShareUrl({ phone: u.phone, message: `Hi ${u.displayName || ""}` })}
             label={rowActionLabels.whatsapp}
@@ -218,10 +229,11 @@ export default async function PreviewUsersPage({
     {
       key: "organization",
       header: cols.organization,
+      minWidth: "12rem",
       secondary: true,
       cell: (u) =>
         u.orgName ? (
-          <RecordCell title={u.orgName} href={u.orgId ? `/admin/preview/organizations/${u.orgId}` : undefined} meta={u.orgCount > 1 ? `+${u.orgCount - 1}` : undefined} />
+          <RecordCell wrap title={u.orgName} href={u.orgId ? `/admin/preview/organizations/${u.orgId}` : undefined} meta={u.orgCount > 1 ? `+${u.orgCount - 1}` : undefined} />
         ) : (
           <span className="text-fg-muted">{m.admin.preview.users.noOrganization}</span>
         ),
@@ -229,34 +241,45 @@ export default async function PreviewUsersPage({
     {
       key: "city",
       header: `${cols.city}${PREVIEW_MARK}`,
+      minWidth: "10rem",
       secondary: true,
       cell: (u) => u.city,
     },
     {
       key: "verification",
       header: cols.verification,
+      minWidth: "8rem",
+      nowrap: true,
       cell: (u) => <StatusBadge status={u.verificationState} label={verificationStateLabels[u.verificationState]} />,
     },
     {
       key: "registered",
-      header: <SortableHeader field="registered" label={cols.registered} />,
+      header: <SortableHeader field="registered" label={`${cols.registered}${PREVIEW_MARK}`} isDefault />,
+      minWidth: "8.5rem",
+      nowrap: true,
       secondary: true,
-      cell: (u) => formatAdminDate(u.createdAt, locale),
+      cell: (u) => formatAdminDate(u.registeredAt, locale),
     },
     {
       key: "status",
       header: cols.status,
+      minWidth: "7.5rem",
+      nowrap: true,
       cell: (u) => <StatusBadge status={u.status} label={statusLabels[u.status] ?? u.status} />,
     },
     {
       key: "lastActive",
       header: `${cols.lastActive}${PREVIEW_MARK}`,
+      minWidth: "8.5rem",
+      nowrap: true,
       secondary: true,
       cell: () => <span className="text-fg-muted">{m.admin.preview.users.lastActiveUnavailable}</span>,
     },
     {
       key: "completeness",
       header: <SortableHeader field="completeness" label={`${cols.completeness}${PREVIEW_MARK}`} />,
+      minWidth: "9rem",
+      nowrap: true,
       secondary: true,
       cell: (u) => (
         <span className="flex items-center gap-2">
@@ -270,6 +293,7 @@ export default async function PreviewUsersPage({
     {
       key: "flags",
       header: cols.flags,
+      minWidth: "10rem",
       secondary: true,
       cell: (u) =>
         u.flags.length === 0 ? (
@@ -287,9 +311,9 @@ export default async function PreviewUsersPage({
     {
       key: "actions",
       header: "",
+      minWidth: "13rem",
       cell: (u) => {
         const more: RowAction[] = [
-          { kind: "link", label: rowActionLabels.viewProfile, href: `/p/${u.id}` },
           { kind: "link", label: rowActionLabels.activity, href: `/admin/preview/users/${u.id}?tab=activity` },
           { kind: "link", label: rowActionLabels.points, href: `/admin/preview/users/${u.id}?tab=points` },
         ];
@@ -301,7 +325,15 @@ export default async function PreviewUsersPage({
 
         return (
           <span className="flex items-center justify-end gap-0.5">
-            <RowIconLink href={`/admin/preview/users/${u.id}`} label={rowActionLabels.view} Icon={EyeIcon} />
+            {/* The eye ALWAYS means "View on platform": the user-facing public
+                profile, in a new tab, keyed by PROFILE id. Disabled (never a
+                guessed link) when no public destination exists. */}
+            {u.profileId && u.publicProfileAvailable ? (
+              <RowIconLink href={`/p/${u.profileId}`} label={platform.viewOnPlatform} Icon={EyeIcon} external />
+            ) : (
+              <RowIconDisabled label={platform.viewOnPlatform} reason={platform.notListed} Icon={EyeIcon} />
+            )}
+            <RowIconLink href={`/admin/preview/users/${u.id}`} label={platform.manage} Icon={SettingsIcon} />
             {u.status === "pending_verification" ? (
               <>
                 <RowIconAction
@@ -360,17 +392,17 @@ export default async function PreviewUsersPage({
           <p className="text-label font-medium text-fg-secondary">{warnings.title}</p>
           <div className="flex flex-wrap gap-sm">
             {tabCounts.pending > 0 ? (
-              <a href={pagerHref({ ...keep, status: "pending" }, 1)} className="rounded-pill bg-warning/10 px-3 py-1 text-label text-fg hover:bg-warning/20">
+              <a href={filterHref(keep, { status: "pending", page: "" })} className="rounded-pill bg-warning/10 px-3 py-1 text-label text-fg hover:bg-warning/20">
                 {warnings.verificationReview.replace("{count}", formatCount(tabCounts.pending, locale))}
               </a>
             ) : null}
             {duplicateCount > 0 ? (
-              <a href={pagerHref({ ...keep, flag: "duplicate" }, 1)} className="rounded-pill bg-warning/10 px-3 py-1 text-label text-fg hover:bg-warning/20">
+              <a href={filterHref(keep, { flag: "duplicate", page: "" })} className="rounded-pill bg-warning/10 px-3 py-1 text-label text-fg hover:bg-warning/20">
                 {warnings.duplicates.replace("{count}", formatCount(duplicateCount, locale))}
               </a>
             ) : null}
             {incompleteCount > 0 ? (
-              <a href={pagerHref({ ...keep, flag: "incomplete" }, 1)} className="rounded-pill bg-warning/10 px-3 py-1 text-label text-fg hover:bg-warning/20">
+              <a href={filterHref(keep, { flag: "incomplete", page: "" })} className="rounded-pill bg-warning/10 px-3 py-1 text-label text-fg hover:bg-warning/20">
                 {warnings.incompleteProfiles.replace("{count}", formatCount(incompleteCount, locale))}
               </a>
             ) : null}
@@ -415,52 +447,26 @@ export default async function PreviewUsersPage({
             anyLabel: m.admin.preview.users.anyCity,
             options: PREVIEW_CITIES.map((c) => ({ value: c, label: c })),
           },
-          {
-            kind: "select",
-            name: "pageSize",
-            anyLabel: `${m.admin.preview.users.pagination.pageSize}: 10`,
-            options: PAGE_SIZES.filter((n) => n !== 10).map((n) => ({ value: String(n), label: `${m.admin.preview.users.pagination.pageSize}: ${n}` })),
-          },
         ]}
       />
 
       <PreviewLegend>{m.admin.preview.previewFieldNote}</PreviewLegend>
+      <p className="-mt-2 text-label text-fg-muted">{m.admin.preview.users.registeredVariationNote}</p>
 
       {filtered.length === 0 ? (
         <StatePanel title={m.admin.preview.users.empty} />
       ) : (
         <>
-          <DataTable columns={columns} rows={paged} rowKey={(u) => u.id} caption={m.admin.preview.users.title} empty={<StatePanel title={m.admin.preview.users.empty} />} />
-          <div className="flex flex-wrap items-center justify-between gap-sm">
-            <ListFooter>
-              {m.admin.preview.users.pagination.showing
-                .replace("{from}", formatCount(filtered.length === 0 ? 0 : (page - 1) * pageSize + 1, locale))
-                .replace("{to}", formatCount(Math.min(page * pageSize, filtered.length), locale))
-                .replace("{total}", formatCount(filtered.length, locale))}
-            </ListFooter>
-            <div className="flex items-center gap-sm">
-              <div className="flex gap-1.5">
-                {page <= 1 ? (
-                  <span aria-disabled="true" className={cn(disabledPagerClass)}>
-                    {m.admin.preview.users.pagination.previous}
-                  </span>
-                ) : (
-                  <ButtonLink variant="outline" size="sm" href={pagerHref(keep, page - 1)}>
-                    {m.admin.preview.users.pagination.previous}
-                  </ButtonLink>
-                )}
-                {page >= totalPages ? (
-                  <span aria-disabled="true" className={cn(disabledPagerClass)}>
-                    {m.admin.preview.users.pagination.next}
-                  </span>
-                ) : (
-                  <ButtonLink variant="outline" size="sm" href={pagerHref(keep, page + 1)}>
-                    {m.admin.preview.users.pagination.next}
-                  </ButtonLink>
-                )}
-              </div>
-            </div>
-          </div>
+          <DataTable
+            columns={columns}
+            rows={slice.rows}
+            rowKey={(u) => u.id}
+            caption={m.admin.preview.users.title}
+            minWidth="90rem"
+            stackBelow="desktop"
+            empty={<StatePanel title={m.admin.preview.users.empty} />}
+          />
+          <TablePagination {...slice} pageSize={pageSize} />
         </>
       )}
     </div>

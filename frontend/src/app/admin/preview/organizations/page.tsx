@@ -9,16 +9,16 @@ import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatAdminDate, formatCount, formatNumber } from "@/lib/ui/format";
 import { AdminHeader, StatusBadge } from "@/features/admin/parts";
 import { Badge, StatePanel, Card } from "@/components/ui/primitives";
-import { ButtonLink } from "@/components/ui/controls";
-import { cn } from "@/lib/ui/cn";
-import { DataTable, RecordCell, Monogram, ListFooter, type Column } from "@/components/ui/data-table";
+import { DataTable, RecordCell, Monogram, type Column } from "@/components/ui/data-table";
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
-import { RowIconLink } from "@/features/admin-preview/row-icon-button";
+import { RowIconLink, RowIconDisabled } from "@/features/admin-preview/row-icon-button";
 import { RowIconAction } from "@/features/admin-preview/row-icon-action";
 import { AutoFilters, SortableHeader } from "@/features/admin-preview/auto-filters";
 import { PreviewLegend, PREVIEW_MARK } from "@/features/admin-preview/preview-legend";
-import { EyeIcon, WhatsAppIcon, CheckIcon, XIcon, AlertIcon } from "@/components/ui/icons";
+import { EyeIcon, SettingsIcon, WhatsAppIcon, CheckIcon, XIcon, AlertIcon } from "@/components/ui/icons";
+import { TablePagination } from "@/features/admin-preview/table-pagination";
+import { clampPageSize, paginate, parseSort, previewRegisteredAt, sortRows } from "@/features/admin-preview/table-state";
 import type { AdminOrgRow } from "@/server/queries/admin";
 
 export const dynamic = "force-dynamic";
@@ -36,12 +36,9 @@ type Row = AdminOrgRow & {
   duplicate: boolean;
   verificationState: "verified" | "pending" | "unverified";
   flags: OrgFlagCode[];
+  /** Preview-only displayed registration date; the real `createdAt` is untouched. */
+  registeredAt: string;
 };
-
-const PAGE_SIZES = [10, 25, 50, 100] as const;
-
-const disabledPagerClass =
-  "inline-flex min-h-8 select-none items-center justify-center rounded-sm px-3 py-1 text-label font-medium text-fg-muted opacity-50";
 
 function pagerHref(keep: Record<string, string | undefined>, page: number): string {
   const qs = new URLSearchParams();
@@ -101,6 +98,7 @@ export default async function PreviewOrganizationsPage({
       duplicate,
       verificationState,
       flags,
+      registeredAt: previewRegisteredAt(o.id, o.createdAt),
     };
   });
 
@@ -124,19 +122,17 @@ export default async function PreviewOrganizationsPage({
   if (flag === "duplicate") filtered = filtered.filter((r) => r.duplicate);
   if (flag === "incomplete") filtered = filtered.filter((r) => r.completeness < 70);
 
-  const [sortField, sortDir] = (sort ?? "").split(":");
-  if (sortField === "registered") {
-    filtered = [...filtered].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    if (sortDir === "desc") filtered.reverse();
-  } else if (sortField === "completeness") {
-    filtered = [...filtered].sort((a, b) => a.completeness - b.completeness);
-    if (sortDir === "desc") filtered.reverse();
-  }
+  // One sort state per table; Registered and Profile Completion never share direction.
+  const sortState = parseSort(sort, ["registered", "completeness"] as const) ?? { field: "registered" as const, dir: "desc" as const };
+  filtered = sortRows(
+    filtered,
+    sortState.dir,
+    sortState.field === "registered" ? (r) => new Date(r.registeredAt).getTime() : (r) => r.completeness,
+    (r) => r.id,
+  );
 
-  const pageSize = PAGE_SIZES.includes(Number(pageSizeParam) as (typeof PAGE_SIZES)[number]) ? Number(pageSizeParam) : 10;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const page = Math.min(Math.max(1, Number(pageParam) || 1), totalPages);
-  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const pageSize = clampPageSize(pageSizeParam);
+  const slice = paginate(filtered, pageParam, pageSize);
 
   const typeLabels = m.orgType as Record<string, string>;
   const statusLabels = m.admin.status as Record<string, string>;
@@ -146,6 +142,7 @@ export default async function PreviewOrganizationsPage({
   const cols = m.admin.preview.organizations.columns;
   const rowActionLabels = m.admin.preview.organizations.rowActions;
   const keep = { q, status, type, city, flag, pageSize: pageSizeParam, sort };
+  const platform = m.admin.preview.platformView;
 
   const provenanceLabel = (source: string | null) => {
     if (source === "salesperson_referral") return m.admin.preview.organizations.provenanceSales;
@@ -157,10 +154,11 @@ export default async function PreviewOrganizationsPage({
     {
       key: "name",
       header: cols.name,
+      minWidth: "15rem",
       grow: true,
       cell: (o) => (
         <span className="flex min-w-0 items-center gap-1.5">
-          <RecordCell title={o.name} href={`/admin/preview/organizations/${o.id}`} avatar={<Monogram name={o.name} size={28} />} />
+          <RecordCell wrap title={o.name} href={`/admin/preview/organizations/${o.id}`} avatar={<Monogram name={o.name} size={28} />} />
           {o.flags.length > 0 ? (
             <span title={o.flags.map((f) => flagLabels[f]).join(", ")} aria-hidden="true" className="shrink-0 text-warning">
               ●
@@ -169,48 +167,58 @@ export default async function PreviewOrganizationsPage({
         </span>
       ),
     },
-    { key: "type", header: cols.type, cell: (o) => typeLabels[o.orgType] ?? o.orgType },
+    { key: "type", header: cols.type, minWidth: "10rem", cell: (o) => typeLabels[o.orgType] ?? o.orgType },
     {
       key: "owner",
       header: cols.owner,
+      minWidth: "11rem",
       secondary: true,
       cell: (o) => o.ownerName || <span className="text-fg-muted">{m.admin.preview.organizations.noOwner}</span>,
     },
     {
       key: "phone",
       header: `${m.admin.preview.users.columns.phone}${PREVIEW_MARK}`,
+      minWidth: "11rem",
+      nowrap: true,
       secondary: true,
       cell: (o) => (
         <span className="flex items-center gap-1.5">
-          <span dir="ltr" className="truncate text-label">{o.phone}</span>
+          <span dir="ltr" className="text-label">{o.phone}</span>
           <RowIconLink href={whatsappShareUrl({ phone: o.phone, message: `Hi ${o.name}` })} label={m.admin.preview.users.rowActions.whatsapp} Icon={WhatsAppIcon} tone="success" external />
         </span>
       ),
     },
-    { key: "city", header: `${m.admin.preview.users.columns.city}${PREVIEW_MARK}`, secondary: true, cell: (o) => o.city },
-    { key: "verification", header: cols.verification ?? m.admin.orgs.verification, cell: (o) => <StatusBadge status={o.verificationState} label={verificationStateLabels[o.verificationState]} /> },
+    { key: "city", header: `${m.admin.preview.users.columns.city}${PREVIEW_MARK}`, minWidth: "10rem", secondary: true, cell: (o) => o.city },
+    { key: "verification", header: cols.verification ?? m.admin.orgs.verification, minWidth: "8rem", nowrap: true, cell: (o) => <StatusBadge status={o.verificationState} label={verificationStateLabels[o.verificationState]} /> },
     {
       key: "members",
       header: cols.members,
+      minWidth: "6rem",
       numeric: true,
       secondary: true,
       cell: (o) => formatNumber(o.memberCount, locale),
     },
-    { key: "branches", header: cols.branches, numeric: true, secondary: true, cell: (o) => formatNumber(o.branchCount, locale) },
+    { key: "branches", header: cols.branches, minWidth: "6rem", numeric: true, secondary: true, cell: (o) => formatNumber(o.branchCount, locale) },
     {
       key: "status",
       header: cols.status,
+      minWidth: "7.5rem",
+      nowrap: true,
       cell: (o) => <StatusBadge status={o.status} label={statusLabels[o.status] ?? o.status} />,
     },
     {
       key: "created",
-      header: <SortableHeader field="registered" label={cols.created} />,
+      header: <SortableHeader field="registered" label={`${cols.created}${PREVIEW_MARK}`} isDefault />,
+      minWidth: "8.5rem",
+      nowrap: true,
       secondary: true,
-      cell: (o) => formatAdminDate(o.createdAt, locale),
+      cell: (o) => formatAdminDate(o.registeredAt, locale),
     },
     {
       key: "completeness",
       header: <SortableHeader field="completeness" label={`${m.admin.preview.users.columns.completeness}${PREVIEW_MARK}`} />,
+      minWidth: "9rem",
+      nowrap: true,
       secondary: true,
       cell: (o) => (
         <span className="flex items-center gap-2">
@@ -221,10 +229,11 @@ export default async function PreviewOrganizationsPage({
         </span>
       ),
     },
-    { key: "provenance", header: cols.provenance, secondary: true, cell: (o) => provenanceLabel(o.source) },
+    { key: "provenance", header: cols.provenance, minWidth: "10rem", secondary: true, cell: (o) => provenanceLabel(o.source) },
     {
       key: "flags",
       header: m.admin.preview.users.columns.flags,
+      minWidth: "10rem",
       secondary: true,
       cell: (o) =>
         o.flags.length === 0 ? (
@@ -242,6 +251,7 @@ export default async function PreviewOrganizationsPage({
     {
       key: "actions",
       header: "",
+      minWidth: "13rem",
       cell: (o) => {
         const more: RowAction[] = [];
         if (o.duplicate) more.push({ kind: "link", label: rowActionLabels.inspectDuplicate, href: `/admin/preview/organizations/${o.id}?tab=network` });
@@ -253,7 +263,10 @@ export default async function PreviewOrganizationsPage({
 
         return (
           <span className="flex items-center justify-end gap-0.5">
-            <RowIconLink href={`/admin/preview/organizations/${o.id}`} label={rowActionLabels.view} Icon={EyeIcon} />
+            {/* The eye means "View on platform". Organizations have NO public
+                route on Aladdin yet, so it is disabled — a made-up URL would 404. */}
+            <RowIconDisabled label={platform.viewOnPlatform} reason={platform.orgNotAvailable} Icon={EyeIcon} />
+            <RowIconLink href={`/admin/preview/organizations/${o.id}`} label={platform.manage} Icon={SettingsIcon} />
             {o.status === "pending_verification" ? (
               <>
                 <RowIconAction
@@ -355,16 +368,11 @@ export default async function PreviewOrganizationsPage({
             anyLabel: m.admin.preview.users.anyCity,
             options: Array.from(new Set(rows.map((r) => r.city))).map((c) => ({ value: c, label: c })),
           },
-          {
-            kind: "select",
-            name: "pageSize",
-            anyLabel: `${m.admin.preview.users.pagination.pageSize}: 10`,
-            options: PAGE_SIZES.filter((n) => n !== 10).map((n) => ({ value: String(n), label: `${m.admin.preview.users.pagination.pageSize}: ${n}` })),
-          },
         ]}
       />
 
       <PreviewLegend>{m.admin.preview.previewFieldNote}</PreviewLegend>
+      <p className="-mt-2 text-label text-fg-muted">{m.admin.preview.users.registeredVariationNote}</p>
 
       {filtered.length === 0 ? (
         <StatePanel title={m.admin.preview.organizations.empty} />
@@ -372,39 +380,14 @@ export default async function PreviewOrganizationsPage({
         <>
           <DataTable
             columns={columns}
-            rows={paged}
+            rows={slice.rows}
             rowKey={(o) => o.id}
             caption={m.admin.preview.organizations.title}
+            minWidth="100rem"
+            stackBelow="desktop"
             empty={<StatePanel title={m.admin.preview.organizations.empty} />}
           />
-          <div className="flex flex-wrap items-center justify-between gap-sm">
-            <ListFooter>
-              {m.admin.preview.users.pagination.showing
-                .replace("{from}", formatCount(filtered.length === 0 ? 0 : (page - 1) * pageSize + 1, locale))
-                .replace("{to}", formatCount(Math.min(page * pageSize, filtered.length), locale))
-                .replace("{total}", formatCount(filtered.length, locale))}
-            </ListFooter>
-            <div className="flex gap-1.5">
-              {page <= 1 ? (
-                <span aria-disabled="true" className={cn(disabledPagerClass)}>
-                  {m.admin.preview.users.pagination.previous}
-                </span>
-              ) : (
-                <ButtonLink variant="outline" size="sm" href={pagerHref(keep, page - 1)}>
-                  {m.admin.preview.users.pagination.previous}
-                </ButtonLink>
-              )}
-              {page >= totalPages ? (
-                <span aria-disabled="true" className={cn(disabledPagerClass)}>
-                  {m.admin.preview.users.pagination.next}
-                </span>
-              ) : (
-                <ButtonLink variant="outline" size="sm" href={pagerHref(keep, page + 1)}>
-                  {m.admin.preview.users.pagination.next}
-                </ButtonLink>
-              )}
-            </div>
-          </div>
+          <TablePagination {...slice} pageSize={pageSize} />
         </>
       )}
     </div>

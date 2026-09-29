@@ -8,16 +8,21 @@ import { Card, SectionTitle, Badge, Field } from "@/components/ui/primitives";
 import { LabeledField, Input, ButtonLink } from "@/components/ui/controls";
 import { Monogram } from "@/components/ui/data-table";
 import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
+import { ChangePasswordPreview } from "@/features/admin-preview/change-password-preview";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Phase 0C — Admin Settings (new page). Uses the reference implementation's
- * own Settings screen as UX inspiration only. The "Sign-in & Security"
- * section states the real mechanism: canonical Email + Password auth (root
- * `CLAUDE.md` Authentication model, 2026-09-28). An in-Admin password-change
- * form is not built yet. Never expose credentials; no backend wiring happens
- * on this page.
+ * Admin Settings — Phase 0D. Two sections:
+ *
+ *  1. **Profile** — Photo · Full Name · Username · Phone · Email. Name, username
+ *     and phone are the signed-in Admin's own real values (`auth.getUser()` +
+ *     `profiles`); Save is a Preview dialog and never writes.
+ *  2. **Security → Change password** (PD-014) — Current · New · Confirm · Save,
+ *     with the REAL password policy and strength meter. Nothing is wired: no
+ *     Supabase Auth call, no password mutation, no migration.
+ *
+ * Admin access itself (roles, permissions) lives on Admin Staff, not here.
  */
 export default async function PreviewSettingsPage() {
   const supabase = await getServerSupabase();
@@ -29,9 +34,11 @@ export default async function PreviewSettingsPage() {
   const [{ data: authData }, role] = await Promise.all([supabase.auth.getUser(), loadPlatformRole(supabase)]);
   const authUser = authData.user;
   let displayName = "";
+  let username = "";
   if (authUser) {
-    const { data: profile } = await supabase.from("profiles").select("display_name").eq("user_id", authUser.id).maybeSingle();
+    const { data: profile } = await supabase.from("profiles").select("display_name, username").eq("user_id", authUser.id).maybeSingle();
     displayName = profile?.display_name ?? "";
+    username = profile?.username ?? "";
   }
 
   return (
@@ -42,26 +49,38 @@ export default async function PreviewSettingsPage() {
         <SectionTitle>{st.profileTitle}</SectionTitle>
         <div className="flex items-center gap-md">
           <Monogram name={displayName || "?"} size={56} />
-          <PreviewActionDialog trigger={st.changePhoto} triggerVariant="outline" title={st.changePhoto} confirmLabel={st.changePhoto} confirmVariant="accent" />
+          <div className="flex flex-col gap-1">
+            <p className="text-label font-medium text-fg-secondary">{st.photo}</p>
+            <PreviewActionDialog trigger={st.changePhoto} triggerVariant="outline" title={st.changePhoto} confirmLabel={st.changePhoto} confirmVariant="accent" />
+          </div>
         </div>
-        <dl className="grid gap-md tablet:grid-cols-2">
+        <div className="grid gap-md tablet:grid-cols-2">
           <LabeledField label={st.fullName} htmlFor="settings-name">
             <Input id="settings-name" defaultValue={displayName} />
           </LabeledField>
-          <Field label={st.role}>
-            <Badge tone="accent">{role ? m.admin.roleLabel[role] : "—"}</Badge>
-          </Field>
+          <LabeledField label={st.username} htmlFor="settings-username" hint={st.usernameHint}>
+            <Input id="settings-username" dir="ltr" defaultValue={username} placeholder={st.notProvided} />
+          </LabeledField>
           <LabeledField label={st.phone} htmlFor="settings-phone">
             <Input id="settings-phone" dir="ltr" defaultValue={authUser?.phone ?? ""} placeholder={st.notProvided} />
           </LabeledField>
           <LabeledField label={st.email} htmlFor="settings-email">
             <Input id="settings-email" dir="ltr" defaultValue={authUser?.email ?? ""} disabled />
           </LabeledField>
-        </dl>
+          <Field label={st.role}>
+            <Badge tone="accent">{role ? m.admin.roleLabel[role] : "—"}</Badge>
+          </Field>
+        </div>
         <p className="text-label text-fg-muted">{st.emailChangeNote}</p>
         <div className="flex justify-end">
           <PreviewActionDialog trigger={st.saveProfile} triggerVariant="accent" title={st.saveProfile} confirmLabel={st.saveProfile} confirmVariant="accent" />
         </div>
+      </Card>
+
+      <Card className="flex flex-col gap-md">
+        <SectionTitle>{st.passwordTitle}</SectionTitle>
+        <p className="text-body text-fg-secondary">{st.passwordBody}</p>
+        <ChangePasswordPreview email={authUser?.email ?? ""} />
       </Card>
 
       <Card className="flex flex-col gap-md">

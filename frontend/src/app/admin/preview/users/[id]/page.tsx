@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserDetail } from "@/server/queries/admin";
-import { previewUserPointsLedger, previewUserTimeline, previewSubjectAudit } from "@/server/queries/admin-preview";
-import { previewNotesFor, previewCompletenessFor, previewUserDuplicateFlag, previewFollowUpsFor } from "@/features/admin-preview/fixtures";
+import { previewUserPointsLedger, previewUserTimeline, previewSubjectAudit, previewUsersDirectoryContext, previewAdminStaff } from "@/server/queries/admin-preview";
+import { FollowUpPanel } from "@/features/admin-preview/follow-up-panel";
+import { previewNotesFor, previewCompletenessFor, previewUserDuplicateFlag, previewFollowUpsFor, previewContactFor } from "@/features/admin-preview/fixtures";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatAdminDate, formatDateTime, formatNumber } from "@/lib/ui/format";
@@ -14,7 +15,8 @@ import { Card, Badge, Field, SectionTitle, StatePanel } from "@/components/ui/pr
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
-import { LabeledField, Textarea, Select, Input, ButtonLink } from "@/components/ui/controls";
+import { EyeIcon } from "@/components/ui/icons";
+import { LabeledField, Textarea, Select, Input } from "@/components/ui/controls";
 
 export const dynamic = "force-dynamic";
 
@@ -55,8 +57,12 @@ export default async function PreviewUserDetailPage({
   const tl = m.admin.preview.timeline;
   const nt = m.admin.preview.notes;
   const ov = m.admin.preview.userOverview;
+  // "View on platform" targets `/p/[profileId]` — the PROFILE id, not the user
+  // id, and only when the public projection will actually render that page.
+  const platformCtx = (await previewUsersDirectoryContext(supabase, [id])).get(id);
+  const platformHref = platformCtx?.profileId && platformCtx.publicProfileAvailable ? `/p/${platformCtx.profileId}` : null;
+  const platform = m.admin.preview.platformView;
   const headerMoreActions: RowAction[] = [
-    { kind: "link", label: t.rowActions.viewProfile, href: `/p/${id}` },
     { kind: "link", label: t.rowActions.addNote, href: `/admin/preview/users/${id}?tab=notes` },
     { kind: "link", label: t.rowActions.followUp, href: `/admin/preview/users/${id}?tab=followup` },
     { kind: "link", label: t.rowActions.report, href: `/admin/preview/users/${id}?tab=report` },
@@ -79,8 +85,10 @@ export default async function PreviewUserDetailPage({
   const auditEntries = tab === "audit" ? await previewSubjectAudit(supabase, "user", id) : null;
   const notes = tab === "notes" ? previewNotesFor(id) : null;
   const followUps = tab === "followup" ? previewFollowUpsFor(id) : null;
-  const fu = t.followUpDialog;
-  const rp = t.reportDialog;
+  const staffNames = tab === "followup" ? (await previewAdminStaff(supabase)).map((s) => s.displayName).filter(Boolean) : [];
+  const rp = m.admin.preview.report;
+  const fu = m.admin.preview.followUp;
+  const reportContact = previewContactFor(id);
 
   return (
     <div className="flex flex-col gap-lg">
@@ -95,7 +103,28 @@ export default async function PreviewUserDetailPage({
             {user.isVerified ? <Badge tone="success">{m.admin.users.verified}</Badge> : null}
           </div>
         </div>
-        <div className="flex flex-wrap gap-sm">
+        <div className="flex flex-wrap items-center gap-sm">
+          {platformHref ? (
+            <a
+              href={platformHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={platform.viewOnPlatformHint}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-strong px-3.5 text-body font-medium text-fg hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <EyeIcon size={16} />
+              {platform.viewOnPlatform}
+            </a>
+          ) : (
+            <span
+              aria-disabled="true"
+              title={platform.notListed}
+              className="inline-flex min-h-10 cursor-not-allowed items-center gap-1.5 rounded-md border px-3.5 text-body font-medium text-fg-muted opacity-50"
+            >
+              <EyeIcon size={16} />
+              {platform.viewOnPlatform}
+            </span>
+          )}
           {user.status === "pending_verification" ? (
             <>
               <PreviewActionDialog trigger={ov.verify} triggerVariant="accent" title={ov.verify} confirmLabel={ov.verify} confirmVariant="accent" />
@@ -128,20 +157,14 @@ export default async function PreviewUserDetailPage({
           { value: "verification", label: t.tabs.verification },
           { value: "points", label: t.tabs.points },
           { value: "activity", label: t.tabs.activity },
-          { value: "followup", label: fu.historyTitle },
+          { value: "followup", label: fu.title },
+          { value: "report", label: rp.title },
           { value: "notes", label: t.tabs.notes },
           { value: "audit", label: t.tabs.audit },
         ]}
       />
 
-      {tab === "overview" ? (
-        <div className="flex flex-wrap gap-sm">
-          <ButtonLink variant="ghost" size="sm" href={`/p/${id}`}>
-            {t.rowActions.viewProfile}
-          </ButtonLink>
-          <span className="self-center text-label text-fg-muted">{t.viewAsProfileNote}</span>
-        </div>
-      ) : null}
+      {tab === "overview" ? <p className="-mt-2 text-label text-fg-muted">{platform.viewOnPlatformHint}</p> : null}
 
       {tab === "overview" ? (
         <div className="flex flex-col gap-lg">
@@ -379,69 +402,38 @@ export default async function PreviewUserDetailPage({
       ) : null}
 
       {tab === "followup" && followUps ? (
-        <section className="flex flex-col gap-md">
-          <div className="flex flex-wrap items-center justify-between gap-md">
-            <SectionTitle>{fu.historyTitle}</SectionTitle>
-            <PreviewActionDialog trigger={fu.title} triggerVariant="accent" title={fu.title} confirmLabel={fu.submit} confirmVariant="accent">
-              <LabeledField label={fu.actionType} htmlFor="followup-type">
-                <Select id="followup-type" defaultValue="call">
-                  <option value="call">{fu.types.call}</option>
-                  <option value="whatsapp">{fu.types.whatsapp}</option>
-                  <option value="email">{fu.types.email}</option>
-                  <option value="verificationFollowUp">{fu.types.verificationFollowUp}</option>
-                  <option value="other">{fu.types.other}</option>
-                </Select>
-              </LabeledField>
-              <LabeledField label={fu.note} htmlFor="followup-note">
-                <Textarea id="followup-note" rows={3} required />
-              </LabeledField>
-              <LabeledField label={fu.followUpDate} htmlFor="followup-date">
-                <input id="followup-date" type="date" className="min-h-11 w-full rounded-md border border-strong bg-canvas px-3.5 text-body text-fg" />
-              </LabeledField>
-            </PreviewActionDialog>
-          </div>
-          <p className="rounded-sm border border-warning/40 bg-warning/10 px-md py-2 text-label text-fg-secondary">{fu.fixtureNotice}</p>
-          {followUps.length === 0 ? (
-            <StatePanel title={fu.historyEmpty} />
-          ) : (
-            <div className="flex flex-col gap-sm">
-              {followUps.map((f) => (
-                <Card key={f.id} pad="sm" className="flex flex-col gap-1">
-                  <div className="flex flex-wrap items-center justify-between gap-md">
-                    <Badge tone="accent">{fu.types[f.type]}</Badge>
-                    <span className="text-label text-fg-muted">{formatDateTime(f.createdAt, locale)}</span>
-                  </div>
-                  <p className="text-body text-fg">{f.note}</p>
-                  <p className="text-label text-fg-muted">
-                    {f.actor}
-                    {f.followUpDate ? ` · ${fu.followUpDate}: ${formatAdminDate(f.followUpDate, locale)}` : ""}
-                  </p>
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
+        <FollowUpPanel m={m} locale={locale} followUps={followUps} staffNames={staffNames} now={Date.now()} />
       ) : null}
 
       {tab === "report" ? (
         <section className="flex flex-col gap-md">
           <Card className="flex flex-col gap-md">
             <SectionTitle>{rp.title}</SectionTitle>
-            <p className="text-label text-fg-secondary">{rp.subtitle}</p>
-            <LabeledField label={rp.subject} htmlFor="report-subject">
-              <Input id="report-subject" defaultValue={user.displayName || m.admin.users.unnamed} disabled />
-            </LabeledField>
-            <LabeledField label={rp.contact} htmlFor="report-contact">
-              <Input id="report-contact" placeholder={rp.contact} />
-            </LabeledField>
-            <LabeledField label={rp.description} htmlFor="report-description">
-              <Textarea id="report-description" rows={4} required />
-            </LabeledField>
-            <LabeledField label={rp.attachment} htmlFor="report-attachment">
-              <input id="report-attachment" type="file" className="text-label text-fg-secondary" disabled />
-            </LabeledField>
-            <div className="flex justify-end">
-              <PreviewActionDialog trigger={rp.submit} triggerVariant="danger" title={rp.title} body={rp.subtitle} confirmLabel={rp.submit} confirmVariant="danger" />
+            <p className="text-body text-fg-secondary">{rp.subtitle}</p>
+            <p className="text-label text-fg-muted">{rp.tabIntro}</p>
+            <div>
+              <PreviewActionDialog wide trigger={rp.open} triggerVariant="danger" title={rp.title} body={rp.subtitle} confirmLabel={rp.submit} confirmVariant="danger">
+                <LabeledField label={rp.subject} htmlFor="report-subject">
+                  <Input id="report-subject" defaultValue={user.displayName || m.admin.users.unnamed} />
+                </LabeledField>
+                <div className="grid gap-md tablet:grid-cols-2">
+                  <LabeledField label={rp.name} htmlFor="report-name">
+                    <Input id="report-name" defaultValue={user.displayName || ""} />
+                  </LabeledField>
+                  <LabeledField label={rp.phone} htmlFor="report-phone">
+                    <Input id="report-phone" type="tel" dir="ltr" defaultValue={reportContact.phone} />
+                  </LabeledField>
+                </div>
+                <LabeledField label={rp.email} htmlFor="report-email">
+                  <Input id="report-email" type="email" dir="ltr" defaultValue={reportContact.email} />
+                </LabeledField>
+                <LabeledField label={rp.details} htmlFor="report-details">
+                  <Textarea id="report-details" rows={4} placeholder={rp.detailsPlaceholder} required />
+                </LabeledField>
+                <LabeledField label={rp.attachment} htmlFor="report-attachment" hint={rp.attachmentHint}>
+                  <input id="report-attachment" type="file" accept="image/jpeg,image/png,application/pdf" className="text-label text-fg-secondary" />
+                </LabeledField>
+              </PreviewActionDialog>
             </div>
           </Card>
         </section>
