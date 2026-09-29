@@ -630,3 +630,14 @@ export const MoreHorizontalIcon = (p: IconProps) => (
     <circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />
   </Svg>
 );
+
+/** A recognizable speech-bubble-with-handset mark for a WhatsApp hand-off
+ *  link (`lib/contact/whatsapp.ts`'s `wa.me` deep link) — deliberately drawn
+ *  distinct from `MessageIcon` (a generic bubble) so an Admin can tell at a
+ *  glance which contact channel a row action opens. */
+export const WhatsAppIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 20.5 5.2 16A8 8 0 1 1 8.4 19.3z" />
+    <path d="M9 9.6c0-.6.5-1.1 1-1.1h.5c.4 0 .7.2.8.6l.5 1.4c.1.3 0 .6-.2.8l-.6.6a5.6 5.6 0 0 0 2.6 2.6l.6-.6c.2-.2.5-.3.8-.2l1.4.5c.4.1.6.4.6.8v.5c0 .5-.5 1-1.1 1-3.3 0-6.9-3.6-6.9-6.9Z" />
+  </Svg>
+);

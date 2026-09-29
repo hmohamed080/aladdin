@@ -192,6 +192,35 @@ export function formatDate(iso: string | null | undefined, locale: Locale): stri
 }
 
 /**
+ * All-numeric day/month/year (e.g. `19/09/2026`) — the Admin-console date
+ * convention (Phase 0C). Every consumer-facing surface keeps `formatDate`'s
+ * short-month form unchanged; this is a SEPARATE, additive export used only
+ * by `/admin/**` so a dense operational table (many date columns per row)
+ * reads as digits-and-separators rather than repeating a month name in every
+ * cell. `2-digit` for month (not `numeric`) so single-digit months keep a
+ * leading zero and every column stays the same width. Locale still governs
+ * the digit system and separator (Arabic renders Arabic-Indic digits) — this
+ * is never literally "DD/MM/YYYY" in the US month/day sense the task
+ * explicitly warns against, it is day-month-year FOR BOTH locales.
+ */
+export function formatAdminDate(iso: string | null | undefined, locale: Locale): string {
+  const d = parse(iso);
+  if (!d) return EMPTY;
+  // Field order is built explicitly (day, month, year) rather than trusted to
+  // Intl.DateTimeFormat's locale pattern: ar-EG puts day before month, but
+  // en-EG resolves to the same month-first pattern as en-US in this
+  // runtime's ICU data (verified in Node: day:"2-digit" month:"2-digit"
+  // prints "09/19/2026" for 19 September -- the exact US ordering this
+  // convention exists to avoid). Each part still runs through formatNumber
+  // so the DIGITS stay locale-correct (Arabic-Indic for ar); only the
+  // ordering is pinned rather than left to the locale pattern.
+  const day = formatNumber(d.getDate(), locale, { minimumIntegerDigits: 2 });
+  const month = formatNumber(d.getMonth() + 1, locale, { minimumIntegerDigits: 2 });
+  const year = formatNumber(d.getFullYear(), locale, { useGrouping: false });
+  return `${day}/${month}/${year}`;
+}
+
+/**
  * Day and month, no year — the OPERATIONAL date.
  *
  * `formatDate` renders "12 Sep 2026", which is the right answer on a record

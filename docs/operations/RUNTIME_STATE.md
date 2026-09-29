@@ -144,6 +144,107 @@
   Production homepage unchanged by this work; no deployment or promotion.
 - Approved video/testimonial content and final user visual approval remain pending.
 
+## Current continuation — 2026-09-20: Phase 0C — Admin Blueprint Final Refinement
+
+- Branch `claude/showroom-approval-workflow-acd3de` (worktree), HEAD unchanged from the prior continuation
+  (no migration this session). Refinement pass over the SAME Phase 0/0B `/admin/preview/**` surface — no
+  parallel pages. Still frontend-first (PD-013); Phase 1 backend not started.
+- **New reference repo audited: `hmohamed080/CRM`** (private, access confirmed via `gh`). Full RBAC gap
+  analysis in [`docs/admin/CRM_RBAC_GAP_ADOPTION.md`](../admin/CRM_RBAC_GAP_ADOPTION.md) — what CRM has vs.
+  Aladdin, an adoption matrix, and what would require reopening **PD-008 (unchanged)**. Talent Admin was
+  re-audited for 9 new areas (Analytics, Settings, Edit-profile, complaint dialog, follow-up/CRM, audit,
+  row-actions, date format, search debounce).
+- **Global conventions:** 10-row default pagination (10/25/50/100); no Search button anywhere — debounced
+  auto-search + instant filters (`features/admin-preview/auto-filters.tsx`); all-numeric day/month/year
+  dates (`formatAdminDate()`, new export in `lib/ui/format.ts` — a real `en-EG` month-first-ordering bug
+  was caught and fixed here, verified in Node).
+- **Real vs. Preview data visual honesty:** a `•` header mark + one `PreviewLegend` note per page/section,
+  never a per-cell badge. The ~200-row Preview fetch is now labelled everywhere as capped, not complete.
+- **Users/Organizations Directories:** final column model (Name+flag-dot/Email/Phone+WhatsApp/Organization/
+  City/Verification/Registered[sortable]/Status/Last active/Profile Completion[sortable]/Flags/Actions),
+  visible row-action icons (not all hidden in the overflow menu), a "Needs attention" bar. **Profile
+  Completion investigated**: a real engine exists (`lib/profile/completeness.ts`) but its inputs are
+  self-select-only RLS — stays a documented fixture. **A real RSC bug caught+fixed**: passing an icon
+  component reference (not a rendered element) from a Server Component into a Client Component threw at
+  runtime ("Functions cannot be passed directly to Client Components") — fixed by rendering the icon on
+  the server and passing the element.
+- **User Details:** real "View as profile" link to `/p/[profileId]` (distinct from Admin Details, never
+  impersonation); new Follow-up tab (fixture, explicitly separate from Notes/Audit/Timeline); new Report
+  tab (Preview-only, explicitly pending PD-009, unchanged/deferred).
+- **Dashboard:** "Needs attention" panel REMOVED per direct Product Owner instruction (KPI cards alone are
+  enough). Recent Activity stays removed (unchanged from Phase 0B).
+- **Points — complete rework:** balance + a REAL derived level/tier (`lib/network/points-level.ts`) +
+  lifetime earned/spent + transaction count + last activity + full ledger with running balance, all shown
+  on one page once a user is selected (not just a picker). Verified live against a real seeded ledger
+  entry (+100 credit, balance 100, Level 2 — all correct).
+- **Analytics:** 9 KPI cards, a new multi-series chart (`MultiTrendLine`, added to `components/ui/charts.tsx`,
+  same no-library hand-rolled-SVG approach), a real Top-Pages-by-activity table, an enriched Visitors table
+  (Registered/Guest, IP always "Not tracked" — confirmed no IP capture exists anywhere, never started here).
+- **Audit:** partial/client-side pagination — verified live that clicking Next changes the visible entries
+  while `window.location.href` stays identical (new `features/admin-preview/audit-results.tsx`).
+- **New: Admin Settings** (`/admin/preview/settings`) — real profile (name/role/email), explicitly NO
+  password-change form since Aladdin is passwordless (WhatsApp/Email OTP) *(superseded 2026-09-28 — canonical auth is now Email + Password; installers Phone + Password)* — the clearest example this
+  phase produced of adapting a reference pattern rather than copying it blindly.
+- Validation: `pnpm typecheck`/`lint` clean throughout; `pnpm test` — 123 files / 1465 tests, all green;
+  `pnpm test -- i18n` clean after fixing two genuine mixed-language Arabic-string bugs found during this
+  session. Live browser QA across every changed/new page, AR+RTL, light+dark, desktop+mobile, zero console
+  errors on fresh tabs.
+- **Next:** Product Owner review of the full Phase 0/0B/0C Preview. Phase 1 backend (BL-001–004) starts
+  only after that review, per PD-013.
+
+## Current continuation — 2026-09-20: Phase 0B — Admin Product Blueprint Enrichment
+
+- Branch `claude/showroom-approval-workflow-acd3de` (worktree), HEAD unchanged from the prior continuation
+  (no migration this session). Product Owner found Phase 0 "too skeletal" and asked for the same
+  `/admin/preview/**` surface to be enriched enough to fully evaluate information density, actions,
+  role/access management, Analytics, and an operational Dashboard — still frontend-first (PD-013).
+- **Fixed first:** two i18n bugs left by the prior session's own final edits — duplicate `dashboard`/
+  `users`/`organizations` keys inside `admin.preview` in both `en.ts`/`ar.ts` (a second block silently
+  shadowing the Phase 0 block, JS last-key-wins), and an English fragment leaking into two Arabic
+  strings. `pnpm test -- i18n` green after the fix, no esbuild duplicate-key warnings.
+- **Dashboard reworked:** Recent Activity list removed (Audit/Activity tabs already own that surface);
+  replaced with a 10-tile real KPI strip and a real "Operational attention" list. New read added to
+  `frontend/src/server/queries/admin-preview.ts` (`previewDashboardExtras()`) — the shared `admin.ts`
+  the real dashboard also uses was **not** touched.
+- **Users/Organizations directories enriched:** real status tabs, real filters/pagination over the
+  existing 200-row fetch, new real columns (org/verification for Users; owner/branches/provenance/
+  duplicate-flag for Organizations, via new bulk reads `previewOrgsDirectoryContext()` and an extended
+  `previewUsersDirectoryContext()`), fixture-labelled columns where no read path exists (contact/city/
+  completeness). New shared component `features/admin-preview/row-actions-menu.tsx` (`RowActionsMenu`)
+  collects up to ten row actions into one menu; `preview-action-dialog.tsx` refactored to expose a
+  controlled `PreviewConfirmDialog` the menu drives (existing `PreviewActionDialog` call sites unchanged).
+- **User/Organization Details enriched:** status-aware header actions, richer Overview tabs, a real
+  "Possible duplicates" panel on the Organization Network tab (`previewOrgDuplicateCandidates()`, built
+  in Phase 0, now rendered).
+- **Two new pages:** **Admin Staff** (`/admin/preview/staff`) — real roster from `platform_role_grants`;
+  does not reverse PD-008 (dynamic RBAC stays deferred). **Analytics** (`/admin/preview/analytics`) —
+  confirmed zero product-usage tracking exists in the schema, so fixture data behind a permanent banner,
+  except "Registrations by account type" (real, reuses `adminSummary()`).
+- **Access matrix expanded** 8 → 13 rows; every suspend/govern/manage-* row stays Administrator-only
+  per PD-004.
+- **Review Details enriched:** real related-User/Organization links, real previous-decisions history,
+  Admin Notes/Entity Timeline/scoped-Audit sections.
+- **PD-011's documentation prerequisite produced:**
+  [`docs/admin/PD-011_ORG_SUSPENSION_MODULE_EFFECTS.md`](../admin/PD-011_ORG_SUSPENSION_MODULE_EFFECTS.md)
+  — module-by-module organization-suspension effects across 12 domains. Documentation only; does not
+  start BL-002. `PRODUCT_DECISIONS_REGISTER.md`'s PD-011 status line updated to reference it (PD-011's
+  APPROVED status/semantics unchanged).
+- **Real bug found in this session's own browser QA and fixed:** `features/admin-preview/fixtures.ts`'s
+  `hashOf()` silently overflowed JS float precision on the new Analytics page's `preview-visitor-N`
+  fixture ids (shared prefix, differ only in one trailing digit), collapsing all ten Visitors rows to
+  one identical row — caught live, fixed with a bounded FNV-1a hash, re-verified live (ten distinct
+  rows). Also fixed: two Arabic-locale number-formatting gaps found in the same QA pass.
+- Validation this session: `pnpm typecheck`/`pnpm lint` clean; full `pnpm test` — 123 files / 1465 tests,
+  all green. Live browser QA (already-running dev server, already signed in as `admin@example.test`) —
+  Dashboard, Users Directory, User Details, Organizations Directory, Organization Details (incl.
+  Network/duplicates), Admin Staff, Analytics, Review Center, Review Details, Points (empty-ledger
+  state), Access — all verified with real data and zero console errors on a freshly opened tab. AR+RTL
+  verified on Dashboard/Users/Admin Staff/Analytics; light mode verified on Dashboard; mobile (375×812)
+  verified on Users Directory in Arabic (card view, no overflow).
+- **Next:** Product Owner review of the enriched Phase 0/0B Preview. Phase 1 backend (BL-001–004) starts
+  only after that review, per PD-013 — BL-002 specifically can now also draw on the PD-011 module-effects
+  document produced this session.
+
 ## Current continuation — 2026-09-19: Admin decisions locked, Phase 2 scope approved, Phase 0 Preview built
 
 - Branch `claude/showroom-approval-workflow-acd3de` (worktree), HEAD `2393334f7af9e5c9b5066756322fb5fa83420b77`

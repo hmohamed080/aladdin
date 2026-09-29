@@ -22,7 +22,8 @@ import { cn } from "@/lib/ui/cn";
 export type Column<T> = {
   /** Stable key — also used as the React key. */
   key: string;
-  header: string;
+  /** A plain label, or a `ReactNode` (e.g. a sortable-header control) — the caption still uses the table's own `caption` prop, so a rich header never costs accessibility. */
+  header: ReactNode;
   cell: (row: T) => ReactNode;
   /** Right-align and use tabular figures (counts, money, dates). */
   numeric?: boolean;

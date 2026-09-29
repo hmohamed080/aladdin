@@ -220,6 +220,101 @@ export function TrendLine({
 }
 
 // ===========================================================================
+// Multi-series trend line (Phase 0C — Analytics needs more than one line)
+// ===========================================================================
+
+export type MultiSeries = { label: string; points: { label: string; value: number }[] };
+
+/**
+ * Several value-over-time lines sharing one axis — "page views vs. signups
+ * vs. clicks vs. profile views" on one chart, with a text legend (colour is
+ * never the only channel, matching every other chart here). Same hand-rolled
+ * SVG approach as `TrendLine` for the same reason (no charting-library
+ * dependency); this is a sibling, not a replacement — single-series callers
+ * keep using `TrendLine`.
+ */
+export function MultiTrendLine({
+  series,
+  emptyLabel,
+  ariaLabel,
+  formatValue,
+}: {
+  series: MultiSeries[];
+  emptyLabel: string;
+  ariaLabel: string;
+  formatValue: (v: number) => string;
+}) {
+  const usable = series.filter((s) => s.points.length >= 2);
+  if (usable.length === 0) return <Empty label={emptyLabel} />;
+
+  const allValues = usable.flatMap((s) => s.points.map((p) => p.value));
+  const max = Math.max(...allValues);
+  const min = Math.min(0, ...allValues);
+  const span = max - min || 1;
+  const pointCount = usable[0]!.points.length;
+
+  const linesOf = (s: MultiSeries) =>
+    s.points
+      .map((p, i) => {
+        const x = (i / (pointCount - 1)) * 100;
+        const y = 98 - ((p.value - min) / span) * 96;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(" L");
+
+  const labels = usable[0]!.points;
+  const step = Math.max(1, Math.ceil(labels.length / 6));
+  const shownLabels = labels.filter((_, i) => i % step === 0 || i === labels.length - 1);
+
+  return (
+    <figure className="m-0 flex flex-col gap-3">
+      <ul className="flex flex-wrap gap-x-4 gap-y-1.5" aria-hidden="true">
+        {usable.map((s, i) => (
+          <li key={s.label} className="flex items-center gap-1.5 text-label text-fg-secondary">
+            <span className={cn("h-2.5 w-2.5 shrink-0 rounded-[3px]", BG[seriesAt(i)])} />
+            {s.label}
+          </li>
+        ))}
+      </ul>
+      <div className="flex gap-2">
+        <div className="flex shrink-0 flex-col justify-between py-0.5 text-[0.6875rem] tabular-nums text-fg-muted" dir="ltr" aria-hidden="true">
+          <span>{formatValue(max)}</span>
+          <span>{formatValue(min)}</span>
+        </div>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={ariaLabel} className="h-36 w-full tablet:h-44">
+          {[25, 50, 75].map((y) => (
+            <line key={y} x1="0" y1={y} x2="100" y2={y} className="stroke-chart-grid" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          ))}
+          {usable.map((s, i) => (
+            <path
+              key={s.label}
+              d={`M${linesOf(s)}`}
+              fill="none"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+              className={STROKE[seriesAt(i)]}
+            />
+          ))}
+        </svg>
+      </div>
+      <div className="flex justify-between gap-2 ps-8 text-[0.6875rem] text-fg-muted" dir="ltr" aria-hidden="true">
+        {shownLabels.map((p) => (
+          <span key={p.label} className="truncate">
+            {p.label}
+          </span>
+        ))}
+      </div>
+      <DataList
+        caption={ariaLabel}
+        items={usable.flatMap((s) => s.points.map((p) => ({ label: `${s.label} — ${p.label}`, value: formatValue(p.value) })))}
+      />
+    </figure>
+  );
+}
+
+// ===========================================================================
 // Proportional split
 // ===========================================================================
 
