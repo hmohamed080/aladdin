@@ -4,11 +4,10 @@ import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
+import { AdminDateInput } from "@/features/admin-preview/admin-date-input";
 
 export type RangePreset = "today" | "7" | "30" | "custom";
 
-const inputClass =
-  "min-h-10 rounded-md border border-strong bg-canvas px-3 text-body text-fg focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/40";
 
 /**
  * Analytics date range: Today · Last 7 days · Last 30 days · Custom (From–To).
@@ -76,33 +75,30 @@ export function AnalyticsRange({ current, from, to, max }: { current: RangePrese
 
       {showCustom ? (
         <div className="flex flex-wrap items-end gap-sm">
-          <label className="flex flex-col gap-1 text-label text-fg-secondary">
-            {t("admin.preview.analytics.from")}
-            <input
-              type="date"
+          <div className="flex flex-col gap-1 text-label text-fg-secondary">
+            <span>{t("admin.preview.analytics.from")}</span>
+            <AdminDateInput
+              label={t("admin.preview.analytics.from")}
               value={customFrom}
               max={max}
-              onChange={(e) => {
-                setCustomFrom(e.target.value);
-                if (e.target.value && customTo && e.target.value <= customTo) go({ range: "custom", from: e.target.value, to: customTo });
+              onChange={(iso) => {
+                setCustomFrom(iso);
+                if (iso && customTo && iso <= customTo) go({ range: "custom", from: iso, to: customTo });
               }}
-              className={inputClass}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-label text-fg-secondary">
-            {t("admin.preview.analytics.to")}
-            <input
-              type="date"
+          </div>
+          <div className="flex flex-col gap-1 text-label text-fg-secondary">
+            <span>{t("admin.preview.analytics.to")}</span>
+            <AdminDateInput
+              label={t("admin.preview.analytics.to")}
               value={customTo}
               max={max}
-              onChange={(e) => {
-                setCustomTo(e.target.value);
-                if (customFrom && e.target.value && customFrom <= e.target.value) go({ range: "custom", from: customFrom, to: e.target.value });
+              onChange={(iso) => {
+                setCustomTo(iso);
+                if (customFrom && iso && customFrom <= iso) go({ range: "custom", from: customFrom, to: iso });
               }}
-              className={inputClass}
-              aria-invalid={invalid || undefined}
             />
-          </label>
+          </div>
           {invalid ? <p role="alert" className="text-label text-danger">{t("admin.preview.analytics.invalidRange")}</p> : null}
         </div>
       ) : null}

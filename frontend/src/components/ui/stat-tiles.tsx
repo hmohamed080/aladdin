@@ -252,7 +252,10 @@ export function TabLinks({
 }) {
   const hrefFor = (value: string) => {
     const qs = new URLSearchParams();
-    for (const [k, v] of Object.entries(keep ?? {})) if (v) qs.set(k, v);
+    // The tab's OWN parameter is never carried over: a tab link states the value
+    // it selects. Carrying `keep[param]` forward made the "All" tab (value "")
+    // keep the previous tab's filter, so it could never clear it.
+    for (const [k, v] of Object.entries(keep ?? {})) if (v && k !== param) qs.set(k, v);
     if (value) qs.set(param, value);
     const s = qs.toString();
     return s ? `${basePath}?${s}` : basePath;

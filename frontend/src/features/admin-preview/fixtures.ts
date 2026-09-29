@@ -418,6 +418,25 @@ export const PREVIEW_ROLES: PreviewRole[] = [
   },
 ];
 
+/**
+ * Core permissions a SYSTEM role can never lose (Preview assumption, to be
+ * confirmed by the Product Owner in BL-018's design audit). Super Admin keeps
+ * role and Admin Staff management so the last super-admin can never lock the
+ * platform out; the other system roles keep their baseline read access. Custom
+ * roles have none. The Role Editor shows these as LOCKED, never as an editable
+ * checkbox.
+ */
+export const PREVIEW_LOCKED_PERMISSIONS: Partial<Record<PreviewRoleKey, readonly string[]>> = {
+  superAdmin: ["roles.read", "roles.manage", "admin_staff.read", "admin_staff.manage"],
+  administrator: ["users.read", "organizations.read"],
+  moderator: ["users.read", "organizations.read"],
+  support: ["users.read", "organizations.read"],
+};
+
+export function isLockedPermission(role: PreviewRole | null, permission: string): boolean {
+  return Boolean(role?.system && PREVIEW_LOCKED_PERMISSIONS[role.key]?.includes(permission));
+}
+
 /** Which planned roles hold a permission — the Permissions tab's "Held by" column. */
 export function rolesHolding(permission: string): PreviewRoleKey[] {
   return PREVIEW_ROLES.filter((r) => r.status === "active" && r.permissions.includes(permission)).map((r) => r.key);

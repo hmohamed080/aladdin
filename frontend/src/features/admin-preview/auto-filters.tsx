@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
+import { AdminDateInput } from "@/features/admin-preview/admin-date-input";
 import { nextSort, type SortDir } from "@/features/admin-preview/table-state";
 
 export type TextFieldConfig = {
@@ -57,13 +58,24 @@ export function AutoFilters({ fields }: { fields: FilterFieldConfig[] }) {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Successive edits made before the previous navigation has committed (clear
+  // From, then clear To) must build on EACH OTHER, not on the same stale
+  // `searchParams` — otherwise the second navigation silently restores the first
+  // field. `pending` carries the latest intended query until the URL catches up.
+  const pending = useRef<URLSearchParams | null>(null);
+  const committed = searchParams.toString();
+  useEffect(() => {
+    pending.current = null;
+  }, [committed]);
+
   function navigate(overrides: Record<string, string>) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams((pending.current ?? new URLSearchParams(committed)).toString());
     for (const [k, v] of Object.entries(overrides)) {
       if (v) params.set(k, v);
       else params.delete(k);
     }
     params.delete("page");
+    pending.current = params;
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
@@ -93,15 +105,14 @@ export function AutoFilters({ fields }: { fields: FilterFieldConfig[] }) {
             }
           />
         ) : f.kind === "date" ? (
-          <label key={f.name} className="flex flex-col gap-1 text-label text-fg-secondary">
-            {f.label}
-            <input
-              type="date"
+          <div key={f.name} className="flex flex-col gap-1 text-label text-fg-secondary">
+            <span>{f.label}</span>
+            <AdminDateInput
+              label={f.label}
               value={searchParams.get(f.name) ?? ""}
-              onChange={(e) => navigate({ [f.name]: e.target.value })}
-              className="min-h-10 rounded-md border border-strong bg-canvas px-3 text-body text-fg focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/40"
+              onChange={(iso) => navigate({ [f.name]: iso })}
             />
-          </label>
+          </div>
         ) : (
           <select
             key={f.name}

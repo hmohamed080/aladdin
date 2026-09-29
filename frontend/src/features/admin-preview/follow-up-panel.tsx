@@ -6,13 +6,13 @@ import { Badge, StatePanel } from "@/components/ui/primitives";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { LabeledField, Select, Textarea } from "@/components/ui/controls";
 import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
+import { AdminDateInput } from "@/features/admin-preview/admin-date-input";
+import { AdminTimeInput } from "@/features/admin-preview/admin-time-input";
 
 type Messages = ReturnType<typeof getMessages>;
 
 const TYPES: PreviewFollowUpType[] = ["call", "whatsapp", "email", "verificationFollowUp", "other"];
 
-const dateInput =
-  "min-h-11 w-full rounded-md border border-strong bg-canvas px-3.5 text-body text-fg focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/40";
 
 /**
  * Follow-up workflow (Phase 0D) — an operational contact attempt with an
@@ -99,10 +99,10 @@ export function FollowUpPanel({
           </LabeledField>
           <div className="grid gap-md tablet:grid-cols-2">
             <LabeledField label={t.followUpDate} htmlFor="followup-date">
-              <input id="followup-date" type="date" className={dateInput} />
+              <AdminDateInput id="followup-date" label={t.followUpDate} />
             </LabeledField>
             <LabeledField label={t.followUpTime} htmlFor="followup-time">
-              <input id="followup-time" type="time" className={dateInput} />
+              <AdminTimeInput id="followup-time" label={t.followUpTime} />
             </LabeledField>
           </div>
           <LabeledField label={t.assignedTo} htmlFor="followup-assignee">

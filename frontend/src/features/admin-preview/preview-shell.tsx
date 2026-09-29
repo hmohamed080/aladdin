@@ -61,9 +61,8 @@ export function PreviewShell({ children, paletteItems }: { children: ReactNode; 
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <CommandPalette items={paletteItems} />
-      </div>
+      {/* No trigger here: the header search is the single entry point (see palette-bridge). */}
+      <CommandPalette items={paletteItems} />
 
       <nav aria-label={t("admin.preview.navLabel")} className="-mx-1 overflow-x-auto overflow-y-hidden">
         <ul className="flex w-max min-w-full gap-1 border-b px-1">

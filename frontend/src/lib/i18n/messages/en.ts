@@ -1474,7 +1474,7 @@ export const en = {
       staff: {
         navLabel: "Admin Staff",
         title: "Admin Staff",
-        subtitle: "Who can operate the Aladdin Admin console, and with which fixed role. Grants are currently provisioned by a DBA (PD-008 keeps this fixed, not a self-service role editor).",
+        subtitle: "Who can operate the Aladdin Admin console and what each person may do. Access is managed through dynamic roles made of resource.action permissions, limited by scope (Platform, Organization, Branch, Department / Team, User). Admin Core will check every action through one centralized server-side authorization.",
         columns: {
           name: "Name",
           email: "Email",
@@ -1490,7 +1490,7 @@ export const en = {
         statusActive: "Active",
         invite: "Invite Admin Staff",
         inviteTitle: "Invite Admin Staff",
-        inviteBody: "Preview of the planned invite flow. Real staff access is still DBA-provisioned (see docs/admin) — this dialog previews the intended self-service shape, not a working invitation.",
+        inviteBody: "Preview of the planned invite flow: invite a person and assign a role. Nothing is sent or saved, and no access is granted.",
         nameLabel: "Name",
         emailLabel: "Email",
         roleLabel: "Role",
@@ -1511,7 +1511,7 @@ export const en = {
           roles: "Roles",
           permissions: "Permissions",
         },
-        rbacNote: "Dynamic RBAC preview — PD-008 is approved (adapt CRM Dynamic RBAC to Aladdin). The roles, permissions and scopes below are the planned model; nothing here is enforced yet.",
+        rbacNote: "Preview only. PD-008 is approved: dynamic roles and dynamic permissions (resource.action) with scopes, checked by one centralized authorization in Admin Core. Nothing on this page is saved or enforced yet — today's enforced access is still the three platform tiers.",
         rolesColumn: "Role(s)",
         invitedColumn: "Created / invited",
         rolesTab: {
@@ -1532,7 +1532,8 @@ export const en = {
           duplicate: "Duplicate",
           archive: "Archive",
           archiveBody: "Archived roles can no longer be assigned. Staff who hold it must be moved to another role first.",
-          lockedNote: "System role — its core permissions cannot be removed.",
+          lockedNote: "System role — its core permissions are locked and cannot be removed.",
+          lockedPermission: "Locked — a core permission of this system role; it cannot be removed.",
           editorTitle: "Role editor",
           editorBody: "Group permissions by resource. A role can only grant permissions up to the editor's own rank.",
           nameLabel: "Role name",
@@ -1728,6 +1729,13 @@ export const en = {
         unresolvedIdentity: "Not resolved",
         chartScaleNote: "Each series is scaled to its own peak so small series stay visible — hover the chart for exact values. Preview fixture data, not a live feed.",
         invalidRange: "From must be on or before To.",
+      },
+      dateInput: {
+        placeholder: "DD/MM/YYYY",
+        invalid: "Enter a real date as DD/MM/YYYY.",
+        afterMax: "This date is in the future.",
+        openCalendar: "Open calendar",
+        invalidTime: "Enter a real 24-hour time as HH:mm.",
       },
       table: {
         pagination: "Pagination",

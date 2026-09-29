@@ -12,6 +12,7 @@ import {
   PREVIEW_PERMISSION_KEYS,
   PREVIEW_SCOPES,
   rolesHolding,
+  isLockedPermission,
   type PreviewRole,
 } from "@/features/admin-preview/fixtures";
 import { AdminHeader } from "@/features/admin/parts";
@@ -539,6 +540,24 @@ function RoleEditorDialog({
             <div className="flex flex-wrap gap-x-md gap-y-1">
               {PREVIEW_RESOURCE_ACTIONS[resource].map((action) => {
                 const key = `${resource}.${action}`;
+                if (isLockedPermission(role, key)) {
+                  // A core permission of a system role: shown, but NOT editable — no checkbox exists to untick.
+                  return (
+                    <span
+                      key={key}
+                      role="img"
+                      aria-label={`${key} — ${t.rolesTab.lockedPermission}`}
+                      title={t.rolesTab.lockedPermission}
+                      className="flex cursor-not-allowed items-center gap-1.5 rounded-sm bg-surface-2 px-1.5 py-0.5 text-body text-fg-muted"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect x="4" y="11" width="16" height="10" rx="2" />
+                        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                      </svg>
+                      <code dir="ltr" className="text-label">{key}</code>
+                    </span>
+                  );
+                }
                 return (
                   <label key={key} className="flex items-center gap-1.5 text-body text-fg-secondary" title={permissionDesc[resource]?.[action]}>
                     <input type="checkbox" defaultChecked={role?.permissions.includes(key) ?? false} className="h-4 w-4 accent-[var(--color-accent-solid)]" />

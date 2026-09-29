@@ -4,6 +4,19 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Phase 0D final acceptance fixes and proof pass (filters, RBAC copy, date entry, single search)
+
+**Date:** 2026-09-29 · **Branch:** `feature/admin-blueprint-recovery` · Not pushed; no migration; no shared-DB writes; Admin Core wiring **not** started.
+
+Product Owner approved Phase 0D visually except four items; this pass fixes and proves them.
+
+- **Filters — proved in a real browser** (70 checks, `15-filter-proof.txt`): Users, Organizations, Points, Audit, Review Center — single, combined (AND), search + filter, clearing, pagination reset to page 1, no full-page reload. The proof **found two real bugs, both fixed**: (1) the **"All" status tab never cleared the status filter** — `TabLinks` carried the tab's own parameter forward through `keep` (B2B callers never pass their own parameter, so they are unaffected); (2) **two quick successive filter edits built their URL from the same stale `searchParams`**, so the second silently restored the first (clear Audit From then To) — `AutoFilters` now chains pending edits. Limits stated: every seeded user is `Unverified`/`Pending` and has no account type among the 200-row Preview fetch, so Users' Verification/Status/Type filters can only prove 0-or-all (Type verified against the DB: 0); City, search and Organizations/Points/Audit carry the non-trivial proof.
+- **RBAC copy** — removed "fixed role", "provisioned by a DBA", "PD-008 keeps this fixed"; the Admin Staff subtitle, invite dialog and Preview-only note now describe dynamic roles/permissions (`resource.action`), scopes and one centralized authorization in Admin Core, and still say plainly that nothing is saved or enforced. System-role **core permissions render locked** (lock icon, no checkbox): Super Admin keeps `roles.*` and `admin_staff.*`; the other system roles keep `users.read` and `organizations.read` — a **Preview assumption** recorded in `fixtures.ts` for BL-018's design audit.
+- **Dates** — new `AdminDateInput` / `AdminTimeInput`: text fields that always read and type `DD/MM/YYYY` and 24-hour `HH:mm` (a native `<input type="date">` follows the browser locale and shows `mm/dd/yyyy` on US browsers). Auto-slash mask, Arabic-Indic digits accepted, real-calendar validation (31/02 and US-order 09/29 rejected inline), select-on-focus, calendar button as a convenience only. Used by Analytics custom range, Audit From/To and the Follow-up dialog; `date-input.ts` is unit-tested. The field stays LTR in Arabic (a date is a digit sequence; mirroring would swap day and year) and uses the literal `DD/MM/YYYY` hint in both locales.
+- **One search entry point** — the shell's header search (click, Ctrl+K, Cmd+K) now hands off to the Admin palette inside Admin Preview through `lib/admin/palette-bridge.ts`; the Preview's own "Admin search" trigger and its capture-phase key handler were removed. No new search backend.
+
+**Validation.** `pnpm typecheck` clean · `pnpm lint` 0 errors (1 pre-existing warning) · `pnpm test` 152 files / 1883 tests · browser proofs: filters 70/70, UI (RBAC copy, locked permissions, EN+AR dates, single search, mobile) 52/52.
+
 ## Session — Phase 0D: the final Admin Preview-design stage (Admin Staff · Roles · Permissions, Review Center separation, Command Palette, Analytics/Audit revision)
 
 **Date:** 2026-09-29 · **Branch:** `feature/admin-blueprint-recovery` (worktree `.claude/worktrees/admin-blueprint-recovery`) · Docs commit `60aec21` (PD-008 approved, PD-014, PD-015) + this session's commits · Not pushed; no PR; nothing deployed; hosted Supabase untouched; **no Supabase migration added**; no shared-DB row created.

@@ -28,6 +28,13 @@ const ARABIC = /[؀-ۿ]/;
 // Values that are intentionally identical technical samples in both locales
 // (neutral placeholders), so they carry Latin/digits and no Arabic script.
 const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
+  // Admin: a permission VOCABULARY token ("resource.action" is the literal shape
+  // of every permission key, e.g. users.read) and the fixed date-entry FORMAT
+  // hint (DD/MM/YYYY — the field is LTR by design, so the hint stays literal).
+  "admin.preview.staff.subtitle",
+  "admin.preview.staff.rbacNote",
+  "admin.preview.dateInput.placeholder",
+  "admin.preview.dateInput.invalid",
   "auth.emailPlaceholder",
   "authPasswordPreview.emailPlaceholder",
   // Illustrative bad-pattern examples ("aaaa", "1234") inside an otherwise

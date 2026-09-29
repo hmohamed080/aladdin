@@ -4,7 +4,8 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
-import { CommandIcon, EnterKeyIcon, SearchIcon } from "@/components/ui/icons";
+import { EnterKeyIcon, SearchIcon } from "@/components/ui/icons";
+import { ADMIN_PALETTE_EVENT, type AdminPaletteIntent } from "@/lib/admin/palette-bridge";
 import {
   flattenResults,
   moveActive,
@@ -29,8 +30,8 @@ const NAV: { key: string; href: string }[] = [
 const DEBOUNCE_MS = 150;
 
 /**
- * Global Admin Command Palette — PREVIEW (Phase 0D). Ctrl+K / Cmd+K from any
- * Admin Preview page (or the visible trigger) opens a dialog with debounced
+ * Global Admin Command Palette — PREVIEW (Phase 0D). The shell's header search
+ * (click, Ctrl+K or Cmd+K) opens this dialog from any Admin Preview page with debounced
  * search across Users · Organizations · Review requests · Network referrals ·
  * Admin Staff · Admin pages. ↑/↓ move (wrapping), Enter opens, Esc closes, and
  * opening a result is a client-side navigation — no page reload.
@@ -50,32 +51,19 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [active, setActive] = useState(0);
-  const [isMac, setIsMac] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  // The ONE entry point is the shell's header search (click, Ctrl+K, Cmd+K): inside
+  // Admin it hands off here through `palette-bridge`. This component renders no
+  // trigger of its own, so there is exactly one search field on screen.
   useEffect(() => {
-    setIsMac(/mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent));
-  }, []);
-
-  // Ctrl+K / Cmd+K anywhere in Admin Preview toggles THIS palette.
-  //
-  // The app shell's own header search (`components/layout/global-search.tsx`)
-  // listens for the same chord on `window`, in the bubble phase. This handler is
-  // registered in the CAPTURE phase and stops the event, so inside Admin Preview
-  // the shortcut opens the Admin palette only — never both dialogs at once. The
-  // header field itself is untouched and still opens the shell's search on click.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        setOpen((v) => !v);
-      }
+    function onIntent(e: Event) {
+      const mode = (e as CustomEvent<AdminPaletteIntent>).detail?.mode ?? "open";
+      setOpen((v) => (mode === "toggle" ? !v : true));
     }
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
+    window.addEventListener(ADMIN_PALETTE_EVENT, onIntent);
+    return () => window.removeEventListener(ADMIN_PALETTE_EVENT, onIntent);
   }, []);
 
   useEffect(() => {
@@ -148,25 +136,6 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
 
   return (
     <>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-haspopup="dialog"
-        aria-keyshortcuts="Control+K Meta+K"
-        className={cn(
-          "flex min-h-9 w-full max-w-xs items-center gap-2 rounded-md border border-strong bg-canvas px-3 text-label text-fg-muted transition-colors",
-          "hover:border-accent hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
-        )}
-      >
-        <SearchIcon size={16} />
-        <span className="flex-1 truncate text-start">{t("admin.preview.palette.title")}</span>
-        <kbd className="inline-flex items-center gap-0.5 rounded-sm border bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] font-medium text-fg-secondary" dir="ltr">
-          {isMac ? <CommandIcon size={11} /> : "Ctrl"}
-          <span>{isMac ? "" : " "}K</span>
-        </kbd>
-      </button>
-
       {open ? (
         <div
           className="fixed inset-0 flex items-start justify-center bg-brand-basalt/60 p-md pt-[12vh]"
