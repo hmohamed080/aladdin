@@ -49,6 +49,15 @@ export type Column<T> = {
    * content is unbounded user input.
    */
   grow?: boolean;
+  /**
+   * Opt-in floor for this column's width (any CSS length, e.g. `"14rem"`).
+   * For dense operational tables (Admin) that would rather scroll sideways
+   * inside the table than squeeze a name or a date into an unreadable sliver.
+   * Unset = today's content-sized behaviour, so no existing table changes.
+   */
+  minWidth?: string;
+  /** Opt-in: keep this column's header and cells on one line (dates, badges, phone numbers). */
+  nowrap?: boolean;
 };
 
 export function DataTable<T>({
@@ -58,6 +67,8 @@ export function DataTable<T>({
   caption,
   empty,
   className,
+  minWidth,
+  stackBelow = "tablet",
 }: {
   columns: Column<T>[];
   rows: readonly T[];
@@ -67,11 +78,26 @@ export function DataTable<T>({
   /** Rendered instead of the table when there is nothing to show. */
   empty: ReactNode;
   className?: string;
+  /**
+   * Opt-in minimum width for the whole table (CSS length). A wide, information-
+   * dense table scrolls horizontally INSIDE its own scroller instead of
+   * compressing every column; the page itself still never scrolls sideways.
+   */
+  minWidth?: string;
+  /**
+   * Below which breakpoint the table becomes stacked cards. `tablet` (default)
+   * keeps every existing table as it was; `desktop` is for tables too dense to
+   * be useful on a tablet (Admin directories), which then get cards there too.
+   */
+  stackBelow?: "tablet" | "desktop";
 }) {
   const lead = columns[0];
   if (rows.length === 0 || !lead) return <>{empty}</>;
 
   const cardColumns = columns.slice(1).filter((c) => !c.secondary);
+  // Literal class strings (not interpolated) so Tailwind can see them.
+  const tableShown = stackBelow === "desktop" ? "desktop:block" : "tablet:block";
+  const cardsHidden = stackBelow === "desktop" ? "desktop:hidden" : "tablet:hidden";
 
   return (
     <div className={cn("min-w-0", className)}>
@@ -82,9 +108,9 @@ export function DataTable<T>({
           half-width dashboard card that hid the money column outright, which is
           far worse than a scrollbar. The scroll is contained here, so the page
           itself still never moves sideways. */}
-      <div className="hidden overflow-hidden rounded-md border bg-surface shadow-card tablet:block">
+      <div className={cn("hidden overflow-hidden rounded-md border bg-surface shadow-card", tableShown)}>
         <div className="overflow-x-auto">
-        <table className="w-full min-w-[34rem] border-collapse text-body">
+        <table className="w-full min-w-[34rem] border-collapse text-body" style={minWidth ? { minWidth } : undefined}>
           <caption className="sr-only">{caption}</caption>
           <thead>
             <tr className="border-b bg-surface-2/50">
@@ -92,11 +118,13 @@ export function DataTable<T>({
                 <th
                   key={c.key}
                   scope="col"
+                  style={c.minWidth ? { minWidth: c.minWidth } : undefined}
                   className={cn(
                     "px-md py-2.5 text-label font-medium text-fg-muted",
                     c.numeric ? "text-end" : "text-start",
                     c.desktopOnly && "hidden desktop:table-cell",
                     c.grow && "w-full max-w-0",
+                    c.nowrap && "whitespace-nowrap",
                   )}
                 >
                   {c.header}
@@ -113,11 +141,13 @@ export function DataTable<T>({
                 {columns.map((c) => (
                   <td
                     key={c.key}
+                    style={c.minWidth ? { minWidth: c.minWidth } : undefined}
                     className={cn(
                       "px-md py-3 align-middle text-fg-secondary",
                       c.numeric ? "text-end tabular-nums" : "text-start",
                       c.desktopOnly && "hidden desktop:table-cell",
                       c.grow && "w-full max-w-0",
+                      c.nowrap && "whitespace-nowrap",
                     )}
                   >
                     {c.cell(row)}
@@ -131,7 +161,7 @@ export function DataTable<T>({
       </div>
 
       {/* Mobile: the same data as stacked cards. */}
-      <ul className="flex flex-col gap-sm tablet:hidden">
+      <ul className={cn("flex flex-col gap-sm", cardsHidden)}>
         {rows.map((row) => (
           <li key={rowKey(row)} className="rounded-md border bg-surface p-md shadow-card">
             <div className="mb-2 text-body-lg font-medium text-fg">{lead.cell(row)}</div>
@@ -167,12 +197,19 @@ export function RecordCell({
   meta,
   href,
   avatar,
+  wrap = false,
 }: {
   title: ReactNode;
   meta?: ReactNode;
   href?: string;
   /** Optional leading square (logo initials / avatar placeholder). */
   avatar?: ReactNode;
+  /**
+   * Opt-in: let the title wrap onto a second line instead of truncating. For
+   * identity columns where the full name IS the information (Admin
+   * directories) — a name cut to "Ahmed Has…" is not a readable identity.
+   */
+  wrap?: boolean;
 }) {
   /* `dir="auto"` because BOTH lines carry user-entered text, and a truncated
      string only loses the right end if the box agrees with the string about
@@ -184,7 +221,7 @@ export function RecordCell({
      unaffected and LTR content truncates at its own end in either workspace. */
   const body = (
     <span className="flex min-w-0 flex-col">
-      <span dir="auto" className="truncate font-medium text-fg">{title}</span>
+      <span dir="auto" className={cn("font-medium text-fg", wrap ? "break-words" : "truncate")}>{title}</span>
       {meta ? <span dir="auto" className="truncate text-label text-fg-muted">{meta}</span> : null}
     </span>
   );

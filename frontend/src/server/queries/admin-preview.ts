@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
-import { listVerifications, type VerificationRow } from "@/server/queries/admin";
+import { listVerifications, listAudit as listAuditBase, type VerificationRow, type AuditEntry } from "@/server/queries/admin";
 import { listAdminReferrals, type AdminReferralRow } from "@/server/queries/affiliation";
 import { listAdminNetworkReferrals, type AdminNetworkReferralRow } from "@/server/queries/network-referrals";
 import { previewCompletenessFor } from "@/features/admin-preview/fixtures";
@@ -89,6 +89,57 @@ export async function previewUserPointsLedger(
     })),
     balance: Number(balanceData ?? 0),
   };
+}
+
+/**
+ * The user whose ledger changed most recently, or null when the environment has
+ * no ledger rows at all. Lets the Points page open on real data immediately
+ * instead of an empty picker. Read-only; the caller falls back to a labelled
+ * fixture when this is null (no rows are ever created to make the page look full).
+ */
+export async function previewLatestPointsUserId(supabase: Client): Promise<string | null> {
+  const { data } = await supabase
+    .from("points_ledger")
+    .select("user_id")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.user_id ?? null;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Audit, with the detail the expandable row needs — REAL. `listAudit()`   */
+/* (shared with the live `/admin/audit`, left untouched) does not select   */
+/* `metadata` or `organization_id`; this adds them with one extra read of  */
+/* the SAME table for the SAME rows under the same platform RLS grant.     */
+/* ---------------------------------------------------------------------- */
+
+export type DetailedAuditEntry = AuditEntry & {
+  /** The row's `metadata` object exactly as recorded (rendered without raw JSON by `describeAuditMetadata`). */
+  metadata: unknown;
+  organizationId: string | null;
+  organizationName: string | null;
+};
+
+export async function previewAuditDetailed(supabase: Client, limit = 200): Promise<DetailedAuditEntry[]> {
+  const base = await listAuditBase(supabase, limit);
+  if (base.length === 0) return [];
+  const { data: extras } = await supabase.from("audit_log").select("id, metadata, organization_id").in("id", base.map((e) => e.id));
+  const extraById = new Map((extras ?? []).map((r) => [r.id, r]));
+  const orgIds = Array.from(new Set((extras ?? []).flatMap((r) => (r.organization_id ? [r.organization_id] : []))));
+  const { data: orgs } = orgIds.length
+    ? await supabase.from("organizations").select("id, name").in("id", orgIds)
+    : { data: [] as { id: string; name: string }[] };
+  const orgName = new Map((orgs ?? []).map((o) => [o.id, o.name]));
+  return base.map((e) => {
+    const x = extraById.get(e.id);
+    return {
+      ...e,
+      metadata: x?.metadata ?? {},
+      organizationId: x?.organization_id ?? null,
+      organizationName: x?.organization_id ? (orgName.get(x.organization_id) ?? null) : null,
+    };
+  });
 }
 
 /* ---------------------------------------------------------------------- */
@@ -418,6 +469,17 @@ export type UserDirectoryContext = {
   primaryOrgName: string | null;
   orgCount: number;
   latestVerificationStatus: string | null;
+  /**
+   * `profiles.id` — NOT the user id. The public route `/p/[profileId]` is keyed
+   * by profile id; a user id there is a guaranteed 404.
+   */
+  profileId: string | null;
+  /**
+   * True only when that public route will actually render: the same test
+   * `profile_public_directory` applies (listed, professional, active). When
+   * false there is no valid platform destination and the eye stays disabled.
+   */
+  publicProfileAvailable: boolean;
 };
 
 export async function previewUsersDirectoryContext(
@@ -427,7 +489,7 @@ export async function previewUsersDirectoryContext(
   const result = new Map<string, UserDirectoryContext>();
   if (userIds.length === 0) return result;
 
-  const [{ data: memberships }, { data: verificationRows }] = await Promise.all([
+  const [{ data: memberships }, { data: verificationRows }, { data: profileRows }] = await Promise.all([
     supabase
       .from("memberships")
       .select("user_id, organization_id, organizations(name)")
@@ -442,7 +504,19 @@ export async function previewUsersDirectoryContext(
       .in("user_id", userIds)
       .eq("subject_type", "user")
       .order("submitted_at", { ascending: false }),
+    // Platform staff may read `profiles` (`profiles_select_platform`), which is
+    // how the profile id behind each user is resolved.
+    supabase.from("profiles").select("id, user_id").in("user_id", userIds),
   ]);
+
+  // The public projection is the single source of truth for "is there a public
+  // page": ask it directly instead of re-deriving its eligibility rules here.
+  const profileIds = (profileRows ?? []).map((p) => p.id);
+  const { data: listedRows } = profileIds.length
+    ? await supabase.from("profile_public_directory").select("id").in("id", profileIds)
+    : { data: [] as { id: string | null }[] };
+  const listedProfileIds = new Set((listedRows ?? []).flatMap((r) => (r.id ? [r.id] : [])));
+  const profileByUser = new Map((profileRows ?? []).map((p) => [p.user_id, p.id]));
 
   const orgsByUser = new Map<string, { id: string; name: string }[]>();
   for (const m of memberships ?? []) {
@@ -464,6 +538,8 @@ export async function previewUsersDirectoryContext(
       primaryOrgName: orgs[0]?.name ?? null,
       orgCount: orgs.length,
       latestVerificationStatus: latestVerificationByUser.get(userId) ?? null,
+      profileId: profileByUser.get(userId) ?? null,
+      publicProfileAvailable: listedProfileIds.has(profileByUser.get(userId) ?? ""),
     });
   }
   return result;

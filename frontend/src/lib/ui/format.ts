@@ -221,6 +221,21 @@ export function formatAdminDate(iso: string | null | undefined, locale: Locale):
 }
 
 /**
+ * `DD/MM/YYYY HH:mm:ss` — the Admin date-time standard (Phase 0D), e.g.
+ * `19/09/2026 14:53:21`. Same pinned day-month-year order as
+ * `formatAdminDate` (never left to the locale pattern), a 24-hour clock with
+ * seconds so two audit/visitor events in the same minute stay distinguishable,
+ * and locale digits throughout. Admin-only, additive — no consumer surface
+ * uses it.
+ */
+export function formatAdminDateTime(iso: string | null | undefined, locale: Locale): string {
+  const d = parse(iso);
+  if (!d) return EMPTY;
+  const two = (n: number) => formatNumber(n, locale, { minimumIntegerDigits: 2, useGrouping: false });
+  return `${formatAdminDate(iso, locale)} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
+}
+
+/**
  * Day and month, no year — the OPERATIONAL date.
  *
  * `formatDate` renders "12 Sep 2026", which is the right answer on a record

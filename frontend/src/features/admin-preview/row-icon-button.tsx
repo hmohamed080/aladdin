@@ -70,3 +70,23 @@ export function RowIconButton({
     </>
   );
 }
+
+/**
+ * A visibly disabled icon with an explanatory tooltip — for an action whose
+ * destination does not exist (e.g. "View on platform" for an organization,
+ * which has no public page yet, or for a profile that is not publicly listed).
+ * Never a link: a fabricated destination would 404, which is worse than an
+ * honest disabled control.
+ */
+export function RowIconDisabled({ label, reason, Icon }: { label: string; reason: string; Icon: ComponentType<{ size?: number }> }) {
+  return (
+    <span
+      role="img"
+      aria-label={`${label} — ${reason}`}
+      title={`${label} — ${reason}`}
+      className={cn(baseClass, "cursor-not-allowed text-fg-muted opacity-40")}
+    >
+      <Icon size={16} />
+    </span>
+  );
+}

@@ -37,6 +37,7 @@ export function PreviewConfirmDialog({
   confirmLabel,
   confirmVariant = "primary",
   confirmDisabled = false,
+  wide = false,
   children,
 }: {
   open: boolean;
@@ -46,6 +47,8 @@ export function PreviewConfirmDialog({
   confirmLabel: string;
   confirmVariant?: "danger" | "accent" | "primary";
   confirmDisabled?: boolean;
+  /** Wider panel for editors (role editor, follow-up, report). */
+  wide?: boolean;
   children?: ReactNode;
 }) {
   const { t } = useI18n();
@@ -108,7 +111,7 @@ export function PreviewConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={body ? bodyId : undefined}
-        className="flex max-h-[90dvh] w-full max-w-md flex-col gap-md overflow-auto rounded-md border bg-surface p-lg shadow-lg"
+        className={cn("flex max-h-[90dvh] w-full flex-col gap-md overflow-auto rounded-md border bg-surface p-lg shadow-lg", wide ? "max-w-2xl" : "max-w-md")}
       >
         <div className="flex items-center gap-2">
           <h2 id={titleId} className="text-title text-fg">
@@ -166,6 +169,7 @@ export function PreviewActionDialog({
   confirmLabel,
   confirmVariant = "primary",
   confirmDisabled = false,
+  wide = false,
   children,
 }: {
   trigger: string;
@@ -175,6 +179,7 @@ export function PreviewActionDialog({
   confirmLabel: string;
   confirmVariant?: "danger" | "accent" | "primary";
   confirmDisabled?: boolean;
+  wide?: boolean;
   children?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -196,6 +201,7 @@ export function PreviewActionDialog({
         confirmLabel={confirmLabel}
         confirmVariant={confirmVariant}
         confirmDisabled={confirmDisabled}
+        wide={wide}
       >
         {children}
       </PreviewConfirmDialog>

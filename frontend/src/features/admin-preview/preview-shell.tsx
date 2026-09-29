@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
+import { CommandPalette } from "@/features/admin-preview/command-palette";
+import type { PaletteItem } from "@/features/admin-preview/command-palette-search";
 import {
   AlertIcon,
   GaugeIcon,
@@ -13,7 +15,6 @@ import {
   BadgeCheckIcon,
   MoneyIcon,
   ScrollIcon,
-  ShieldIcon,
   UserIcon,
   BarChartIcon,
   SettingsIcon,
@@ -30,7 +31,6 @@ const items: Item[] = [
   { href: "/admin/preview/staff", key: "admin.preview.nav.staff", Icon: UserIcon },
   { href: "/admin/preview/analytics", key: "admin.preview.nav.analytics", Icon: BarChartIcon },
   { href: "/admin/preview/audit", key: "admin.preview.nav.audit", Icon: ScrollIcon },
-  { href: "/admin/preview/access", key: "admin.preview.nav.access", Icon: ShieldIcon },
   { href: "/admin/preview/settings", key: "admin.preview.nav.settings", Icon: SettingsIcon },
 ];
 
@@ -41,7 +41,7 @@ const items: Item[] = [
  * so it already sits behind the same platform-role gate as every other admin
  * route — no second auth check is implemented here.
  */
-export function PreviewShell({ children }: { children: ReactNode }) {
+export function PreviewShell({ children, paletteItems }: { children: ReactNode; paletteItems: PaletteItem[] }) {
   const { t } = useI18n();
   const pathname = usePathname();
   const isActive = (href: string) => (href === "/admin/preview" ? pathname === href : pathname.startsWith(href));
@@ -59,6 +59,10 @@ export function PreviewShell({ children }: { children: ReactNode }) {
           <p className="text-body-lg font-medium text-fg">{t("admin.preview.bannerTitle")}</p>
           <p className="mt-0.5 text-body text-fg-secondary">{t("admin.preview.bannerBody")}</p>
         </div>
+      </div>
+
+      <div className="flex justify-end">
+        <CommandPalette items={paletteItems} />
       </div>
 
       <nav aria-label={t("admin.preview.navLabel")} className="-mx-1 overflow-x-auto overflow-y-hidden">

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useI18n } from "@/lib/i18n/context";
+import { nextSort, type SortDir } from "@/features/admin-preview/table-state";
 
 export type TextFieldConfig = {
   kind: "text";
@@ -18,7 +20,14 @@ export type SelectFieldConfig = {
   options: { value: string; label: string }[];
 };
 
-export type FilterFieldConfig = TextFieldConfig | SelectFieldConfig;
+export type DateFieldConfig = {
+  kind: "date";
+  name: string;
+  /** Visible label above the input (e.g. "From"). */
+  label: string;
+};
+
+export type FilterFieldConfig = TextFieldConfig | SelectFieldConfig | DateFieldConfig;
 
 /**
  * Global Admin UX convention (Phase 0C): NO standalone "Search" button on a
@@ -83,12 +92,22 @@ export function AutoFilters({ fields }: { fields: FilterFieldConfig[] }) {
               "min-h-10 w-full max-w-sm rounded-md border border-strong bg-canvas px-3.5 text-body text-fg placeholder:text-fg-muted focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/40"
             }
           />
+        ) : f.kind === "date" ? (
+          <label key={f.name} className="flex flex-col gap-1 text-label text-fg-secondary">
+            {f.label}
+            <input
+              type="date"
+              value={searchParams.get(f.name) ?? ""}
+              onChange={(e) => navigate({ [f.name]: e.target.value })}
+              className="min-h-10 rounded-md border border-strong bg-canvas px-3 text-body text-fg focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/40"
+            />
+          </label>
         ) : (
           <select
             key={f.name}
             value={searchParams.get(f.name) ?? ""}
             onChange={(e) => navigate({ [f.name]: e.target.value })}
-            className="min-h-10 rounded-md border border-strong bg-canvas px-3 text-body text-fg"
+            className="min-h-10 min-w-0 max-w-full rounded-md border border-strong bg-canvas px-3 text-body text-fg"
           >
             <option value="">{f.anyLabel}</option>
             {f.options.map((o) => (
@@ -111,29 +130,45 @@ export type SortFieldConfig = { value: string; label: string };
  * a decorative arrow that does nothing. Toggles asc/desc on repeat click.
  * Same URL-param navigation model as `AutoFilters`.
  */
-export function SortableHeader({ field, label }: { field: string; label: string }) {
+export function SortableHeader({
+  field,
+  label,
+  naturalDir = "desc",
+  isDefault = false,
+}: {
+  field: string;
+  label: string;
+  naturalDir?: SortDir;
+  /** This column is the table's default sort when `?sort=` is absent — shown as active. */
+  isDefault?: boolean;
+}) {
+  const { t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const currentSort = searchParams.get("sort") ?? "";
-  const [currentField, currentDir] = currentSort.split(":");
-  const active = currentField === field;
-  const nextDir = active && currentDir === "asc" ? "desc" : "asc";
+  const [currentField, currentDir] = (searchParams.get("sort") ?? "").split(":");
+  const noSortParam = !currentField;
+  const active = currentField === field || (noSortParam && isDefault);
+  const dir: SortDir | null = active ? (noSortParam ? naturalDir : currentDir === "asc" ? "asc" : "desc") : null;
 
   return (
     <button
       type="button"
+      aria-label={dir ? `${label} — ${t(dir === "asc" ? "admin.preview.users.sortAscending" : "admin.preview.users.sortDescending")}` : label}
       onClick={() => {
         const params = new URLSearchParams(searchParams.toString());
-        params.set("sort", `${field}:${nextDir}`);
+        // ONE sort param holds ONE field. Switching columns starts at the new
+        // column's own natural direction — the previous column's direction
+        // never carries over (Registered and Profile Completion are independent).
+        params.set("sort", nextSort(dir ? { field, dir } : null, field, naturalDir));
         params.delete("page");
         router.replace(`${pathname}?${params.toString()}`, { scroll: false });
       }}
-      className="inline-flex items-center gap-1 text-label font-medium text-fg-muted transition-colors hover:text-fg"
+      className="inline-flex items-center gap-1 whitespace-nowrap text-label font-medium text-fg-muted transition-colors hover:text-fg"
     >
       {label}
       <span aria-hidden="true" className={active ? "text-accent" : "text-fg-muted/50"}>
-        {active && currentDir === "desc" ? "▾" : "▴"}
+        {dir === "asc" ? "▴" : dir === "desc" ? "▾" : "↕"}
       </span>
     </button>
   );
