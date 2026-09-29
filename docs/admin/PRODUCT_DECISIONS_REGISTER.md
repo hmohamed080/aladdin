@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **APPROVED: PD-001–006, PD-008 (re-decided 2026-09-29), PD-010–015. DEFERRED: PD-007, PD-009.** PD-001–013 were decided on 2026-09-19; PD-008's deferral was replaced and PD-014/PD-015 were added by the Product Owner on 2026-09-29 (Phase 0D). None of PD-001/002/003/008/010/011/012/015's approved semantics have been implemented in the backend yet — approval sets the target behavior; the current live behavior each documents remains unchanged until its own backlog item is built (see `ADMIN_IMPLEMENTATION_BACKLOG.md`). PD-014 is the one decision whose core is already live on `main` (see its *Current implementation* block). |
+| **Status** | **APPROVED: PD-001–006, PD-008 (re-decided 2026-09-29), PD-010–016. DEFERRED: PD-007, PD-009.** PD-001–013 were decided on 2026-09-19; PD-008's deferral was replaced and PD-014/PD-015/PD-016 were added by the Product Owner on 2026-09-29 (Phase 0D). None of PD-001/002/003/008/010/011/012/015's approved semantics have been implemented in the backend yet — approval sets the target behavior; the current live behavior each documents remains unchanged until its own backlog item is built (see `ADMIN_IMPLEMENTATION_BACKLOG.md`). PD-014 is the one decision whose core is already live on `main` (see its *Current implementation* block). |
 | **Version** | 3.0.0 |
 | **Owner** | Product / Foundation |
 | **Last Updated** | 2026-09-29 (Phase 0D — PD-008 approved as "Adapt CRM Dynamic RBAC to Aladdin"; PD-014 and PD-015 added) |
@@ -425,3 +425,22 @@ Every row below is a real business-rule question surfaced by the Admin gap analy
 - Current reality, stated plainly: business creation today is either self-serve (registration creates organization + owner membership + primary branch) or referral-driven; **no Organization Request record exists yet**. The Phase 0D Organization Requests tab is fixture-backed and labelled as such.
 
 **Data model impact:** a future, separately approved migration (new request record + lifecycle + audit vocabulary). None in Phase 0D. **STATUS: APPROVED — 2026-09-29 (Preview only; backend not started)**
+
+---
+
+## PD-016 — Admin Preview Promotion Strategy
+
+**Decision (2026-09-29, APPROVED — added after the original Phase 0D prompt):** `/admin/preview/**` is **not** disposable prototype code. The approved Phase 0 / 0B / 0C / 0D architecture, components, information architecture and UX are the **foundation of the future production Admin**.
+
+**After Phase 0D Product Owner approval:**
+- Do **not** rebuild a separate Admin from scratch.
+- Progressively replace Preview fixtures with real queries.
+- Progressively replace non-mutating Preview interactions with authorized mutations.
+- Move server-side search / filter / sort / pagination into the approved UI (BL-005, BL-006, BL-011).
+- Preserve approved components and flows unless a later Product Decision changes them.
+
+**Stage boundary:** Phase 0D is the **final Preview-design stage**. After approval the work becomes **Admin Core / production wiring** work.
+
+**Backlog note — Data Freshness / Realtime Architecture Audit:** a site-wide audit will happen **after** the Admin Core backend-wiring stage (never inside Phase 0D, which must not implement any realtime architecture). It will classify every module as one of: **Realtime subscription** · **mutation-triggered refetch** · **focus/navigation refetch** · **polling** · **normal fetch**. Tracked as [BL-024](ADMIN_IMPLEMENTATION_BACKLOG.md).
+
+**Data model impact:** none. **STATUS: APPROVED — 2026-09-29 (process/architecture decision, in effect from Phase 0D approval)**

@@ -1,5 +1,12 @@
 # Runtime State
 
+## Current continuation — 2026-09-29 (Phase 0D, latest): Admin Preview design complete, awaiting Product Owner approval
+
+- Branch `feature/admin-blueprint-recovery` (worktree `.claude/worktrees/admin-blueprint-recovery`). Phase 0D Preview implementation is finished in `/admin/preview/**` (see the newest work-log entry). **Admin Core backend wiring has NOT started** and must not until the Product Owner approves Phase 0D. **PD-016**: the Preview is the foundation of the production Admin — promote it (fixtures → real queries, dialogs → authorized mutations), never rebuild it.
+- `/admin/preview/access` is retired; access management lives in **Admin Staff · Roles · Permissions** (`/admin/preview/staff?tab=roles|permissions`). No RBAC schema/enforcement exists — only the fixed 3-tier model is enforced (BL-018 owns the real work).
+- No Supabase migration was added in Phase 0D; hosted Supabase and Vercel untouched. The shared local DB was **not** modified (Points uses a labelled fixture because the local ledger has 0 rows). Local dev server for this worktree: `pnpm exec next dev --port 3107` from `frontend/` (the harness's `preview_start` resolves the main checkout's `aladdin-dev` config, not this worktree's).
+- Admin Preview inside the shell: `Ctrl/Cmd+K` opens the Admin palette (capture-phase handler that pre-empts the shell `GlobalSearch`). Still owed before any PR: clean isolated `supabase db reset` + full `supabase test db`.
+
 ## Current continuation — 2026-09-29 (latest): Admin work recovered onto `main`
 
 - Branch `feature/admin-blueprint-recovery` (worktree `.claude/worktrees/admin-blueprint-recovery`) from `origin/main` @ `1618386` is now the **authoritative line for Admin work**. The uncommitted 2026-09-19 Admin work in worktree `claude/showroom-approval-workflow-acd3de` (base `2393334`, stale) is being transplanted onto it layer by layer; that old worktree is left intact as a source and must not be continued.
