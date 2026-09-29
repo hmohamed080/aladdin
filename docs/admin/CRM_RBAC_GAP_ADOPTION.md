@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | ANALYSIS ONLY — does not change PD-004 or PD-008. Both remain as approved: fixed 3-tier platform roles, dynamic RBAC deferred. |
-| **Version** | 1.0.0 |
+| **Status** | ANALYSIS — the evidence base for PD-008. *Update 2026-09-29:* the Product Owner has since **approved PD-008 as "Adapt CRM Dynamic RBAC to Aladdin"** (see [`PRODUCT_DECISIONS_REGISTER.md` §PD-008](PRODUCT_DECISIONS_REGISTER.md)); §4's "requires Product Owner approval" items are now approved direction, previewed in Phase 0D, with no backend built. The "deferred" conclusions below are the 2026-09-20 analysis as written, kept as history. |
+| **Version** | 1.1.0 |
 | **Owner** | Product / Foundation |
 | **Created** | 2026-09-20 (Phase 0C — Admin Blueprint Final Refinement) |
 | **Reference repository** | `hmohamed080/CRM` (private, accessed via `gh`, cloned read-only for this audit — `web/` subtree, Next.js + Supabase multi-tenant CRM) |

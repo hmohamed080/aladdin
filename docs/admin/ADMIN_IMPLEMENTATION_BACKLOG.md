@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Status** | **Phase 0 → 0B → 0C (Admin Frontend Blueprint, its enrichment, and this final refinement pass) are all delivered** — see the three sections below. **Phase 2 scope is locked/approved** (Product Owner, 2026-09-19) — its information architecture below is authoritative for implementation, not still under discussion. **Phase 1 backend has NOT been implemented** — per PD-013 (frontend-first Admin delivery), Phase 1's sensitive/destructive backend work begins only after Product Owner review of the full Phase 0/0B/0C Preview. Phases 3–6 remain planning-only, several still blocked on a Product Decision (see each item's `Blocked by` field). |
-| **Version** | 2.2.0 |
+| **Status** | **Phase 0 → 0B → 0C are delivered; Phase 0D (Final Admin Product Blueprint) is in delivery** — see the sections below. **Phase 2 scope is locked/approved** (Product Owner, 2026-09-19) — its information architecture below is authoritative for implementation, not still under discussion. **Phase 1 backend has NOT been implemented** — per PD-013 (frontend-first Admin delivery), Phase 1's sensitive/destructive backend work begins only after Product Owner review of the full Phase 0/0B/0C Preview. Phases 3–6 remain planning-only, several still blocked on a Product Decision (see each item's `Blocked by` field). |
+| **Version** | 3.0.0 |
 | **Owner** | Foundation / Operations |
-| **Last Updated** | 2026-09-20 (Phase 0C) |
+| **Last Updated** | 2026-09-29 (Phase 0D scope; PD-008/014/015) |
 | **Depends On** | [`ADMIN_FEATURE_MATRIX.md`](ADMIN_FEATURE_MATRIX.md), [`PRODUCT_DECISIONS_REGISTER.md`](PRODUCT_DECISIONS_REGISTER.md), [`PD-011_ORG_SUSPENSION_MODULE_EFFECTS.md`](PD-011_ORG_SUSPENSION_MODULE_EFFECTS.md), [`CRM_RBAC_GAP_ADOPTION.md`](CRM_RBAC_GAP_ADOPTION.md) |
 
 Phases are ordered by operational necessity, not by convenience of implementation. Phase 0 (new) is the frontend blueprint every subsequent phase's UI is now expected to have been previewed through first (PD-013). Phase 1 items are the ones the original audit found to be genuine safety gaps (a live platform with no way to stop a bad actor, and a fully-built-but-unreachable Points correction primitive) — everything else is real but less urgent.
@@ -64,6 +64,34 @@ Phases are ordered by operational necessity, not by convenience of implementatio
 - **NEW: Admin Settings** (`/admin/preview/settings`) — the signed-in Admin's own profile (real name/role/email from `auth.getUser()`+`profiles`, Preview-only edit) and a "Sign-in & Security" section. ~~Deliberately does NOT include a password-change form: Aladdin's real auth architecture is passwordless~~ — *superseded 2026-09-28:* the canonical auth model on `main` is now Email + Password (Email OTP verification and recovery; installers/technicians: Phone + Password), per the root `CLAUDE.md` Authentication model and [`PRODUCT_DIRECTION_GUIDE.md` Change History](../product/PRODUCT_DIRECTION_GUIDE.md). A password-change surface in Admin Settings is therefore a legitimate Preview item, not a mechanism the product lacks.
 - **Out of scope, unchanged from Phase 0/0B:** any real backend mutation, any status-model/RLS/Points-rule change, dynamic RBAC (PD-008 unchanged), a full organization-merge engine, a CRM, support tickets (PD-009 unchanged), a Flags database table (documented as a future data-contract requirement, not built), password/email change wiring, analytics/IP collection.
 - **Validation:** `pnpm typecheck`/`lint`/`test` clean throughout (checked after every meaningful edit, 1465 tests green), `pnpm test -- i18n` clean (two genuine mixed-language Arabic-string bugs caught and fixed during this phase, see the Work Log entry), live browser QA across every changed/new page in English and Arabic (RTL), light and dark mode, desktop and mobile viewport, zero console errors on freshly opened tabs.
+
+---
+
+## Phase 0D — Final Admin Product Blueprint
+
+**Status: in delivery (2026-09-29) on `feature/admin-blueprint-recovery`.** The last frontend-only pass before any Phase 1 backend. Same `/admin/preview/**` architecture — no second Preview system; the real `/admin/**` stays unchanged. Decisions it implements as Preview: PD-008 (approved: adapt CRM Dynamic RBAC), PD-014 (password authentication), PD-015 (Organization Request ≠ Network Referral).
+
+**Scope (Preview only):**
+- **Global table standard** (shared `DataTable`, not per-page patches): full identity names stay readable (no initials-only names); no overlapping or unreadably narrow columns; per-column minimum widths; horizontal scroll inside the table is acceptable for dense tables; width goes to useful columns, not empty space. Sticky identity/actions columns only if RTL-safe. Desktop = dense table; mobile/tablet = cards.
+- **Global pagination standard:** a footer `Previous 1 2 … N Next · 10 per page` (label "10 per page", never "Rows per page: 10"); default 10, options 10/25/50/100; moved out of the filter bar; mirrors correctly in RTL.
+- **Auto search / filter standard (retained from 0C):** typing or changing a filter updates results; no Search button anywhere.
+- **Date standard:** `DD/MM/YYYY` and `DD/MM/YYYY HH:mm:ss` across Admin.
+- **Users:** the 12 approved columns; full names; Registered sorts by registration date only and Profile Completion sorts independently (no cross-wired sort state); Preview-only registration-date variation so sorting is visually verifiable (real DB dates untouched).
+- **Row actions:** the eye icon always means **View on platform** (opens the user-facing profile in a new tab); **Manage** opens Admin Details. No impersonation.
+- **Follow-up workflow (requirements):** a follow-up is an operational contact attempt, separate from Admin Notes (freeform context), Audit (system change history) and Entity Timeline (human-readable history). Log action = type (Call · WhatsApp · Email · Verification follow-up · Other), outcome/internal note, follow-up date and time, acting/assigned staff, optional next-reminder concept; history shows type, outcome, actor, timestamp, next follow-up date, status. No persistence or reminder backend yet.
+- **Report / internal case:** subject, name, phone, email, details, optional attachment, submit/cancel. PD-009 (support tickets) stays separate and deferred.
+- **Global Command Palette:** `Ctrl+K` / `Cmd+K` from any Admin Preview page; grouped results across Users, Organizations, Review requests, Network referrals, Admin Staff and Admin pages (Points, Analytics, Audit, Settings…); debounced search, arrow-key navigation, Enter opens, Escape closes, no page reload. Preview uses real rows where a query already exists plus fixtures; **real server-side global search is a later backend item**.
+- **Settings:** Profile (Photo, Full Name, Username, Phone, Email) + Security → Change Password (current / new / confirm / save) per PD-014. No Auth wiring.
+- **Admin Staff + Dynamic RBAC** (PD-008): the standalone Access page is removed; Admin Staff hosts Staff · Roles · Permissions; roles show name, description, rank, assigned-staff count, status, edit/duplicate/archive; the role editor groups `resource.action` permissions; scope concepts Platform · Organization · Branch · Department/Team · User. No enforcement.
+- **Dashboard:** no Recent Activity and no Needs Attention; Users by status and Organizations by status, only states Aladdin actually supports.
+- **Review Center** (PD-015): tabs All · Organization Requests · Network Referrals · Verifications, visually distinct; Organization Requests carry no Points context; Network Referrals show provenance, network relationship and reward eligibility.
+- **Points:** the page shows a default user with real seeded ledger data immediately (summary + ledger with running balance), plus Adjust and Reverse dialogs. No mutation.
+- **Analytics (revised):** presets Today / Last 7 days / Last 30 days / Custom (From–To); Landing Page Views is the primary KPI; Profile Views, Searches, Job Applications and Clicks cards removed; Signups, Logins, Page Engagement, Total Registered and visitor-to-signup conversion kept; Visitors with `DD/MM/YYYY HH:mm:ss`; Top Pages grouped by canonical route (`/profile/[id]`); an interactive multi-series chart (legend toggles, hover tooltip, range controls) that never claims to be "Live". No tracking or IP collection.
+- **Audit (revised presentation):** Actor · Action · Entity · Details · Context/route · Date & time; expandable details (target, before/after, reason, metadata, reference id) without raw JSON by default; filters Actor · Action · Entity type · Date range · text, auto-applied; the 0C partial pagination retained with the standard footer. Admin Audit and Analytics events are never mixed.
+
+**Out of bounds for Phase 0D (backend):** password/Auth migrations and password enrollment; Dynamic RBAC schema, enforcement, role creation/assignment; Organization Request schema and Review Center workflow changes; referral lifecycle migrations; Points mutations; Follow-up persistence; report/ticket backend; analytics tracking; IP collection; realtime changes. **No Supabase migration is added in Phase 0D.**
+
+**Pre-PR acceptance gate (mandatory):** the recovered backend work on this branch (`20260929090001_admin_network_referral_review.sql` + pgTAP `65_…`) was validated only against the shared, un-reset local database, where pgTAP files 11/16/20 fail for reasons proven independent of it. Before any PR/merge of this branch: run a **clean, isolated `supabase db reset` + full `supabase test db`** and record the result. Not done yet.
 
 ---
 
@@ -369,8 +397,11 @@ Per the Product Owner's Part B direction, this phase's scope is now approved and
 ### BL-017 — Full organization merge engine
 - **Related feature-matrix rows:** B3. **Scope note:** this is specifically the full, transactional, every-FK-table re-parenting merge — the limited "detect → suggest → link to existing" scope is **approved and locked into Phase 2 as BL-015**, not this item. **Blocked by:** PD-006 (approved decision: do not build the full merge engine now). **Suggested priority:** Later, not scheduled.
 
-### BL-018 — Dynamic RBAC role editor
-- **Related feature-matrix rows:** L2. **Blocked by:** PD-008 (approved decision: DEFERRED — fixed 3-tier model stays authoritative; dynamic RBAC management explicitly not to be built yet, per the Product Owner's direct instruction). **Suggested priority:** Later, not scheduled.
+### BL-018 — Dynamic RBAC (roles, permissions, scopes, Admin Staff)
+- **Related feature-matrix rows:** L2. **Unblocked 2026-09-29:** PD-008 is now **APPROVED — adapt CRM Dynamic RBAC to Aladdin** (was DEFERRED). **Previewed in:** Phase 0D (`/admin/preview/staff`). **First step:** a design audit of the tenant/scope model PD-008 lists (platform vs. organization roles; Platform · Organization · Branch · Department/Team · User scopes; super-admin safeguards; migration of every `app.is_platform(...)` call site and `membership_capabilities`). **Suggested priority:** after Phase 1 safety items; not scheduled.
+
+### BL-023 — Organization Request workflow (PD-015)
+- **What:** a distinct request record and lifecycle for "add my organization to Aladdin", reviewed in the Review Center next to (never inside) Network Referrals. No Points context. **Blocked by:** nothing — PD-015 is approved; needs its own schema design and approval. **Previewed in:** Phase 0D (Review Center → Organization Requests). **Suggested priority:** P1, not scheduled.
 
 ### BL-019 — Platform-level internal lead/prospect CRM
 - **Related feature-matrix rows:** none directly (Talent-specific, see the matrix's "Talent-specific" table). **Blocked by:** PD-007 (approved decision: DEFERRED — do not build simply because Talent has one; revisit only when a real Aladdin Sales/Onboarding need justifies it). **Suggested priority:** Later, not scheduled.
@@ -389,9 +420,11 @@ Each Phase 6 item is deliberately left at backlog-entry depth (not full field-by
 | 0 — Admin Frontend Blueprint / Preview | (this document's own delivery) | — | **Approved, in delivery** |
 | 0B — Admin Product Blueprint Enrichment | (this document's own delivery) | — | **Delivered 2026-09-20** — enrichment of Phase 0's screens + Admin Staff + Analytics (new) + PD-011 module-effects doc |
 | 0C — Admin Blueprint Final Refinement | (this document's own delivery) | — | **Delivered 2026-09-20** — global table/search/pagination conventions, Users/Organizations final column model, Points rework, Analytics KPI/chart/Top-Pages/Visitors, Audit partial pagination, new Settings page, CRM RBAC gap analysis |
+| 0D — Final Admin Product Blueprint | (this document's own delivery) | — | **In delivery 2026-09-29** — table/pagination standards, Command Palette, Follow-up/Report, Settings Change Password (PD-014), Dynamic RBAC Preview (PD-008), Review Center separation (PD-015), Points/Analytics/Audit revisions. **Pre-PR gate: clean DB reset + full pgTAP** |
 | 1 — Admin operational safety | BL-001–004 | P0 | Semantics/tiers **approved** (PD-004/010/011/012); backend build gated on Phase 0/0B review (PD-013) |
 | 2 — User & org operations | BL-005–006, BL-008, BL-012, BL-015, BL-021–022 | P1 | **Scope APPROVED/LOCKED** 2026-09-19; not yet implemented |
 | 3 — Moderation/review enrichment | BL-009–010 | P1 | BL-010's taxonomy is approved (PD-005); not yet implemented |
 | 4 — Audit & history | BL-011 | P1 | Not yet implemented (BL-012 moved to Phase 2) |
 | 5 — Dashboard & discoverability | BL-013–014 | P2 | Not yet implemented (BL-015 moved to Phase 2) |
-| 6 — Advanced/deferred | BL-016–020 | Later | BL-017/018/019/020 each carry an approved **DEFERRED** decision (PD-006/008/007/009); not scheduled |
+| 3 — Organization Requests | BL-023 | P1 | PD-015 approved; previewed in 0D; not implemented |
+| 6 — Advanced/deferred | BL-016–020 | Later | BL-017/019/020 carry a **DEFERRED** decision (PD-006/007/009). BL-018 is **unblocked** (PD-008 approved 2026-09-29) and previewed in 0D; not scheduled |

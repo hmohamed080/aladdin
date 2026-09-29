@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Status** | **PD-001 through PD-006 and PD-010 through PD-013 are APPROVED. PD-007, PD-008, PD-009 are DEFERRED.** Approved on 2026-09-19 by the Product Owner. None of PD-001/002/003/010/011/012's approved semantics have been implemented yet — approval sets the target behavior and locks Phase 2 scope; the current live behavior each documents remains unchanged until its own backlog item is built (see `ADMIN_IMPLEMENTATION_BACKLOG.md`). |
-| **Version** | 2.1.0 |
+| **Status** | **APPROVED: PD-001–006, PD-008 (re-decided 2026-09-29), PD-010–015. DEFERRED: PD-007, PD-009.** PD-001–013 were decided on 2026-09-19; PD-008's deferral was replaced and PD-014/PD-015 were added by the Product Owner on 2026-09-29 (Phase 0D). None of PD-001/002/003/008/010/011/012/015's approved semantics have been implemented in the backend yet — approval sets the target behavior; the current live behavior each documents remains unchanged until its own backlog item is built (see `ADMIN_IMPLEMENTATION_BACKLOG.md`). PD-014 is the one decision whose core is already live on `main` (see its *Current implementation* block). |
+| **Version** | 3.0.0 |
 | **Owner** | Product / Foundation |
-| **Last Updated** | 2026-09-20 (Phase 0B addendum — PD-011's module-effects prerequisite produced; no PD status changed) |
+| **Last Updated** | 2026-09-29 (Phase 0D — PD-008 approved as "Adapt CRM Dynamic RBAC to Aladdin"; PD-014 and PD-015 added) |
 | **Depends On** | [`ADMIN_FEATURE_MATRIX.md`](ADMIN_FEATURE_MATRIX.md) |
 | **Related** | [`ADMIN_IMPLEMENTATION_BACKLOG.md`](ADMIN_IMPLEMENTATION_BACKLOG.md), [`../database/points-core.md`](../database/points-core.md), [`PD-011_ORG_SUSPENSION_MODULE_EFFECTS.md`](PD-011_ORG_SUSPENSION_MODULE_EFFECTS.md) |
 
@@ -229,7 +229,16 @@ Every row below is a real business-rule question surfaced by the Admin gap analy
 
 ## PD-008 — Dynamic, admin-creatable RBAC roles vs. fixed platform-role tiers
 
-**Decision (2026-09-19, deferred):** **Option A.** First establish correct, meaningfully-separated fixed server-side permission boundaries (PD-004/010/011/012's tiering work). A dynamic, admin-manageable permission-management UI may be considered later, only once the fixed model has genuinely been outgrown — nothing in this audit found evidence of that yet.
+**Decision (2026-09-29, APPROVED — ADAPT CRM DYNAMIC RBAC TO ALADDIN):** **Option B, adapted.** The Product Owner replaced the 2026-09-19 deferral below. Aladdin will adapt the useful RBAC architecture of the audited reference implementation ([`hmohamed080/CRM`](https://github.com/hmohamed080/CRM); evidence in [`CRM_RBAC_GAP_ADOPTION.md`](CRM_RBAC_GAP_ADOPTION.md)) — **adapt, not copy**:
+
+- **Adopt:** DB-backed roles; `resource.action` permissions; dynamic role creation and editing; role assignment; one centralized server-side authorization check; permission-change audit/history; Admin Staff as the entry point for access management. Hierarchy/rank inheritance (CRM's assignment ceiling) only where it genuinely fits.
+- **Aladdin-specific requirements the eventual design must answer** (CRM is single-tenant in shape; Aladdin is not): Platform Admin roles vs. organization-level roles; scopes **Platform · Organization · Branch · Department/Team · User**; multi-tenant boundaries (an organization role can never read another tenant, and never grants platform authority); super-admin safeguards (no self-escalation, a role holder can grant only up to their own ceiling, the last super-admin cannot be removed or demoted); authorization enforced server-side (RLS/RPC), never UI-hidden only; migration of every existing `app.is_platform(...)` call site and the org-level `membership_capabilities` catalog onto the new model without a permission gap in between.
+- **Aladdin resource vocabulary (initial, Admin domains — not CRM's resources):** `users.read/verify/suspend`, `organizations.read/verify/suspend`, `referrals.read/approve`, `points.read/adjust/reverse`, `audit.read`, `analytics.read`, `admin_staff.read/manage`, `roles.read/manage`.
+- **Phase 0D delivers the Preview only** (`/admin/preview/staff` — Staff · Roles · Permissions, a role editor over the vocabulary above, scope concepts). The weak standalone Access page is removed from the Preview; its content is superseded by this model. **No RBAC schema, RPC, RLS or enforcement change is authorized by this decision** — that is a separately approved backlog item ([BL-018](ADMIN_IMPLEMENTATION_BACKLOG.md)), which must start with a design audit of the tenant/scope model above. Until it ships, the fixed 3-tier `support ⊆ moderator ⊆ administrator` model stays the only enforced authority.
+
+**STATUS: APPROVED — 2026-09-29 (direction approved; Preview in Phase 0D; backend not started)**
+
+**Superseded decision (2026-09-19, deferred) — kept as the recorded rationale:** **Option A.** First establish correct, meaningfully-separated fixed server-side permission boundaries (PD-004/010/011/012's tiering work). A dynamic, admin-manageable permission-management UI may be considered later, only once the fixed model has genuinely been outgrown — nothing in this audit found evidence of that yet.
 
 **Topic:** Should Aladdin ever move from its current fixed 3-tier platform-role hierarchy (`support`/`moderator`/`administrator`) toward Talent's fully dynamic, admin-creatable resource×action role model?
 
@@ -253,7 +262,7 @@ Every row below is a real business-rule question surfaced by the Admin gap analy
 
 **Recommended engineering-safe default (adopted as the deferral decision):** Option A — this was the original recommendation and is now the approved deferral.
 
-**STATUS: DEFERRED — 2026-09-19 (fixed-tier model stays authoritative; revisit only once real role-diversity need is evidenced)**
+~~**STATUS: DEFERRED — 2026-09-19 (fixed-tier model stays authoritative; revisit only once real role-diversity need is evidenced)**~~ — *superseded 2026-09-29 by the approval above.*
 
 ---
 
@@ -373,3 +382,46 @@ Every row below is a real business-rule question surfaced by the Admin gap analy
 **Recommended engineering-safe default:** No default was recommended either way, for the reason stated in the decision above — this is now formally deferred rather than left open indeterminately.
 
 **STATUS: DEFERRED — 2026-09-19 (pending a support-volume/existing-channel-adequacy assessment, not scheduled)**
+
+---
+
+## PD-014 — Platform Password Authentication
+
+**Decision (2026-09-29, APPROVED):** Every Aladdin user account supports password authentication. Daily sign-in must **not** cost a paid OTP each time. OTP stays where it earns its cost: account verification, account recovery / password reset, phone/email verification, and high-risk step-up verification. This replaces the earlier passwordless-only direction (superseded 2026-09-28 in [`PRODUCT_DIRECTION_GUIDE.md`](../product/PRODUCT_DIRECTION_GUIDE.md) Change History).
+
+**Current implementation on `main` (already live — not new architecture):** canonical password auth was merged in PR #66 and smoke-tested on Production on 2026-09-28 (details: [`../frontend/auth-password-preview.md`](../frontend/auth-password-preview.md), [`../frontend/installer-phone-auth.md`](../frontend/installer-phone-auth.md)).
+- **General accounts:** `/auth/sign-up` (Full Name + Email + Username + Account Type + Password, then Email OTP verification) · `/auth/sign-in` (Email + Password) · `/auth/forgot-password/*` (Email OTP recovery, 4 screens).
+- **Installer/Technician:** `/installer/sign-up` and `/installer/sign-in` (Phone + Password, via an internal login alias that is never displayed).
+- **Password policy:** 10 characters minimum, 72 bytes maximum, weak/common/sequential/account-derived passwords rejected, live strength meter.
+- **Abuse protection:** application-scoped Turnstile on Create Account, Resend Signup and the Forgot Password request; Supabase's own rate limits (`sign_in_sign_ups`, `token_verifications`, `email_sent`) are the real throttle.
+- **Password state:** tracked in service-role-only `app_metadata`, never in user-editable metadata; passwords live only inside Supabase Auth, never in public application tables.
+- **Existing-account enrollment and change password:** both exist but are **unlinked compatibility routes** (`/preview/auth-password/migrate`, `/preview/auth-password/change-password`) — the only authenticated change-password flow today.
+
+**Still missing (future Auth work — each item needs its own audit/approval before Phase 1 Auth):**
+- Change Password inside Settings (member Settings and Admin Settings) — the product decision the post-rollout audit left open.
+- Installer/Technician Forgot Password (phone accounts have no recovery flow yet).
+- A linked password-enrollment path for any remaining passwordless accounts, then retirement of the legacy email-OTP compatibility routes (`/auth/verify`, `/auth/recovery`) once no account lacks a password; the `/preview/auth-password/*` redirects stay ≥ 90 days.
+- Leaked-password protection (Supabase Pro native check, or server-side HaveIBeenPwned k-anonymity — pending approval).
+- Emailed-link variant of recovery; hosted rate-limit values verified against the dashboard; step-up verification for high-risk Admin actions.
+
+**Previewed in Phase 0D only:** Admin Settings (`/admin/preview/settings`) shows the planned **Change Password** section (Current password · New password · Confirm new password · Save password) with the real policy hints, and the Profile section (Photo · Full Name · Username · Phone · Email). Nothing is wired: no Supabase Auth call, no password mutation, no migration.
+
+**Future requirements recorded for the Auth implementation:** reuse the existing password policy (one source, not a second copy); rate-limit change-password attempts and require the current password (or a fresh OTP) before a change; send the existing password-changed notification; keep recovery on OTP; never store or log passwords outside Supabase Auth; enrollment for existing accounts must not create a second identity.
+
+**Data model impact:** none in Phase 0D. **STATUS: APPROVED — 2026-09-29 (core live on `main`; Settings Change Password previewed; remaining items above not started)**
+
+---
+
+## PD-015 — Organization Creation Request vs. Network Referral
+
+**Decision (2026-09-29, APPROVED):** these are **two separate business workflows** and must stay separate in product, UI and (later) data model.
+
+- **A. Organization Request** — a user wants their **own** organization/business added to Aladdin because it does not exist yet (showroom owner, supplier, manufacturer, importer, contractor, engineering/design office). It is **not** inherently a referral and carries **no** Points/reward context. Review needs: requester, organization name and `org_type`, contact information, location, submitted data, duplicate candidates, request date, status, notes/history, approve/reject.
+- **B. Network Referral** — a user recommends an organization **they know**. It preserves referrer identity, referral provenance, the network relationship and reward/Points eligibility (+100 only when a genuinely new organization is created — the live rule in `20260911090001_network_referrals.sql`). Review needs: referrer, organization, provenance, potential duplicate, network relationship, reward eligibility, lifecycle, review history.
+
+**Rules:**
+- Do **not** retrofit Organization Requests into `network_referrals` (nor into the Sales `organization_referrals` family). They need distinct semantics and, most likely, a distinct record and lifecycle.
+- The Review Center presents them as separate request types (All · Organization Requests · Network Referrals · Verifications). Phase 0D previews that separation visually only.
+- Current reality, stated plainly: business creation today is either self-serve (registration creates organization + owner membership + primary branch) or referral-driven; **no Organization Request record exists yet**. The Phase 0D Organization Requests tab is fixture-backed and labelled as such.
+
+**Data model impact:** a future, separately approved migration (new request record + lifecycle + audit vocabulary). None in Phase 0D. **STATUS: APPROVED — 2026-09-29 (Preview only; backend not started)**

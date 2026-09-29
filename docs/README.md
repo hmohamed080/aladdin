@@ -93,10 +93,10 @@ The five files above are **persistent project memory and part of the core archit
 ## Admin
 
 - [`admin/ADMIN_FEATURE_MATRIX.md`](admin/ADMIN_FEATURE_MATRIX.md) — Admin gap analysis: Aladdin vs. the `talent-project` reference implementation
-- [`admin/PRODUCT_DECISIONS_REGISTER.md`](admin/PRODUCT_DECISIONS_REGISTER.md) — the business-rule decisions the gap analysis surfaced (PD-001–006/010–013 **APPROVED**, PD-007–009 **DEFERRED**)
-- [`admin/ADMIN_IMPLEMENTATION_BACKLOG.md`](admin/ADMIN_IMPLEMENTATION_BACKLOG.md) — admin backlog in phases; Phase 0/0B (frontend preview) delivered, Phase 1+ not yet implemented
+- [`admin/PRODUCT_DECISIONS_REGISTER.md`](admin/PRODUCT_DECISIONS_REGISTER.md) — the business-rule decisions the gap analysis surfaced (PD-001–006, PD-008, PD-010–015 **APPROVED**; PD-007, PD-009 **DEFERRED**)
+- [`admin/ADMIN_IMPLEMENTATION_BACKLOG.md`](admin/ADMIN_IMPLEMENTATION_BACKLOG.md) — admin backlog in phases; Phase 0/0B/0C (frontend preview) delivered, Phase 0D in delivery, Phase 1+ not yet implemented
 - [`admin/PD-011_ORG_SUSPENSION_MODULE_EFFECTS.md`](admin/PD-011_ORG_SUSPENSION_MODULE_EFFECTS.md) — module-by-module effects of organization suspension, PD-011's documentation prerequisite for BL-002
-- [`admin/CRM_RBAC_GAP_ADOPTION.md`](admin/CRM_RBAC_GAP_ADOPTION.md) — RBAC gap analysis vs. a dynamic-RBAC reference implementation; does not change PD-004/PD-008
+- [`admin/CRM_RBAC_GAP_ADOPTION.md`](admin/CRM_RBAC_GAP_ADOPTION.md) — RBAC gap analysis vs. a dynamic-RBAC reference implementation; the evidence base for PD-008 (approved 2026-09-29)
 
 ## Operations
 
