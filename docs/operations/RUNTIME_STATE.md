@@ -1,6 +1,12 @@
 # Runtime State
 
-## Current continuation — 2026-09-28 (latest): post-rollout auth cleanup
+## Current continuation — 2026-09-29 (latest): Admin work recovered onto `main`
+
+- Branch `feature/admin-blueprint-recovery` (worktree `.claude/worktrees/admin-blueprint-recovery`) from `origin/main` @ `1618386` is now the **authoritative line for Admin work**. The uncommitted 2026-09-19 Admin work in worktree `claude/showroom-approval-workflow-acd3de` (base `2393334`, stale) is being transplanted onto it layer by layer; that old worktree is left intact as a source and must not be continued.
+- Layer A (Network Referral Admin Review): migration `20260929090001_admin_network_referral_review.sql` (one read-only, platform-gated RPC `admin_network_referrals_list`; SQL identical to the never-committed `20260919090001` original), pgTAP `65_admin_network_referral_review_test.sql`, and the review section on `/admin/verifications`. Base `20260911090001_network_referrals.sql` lifecycle, decision RPCs and Points rule unchanged.
+- Migrations: 77 in the repo; the local shared stack has all of them applied (`migration up`, no reset). pgTAP files 11 and 20 fail on this un-reset local DB independently of this change (see the work log); a clean-reset run is still owed before any PR. Nothing pushed, applied remotely, or deployed.
+
+## Current continuation — 2026-09-28: post-rollout auth cleanup
 
 - Canonical password auth (PR #66) is **merged and smoke-tested on Production**: General = Email + Password (`/auth/sign-up`, `/auth/sign-in`, `/auth/forgot-password/*`, `/auth/finish-registration`); Installer = Phone + Password (`/installer/sign-up`, `/installer/sign-in`).
 - Branch `chore/post-auth-rollout-cleanup` from `main` @ `233b738`: stale "preview"/passwordless comments and docs cleaned; `.env.example` now says `SUPABASE_SERVICE_ROLE_KEY`, `AUTH_PASSWORD_PREVIEW_GRANT_SECRET` and `TURNSTILE_SECRET_KEY` are **required** in staging/production; settings copy for email accounts no longer claims "Aladdin has no passwords". No behavior, schema, RLS, auth-provider or hosted change; no migration.

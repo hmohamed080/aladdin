@@ -82,3 +82,48 @@ export async function cancelNetworkReferral(formData: FormData): Promise<void> {
   revalidatePath("/home/network");
   redirect("/home/network");
 }
+
+/* ---------------------------------- the platform ---------------------------------- */
+
+/**
+ * Approve a pending Network referral. Links it to an existing organization
+ * when the Admin names one, otherwise materialises a new, unowned
+ * `showroom_dealer` organization + primary branch and awards the referrer
+ * the approved `referral.organization_approved` Points event — all inside
+ * the existing, unchanged `network_referral_approve` RPC.
+ */
+export async function approveNetworkReferral(formData: FormData): Promise<void> {
+  const id = uuid.safeParse(formData.get("referralId"));
+  if (!id.success) redirect("/admin/verifications?error=1");
+
+  const linkRaw = formData.get("linkOrganizationId");
+  const linkId = typeof linkRaw === "string" && uuid.safeParse(linkRaw).success ? linkRaw : undefined;
+
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.rpc("network_referral_approve", {
+    p_referral_id: id.data,
+    p_link_organization_id: linkId,
+  });
+  if (error) redirect("/admin/verifications?error=approve");
+
+  revalidatePath("/admin/verifications");
+  redirect("/admin/verifications?networkReferral=approved");
+}
+
+/** Reject a pending Network referral, with a reason. */
+export async function rejectNetworkReferral(formData: FormData): Promise<void> {
+  const id = uuid.safeParse(formData.get("referralId"));
+  const reasonRaw = formData.get("reason");
+  const reason = typeof reasonRaw === "string" ? reasonRaw.trim() : "";
+  if (!id.success || reason === "") redirect("/admin/verifications?error=reason");
+
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.rpc("network_referral_reject", {
+    p_referral_id: id.data,
+    p_reason: reason.slice(0, 500),
+  });
+  if (error) redirect("/admin/verifications?error=reject");
+
+  revalidatePath("/admin/verifications");
+  redirect("/admin/verifications?networkReferral=rejected");
+}

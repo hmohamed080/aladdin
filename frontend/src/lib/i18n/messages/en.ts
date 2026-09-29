@@ -886,6 +886,28 @@ export const en = {
         draft: "Draft",
       },
     },
+    networkReferrals: {
+      title: "Showroom referrals (Network)",
+      subtitle:
+        "Showrooms an installer or professional told us about from their Network page. Link one to a business already on Aladdin, or approve it to add it.",
+      empty: "No network referrals.",
+      referredBy: "Referred by",
+      phone: "Phone",
+      possibleDuplicate: "This may already be on Aladdin",
+      matches: "Closest match",
+      linkExisting: "Link to this business",
+      linkNote: "Linking connects nothing — the business already existed, so no Points are awarded.",
+      approveNew: "Approve as a new business",
+      approveNote: "Adds the showroom and its main branch, unowned, and awards the referrer +100 Points.",
+      reject: "Decline",
+      reasonLabel: "Reason",
+      resultOrganization: "Business",
+      status: {
+        pending: "Awaiting review",
+        joined: "Added",
+        cancelled: "Declined",
+      },
+    },
     review: {
       title: "Verifications",
       pendingSubtitle: "Professional and business reviews awaiting a decision.",

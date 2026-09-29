@@ -102,3 +102,65 @@ export async function loadMyNetworkReferrals(): Promise<NetworkReferral[]> {
   const supabase = await getServerSupabase();
   return listMyNetworkReferrals(supabase);
 }
+
+/**
+ * Admin review queue reads. See
+ * `supabase/migrations/20260929090001_admin_network_referral_review.sql` —
+ * the admin-facing half of the Network referral lifecycle, mirroring
+ * `listAdminReferrals` (`server/queries/affiliation.ts`) for the Sales
+ * referral family. Only `origin = 'new_showroom'` rows are ever returned —
+ * a known-organization referral resolves to joined immediately and is never
+ * a review candidate.
+ */
+export type AdminNetworkReferralRow = {
+  id: string;
+  organizationId: string | null;
+  organizationName: string | null;
+  displayName: string | null;
+  governorate: string | null;
+  city: string | null;
+  phone: string | null;
+  note: string | null;
+  status: "pending" | "joined" | "cancelled";
+  decisionReason: string | null;
+  referredBy: string;
+  referrerName: string;
+  referrerEmail: string;
+  referrerPersona: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  matchCount: number;
+  matchId: string | null;
+  matchName: string | null;
+};
+
+export async function listAdminNetworkReferrals(
+  supabase: DB,
+  pendingOnly = true,
+): Promise<AdminNetworkReferralRow[]> {
+  const { data, error } = await supabase.rpc("admin_network_referrals_list", {
+    p_pending_only: pendingOnly,
+  });
+  if (error) return [];
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    organizationId: r.organization_id ?? null,
+    organizationName: r.organization_name ?? null,
+    displayName: r.display_name ?? null,
+    governorate: r.governorate ?? null,
+    city: r.city ?? null,
+    phone: r.phone ?? null,
+    note: r.note ?? null,
+    status: r.status,
+    decisionReason: r.decision_reason ?? null,
+    referredBy: r.referred_by,
+    referrerName: r.referrer_name,
+    referrerEmail: r.referrer_email ?? "",
+    referrerPersona: r.referrer_persona ?? null,
+    createdAt: r.created_at,
+    decidedAt: r.decided_at ?? null,
+    matchCount: r.match_count,
+    matchId: r.match_id ?? null,
+    matchName: r.match_name ?? null,
+  }));
+}

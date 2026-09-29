@@ -4678,6 +4678,30 @@ export type Database = {
         }
         Returns: string
       }
+      admin_network_referrals_list: {
+        Args: { p_pending_only?: boolean }
+        Returns: {
+          city: string
+          created_at: string
+          decided_at: string
+          decision_reason: string
+          display_name: string
+          governorate: string
+          id: string
+          match_count: number
+          match_id: string
+          match_name: string
+          note: string
+          organization_id: string
+          organization_name: string
+          phone: string
+          referred_by: string
+          referrer_email: string
+          referrer_name: string
+          referrer_persona: Database["public"]["Enums"]["persona_type"]
+          status: Database["public"]["Enums"]["network_referral_status"]
+        }[]
+      }
       admin_showroom_referrals_list: {
         Args: { p_pending_only?: boolean }
         Returns: {

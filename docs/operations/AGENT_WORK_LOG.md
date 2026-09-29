@@ -4,6 +4,26 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Admin review queue for Network (installer) showroom referrals, recovered onto current `main`
+
+**Date:** 2026-09-29 · **Branch:** `feature/admin-blueprint-recovery` (worktree `.claude/worktrees/admin-blueprint-recovery`, from `origin/main` @ `1618386`) · Not pushed; no PR; nothing deployed; hosted Supabase untouched.
+
+**Provenance.** This work was built on 2026-09-19 in worktree `claude/showroom-approval-workflow-acd3de` (base `2393334`) and never committed. That base is 60+ commits behind `main` (canonical password auth PRs #66–#68, staging-prep increments, trade vocabulary, `mask_email` alias). Rather than continue from the stale worktree, the verified unique work was transplanted layer by layer onto current `main`; this entry covers **Layer A (Network Referral Admin Review) only**. The old worktree is left intact, and a full safety snapshot of it (binary diff + every untracked/modified file) was taken before anything was copied.
+
+**What existed already (unchanged, reused).** `supabase/migrations/20260911090001_network_referrals.sql` already made the whole installer-facing lifecycle real: the `network_referrals` table, RLS, and the platform decision RPCs `network_referral_approve`/`_reject` (create the unowned `showroom_dealer` organization, audit `network_referral.approved`/`.rejected`, award `referral.organization_approved` +100 via idempotent `app.award_points` only for a genuinely new organization — never on link-to-existing). Nothing in that base changed on `main` after it; this transplant does not replace or alter it. The one gap: no admin LIST RPC or UI ever surfaced pending Network referrals (the Sales family already had `admin_showroom_referrals_list` + `ReferralReview`).
+
+**Change (additive only).**
+- Migration **`20260929090001_admin_network_referral_review.sql`** — SQL byte-identical to the 2026-09-19 original (`20260919090001_…`), recreated under a new timestamp because the original was never committed or applied to any shared environment, and a timestamp older than `main`'s latest (`20260927090001`) would sort before already-applied migrations. Its dependencies were re-verified against current `main`: `app.mask_email(text)` (redefined in `20260927090001`, same signature/grants; only the installer login alias now masks to `•••`), `users.primary_account_type` (`persona_type`), `app.is_platform`, `extensions.similarity`. One read-only, `support`-gated `security definer` RPC `admin_network_referrals_list(p_pending_only)`; no table/column/policy/audit-vocabulary change.
+- pgTAP **`65_admin_network_referral_review_test.sql`** (17 assertions) — renumbered from `58_` because `58_staging_prep_registration_test.sql` now occupies that slot on `main`.
+- Frontend: `listAdminNetworkReferrals` (query), `approveNetworkReferral`/`rejectNetworkReferral` (thin action wrappers over the existing RPCs), `features/admin/network-referral-review.tsx`, wired into the existing `/admin/verifications` page. `admin.networkReferrals.*` EN/AR keys inserted after `admin.referrals` without touching `main`'s newer Auth/Registration/Profile Completion keys. Their claims ("+100 Points" on approve-new, none on link) were checked against the current approve RPC.
+- `database.types.ts`: regenerated with `supabase gen types typescript --local` from the migrated local DB; the only schema difference is the new RPC, so exactly that generated block was spliced in (the CLI's formatter-only paren changes elsewhere were not committed). The stale hand-edited types file from the old worktree was **not** copied.
+
+**Validation (on the new base).** `supabase migration up --local` (non-destructive — the local stack is shared by every worktree, so no `db reset`) applied `20260927090001` + `20260929090001`. `supabase test db`: 66 files / 2452 tests; **65 passes 17/17, 51 (base network referrals) and 64 pass**. Files 11 (`account_upgrade`, 1/26) and 20 (`account_registration`, 1/26) fail — proven independent of this change by re-running both inside a transaction that first drops `admin_network_referrals_list` (identical failures), then rolling back; the failures ("invitation already used", a public-discovery count) come from state accumulated in the un-reset shared local DB. File 16 fails only in the full run, passes alone (order-dependent). `pnpm typecheck` clean; `pnpm lint` 0 errors (pre-existing `sidebar-shell.tsx:160` warning); `pnpm test` 148 files / 1839 tests pass (includes EN/AR parity). The full live browser E2E (submit → admin queue → approve/+100 Points/audit → reject with reason) was performed on 2026-09-19 on the old base; on this base it is covered by the pgTAP contract and the Commit C browser smoke.
+
+**Not done here:** Admin audit docs (Layer B) and the Admin Preview (Layer C) — separate commits.
+
+---
+
 ## Session — Post-rollout cleanup of canonical password auth
 
 **Date:** 2026-09-28 · **Branch:** `chore/post-auth-rollout-cleanup` (from `main` @ `233b738`) · PR to `main`; not merged; nothing deployed; hosted Supabase/Cloudflare/Vercel untouched; no migration.
