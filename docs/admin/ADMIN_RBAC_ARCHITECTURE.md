@@ -114,4 +114,29 @@ Mutations: `admin_role_create`, `admin_role_update`, `admin_role_set_archived` (
 
 - `users.status` changes (suspension, PD-010) have no write path yet; the last-Super-Admin trigger guards assignments, not account status. When PD-010's suspend RPC lands it must refuse suspending the last active Super Admin.
 - `department` scope is deferred until a departments/teams domain exists.
+- **Scoped role UI** — organization/branch/user-scoped roles are fully supported by the schema, RPCs and tests, but the console creates and assigns **platform** roles only; the scope picker belongs to the Organizations module (Phase 1B). `admin_assignment_change_scope` has no UI yet.
+- **Invite Admin Staff** stays a Preview dialog: the RBAC RPCs only manage people who already have Admin history; onboarding a new person is the Invitation sub-phase.
+- **No Super Admin exists after a fresh seed or on staging** until a DBA runs `select app.admin_bootstrap_super_admin('<user id>')`. Until then nobody holds `roles.manage` (Administrators can still manage staff below rank 80).
+- `audit_log.actor_role` is the informational legacy tier (`support/moderator/administrator` enum): a Super Admin actor is recorded as `administrator`. Never used for authorization; the precise role is derivable from the assignment history.
 - Organization-level `membership_capabilities` remains the tenant-side model; unifying it with this catalog is a later PD-008 stage.
+
+## 11. Frontend enforcement (one reader, one route table)
+
+| Layer | File | Role |
+|---|---|---|
+| Authority snapshot | `frontend/src/server/authorization/admin.ts` | `loadAdminAccess()` — `admin_my_access()` once per request (React `cache`), fails closed. `requireAdminStaff()` (console door → redirect `/`), `requireAdminPermission()` / `requireAdminRoute(path)` (staff lacking the permission → non-disclosing 404). |
+| Rules | `frontend/src/lib/permissions/admin.ts` | Pure, client-safe: permission keys, `parseAdminAccess` (drops unknown keys), `can` / `meets`, and **`ADMIN_ROUTE_RULES`** — the single route→permission table (longest prefix wins). |
+| Direct-route enforcement | every `frontend/src/app/admin/**/page.tsx` | First statement: `await requireAdminRoute("<own route>")`. `admin-route-coverage.test.ts` fails if any current or future Admin page omits it or passes a different route. |
+| Navigation | `components/admin/admin-nav.tsx`, `features/admin-preview/preview-shell.tsx` | Filtered with `canAccessAdminPath(access, href)` — same table. The command palette indexes only sources the caller may read. |
+| Controls | `features/admin-rbac/eligibility.ts` | Mirrors the SQL ceilings to decide which buttons/options to draw (presentation only; the RPC decides). Verification/referral decision UI is drawn only with `*.verify` / `referrals.approve`. |
+| Mutations | `server/actions/admin-rbac.ts` | Forward the caller JWT to one RPC each; `admin-rbac-errors.ts` maps RPC messages to translation keys (never raw DB text). |
+| Legacy reader removed | `server/queries/platform.ts` | Now `loadIsAdminStaff()` over `admin_my_access()`; the `/home`, landing, search and settings consumers moved with it. `previewAdminStaff()` (which read `platform_role_grants`) was deleted. |
+
+The Preview shell shows a **"Live"** banner (not the "nothing is saved" Preview banner) on promoted routes (`LIVE_PREVIEW_ROUTES`: `/admin/preview/staff`), per PD-016.
+
+## 12. Verification record (Phase 1A)
+
+- Isolated `aladdin_rbac` Supabase stack (ports 553xx; the shared `aladdin` stack untouched), rebuilt from zero (78 migrations + seeds): **pgTAP 67 files / 2591 tests PASS** (2477 pre-RBAC baseline + 114 in `66_admin_rbac_foundation_test.sql`).
+- Direct PostgREST probes with real password sign-ins (Super Admin, Administrator, Moderator, Support, non-staff, anon): every escalation / self-management / last-Super-Admin / cross-tier attempt → `403 42501`; non-staff `admin_my_access` → empty snapshot; anon → denied.
+- Browser QA (EN + AR/RTL, desktop + mobile, light/dark): real Staff/Roles/Permissions reads; change role, create / duplicate-rejected / archive / restore custom role; system-role editor keeps locked permissions; per-role navigation and direct-URL 404s; non-staff redirected from every `/admin/**` route.
+- One defect found and fixed during QA: the re-tiered Points RPCs still said "platform **support** authority is required" — now `admin permission points.adjust|reverse required` (§8 retier).

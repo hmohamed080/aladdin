@@ -1,5 +1,13 @@
 # Runtime State
 
+## Current continuation — 2026-09-30 (Admin Core Phase 1A, latest): dynamic RBAC implemented, awaiting Product Owner acceptance
+
+- Branch `feature/admin-core-rbac-foundation` (worktree `.claude/worktrees/admin-core-rbac-foundation`, base `af55b2f`). **Not pushed, no PR, hosted Supabase and Vercel untouched, shared local `aladdin` DB untouched.** Phase 1B (Users / Organizations) has **not** started.
+- New migration `20260929100001_admin_rbac_foundation.sql` (78 migrations total). Platform authority is now `admin_role_assignments` via `app.has_admin_permission()`; `platform_role_grants` is a never-read compatibility bridge (retirement stages A–D in [`docs/admin/ADMIN_RBAC_ARCHITECTURE.md`](../admin/ADMIN_RBAC_ARCHITECTURE.md) §6); [ADR-0011](../decisions/ADR-0011-admin-rbac-platform-authority.md) is **Proposed**.
+- Verified on the ISOLATED `aladdin_rbac` Supabase stack (ports 553xx), rebuilt from zero: pgTAP **67 files / 2591 tests PASS** (2477 baseline + 114 RBAC). Frontend: typecheck clean, lint 0 errors (1 pre-existing warning), Vitest **156 files / 1949 tests PASS**.
+- `/admin/preview/staff` (Staff · Roles · Permissions) is **live** (real reads + audited mutations); every Admin page guards its own route; navigation is permission-filtered. Invite Admin Staff and scoped-role UI remain Preview/deferred.
+- **Operational note:** after any fresh seed or on staging, **no Super Admin exists** until a DBA runs `select app.admin_bootstrap_super_admin('<user id>')`; until then nobody can manage roles.
+
 ## Current continuation — 2026-09-29 (Phase 0D, latest): Admin Preview design complete, awaiting Product Owner approval
 
 - Branch `feature/admin-blueprint-recovery` (worktree `.claude/worktrees/admin-blueprint-recovery`). Phase 0D Preview implementation is finished in `/admin/preview/**` (see the newest work-log entry). **Admin Core backend wiring has NOT started** and must not until the Product Owner approves Phase 0D. **PD-016**: the Preview is the foundation of the production Admin — promote it (fixtures → real queries, dialogs → authorized mutations), never rebuild it.

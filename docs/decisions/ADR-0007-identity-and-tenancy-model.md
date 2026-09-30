@@ -27,6 +27,8 @@ The tenant-isolation helpers (`app.current_org_ids`, `app.current_branch_ids`, `
 An `AFTER INSERT` trigger `handle_new_user()` (`security definer`) on `auth.users` creates the `public.users` row and a minimal `public.profiles` row atomically. There is **no** client INSERT path for `users`, and `profiles` INSERT is not exposed to `authenticated`. Duplicate base identity is **structurally impossible**: `users.id` PK = `auth.users.id`, and `profiles.user_id` is `unique`. This is the enforcement point for the product invariant *"account upgrade extends the one identity; it never creates a second user or a duplicate base profile."*
 
 ### D4 — Platform-admin boundary lives only in `platform_role_grants`
+> **Superseded (proposed) by [ADR-0011](ADR-0011-admin-rbac-platform-authority.md) on the source of platform authority** — `admin_role_assignments` + `app.has_admin_permission()`; `platform_role_grants` becomes a never-read compatibility bridge. The text below is the historical record.
+
 Platform authority (`support` / `moderator` / `administrator`) is **not** a column on `users`/`profiles` and **not** a `membership_capability`. It exists solely in `platform_role_grants`, which has **no ordinary-user write policy** — for the pilot it is provisioned by a trusted server/migration/DBA path (service-role or a SQL seed run out-of-band), and every grant is auditable via `audit_log`. `app.is_platform(role)` is the single read point. This keeps org admins from ever escalating to platform admins.
 
 ### D5 — Explicit `grant`s, RLS on every table, deny-by-default

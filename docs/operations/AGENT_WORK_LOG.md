@@ -4,6 +4,34 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Admin Core Phase 1A: dynamic RBAC foundation, centralized authorization, live Staff · Roles · Permissions
+
+**Date:** 2026-09-29 → 2026-09-30 · **Branch:** `feature/admin-core-rbac-foundation` (worktree `.claude/worktrees/admin-core-rbac-foundation`, base `af55b2f`) · Not pushed; no PR; hosted Supabase/Vercel and the shared local `aladdin` DB untouched. Phase 1B (Users / Organizations) **not** started.
+
+**Blocker cleared first.** The Semgrep Guardian PreToolUse hook blocked edits because its OAuth session (`~/.semgrep/guardian.yml`) had expired on 2026-09-25; logins attempted from inside the desktop session were cancelled before reaching the plugin, and a first terminal login refreshed only the CLI token (`settings.yml`). The Product Owner logged in from a terminal with method `oauth`; `guardian.yml` was rewritten (2026-09-30 10:57) and the previously blocked migration edit then passed. The hook was never disabled or bypassed.
+
+**Two pre-apply defects fixed in the migration.**
+- *Legacy DELETE did not revoke.* `admin_role_assignments.legacy_grant_id` is `ON DELETE SET NULL`; that FK action is an internal AFTER trigger (`RI_ConstraintTrigger_*`) which sorts — and fires — before the user AFTER trigger, so the link was already null and nothing was revoked. The revoke now runs in a BEFORE-DELETE trigger (all linked assignments, each audited). UPDATE/TRUNCATE on the bridge are refused.
+- *Copied grants had no history.* The backfill is now `app.admin_backfill_legacy_grants()` (idempotent, DBA-only), writing one `admin_role.assigned` audit row per copy with `source = legacy_backfill`, original granter and time, no human actor.
+
+**Also found in QA and fixed:** the re-tiered `adjust_points`/`reverse_points_entry` still raised "platform **support** authority is required" — now `admin permission points.adjust|reverse required`.
+
+**Frontend (one reader, one route table).** `server/authorization/admin.ts` (`loadAdminAccess` over `admin_my_access`, `requireAdminStaff`, `requireAdminRoute`) · `lib/permissions/admin.ts` (keys, fail-closed parser, `ADMIN_ROUTE_RULES`) · all 19 Admin pages guard their own route (coverage test) · permission-filtered nav, Preview tabs and palette · `platform.ts` now `loadIsAdminStaff()`; `previewAdminStaff()` (read `platform_role_grants`) deleted · `/admin/preview/staff` live: real roster (verified email, last sign-in), roles, catalog, and change/add/remove role, disable/restore, create/edit/archive/restore role through `ConfirmDialog` → server action → RPC · decision buttons on `/admin/verifications` drawn only with `*.verify`/`referrals.approve` · "Live" banner on promoted Preview routes · EN+AR strings.
+
+**Support fixture rule (PD-004/PD-012):** no existing pgTAP fixture depended on Support mutation access, so none needed changing; the new tests assert the denial.
+
+**Validation.**
+- Isolated `aladdin_rbac` stack, `supabase db reset` from zero (78 migrations + 3 seeds) → `supabase test db`: **67 files / 2591 tests PASS** (2477 baseline + 114 new) — run three times, the last after the final migration edit.
+- Direct PostgREST probes with real password sign-ins (11 cases: self-promotion, grant-above-rank, disable last Super Admin, self-disable, create role without `roles.manage`, moderator managing staff, support Points adjust, support/non-staff roster read, non-staff/anon `admin_my_access`) — all as expected.
+- Browser QA on `localhost:3100` (worktree dev server, isolated DB): Super Admin / Administrator / Moderator / Support / non-staff; EN + AR (RTL); desktop + 375px mobile; dark. Direct-URL 404s and non-staff redirects confirmed by real-session requests.
+- `pnpm --filter frontend typecheck` clean · `lint` 0 errors (1 pre-existing warning in `sidebar-shell.tsx`) · `test` **156 files / 1949 tests PASS**.
+
+**Deviations / notes.** The desktop preview tool reads `.claude/launch.json` from the main checkout, so it started the main checkout's dev server once; it was stopped immediately (one page load, no writes) and the worktree server was run from the shell on port 3100 instead. QA fixtures (test passwords, a bootstrapped Super Admin, legacy grants) exist only in the isolated DB. `database.types.ts` regenerated from the isolated DB (RBAC additions + CLI-version formatting of generic helpers).
+
+**Unfinished / next (explicit).** Bridge retirement stage B (move seed/staging/DBA writers) → C (drop bridge) → D (drop shim); scoped-role creation/assignment UI (needs the Phase 1B organization picker); Invitation sub-phase for brand-new staff; PD-010 suspend RPC must refuse the last active Super Admin; staging needs a one-time `app.admin_bootstrap_super_admin`. ADR-0011 is Proposed until Phase 1A is accepted.
+
+---
+
 ## Session — Phase 0D final acceptance fixes and proof pass (filters, RBAC copy, date entry, single search)
 
 **Date:** 2026-09-29 · **Branch:** `feature/admin-blueprint-recovery` · Not pushed; no migration; no shared-DB writes; Admin Core wiring **not** started.
