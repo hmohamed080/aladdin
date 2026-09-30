@@ -4,6 +4,22 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Admin Core Phase 1B-B: Users + Organizations operational workflows
+
+**Date:** 2026-09-30 · **Branch:** `feature/admin-core-user-org-operations` (worktree `.claude/worktrees/admin-core-user-org-operations`, created from exactly `2cdbacd` after confirming the Phase 1B-A worktree clean; Phase 1B-A has **8** commits since `bc16841` — the earlier "9" was a miscount in a progress message, history unchanged) · Not pushed; no PR; only the new isolated `aladdin_1bb` stack (ports 573xx) was used.
+
+**Design first.** [`ADMIN_USER_ORG_OPERATIONS.md`](../admin/ADMIN_USER_ORG_OPERATIONS.md) §1–§11 (audit findings, permission model, scope, the user-suspension enforcement table, the PD-011 MODULE → BEHAVIOUR → ENFORCEMENT POINT → CHANGE matrix) was written before any code. Key finding: tenant authority is one helper (`has_capability`, 126 call sites) whose capability keys split into `.read` and writes, and every organization write RPC is capability-gated — so suspension is enforced centrally, not per module.
+
+**Built.** User and organization suspend/restore (reason, actor, time, episode history, idempotent, audited, last-Super-Admin guard on `users.status`, rank/self rules); enforcement through a PostgREST pre-request hook plus the tenant/personal/storage helpers, catalog visibility, and job-application/order triggers; append-only Admin Notes; Follow-ups with derived Open/Overdue/Done and staff-only assignees; internal Cases (no attachments); organization duplicate detection + link-to-existing/dismiss (no merge, provenance snapshot); the Entity Timeline; the suspended-account page and middleware gate; all approved UI wired (User/Organization details, directory row icons, Review Center detail notes + timeline). No Points amount, rule or ledger change.
+
+**QA found and fixed:** the suspended page crashed (client card rendered from a Server Component); the canonical organization's timeline wording; an orphaned dev-server process (environment). Earlier suites 25 and 66 updated for the intended behaviour (suspension now refused; Support's new read keys).
+
+**Validation.** From-zero rebuild (84 migrations + seeds) → pgTAP **69 files / 2778 tests PASS**; concurrency proof PASS; real-token PostgREST proofs of every blocked action; browser QA (six roles, EN/AR, desktop/mobile, dark/light); frontend typecheck / lint (0 errors) / Vitest **164 / 2018 PASS**; Semgrep CLI scan 0 actionable findings; `check_doc_links.py` before the docs commit.
+
+**Unfinished / next (explicit).** BL-026 (**required before Final Admin Cutover** unless measured unnecessary), BL-028 and BL-029 (remaining 200-row / fixture paths, owned), BL-030 case attachments, BL-031 reminder delivery, BL-032 session revocation / expiry, BL-027 scoped directories and operations, BL-003 Points adjust/reverse (Points Engine phase), BL-023 Organization Requests. Product confirmation pending for the PD-011 order-counterparty default.
+
+---
+
 ## Session — Admin Core Phase 1B-A: Users + Organizations production reads (directories and details)
 
 **Date:** 2026-09-30 · **Branch:** `feature/admin-core-users-organizations` (worktree `.claude/worktrees/admin-core-users-organizations`, created from exactly `bc16841` after confirming the Phase 1A worktree clean and all eight Phase 1A commits present) · Not pushed; no PR; production/staging, the shared `aladdin` DB and the main checkout untouched; only the new isolated `aladdin_1b` stack (ports 563xx, junction-linked to this worktree's migrations/tests) was used. **Phase 1B-B not started.**

@@ -98,6 +98,7 @@ Phases are ordered by operational necessity, not by convenience of implementatio
 ## Phase 1 — Admin operational safety (P0)
 
 ### BL-001 — User suspend / restore
+- **Status (2026-09-30): IMPLEMENTED in Admin Core Phase 1B-B, awaiting approval.** `admin_user_suspend/restore` (users.suspend, platform scope); enforcement = PostgREST pre-request hook + tenant/personal/storage helpers; last-Super-Admin guard on `users.status`; see [ADMIN_USER_ORG_OPERATIONS.md](ADMIN_USER_ORG_OPERATIONS.md) §4.
 - **Problem:** `users.status` has `suspended`/`deactivated` enum values with UI badge colors already wired, but exhaustive grep confirmed **zero write path** (no RPC) and **zero enforcement path** (no middleware/RLS check anywhere references these states). A platform admin currently cannot stop a bad-actor account from using Aladdin through any surface.
 - **Expected outcome:** An admin can suspend a user (with a required reason), the suspension is actually enforced (the user cannot continue transacting/authenticating meaningfully), and the admin can restore them.
 - **Related feature-matrix rows:** A3.
@@ -114,6 +115,7 @@ Phases are ordered by operational necessity, not by convenience of implementatio
 - **Suggested priority:** **P0**
 
 ### BL-002 — Organization suspend / restore
+- **Status (2026-09-30): IMPLEMENTED in Admin Core Phase 1B-B, awaiting approval.** `admin_organization_suspend/restore` (organizations.suspend); members never suspended; non-`.read` capabilities withheld, catalog/jobs/orders restricted; see [ADMIN_USER_ORG_OPERATIONS.md](ADMIN_USER_ORG_OPERATIONS.md) §5.
 - **Problem:** Same shape as BL-001 for organizations — `organizations.status`/`deleted_at` exist and are read, but nothing in admin ever writes them.
 - **Expected outcome:** An admin can suspend a fraudulent/abusive organization (with a required reason), affecting its members' effective access, and restore it.
 - **Related feature-matrix rows:** A4.
@@ -248,6 +250,7 @@ Per the Product Owner's Part B direction, this phase's scope is now approved and
 - **Suggested priority:** P1
 
 ### BL-008 — Internal Admin Notes (Phase 2 initial scope: Users + Organizations)
+- **Status (2026-09-30): IMPLEMENTED (Phase 1B-B), awaiting approval.** Append-only `admin_notes` for users and organizations (notes.read / notes.create); also shown in the Review Center detail.
 - **Problem:** No internal-notes concept exists anywhere in Aladdin admin — an admin cannot record "called this showroom, confirmed legitimate" against a user or organization without leaving the product.
 - **Expected outcome:** A generic, reusable internal-note capability, with **Phase 2's scope explicitly limited to Users and Organizations** (verification/referral notes are a later extension of the same mechanism, not required for Phase 2). Notes are internal-only by default and retain **author**, **timestamp**, and **content**, exactly as specified.
 - **Related feature-matrix rows:** G1, D1.
@@ -264,6 +267,7 @@ Per the Product Owner's Part B direction, this phase's scope is now approved and
 - **Suggested priority:** P1
 
 ### BL-012 — Entity Timeline (Phase 2 scope: user/organization)
+- **Status (2026-09-30): IMPLEMENTED (Phase 1B-B), awaiting approval.** `admin_entity_timeline` — composed from source records, never a copy of Audit; see [ADMIN_USER_ORG_OPERATIONS.md](ADMIN_USER_ORG_OPERATIONS.md) §9.
 - **Problem:** No unified, human-readable narrative exists for a user or organization's history — the underlying events (verifications, referrals, audit_log) are already queryable but not assembled into one timeline.
 - **Expected outcome:** A "Registered → Profile completed → Verification submitted → Approved → ..." timeline, **explicitly distinct from the raw Audit Log** (BL-011) — this is the human-readable operational history, not a technical action feed — feeding the "Activity" tab on both `AdminUserDetailPage` (BL-021) and `AdminOrgDetailPage` (BL-022).
 - **Related feature-matrix rows:** I1.
@@ -280,6 +284,7 @@ Per the Product Owner's Part B direction, this phase's scope is now approved and
 - **Suggested priority:** P1
 
 ### BL-015 — Duplicate Management (Phase 2 limited scope, per PD-006)
+- **Status (2026-09-30): IMPLEMENTED for organizations (Phase 1B-B), awaiting approval.** Detect (same / similar name) → suggest → link-to-existing or dismiss; no merge. Users have no authoritative duplicate signal (unique phone/email/username). See [ADMIN_USER_ORG_OPERATIONS.md](ADMIN_USER_ORG_OPERATIONS.md) §10.
 - **Problem:** Duplicate detection exists only inside the two referral-review flows; the Organizations directory itself has no dedup assistance, and the audit's original recommendation was open-ended ("generalize it eventually"). PD-006 has now formally approved a specific, limited scope.
 - **Expected outcome:** **Detect probable duplicate → show candidate → link to existing where appropriate**, reusing the existing `pg_trgm` similarity technique already proven twice in this codebase (`admin_showroom_referrals_list`, `admin_network_referrals_list`). **Full transactional entity merge is explicitly out of scope for Phase 2** (remains BL-017, Phase 6, deferred per PD-006).
 - **Related feature-matrix rows:** B2, B3.
@@ -417,13 +422,27 @@ Per the Product Owner's Part B direction, this phase's scope is now approved and
 - **Blocked by:** nothing (ADR-0011 accepted). **Suggested priority:** P3, with the Audit module's wiring; not scheduled.
 
 ### BL-026 — Stored profile-completion value for large-scale sorting
+- **Gate: REQUIRED BEFORE FINAL ADMIN CUTOVER** unless measurement at realistic production scale proves the full-set completion sort acceptable (measured 3.8 s at 20,287 users, Phase 1B-A). Implementation stays deferred in 1B-B.
 - **What:** sorting the FULL Users directory by Profile Completion evaluates `app.profile_completion()` (plpgsql, several lookups) for every row — measured 3.8 s at 20,287 users (filtered sorts are proportionally cheaper; pilot scale is fine). When the user base approaches ~10k, maintain the percentage in a stored column updated by triggers on the inputs (profiles, onboarding_progress, individual_onboarding, user_activities, user_trades, memberships, membership_capabilities, organization_activities), computed by the SAME function — never a second formula. **Blocked by:** nothing. **Suggested priority:** P3, scale-triggered.
 
 ### BL-027 — Scoped Users / Organizations directories (RBAC option B)
 - **What:** Phase 1B-A requires a PLATFORM-scoped `users.read` / `organizations.read` for the global directories and refuses scoped assignments. A scoped directory (results restricted to the caller's organization/branch scope) needs its own UI and query contract. **Blocked by:** a product decision that scoped Admin roles need directory access. **Suggested priority:** Later.
 
 ### BL-028 — Command palette and Points user picker off the 200-row list
+- **Owner / phase:** Admin Core Points promotion (Points user picker) and the command-palette search pass — both before Final Admin Cutover. No unowned 200-row dependency may remain at cutover.
 - **What:** `listUsers()` / `listOrganizations()` (200 rows, JavaScript search) still feed the Admin command-palette index and the Points page's user picker. Move both to `admin_users_list` / `admin_organizations_list` (server search). **Blocked by:** nothing. **Suggested priority:** P2, with the Points / palette promotion.
+
+### BL-029 — Dashboard "incomplete profiles" counts off the fixture
+- **What:** the Preview dashboard's incomplete-profile counts still use `previewCompletenessFor` (fixture). Replace with a server count over `app.profile_completion` (or BL-026's stored value). **Owner:** Admin Dashboard promotion (Phase 05E), before Final Admin Cutover. **Blocked by:** BL-026 for scale.
+
+### BL-030 — Internal case attachments
+- **What:** private Storage bucket and its own policies (cases.read / cases.create), upload through the case form. **Blocked by:** nothing; needs a Storage security review. **Priority:** P2.
+
+### BL-031 — Follow-up reminder delivery
+- **What:** deliver reminders for `admin_follow_ups.due_at` (notification infrastructure). Today the due time is stored and shown Overdue; nothing is sent. **Priority:** P2.
+
+### BL-032 — Suspension session revocation and optional expiry
+- **What:** revoke a suspended account's Supabase Auth sessions (Admin API, server-side) and, if Product wants it, suspension expiry (needs a scheduler). Data access is already refused. **Priority:** P2.
 
 ### BL-019 — Platform-level internal lead/prospect CRM
 - **Related feature-matrix rows:** none directly (Talent-specific, see the matrix's "Talent-specific" table). **Blocked by:** PD-007 (approved decision: DEFERRED — do not build simply because Talent has one; revisit only when a real Aladdin Sales/Onboarding need justifies it). **Suggested priority:** Later, not scheduled.
@@ -443,8 +462,8 @@ Each Phase 6 item is deliberately left at backlog-entry depth (not full field-by
 | 0B — Admin Product Blueprint Enrichment | (this document's own delivery) | — | **Delivered 2026-09-20** — enrichment of Phase 0's screens + Admin Staff + Analytics (new) + PD-011 module-effects doc |
 | 0C — Admin Blueprint Final Refinement | (this document's own delivery) | — | **Delivered 2026-09-20** — global table/search/pagination conventions, Users/Organizations final column model, Points rework, Analytics KPI/chart/Top-Pages/Visitors, Audit partial pagination, new Settings page, CRM RBAC gap analysis |
 | 0D — Final Admin Product Blueprint | (this document's own delivery) | — | **Implemented 2026-09-29, awaiting PO approval** — table/pagination standards, Command Palette, Follow-up/Report, Settings Change Password (PD-014), Dynamic RBAC Preview (PD-008), Review Center separation (PD-015), Points/Analytics/Audit revisions. **Pre-PR gate: clean DB reset + full pgTAP** |
-| 1 — Admin operational safety | BL-001–004 | P0 | Semantics/tiers **approved** (PD-004/010/011/012); backend build gated on Phase 0/0B review (PD-013) |
-| 2 — User & org operations | BL-005–006, BL-008, BL-012, BL-015, BL-021–022 | P1 | **Scope APPROVED/LOCKED** 2026-09-19. **Admin Core Phase 1B-A (2026-09-30, awaiting approval):** BL-005/006 implemented; BL-021/022 read models implemented. BL-008 (notes), BL-012 (timeline), BL-015 (duplicates) and all user/org mutations (BL-001/002) belong to Phase 1B-B |
+| 1 — Admin operational safety | BL-001–004 | P0 | **BL-001/002 implemented in Admin Core Phase 1B-B (2026-09-30, awaiting approval).** BL-003 (Points adjust/reverse UI) belongs to the Points Engine phase; BL-004 done in 1A |
+| 2 — User & org operations | BL-005–006, BL-008, BL-012, BL-015, BL-021–022 | P1 | **Scope APPROVED/LOCKED** 2026-09-19. **Admin Core Phase 1B-A (2026-09-30, awaiting approval):** BL-005/006 implemented; BL-021/022 read models implemented. **Phase 1B-B (2026-09-30, awaiting approval):** BL-008, BL-012 and BL-015 (organizations) implemented, plus Follow-ups and internal Cases |
 | 3 — Moderation/review enrichment | BL-009–010 | P1 | BL-010's taxonomy is approved (PD-005); not yet implemented |
 | 4 — Audit & history | BL-011 | P1 | Not yet implemented (BL-012 moved to Phase 2) |
 | 5 — Dashboard & discoverability | BL-013–014 | P2 | Not yet implemented (BL-015 moved to Phase 2) |

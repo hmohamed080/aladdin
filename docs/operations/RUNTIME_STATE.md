@@ -1,6 +1,14 @@
 # Runtime State
 
-## Current continuation — 2026-09-30 (Admin Core Phase 1B-A: Users + Organizations reads, latest)
+## Current continuation — 2026-09-30 (Admin Core Phase 1B-B: Users + Organizations operations, latest)
+
+- **Admin Core Phase 1B-B implemented, awaiting Product Owner approval.** Branch `feature/admin-core-user-org-operations` (worktree `.claude/worktrees/admin-core-user-org-operations`, base `2cdbacd` = approved Phase 1B-A HEAD). **Not pushed, no PR**; hosted Supabase/Vercel, the shared `aladdin` DB and the main checkout untouched. Points adjust/reverse, Organization Requests, Analytics and Realtime **not** started.
+- New migrations `20260930100001`–`100004` (84 total): suspension (PD-010/011) with a PostgREST pre-request hook, Admin Notes, Follow-ups, internal Cases, organization duplicates, Entity Timeline; 7 new permission keys.
+- **Deployment note:** migration `100002` sets `pgrst.db_pre_request` on the `authenticator` role (cluster-level) and notifies PostgREST to reload — verify on staging that API requests still flow and a suspended account is refused.
+- Verified on the ISOLATED `aladdin_1bb` stack (ports 573xx), rebuilt from zero after the final migration edit: pgTAP **69 files / 2778 tests PASS**; two-session concurrency proof PASS. Frontend: typecheck clean, lint 0 errors (1 pre-existing warning), Vitest **164 files / 2018 tests PASS**. Browser QA across six roles, EN/AR, desktop/mobile, dark/light — [`ADMIN_USER_ORG_OPERATIONS.md`](../admin/ADMIN_USER_ORG_OPERATIONS.md) §12.
+- **Before Final Admin Cutover:** BL-026 (stored completion — REQUIRED unless measured unnecessary), BL-028 (palette + Points picker off 200 rows), BL-029 (dashboard incomplete counts off the fixture).
+
+## Current continuation — 2026-09-30 (Admin Core Phase 1B-A: Users + Organizations reads)
 
 - **Admin Core Phase 1B-A implemented, awaiting Product Owner approval.** Branch `feature/admin-core-users-organizations` (worktree `.claude/worktrees/admin-core-users-organizations`, base `bc16841` = approved Phase 1A). **Not pushed, no PR**; hosted Supabase/Vercel, the shared local `aladdin` DB and the main checkout untouched. **Phase 1B-B (mutations) NOT started.**
 - New migrations (80 total): `20260930090001_profile_completion_shared.sql` (one completion formula, `app.profile_completion`, wrapped by `my_profile_completion`) and `20260930090002_admin_users_organizations_read.sql` (`admin_users_list`, `admin_user_detail`, `admin_organizations_list`, `admin_organization_detail` — platform `users.read` / `organizations.read`).

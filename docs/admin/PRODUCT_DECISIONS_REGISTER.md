@@ -195,6 +195,8 @@ Every row below is a real business-rule question surfaced by the Admin gap analy
 
 **STATUS: APPROVED — 2026-09-19 (limited scope: detect → suggest → link to existing, part of Phase 2; full merge engine deferred, not scheduled)**
 
+**Implementation (2026-09-30):** Admin Core Phase 1B-B — organization duplicate detection (same / similar name), suggestion and link-to-existing / dismiss with provenance kept; no merge. Awaiting approval. See [ADMIN_USER_ORG_OPERATIONS.md](ADMIN_USER_ORG_OPERATIONS.md) §10.
+
 ---
 
 ## PD-007 — Platform-level internal sales/lead CRM
@@ -303,6 +305,8 @@ Every row below is a real business-rule question surfaced by the Admin gap analy
 
 **STATUS: APPROVED — 2026-09-19 (semantics only; not yet implemented)**
 
+**Implementation (2026-09-30):** Admin Core Phase 1B-B — BL-001 built to these semantics (reason, actor, time, restore, audit, no deletion, server-side enforcement through the Supabase architecture: PostgREST pre-request hook + RLS/definer helpers). Expiry not implemented (would need a scheduler — BL-032). Awaiting approval. See [ADMIN_USER_ORG_OPERATIONS.md](ADMIN_USER_ORG_OPERATIONS.md) §4.
+
 ---
 
 ## PD-011 — Organization suspension semantics
@@ -326,6 +330,8 @@ Every row below is a real business-rule question surfaced by the Admin gap analy
 **Not implemented in this phase.** The module-by-module effect documentation required as a prerequisite for BL-002 has now been produced — see [`PD-011_ORG_SUSPENSION_MODULE_EFFECTS.md`](PD-011_ORG_SUSPENSION_MODULE_EFFECTS.md) (Phase 0B, 2026-09-20). That document is itself documentation only; it does not authorize or start BL-002's backend implementation.
 
 **STATUS: APPROVED — 2026-09-19 (principle approved; module-by-module effect documentation produced 2026-09-20 — see `PD-011_ORG_SUSPENSION_MODULE_EFFECTS.md`; BL-002 implementation not started)**
+
+**Implementation (2026-09-30):** Admin Core Phase 1B-B — BL-002 built from the module-effects document (members never suspended; new organization activity refused; records and in-flight work preserved; hidden from public listings; no new orders or job applications with it; organizations.suspend is Administrator-level). The order-counterparty default is implemented as the document's safe default and still needs Product confirmation. Awaiting approval. See [ADMIN_USER_ORG_OPERATIONS.md](ADMIN_USER_ORG_OPERATIONS.md) §5.
 
 ---
 

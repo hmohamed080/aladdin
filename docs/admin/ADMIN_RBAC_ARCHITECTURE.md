@@ -55,6 +55,8 @@ All four tables: RLS enabled, **no policies, no DML grant to any application rol
 | admin_staff.manage | 🔒 | ✓ | — | — |
 | roles.read | 🔒 | 🔒 | — | — |
 | roles.manage | 🔒 | — | — | — |
+| notes.read · follow_ups.read · cases.read | 🔒 | ✓ | ✓ | ✓ |
+| notes.create · follow_ups.manage · cases.create · duplicates.resolve | 🔒 | ✓ | ✓ | — |
 
 🔒 = locked core permission. Support is **read-only** (PD-004). Points adjust/reverse are **Administrator-level** (PD-012).
 
@@ -112,7 +114,7 @@ Mutations: `admin_role_create`, `admin_role_update`, `admin_role_set_archived` (
 
 ## 10. Known limitations / deferred
 
-- `users.status` changes (suspension, PD-010) have no write path yet; the last-Super-Admin trigger guards assignments, not account status. When PD-010's suspend RPC lands it must refuse suspending the last active Super Admin.
+- `users.status` changes (suspension, PD-010) now go through `admin_user_suspend` (Phase 1B-B); a `BEFORE UPDATE OF status` trigger under the same advisory lock refuses leaving zero usable Super Admins through every path.
 - `department` scope is deferred until a departments/teams domain exists.
 - **Scoped role UI** — organization/branch/user-scoped roles are fully supported by the schema, RPCs and tests, but the console creates and assigns **platform** roles only; the scope picker belongs to the Organizations module (Phase 1B). Phase 1B-A (Users / Organizations reads) did not add it: the global directories require a platform-scoped read (§13). `admin_assignment_change_scope` has no UI yet.
 - **Invite Admin Staff** stays a Preview dialog: the RBAC RPCs only manage people who already have Admin history; onboarding a new person is the Invitation sub-phase.
@@ -144,3 +146,7 @@ The Preview shell shows a **"Live"** banner (not the "nothing is saved" Preview 
 ## 13. First domain consumers — Users & Organizations reads (Phase 1B-A)
 
 The Users and Organizations directories and detail pages read through four self-guarding RPCs (`admin_users_list`, `admin_user_detail` → `users.read`; `admin_organizations_list`, `admin_organization_detail` → `organizations.read`), each calling `app.admin_require(<perm>)` — i.e. `has_admin_permission` **without context**, so only a **platform** assignment qualifies (§3). A scoped `users.read` / `organizations.read` is refused (`42501`), never widened into the global directory; a scoped directory is backlog BL-027. Nested panels keep their own permission: Points (`points.read`, RLS `points_ledger_select_platform`) and Audit (`audit.read`, RLS `audit_log_select_admin`). Contracts, field sources and proofs: [`ADMIN_USERS_ORGS_READ_AUDIT.md`](ADMIN_USERS_ORGS_READ_AUDIT.md).
+
+## 14. Operational workflows (Phase 1B-B)
+
+Mutations `admin_user_suspend/restore` (users.suspend), `admin_organization_suspend/restore` (organizations.suspend), `admin_note_add` (notes.create), `admin_follow_up_log/complete` (follow_ups.manage), `admin_case_create` (cases.create), `admin_organization_link_duplicate/dismiss_duplicate` (duplicates.resolve) — each also requires the parent read permission and a **platform** assignment; scoped holders are refused (tested). Non-staff rank ceilings apply to suspension (no self-suspension; a non-Super-Admin cannot suspend staff at or above their rank). Support gains only the three `.read` keys (PD-004). Details: [ADMIN_USER_ORG_OPERATIONS.md](ADMIN_USER_ORG_OPERATIONS.md).
