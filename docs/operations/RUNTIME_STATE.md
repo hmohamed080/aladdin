@@ -1,10 +1,17 @@
 # Runtime State
 
-## Current continuation — 2026-09-30 (Admin Core Phase 1A, latest): dynamic RBAC implemented, awaiting Product Owner acceptance
+## Current continuation — 2026-09-30 (Admin Core Phase 1A CLOSED / APPROVED, latest)
+
+- **Admin Core Phase 1A is CLOSED / APPROVED**; [ADR-0011](../decisions/ADR-0011-admin-rbac-platform-authority.md) **Accepted**. Branch `feature/admin-core-rbac-foundation` — not pushed, no PR. **Phase 1B (Users / Organizations) has NOT started.**
+- **Deployment gate:** any environment receiving migration `20260929100001` has **zero Super Admins** until the one-time, DB-owner-only bootstrap in [`docs/admin/SUPER_ADMIN_BOOTSTRAP.md`](../admin/SUPER_ADMIN_BOOTSTRAP.md) is performed and recorded; Roles management is not operational before that. Not performed on staging or production.
+- **Audit debt:** `audit_log.actor_role` is informational legacy (Super Admin recorded as `administrator`); verified not an authorization input; dynamic snapshot is BL-025.
+- Isolated `aladdin_rbac` (the only DB touched) is bootstrapped: Platform Admin is its Super Admin. Final gate: pgTAP **67 files / 2594 tests PASS** from zero.
+
+## Previous continuation — 2026-09-30 (Admin Core Phase 1A): dynamic RBAC implemented, awaiting Product Owner acceptance
 
 - Branch `feature/admin-core-rbac-foundation` (worktree `.claude/worktrees/admin-core-rbac-foundation`, base `af55b2f`). **Not pushed, no PR, hosted Supabase and Vercel untouched, shared local `aladdin` DB untouched.** Phase 1B (Users / Organizations) has **not** started.
 - New migration `20260929100001_admin_rbac_foundation.sql` (78 migrations total). Platform authority is now `admin_role_assignments` via `app.has_admin_permission()`; `platform_role_grants` is a never-read compatibility bridge (retirement stages A–D in [`docs/admin/ADMIN_RBAC_ARCHITECTURE.md`](../admin/ADMIN_RBAC_ARCHITECTURE.md) §6); [ADR-0011](../decisions/ADR-0011-admin-rbac-platform-authority.md) is **Proposed**.
-- Verified on the ISOLATED `aladdin_rbac` Supabase stack (ports 553xx), rebuilt from zero: pgTAP **67 files / 2591 tests PASS** (2477 baseline + 114 RBAC). Frontend: typecheck clean, lint 0 errors (1 pre-existing warning), Vitest **156 files / 1949 tests PASS**.
+- Verified on the ISOLATED `aladdin_rbac` Supabase stack (ports 553xx), rebuilt from zero: pgTAP **67 files / 2591 tests PASS** (2477 baseline + 114 RBAC; 2594 after the closure pass added 3 bootstrap assertions). Frontend: typecheck clean, lint 0 errors (1 pre-existing warning), Vitest **156 files / 1949 tests PASS**.
 - `/admin/preview/staff` (Staff · Roles · Permissions) is **live** (real reads + audited mutations); every Admin page guards its own route; navigation is permission-filtered. Invite Admin Staff and scoped-role UI remain Preview/deferred.
 - **Operational note:** after any fresh seed or on staging, **no Super Admin exists** until a DBA runs `select app.admin_bootstrap_super_admin('<user id>')`; until then nobody can manage roles.
 

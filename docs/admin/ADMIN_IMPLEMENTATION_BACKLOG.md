@@ -398,7 +398,7 @@ Per the Product Owner's Part B direction, this phase's scope is now approved and
 - **Related feature-matrix rows:** B3. **Scope note:** this is specifically the full, transactional, every-FK-table re-parenting merge — the limited "detect → suggest → link to existing" scope is **approved and locked into Phase 2 as BL-015**, not this item. **Blocked by:** PD-006 (approved decision: do not build the full merge engine now). **Suggested priority:** Later, not scheduled.
 
 ### BL-018 — Dynamic RBAC (roles, permissions, scopes, Admin Staff)
-- **Status 2026-09-30 — Phase 1A implemented, pending acceptance** (branch `feature/admin-core-rbac-foundation`): DB-backed RBAC, legacy-grant bridge, audited rank-checked RPCs, centralized frontend authorization, real Staff/Roles/Permissions. Design, cutover and retirement plan: [`ADMIN_RBAC_ARCHITECTURE.md`](ADMIN_RBAC_ARCHITECTURE.md); [ADR-0011](../decisions/ADR-0011-admin-rbac-platform-authority.md) (Proposed). **Next:** bridge retirement stage B, scoped-role UI (Phase 1B), Invitation sub-phase.
+- **Status 2026-09-30 — Phase 1A CLOSED / APPROVED** (branch `feature/admin-core-rbac-foundation`; deployment gate: one-time [Super Admin bootstrap](SUPER_ADMIN_BOOTSTRAP.md)): DB-backed RBAC, legacy-grant bridge, audited rank-checked RPCs, centralized frontend authorization, real Staff/Roles/Permissions. Design, cutover and retirement plan: [`ADMIN_RBAC_ARCHITECTURE.md`](ADMIN_RBAC_ARCHITECTURE.md); [ADR-0011](../decisions/ADR-0011-admin-rbac-platform-authority.md) (Accepted). **Next:** bridge retirement stage B, scoped-role UI (Phase 1B), Invitation sub-phase.
 - **Related feature-matrix rows:** L2. **Unblocked 2026-09-29:** PD-008 is now **APPROVED — adapt CRM Dynamic RBAC to Aladdin** (was DEFERRED). **Previewed in:** Phase 0D (`/admin/preview/staff`). **First step:** a design audit of the tenant/scope model PD-008 lists (platform vs. organization roles; Platform · Organization · Branch · Department/Team · User scopes; super-admin safeguards; migration of every `app.is_platform(...)` call site and `membership_capabilities`). **Suggested priority:** after Phase 1 safety items; not scheduled.
 
 ### BL-023 — Organization Request workflow (PD-015)
@@ -406,6 +406,11 @@ Per the Product Owner's Part B direction, this phase's scope is now approved and
 
 ### BL-024 — Site-wide Data Freshness / Realtime Architecture Audit (PD-016)
 - **What:** after the Admin Core backend-wiring stage, audit every module and classify how it stays fresh: **Realtime subscription** · **mutation-triggered refetch** · **focus/navigation refetch** · **polling** · **normal fetch**. **Not** part of Phase 0D — no realtime architecture is implemented there. **Blocked by:** Admin Core backend wiring. **Suggested priority:** Later.
+
+### BL-025 — Dynamic RBAC actor-role snapshot in the audit trail
+- **What:** `audit_log.actor_role` still stores the legacy `platform_role` tier (`support/moderator/administrator`), so events by a Super Admin or a custom-role holder show `administrator`/`support`. Record the actor's dynamic role(s) at event time — e.g. the highest active platform role key + name and rank (or the full active role-key set) — as an additive snapshot, and show it in Audit views.
+- **Constraints:** additive only; **never** an authorization input (verified 2026-09-30 that `actor_role` is written only by `app.record_audit_event` and read by no policy/view/check); existing rows keep their legacy value; decide whether `actor_role` is then deprecated.
+- **Blocked by:** nothing (ADR-0011 accepted). **Suggested priority:** P3, with the Audit module's wiring; not scheduled.
 
 ### BL-019 — Platform-level internal lead/prospect CRM
 - **Related feature-matrix rows:** none directly (Talent-specific, see the matrix's "Talent-specific" table). **Blocked by:** PD-007 (approved decision: DEFERRED — do not build simply because Talent has one; revisit only when a real Aladdin Sales/Onboarding need justifies it). **Suggested priority:** Later, not scheduled.

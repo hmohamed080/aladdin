@@ -4,6 +4,22 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Admin Core Phase 1A closure pass: Super Admin deployment gate, actor_role audit debt, CLOSED / APPROVED
+
+**Date:** 2026-09-30 · **Branch:** `feature/admin-core-rbac-foundation` · Not pushed; no PR; production/staging untouched; only the isolated `aladdin_rbac` DB used. Phase 1B **not** started; RBAC not redesigned or expanded.
+
+**Super Admin bootstrap = deployment gate.** Kept the no-auto-promotion behaviour (no migration/seed/trigger creates a Super Admin; the legacy enum has no Super Admin tier). Documented the one-time, DB-owner-only procedure in [`docs/admin/SUPER_ADMIN_BOOTSTRAP.md`](../admin/SUPER_ADMIN_BOOTSTRAP.md): who may run it, explicit target selection by verified contact, zero-Super-Admin precheck, the call, assignment + `dba_bootstrap` audit verification, `≥ 1` active Super Admin check, and the staging/production gate before Roles management counts as operational. No email or user id added to any migration.
+
+**Isolated proof** (fresh `db reset`, 78 migrations): 0 Super Admins → six improper attempts refused (`authenticated` 42501, `service_role` 42501, `anon` 42501, non-active target 22023, unknown id 22023, legacy bridge 22P02) with still 0 → Platform Admin chosen explicitly and bootstrapped → one active platform `super_admin` assignment + audit row → `roles.manage` false→true, `admin_role_create` refused→succeeded (rolled back) → second bootstrap refused 42501 → deactivate/delete/self-disable of the only Super Admin refused 42501. Three previously untested cases (non-active target, `service_role`, legacy-bridge minting) were added to `66_admin_rbac_foundation_test.sql` (114 → 117 assertions); the rest were already covered (§F/§I).
+
+**actor_role.** Verified not an authorization source: in the live catalog only `app.record_audit_event` references it (writes); no RLS policy or view reads it; frontend renders it as a badge only; tests only assert its written value. Documented as informational/legacy; backlog **BL-025** (dynamic actor-role snapshot) created.
+
+**Status changes.** ADR-0011 → **Accepted** (ADR-0007 changed only in its superseded link); PD-008 implementation status, BL-018, ARCHITECTURE_GUIDE, DECISION_LOG, RBAC architecture doc, RUNTIME_STATE updated. **Admin Core Phase 1A: CLOSED / APPROVED.**
+
+**Validation.** Isolated `supabase db reset` from zero → `supabase test db`: **67 files / 2594 tests PASS**; bootstrap proof re-run on the fresh DB with identical results; `python scripts/check_doc_links.py` 0 broken. No frontend code changed in this pass, so the committed frontend gates (typecheck clean, lint 0 errors, Vitest 156 files / 1949 tests) stand; rerun as the final tree check.
+
+---
+
 ## Session — Admin Core Phase 1A: dynamic RBAC foundation, centralized authorization, live Staff · Roles · Permissions
 
 **Date:** 2026-09-29 → 2026-09-30 · **Branch:** `feature/admin-core-rbac-foundation` (worktree `.claude/worktrees/admin-core-rbac-foundation`, base `af55b2f`) · Not pushed; no PR; hosted Supabase/Vercel and the shared local `aladdin` DB untouched. Phase 1B (Users / Organizations) **not** started.

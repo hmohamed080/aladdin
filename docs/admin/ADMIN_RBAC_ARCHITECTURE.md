@@ -1,6 +1,6 @@
 # Admin RBAC Architecture (Admin Core Phase 1A)
 
-**Status:** Implemented in `supabase/migrations/20260929100001_admin_rbac_foundation.sql` (branch `feature/admin-core-rbac-foundation`).
+**Status:** Admin Core Phase 1A **CLOSED / APPROVED** (2026-09-30) — `supabase/migrations/20260929100001_admin_rbac_foundation.sql`, branch `feature/admin-core-rbac-foundation`. [ADR-0011](../decisions/ADR-0011-admin-rbac-platform-authority.md) Accepted.
 **Authority:** PD-008 (approved 2026-09-29 — adapt dynamic RBAC), PD-004 (real tier separation), PD-012 (Points = Administrator-level), PD-016 (promote the Admin Preview). Backlog: BL-018.
 **Tests:** `supabase/tests/66_admin_rbac_foundation_test.sql` (114 assertions, direct RPC/table invocation as `authenticated`/`anon`).
 
@@ -116,8 +116,8 @@ Mutations: `admin_role_create`, `admin_role_update`, `admin_role_set_archived` (
 - `department` scope is deferred until a departments/teams domain exists.
 - **Scoped role UI** — organization/branch/user-scoped roles are fully supported by the schema, RPCs and tests, but the console creates and assigns **platform** roles only; the scope picker belongs to the Organizations module (Phase 1B). `admin_assignment_change_scope` has no UI yet.
 - **Invite Admin Staff** stays a Preview dialog: the RBAC RPCs only manage people who already have Admin history; onboarding a new person is the Invitation sub-phase.
-- **No Super Admin exists after a fresh seed or on staging** until a DBA runs `select app.admin_bootstrap_super_admin('<user id>')`. Until then nobody holds `roles.manage` (Administrators can still manage staff below rank 80).
-- `audit_log.actor_role` is the informational legacy tier (`support/moderator/administrator` enum): a Super Admin actor is recorded as `administrator`. Never used for authorization; the precise role is derivable from the assignment history.
+- **No Super Admin exists after a fresh seed or on any deployed environment** until the one-time, DB-owner-only bootstrap is performed — a **deployment gate**, procedure in [`SUPER_ADMIN_BOOTSTRAP.md`](SUPER_ADMIN_BOOTSTRAP.md). Until then nobody holds `roles.manage` (Administrators can still manage staff below rank 80).
+- **`audit_log.actor_role` is informational / legacy — verified not an authorization source (closure pass 2026-09-30).** It holds the legacy tier enum (`support/moderator/administrator`), so a Super Admin actor is recorded as `administrator`. The only database object referencing it is `app.record_audit_event` (the writer); no RLS policy, view or security check reads it; the frontend only renders it as a badge in audit lists. The precise role is derivable from the assignment history. A dynamic actor-role snapshot is backlog item [BL-025](ADMIN_IMPLEMENTATION_BACKLOG.md).
 - Organization-level `membership_capabilities` remains the tenant-side model; unifying it with this catalog is a later PD-008 stage.
 
 ## 11. Frontend enforcement (one reader, one route table)

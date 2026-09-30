@@ -1,6 +1,6 @@
 # ADR-0011 — Admin RBAC Is the Single Source of Platform Authority
 
-**Status:** Proposed · 2026-09-30 (Admin Core Phase 1A — becomes Accepted when the Product Owner accepts Phase 1A) · **Supersedes [ADR-0007](ADR-0007-identity-and-tenancy-model.md) D4 on the source of platform authority** (the rest of ADR-0007 is unchanged)
+**Status:** Accepted · 2026-09-30 (Admin Core Phase 1A accepted by the Product Owner; proposed earlier the same day) · **Supersedes [ADR-0007](ADR-0007-identity-and-tenancy-model.md) D4 on the source of platform authority** (the rest of ADR-0007 is unchanged)
 
 ## Purpose
 
@@ -39,7 +39,8 @@ Platform (Admin Staff) authority. Organization-level `membership_capabilities` (
 
 - Legacy `support` holders lose every sensitive mutation and verification-document reads (intended, PD-004); Points adjust/reverse become Administrator-level (PD-012). Legacy moderators/administrators keep everything they had.
 - `audit_log.actor_role` stays an informational legacy tier label (a Super Admin is recorded as `administrator`); it is never used for authorization.
-- Local/staging environments have **no Super Admin until bootstrapped** (`app.admin_bootstrap_super_admin`), so nobody can manage roles until then.
+- Every environment has **no Super Admin until bootstrapped** — a one-time, DB-owner-only, audited deployment gate: [`SUPER_ADMIN_BOOTSTRAP.md`](../admin/SUPER_ADMIN_BOOTSTRAP.md). Roles management is not operational until it is done.
+- `audit_log.actor_role` was verified **not** to be an authorization input anywhere (only written by `app.record_audit_event`; no policy, view or check reads it); a dynamic actor-role snapshot is backlog item BL-025.
 
 ## Related files
 
