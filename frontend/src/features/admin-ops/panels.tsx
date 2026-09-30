@@ -219,7 +219,9 @@ export function TimelineList({ m, locale, events }: { m: Messages; locale: Local
         const text = detail(e);
         return (
           <li key={`${e.kind}-${e.at}-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 bg-surface px-md py-2.5 odd:bg-surface-2/30">
-            <span className="font-medium text-fg">{t.kinds[e.kind]}</span>
+            <span className="font-medium text-fg">
+              {e.kind === "duplicate_linked" && e.data.role === "canonical" ? t.duplicateLinkedHere : t.kinds[e.kind]}
+            </span>
             {text ? <span className="text-label text-fg-secondary">· {text}</span> : null}
             {e.actor ? <span className="text-label text-fg-muted">· {t.by.replace("{name}", e.actor.displayName || m.admin.users.unnamed)}</span> : null}
             <span className="ms-auto text-label text-fg-muted">{formatAdminDateTime(e.at, locale)}</span>

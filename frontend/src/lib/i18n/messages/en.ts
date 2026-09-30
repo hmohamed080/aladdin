@@ -1107,6 +1107,7 @@ export const en = {
         timeline: {
           empty: "No history yet.",
           by: "by {name}",
+          duplicateLinkedHere: "A duplicate was linked here",
           kinds: {
             registered: "Registered",
             verification_submitted: "Verification submitted",

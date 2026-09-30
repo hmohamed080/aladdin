@@ -1080,6 +1080,7 @@ export const ar: Messages = {
         timeline: {
           empty: "لا يوجد سجل بعد.",
           by: "بواسطة {name}",
+          duplicateLinkedHere: "تم ربط مؤسسة مكررة هنا",
           kinds: {
             registered: "التسجيل",
             verification_submitted: "تم تقديم طلب التوثيق",
