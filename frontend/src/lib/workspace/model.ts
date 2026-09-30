@@ -71,7 +71,7 @@ export function resolveWorkContext(
 
 /**
  * Deterministic landing. Platform authority wins outright (it is granted by
- * `platform_role_grants`, never by an account type). Otherwise the caller lands in
+ * admin_role_assignments via admin_my_access(), never by an account type). Otherwise the caller lands in
  * the work context they selected; a business-only identity therefore reaches /b2b
  * and never a fake, empty Personal home, and a personal identity never lands in
  * the Sales cockpit.

@@ -2,7 +2,7 @@
 
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadWorkspaceContext } from "@/server/queries/context";
-import { loadPlatformRole, isPlatformStaff } from "@/server/queries/platform";
+import { loadIsAdminStaff } from "@/server/queries/platform";
 import { sanitizeSearchTerm } from "@/server/queries/sales";
 import { commerceStance, defaultCommerceSide } from "@/lib/workspace/supply-side";
 import {
@@ -279,5 +279,5 @@ export async function searchWorkspace(rawQuery: string): Promise<SearchHit[]> {
  */
 export async function canSearchAdmin(): Promise<boolean> {
   const supabase = await getServerSupabase();
-  return isPlatformStaff(await loadPlatformRole(supabase));
+  return loadIsAdminStaff(supabase);
 }

@@ -73,6 +73,265 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_permissions: {
+        Row: {
+          action: string
+          created_at: string
+          description: string
+          is_active: boolean
+          is_system: boolean
+          key: string
+          resource: string
+          sort_order: number
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          description: string
+          is_active?: boolean
+          is_system?: boolean
+          key: string
+          resource: string
+          sort_order: number
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          description?: string
+          is_active?: boolean
+          is_system?: boolean
+          key?: string
+          resource?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      admin_role_assignments: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          deactivated_at: string | null
+          deactivated_by: string | null
+          deactivation_kind:
+            | Database["public"]["Enums"]["admin_deactivation_kind"]
+            | null
+          id: string
+          is_active: boolean
+          legacy_grant_id: string | null
+          role_id: string
+          scope_branch_id: string | null
+          scope_organization_id: string | null
+          scope_type: Database["public"]["Enums"]["admin_scope_type"]
+          scope_user_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          deactivated_at?: string | null
+          deactivated_by?: string | null
+          deactivation_kind?:
+            | Database["public"]["Enums"]["admin_deactivation_kind"]
+            | null
+          id?: string
+          is_active?: boolean
+          legacy_grant_id?: string | null
+          role_id: string
+          scope_branch_id?: string | null
+          scope_organization_id?: string | null
+          scope_type?: Database["public"]["Enums"]["admin_scope_type"]
+          scope_user_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          deactivated_at?: string | null
+          deactivated_by?: string | null
+          deactivation_kind?:
+            | Database["public"]["Enums"]["admin_deactivation_kind"]
+            | null
+          id?: string
+          is_active?: boolean
+          legacy_grant_id?: string | null
+          role_id?: string
+          scope_branch_id?: string | null
+          scope_organization_id?: string | null
+          scope_type?: Database["public"]["Enums"]["admin_scope_type"]
+          scope_user_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_role_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_role_assignments_deactivated_by_fkey"
+            columns: ["deactivated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_role_assignments_legacy_grant_id_fkey"
+            columns: ["legacy_grant_id"]
+            isOneToOne: true
+            referencedRelation: "platform_role_grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_role_assignments_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "admin_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_role_assignments_scope_branch_id_fkey"
+            columns: ["scope_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_role_assignments_scope_organization_id_fkey"
+            columns: ["scope_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_role_assignments_scope_user_id_fkey"
+            columns: ["scope_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_role_assignments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_role_permissions: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          is_locked: boolean
+          permission_key: string
+          role_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          is_locked?: boolean
+          permission_key: string
+          role_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          is_locked?: boolean
+          permission_key?: string
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_role_permissions_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_role_permissions_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "admin_permissions"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "admin_role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "admin_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_roles: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          is_system: boolean
+          key: string
+          name: string
+          rank: number
+          scope_type: Database["public"]["Enums"]["admin_scope_type"]
+          status: Database["public"]["Enums"]["admin_role_status"]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          is_system?: boolean
+          key: string
+          name: string
+          rank: number
+          scope_type?: Database["public"]["Enums"]["admin_scope_type"]
+          status?: Database["public"]["Enums"]["admin_role_status"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          is_system?: boolean
+          key?: string
+          name?: string
+          rank?: number
+          scope_type?: Database["public"]["Enums"]["admin_scope_type"]
+          status?: Database["public"]["Enums"]["admin_role_status"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_roles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_roles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -4678,6 +4937,11 @@ export type Database = {
         }
         Returns: string
       }
+      admin_assignment_change_scope: {
+        Args: { p_assignment_id: string; p_reason?: string; p_scope_id: string }
+        Returns: undefined
+      }
+      admin_my_access: { Args: never; Returns: Json }
       admin_network_referrals_list: {
         Args: { p_pending_only?: boolean }
         Returns: {
@@ -4701,6 +4965,73 @@ export type Database = {
           referrer_persona: Database["public"]["Enums"]["persona_type"]
           status: Database["public"]["Enums"]["network_referral_status"]
         }[]
+      }
+      admin_rbac_permissions: {
+        Args: never
+        Returns: {
+          action: string
+          description: string
+          key: string
+          resource: string
+          sort_order: number
+        }[]
+      }
+      admin_rbac_roles: {
+        Args: never
+        Returns: {
+          created_at: string
+          description: string
+          id: string
+          is_system: boolean
+          key: string
+          locked_permissions: string[]
+          name: string
+          permissions: string[]
+          rank: number
+          scope_type: Database["public"]["Enums"]["admin_scope_type"]
+          staff_count: number
+          status: Database["public"]["Enums"]["admin_role_status"]
+          updated_at: string
+        }[]
+      }
+      admin_rbac_staff: {
+        Args: never
+        Returns: {
+          account_status: Database["public"]["Enums"]["user_status"]
+          assignments: Json
+          display_name: string
+          email: string
+          first_assigned_at: string
+          is_active: boolean
+          last_sign_in_at: string
+          user_id: string
+        }[]
+      }
+      admin_role_create: {
+        Args: {
+          p_description: string
+          p_name: string
+          p_permissions: string[]
+          p_rank: number
+          p_reason?: string
+          p_scope_type: Database["public"]["Enums"]["admin_scope_type"]
+        }
+        Returns: string
+      }
+      admin_role_set_archived: {
+        Args: { p_archived: boolean; p_reason?: string; p_role_id: string }
+        Returns: undefined
+      }
+      admin_role_update: {
+        Args: {
+          p_description: string
+          p_name: string
+          p_permissions: string[]
+          p_rank: number
+          p_reason?: string
+          p_role_id: string
+        }
+        Returns: undefined
       }
       admin_showroom_referrals_list: {
         Args: { p_pending_only?: boolean }
@@ -4727,6 +5058,28 @@ export type Database = {
           reviewed_at: string
           status: Database["public"]["Enums"]["referral_status"]
         }[]
+      }
+      admin_staff_assign_role: {
+        Args: {
+          p_reason?: string
+          p_role_id: string
+          p_scope_id?: string
+          p_scope_type?: Database["public"]["Enums"]["admin_scope_type"]
+          p_user_id: string
+        }
+        Returns: string
+      }
+      admin_staff_change_role: {
+        Args: { p_reason?: string; p_role_id: string; p_user_id: string }
+        Returns: string
+      }
+      admin_staff_set_disabled: {
+        Args: { p_disabled: boolean; p_reason?: string; p_user_id: string }
+        Returns: undefined
+      }
+      admin_staff_unassign: {
+        Args: { p_assignment_id: string; p_reason?: string }
+        Returns: undefined
       }
       apply_account_upgrade: {
         Args: { p_verification_id: string }
@@ -5603,6 +5956,18 @@ export type Database = {
     }
     Enums: {
       activity_audience_kind: "organization_type" | "persona_type"
+      admin_deactivation_kind:
+        | "unassigned"
+        | "role_changed"
+        | "staff_disabled"
+        | "legacy_revoked"
+      admin_role_status: "active" | "archived"
+      admin_scope_type:
+        | "platform"
+        | "organization"
+        | "branch"
+        | "department"
+        | "user"
       affiliation_request_status:
         | "pending"
         | "approved"
@@ -5751,12 +6116,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5780,11 +6145,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5805,11 +6170,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5830,11 +6195,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5847,11 +6212,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5867,6 +6232,20 @@ export const Constants = {
   public: {
     Enums: {
       activity_audience_kind: ["organization_type", "persona_type"],
+      admin_deactivation_kind: [
+        "unassigned",
+        "role_changed",
+        "staff_disabled",
+        "legacy_revoked",
+      ],
+      admin_role_status: ["active", "archived"],
+      admin_scope_type: [
+        "platform",
+        "organization",
+        "branch",
+        "department",
+        "user",
+      ],
       affiliation_request_status: [
         "pending",
         "approved",

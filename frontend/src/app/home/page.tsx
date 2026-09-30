@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
-import { loadPlatformRole } from "@/server/queries/platform";
+import { loadIsAdminStaff } from "@/server/queries/platform";
 import { loadWorkspaces } from "@/server/queries/workspace";
 import { personalEntry, businessEntries } from "@/lib/workspace/model";
 import { loadPersonalHome } from "@/server/queries/personal-home";
@@ -70,7 +70,7 @@ export default async function PersonalHomePage() {
   if (!hasAppAccess(state)) redirect("/onboarding");
 
   const supabase = await getServerSupabase();
-  if (await loadPlatformRole(supabase)) redirect("/admin");
+  if (await loadIsAdminStaff(supabase)) redirect("/admin");
 
   // Informational only (never a gate): the persistent "Complete your profile"
   // card. A failed read yields null and the card simply does not render.

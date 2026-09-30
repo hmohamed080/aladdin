@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { loadPlatformRole } from "@/server/queries/platform";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { AdminHeader } from "@/features/admin/parts";
@@ -9,6 +8,7 @@ import { LabeledField, Input, ButtonLink } from "@/components/ui/controls";
 import { Monogram } from "@/components/ui/data-table";
 import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
 import { ChangePasswordPreview } from "@/features/admin-preview/change-password-preview";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -25,13 +25,16 @@ export const dynamic = "force-dynamic";
  * Admin access itself (roles, permissions) lives on Admin Staff, not here.
  */
 export default async function PreviewSettingsPage() {
+  const access = await requireAdminRoute("/admin/preview/settings");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const m = getMessages(locale);
   const st = m.admin.preview.settings;
 
-  const [{ data: authData }, role] = await Promise.all([supabase.auth.getUser(), loadPlatformRole(supabase)]);
+  const { data: authData } = await supabase.auth.getUser();
+  const roleLabels = m.admin.roleLabel as Record<string, string>;
+  const roleNames = access.roles.map((r) => (r.isSystem ? (roleLabels[r.key] ?? r.name) : r.name));
   const authUser = authData.user;
   let displayName = "";
   let username = "";
@@ -68,7 +71,17 @@ export default async function PreviewSettingsPage() {
             <Input id="settings-email" dir="ltr" defaultValue={authUser?.email ?? ""} disabled />
           </LabeledField>
           <Field label={st.role}>
-            <Badge tone="accent">{role ? m.admin.roleLabel[role] : "—"}</Badge>
+            {roleNames.length ? (
+              <span className="flex flex-wrap gap-1">
+                {roleNames.map((n) => (
+                  <Badge key={n} tone="accent">
+                    {n}
+                  </Badge>
+                ))}
+              </span>
+            ) : (
+              "—"
+            )}
           </Field>
         </div>
         <p className="text-label text-fg-muted">{st.emailChangeNote}</p>

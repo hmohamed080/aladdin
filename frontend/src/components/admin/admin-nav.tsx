@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
+import { canAccessAdminPath, type AdminAccess } from "@/lib/permissions/admin";
 import { GaugeIcon, UsersIcon, BuildingIcon, BadgeCheckIcon, ScrollIcon, EyeIcon } from "@/components/ui/icons";
 
 type Item = { href: string; key: string; exact: boolean; Icon: ComponentType<{ size?: number }>; badge?: string };
@@ -27,13 +28,18 @@ function useActive() {
     exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
 }
 
-/** Vertical rail for the admin console (desktop/tablet). */
-export function AdminSidebar() {
+/**
+ * Vertical rail for the admin console (desktop/tablet). Shows only destinations
+ * the caller's server-loaded `access` opens, via the SAME route table the page
+ * guards use (lib/permissions/admin.ts). Presentation only: a hidden link is
+ * still guarded by its page, and the data behind it by RLS/RPCs.
+ */
+export function AdminSidebar({ access }: { access: AdminAccess }) {
   const { t } = useI18n();
   const isActive = useActive();
   return (
     <nav aria-label={t("admin.title")} className="flex flex-col gap-0.5">
-      {items.map(({ href, key, exact, Icon, badge }) => {
+      {items.filter((i) => canAccessAdminPath(access, i.href)).map(({ href, key, exact, Icon, badge }) => {
         const active = isActive(href, exact);
         return (
           <Link
@@ -62,8 +68,8 @@ export function AdminSidebar() {
   );
 }
 
-/** Horizontal scroll nav for mobile. */
-export function AdminTopNav() {
+/** Horizontal scroll nav for mobile (same permission filter). */
+export function AdminTopNav({ access }: { access: AdminAccess }) {
   const { t } = useI18n();
   const isActive = useActive();
   return (
@@ -71,7 +77,7 @@ export function AdminTopNav() {
       aria-label={t("admin.title")}
       className="flex gap-1 overflow-x-auto border-b bg-surface px-md py-1.5 tablet:hidden"
     >
-      {items.map(({ href, key, exact, Icon }) => {
+      {items.filter((i) => canAccessAdminPath(access, i.href)).map(({ href, key, exact, Icon }) => {
         const active = isActive(href, exact);
         return (
           <Link

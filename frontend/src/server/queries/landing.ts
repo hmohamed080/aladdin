@@ -3,7 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { loadPlatformRole } from "@/server/queries/platform";
+import { loadIsAdminStaff } from "@/server/queries/platform";
 import { loadWorkspaces } from "@/server/queries/workspace";
 import { landingFor } from "@/lib/workspace/model";
 
@@ -28,8 +28,7 @@ import { landingFor } from "@/lib/workspace/model";
 export async function resolveActiveLanding(
   supabase: SupabaseClient<Database>,
 ): Promise<"/admin" | "/b2b" | "/home"> {
-  const platformRole = await loadPlatformRole(supabase);
-  if (platformRole) return "/admin";
+  if (await loadIsAdminStaff(supabase)) return "/admin";
 
   const { context } = await loadWorkspaces(supabase);
   return landingFor(context, false);

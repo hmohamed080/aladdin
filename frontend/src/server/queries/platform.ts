@@ -2,44 +2,27 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
-
-export type PlatformRole = "support" | "moderator" | "administrator";
+import { parseAdminAccess } from "@/lib/permissions/admin";
 
 /**
- * The caller's platform (staff) role, or null for an ordinary user. Derived from
- * `platform_role_grants`, which every authenticated user may read for THEIR OWN
- * row (RLS `platform_role_grants_select_self`) — a non-staff caller simply reads
- * zero rows. Platform authority NEVER comes from `primary_account_type`; it is
- * only ever this grant (ADR-0007 / PRODUCT_DIRECTION_GUIDE). RLS remains the real
- * boundary on every admin query; this only decides what chrome to render.
+ * Whether the caller is Admin Staff (holds any active platform role).
+ *
+ * Resolved through `admin_my_access()` — i.e. `admin_role_assignments`, the
+ * single source of platform authority (Admin Core 1A). This deliberately does
+ * NOT read `platform_role_grants`: that table is a write-only compatibility
+ * bridge and is never an authorization input (docs/admin/ADMIN_RBAC_ARCHITECTURE.md
+ * §6). Platform authority never comes from `primary_account_type` either.
+ *
+ * Takes the caller's client (rather than using `loadAdminAccess`) so landing
+ * resolution stays a plain function of the client it is given. RLS and the RPC
+ * guards remain the real boundary; this decides routing and chrome only.
  */
-export async function loadPlatformRole(
-  supabase: SupabaseClient<Database>,
-): Promise<PlatformRole | null> {
+export async function loadIsAdminStaff(supabase: SupabaseClient<Database>): Promise<boolean> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data, error } = await supabase
-    .from("platform_role_grants")
-    .select("role")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (error || !data) return null;
-  return data.role as PlatformRole;
-}
-
-/** True when the caller may open the Admin surface (any staff role). */
-export function isPlatformStaff(role: PlatformRole | null): boolean {
-  return role !== null;
-}
-
-/**
- * True when the caller may take verification review actions. The trusted
- * `review_*` RPCs gate on `is_platform('support')`, i.e. ANY staff role, so the
- * UI mirrors that exactly — the RPC is still the enforcing boundary.
- */
-export function canReview(role: PlatformRole | null): boolean {
-  return role !== null;
+  if (!user) return false;
+  const { data, error } = await supabase.rpc("admin_my_access");
+  if (error) return false;
+  return parseAdminAccess(data).isStaff;
 }

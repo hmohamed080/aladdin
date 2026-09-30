@@ -4,8 +4,8 @@ import type { Database } from "@/types/database.types";
 
 vi.mock("server-only", () => ({}));
 
-const { loadPlatformRole } = vi.hoisted(() => ({ loadPlatformRole: vi.fn() }));
-vi.mock("@/server/queries/platform", () => ({ loadPlatformRole }));
+const { loadIsAdminStaff } = vi.hoisted(() => ({ loadIsAdminStaff: vi.fn() }));
+vi.mock("@/server/queries/platform", () => ({ loadIsAdminStaff }));
 
 const { cookieValue } = vi.hoisted(() => ({ cookieValue: { current: undefined as string | undefined } }));
 vi.mock("next/headers", () => ({
@@ -52,14 +52,14 @@ function clientWithWorkspaces(rows: Row[]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  loadPlatformRole.mockResolvedValue(null);
+  loadIsAdminStaff.mockResolvedValue(false);
   cookieValue.current = undefined;
 });
 
 describe("resolveActiveLanding", () => {
   it("routes platform staff to /admin without consulting workspaces", async () => {
     const { client, rpc } = clientWithWorkspaces([business("org-1", "Cairo Ceramics")]);
-    loadPlatformRole.mockResolvedValueOnce("administrator");
+    loadIsAdminStaff.mockResolvedValueOnce(true);
 
     await expect(resolveActiveLanding(client)).resolves.toBe("/admin");
     expect(rpc).not.toHaveBeenCalled();
