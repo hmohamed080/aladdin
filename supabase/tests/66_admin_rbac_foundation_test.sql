@@ -419,7 +419,8 @@ select pg_temp.as_dba();
 
 select pg_temp.act_as(:'plain');
 select is((public.admin_my_access())->'permissions',
-  '["organizations.read", "points.read", "referrals.read", "users.read"]'::jsonb,
+  -- Support's matrix gained the read-only cases/follow_ups/notes keys in Admin Core 1B-B.
+  '["cases.read", "follow_ups.read", "notes.read", "organizations.read", "points.read", "referrals.read", "users.read"]'::jsonb,
   'admin_my_access reports exactly the caller''s own effective permissions');
 select pg_temp.as_dba();
 
