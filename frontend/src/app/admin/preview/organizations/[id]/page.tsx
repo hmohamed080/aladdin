@@ -21,6 +21,7 @@ import { TabLinks } from "@/components/ui/stat-tiles";
 import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
 import { LabeledField, Textarea, ButtonLink } from "@/components/ui/controls";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export default async function PreviewOrgDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
+  await requireAdminRoute("/admin/preview/organizations");
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
   const tab = tabParam || "overview";

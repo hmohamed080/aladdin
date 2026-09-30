@@ -8,10 +8,12 @@ import { formatCount } from "@/lib/ui/format";
 import { Card, SectionTitle } from "@/components/ui/primitives";
 import { AdminHeader, StatTile, DistList } from "@/features/admin/parts";
 import { AuditFeed } from "@/features/admin/audit-feed";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  await requireAdminRoute("/admin");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);

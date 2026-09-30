@@ -13,6 +13,7 @@ import { AutoFilters } from "@/features/admin-preview/auto-filters";
 import { TablePagination } from "@/features/admin-preview/table-pagination";
 import { clampPageSize, paginate } from "@/features/admin-preview/table-state";
 import { cn } from "@/lib/ui/cn";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function PreviewReviewQueuePage({
 }: {
   searchParams: Promise<{ tab?: string; q?: string; page?: string; pageSize?: string }>;
 }) {
+  await requireAdminRoute("/admin/preview/review");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);

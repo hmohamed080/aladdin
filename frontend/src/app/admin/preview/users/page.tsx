@@ -20,6 +20,7 @@ import { TablePagination } from "@/features/admin-preview/table-pagination";
 import { clampPageSize, paginate, parseSort, previewRegisteredAt, sortRows } from "@/features/admin-preview/table-state";
 import { EyeIcon, SettingsIcon, WhatsAppIcon, CheckIcon, XIcon, AlertIcon } from "@/components/ui/icons";
 import type { AdminUserRow } from "@/server/queries/admin";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +87,7 @@ export default async function PreviewUsersPage({
     sort?: string;
   }>;
 }) {
+  await requireAdminRoute("/admin/preview/users");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);

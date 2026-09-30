@@ -8,10 +8,12 @@ import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatDate } from "@/lib/ui/format";
 import { AdminHeader, StatusBadge } from "@/features/admin/parts";
 import { Card, Badge, Field, SectionTitle, StatePanel } from "@/components/ui/primitives";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminOrgDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdminRoute("/admin/organizations");
   const { id } = await params;
   const supabase = await getServerSupabase();
   const store = await cookies();

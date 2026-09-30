@@ -22,6 +22,7 @@ import { InteractiveTrendChart } from "@/features/admin-preview/interactive-tren
 import { PreviewLegend, PREVIEW_MARK } from "@/features/admin-preview/preview-legend";
 import { canonicalRoute } from "@/features/admin-preview/table-state";
 import { EyeIcon, LogOutIcon, TrendingUpIcon, UsersIcon, ClockIcon } from "@/components/ui/icons";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,7 @@ export default async function PreviewAnalyticsPage({
 }: {
   searchParams: Promise<{ range?: string; from?: string; to?: string; event?: string; persona?: string }>;
 }) {
+  await requireAdminRoute("/admin/preview/analytics");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);

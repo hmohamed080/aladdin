@@ -18,6 +18,7 @@ import {
   ShieldIcon,
   HandshakeIcon,
 } from "@/components/ui/icons";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export const dynamic = "force-dynamic";
  * own, and a second panel repeating the same signal was noise, not signal).
  */
 export default async function AdminPreviewDashboardPage() {
+  await requireAdminRoute("/admin/preview");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);

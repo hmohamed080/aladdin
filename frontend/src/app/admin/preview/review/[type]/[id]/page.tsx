@@ -21,6 +21,7 @@ import { AdminHeader } from "@/features/admin/parts";
 import { Card, Badge, Field, SectionTitle, StatePanel } from "@/components/ui/primitives";
 import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
 import { LabeledField, Select, Textarea } from "@/components/ui/controls";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export default async function PreviewReviewDetailPage({
 }: {
   params: Promise<{ type: string; id: string }>;
 }) {
+  await requireAdminRoute("/admin/preview/review");
   const { type, id } = await params;
   const supabase = await getServerSupabase();
   const store = await cookies();

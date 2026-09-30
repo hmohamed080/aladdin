@@ -7,10 +7,12 @@ import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatDate } from "@/lib/ui/format";
 import { AdminHeader, StatusBadge, TableScroll } from "@/features/admin/parts";
 import { Badge, StatePanel } from "@/components/ui/primitives";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminOrganizationsPage() {
+  await requireAdminRoute("/admin/organizations");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);

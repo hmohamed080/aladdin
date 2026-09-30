@@ -12,6 +12,8 @@ import { Card, StatePanel } from "@/components/ui/primitives";
 import { VerificationActions } from "@/features/admin/verification-actions";
 import { ReferralReview } from "@/features/admin/referral-review";
 import { NetworkReferralReview } from "@/features/admin/network-referral-review";
+import { requireAdminRoute } from "@/server/authorization/admin";
+import { can } from "@/lib/permissions/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,7 @@ export default async function AdminVerificationsPage({
 }: {
   searchParams: Promise<{ all?: string }>;
 }) {
+  const access = await requireAdminRoute("/admin/verifications");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
@@ -79,14 +82,15 @@ export default async function AdminVerificationsPage({
                   </p>
                 </div>
               </div>
-              <VerificationActions v={v} />
+              {/* Decisions only for the matching verify permission (the RPC enforces it too). */}
+              {can(access, v.subjectType === "user" ? "users.verify" : "organizations.verify") ? <VerificationActions v={v} /> : null}
             </Card>
           ))}
         </div>
       )}
 
-      <ReferralReview rows={referrals} m={m} locale={locale} />
-      <NetworkReferralReview rows={networkReferrals} m={m} locale={locale} />
+      <ReferralReview rows={referrals} m={m} locale={locale} canDecide={can(access, "referrals.approve")} />
+      <NetworkReferralReview rows={networkReferrals} m={m} locale={locale} canDecide={can(access, "referrals.approve")} />
     </div>
   );
 }

@@ -28,10 +28,13 @@ export function ReferralReview({
   rows,
   m,
   locale,
+  canDecide,
 }: {
   rows: AdminReferralRow[];
   m: Messages;
   locale: Locale;
+  /** Caller holds referrals.approve. Decisions are drawn only then; the RPC enforces it regardless. */
+  canDecide: boolean;
 }) {
   const copy = m.admin.referrals;
   const statusLabels = copy.status as Record<string, string>;
@@ -97,7 +100,7 @@ export function ReferralReview({
                     </p>
                   </div>
 
-                  {r.status === "submitted" ? (
+                  {r.status === "submitted" && canDecide ? (
                     <div className="flex flex-col gap-md">
                       {r.matchId ? (
                         <div className="flex flex-col gap-sm rounded-sm border border-warning/40 bg-warning/10 px-3 py-2.5">

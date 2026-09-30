@@ -20,6 +20,7 @@ import { EyeIcon, SettingsIcon, WhatsAppIcon, CheckIcon, XIcon, AlertIcon } from
 import { TablePagination } from "@/features/admin-preview/table-pagination";
 import { clampPageSize, paginate, parseSort, previewRegisteredAt, sortRows } from "@/features/admin-preview/table-state";
 import type { AdminOrgRow } from "@/server/queries/admin";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,7 @@ export default async function PreviewOrganizationsPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; type?: string; city?: string; flag?: string; page?: string; pageSize?: string; sort?: string }>;
 }) {
+  await requireAdminRoute("/admin/preview/organizations");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);

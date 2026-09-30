@@ -17,6 +17,7 @@ import { clampPageSize, paginate } from "@/features/admin-preview/table-state";
 import { LabeledField, Textarea, Select } from "@/components/ui/controls";
 import type { AdminUserRow } from "@/server/queries/admin";
 import type { PointsLedgerEntry } from "@/server/queries/admin-preview";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ export default async function PreviewPointsPage({
     pageSize?: string;
   }>;
 }) {
+  await requireAdminRoute("/admin/preview/points");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);

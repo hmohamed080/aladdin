@@ -9,6 +9,7 @@ import { AdminHeader } from "@/features/admin/parts";
 import { AutoFilters } from "@/features/admin-preview/auto-filters";
 import { AuditResults, type AuditRow } from "@/features/admin-preview/audit-results";
 import { describeAuditMetadata, summarizeAuditDetails } from "@/features/admin-preview/audit-details";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export default async function PreviewAuditPage({
 }: {
   searchParams: Promise<{ actor?: string; action?: string; subject?: string; from?: string; to?: string; q?: string }>;
 }) {
+  await requireAdminRoute("/admin/preview/audit");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
