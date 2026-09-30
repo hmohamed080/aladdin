@@ -369,12 +369,17 @@ select is(
 -- trade. That function is INFORMATIONAL ONLY — never consulted by
 -- my_registration_state() or any capability/can_* predicate — so it reads the
 -- relation to describe the caller to themselves, and gates nothing.
+-- Admin Core Phase 1B-A moved that formula, verbatim, into
+-- `app.profile_completion(user_id)` (my_profile_completion is now a thin
+-- wrapper that no longer mentions the relation) so Admin reads the same
+-- percentage; the entry follows the formula. Still informational only: its
+-- callers are my_profile_completion and the users.read-guarded Admin reads.
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('app', 'public')
       and p.prosrc like '%user_trades%'
       and p.proname not in ('user_trades_set', '_profile_public_directory',
-                            '_job_applicants', 'my_profile_completion')),
+                            '_job_applicants', 'profile_completion')),
   0::bigint,
   'and the ONLY functions that mention it are its writer and two DISPLAY projections — no capability, no can_* predicate');
 
