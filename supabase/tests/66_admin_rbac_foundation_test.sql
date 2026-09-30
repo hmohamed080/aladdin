@@ -23,7 +23,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(117);
+select plan(118);
 
 \set padmin   '55555555-5555-4555-8555-555555555555'
 \set super1   '11111111-1111-4111-8111-111111111111'
@@ -89,8 +89,13 @@ select is((select array_agg(key order by rank desc) from public.admin_roles wher
 select is(
   (select array_agg(rp.permission_key order by rp.permission_key)
    from public.admin_role_permissions rp where rp.role_id = pg_temp.role_id('support')),
-  array['organizations.read','points.read','referrals.read','users.read'],
+  -- Admin Core 1B-B added the read-only cases.read / follow_ups.read / notes.read.
+  array['cases.read','follow_ups.read','notes.read','organizations.read','points.read','referrals.read','users.read'],
   'Support is READ-ONLY: no verify / approve / adjust / reverse / manage permission (PD-004)');
+select ok(not exists (
+    select 1 from public.admin_role_permissions
+    where role_id = pg_temp.role_id('support') and permission_key !~ '\.read$'),
+  'Support holds no mutating permission of any kind');
 select ok(not exists (
     select 1 from public.admin_role_permissions
     where role_id = pg_temp.role_id('moderator') and permission_key in ('points.adjust','points.reverse')),
