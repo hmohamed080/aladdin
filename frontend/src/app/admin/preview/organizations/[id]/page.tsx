@@ -15,8 +15,11 @@ import { Card, Badge, Field, SectionTitle, StatePanel } from "@/components/ui/pr
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
-import { LabeledField, Textarea, ButtonLink } from "@/components/ui/controls";
+import { ButtonLink } from "@/components/ui/controls";
 import { requireAdminRoute } from "@/server/authorization/admin";
+import { loadNotes, loadOrganizationDuplicates, loadSuspension, loadTimeline } from "@/server/queries/admin-operations";
+import { SuspensionAction, SuspensionBanner } from "@/features/admin-ops/suspension";
+import { DuplicatesPanel, NotesPanel, TimelineList } from "@/features/admin-ops/panels";
 
 export const dynamic = "force-dynamic";
 
@@ -27,16 +30,20 @@ const PROVENANCE_LABEL_KEY: Record<string, "provenanceSelfCreated" | "provenance
 };
 
 /**
- * Organization Details — Admin Core Phase 1B-A. The approved tab architecture
- * (BL-022) over REAL reads:
+ * Organization Details — Admin Core Phase 1B-A reads + 1B-B operations. The
+ * approved tab architecture (BL-022):
  *
  *   Overview · Members · Branches · Ownership · Verification · Network
  *     (provenance) — `admin_organization_detail` (platform organizations.read).
  *     Ownership = active members holding org.manage; no separate ownership
  *     record exists.
+ *   Suspend / Restore — live (organizations.suspend); members are never
+ *     suspended with the organization (PD-011).
+ *   Network — also the duplicate candidates and their link-to-existing /
+ *     dismiss resolution (duplicates.resolve; PD-006, no merge).
+ *   Activity — the Entity Timeline. Admin Notes — live (notes.*).
  *   Audit — only with `audit.read` (its own RLS policy).
- *   Activity — no organization activity source for Admin; honest empty state.
- *   Admin Notes · duplicate candidates — Phase 1B-B; honest deferred states.
+ *   Verify / Reject in the header stay Preview here.
  */
 export default async function PreviewOrgDetailPage({
   params,
@@ -77,6 +84,11 @@ export default async function PreviewOrgDetailPage({
   const name = localizedName(org, locale);
   const provenance = t[PROVENANCE_LABEL_KEY[org.source ?? ""] ?? "provenanceSelfCreated"];
   const auditEntries = canAudit && tab === "audit" ? await previewSubjectAudit(supabase, "organization", org.id) : null;
+  const canSuspend = can(access, "organizations.suspend");
+  const suspension = org.status === "suspended" ? await loadSuspension(supabase, "organization", org.id) : null;
+  const timeline = tab === "activity" ? await loadTimeline(supabase, "organization", org.id) : null;
+  const notes = tab === "notes" && can(access, "notes.read") ? await loadNotes(supabase, "organization", org.id) : null;
+  const duplicates = tab === "network" ? await loadOrganizationDuplicates(supabase, org.id) : null;
   const activeMembers = org.members.filter((mem) => mem.status === "active").length;
 
   return (
@@ -99,15 +111,9 @@ export default async function PreviewOrgDetailPage({
               <PreviewActionDialog trigger={t.rowActions.reject} triggerVariant="danger" title={m.admin.preview.review.rejectTitle} body={m.admin.preview.review.rejectBody} confirmLabel={t.rowActions.reject} confirmVariant="danger" />
             </>
           ) : null}
-          {org.status === "suspended" ? (
-            <PreviewActionDialog trigger={t.restore} triggerVariant="outline" title={t.restoreTitle} body={t.restoreBody} confirmLabel={t.restore} confirmVariant="accent" />
-          ) : (
-            <PreviewActionDialog trigger={t.suspend} triggerVariant="danger" title={t.suspendTitle} body={t.suspendBody} confirmLabel={t.suspend} confirmVariant="danger">
-              <LabeledField label={m.admin.preview.users.reasonLabel} htmlFor="org-suspend-reason">
-                <Textarea id="org-suspend-reason" rows={3} required />
-              </LabeledField>
-            </PreviewActionDialog>
-          )}
+          {canSuspend && org.status !== "archived" ? (
+            <SuspensionAction m={m} subjectType="organization" subjectId={org.id} suspended={org.status === "suspended"} />
+          ) : null}
           <RowActionsMenu
             label={t.title}
             actions={
@@ -120,6 +126,8 @@ export default async function PreviewOrgDetailPage({
           />
         </div>
       </div>
+
+      {org.status === "suspended" ? <SuspensionBanner m={m} locale={locale} subjectType="organization" suspension={suspension} /> : null}
 
       <TabLinks
         basePath={`/admin/preview/organizations/${id}`}
@@ -279,15 +287,25 @@ export default async function PreviewOrgDetailPage({
               ) : null}
             </dl>
           </Card>
-          <Card className="flex flex-col gap-sm">
-            <SectionTitle>{m.admin.preview.duplicates.title}</SectionTitle>
-            <p className="text-body text-fg-secondary">{d.duplicatesDeferred}</p>
-          </Card>
+          {duplicates ? (
+            <DuplicatesPanel
+              m={m}
+              locale={locale}
+              organizationId={org.id}
+              candidates={duplicates.candidates}
+              resolutions={duplicates.resolutions}
+              canResolve={can(access, "duplicates.resolve")}
+            />
+          ) : (
+            <StatePanel title={d.detailLoadError} />
+          )}
         </div>
       ) : null}
 
-      {tab === "activity" ? <StatePanel title={d.activityUnavailable} /> : null}
-      {tab === "notes" ? <StatePanel title={d.notesDeferred} /> : null}
+      {tab === "activity" ? <TimelineList m={m} locale={locale} events={timeline} /> : null}
+      {tab === "notes" ? (
+        <NotesPanel m={m} locale={locale} subjectType="organization" subjectId={org.id} notes={notes} canCreate={can(access, "notes.create")} />
+      ) : null}
 
       {tab === "audit" && !canAudit ? <StatePanel title={d.auditLocked} /> : null}
       {tab === "audit" && auditEntries ? (

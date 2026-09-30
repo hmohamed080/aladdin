@@ -181,23 +181,6 @@ export function previewVisitorRows(): PreviewVisitorRow[] {
 /* Phase 0C additions.                                                     */
 /* ---------------------------------------------------------------------- */
 
-export type PreviewFollowUpType = "call" | "whatsapp" | "email" | "verificationFollowUp" | "other";
-
-export type PreviewFollowUp = {
-  id: string;
-  type: PreviewFollowUpType;
-  /** The outcome / internal note recorded for this contact attempt. */
-  note: string;
-  /** Next follow-up date AND time (ISO), or null when none was set. */
-  followUpDate: string | null;
-  actor: string;
-  /** Staff member the next follow-up is assigned to. */
-  assignedTo: string | null;
-  createdAt: string;
-  /** Recorded state; "overdue" is DERIVED at render time (open + date in the past), never stored. */
-  done: boolean;
-};
-
 /** Multi-series traffic point -- Phase 0C's Analytics chart needs more than page views alone. */
 export type PreviewTrafficPointMulti = { date: string; pageViews: number; signups: number; clicks: number; profileViews: number };
 

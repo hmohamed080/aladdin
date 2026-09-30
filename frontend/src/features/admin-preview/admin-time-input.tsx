@@ -10,7 +10,20 @@ import { classifyAdminTime, maskAdminTime } from "@/features/admin-preview/date-
  * `<input type="time">` shows a 12-hour AM/PM control on US-locale browsers,
  * which is as ambiguous as its date sibling. Digits only; the colon is inserted.
  */
-export function AdminTimeInput({ label, id, defaultValue = "", className }: { label: string; id?: string; defaultValue?: string; className?: string }) {
+export function AdminTimeInput({
+  label,
+  id,
+  name,
+  defaultValue = "",
+  className,
+}: {
+  label: string;
+  id?: string;
+  /** When set, the field posts its HH:mm value under this name. */
+  name?: string;
+  defaultValue?: string;
+  className?: string;
+}) {
   const { t } = useI18n();
   const [text, setText] = useState(defaultValue);
   const bad = classifyAdminTime(text) === "invalid";
@@ -18,6 +31,7 @@ export function AdminTimeInput({ label, id, defaultValue = "", className }: { la
     <div className={cn("flex flex-col", className)}>
       <input
         id={id}
+        name={name}
         type="text"
         inputMode="numeric"
         autoComplete="off"

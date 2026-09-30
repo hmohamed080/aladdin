@@ -15,7 +15,9 @@ import { Card, Badge, Field, SectionTitle, StatePanel } from "@/components/ui/pr
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
 import { FollowUpPanel } from "@/features/admin-preview/follow-up-panel";
-import { listAdminStaff } from "@/server/queries/admin-rbac";
+import { loadCases, loadFollowUpAssignees, loadFollowUps, loadNotes, loadSuspension, loadTimeline } from "@/server/queries/admin-operations";
+import { SuspensionAction, SuspensionBanner } from "@/features/admin-ops/suspension";
+import { CasesPanel, NotesPanel, TimelineList } from "@/features/admin-ops/panels";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
 import { EyeIcon } from "@/components/ui/icons";
 import { LabeledField, Textarea, Select, Input } from "@/components/ui/controls";
@@ -24,18 +26,22 @@ import { requireAdminRoute } from "@/server/authorization/admin";
 export const dynamic = "force-dynamic";
 
 /**
- * User Details — Admin Core Phase 1B-A. The approved tab architecture (BL-021)
- * over REAL reads:
+ * User Details — Admin Core Phase 1B-A reads + 1B-B operations. The approved
+ * tab architecture (BL-021):
  *
  *   Overview · Profile · Organizations · Verification — `admin_user_detail`
  *     (platform users.read), one RPC.
+ *   Suspend / Restore — live (users.suspend): reason, actor and time kept;
+ *     the banner shows the open suspension.
  *   Points — only with `points.read`; the ledger reads through its own
- *     `points.read` RLS policy. Adjust / Reverse stay Preview dialogs (1B-B)
- *     and are drawn only for holders of points.adjust / points.reverse.
+ *     `points.read` RLS policy. Adjust / Reverse stay Preview dialogs (a
+ *     later Points phase) and are drawn only for their permission holders.
  *   Audit — only with `audit.read` (its own RLS policy).
- *   Activity — no product-activity source exists; an honest empty state.
- *   Follow-up · Report · Admin Notes — no backend yet (Phase 1B-B): the
- *     approved controls stay (Preview dialogs), with no fixture records.
+ *   Activity — the Entity Timeline (human-readable history, not raw Audit).
+ *   Follow-up · Admin Notes · Report — live records, each gated by its own
+ *     read / write permission (follow_ups.*, notes.*, cases.*).
+ *   Verify / Reject in the header stay Preview here; decisions are made in
+ *     Verifications.
  *
  * Opening this page never widens access: the nested panels check their own
  * permission server-side AND in the database.
@@ -108,11 +114,15 @@ export default async function PreviewUserDetailPage({
       pointsActorNames = new Map((actorProfiles ?? []).map((r) => [r.user_id, r.display_name]));
     }
   }
-  // Active Admin Staff as follow-up assignees; empty when the caller lacks admin_staff.read.
-  const staffNames =
-    tab === "followup"
-      ? ((await listAdminStaff(supabase)) ?? []).filter((s) => s.isActive).map((s) => s.displayName).filter(Boolean)
-      : [];
+  // Phase 1B-B operational reads: each tab loads only its own data, and only
+  // when the caller holds that record's read permission (else a locked state).
+  const canSuspend = can(access, "users.suspend");
+  const suspension = user.status === "suspended" ? await loadSuspension(supabase, "user", user.id) : null;
+  const timeline = tab === "activity" ? await loadTimeline(supabase, "user", user.id) : null;
+  const notes = tab === "notes" && can(access, "notes.read") ? await loadNotes(supabase, "user", user.id) : null;
+  const followUps = tab === "followup" && can(access, "follow_ups.read") ? await loadFollowUps(supabase, "user", user.id) : null;
+  const assignees = tab === "followup" && can(access, "follow_ups.manage") ? ((await loadFollowUpAssignees(supabase)) ?? []) : [];
+  const cases = tab === "report" && can(access, "cases.read") ? await loadCases(supabase, "user", user.id) : null;
   const auditEntries = canAudit && tab === "audit" ? await previewSubjectAudit(supabase, "user", user.id) : null;
 
   const flags: string[] = [];
@@ -160,18 +170,14 @@ export default async function PreviewUserDetailPage({
               <PreviewActionDialog trigger={ov.reject} triggerVariant="danger" title={m.admin.preview.review.rejectTitle} body={m.admin.preview.review.rejectBody} confirmLabel={ov.reject} confirmVariant="danger" />
             </>
           ) : null}
-          {user.status === "suspended" ? (
-            <PreviewActionDialog trigger={t.restore} triggerVariant="outline" title={t.restoreTitle} body={t.restoreBody} confirmLabel={t.restore} confirmVariant="accent" />
-          ) : (
-            <PreviewActionDialog trigger={t.suspend} triggerVariant="danger" title={t.suspendTitle} body={t.suspendBody} confirmLabel={t.suspend} confirmVariant="danger">
-              <LabeledField label={t.reasonLabel} htmlFor="suspend-reason">
-                <Textarea id="suspend-reason" rows={3} placeholder={t.reasonPlaceholder} required />
-              </LabeledField>
-            </PreviewActionDialog>
-          )}
+          {canSuspend && user.status !== "deactivated" ? (
+            <SuspensionAction m={m} subjectType="user" subjectId={user.id} suspended={user.status === "suspended"} />
+          ) : null}
           <RowActionsMenu label={t.moreActions} actions={headerMoreActions} />
         </div>
       </div>
+
+      {user.status === "suspended" ? <SuspensionBanner m={m} locale={locale} subjectType="user" suspension={suspension} /> : null}
 
       <TabLinks
         basePath={`/admin/preview/users/${id}`}
@@ -396,11 +402,21 @@ export default async function PreviewUserDetailPage({
         </section>
       ) : null}
 
-      {tab === "activity" ? <StatePanel title={d.activityUnavailable} /> : null}
-      {/* The approved follow-up UI with an EMPTY history: nothing is persisted
-          until Phase 1B-B, so no record (real or fixture) exists to show. */}
-      {tab === "followup" ? <FollowUpPanel m={m} locale={locale} followUps={[]} staffNames={staffNames} now={Date.now()} /> : null}
-      {tab === "notes" ? <StatePanel title={d.notesDeferred} /> : null}
+      {tab === "activity" ? <TimelineList m={m} locale={locale} events={timeline} /> : null}
+      {tab === "followup" ? (
+        <FollowUpPanel
+          m={m}
+          locale={locale}
+          subjectType="user"
+          subjectId={user.id}
+          followUps={can(access, "follow_ups.read") ? followUps : null}
+          assignees={assignees}
+          canManage={can(access, "follow_ups.manage")}
+        />
+      ) : null}
+      {tab === "notes" ? (
+        <NotesPanel m={m} locale={locale} subjectType="user" subjectId={user.id} notes={notes} canCreate={can(access, "notes.create")} />
+      ) : null}
 
       {tab === "audit" && !canAudit ? <StatePanel title={d.auditLocked} /> : null}
       {tab === "audit" && auditEntries ? (
@@ -420,37 +436,15 @@ export default async function PreviewUserDetailPage({
       ) : null}
 
       {tab === "report" ? (
-        <section className="flex flex-col gap-md">
-          <Card className="flex flex-col gap-md">
-            <SectionTitle>{rp.title}</SectionTitle>
-            <p className="text-body text-fg-secondary">{rp.subtitle}</p>
-            <p className="rounded-sm border border-warning/40 bg-warning/10 px-md py-2 text-label text-fg-secondary">{d.reportDeferred}</p>
-            <div>
-              <PreviewActionDialog wide trigger={rp.open} triggerVariant="danger" title={rp.title} body={rp.subtitle} confirmLabel={rp.submit} confirmVariant="danger">
-                <LabeledField label={rp.subject} htmlFor="report-subject">
-                  <Input id="report-subject" defaultValue={name} />
-                </LabeledField>
-                <div className="grid gap-md tablet:grid-cols-2">
-                  <LabeledField label={rp.name} htmlFor="report-name">
-                    <Input id="report-name" defaultValue={name} />
-                  </LabeledField>
-                  <LabeledField label={rp.phone} htmlFor="report-phone">
-                    <Input id="report-phone" type="tel" dir="ltr" defaultValue={user.phone ?? ""} />
-                  </LabeledField>
-                </div>
-                <LabeledField label={rp.email} htmlFor="report-email">
-                  <Input id="report-email" type="email" dir="ltr" defaultValue={user.email ?? ""} />
-                </LabeledField>
-                <LabeledField label={rp.details} htmlFor="report-details">
-                  <Textarea id="report-details" rows={4} placeholder={rp.detailsPlaceholder} required />
-                </LabeledField>
-                <LabeledField label={rp.attachment} htmlFor="report-attachment" hint={rp.attachmentHint}>
-                  <input id="report-attachment" type="file" accept="image/jpeg,image/png,application/pdf" className="text-label text-fg-secondary" />
-                </LabeledField>
-              </PreviewActionDialog>
-            </div>
-          </Card>
-        </section>
+        <CasesPanel
+          m={m}
+          locale={locale}
+          subjectType="user"
+          subjectId={user.id}
+          cases={cases}
+          canCreate={can(access, "cases.create")}
+          defaults={{ subject: name, name, phone: user.phone ?? "", email: user.email ?? "" }}
+        />
       ) : null}
     </div>
   );
