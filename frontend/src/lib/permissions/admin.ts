@@ -31,6 +31,14 @@ export const ADMIN_PERMISSIONS = [
   "admin_staff.manage",
   "roles.read",
   "roles.manage",
+  // Admin Core 1B-B — operational workflows.
+  "notes.read",
+  "notes.create",
+  "follow_ups.read",
+  "follow_ups.manage",
+  "cases.read",
+  "cases.create",
+  "duplicates.resolve",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];

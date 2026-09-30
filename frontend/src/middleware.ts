@@ -56,6 +56,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // A suspended account (PD-010) is refused by the database on every data
+  // request; route it to a page that says so instead of a broken screen. Its own
+  // status is the one request the database still answers for it.
+  const productSurface =
+    authRequired || path.startsWith("/settings") || path.startsWith("/business");
+  if (user && (productSurface || path === "/auth/suspended")) {
+    const { data: account } = await supabase.rpc("my_account_status");
+    const suspended = (account as { suspended?: boolean } | null)?.suspended === true;
+    if (suspended && productSurface) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/auth/suspended";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    if (!suspended && path === "/auth/suspended") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/onboarding";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
   // A signed-in caller never needs Sign In / Sign Up (shared email pages or the
   // installer phone pages) — send them through the resume
   // funnel (/onboarding forwards active users on to the workspace). Recovery,

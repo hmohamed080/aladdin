@@ -14,9 +14,11 @@ import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-act
 import { RowIconLink, RowIconDisabled } from "@/features/admin-preview/row-icon-button";
 import { RowIconAction } from "@/features/admin-preview/row-icon-action";
 import { AutoFilters, SortableHeader } from "@/features/admin-preview/auto-filters";
-import { EyeIcon, SettingsIcon, CheckIcon, XIcon, AlertIcon } from "@/components/ui/icons";
+import { EyeIcon, SettingsIcon, CheckIcon, XIcon } from "@/components/ui/icons";
 import { TablePagination } from "@/features/admin-preview/table-pagination";
 import { requireAdminRoute } from "@/server/authorization/admin";
+import { can } from "@/lib/permissions/admin";
+import { SuspensionAction } from "@/features/admin-ops/suspension";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +42,8 @@ export default async function PreviewOrganizationsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdminRoute("/admin/preview/organizations");
+  const access = await requireAdminRoute("/admin/preview/organizations");
+  const canSuspend = can(access, "organizations.suspend");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
@@ -166,27 +169,10 @@ export default async function PreviewOrganizationsPage({
                   confirmVariant="danger"
                 />
               </>
-            ) : o.status === "suspended" ? (
-              <RowIconAction
-                label={rowActionLabels.restore}
-                icon={<CheckIcon size={16} />}
-                tone="success"
-                title={t.restoreTitle}
-                body={t.restoreBody}
-                confirmLabel={rowActionLabels.restore}
-                confirmVariant="primary"
-              />
-            ) : (
-              <RowIconAction
-                label={rowActionLabels.suspend}
-                icon={<AlertIcon size={16} />}
-                tone="danger"
-                title={t.suspendTitle}
-                body={t.suspendBody}
-                confirmLabel={rowActionLabels.suspend}
-                confirmVariant="danger"
-              />
-            )}
+            ) : null}
+            {canSuspend ? (
+              <SuspensionAction m={m} subjectType="organization" subjectId={o.id} suspended={o.status === "suspended"} compact />
+            ) : null}
             <RowActionsMenu label={t.title} actions={more} />
           </span>
         );

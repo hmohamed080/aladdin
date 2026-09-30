@@ -8,6 +8,12 @@ import { Button, SubmitButton } from "@/components/ui/controls";
 import { cn } from "@/lib/ui/cn";
 import type { FormState } from "@/server/actions/sales-forms";
 
+const ICON_TONES = {
+  neutral: "text-fg-muted hover:bg-surface-hover hover:text-fg",
+  danger: "text-danger hover:bg-danger/10",
+  success: "text-success hover:bg-success/10",
+} as const;
+
 /**
  * Accessible confirmation dialog for a destructive/terminal action. Focus moves
  * into the dialog on open, is trapped, Escape closes, a backdrop click closes,
@@ -34,6 +40,8 @@ export function ConfirmDialog({
   formAction,
   confirmDisabled = false,
   wide = false,
+  triggerIcon,
+  triggerTone = "neutral",
   children,
 }: {
   trigger: string;
@@ -53,6 +61,12 @@ export function ConfirmDialog({
   confirmDisabled?: boolean;
   /** Wider panel for editors (e.g. the Admin role editor). */
   wide?: boolean;
+  /**
+   * Render the trigger as a compact icon button (a table-row action) instead of
+   * a labelled button; `trigger` becomes its accessible name and tooltip.
+   */
+  triggerIcon?: ReactNode;
+  triggerTone?: keyof typeof ICON_TONES;
   children?: ReactNode | ((state: FormState) => ReactNode);
 }) {
   const { t } = useI18n();
@@ -123,9 +137,25 @@ export function ConfirmDialog({
 
   return (
     <>
-      <Button ref={triggerRef} type="button" variant={triggerVariant} onClick={() => setOpen(true)}>
-        {trigger}
-      </Button>
+      {triggerIcon ? (
+        <button
+          ref={triggerRef}
+          type="button"
+          title={trigger}
+          aria-label={trigger}
+          onClick={() => setOpen(true)}
+          className={cn(
+            "grid h-8 w-8 shrink-0 place-items-center rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
+            ICON_TONES[triggerTone],
+          )}
+        >
+          {triggerIcon}
+        </button>
+      ) : (
+        <Button ref={triggerRef} type="button" variant={triggerVariant} onClick={() => setOpen(true)}>
+          {trigger}
+        </Button>
+      )}
 
       {open ? (
         <div

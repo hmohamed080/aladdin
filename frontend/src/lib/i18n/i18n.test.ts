@@ -35,6 +35,8 @@ const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   "admin.preview.staff.rbacNote",
   "admin.preview.dateInput.placeholder",
   "admin.preview.dateInput.invalid",
+  // The same literal format hints (DD/MM/YYYY, HH:mm) in the follow-up due-time error.
+  "admin.preview.ops.error.dueInvalid",
   "auth.emailPlaceholder",
   "authPasswordPreview.emailPlaceholder",
   // Illustrative bad-pattern examples ("aaaa", "1234") inside an otherwise
