@@ -34,6 +34,13 @@
 
 -- ---------------------------------------------------------------------------
 -- 2. Small shared derivations (one definition for list and detail)
+--
+-- The four per-row helpers below deliberately carry NO `set search_path`: a
+-- SQL function with a SET clause is never inlined, and at 20k users that cost
+-- the directory ~200 ms of pure call overhead (measured: 256 ms -> 61 ms).
+-- They are safe without it: every identifier is schema-qualified or a
+-- pg_catalog built-in, they have no client grant, and their only callers are
+-- the security-definer RPCs below, which pin search_path = '' themselves.
 -- ---------------------------------------------------------------------------
 
 -- The account email as a person-facing value: NULL for the Installer/Technician
@@ -43,7 +50,6 @@ create or replace function app.user_facing_email(p_email text)
 returns text
 language sql
 immutable
-set search_path = ''
 as $$
   select case
     when p_email is null or btrim(p_email) = '' then null
@@ -59,7 +65,6 @@ create or replace function app.admin_user_verification_state(p_is_verified boole
 returns text
 language sql
 immutable
-set search_path = ''
 as $$
   select case
     when p_latest = 'rejected' then 'rejected'
@@ -76,7 +81,6 @@ create or replace function app.admin_user_status_tab(p_status public.user_status
 returns text
 language sql
 immutable
-set search_path = ''
 as $$
   select case
     when p_status = 'suspended' then 'suspended'
@@ -91,7 +95,6 @@ create or replace function app.admin_org_status_tab(p_status public.org_status)
 returns text
 language sql
 immutable
-set search_path = ''
 as $$
   select case p_status
     when 'suspended' then 'suspended'
@@ -206,9 +209,9 @@ begin
         or p.display_name_ar ilike v_like escape '\'
         or p.display_name_en ilike v_like escape '\'
         or p.username ilike v_like escape '\'
-        or exists (
-          select 1 from auth.users au
-          where au.id = u.id and app.user_facing_email(au.email) ilike v_like escape '\')
+        or u.id in (
+          select au.id from auth.users au
+          where app.user_facing_email(au.email) ilike v_like escape '\')
         or (v_digits is not null and (p.phone_e164 like '%' || v_digits || '%' or p.phone_e164 = v_phone))
       )
   ),
