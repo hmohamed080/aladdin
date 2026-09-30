@@ -2,50 +2,12 @@
  * PREVIEW FIXTURES — Phase 0 Admin Frontend Blueprint only.
  *
  * Everything in this file is either (a) illustrative fake content for a
- * capability with NO backend yet (Admin Notes, BL-008), or (b) a taxonomy
+ * capability with NO backend yet, or (b) a taxonomy
  * that has been product-approved (PD-005's rejection reason codes) but has
  * no database column yet. Nothing here is read by, or leaks into, any
  * production Admin page (`/admin/**`) — this module is imported only from
  * `app/admin/preview/**`. Do not import it from outside the preview feature.
  */
-
-export type PreviewNoteFixture = {
-  id: string;
-  author: string;
-  body: string;
-  createdAt: string;
-};
-
-/**
- * Admin Notes has no backend (BL-008 is planning-only). This fixture exists
- * purely so the "Admin Notes" tab in the preview can show what the feature
- * will look like once built — every note here is fake, deterministic (keyed
- * by subject id) rather than random, and labelled in the UI as a preview
- * fixture (`adminPreview.notes.fixtureNotice`).
- */
-const NOTE_FIXTURE_POOL: PreviewNoteFixture[] = [
-  {
-    id: "fixture-note-1",
-    author: "Preview reviewer",
-    body: "Called to confirm the phone number on file — reachable, matches the submitted documents.",
-    createdAt: "2026-09-10T09:15:00.000Z",
-  },
-  {
-    id: "fixture-note-2",
-    author: "Preview reviewer",
-    body: "Flagged for a follow-up check next quarter — nothing concerning found so far.",
-    createdAt: "2026-09-15T13:40:00.000Z",
-  },
-];
-
-/** Deterministic per-subject fixture set — same subject always shows the same fake notes. */
-export function previewNotesFor(subjectId: string): PreviewNoteFixture[] {
-  // A short hash of the id decides how many fixture notes to show (0-2), so
-  // different subjects in the preview don't all look identical.
-  const hash = Array.from(subjectId).reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const count = hash % 3;
-  return NOTE_FIXTURE_POOL.slice(0, count);
-}
 
 /**
  * PD-005's approved rejection-reason taxonomy. Product-decided (2026-09-19),

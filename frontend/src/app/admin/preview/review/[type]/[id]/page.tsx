@@ -7,12 +7,13 @@ import {
   listAdminReferrals,
   listAdminNetworkReferrals,
   previewSubjectAudit,
-  previewUserTimeline,
-  previewOrgTimeline,
   previewOrgDuplicateCandidates,
   type OrgDuplicateCandidate,
 } from "@/server/queries/admin-preview";
-import { PREVIEW_REASON_CODES, PREVIEW_ORG_REQUESTS, previewNotesFor } from "@/features/admin-preview/fixtures";
+import { PREVIEW_REASON_CODES, PREVIEW_ORG_REQUESTS } from "@/features/admin-preview/fixtures";
+import { loadNotes, loadTimeline } from "@/server/queries/admin-operations";
+import { NotesPanel, TimelineList } from "@/features/admin-ops/panels";
+import { can } from "@/lib/permissions/admin";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatAdminDate, formatDateTime } from "@/lib/ui/format";
@@ -42,7 +43,7 @@ export default async function PreviewReviewDetailPage({
 }: {
   params: Promise<{ type: string; id: string }>;
 }) {
-  await requireAdminRoute("/admin/preview/review");
+  const access = await requireAdminRoute("/admin/preview/review");
   const { type, id } = await params;
   const supabase = await getServerSupabase();
   const store = await cookies();
@@ -163,12 +164,15 @@ export default async function PreviewReviewDetailPage({
     : relatedOrgId
       ? await previewSubjectAudit(supabase, "organization", relatedOrgId)
       : [];
-  const timeline = relatedUserId
-    ? await previewUserTimeline(supabase, relatedUserId)
+  // Admin Core 1B-B: the reviewed person's / organization's REAL Entity
+  // Timeline and Admin Notes (each behind its own permission) — no fixtures.
+  const subject: { type: "user" | "organization"; id: string } | null = relatedUserId
+    ? { type: "user", id: relatedUserId }
     : relatedOrgId
-      ? await previewOrgTimeline(supabase, relatedOrgId)
-      : [];
-  const notes = previewNotesFor(id);
+      ? { type: "organization", id: relatedOrgId }
+      : null;
+  const timeline = subject ? await loadTimeline(supabase, subject.type, subject.id) : [];
+  const notes = subject && can(access, "notes.read") ? await loadNotes(supabase, subject.type, subject.id) : null;
   const actionLabels = m.admin.actions as Record<string, string>;
 
   return (
@@ -323,37 +327,16 @@ export default async function PreviewReviewDetailPage({
       <div className="grid gap-lg tablet:grid-cols-2">
         <Card className="flex flex-col gap-sm">
           <SectionTitle>{m.admin.preview.notes.title}</SectionTitle>
-          <p className="rounded-sm border border-warning/40 bg-warning/10 px-md py-2 text-label text-fg-secondary">{m.admin.preview.notes.fixtureNotice}</p>
-          {notes.length === 0 ? (
-            <StatePanel title={m.admin.preview.notes.empty} />
+          {subject ? (
+            <NotesPanel m={m} locale={locale} subjectType={subject.type} subjectId={subject.id} notes={notes} canCreate={can(access, "notes.create")} />
           ) : (
-            <div className="flex flex-col gap-sm">
-              {notes.map((n) => (
-                <Card key={n.id} pad="sm" className="flex flex-col gap-1">
-                  <p className="text-body text-fg">{n.body}</p>
-                  <p className="text-label text-fg-muted">
-                    {n.author} · {formatDateTime(n.createdAt, locale)} · {m.admin.preview.notes.internalOnly}
-                  </p>
-                </Card>
-              ))}
-            </div>
+            <StatePanel title={m.admin.preview.notes.empty} />
           )}
         </Card>
 
         <Card className="flex flex-col gap-sm">
           <SectionTitle>{m.admin.preview.timeline.title}</SectionTitle>
-          {timeline.length === 0 ? (
-            <StatePanel title={m.admin.preview.timeline.empty} />
-          ) : (
-            <ol className="flex flex-col gap-px overflow-hidden rounded-md border bg-surface">
-              {timeline.slice(0, 8).map((e) => (
-                <li key={e.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 bg-surface px-md py-2 odd:bg-surface-2/30">
-                  <span className="font-medium text-fg">{e.label}</span>
-                  <span className="ms-auto text-label text-fg-muted">{formatDateTime(e.at, locale)}</span>
-                </li>
-              ))}
-            </ol>
-          )}
+          <TimelineList m={m} locale={locale} events={timeline ? timeline.slice(0, 8) : null} />
         </Card>
       </div>
 
