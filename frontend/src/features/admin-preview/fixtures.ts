@@ -67,16 +67,11 @@ export type PreviewReasonCode = (typeof PREVIEW_REASON_CODES)[number];
 /* ---------------------------------------------------------------------- */
 /* Phase 0B additions.                                                     */
 /*                                                                         */
-/* Investigated before adding any of these (not guessed): `contacts`      */
-/* (email/phone) is self-select-only RLS, no platform-read policy;        */
-/* `profiles.locality_id` / `organizations.locality_id` are both orphaned */
-/* FKs (no `localities` table has ever shipped); `individual_onboarding`  */
-/* (which DOES hold real governorate/city) is also self-select-only.      */
-/* There is genuinely no safe admin read path for email, phone, or        */
-/* city/location anywhere in the current schema — building one is backend */
-/* work (a new RLS policy or RPC), explicitly out of scope for Phase 0B.  */
-/* Every function below is therefore a deterministic, clearly-labelled    */
-/* fixture — never a guess dressed up as data.                            */
+/* Admin Core Phase 1B-A retired the contact, city, duplicate-flag and     */
+/* follow-up fixtures: the Users / Organizations directories and details  */
+/* now read real data (admin_users_list & co.). What remains below is used */
+/* only by Preview areas not yet promoted (the dashboard's incomplete-     */
+/* profile counts), each listed in ADMIN_USERS_ORGS_READ_AUDIT.md §6.       */
 /* ---------------------------------------------------------------------- */
 
 /**
@@ -98,44 +93,13 @@ function hashOf(id: string): number {
   return hash >>> 0;
 }
 
-/** Deterministic fixture email/phone — no safe admin read path exists for either (see note above). */
-export function previewContactFor(userId: string): { email: string; phone: string } {
-  const n = hashOf(userId);
-  return {
-    email: `user${n % 9000}@preview.example`,
-    phone: `010${String(1000000 + (n % 8999999)).padStart(8, "0")}`,
-  };
-}
-
-export const PREVIEW_CITIES = [
-  "Cairo · Nasr City",
-  "Cairo · New Cairo",
-  "Giza · Sheikh Zayed",
-  "Giza · 6th of October",
-  "Alexandria · Smouha",
-  "Alexandria · Miami",
-] as const;
-
-/** Deterministic fixture city — Aladdin has no shipped locality table yet (see note above). */
-export function previewCityFor(id: string): string {
-  return PREVIEW_CITIES[hashOf(id) % PREVIEW_CITIES.length]!;
-}
-
 /**
- * Deterministic fixture profile-completeness percentage. Aladdin DOES have a
- * real completeness engine (`lib/profile/completeness.ts`), but it scores
- * fields on `individual_onboarding`, which — like contacts — is self-select
- * RLS only, so an admin cannot read another user's onboarding answers to
- * compute it for real without new backend access. Fixture until that read
- * path exists.
+ * Deterministic fixture profile-completeness percentage — now used ONLY by the
+ * not-yet-promoted Preview dashboard's "incomplete profiles" counts. The Users
+ * directory and details show the real value (app.profile_completion).
  */
 export function previewCompletenessFor(userId: string): number {
   return 40 + (hashOf(userId) % 61); // 40-100, never a misleadingly-empty 0%
-}
-
-/** Deterministic, low-frequency fixture duplicate flag for the Users directory — Aladdin has no real user-level duplicate signal (unlike organizations, which have a real one; see `previewOrgDuplicateCandidates`). */
-export function previewUserDuplicateFlag(userId: string): boolean {
-  return hashOf(userId) % 11 === 0;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -233,25 +197,6 @@ export type PreviewFollowUp = {
   /** Recorded state; "overdue" is DERIVED at render time (open + date in the past), never stored. */
   done: boolean;
 };
-
-/**
- * Admin Follow-up — an OPERATIONAL contact attempt (a call made, a WhatsApp
- * sent, a verification chased) with its own outcome and an optional
- * next-follow-up date/time. Deliberately a different concept from Admin Notes
- * (freeform context), Audit (system change history) and Entity Timeline
- * (human-readable history). No persistence and no reminder backend exists:
- * these rows are deterministic per subject, like every other fixture here.
- */
-const FOLLOW_UP_POOL: Omit<PreviewFollowUp, "id">[] = [
-  { type: "call", note: "Called to confirm the phone number — reachable, will send documents.", followUpDate: null, actor: "Preview reviewer", assignedTo: null, createdAt: "2026-09-12T10:00:00.000Z", done: true },
-  { type: "whatsapp", note: "Sent a WhatsApp reminder about the pending verification documents.", followUpDate: "2026-09-20T11:30:00.000Z", actor: "Preview reviewer", assignedTo: "Preview reviewer", createdAt: "2026-09-16T14:30:00.000Z", done: false },
-  { type: "verificationFollowUp", note: "Documents received; second check scheduled after review.", followUpDate: "2026-10-06T09:00:00.000Z", actor: "Preview reviewer", assignedTo: "Preview reviewer", createdAt: "2026-09-27T09:20:00.000Z", done: false },
-];
-
-export function previewFollowUpsFor(subjectId: string): PreviewFollowUp[] {
-  const count = hashOf(subjectId) % 4; // 0-3
-  return FOLLOW_UP_POOL.slice(0, count).map((f, i) => ({ ...f, id: `${subjectId}-followup-${i}` }));
-}
 
 /** Multi-series traffic point -- Phase 0C's Analytics chart needs more than page views alone. */
 export type PreviewTrafficPointMulti = { date: string; pageViews: number; signups: number; clicks: number; profileViews: number };

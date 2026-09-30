@@ -109,25 +109,6 @@ export function sortRows<T>(
   });
 }
 
-/**
- * Preview-only registration-date variation (Phase 0D). Almost every local and
- * preview account was created within the same day or two, so a correct
- * Registered sort is visually indistinguishable from no sort at all. This
- * shifts each row's DISPLAYED date back by a deterministic 0–29 days derived
- * from its id. It never touches the database; the column is marked as a
- * Preview field wherever it is used, and the real date stays on the record.
- */
-export function previewRegisteredAt(id: string, realIso: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < id.length; i++) {
-    hash ^= id.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  const offsetDays = (hash >>> 0) % 30;
-  const real = new Date(realIso).getTime();
-  return new Date(real - offsetDays * 86_400_000).toISOString();
-}
-
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**

@@ -6,7 +6,6 @@ import {
   pageItems,
   paginate,
   parseSort,
-  previewRegisteredAt,
   sortRows,
 } from "./table-state";
 
@@ -84,16 +83,6 @@ describe("sorting — Registered and Profile Completion stay independent", () =>
       { id: "m", v: 1 },
     ];
     expect(sortRows(tied, "desc", (r) => r.v, (r) => r.id).map((r) => r.id)).toEqual(["m", "z"]);
-  });
-});
-
-describe("previewRegisteredAt", () => {
-  it("is deterministic and never later than the real date", () => {
-    const real = "2026-09-28T10:00:00.000Z";
-    const a = previewRegisteredAt("user-1", real);
-    expect(previewRegisteredAt("user-1", real)).toBe(a);
-    expect(new Date(a).getTime()).toBeLessThanOrEqual(new Date(real).getTime());
-    expect(new Date(real).getTime() - new Date(a).getTime()).toBeLessThan(30 * 86_400_000);
   });
 });
 
