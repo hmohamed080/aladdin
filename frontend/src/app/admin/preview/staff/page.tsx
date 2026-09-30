@@ -1,82 +1,104 @@
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { previewAdminStaff } from "@/server/queries/admin-preview";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatAdminDate, formatCount } from "@/lib/ui/format";
+import { can, type AdminAccess } from "@/lib/permissions/admin";
+import { requireAdminRoute } from "@/server/authorization/admin";
 import {
-  previewContactFor,
-  PREVIEW_ROLES,
-  PREVIEW_RESOURCES,
-  PREVIEW_RESOURCE_ACTIONS,
-  PREVIEW_PERMISSION_KEYS,
-  PREVIEW_SCOPES,
-  rolesHolding,
-  isLockedPermission,
-  type PreviewRole,
-} from "@/features/admin-preview/fixtures";
+  listAdminPermissions,
+  listAdminRoles,
+  listAdminStaff,
+  type AdminPermissionRow,
+  type AdminRoleRow,
+  type AdminStaffMember,
+} from "@/server/queries/admin-rbac";
+import {
+  assignRoleAction,
+  changeStaffRoleAction,
+  setRoleArchivedAction,
+  setStaffDisabledAction,
+  unassignRoleAction,
+} from "@/server/actions/admin-rbac";
+import { assignableRoles, canEditRole, canManageMember } from "@/features/admin-rbac/eligibility";
+import { RoleEditor } from "@/features/admin-rbac/role-editor";
+import type { Messages, StaffMessages } from "@/features/admin-rbac/types";
 import { AdminHeader } from "@/features/admin/parts";
 import { Badge, Card, StatePanel } from "@/components/ui/primitives";
 import { DataTable, RecordCell, Monogram, type Column } from "@/components/ui/data-table";
 import { TabLinks } from "@/components/ui/stat-tiles";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
-import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
-import { PreviewLegend, PREVIEW_MARK } from "@/features/admin-preview/preview-legend";
-import { LabeledField, Input, Select, Textarea } from "@/components/ui/controls";
+import { LabeledField, Input, Select } from "@/components/ui/controls";
 import { AutoFilters } from "@/features/admin-preview/auto-filters";
 import { TablePagination } from "@/features/admin-preview/table-pagination";
 import { clampPageSize, paginate } from "@/features/admin-preview/table-state";
-import type { AdminStaffRow } from "@/server/queries/admin-preview";
 
 export const dynamic = "force-dynamic";
 
 type TabKey = "staff" | "roles" | "permissions";
 
 /**
- * Admin Staff · Roles · Permissions — PD-008 (approved 2026-09-29: adapt CRM
- * Dynamic RBAC to Aladdin), PREVIEW ONLY.
+ * Admin Staff · Roles · Permissions — Admin Core 1A (PD-008, PD-016).
  *
- * This page replaces the retired standalone Access page: Admin Staff is the
- * single entry point for access management, hosting three tabs.
+ * Every row is REAL: the roster, roles and catalog come from the self-guarding
+ * `admin_rbac_*` RPCs over `admin_role_assignments` / `admin_roles` /
+ * `admin_permissions`. Every control is a REAL mutation through a server action
+ * → RPC that re-checks the permission, the rank/permission ceilings, the
+ * no-self-management and last-Super-Admin rules, and writes the audit trail.
+ * Controls are drawn only when the caller is eligible (features/admin-rbac/
+ * eligibility.ts) — presentation only; the RPC is the boundary.
  *
- *  - **Admin Staff** — the roster is REAL (`platform_role_grants`, generalized
- *    from the caller's own row under existing RLS). No `status` column exists
- *    yet, so every grant is honestly "Active".
- *  - **Roles** and **Permissions** — the approved `resource.action`
- *    vocabulary and an illustrative set of planned roles from `fixtures.ts`.
- *    The role editor, Duplicate and Archive are Preview dialogs that never
- *    save; nothing here is enforced. The fixed `support ⊆ moderator ⊆
- *    administrator` tiers stay the ONLY enforced authority until BL-018.
+ * Still Preview: "Invite Admin Staff" (onboarding a person with no Admin history
+ * is the separate Invitation sub-phase), and scoped (organization / branch /
+ * user) role creation and assignment, whose scope picker belongs to Phase 1B.
  */
-export default async function PreviewAdminStaffPage({
+export default async function AdminStaffPage({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string; q?: string; page?: string; pageSize?: string }>;
 }) {
+  const access = await requireAdminRoute("/admin/preview/staff");
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const m = getMessages(locale);
-  const { tab: tabParam, q, page: pageParam, pageSize: pageSizeParam } = await searchParams;
-  const tab: TabKey = tabParam === "roles" || tabParam === "permissions" ? tabParam : "staff";
   const t = m.admin.preview.staff;
+  const { tab: tabParam, q, page: pageParam, pageSize: pageSizeParam } = await searchParams;
 
-  const allStaff = await previewAdminStaff(supabase);
+  // Tabs the caller may open; an unpermitted ?tab= falls back to the first allowed.
+  const allowed: TabKey[] = [
+    ...(can(access, "admin_staff.read") ? (["staff"] as const) : []),
+    ...(can(access, "roles.read") ? (["roles", "permissions"] as const) : []),
+  ];
+  const requested = (tabParam || "staff") as TabKey;
+  const tab: TabKey = allowed.includes(requested) ? requested : allowed[0]!;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const callerId = user?.id ?? "";
+
+  const [staff, roles, catalog] = await Promise.all([
+    tab === "staff" ? listAdminStaff(supabase) : Promise.resolve(null),
+    // The Staff tab needs roles for its "Change role" options (roles.read);
+    // Roles/Permissions need them for their rows.
+    can(access, "roles.read") ? listAdminRoles(supabase) : Promise.resolve(null),
+    tab !== "staff" ? listAdminPermissions(supabase) : Promise.resolve(null),
+  ]);
+
   const roleNames = t.roleNames as Record<string, string>;
   const roleDescriptions = t.roleDescriptions as Record<string, string>;
-  const roleLabels = t.roles as Record<string, string>;
   const resourceLabels = t.resources as Record<string, string>;
   const scopeLabels = t.scopes as Record<string, string>;
   const permissionDesc = t.permissionDesc as unknown as Record<string, Record<string, string>>;
-
-  const staffCountByRole = new Map<string, number>();
-  for (const s of allStaff) staffCountByRole.set(s.role, (staffCountByRole.get(s.role) ?? 0) + 1);
+  const nameOf = (r: { key: string; name: string; isSystem: boolean }) => (r.isSystem ? (roleNames[r.key] ?? r.name) : r.name);
 
   return (
     <div className="flex flex-col gap-lg">
       <div className="flex flex-wrap items-center justify-between gap-md">
         <AdminHeader locale={locale} title={t.title} subtitle={t.subtitle} />
-        {tab === "staff" ? (
+        {tab === "staff" && can(access, "admin_staff.manage") ? (
           <PreviewActionDialog trigger={t.invite} triggerVariant="accent" title={t.inviteTitle} body={t.inviteBody} confirmLabel={t.invite} confirmVariant="accent">
             <LabeledField label={t.nameLabel} htmlFor="invite-name">
               <Input id="invite-name" placeholder={t.nameLabel} />
@@ -84,26 +106,19 @@ export default async function PreviewAdminStaffPage({
             <LabeledField label={t.emailLabel} htmlFor="invite-email">
               <Input id="invite-email" type="email" dir="ltr" placeholder="name@aladdin.eg" />
             </LabeledField>
-            <LabeledField label={t.roleLabel} htmlFor="invite-role">
-              <Select id="invite-role" defaultValue="support">
-                {PREVIEW_ROLES.filter((r) => r.status === "active").map((r) => (
-                  <option key={r.key} value={r.key}>
-                    {roleNames[r.key]}
-                  </option>
-                ))}
-              </Select>
-            </LabeledField>
           </PreviewActionDialog>
-        ) : tab === "roles" ? (
-          <RoleEditorDialog
-            trigger={t.rolesTab.create}
-            triggerVariant="accent"
+        ) : tab === "roles" && can(access, "roles.manage") && catalog ? (
+          <RoleEditor
             role={null}
+            displayName=""
+            displayDescription=""
+            catalog={catalog}
+            held={access.permissions}
+            actorRank={access.rank}
             t={t}
-            roleNames={roleNames}
             resourceLabels={resourceLabels}
-            scopeLabels={scopeLabels}
             permissionDesc={permissionDesc}
+            scopeLabels={scopeLabels}
           />
         ) : null}
       </div>
@@ -114,84 +129,107 @@ export default async function PreviewAdminStaffPage({
         current={tab === "staff" ? "" : tab}
         locale={locale}
         label={t.title}
-        tabs={[
-          { value: "", label: t.tabs.staff },
-          { value: "roles", label: t.tabs.roles },
-          { value: "permissions", label: t.tabs.permissions },
-        ]}
+        tabs={allowed.map((k) => ({ value: k === "staff" ? "" : k, label: t.tabs[k] }))}
       />
 
-      <p role="note" className="-mt-2 rounded-sm border border-warning/40 bg-warning/10 px-md py-2 text-label text-fg-secondary">
+      <p role="note" className="-mt-2 rounded-sm border border-info/40 bg-info/10 px-md py-2 text-label text-fg-secondary">
         {t.rbacNote}
       </p>
 
       {tab === "staff" ? (
-        <StaffTab
-          allStaff={allStaff}
-          q={q}
-          pageParam={pageParam}
-          pageSizeParam={pageSizeParam}
-          locale={locale}
-          m={m}
-          t={t}
-          roleLabels={roleLabels}
-        />
+        staff === null ? (
+          <StatePanel title={t.notAuthorizedTab} />
+        ) : (
+          <StaffTab
+            staff={staff}
+            roles={roles ?? []}
+            access={access}
+            callerId={callerId}
+            q={q}
+            pageParam={pageParam}
+            pageSizeParam={pageSizeParam}
+            locale={locale}
+            m={m}
+            t={t}
+            nameOf={nameOf}
+          />
+        )
       ) : null}
 
       {tab === "roles" ? (
-        <RolesTab
-          legend={m.admin.preview.previewFieldNote}
-          t={t}
-          staffCountByRole={staffCountByRole}
-          roleNames={roleNames}
-          roleDescriptions={roleDescriptions}
-          resourceLabels={resourceLabels}
-          scopeLabels={scopeLabels}
-          permissionDesc={permissionDesc}
-          locale={locale}
-        />
+        roles === null || catalog === null ? (
+          <StatePanel title={t.notAuthorizedTab} />
+        ) : (
+          <RolesTab
+            roles={roles}
+            catalog={catalog}
+            access={access}
+            t={t}
+            locale={locale}
+            nameOf={nameOf}
+            roleDescriptions={roleDescriptions}
+            resourceLabels={resourceLabels}
+            scopeLabels={scopeLabels}
+            permissionDesc={permissionDesc}
+          />
+        )
       ) : null}
 
       {tab === "permissions" ? (
-        <PermissionsTab
-          t={t}
-          roleNames={roleNames}
-          permissionDesc={permissionDesc}
-          resourceLabels={resourceLabels}
-          scopeLabels={scopeLabels}
-        />
+        roles === null || catalog === null ? (
+          <StatePanel title={t.notAuthorizedTab} />
+        ) : (
+          <PermissionsTab
+            roles={roles}
+            catalog={catalog}
+            t={t}
+            nameOf={nameOf}
+            permissionDesc={permissionDesc}
+            resourceLabels={resourceLabels}
+            scopeLabels={scopeLabels}
+          />
+        )
       ) : null}
     </div>
   );
 }
 
-type Messages = ReturnType<typeof getMessages>;
-type StaffMessages = Messages["admin"]["preview"]["staff"];
+type NameOf = (r: { key: string; name: string; isSystem: boolean }) => string;
 
 function StaffTab({
-  allStaff,
+  staff,
+  roles,
+  access,
+  callerId,
   q,
   pageParam,
   pageSizeParam,
   locale,
   m,
   t,
-  roleLabels,
+  nameOf,
 }: {
-  allStaff: AdminStaffRow[];
+  staff: AdminStaffMember[];
+  roles: AdminRoleRow[];
+  access: AdminAccess;
+  callerId: string;
   q?: string;
   pageParam?: string;
   pageSizeParam?: string;
   locale: ReturnType<typeof resolveLocale>;
   m: Messages;
   t: StaffMessages;
-  roleLabels: Record<string, string>;
+  nameOf: NameOf;
 }) {
   const query = (q ?? "").trim().toLowerCase();
-  const filtered = query ? allStaff.filter((s) => s.displayName.toLowerCase().includes(query)) : allStaff;
+  const filtered = query
+    ? staff.filter((s) => s.displayName.toLowerCase().includes(query) || (s.email ?? "").toLowerCase().includes(query))
+    : staff;
   const slice = paginate(filtered, pageParam, clampPageSize(pageSizeParam));
+  const offer = assignableRoles(access, roles);
+  const manages = can(access, "admin_staff.manage");
 
-  const columns: Column<AdminStaffRow>[] = [
+  const columns: Column<AdminStaffMember>[] = [
     {
       key: "name",
       header: t.columns.name,
@@ -201,67 +239,156 @@ function StaffTab({
         <RecordCell
           wrap
           title={s.displayName || m.admin.users.unnamed}
+          meta={s.userId === callerId ? <Badge tone="neutral">{t.you}</Badge> : undefined}
           avatar={<Monogram name={s.displayName || "?"} size={28} />}
         />
       ),
     },
     {
       key: "email",
-      header: `${t.columns.email}${PREVIEW_MARK}`,
-      minWidth: "16rem",
+      header: t.columns.email,
+      minWidth: "14rem",
       nowrap: true,
       secondary: true,
-      cell: (s) => <span dir="ltr" className="text-label">{previewContactFor(s.userId).email}</span>,
+      cell: (s) => (s.email ? <span dir="ltr" className="text-label">{s.email}</span> : <span className="text-fg-muted">—</span>),
     },
     {
       key: "role",
       header: t.rolesColumn,
-      minWidth: "8rem",
-      nowrap: true,
-      cell: (s) => <Badge tone="accent">{roleLabels[s.role] ?? s.role}</Badge>,
+      minWidth: "10rem",
+      cell: (s) => {
+        const active = s.assignments.filter((a) => a.isActive);
+        return active.length ? (
+          <span className="flex flex-wrap gap-1">
+            {active.map((a) => (
+              <Badge key={a.id} tone={a.roleStatus === "archived" ? "neutral" : "accent"}>
+                {nameOf({ key: a.roleKey, name: a.roleName, isSystem: a.isSystem })}
+                {a.scopeType !== "platform" && a.scopeOrganizationName ? ` · ${a.scopeOrganizationName}` : ""}
+              </Badge>
+            ))}
+          </span>
+        ) : (
+          <span className="text-fg-muted">—</span>
+        );
+      },
     },
-    { key: "status", header: t.columns.status, minWidth: "6rem", nowrap: true, cell: () => <Badge tone="success">{t.statusActive}</Badge> },
-    { key: "scope", header: t.columns.scope, minWidth: "8rem", nowrap: true, secondary: true, cell: () => t.scopePlatformWide },
+    {
+      key: "status",
+      header: t.columns.status,
+      minWidth: "6rem",
+      nowrap: true,
+      cell: (s) => (s.isActive ? <Badge tone="success">{t.statusActive}</Badge> : <Badge tone="neutral">{t.statusDisabled}</Badge>),
+    },
     {
       key: "created",
       header: t.invitedColumn,
       minWidth: "8rem",
       nowrap: true,
       secondary: true,
-      cell: (s) => formatAdminDate(s.createdAt, locale),
+      cell: (s) => formatAdminDate(s.firstAssignedAt, locale),
     },
     {
       key: "lastActive",
-      header: `${t.columns.lastActive}${PREVIEW_MARK}`,
+      header: t.columns.lastActive,
       minWidth: "8rem",
       nowrap: true,
       secondary: true,
-      cell: () => <span className="text-fg-muted">{m.admin.preview.users.lastActiveUnavailable}</span>,
+      cell: (s) => (s.lastSignInAt ? formatAdminDate(s.lastSignInAt, locale) : <span className="text-fg-muted">{t.neverSignedIn}</span>),
     },
     {
       key: "actions",
       header: "",
-      minWidth: "12rem",
+      minWidth: "16rem",
       cell: (s) => {
-        const more: RowAction[] = [
-          { kind: "link", label: t.viewPermissions, href: "/admin/preview/staff?tab=permissions" },
-          { kind: "action", label: t.viewHistory, title: t.viewHistory, confirmLabel: t.viewHistory, confirmVariant: "primary" },
-        ];
+        if (!canManageMember(access, callerId, s)) return null;
+        const active = s.assignments.filter((a) => a.isActive);
+        const current = active.find((a) => a.scopeType === "platform");
+        const addable = offer.filter((r) => !active.some((a) => a.roleId === r.id));
         return (
-          <div className="flex items-center justify-end gap-sm">
-            <PreviewActionDialog trigger={t.changeRole} triggerVariant="outline" title={t.changeRoleTitle} confirmLabel={t.changeRole} confirmVariant="accent">
-              <LabeledField label={t.roleLabel} htmlFor={`role-${s.userId}`}>
-                <Select id={`role-${s.userId}`} defaultValue={s.role}>
-                  {PREVIEW_ROLES.filter((r) => r.status === "active").map((r) => (
-                    <option key={r.key} value={r.key}>
-                      {(t.roleNames as Record<string, string>)[r.key]}
-                    </option>
-                  ))}
-                </Select>
-              </LabeledField>
-            </PreviewActionDialog>
-            <PreviewActionDialog trigger={t.disable} triggerVariant="danger" title={t.disableTitle} body={t.disableBody} confirmLabel={t.disable} confirmVariant="danger" />
-            <RowActionsMenu label={t.title} actions={more} />
+          <div className="flex flex-wrap items-center justify-end gap-sm">
+            {s.isActive && offer.length ? (
+              <ConfirmDialog
+                trigger={t.changeRole}
+                triggerVariant="outline"
+                title={t.changeRoleTitle}
+                body={t.changeRoleBody}
+                confirmLabel={t.changeRole}
+                confirmVariant="accent"
+                formAction={changeStaffRoleAction}
+              >
+                <input type="hidden" name="userId" value={s.userId} />
+                <LabeledField label={t.roleLabel} htmlFor={`change-${s.userId}`}>
+                  <Select id={`change-${s.userId}`} name="roleId" defaultValue={current?.roleId ?? offer[0]!.id}>
+                    {offer.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {nameOf(r)}
+                      </option>
+                    ))}
+                  </Select>
+                </LabeledField>
+                <ReasonField id={`change-reason-${s.userId}`} label={t.reasonOptional} />
+              </ConfirmDialog>
+            ) : null}
+            {s.isActive && addable.length ? (
+              <ConfirmDialog
+                trigger={t.addRole}
+                triggerVariant="ghost"
+                title={t.addRoleTitle}
+                body={t.addRoleBody}
+                confirmLabel={t.addRole}
+                confirmVariant="accent"
+                formAction={assignRoleAction}
+              >
+                <input type="hidden" name="userId" value={s.userId} />
+                <LabeledField label={t.roleLabel} htmlFor={`add-${s.userId}`}>
+                  <Select id={`add-${s.userId}`} name="roleId" defaultValue={addable[0]!.id}>
+                    {addable.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {nameOf(r)}
+                      </option>
+                    ))}
+                  </Select>
+                </LabeledField>
+                <ReasonField id={`add-reason-${s.userId}`} label={t.reasonOptional} />
+              </ConfirmDialog>
+            ) : null}
+            {active.length > 1 ? (
+              <ConfirmDialog
+                trigger={t.removeRole}
+                triggerVariant="ghost"
+                title={t.removeRoleTitle}
+                body={t.removeRoleBody}
+                confirmLabel={t.removeRole}
+                confirmVariant="danger"
+                formAction={unassignRoleAction}
+              >
+                <LabeledField label={t.roleLabel} htmlFor={`remove-${s.userId}`}>
+                  <Select id={`remove-${s.userId}`} name="assignmentId" defaultValue={active[active.length - 1]!.id}>
+                    {active.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {nameOf({ key: a.roleKey, name: a.roleName, isSystem: a.isSystem })}
+                      </option>
+                    ))}
+                  </Select>
+                </LabeledField>
+                <ReasonField id={`remove-reason-${s.userId}`} label={t.reasonOptional} />
+              </ConfirmDialog>
+            ) : null}
+            {manages ? (
+              <ConfirmDialog
+                trigger={s.isActive ? t.disable : t.restore}
+                triggerVariant={s.isActive ? "danger" : "outline"}
+                title={s.isActive ? t.disableTitle : t.restoreTitle}
+                body={s.isActive ? t.disableBody : t.restoreBody}
+                confirmLabel={s.isActive ? t.disable : t.restore}
+                confirmVariant={s.isActive ? "danger" : "accent"}
+                formAction={setStaffDisabledAction}
+              >
+                <input type="hidden" name="userId" value={s.userId} />
+                <input type="hidden" name="disabled" value={s.isActive ? "true" : "false"} />
+                <ReasonField id={`disable-reason-${s.userId}`} label={s.isActive ? t.reasonLabel : t.reasonOptional} required={s.isActive} />
+              </ConfirmDialog>
+            ) : null}
           </div>
         );
       },
@@ -270,14 +397,14 @@ function StaffTab({
 
   return (
     <>
+      {!manages ? <p className="text-label text-fg-muted">{t.readOnlyNote}</p> : null}
       <AutoFilters fields={[{ kind: "text", name: "q", placeholder: m.admin.preview.users.searchPlaceholder }]} />
-      <PreviewLegend>{m.admin.preview.previewFieldNote}</PreviewLegend>
       <DataTable
         columns={columns}
         rows={slice.rows}
         rowKey={(s) => s.userId}
         caption={t.title}
-        minWidth="64rem"
+        minWidth="68rem"
         stackBelow="desktop"
         empty={<StatePanel title={m.admin.preview.duplicates.none} />}
       />
@@ -286,50 +413,54 @@ function StaffTab({
   );
 }
 
+function ReasonField({ id, label, required = false }: { id: string; label: string; required?: boolean }) {
+  return (
+    <LabeledField label={label} htmlFor={id}>
+      <Input id={id} name="reason" maxLength={500} required={required} />
+    </LabeledField>
+  );
+}
+
 function RolesTab({
-  legend,
+  roles,
+  catalog,
+  access,
   t,
-  staffCountByRole,
-  roleNames,
+  locale,
+  nameOf,
   roleDescriptions,
   resourceLabels,
   scopeLabels,
   permissionDesc,
-  locale,
 }: {
-  legend: string;
+  roles: AdminRoleRow[];
+  catalog: AdminPermissionRow[];
+  access: AdminAccess;
   t: StaffMessages;
-  staffCountByRole: Map<string, number>;
-  roleNames: Record<string, string>;
+  locale: ReturnType<typeof resolveLocale>;
+  nameOf: NameOf;
   roleDescriptions: Record<string, string>;
   resourceLabels: Record<string, string>;
   scopeLabels: Record<string, string>;
   permissionDesc: Record<string, Record<string, string>>;
-  locale: ReturnType<typeof resolveLocale>;
 }) {
-  const columns: Column<PreviewRole>[] = [
+  const describe = (r: AdminRoleRow) => (r.isSystem ? (roleDescriptions[r.key] ?? r.description) : r.description);
+  const columns: Column<AdminRoleRow>[] = [
     {
       key: "name",
       header: t.rolesTab.columns.name,
       minWidth: "14rem",
       cell: (r) => (
         <span className="flex flex-wrap items-center gap-1.5">
-          <span className="font-medium text-fg">{roleNames[r.key]}</span>
-          <Badge tone={r.system ? "neutral" : "accent"}>{r.system ? t.rolesTab.system : t.rolesTab.custom}</Badge>
+          <span className="font-medium text-fg">{nameOf(r)}</span>
+          <Badge tone={r.isSystem ? "neutral" : "accent"}>{r.isSystem ? t.rolesTab.system : t.rolesTab.custom}</Badge>
         </span>
       ),
     },
-    { key: "description", header: t.rolesTab.columns.description, minWidth: "20rem", grow: true, cell: (r) => <span className="text-fg-secondary">{roleDescriptions[r.key]}</span> },
+    { key: "description", header: t.rolesTab.columns.description, minWidth: "20rem", grow: true, cell: (r) => <span className="text-fg-secondary">{describe(r) || "—"}</span> },
     { key: "rank", header: t.rolesTab.columns.rank, minWidth: "5rem", nowrap: true, numeric: true, cell: (r) => formatCount(r.rank, locale) },
-    {
-      key: "staff",
-      header: `${t.rolesTab.columns.staffCount}${PREVIEW_MARK}`,
-      minWidth: "5rem",
-      nowrap: true,
-      numeric: true,
-      cell: (r) => formatCount(r.realTier ? (staffCountByRole.get(r.realTier) ?? 0) : 0, locale),
-    },
-    { key: "scope", header: t.rolesTab.columns.scope, minWidth: "7rem", nowrap: true, secondary: true, cell: (r) => scopeLabels[r.scope] },
+    { key: "staff", header: t.rolesTab.columns.staffCount, minWidth: "5rem", nowrap: true, numeric: true, cell: (r) => formatCount(r.staffCount, locale) },
+    { key: "scope", header: t.rolesTab.columns.scope, minWidth: "7rem", nowrap: true, secondary: true, cell: (r) => scopeLabels[r.scopeType] ?? r.scopeType },
     {
       key: "status",
       header: t.rolesTab.columns.status,
@@ -346,40 +477,38 @@ function RolesTab({
       header: "",
       minWidth: "13rem",
       cell: (r) => {
-        const more: RowAction[] = [
-          {
-            kind: "action",
-            label: t.rolesTab.duplicate,
-            title: t.rolesTab.duplicate,
-            confirmLabel: t.rolesTab.duplicate,
-            confirmVariant: "primary",
-          },
-        ];
-        if (!r.system) {
-          more.push({
-            kind: "action",
-            label: t.rolesTab.archive,
-            title: `${t.rolesTab.archive} · ${roleNames[r.key]}`,
-            body: t.rolesTab.archiveBody,
-            confirmLabel: t.rolesTab.archive,
-            confirmVariant: "danger",
-            tone: "danger",
-          });
-        }
+        if (!canEditRole(access, r)) return null;
         return (
           <div className="flex items-center justify-end gap-sm">
-            <RoleEditorDialog
-              trigger={t.rolesTab.edit}
-              triggerVariant="outline"
-              role={r}
-              description={roleDescriptions[r.key]}
-              t={t}
-              roleNames={roleNames}
-              resourceLabels={resourceLabels}
-              scopeLabels={scopeLabels}
-              permissionDesc={permissionDesc}
-            />
-            <RowActionsMenu label={roleNames[r.key] ?? ""} actions={more} />
+            {r.status === "active" ? (
+              <RoleEditor
+                role={r}
+                displayName={nameOf(r)}
+                displayDescription={describe(r)}
+                catalog={catalog}
+                held={access.permissions}
+                actorRank={access.rank}
+                t={t}
+                resourceLabels={resourceLabels}
+                permissionDesc={permissionDesc}
+                scopeLabels={scopeLabels}
+              />
+            ) : null}
+            {!r.isSystem ? (
+              <ConfirmDialog
+                trigger={r.status === "active" ? t.rolesTab.archive : t.rolesTab.restore}
+                triggerVariant={r.status === "active" ? "danger" : "outline"}
+                title={`${r.status === "active" ? t.rolesTab.archive : t.rolesTab.restore} · ${nameOf(r)}`}
+                body={r.status === "active" ? t.rolesTab.archiveBody : t.rolesTab.restoreBody}
+                confirmLabel={r.status === "active" ? t.rolesTab.archive : t.rolesTab.restore}
+                confirmVariant={r.status === "active" ? "danger" : "accent"}
+                formAction={setRoleArchivedAction}
+              >
+                <input type="hidden" name="roleId" value={r.id} />
+                <input type="hidden" name="archived" value={r.status === "active" ? "true" : "false"} />
+                <ReasonField id={`archive-reason-${r.id}`} label={t.reasonOptional} />
+              </ConfirmDialog>
+            ) : null}
           </div>
         );
       },
@@ -387,39 +516,37 @@ function RolesTab({
   ];
 
   return (
-    <>
-      <PreviewLegend>{legend}</PreviewLegend>
-      <DataTable
-        columns={columns}
-        rows={PREVIEW_ROLES}
-        rowKey={(r) => r.key}
-        caption={t.tabs.roles}
-        minWidth="62rem"
-        stackBelow="desktop"
-        empty={<StatePanel title={t.tabs.roles} />}
-      />
-    </>
+    <DataTable
+      columns={columns}
+      rows={roles}
+      rowKey={(r) => r.id}
+      caption={t.tabs.roles}
+      minWidth="62rem"
+      stackBelow="desktop"
+      empty={<StatePanel title={t.tabs.roles} />}
+    />
   );
 }
 
 function PermissionsTab({
+  roles,
+  catalog,
   t,
-  roleNames,
+  nameOf,
   permissionDesc,
   resourceLabels,
   scopeLabels,
 }: {
+  roles: AdminRoleRow[];
+  catalog: AdminPermissionRow[];
   t: StaffMessages;
-  roleNames: Record<string, string>;
+  nameOf: NameOf;
   permissionDesc: Record<string, Record<string, string>>;
   resourceLabels: Record<string, string>;
   scopeLabels: Record<string, string>;
 }) {
-  const rows = PREVIEW_PERMISSION_KEYS.map((key) => {
-    const [resource, action] = key.split(".") as [string, string];
-    return { key, resource, action };
-  });
-  const columns: Column<(typeof rows)[number]>[] = [
+  const activeRoles = roles.filter((r) => r.status === "active");
+  const columns: Column<AdminPermissionRow>[] = [
     {
       key: "permission",
       header: t.permissionsTab.columns.permission,
@@ -428,24 +555,35 @@ function PermissionsTab({
       cell: (p) => (
         <span className="flex flex-col">
           <code dir="ltr" className="text-label font-medium text-fg">{p.key}</code>
-          <span className="text-label text-fg-muted">{resourceLabels[p.resource]}</span>
+          <span className="text-label text-fg-muted">{resourceLabels[p.resource] ?? p.resource}</span>
         </span>
       ),
     },
-    { key: "description", header: t.permissionsTab.columns.description, minWidth: "20rem", grow: true, cell: (p) => permissionDesc[p.resource]?.[p.action] ?? "—" },
+    {
+      key: "description",
+      header: t.permissionsTab.columns.description,
+      minWidth: "20rem",
+      grow: true,
+      cell: (p) => permissionDesc[p.resource]?.[p.action] ?? p.description,
+    },
     {
       key: "roles",
       header: t.permissionsTab.columns.roles,
       minWidth: "16rem",
-      cell: (p) => (
-        <span className="flex flex-wrap gap-1">
-          {rolesHolding(p.key).map((rk) => (
-            <Badge key={rk} tone="neutral">
-              {roleNames[rk]}
-            </Badge>
-          ))}
-        </span>
-      ),
+      cell: (p) => {
+        const holders = activeRoles.filter((r) => r.permissions.includes(p.key));
+        return holders.length ? (
+          <span className="flex flex-wrap gap-1">
+            {holders.map((r) => (
+              <Badge key={r.id} tone="neutral">
+                {nameOf(r)}
+              </Badge>
+            ))}
+          </span>
+        ) : (
+          <span className="text-fg-muted">{t.permissionsTab.none}</span>
+        );
+      },
     },
   ];
 
@@ -454,7 +592,7 @@ function PermissionsTab({
       <p className="text-body text-fg-secondary">{t.permissionsTab.intro}</p>
       <DataTable
         columns={columns}
-        rows={rows}
+        rows={catalog}
         rowKey={(p) => p.key}
         caption={t.tabs.permissions}
         minWidth="52rem"
@@ -464,7 +602,7 @@ function PermissionsTab({
       <section aria-labelledby="scopes-title" className="flex flex-col gap-sm">
         <h2 id="scopes-title" className="text-title text-fg">{t.scopes.title}</h2>
         <ul className="grid gap-sm tablet:grid-cols-2 desktop:grid-cols-5">
-          {PREVIEW_SCOPES.map((s) => (
+          {(["platform", "organization", "branch", "department", "user"] as const).map((s) => (
             <li key={s}>
               <Card pad="sm" className="h-full">
                 <p className="text-body font-medium text-fg">{scopeLabels[s]}</p>
@@ -475,100 +613,5 @@ function PermissionsTab({
         </ul>
       </section>
     </>
-  );
-}
-
-/** The role editor: name, description, rank, scope and `resource.action` permissions grouped by resource. Never saves. */
-function RoleEditorDialog({
-  trigger,
-  triggerVariant,
-  role,
-  description = "",
-  t,
-  roleNames,
-  resourceLabels,
-  scopeLabels,
-  permissionDesc,
-}: {
-  trigger: string;
-  triggerVariant: "outline" | "accent";
-  role: PreviewRole | null;
-  description?: string;
-  t: StaffMessages;
-  roleNames: Record<string, string>;
-  resourceLabels: Record<string, string>;
-  scopeLabels: Record<string, string>;
-  permissionDesc: Record<string, Record<string, string>>;
-}) {
-  const id = role ? `role-${role.key}` : "role-new";
-  return (
-    <PreviewActionDialog
-      wide
-      trigger={trigger}
-      triggerVariant={triggerVariant}
-      title={t.rolesTab.editorTitle}
-      body={t.rolesTab.editorBody}
-      confirmLabel={t.rolesTab.save}
-      confirmVariant="accent"
-    >
-      {role?.system ? <p className="text-label text-fg-muted">{t.rolesTab.lockedNote}</p> : null}
-      <div className="grid gap-md tablet:grid-cols-2">
-        <LabeledField label={t.rolesTab.nameLabel} htmlFor={`${id}-name`}>
-          <Input id={`${id}-name`} defaultValue={role ? roleNames[role.key] : ""} placeholder={t.rolesTab.nameLabel} />
-        </LabeledField>
-        <LabeledField label={t.rolesTab.rankLabel} htmlFor={`${id}-rank`} hint={t.rolesTab.rankHint}>
-          <Input id={`${id}-rank`} type="number" min={1} max={99} defaultValue={role?.rank ?? 30} />
-        </LabeledField>
-      </div>
-      <LabeledField label={t.rolesTab.descriptionLabel} htmlFor={`${id}-desc`}>
-        <Textarea id={`${id}-desc`} rows={2} defaultValue={description} />
-      </LabeledField>
-      <LabeledField label={t.rolesTab.scopeLabel} htmlFor={`${id}-scope`}>
-        <Select id={`${id}-scope`} defaultValue={role?.scope ?? "platform"}>
-          {PREVIEW_SCOPES.map((s) => (
-            <option key={s} value={s}>
-              {scopeLabels[s]}
-            </option>
-          ))}
-        </Select>
-      </LabeledField>
-      <fieldset className="flex flex-col gap-sm">
-        <legend className="mb-1 text-label font-medium text-fg-secondary">{t.rolesTab.permissionsLabel}</legend>
-        {PREVIEW_RESOURCES.map((resource) => (
-          <div key={resource} className="rounded-sm border p-sm">
-            <p className="mb-1 text-label font-medium text-fg">{resourceLabels[resource]}</p>
-            <div className="flex flex-wrap gap-x-md gap-y-1">
-              {PREVIEW_RESOURCE_ACTIONS[resource].map((action) => {
-                const key = `${resource}.${action}`;
-                if (isLockedPermission(role, key)) {
-                  // A core permission of a system role: shown, but NOT editable — no checkbox exists to untick.
-                  return (
-                    <span
-                      key={key}
-                      role="img"
-                      aria-label={`${key} — ${t.rolesTab.lockedPermission}`}
-                      title={t.rolesTab.lockedPermission}
-                      className="flex cursor-not-allowed items-center gap-1.5 rounded-sm bg-surface-2 px-1.5 py-0.5 text-body text-fg-muted"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <rect x="4" y="11" width="16" height="10" rx="2" />
-                        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-                      </svg>
-                      <code dir="ltr" className="text-label">{key}</code>
-                    </span>
-                  );
-                }
-                return (
-                  <label key={key} className="flex items-center gap-1.5 text-body text-fg-secondary" title={permissionDesc[resource]?.[action]}>
-                    <input type="checkbox" defaultChecked={role?.permissions.includes(key) ?? false} className="h-4 w-4 accent-[var(--color-accent-solid)]" />
-                    <code dir="ltr" className="text-label">{key}</code>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </fieldset>
-    </PreviewActionDialog>
   );
 }

@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserDetail } from "@/server/queries/admin";
-import { previewUserPointsLedger, previewUserTimeline, previewSubjectAudit, previewUsersDirectoryContext, previewAdminStaff } from "@/server/queries/admin-preview";
+import { previewUserPointsLedger, previewUserTimeline, previewSubjectAudit, previewUsersDirectoryContext } from "@/server/queries/admin-preview";
+import { listAdminStaff } from "@/server/queries/admin-rbac";
 import { FollowUpPanel } from "@/features/admin-preview/follow-up-panel";
 import { previewNotesFor, previewCompletenessFor, previewUserDuplicateFlag, previewFollowUpsFor, previewContactFor } from "@/features/admin-preview/fixtures";
 import { getMessages } from "@/lib/i18n/translate";
@@ -17,6 +18,7 @@ import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dia
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
 import { EyeIcon } from "@/components/ui/icons";
 import { LabeledField, Textarea, Select, Input } from "@/components/ui/controls";
+import { requireAdminRoute } from "@/server/authorization/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,7 @@ export default async function PreviewUserDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
+  await requireAdminRoute("/admin/preview/users");
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
   const tab = tabParam || "overview";
@@ -85,7 +88,11 @@ export default async function PreviewUserDetailPage({
   const auditEntries = tab === "audit" ? await previewSubjectAudit(supabase, "user", id) : null;
   const notes = tab === "notes" ? previewNotesFor(id) : null;
   const followUps = tab === "followup" ? previewFollowUpsFor(id) : null;
-  const staffNames = tab === "followup" ? (await previewAdminStaff(supabase)).map((s) => s.displayName).filter(Boolean) : [];
+  // Active Admin Staff as follow-up assignees; empty when the caller lacks admin_staff.read.
+  const staffNames =
+    tab === "followup"
+      ? ((await listAdminStaff(supabase)) ?? []).filter((s) => s.isActive).map((s) => s.displayName).filter(Boolean)
+      : [];
   const rp = m.admin.preview.report;
   const fu = m.admin.preview.followUp;
   const reportContact = previewContactFor(id);

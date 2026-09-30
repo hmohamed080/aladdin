@@ -2,7 +2,10 @@ import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { listUsers, listOrganizations } from "@/server/queries/admin";
-import { previewReviewQueue, previewAdminStaff } from "@/server/queries/admin-preview";
+import { previewReviewQueue } from "@/server/queries/admin-preview";
+import { listAdminStaff } from "@/server/queries/admin-rbac";
+import { requireAdminStaff } from "@/server/authorization/admin";
+import { can, meets } from "@/lib/permissions/admin";
 import { PREVIEW_ORG_REQUESTS } from "@/features/admin-preview/fixtures";
 import type { PaletteItem } from "@/features/admin-preview/command-palette-search";
 import { getMessages } from "@/lib/i18n/translate";
@@ -14,12 +17,10 @@ export const dynamic = "force-dynamic";
 /**
  * Phase 0 — Admin Frontend Blueprint / Preview.
  *
- * Deliberately has NO auth check of its own: nesting under `app/admin/layout.tsx`
- * means every route under `/admin/preview/**` already inherits that layout's
- * `loadPlatformRole()` gate (platform staff only, else redirect to `/`) before
- * this component ever renders. A second, bespoke check here would be a second
- * place to get the boundary wrong — the existing Admin gate is the one and only
- * enforcement point, exactly as the real Admin console already relies on it.
+ * Nested under `app/admin/layout.tsx` (the Admin Staff door); each page under
+ * `/admin/preview/**` additionally guards its own route (requireAdminRoute).
+ * This layout only needs the caller's access to decide which palette sources
+ * to load and which Preview tabs to draw.
  *
  * Phase 0D — Command Palette index. Product Owner decision B: NO new global-search
  * backend or server action. The palette filters, in the browser, rows this
@@ -30,6 +31,7 @@ export const dynamic = "force-dynamic";
  * Admin search is a later Admin Core backend-wiring item.
  */
 export default async function AdminPreviewLayout({ children }: { children: ReactNode }) {
+  const access = await requireAdminStaff();
   const supabase = await getServerSupabase();
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
@@ -38,11 +40,12 @@ export default async function AdminPreviewLayout({ children }: { children: React
   const typeLabels = m.accountType as Record<string, string>;
   const orgTypeLabels = m.orgType as Record<string, string>;
 
+  // Only index what the caller may open: a source they lack is never queried.
   const [users, orgs, queue, staff] = await Promise.all([
-    listUsers(supabase),
-    listOrganizations(supabase),
-    previewReviewQueue(supabase),
-    previewAdminStaff(supabase),
+    can(access, "users.read") ? listUsers(supabase) : Promise.resolve([]),
+    can(access, "organizations.read") ? listOrganizations(supabase) : Promise.resolve([]),
+    meets(access, ["users.read", "organizations.read", "referrals.read"]) ? previewReviewQueue(supabase) : Promise.resolve([]),
+    can(access, "admin_staff.read") ? listAdminStaff(supabase).then((r) => r ?? []) : Promise.resolve([]),
   ]);
 
   const items: PaletteItem[] = [
@@ -99,10 +102,14 @@ export default async function AdminPreviewLayout({ children }: { children: React
       id: `staff-${s.userId}`,
       group: "staff",
       label: s.displayName || m.admin.users.unnamed,
-      secondary: (m.admin.preview.staff.roles as Record<string, string>)[s.role] ?? s.role,
+      secondary: s.assignments.filter((a) => a.isActive).map((a) => a.roleName).join(", ") || m.admin.preview.staff.statusDisabled,
       href: `/admin/preview/staff?q=${encodeURIComponent(s.displayName)}`,
     })),
   ].filter((i) => i.label);
 
-  return <PreviewShell paletteItems={items}>{children}</PreviewShell>;
+  return (
+    <PreviewShell paletteItems={items} access={access}>
+      {children}
+    </PreviewShell>
+  );
 }

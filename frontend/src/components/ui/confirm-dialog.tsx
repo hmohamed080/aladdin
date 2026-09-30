@@ -33,6 +33,7 @@ export function ConfirmDialog({
   action,
   formAction,
   confirmDisabled = false,
+  wide = false,
   children,
 }: {
   trigger: string;
@@ -50,6 +51,8 @@ export function ConfirmDialog({
    * no knowledge of what makes a submission unsafe; the caller decides.
    */
   confirmDisabled?: boolean;
+  /** Wider panel for editors (e.g. the Admin role editor). */
+  wide?: boolean;
   children?: ReactNode | ((state: FormState) => ReactNode);
 }) {
   const { t } = useI18n();
@@ -139,7 +142,8 @@ export function ConfirmDialog({
             aria-labelledby={titleId}
             aria-describedby={body ? bodyId : undefined}
             className={cn(
-              "flex max-h-[90dvh] w-full max-w-md flex-col gap-md overflow-auto rounded-md border bg-surface p-lg shadow-lg",
+              "flex max-h-[90dvh] w-full flex-col gap-md overflow-auto rounded-md border bg-surface p-lg shadow-lg",
+              wide ? "max-w-2xl" : "max-w-md",
             )}
           >
             <h2 id={titleId} className="text-title text-fg">

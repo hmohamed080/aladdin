@@ -418,46 +418,6 @@ export function flagDuplicateOrgNames<T extends { id: string; name: string; orgT
 }
 
 /* ---------------------------------------------------------------------- */
-/* Admin Staff roster — REAL. `platform_role_grants` is a genuine, already- */
-/* queryable table (readable by any platform staff member under existing  */
-/* RLS — the same read `loadPlatformRole()` already performs for the       */
-/* caller's own row, generalized to all rows). There is no "status"        */
-/* (invited/active/disabled) column in this schema today — every grant is  */
-/* implicitly active, which this preview states honestly rather than       */
-/* inventing a status value the database cannot back yet.                  */
-/* ---------------------------------------------------------------------- */
-
-export type AdminStaffRow = {
-  userId: string;
-  displayName: string;
-  role: "support" | "moderator" | "administrator";
-  grantedByUserId: string | null;
-  grantedByName: string | null;
-  createdAt: string;
-};
-
-export async function previewAdminStaff(supabase: Client): Promise<AdminStaffRow[]> {
-  const { data: grants, error } = await supabase
-    .from("platform_role_grants")
-    .select("user_id, role, granted_by, created_at")
-    .order("created_at", { ascending: false });
-  if (error) return [];
-  const rows = grants ?? [];
-  const userIds = Array.from(new Set([...rows.map((r) => r.user_id), ...rows.flatMap((r) => (r.granted_by ? [r.granted_by] : []))]));
-  if (userIds.length === 0) return [];
-  const { data: profiles } = await supabase.from("profiles").select("user_id, display_name").in("user_id", userIds);
-  const nameByUserId = new Map((profiles ?? []).map((p) => [p.user_id, p.display_name]));
-  return rows.map((r) => ({
-    userId: r.user_id,
-    displayName: nameByUserId.get(r.user_id) ?? "",
-    role: r.role,
-    grantedByUserId: r.granted_by,
-    grantedByName: r.granted_by ? (nameByUserId.get(r.granted_by) ?? null) : null,
-    createdAt: r.created_at,
-  }));
-}
-
-/* ---------------------------------------------------------------------- */
 /* Directory bulk context — REAL. One extra pair of queries so the Users   */
 /* directory table can show each user's primary organization and latest    */
 /* verification status without an N+1 per-row fetch. Reuses the exact      */

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
+import { canAccessAdminPath, type AdminAccess } from "@/lib/permissions/admin";
 import { cn } from "@/lib/ui/cn";
 import { CommandPalette } from "@/features/admin-preview/command-palette";
 import type { PaletteItem } from "@/features/admin-preview/command-palette-search";
@@ -19,6 +20,9 @@ import {
   BarChartIcon,
   SettingsIcon,
 } from "@/components/ui/icons";
+
+/** Preview routes already promoted to real, enforced Admin Core (Phase 1A: Staff · Roles · Permissions). */
+const LIVE_PREVIEW_ROUTES = ["/admin/preview/staff"];
 
 type Item = { href: string; key: string; Icon: ComponentType<{ size?: number }> };
 
@@ -38,26 +42,42 @@ const items: Item[] = [
  * The Phase 0 Preview's own chrome: a permanent banner (so this can never be
  * mistaken for the live Admin console) and a secondary nav for the preview's
  * information architecture. Rendered inside the REAL `app/admin/layout.tsx`,
- * so it already sits behind the same platform-role gate as every other admin
- * route — no second auth check is implemented here.
+ * so it already sits behind the Admin Staff gate. Tabs show only areas the
+ * caller's permissions open (same route table as the page guards); each page
+ * still enforces its own permission.
  */
-export function PreviewShell({ children, paletteItems }: { children: ReactNode; paletteItems: PaletteItem[] }) {
+export function PreviewShell({
+  children,
+  paletteItems,
+  access,
+}: {
+  children: ReactNode;
+  paletteItems: PaletteItem[];
+  access: AdminAccess;
+}) {
   const { t } = useI18n();
   const pathname = usePathname();
   const isActive = (href: string) => (href === "/admin/preview" ? pathname === href : pathname.startsWith(href));
+
+  // PD-016: Preview areas are promoted one at a time. A promoted (live) area must
+  // never sit under the "nothing is saved" banner — that would be untrue.
+  const live = LIVE_PREVIEW_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
 
   return (
     <div className="flex flex-col gap-lg">
       <div
         role="note"
-        className="flex items-start gap-3 rounded-md border border-warning/40 bg-warning/10 px-md py-3"
+        className={cn(
+          "flex items-start gap-3 rounded-md border px-md py-3",
+          live ? "border-info/40 bg-info/10" : "border-warning/40 bg-warning/10",
+        )}
       >
-        <span aria-hidden="true" className="mt-0.5 shrink-0 text-warning">
+        <span aria-hidden="true" className={cn("mt-0.5 shrink-0", live ? "text-info" : "text-warning")}>
           <AlertIcon size={18} />
         </span>
         <div className="min-w-0">
-          <p className="text-body-lg font-medium text-fg">{t("admin.preview.bannerTitle")}</p>
-          <p className="mt-0.5 text-body text-fg-secondary">{t("admin.preview.bannerBody")}</p>
+          <p className="text-body-lg font-medium text-fg">{t(live ? "admin.preview.liveBannerTitle" : "admin.preview.bannerTitle")}</p>
+          <p className="mt-0.5 text-body text-fg-secondary">{t(live ? "admin.preview.liveBannerBody" : "admin.preview.bannerBody")}</p>
         </div>
       </div>
 
@@ -66,7 +86,7 @@ export function PreviewShell({ children, paletteItems }: { children: ReactNode; 
 
       <nav aria-label={t("admin.preview.navLabel")} className="-mx-1 overflow-x-auto overflow-y-hidden">
         <ul className="flex w-max min-w-full gap-1 border-b px-1">
-          {items.map(({ href, key, Icon }) => {
+          {items.filter((i) => canAccessAdminPath(access, i.href)).map(({ href, key, Icon }) => {
             const active = isActive(href);
             return (
               <li key={href}>
