@@ -1,6 +1,14 @@
 # Runtime State
 
-## Current continuation — 2026-09-30 (Admin Core Phase 1A CLOSED / APPROVED, latest)
+## Current continuation — 2026-09-30 (Admin Core Phase 1B-A: Users + Organizations reads, latest)
+
+- **Admin Core Phase 1B-A implemented, awaiting Product Owner approval.** Branch `feature/admin-core-users-organizations` (worktree `.claude/worktrees/admin-core-users-organizations`, base `bc16841` = approved Phase 1A). **Not pushed, no PR**; hosted Supabase/Vercel, the shared local `aladdin` DB and the main checkout untouched. **Phase 1B-B (mutations) NOT started.**
+- New migrations (80 total): `20260930090001_profile_completion_shared.sql` (one completion formula, `app.profile_completion`, wrapped by `my_profile_completion`) and `20260930090002_admin_users_organizations_read.sql` (`admin_users_list`, `admin_user_detail`, `admin_organizations_list`, `admin_organization_detail` — platform `users.read` / `organizations.read`).
+- `/admin/preview/users` and `/admin/preview/organizations` (+ details) render **real data only**, server-paginated over the full dataset, under a "Live data — actions not connected yet" banner; their actions are still Preview dialogs. Legacy `/admin/users*` and `/admin/organizations*` redirect to them.
+- Verified on the ISOLATED `aladdin_1b` stack (ports 563xx), rebuilt from zero after the final migration edit: pgTAP **68 files / 2669 tests PASS** (2594 + 75). Frontend: typecheck clean, lint 0 errors (1 pre-existing warning), Vitest **160 files / 1989 tests PASS**. Browser QA across five roles, EN/AR, desktop/mobile, dark/light — [`ADMIN_USERS_ORGS_READ_AUDIT.md`](../admin/ADMIN_USERS_ORGS_READ_AUDIT.md) §12.
+- Remaining before operations: Phase 1B-B (suspend/restore, notes, follow-up, report, duplicates, Points adjust/reverse); BL-026 (stored completion at scale), BL-027 (scoped directories), BL-028 (palette / Points picker off the 200-row list).
+
+## Current continuation — 2026-09-30 (Admin Core Phase 1A CLOSED / APPROVED)
 
 - **Admin Core Phase 1A is CLOSED / APPROVED**; [ADR-0011](../decisions/ADR-0011-admin-rbac-platform-authority.md) **Accepted**. Branch `feature/admin-core-rbac-foundation` — not pushed, no PR. **Phase 1B (Users / Organizations) has NOT started.**
 - **Deployment gate:** any environment receiving migration `20260929100001` has **zero Super Admins** until the one-time, DB-owner-only bootstrap in [`docs/admin/SUPER_ADMIN_BOOTSTRAP.md`](../admin/SUPER_ADMIN_BOOTSTRAP.md) is performed and recorded; Roles management is not operational before that. Not performed on staging or production.

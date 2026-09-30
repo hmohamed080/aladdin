@@ -168,6 +168,7 @@ Phases are ordered by operational necessity, not by convenience of implementatio
 Per the Product Owner's Part B direction, this phase's scope is now approved and authoritative for implementation (still **not implemented** — this is a scope lock, not a build). It absorbs three items that were previously scattered in later phases (admin notes, entity timeline, duplicate management) because the Product Owner scoped them as Phase 2, not later — their original locations below are now forward-references only.
 
 ### BL-005 — Users Directory: server-side search, pagination, filters, sorting
+- **Status (2026-09-30): IMPLEMENTED in Admin Core Phase 1B-A, awaiting Product Owner approval.** `admin_users_list` (platform `users.read`) searches/filters/sorts/pages the full dataset in the database; the 200-row snapshot is gone from the directory. Field sources, contracts, measured plans and the >200-row proof: [ADMIN_USERS_ORGS_READ_AUDIT.md](ADMIN_USERS_ORGS_READ_AUDIT.md).
 - **Problem:** `listUsers()` hard-caps at 200 rows and does search via in-memory JS filtering after the fetch — not scalable, and silently misses users outside the newest 200.
 - **Expected outcome:** Real DB-side search, status/account-type filters, sortable columns, and real server-side pagination. **Explicitly locked requirement: no fixed-200-row, browser-search architecture** — the replacement must not simply raise the cap, it must remove the "fetch everything then filter in JS" shape entirely.
 - **Related feature-matrix rows:** A1.
@@ -184,6 +185,7 @@ Per the Product Owner's Part B direction, this phase's scope is now approved and
 - **Suggested priority:** P1
 
 ### BL-021 — User Details Page: locked information architecture
+- **Status (2026-09-30): READ MODEL IMPLEMENTED (Phase 1B-A), awaiting approval.** Overview/Profile/Organizations/Verification from `admin_user_detail`; Points (`points.read`) and Audit (`audit.read`) keep their own permission; Activity shows "not tracked"; Admin Notes / Follow-up / Report persistence is Phase 1B-B. See [ADMIN_USERS_ORGS_READ_AUDIT.md](ADMIN_USERS_ORGS_READ_AUDIT.md) §3.
 - **Problem:** `AdminUserDetailPage` today shows only type/status/joined/memberships/verifications, with no consistent structure for the richer set of tabs Phase 2 requires, and no actions at all.
 - **Expected outcome:** The user detail page is organized into the following tabs/sections, each independently loadable:
   1. **Overview** — identity, status, verification badge, quick facts.
@@ -208,6 +210,7 @@ Per the Product Owner's Part B direction, this phase's scope is now approved and
 - **Suggested priority:** P1
 
 ### BL-006 — Organizations Directory: server-side search, pagination, filters, sorting
+- **Status (2026-09-30): IMPLEMENTED in Admin Core Phase 1B-A, awaiting approval.** `admin_organizations_list` (platform `organizations.read`). Phone, City and Profile Completion have no authoritative source and show "Not available"; the City filter and Completion sort are not offered. See [ADMIN_USERS_ORGS_READ_AUDIT.md](ADMIN_USERS_ORGS_READ_AUDIT.md).
 - **Problem:** `listOrganizations()` has the same `.limit(200)` ceiling and, worse, no search field at all.
 - **Expected outcome:** Same as BL-005, for organizations (search by name, filter by org_type/status, sortable columns, real pagination) — same "no fixed-200-row, browser-search architecture" requirement.
 - **Related feature-matrix rows:** A2.
@@ -219,6 +222,7 @@ Per the Product Owner's Part B direction, this phase's scope is now approved and
 - **Suggested priority:** P1
 
 ### BL-022 — Organization Details Page: locked information architecture
+- **Status (2026-09-30): READ MODEL IMPLEMENTED (Phase 1B-A), awaiting approval.** `admin_organization_detail`; Ownership = active `org.manage` holders; Network = provenance (duplicates are Phase 1B-B); Activity "not tracked"; Admin Notes Phase 1B-B; Audit needs `audit.read`. See [ADMIN_USERS_ORGS_READ_AUDIT.md](ADMIN_USERS_ORGS_READ_AUDIT.md) §4.
 - **Problem:** `AdminOrgDetailPage` today shows type/status/verified/branches/members/verifications, with no consistent structure for the richer set of tabs Phase 2 requires, no actions, and no referral-provenance visibility (BL-007's original gap).
 - **Expected outcome:** The organization detail page is organized into the following tabs/sections:
   1. **Overview** — name, type, status, verification badge, quick facts.
@@ -412,6 +416,15 @@ Per the Product Owner's Part B direction, this phase's scope is now approved and
 - **Constraints:** additive only; **never** an authorization input (verified 2026-09-30 that `actor_role` is written only by `app.record_audit_event` and read by no policy/view/check); existing rows keep their legacy value; decide whether `actor_role` is then deprecated.
 - **Blocked by:** nothing (ADR-0011 accepted). **Suggested priority:** P3, with the Audit module's wiring; not scheduled.
 
+### BL-026 — Stored profile-completion value for large-scale sorting
+- **What:** sorting the FULL Users directory by Profile Completion evaluates `app.profile_completion()` (plpgsql, several lookups) for every row — measured 3.8 s at 20,287 users (filtered sorts are proportionally cheaper; pilot scale is fine). When the user base approaches ~10k, maintain the percentage in a stored column updated by triggers on the inputs (profiles, onboarding_progress, individual_onboarding, user_activities, user_trades, memberships, membership_capabilities, organization_activities), computed by the SAME function — never a second formula. **Blocked by:** nothing. **Suggested priority:** P3, scale-triggered.
+
+### BL-027 — Scoped Users / Organizations directories (RBAC option B)
+- **What:** Phase 1B-A requires a PLATFORM-scoped `users.read` / `organizations.read` for the global directories and refuses scoped assignments. A scoped directory (results restricted to the caller's organization/branch scope) needs its own UI and query contract. **Blocked by:** a product decision that scoped Admin roles need directory access. **Suggested priority:** Later.
+
+### BL-028 — Command palette and Points user picker off the 200-row list
+- **What:** `listUsers()` / `listOrganizations()` (200 rows, JavaScript search) still feed the Admin command-palette index and the Points page's user picker. Move both to `admin_users_list` / `admin_organizations_list` (server search). **Blocked by:** nothing. **Suggested priority:** P2, with the Points / palette promotion.
+
 ### BL-019 — Platform-level internal lead/prospect CRM
 - **Related feature-matrix rows:** none directly (Talent-specific, see the matrix's "Talent-specific" table). **Blocked by:** PD-007 (approved decision: DEFERRED — do not build simply because Talent has one; revisit only when a real Aladdin Sales/Onboarding need justifies it). **Suggested priority:** Later, not scheduled.
 
@@ -431,7 +444,7 @@ Each Phase 6 item is deliberately left at backlog-entry depth (not full field-by
 | 0C — Admin Blueprint Final Refinement | (this document's own delivery) | — | **Delivered 2026-09-20** — global table/search/pagination conventions, Users/Organizations final column model, Points rework, Analytics KPI/chart/Top-Pages/Visitors, Audit partial pagination, new Settings page, CRM RBAC gap analysis |
 | 0D — Final Admin Product Blueprint | (this document's own delivery) | — | **Implemented 2026-09-29, awaiting PO approval** — table/pagination standards, Command Palette, Follow-up/Report, Settings Change Password (PD-014), Dynamic RBAC Preview (PD-008), Review Center separation (PD-015), Points/Analytics/Audit revisions. **Pre-PR gate: clean DB reset + full pgTAP** |
 | 1 — Admin operational safety | BL-001–004 | P0 | Semantics/tiers **approved** (PD-004/010/011/012); backend build gated on Phase 0/0B review (PD-013) |
-| 2 — User & org operations | BL-005–006, BL-008, BL-012, BL-015, BL-021–022 | P1 | **Scope APPROVED/LOCKED** 2026-09-19; not yet implemented |
+| 2 — User & org operations | BL-005–006, BL-008, BL-012, BL-015, BL-021–022 | P1 | **Scope APPROVED/LOCKED** 2026-09-19. **Admin Core Phase 1B-A (2026-09-30, awaiting approval):** BL-005/006 implemented; BL-021/022 read models implemented. BL-008 (notes), BL-012 (timeline), BL-015 (duplicates) and all user/org mutations (BL-001/002) belong to Phase 1B-B |
 | 3 — Moderation/review enrichment | BL-009–010 | P1 | BL-010's taxonomy is approved (PD-005); not yet implemented |
 | 4 — Audit & history | BL-011 | P1 | Not yet implemented (BL-012 moved to Phase 2) |
 | 5 — Dashboard & discoverability | BL-013–014 | P2 | Not yet implemented (BL-015 moved to Phase 2) |

@@ -4,6 +4,26 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Admin Core Phase 1B-A: Users + Organizations production reads (directories and details)
+
+**Date:** 2026-09-30 · **Branch:** `feature/admin-core-users-organizations` (worktree `.claude/worktrees/admin-core-users-organizations`, created from exactly `bc16841` after confirming the Phase 1A worktree clean and all eight Phase 1A commits present) · Not pushed; no PR; production/staging, the shared `aladdin` DB and the main checkout untouched; only the new isolated `aladdin_1b` stack (ports 563xx, junction-linked to this worktree's migrations/tests) was used. **Phase 1B-B not started.**
+
+**Audit first.** Every Users/Organizations directory column and every detail tab mapped UI field → Preview source → authoritative source → permission → query plan → REAL/DERIVED/UNAVAILABLE in [`ADMIN_USERS_ORGS_READ_AUDIT.md`](../admin/ADMIN_USERS_ORGS_READ_AUDIT.md) before any schema work. Key facts: `contacts` is written by no product path (email = `auth.users.email`, minus the Installer login alias); phone = `profiles.phone_e164`; the only live location is the onboarding governorate; organizations have no phone, city or completion source; there is no product-activity source.
+
+**Database.** `app.profile_completion(user_id)` holds `my_profile_completion()`'s body verbatim (the self RPC wraps it; test 41's reviewed `user_trades` allow-list follows the formula). Four read RPCs, platform-scoped, deterministic (sort key + primary key), full-dataset search/AND filters/sort/paging, tab counts, page clamped. Query-plan review at 20,287 users: per-row SQL helpers made inlinable (dropping their own `SET search_path`; 256 → 61 ms scan), email search set-based; list/search ~125 ms, organizations 4–14 ms; no index added (the totals need the full filtered pass); full-set completion sort 3.8 s → BL-026.
+
+**Frontend.** One URL parser (invalid → safe default), fail-closed JSON mappers, one loader module; Users/Organizations directories and details rewired with the approved layout preserved; truthful "Not available" / "not tracked" / "not connected" states replace every fixture; Points and Audit panels need `points.read` / `audit.read`; View on Platform uses the profile id (orgs stay disabled); a dedicated "Live data — actions not connected yet" banner; legacy routes redirect; retired fixtures and the snapshot helpers deleted (remaining 200-row consumers → BL-028).
+
+**QA found and fixed:** deep page links reset to page 1 (filter bar navigated on mount); the pager overflowed a 375 px RTL phone; stale "Planned … 200-row cap" copy and a "Preview fixture" label.
+
+**Validation.** Isolated `supabase db reset` from zero (80 migrations + 3 seeds) → `supabase test db`: **68 files / 2669 tests PASS** (75 new in `67_admin_users_organizations_read_test.sql`), after the final migration edit. >200-row proof (287 users / 242 orgs, matches deliberately oldest) and browser QA across Super Admin / Administrator / Support / org-scoped / non-staff, EN + AR, desktop + mobile, dark + light (audit doc §9, §12). `pnpm typecheck` clean · `lint` 0 errors (1 pre-existing warning) · Vitest **160 files / 1989 tests PASS**. `check_doc_links.py` run before the docs commit.
+
+**Notes.** The preview tool reads `.claude/launch.json` from the main checkout, so the worktree dev server ran from the shell on :3200 (main checkout untouched). The Semgrep Guardian post-edit scans reported "service returned an error" several times (service outage, not findings). QA accounts/passwords and QA rows exist only in `aladdin_1b`.
+
+**Unfinished / next (explicit).** Phase 1B-B: user/org suspend & restore (BL-001/002; PD-010's last-Super-Admin guard), Admin Notes (BL-008), Follow-up and Report persistence, duplicate detection/linking (BL-015), verification decisions beyond existing flows, Points adjust/reverse UI (BL-003), Organization Requests (BL-023). Later: BL-026, BL-027, BL-028, Realtime (BL-024; these pages are "navigation refetch").
+
+---
+
 ## Session — Admin Core Phase 1A closure pass: Super Admin deployment gate, actor_role audit debt, CLOSED / APPROVED
 
 **Date:** 2026-09-30 · **Branch:** `feature/admin-core-rbac-foundation` · Not pushed; no PR; production/staging untouched; only the isolated `aladdin_rbac` DB used. Phase 1B **not** started; RBAC not redesigned or expanded.
