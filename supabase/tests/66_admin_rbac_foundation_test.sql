@@ -23,7 +23,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(114);
+select plan(117);
 
 \set padmin   '55555555-5555-4555-8555-555555555555'
 \set super1   '11111111-1111-4111-8111-111111111111'
@@ -61,7 +61,7 @@ exception when others then
   return sqlstate || ': ' || sqlerrm;
 end;
 $$;
-grant execute on function pg_temp.act_as(uuid), pg_temp.as_dba(), pg_temp.outcome(text) to authenticated, anon;
+grant execute on function pg_temp.act_as(uuid), pg_temp.as_dba(), pg_temp.outcome(text) to authenticated, anon, service_role;
 
 -- Fixture lookup (runs as its owner: `authenticated` rightly cannot read admin_roles).
 create function pg_temp.role_id(p_key text) returns uuid language sql security definer as $$
@@ -222,6 +222,14 @@ select is(app.admin_backfill_legacy_grants(), 0, 'backfill is idempotent');
 -- ===========================================================================
 -- F. Last-Super-Admin protection
 -- ===========================================================================
+select throws_ok(format($$select app.admin_bootstrap_super_admin(%L)$$, '70000010-0000-4000-8000-000000000010'),
+  '22023', null, 'bootstrap refuses a non-active target account');
+select throws_ok(format($$insert into public.platform_role_grants (user_id, role) values (%L, 'super_admin')$$, :'plain'),
+  '22P02', null, 'the legacy bridge cannot mint a Super Admin (no such legacy tier)');
+set local role service_role;
+select throws_ok(format($$select app.admin_bootstrap_super_admin(%L)$$, :'super1'),
+  '42501', null, 'service_role cannot run the bootstrap (DB owner only)');
+select pg_temp.as_dba();
 select lives_ok(format($$select app.admin_bootstrap_super_admin(%L)$$, :'super1'),
   'DBA bootstrap of the first Super Admin');
 select throws_ok(format($$select app.admin_bootstrap_super_admin(%L)$$, :'super2'),
