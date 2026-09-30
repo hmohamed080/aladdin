@@ -51,7 +51,6 @@ describe("AutoFilters", () => {
     vi.useFakeTimers();
     currentQuery = "status=suspended&verification=pending&sort=completeness:asc&page=7";
     render(wrap(<AutoFilters fields={fields} />));
-    replace.mockClear(); // the initial debounced sync
     fireEvent.change(screen.getByPlaceholderText("Search"), { target: { value: "hana" } });
     act(() => {
       vi.advanceTimersByTime(300);
@@ -63,6 +62,16 @@ describe("AutoFilters", () => {
     expect(url.searchParams.get("verification")).toBe("pending");
     expect(url.searchParams.get("sort")).toBe("completeness:asc");
     expect(replace.mock.calls.at(-1)?.[1]).toEqual({ scroll: false });
+  });
+
+  it("mounting on a deep page does not navigate (a link to page 25 stays on page 25)", () => {
+    vi.useFakeTimers();
+    currentQuery = "q=hana&page=25";
+    render(wrap(<AutoFilters fields={fields} />));
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it("a filter change resets to page 1", () => {

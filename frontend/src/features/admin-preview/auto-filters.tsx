@@ -82,6 +82,12 @@ export function AutoFilters({ fields }: { fields: FilterFieldConfig[] }) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    // Only a real edit navigates. On mount the text fields already equal the
+    // URL, and navigating then would drop `page` — a link or reload to page 25
+    // would silently land on page 1 (found in Phase 1B-A browser QA).
+    const current = pending.current ?? new URLSearchParams(committed);
+    const changed = Object.entries(textValues).some(([k, v]) => v !== (current.get(k) ?? ""));
+    if (!changed) return;
     debounceRef.current = setTimeout(() => navigate(textValues), 300);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);

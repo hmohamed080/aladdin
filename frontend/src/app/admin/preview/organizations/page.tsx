@@ -211,7 +211,7 @@ export default async function PreviewOrganizationsPage({
   if (!result.ok) {
     return (
       <div className="flex flex-col gap-lg">
-        <AdminHeader locale={locale} title={t.title} subtitle={t.detailSubtitle} />
+        <AdminHeader locale={locale} title={t.title} subtitle={t.subtitle} />
         {filters}
         <StatePanel title={d.loadError} />
       </div>
@@ -223,7 +223,7 @@ export default async function PreviewOrganizationsPage({
 
   return (
     <div className="flex flex-col gap-lg">
-      <AdminHeader locale={locale} title={t.title} subtitle={t.detailSubtitle} count={total} />
+      <AdminHeader locale={locale} title={t.title} subtitle={t.subtitle} count={total} />
 
       <TabLinks
         basePath="/admin/preview/organizations"

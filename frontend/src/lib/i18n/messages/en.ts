@@ -1125,8 +1125,8 @@ export const en = {
       },
       users: {
         title: "Users",
-        subtitle: "Planned directory: server-side search, filters, sorting and pagination replace today's 200-row cap.",
-        detailSubtitle: "Planned detail page — tabs represent the approved Phase 2 information architecture.",
+        subtitle: "Every Aladdin account, searched, filtered, sorted and paged on the server over the full directory.",
+        detailSubtitle: "Account, profile, organizations and verification, read live from Aladdin.",
         searchPlaceholder: "Search by name or type",
         search: "Search",
         empty: "No users match.",
@@ -1258,8 +1258,8 @@ export const en = {
       },
       organizations: {
         title: "Organizations",
-        subtitle: "Planned directory: server-side search, filters, sorting and pagination replace today's 200-row cap.",
-        detailSubtitle: "Planned detail page — tabs represent the approved Phase 2 information architecture.",
+        subtitle: "Every organization on Aladdin, searched, filtered, sorted and paged on the server over the full directory.",
+        detailSubtitle: "Organization, members, branches, ownership and verification, read live from Aladdin.",
         searchPlaceholder: "Search by name",
         search: "Search",
         empty: "No organizations match.",
@@ -1856,7 +1856,7 @@ export const en = {
         historyTitle: "Follow-up history",
         historyEmpty: "No follow-up actions logged yet.",
         separationNote: "Follow-up is operational contact history. It is separate from Admin Notes (context), Audit (system changes) and Activity (timeline).",
-        fixtureNotice: "Preview fixture — follow-ups are not persisted yet.",
+        fixtureNotice: "Not connected yet — follow-ups are not saved, so there is no history to show.",
         columns: {
           type: "Action",
           outcome: "Outcome",

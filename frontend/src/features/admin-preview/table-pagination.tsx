@@ -83,7 +83,9 @@ export function TablePagination({
       </p>
 
       <div className="flex flex-wrap items-center gap-x-md gap-y-sm">
-        <div className="flex items-center gap-1">
+        {/* Wraps: with real totals (Phase 1B-A) a full 7-page strip plus
+            Previous/Next is wider than a 375px phone. */}
+        <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
             disabled={page <= 1}

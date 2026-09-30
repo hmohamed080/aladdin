@@ -327,7 +327,7 @@ export default async function PreviewUsersPage({
   if (!result.ok) {
     return (
       <div className="flex flex-col gap-lg">
-        <AdminHeader locale={locale} title={t.title} subtitle={t.detailSubtitle} />
+        <AdminHeader locale={locale} title={t.title} subtitle={t.subtitle} />
         {filters}
         <StatePanel title={d.loadError} />
       </div>
@@ -339,7 +339,7 @@ export default async function PreviewUsersPage({
 
   return (
     <div className="flex flex-col gap-lg">
-      <AdminHeader locale={locale} title={t.title} subtitle={t.detailSubtitle} count={total} />
+      <AdminHeader locale={locale} title={t.title} subtitle={t.subtitle} count={total} />
 
       {counts.pending > 0 ? (
         <Card pad="sm" className="flex flex-col gap-1.5">
