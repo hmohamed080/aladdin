@@ -2,11 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { getUserDetail } from "@/server/queries/admin";
-import { previewUserPointsLedger, previewUserTimeline, previewSubjectAudit, previewUsersDirectoryContext } from "@/server/queries/admin-preview";
-import { listAdminStaff } from "@/server/queries/admin-rbac";
-import { FollowUpPanel } from "@/features/admin-preview/follow-up-panel";
-import { previewNotesFor, previewCompletenessFor, previewUserDuplicateFlag, previewFollowUpsFor, previewContactFor } from "@/features/admin-preview/fixtures";
+import { loadUserDetail } from "@/server/queries/admin-directory";
+import { previewUserPointsLedger, previewSubjectAudit } from "@/server/queries/admin-preview";
+import { localizedName } from "@/features/admin-preview/directory-mappers";
+import { can } from "@/lib/permissions/admin";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatAdminDate, formatDateTime, formatNumber } from "@/lib/ui/format";
@@ -15,6 +14,8 @@ import { AdminHeader, StatusBadge } from "@/features/admin/parts";
 import { Card, Badge, Field, SectionTitle, StatePanel } from "@/components/ui/primitives";
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
+import { FollowUpPanel } from "@/features/admin-preview/follow-up-panel";
+import { listAdminStaff } from "@/server/queries/admin-rbac";
 import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-actions-menu";
 import { EyeIcon } from "@/components/ui/icons";
 import { LabeledField, Textarea, Select, Input } from "@/components/ui/controls";
@@ -23,16 +24,21 @@ import { requireAdminRoute } from "@/server/authorization/admin";
 export const dynamic = "force-dynamic";
 
 /**
- * Phase 0 preview — User Details (BL-021's locked information architecture):
- * Overview / Profile / Organizations / Verification / Points / Activity /
- * Admin Notes / Audit. Real data everywhere it exists (getUserDetail, the
- * Points ledger, the composed Entity Timeline, the scoped audit read); the
- * "Admin Notes" tab is the one section with no backend (BL-008) and uses a
- * clearly-labelled preview fixture. Suspend/Restore are shown as preview-only
- * dialogs (BL-001) — no real mutation is possible from this page.
+ * User Details — Admin Core Phase 1B-A. The approved tab architecture (BL-021)
+ * over REAL reads:
  *
- * Only the ACTIVE tab's own data is fetched, server-side, before render —
- * there is no client-side tab component here, each tab is its own request.
+ *   Overview · Profile · Organizations · Verification — `admin_user_detail`
+ *     (platform users.read), one RPC.
+ *   Points — only with `points.read`; the ledger reads through its own
+ *     `points.read` RLS policy. Adjust / Reverse stay Preview dialogs (1B-B)
+ *     and are drawn only for holders of points.adjust / points.reverse.
+ *   Audit — only with `audit.read` (its own RLS policy).
+ *   Activity — no product-activity source exists; an honest empty state.
+ *   Follow-up · Report · Admin Notes — no backend yet (Phase 1B-B): the
+ *     approved controls stay (Preview dialogs), with no fixture records.
+ *
+ * Opening this page never widens access: the nested panels check their own
+ * permission server-side AND in the database.
  */
 export default async function PreviewUserDetailPage({
   params,
@@ -41,7 +47,7 @@ export default async function PreviewUserDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
-  await requireAdminRoute("/admin/preview/users");
+  const access = await requireAdminRoute("/admin/preview/users");
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
   const tab = tabParam || "overview";
@@ -49,33 +55,51 @@ export default async function PreviewUserDetailPage({
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const m = getMessages(locale);
-  const user = await getUserDetail(supabase, id);
+
+  const t = m.admin.preview.users;
+  const d = m.admin.preview.directory;
+  const loaded = await loadUserDetail(supabase, id);
+  if (!loaded.ok) {
+    return (
+      <div className="flex flex-col gap-lg">
+        <Link href="/admin/preview/users" className="text-label text-accent hover:underline">
+          ← {t.title}
+        </Link>
+        <StatePanel title={d.detailLoadError} />
+      </div>
+    );
+  }
+  const user = loaded.data;
   if (!user) notFound();
 
+  const canPoints = can(access, "points.read");
+  const canAudit = can(access, "audit.read");
   const typeLabels = m.accountType as Record<string, string>;
   const statusLabels = m.admin.status as Record<string, string>;
   const actionLabels = m.admin.actions as Record<string, string>;
-  const t = m.admin.preview.users;
+  const governorateLabels = m.onboarding.consumer.governorates as Record<string, string>;
+  const cityLabels = m.onboarding.consumer.cities as Record<string, string>;
+  const completionItemLabels = d.completionItems as Record<string, string>;
   const pt = m.admin.preview.points;
-  const tl = m.admin.preview.timeline;
-  const nt = m.admin.preview.notes;
   const ov = m.admin.preview.userOverview;
-  // "View on platform" targets `/p/[profileId]` — the PROFILE id, not the user
-  // id, and only when the public projection will actually render that page.
-  const platformCtx = (await previewUsersDirectoryContext(supabase, [id])).get(id);
-  const platformHref = platformCtx?.profileId && platformCtx.publicProfileAvailable ? `/p/${platformCtx.profileId}` : null;
   const platform = m.admin.preview.platformView;
+  const rp = m.admin.preview.report;
+  const fu = m.admin.preview.followUp;
+  const name = localizedName(user.displayName, locale) || m.admin.users.unnamed;
+  const platformHref = user.profileId && user.publicProfileAvailable ? `/p/${user.profileId}` : null;
+  const location = user.governorate
+    ? [governorateLabels[user.governorate] ?? user.governorate, user.city ? (cityLabels[user.city] ?? user.city) : null].filter(Boolean).join(" · ")
+    : null;
+  const firstOrg = user.memberships.find((mm) => mm.status === "active") ?? user.memberships[0];
   const headerMoreActions: RowAction[] = [
     { kind: "link", label: t.rowActions.addNote, href: `/admin/preview/users/${id}?tab=notes` },
     { kind: "link", label: t.rowActions.followUp, href: `/admin/preview/users/${id}?tab=followup` },
     { kind: "link", label: t.rowActions.report, href: `/admin/preview/users/${id}?tab=report` },
-    { kind: "link", label: t.rowActions.audit, href: `/admin/preview/users/${id}?tab=audit` },
-    ...(user.memberships[0]
-      ? [{ kind: "link" as const, label: t.rowActions.viewOrg, href: `/admin/preview/organizations/${user.memberships[0].orgId}` }]
-      : []),
+    ...(canAudit ? [{ kind: "link" as const, label: t.rowActions.audit, href: `/admin/preview/users/${id}?tab=audit` }] : []),
+    ...(firstOrg ? [{ kind: "link" as const, label: t.rowActions.viewOrg, href: `/admin/preview/organizations/${firstOrg.organization.id}` }] : []),
   ];
 
-  const points = tab === "points" || tab === "overview" ? await previewUserPointsLedger(supabase, id) : null;
+  const points = canPoints && (tab === "points" || tab === "overview") ? await previewUserPointsLedger(supabase, user.id) : null;
   let pointsActorNames = new Map<string, string>();
   if (points && points.entries.length > 0) {
     const actorIds = Array.from(new Set(points.entries.flatMap((e) => (e.awardedByUserId ? [e.awardedByUserId] : []))));
@@ -84,18 +108,16 @@ export default async function PreviewUserDetailPage({
       pointsActorNames = new Map((actorProfiles ?? []).map((r) => [r.user_id, r.display_name]));
     }
   }
-  const timeline = tab === "activity" ? await previewUserTimeline(supabase, id) : null;
-  const auditEntries = tab === "audit" ? await previewSubjectAudit(supabase, "user", id) : null;
-  const notes = tab === "notes" ? previewNotesFor(id) : null;
-  const followUps = tab === "followup" ? previewFollowUpsFor(id) : null;
   // Active Admin Staff as follow-up assignees; empty when the caller lacks admin_staff.read.
   const staffNames =
     tab === "followup"
       ? ((await listAdminStaff(supabase)) ?? []).filter((s) => s.isActive).map((s) => s.displayName).filter(Boolean)
       : [];
-  const rp = m.admin.preview.report;
-  const fu = m.admin.preview.followUp;
-  const reportContact = previewContactFor(id);
+  const auditEntries = canAudit && tab === "audit" ? await previewSubjectAudit(supabase, "user", user.id) : null;
+
+  const flags: string[] = [];
+  if (user.status === "suspended") flags.push(statusLabels.suspended ?? user.status);
+  if (user.verificationState === "rejected") flags.push(t.flagLabels.verification_issue);
 
   return (
     <div className="flex flex-col gap-lg">
@@ -104,7 +126,7 @@ export default async function PreviewUserDetailPage({
       </Link>
       <div className="flex flex-wrap items-center justify-between gap-md">
         <div className="flex flex-wrap items-center gap-md">
-          <AdminHeader locale={locale} title={user.displayName || m.admin.users.unnamed} subtitle={user.headline ?? undefined} />
+          <AdminHeader locale={locale} title={name} subtitle={user.headline ?? undefined} />
           <div className="flex items-center gap-2">
             <StatusBadge status={user.status} label={statusLabels[user.status] ?? user.status} />
             {user.isVerified ? <Badge tone="success">{m.admin.users.verified}</Badge> : null}
@@ -171,8 +193,6 @@ export default async function PreviewUserDetailPage({
         ]}
       />
 
-      {tab === "overview" ? <p className="-mt-2 text-label text-fg-muted">{platform.viewOnPlatformHint}</p> : null}
-
       {tab === "overview" ? (
         <div className="flex flex-col gap-lg">
           <Card>
@@ -182,42 +202,63 @@ export default async function PreviewUserDetailPage({
               </Field>
               <Field label={m.admin.users.status}>{statusLabels[user.status] ?? user.status}</Field>
               <Field label={m.admin.users.joined}>{formatAdminDate(user.createdAt, locale)}</Field>
+              <Field label={d.lastSignIn}>{user.lastSignInAt ? formatDateTime(user.lastSignInAt, locale) : d.neverSignedIn}</Field>
               <Field label={ov.organizationsSummary}>{formatNumber(user.memberships.length, locale)}</Field>
-              <Field label={ov.pointsSummary}>{points ? formatNumber(points.balance, locale) : "—"}</Field>
+              <Field label={d.completion}>{formatNumber(user.completion.percent, locale)}%</Field>
+              {points ? <Field label={ov.pointsSummary}>{formatNumber(points.balance, locale)}</Field> : null}
             </dl>
           </Card>
 
           <Card className="flex flex-col gap-sm">
             <SectionTitle>{ov.recentFlags}</SectionTitle>
-            {(() => {
-              const flags: string[] = [];
-              if (user.status === "suspended") flags.push(t.suspendTitle);
-              if (user.verifications.some((v) => v.status === "rejected")) flags.push(m.admin.preview.review.rejectTitle);
-              if (previewUserDuplicateFlag(user.id)) flags.push(m.admin.preview.duplicateBadge);
-              if (previewCompletenessFor(user.id) < 70) flags.push(m.admin.preview.dashboard.attentionSections.incompleteProfiles);
-              return flags.length === 0 ? (
-                <p className="text-body text-fg-secondary">{ov.noFlags}</p>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {flags.map((f) => (
-                    <Badge key={f} tone="warning">
-                      {f}
-                    </Badge>
-                  ))}
-                </div>
-              );
-            })()}
+            {flags.length === 0 ? (
+              <p className="text-body text-fg-secondary">{ov.noFlags}</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {flags.map((f) => (
+                  <Badge key={f} tone="warning">
+                    {f}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       ) : null}
 
       {tab === "profile" ? (
-        <Card>
-          <dl className="grid gap-md tablet:grid-cols-2">
-            <Field label={m.admin.users.name}>{user.displayName || m.admin.users.unnamed}</Field>
-            <Field label={m.admin.users.type}>{user.headline ?? "—"}</Field>
-          </dl>
-        </Card>
+        <div className="flex flex-col gap-lg">
+          <Card>
+            <dl className="grid gap-md tablet:grid-cols-2">
+              <Field label={m.admin.users.name}>{name}</Field>
+              <Field label={d.username}>{user.username ? <span dir="ltr">@{user.username}</span> : d.notProvided}</Field>
+              <Field label={d.email}>{user.email ? <span dir="ltr">{user.email}</span> : d.notProvided}</Field>
+              <Field label={d.phone}>{user.phone ? <span dir="ltr">{user.phone}</span> : d.notProvided}</Field>
+              <Field label={d.location}>{location ?? d.notProvided}</Field>
+              <Field label={d.headline}>{user.headline ?? d.notProvided}</Field>
+              <Field label={d.bio}>{user.bio ?? d.notProvided}</Field>
+            </dl>
+          </Card>
+          <Card className="flex flex-col gap-sm">
+            <SectionTitle>
+              {d.completion}: {formatNumber(user.completion.percent, locale)}%
+            </SectionTitle>
+            {user.completion.missing.length === 0 ? (
+              <p className="text-body text-fg-secondary">{d.completionComplete}</p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <p className="text-label text-fg-muted">{d.completionMissing}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {user.completion.missing.map((k) => (
+                    <Badge key={k} tone="neutral">
+                      {completionItemLabels[k] ?? k}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
       ) : null}
 
       {tab === "organizations" ? (
@@ -229,15 +270,15 @@ export default async function PreviewUserDetailPage({
               {user.memberships.map((mm) => (
                 <Card key={mm.membershipId} pad="sm" className="flex flex-col gap-2">
                   <div className="flex flex-wrap items-center justify-between gap-md">
-                    <Link href={`/admin/preview/organizations/${mm.orgId}`} className="font-medium text-accent hover:underline">
-                      {mm.orgName}
+                    <Link href={`/admin/preview/organizations/${mm.organization.id}`} className="font-medium text-accent hover:underline">
+                      {localizedName(mm.organization, locale)}
                     </Link>
                     <StatusBadge status={mm.status} label={statusLabels[mm.status] ?? mm.status} />
                   </div>
                   {mm.capabilities.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-1.5" aria-label={d.capabilities}>
                       {mm.capabilities.map((c) => (
-                        <span key={c} className="rounded-pill bg-surface-2 px-2 py-0.5 text-label text-fg-secondary">
+                        <span key={c} dir="ltr" className="rounded-pill bg-surface-2 px-2 py-0.5 text-label text-fg-secondary">
                           {c}
                         </span>
                       ))}
@@ -263,7 +304,10 @@ export default async function PreviewUserDetailPage({
                       {(m.admin.verificationType as Record<string, string>)[v.verificationType] ?? v.verificationType}
                       {v.requestedAccountType ? ` → ${typeLabels[v.requestedAccountType] ?? v.requestedAccountType}` : ""}
                     </p>
-                    <p className="text-label text-fg-muted">{formatAdminDate(v.submittedAt, locale)}</p>
+                    <p className="text-label text-fg-muted">
+                      {formatAdminDate(v.submittedAt, locale)}
+                      {v.reason ? ` · ${v.reason}` : ""}
+                    </p>
                   </div>
                   <StatusBadge status={v.status} label={statusLabels[v.status] ?? v.status} />
                 </Card>
@@ -273,35 +317,32 @@ export default async function PreviewUserDetailPage({
         </section>
       ) : null}
 
+      {tab === "points" && !canPoints ? <StatePanel title={d.pointsLocked} /> : null}
       {tab === "points" && points ? (
         <section className="flex flex-col gap-md">
           <div className="flex flex-wrap items-center justify-between gap-md">
             <SectionTitle>
               {pt.summary}: {formatNumber(points.balance, locale)}
             </SectionTitle>
-            <PreviewActionDialog trigger={pt.adjust} title={pt.adjustTitle} body={pt.adjustBody} confirmLabel={pt.adjust} confirmVariant="accent">
-              <LabeledField label={pt.direction} htmlFor="adjust-direction">
-                <Select id="adjust-direction" defaultValue="credit">
-                  <option value="credit">{pt.creditLabel}</option>
-                  <option value="debit">{pt.debitLabel}</option>
-                </Select>
-              </LabeledField>
-              <LabeledField label={pt.amountLabel} htmlFor="adjust-amount">
-                <input
-                  id="adjust-amount"
-                  type="number"
-                  min={0}
-                  className="min-h-11 w-full rounded-md border border-strong bg-canvas px-3.5 text-body-lg text-fg"
-                  placeholder="100"
-                />
-              </LabeledField>
-              <LabeledField label={pt.reasonLabel} htmlFor="adjust-reason">
-                <Textarea id="adjust-reason" rows={2} required />
-              </LabeledField>
-              <LabeledField label={pt.referenceLabel} htmlFor="adjust-reference">
-                <input id="adjust-reference" className="min-h-11 w-full rounded-md border border-strong bg-canvas px-3.5 text-body text-fg" />
-              </LabeledField>
-            </PreviewActionDialog>
+            {can(access, "points.adjust") ? (
+              <PreviewActionDialog trigger={pt.adjust} title={pt.adjustTitle} body={pt.adjustBody} confirmLabel={pt.adjust} confirmVariant="accent">
+                <LabeledField label={pt.direction} htmlFor="adjust-direction">
+                  <Select id="adjust-direction" defaultValue="credit">
+                    <option value="credit">{pt.creditLabel}</option>
+                    <option value="debit">{pt.debitLabel}</option>
+                  </Select>
+                </LabeledField>
+                <LabeledField label={pt.amountLabel} htmlFor="adjust-amount">
+                  <Input id="adjust-amount" type="number" min={0} placeholder="100" />
+                </LabeledField>
+                <LabeledField label={pt.reasonLabel} htmlFor="adjust-reason">
+                  <Textarea id="adjust-reason" rows={2} required />
+                </LabeledField>
+                <LabeledField label={pt.referenceLabel} htmlFor="adjust-reference">
+                  <Input id="adjust-reference" />
+                </LabeledField>
+              </PreviewActionDialog>
+            ) : null}
           </div>
           {points.entries.length === 0 ? (
             <StatePanel title={pt.ledgerEmpty} />
@@ -336,7 +377,7 @@ export default async function PreviewUserDetailPage({
                         {e.awardedByUserId ? (pointsActorNames.get(e.awardedByUserId) ?? pt.manual) : pt.automatic}
                       </td>
                       <td className="px-md py-2.5 text-end">
-                        {!e.reversesEntryId ? (
+                        {!e.reversesEntryId && can(access, "points.reverse") ? (
                           <PreviewActionDialog trigger={pt.reverse} triggerVariant="ghost" title={pt.reverseTitle} body={pt.reverseBody} confirmLabel={pt.reverse} confirmVariant="danger">
                             <p className="text-label text-fg-muted">
                               {pt.originalTransaction}: {e.eventType} ({e.pointsDelta >= 0 ? "+" : ""}
@@ -355,43 +396,13 @@ export default async function PreviewUserDetailPage({
         </section>
       ) : null}
 
-      {tab === "activity" && timeline ? (
-        timeline.length === 0 ? (
-          <StatePanel title={tl.empty} />
-        ) : (
-          <ol className="flex flex-col gap-px overflow-hidden rounded-md border bg-surface">
-            {timeline.map((e) => (
-              <li key={e.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 bg-surface px-md py-2.5 odd:bg-surface-2/30">
-                <span className="font-medium text-fg">{e.label}</span>
-                {e.detail ? <span className="text-label text-fg-muted">· {e.detail}</span> : null}
-                <span className="ms-auto text-label text-fg-muted">{formatDateTime(e.at, locale)}</span>
-              </li>
-            ))}
-          </ol>
-        )
-      ) : null}
+      {tab === "activity" ? <StatePanel title={d.activityUnavailable} /> : null}
+      {/* The approved follow-up UI with an EMPTY history: nothing is persisted
+          until Phase 1B-B, so no record (real or fixture) exists to show. */}
+      {tab === "followup" ? <FollowUpPanel m={m} locale={locale} followUps={[]} staffNames={staffNames} now={Date.now()} /> : null}
+      {tab === "notes" ? <StatePanel title={d.notesDeferred} /> : null}
 
-      {tab === "notes" && notes ? (
-        <section className="flex flex-col gap-md">
-          <p className="rounded-sm border border-warning/40 bg-warning/10 px-md py-2 text-label text-fg-secondary">{nt.fixtureNotice}</p>
-          {notes.length === 0 ? (
-            <StatePanel title={nt.empty} />
-          ) : (
-            <div className="flex flex-col gap-sm">
-              {notes.map((n) => (
-                <Card key={n.id} pad="sm" className="flex flex-col gap-1">
-                  <p className="text-body text-fg">{n.body}</p>
-                  <p className="text-label text-fg-muted">
-                    {n.author} · {formatDateTime(n.createdAt, locale)} · {nt.internalOnly}
-                  </p>
-                </Card>
-              ))}
-            </div>
-          )}
-          <Textarea rows={2} placeholder={nt.addPlaceholder} disabled />
-        </section>
-      ) : null}
-
+      {tab === "audit" && !canAudit ? <StatePanel title={d.auditLocked} /> : null}
       {tab === "audit" && auditEntries ? (
         auditEntries.length === 0 ? (
           <StatePanel title={m.admin.audit.empty} />
@@ -408,31 +419,27 @@ export default async function PreviewUserDetailPage({
         )
       ) : null}
 
-      {tab === "followup" && followUps ? (
-        <FollowUpPanel m={m} locale={locale} followUps={followUps} staffNames={staffNames} now={Date.now()} />
-      ) : null}
-
       {tab === "report" ? (
         <section className="flex flex-col gap-md">
           <Card className="flex flex-col gap-md">
             <SectionTitle>{rp.title}</SectionTitle>
             <p className="text-body text-fg-secondary">{rp.subtitle}</p>
-            <p className="text-label text-fg-muted">{rp.tabIntro}</p>
+            <p className="rounded-sm border border-warning/40 bg-warning/10 px-md py-2 text-label text-fg-secondary">{d.reportDeferred}</p>
             <div>
               <PreviewActionDialog wide trigger={rp.open} triggerVariant="danger" title={rp.title} body={rp.subtitle} confirmLabel={rp.submit} confirmVariant="danger">
                 <LabeledField label={rp.subject} htmlFor="report-subject">
-                  <Input id="report-subject" defaultValue={user.displayName || m.admin.users.unnamed} />
+                  <Input id="report-subject" defaultValue={name} />
                 </LabeledField>
                 <div className="grid gap-md tablet:grid-cols-2">
                   <LabeledField label={rp.name} htmlFor="report-name">
-                    <Input id="report-name" defaultValue={user.displayName || ""} />
+                    <Input id="report-name" defaultValue={name} />
                   </LabeledField>
                   <LabeledField label={rp.phone} htmlFor="report-phone">
-                    <Input id="report-phone" type="tel" dir="ltr" defaultValue={reportContact.phone} />
+                    <Input id="report-phone" type="tel" dir="ltr" defaultValue={user.phone ?? ""} />
                   </LabeledField>
                 </div>
                 <LabeledField label={rp.email} htmlFor="report-email">
-                  <Input id="report-email" type="email" dir="ltr" defaultValue={reportContact.email} />
+                  <Input id="report-email" type="email" dir="ltr" defaultValue={user.email ?? ""} />
                 </LabeledField>
                 <LabeledField label={rp.details} htmlFor="report-details">
                   <Textarea id="report-details" rows={4} placeholder={rp.detailsPlaceholder} required />

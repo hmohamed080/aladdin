@@ -4966,6 +4966,21 @@ export type Database = {
           status: Database["public"]["Enums"]["network_referral_status"]
         }[]
       }
+      admin_organization_detail: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      admin_organizations_list: {
+        Args: {
+          p_org_type?: Database["public"]["Enums"]["organization_type"]
+          p_page?: number
+          p_page_size?: number
+          p_search?: string
+          p_sort?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
       admin_rbac_permissions: {
         Args: never
         Returns: {
@@ -5080,6 +5095,20 @@ export type Database = {
       admin_staff_unassign: {
         Args: { p_assignment_id: string; p_reason?: string }
         Returns: undefined
+      }
+      admin_user_detail: { Args: { p_user_id: string }; Returns: Json }
+      admin_users_list: {
+        Args: {
+          p_account_type?: Database["public"]["Enums"]["persona_type"]
+          p_governorate?: string
+          p_page?: number
+          p_page_size?: number
+          p_search?: string
+          p_sort?: string
+          p_status?: string
+          p_verification?: string
+        }
+        Returns: Json
       }
       apply_account_upgrade: {
         Args: { p_verification_id: string }

@@ -23,6 +23,12 @@ import {
 
 /** Preview routes already promoted to real, enforced Admin Core (Phase 1A: Staff · Roles · Permissions). */
 const LIVE_PREVIEW_ROUTES = ["/admin/preview/staff"];
+/**
+ * Preview routes whose DATA is real (Phase 1B-A: Users · Organizations read
+ * from Admin Core) while their actions are still Preview dialogs until 1B-B.
+ * They get their own banner — "changes here are real" would be untrue.
+ */
+const LIVE_READ_ROUTES = ["/admin/preview/users", "/admin/preview/organizations"];
 
 type Item = { href: string; key: string; Icon: ComponentType<{ size?: number }> };
 
@@ -61,7 +67,10 @@ export function PreviewShell({
 
   // PD-016: Preview areas are promoted one at a time. A promoted (live) area must
   // never sit under the "nothing is saved" banner — that would be untrue.
-  const live = LIVE_PREVIEW_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
+  const matches = (routes: string[]) => routes.some((r) => pathname === r || pathname.startsWith(r + "/"));
+  const live = matches(LIVE_PREVIEW_ROUTES);
+  const liveRead = !live && matches(LIVE_READ_ROUTES);
+  const bannerKey = live ? "liveBanner" : liveRead ? "liveReadBanner" : "banner";
 
   return (
     <div className="flex flex-col gap-lg">
@@ -69,15 +78,15 @@ export function PreviewShell({
         role="note"
         className={cn(
           "flex items-start gap-3 rounded-md border px-md py-3",
-          live ? "border-info/40 bg-info/10" : "border-warning/40 bg-warning/10",
+          live || liveRead ? "border-info/40 bg-info/10" : "border-warning/40 bg-warning/10",
         )}
       >
-        <span aria-hidden="true" className={cn("mt-0.5 shrink-0", live ? "text-info" : "text-warning")}>
+        <span aria-hidden="true" className={cn("mt-0.5 shrink-0", live || liveRead ? "text-info" : "text-warning")}>
           <AlertIcon size={18} />
         </span>
         <div className="min-w-0">
-          <p className="text-body-lg font-medium text-fg">{t(live ? "admin.preview.liveBannerTitle" : "admin.preview.bannerTitle")}</p>
-          <p className="mt-0.5 text-body text-fg-secondary">{t(live ? "admin.preview.liveBannerBody" : "admin.preview.bannerBody")}</p>
+          <p className="text-body-lg font-medium text-fg">{t(`admin.preview.${bannerKey}Title`)}</p>
+          <p className="mt-0.5 text-body text-fg-secondary">{t(`admin.preview.${bannerKey}Body`)}</p>
         </div>
       </div>
 
