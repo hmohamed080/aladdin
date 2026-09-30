@@ -738,6 +738,12 @@ select pg_temp.retier('public.adjust_points(uuid,integer,text,uuid)'::regprocedu
   'if not app.is_platform(''support'') then', 'if not app.has_admin_permission(''points.adjust'') then');
 select pg_temp.retier('public.reverse_points_entry(uuid,text)'::regprocedure,
   'if not app.is_platform(''support'') then', 'if not app.has_admin_permission(''points.reverse'') then');
+-- The two Points guards named the old tier in their error text; after re-tiering
+-- "support authority is required" would describe a rule that no longer exists.
+select pg_temp.retier('public.adjust_points(uuid,integer,text,uuid)'::regprocedure,
+  'platform support authority is required to adjust points', 'admin permission points.adjust required');
+select pg_temp.retier('public.reverse_points_entry(uuid,text)'::regprocedure,
+  'platform support authority is required to reverse points', 'admin permission points.reverse required');
 select pg_temp.retier('public.job_review_moderate(uuid,text,text)'::regprocedure,
   'if not app.is_platform(''moderator'') then', 'if not app.has_admin_permission(''job_reviews.moderate'') then');
 
