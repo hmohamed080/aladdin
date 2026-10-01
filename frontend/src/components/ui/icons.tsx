@@ -80,6 +80,13 @@ export const CalendarCheckIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const CameraIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M8.5 5.5 10 3.5h4l1.5 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2h3.5Z" />
+    <circle cx="12" cy="12.5" r="3.5" />
+  </Svg>
+);
+
 export const AlertIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M10.3 4.3 2.6 17.5A1.8 1.8 0 0 0 4.2 20.2h15.6a1.8 1.8 0 0 0 1.6-2.7L13.7 4.3a1.8 1.8 0 0 0-3.4 0Z" />
@@ -181,6 +188,15 @@ export const PackageIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M21 8.5 12 3.5 3 8.5v7L12 20.5l9-5v-7Z" />
     <path d="M3 8.5 12 13.5l9-5M12 13.5V20.5" />
+  </Svg>
+);
+
+/** Showroom activity: paint and coatings. Matches the approved outlined icon family. */
+export const PaintRollerIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="5" width="13" height="5" rx="1" />
+    <path d="M16 7h3a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-6v3" />
+    <path d="M13 16v5" />
   </Svg>
 );
 
@@ -382,6 +398,24 @@ export const StarIcon = (p: IconProps) => (
 export const StarOutlineIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="m12 3.6 2.6 5.27 5.82.85-4.21 4.1.99 5.79L12 16.88l-5.2 2.73.99-5.79-4.21-4.1 5.82-.85z" />
+  </Svg>
+);
+
+export const CrownIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m3.5 8.5 4 3 4.5-6 4.5 6 4-3-1.5 9H5z" />
+    <path d="M5 20h14" />
+    <circle cx="3.5" cy="7" r="1" />
+    <circle cx="12" cy="4" r="1" />
+    <circle cx="20.5" cy="7" r="1" />
+  </Svg>
+);
+
+export const LightbulbIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 18h6M10 21h4" />
+    <path d="M8.4 14.5A6 6 0 1 1 15.6 14.5c-.9.7-1.6 1.4-1.6 2.5h-4c0-1.1-.7-1.8-1.6-2.5Z" />
+    <path d="M12 1V0M4.2 4.2l-1.4-1.4M19.8 4.2l1.4-1.4M2 11H0M24 11h-2" />
   </Svg>
 );
 
@@ -702,6 +736,13 @@ export const CalendarIcon = (p: IconProps) => (
   <Svg {...p}>
     <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
     <path d="M3.5 9.5h17M8 3v3M16 3v3" />
+  </Svg>
+);
+
+/** Availability without a fixed start date. */
+export const InfinityIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M18.2 7.7c-2.7 0-4.6 2.2-6.2 4.3-1.6-2.1-3.5-4.3-6.2-4.3A4.2 4.2 0 0 0 1.6 12a4.2 4.2 0 0 0 4.2 4.3c2.7 0 4.6-2.2 6.2-4.3 1.6 2.1 3.5 4.3 6.2 4.3a4.3 4.3 0 0 0 0-8.6Z" />
   </Svg>
 );
 

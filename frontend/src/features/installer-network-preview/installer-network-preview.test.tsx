@@ -63,16 +63,16 @@ describe("InstallerNetworkPreview", () => {
     expect(screen.getByText("No matching showrooms")).toBeTruthy();
   });
 
-  it("shows additional fixtures and exposes the preview invitation form", () => {
+  it("shows additional fixtures and links to the showroom referral preview", () => {
     renderWithI18n(<InstallerNetworkPreview theme="light" sidebarMode="expanded" />, "en");
 
     fireEvent.click(screen.getByRole("button", { name: "View more" }));
     expect(screen.getAllByTestId("network-showroom-row")).toHaveLength(10);
     expect(screen.getAllByTestId("network-pending-row")).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole("button", { name: "Add a showroom I know" }));
-    expect(screen.getByPlaceholderText("Showroom name")).toBeTruthy();
-    expect(screen.getByPlaceholderText("Phone number")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Send invitation" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Add a showroom I know" })).toHaveAttribute(
+      "href",
+      "/preview/installer-network/refer",
+    );
   });
 });

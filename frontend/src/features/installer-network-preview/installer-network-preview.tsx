@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Button } from "@/components/ui/controls";
 import {
@@ -83,11 +84,6 @@ const copy = {
       "nasr-city": "مدينة نصر",
       "el-shorouk": "الشروق",
     },
-    inviteName: "اسم المعرض",
-    invitePhone: "رقم الهاتف",
-    cancel: "إلغاء",
-    sendInvite: "إرسال الدعوة",
-    inviteTitle: "دعوة معرض جديد",
   },
   en: {
     title: "My showroom network",
@@ -132,11 +128,6 @@ const copy = {
       "nasr-city": "Nasr City",
       "el-shorouk": "El Shorouk",
     },
-    inviteName: "Showroom name",
-    invitePhone: "Phone number",
-    cancel: "Cancel",
-    sendInvite: "Send invitation",
-    inviteTitle: "Invite a new showroom",
   },
 } as const;
 
@@ -158,7 +149,6 @@ export function InstallerNetworkPreview({
   const [query, setQuery] = useState("");
   const [area, setArea] = useState<AreaFilter>("all");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [inviteOpen, setInviteOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(6);
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -240,33 +230,18 @@ export function InstallerNetworkPreview({
                       {c.bannerTitle}
                     </h2>
                     <p className="mt-2 max-w-2xl text-body leading-relaxed text-fg-secondary">{c.bannerBody}</p>
-                    <Button className="mt-md" onClick={() => setInviteOpen((value) => !value)} aria-expanded={inviteOpen}>
+                    <Link
+                      href="/preview/installer-network/refer"
+                      className="mt-md inline-flex min-h-10 items-center justify-center gap-2 rounded-sm bg-primary px-md py-2 text-label font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                    >
                       <PlusIcon size={16} />
                       {c.addShowroom}
-                    </Button>
+                    </Link>
                   </div>
                   <div className="hidden justify-center tablet:flex" aria-hidden="true">
                     <Image src="/assets/installer-network/showroom-invite.png" alt="" width={224} height={150} className="h-36 w-56 scale-125 object-contain" priority />
                   </div>
                 </div>
-                {inviteOpen ? (
-                  <form
-                    className="grid gap-sm border-t p-md tablet:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      setInviteOpen(false);
-                    }}
-                  >
-                    <label className="sr-only" htmlFor="showroom-name">{c.inviteName}</label>
-                    <input id="showroom-name" required placeholder={c.inviteName} className="min-h-10 rounded-sm border border-strong bg-canvas px-md text-label text-fg outline-none placeholder:text-fg-muted focus-visible:ring-2 focus-visible:ring-focus" />
-                    <label className="sr-only" htmlFor="showroom-phone">{c.invitePhone}</label>
-                    <input id="showroom-phone" required inputMode="tel" placeholder={c.invitePhone} className="min-h-10 rounded-sm border border-strong bg-canvas px-md text-label text-fg outline-none placeholder:text-fg-muted focus-visible:ring-2 focus-visible:ring-focus" />
-                    <div className="flex gap-sm">
-                      <Button variant="outline" onClick={() => setInviteOpen(false)}>{c.cancel}</Button>
-                      <Button type="submit"><SendIcon size={16} />{c.sendInvite}</Button>
-                    </div>
-                  </form>
-                ) : null}
               </section>
 
               <section className="overflow-visible rounded-md border border-strong bg-surface desktop:flex desktop:min-h-0 desktop:flex-1 desktop:flex-col" aria-labelledby="showroom-list-title">
