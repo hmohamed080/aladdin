@@ -97,4 +97,3 @@ export const SETTINGS_ROWS = [
   { ar: "الإشعارات", en: "Notifications" },
   { ar: "إعدادات الحساب", en: "Account settings" },
 ] as const;
-

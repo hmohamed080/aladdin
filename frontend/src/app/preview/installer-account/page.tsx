@@ -25,4 +25,3 @@ export default async function InstallerAccountPreviewPage() {
     </I18nProvider>
   );
 }
-
