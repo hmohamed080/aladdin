@@ -178,8 +178,8 @@ export function InstallerSearch({
         </span>
         <kbd
           className={cn(
-            styles.hint,
-            "ms-auto hidden shrink-0 rounded-xs border border-field-line bg-surface px-1.5 py-0.5 font-sans text-[0.6875rem] text-field-hint tablet:inline",
+            styles.shortcut,
+            "ms-auto hidden shrink-0 rounded-xs border px-1.5 py-0.5 font-sans text-[0.6875rem] font-bold tablet:inline",
           )}
         >
           Ctrl K

@@ -14,6 +14,7 @@ import {
   HeartFilledIcon,
   HeartIcon,
   MapPinIcon,
+  SendIcon,
   TargetIcon,
 } from "@/components/ui/icons";
 import { pick } from "./mock-data";
@@ -121,10 +122,10 @@ export function JobOpportunityCard({ job }: { job: InstallerOpportunityVM }) {
               onClick={() => setApplied(true)}
               className={cn(
                 "flex items-center gap-1.5 rounded-sm px-2.5 py-1.5 text-label font-medium transition-colors",
-                applied ? "bg-success/15 text-success" : "bg-iris-solid text-white hover:brightness-105",
+                applied ? "bg-success/15 text-success" : "bg-primary text-primary-foreground hover:opacity-90",
               )}
             >
-              {applied ? <CheckIcon size={14} /> : null}
+              {applied ? <CheckIcon size={14} /> : <SendIcon size={14} />}
               {applied ? (locale === "ar" ? "تم التقديم" : "Applied") : locale === "ar" ? "قدم الآن" : "Apply now"}
             </button>
           </div>

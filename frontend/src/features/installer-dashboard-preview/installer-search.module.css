@@ -23,3 +23,9 @@
 .hint {
   color: color-mix(in srgb, var(--field-hint) 45%, var(--field-fg));
 }
+
+.shortcut {
+  border-color: var(--accent-solid);
+  background-color: var(--accent-solid);
+  color: var(--on-accent);
+}

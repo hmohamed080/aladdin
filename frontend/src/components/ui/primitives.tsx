@@ -150,6 +150,7 @@ export function InlineSuccess({ children }: { children: ReactNode }) {
 const meterTones = {
   neutral: "bg-fg-muted",
   accent: "bg-accent-solid",
+  iris: "bg-iris-solid",
   success: "bg-success",
   warning: "bg-warning",
 } as const;

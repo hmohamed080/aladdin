@@ -24,16 +24,16 @@ export function ProfileCompletionBanner({ data }: { data: InstallerProfileComple
   if (!data || dismissed) return null;
 
   return (
-    <div className="relative overflow-hidden rounded-lg border border-iris-solid/20 bg-surface p-4 shadow-card tablet:p-5">
+    <div className="relative overflow-hidden rounded-lg border border-iris-solid/20 bg-surface p-3 shadow-card tablet:px-4 tablet:py-3">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-y-0 end-0 w-40 bg-gradient-to-l from-iris-solid/[0.07] to-transparent"
       />
 
-      <div className="relative flex flex-col gap-4 tablet:flex-row tablet:items-center tablet:justify-between">
+      <div className="relative flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
         <div className="flex items-start gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-pill bg-iris-solid/10 text-iris">
-            <UserIcon size={20} />
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-pill bg-iris-solid/10 text-iris">
+            <UserIcon size={18} />
           </span>
           <div className="min-w-0">
             <p className="text-body-lg font-semibold text-fg">
@@ -41,7 +41,7 @@ export function ProfileCompletionBanner({ data }: { data: InstallerProfileComple
             </p>
             <p className="mt-0.5 text-caption text-fg-secondary">{pick(locale, data.hint)}</p>
 
-            <div className="mt-3 flex max-w-xs items-center gap-2.5">
+            <div className="mt-2 flex max-w-xs items-center gap-2.5">
               <div className="flex-1">
                 <ProgressMeter
                   value={data.percent}
@@ -55,7 +55,7 @@ export function ProfileCompletionBanner({ data }: { data: InstallerProfileComple
               </span>
             </div>
 
-            <p className="mt-2 flex items-center gap-1.5 text-caption text-fg-secondary">
+            <p className="mt-1.5 flex items-center gap-1.5 text-caption text-fg-secondary">
               <BadgeCheckIcon size={14} className={data.verified ? "text-success" : "text-bronze"} />
               {pick(locale, data.verifiedHint)}
             </p>
@@ -66,7 +66,7 @@ export function ProfileCompletionBanner({ data }: { data: InstallerProfileComple
           <Link
             href={data.href}
             onClick={data.href === "#" ? (e) => e.preventDefault() : undefined}
-            className="rounded-sm bg-iris-solid px-4 py-2 text-label font-semibold text-white transition-colors hover:brightness-105"
+            className="rounded-sm bg-primary px-4 py-2 text-label font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >
             {locale === "ar" ? "استكمال الملف" : "Complete profile"}
           </Link>

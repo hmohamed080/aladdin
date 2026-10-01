@@ -37,6 +37,7 @@ export function PhoneField({
   onChange,
   error,
   id,
+  placeholder,
 }: {
   defaultCountryIso2?: string | null;
   defaultNational?: string | null;
@@ -44,6 +45,7 @@ export function PhoneField({
   onChange: (value: CanonicalPhone | null) => void;
   error?: string;
   id?: string;
+  placeholder?: string;
 }) {
   const { t, locale } = useI18n();
   const [countryIso2, setCountryIso2] = useState<CountryCode>(
@@ -97,7 +99,7 @@ export function PhoneField({
           className="flex-1"
           value={national}
           onChange={(e) => emit(countryIso2, e.target.value)}
-          placeholder={t("phoneField.nationalPlaceholder")}
+          placeholder={placeholder ?? t("phoneField.nationalPlaceholder")}
           aria-invalid={invalid || Boolean(error) ? true : undefined}
         />
       </div>

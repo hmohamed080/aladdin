@@ -49,6 +49,7 @@ The register of reusable UI components. **Search this file before creating any c
 | **Pagination** | Navigate large sets | Proposed | hover, current, disabled, focus | `nav` + `aria-current`; RTL order | Server-side contract |
 | **Status badge** | State label | Proposed | per status (verified/won/lost/pending…) | Color + icon + text always | Status taxonomy per domain |
 | **File upload** | Attach documents | Proposed | idle, dragover, uploading, success, error | Keyboard trigger; progress `aria` | Off-request-path upload + progress via Realtime |
+| **Image crop dialog** | Crop profile/portfolio image | Draft | open, saving, error | Modal focus trap/restore; Escape; labelled zoom control | Installer preview use; persistence remains out of scope |
 | **Charts** | Data visualization | Proposed | loading, empty, error, populated | Text/table alternative; RTL axes; theme-aware | Follow the dataviz skill; palette per theme |
 | **AI surfaces** | Consult / Smart Share / suggestion + explanation | Proposed | idle, streaming, awaiting-review, sent | Human-review before send; streaming `aria-live`; Lumen "thinking" | Never auto-send; attribution + explanation required |
 

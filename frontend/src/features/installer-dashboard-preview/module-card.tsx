@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import { cn } from "@/lib/ui/cn";
 
-const MODULE_HEADER_ICON_SIZE = 18;
+const MODULE_HEADER_ICON_SIZE = 22;
 
 function ModuleHeaderIcon({
   icon: Icon,
@@ -41,6 +41,7 @@ export function ModuleCard({
   title,
   headerAction,
   footer,
+  footerClassName,
   children,
   className,
 }: {
@@ -50,32 +51,54 @@ export function ModuleCard({
   title: string;
   headerAction?: ReactNode;
   footer?: ReactNode;
+  footerClassName?: string;
   children: ReactNode;
   className?: string;
 }) {
   return (
-    <div id={id} className={cn("flex h-full scroll-mt-24 flex-col gap-3 rounded-lg border bg-surface p-4 shadow-card", className)}>
-      <div className="flex h-14 shrink-0 items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
+    <div
+      id={id}
+      data-module-card=""
+      className={cn(
+        "flex h-full min-h-0 scroll-mt-24 flex-col gap-3 rounded-lg border border-strong bg-surface p-4 shadow-card desktop:min-h-96 desktop:gap-2 desktop:p-3",
+        className,
+      )}
+    >
+      <div className="flex min-h-12 shrink-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2 rounded-sm border border-strong bg-surface-2/45 px-2.5 py-1.5">
           <ModuleHeaderIcon icon={Icon} className={iconClassName} />
           <h2 className="text-title leading-snug text-fg">{title}</h2>
         </div>
         {headerAction}
       </div>
 
-      <div className="flex flex-1 flex-col gap-2">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col gap-2 desktop:gap-1">{children}</div>
 
-      {footer ? <div className="border-t pt-3">{footer}</div> : null}
+      {footer ? (
+        <div className={cn("mt-auto shrink-0 border-t border-strong pt-3 desktop:pt-2", footerClassName)}>{footer}</div>
+      ) : null}
     </div>
   );
 }
 
-export function ModuleFooterLink({ href = "#", children }: { href?: string; children: ReactNode }) {
+export function ModuleFooterLink({
+  href = "#",
+  boxed = false,
+  children,
+}: {
+  href?: string;
+  boxed?: boolean;
+  children: ReactNode;
+}) {
   return (
     <a
       href={href}
       onClick={href === "#" ? (e) => e.preventDefault() : undefined}
-      className="block text-center text-label font-medium text-iris hover:underline"
+      className={cn(
+        "text-center text-label font-medium text-fg transition-colors hover:text-fg-secondary hover:underline",
+        boxed && "flex min-h-9 w-full items-center justify-center rounded-sm border border-strong px-3",
+        !boxed && "block",
+      )}
     >
       {children}
     </a>

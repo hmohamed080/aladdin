@@ -27,6 +27,18 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Approved installer previews preserved on a clean promotion branch
+
+**Date:** 2026-09-28 · **Branch:** `feature/installer-experience-promotion` · Based on `origin/main` `52bee525d1e705a9272308e127dc61048475c3a0` · No production installer route changed; nothing deployed or merged.
+
+- **Preservation:** isolated the approved installer preview presentation in a separate Git worktree so the unrelated dirty password-auth/Supabase changes on `feature/auth-password-preview` remained untouched. The approved installer commits were already durable, so no additional safety snapshot commit was required.
+- **Scope:** preserved `/preview/installer-dashboard`, `/preview/installer-job-opportunities`, `/preview/installer-my-work`, `/preview/installer-network`, `/preview/installer-reviews`, and `/preview/installer-account`, including the shared installer shell/sidebar/topbar/search, fixtures, tests, approved assets and their provenance records.
+- **Main reconciliation:** retained the latest `origin/main` auth test hooks in `installer-topbar.tsx` while carrying forward the approved preview presentation. Explicitly excluded the old `/installer-job-opportunities` production route and all password-auth, Supabase, backend, admin, supplier, and unrelated application changes.
+- **Validation:** frontend typecheck ✓ · lint 0 errors (one pre-existing `sidebar-shell.tsx` hook warning) · targeted installer tests 22/22 ✓ · production build ✓ · documentation links and final diff checks recorded after this entry.
+- **Browser QA:** all six preview routes loaded from the clean worktree in Arabic RTL with the approved installer sidebar and topbar/search, meaningful content, no broken images, no Next error overlay, and 0 console errors.
+
+---
+
 ## Session — mask_email audit decision; phone accounts kept out of the email password-migration flow
 
 **Date:** 2026-09-28 · **Branch:** `claude/vigilant-cori-471vck` · Not merged; no PR; nothing deployed; hosted Supabase not inspected or touched.

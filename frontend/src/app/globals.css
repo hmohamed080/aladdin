@@ -39,6 +39,16 @@
   --landing-preview-gutter: clamp(24px, 3.6vw, 64px);
 }
 
+/* INSTALLER / CRAFTSMAN SURFACE SEPARATION
+   Operational installer screens place many adjacent cards, controls and nested
+   regions on one workspace. Promote the existing neutral border token inside
+   this shared scope so those boundaries remain visible in both themes without
+   thicker strokes, raw colours or heavier shadows. */
+.installer-surface {
+  --border: var(--border-strong);
+  --field-line: var(--border-strong);
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -630,6 +640,65 @@ header[data-app-header="card"] [data-testid="global-search-trigger"] [class*="te
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 10px 24px -16px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Installer opportunity filters preserve the native range interaction while
+   using the approved Lumen progress/thumb and a quiet neutral remainder. */
+.installer-budget-range {
+  --range-track-bg: color-mix(in srgb, var(--surface-2) 38%, var(--surface));
+  appearance: none;
+  height: 1.25rem;
+  background: transparent;
+}
+
+.installer-budget-range::-webkit-slider-runnable-track {
+  height: 0.25rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--accent-solid) 0 var(--range-progress),
+    var(--range-track-bg) var(--range-progress) 100%
+  );
+}
+
+.installer-budget-range[dir="rtl"]::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to left,
+    var(--accent-solid) 0 var(--range-progress),
+    var(--range-track-bg) var(--range-progress) 100%
+  );
+}
+
+.installer-budget-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-top: -0.3125rem;
+  border: 2px solid var(--surface);
+  border-radius: 9999px;
+  background: var(--accent-solid);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+.installer-budget-range::-moz-range-track {
+  height: 0.25rem;
+  border-radius: 9999px;
+  background: var(--range-track-bg);
+}
+
+.installer-budget-range::-moz-range-progress {
+  height: 0.25rem;
+  border-radius: 9999px;
+  background: var(--accent-solid);
+}
+
+.installer-budget-range::-moz-range-thumb {
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 2px solid var(--surface);
+  border-radius: 9999px;
+  background: var(--accent-solid);
+  box-shadow: 0 0 0 1px var(--border-strong);
 }
 
 /* FILTER CHIPS — flat and borderless rather than bordered buttons competing with
