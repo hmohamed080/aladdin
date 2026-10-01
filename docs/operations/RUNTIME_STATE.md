@@ -1,5 +1,11 @@
 # Runtime State
 
+## Current continuation — 2026-10-01 (Production: Super Admin BOOTSTRAPPED for the designated platform account; Admin Core app NOT deployed)
+
+- **Production head `20260930100006`.** `app.admin_bootstrap_super_admin()` was run once, as the DB owner, for the designated account (the one prepared in the previous step), after a read-only pre-check and a fresh backup (`<operator-backup-dir>/2026-10-01-pre-super-admin-bootstrap`, outside Git, SHA-256 recorded). Production now has **exactly 1 active Super Admin** (rank 100, platform scope, 25/25 permissions including `roles.manage`; `admin_my_access` reports `is_staff=true`, rank 100, `super_admin`) plus the existing Platform Admin unchanged (Administrator, rank 80, row fingerprints identical). One `admin_role.assigned` audit row, `source = dba_bootstrap`, actor null, internal ids only (no PII).
+- Safeguards re-verified in aborted transactions: a second bootstrap is refused (`42501`); the last Super Admin cannot be demoted, deactivated, deleted or suspended (DML and RPC paths); self role change / unassign / disable / suspend refused; an Administrator cannot manage, disable or suspend a Super Admin or self-promote.
+- Hook `pgrst_hooks.pre_request` still enabled; cold/reload recheck 0/416 failures. **Still gated:** real browser sign-in verification by the account owner, Admin Core app deploy, Final Admin Cutover.
+
 ## Current continuation — 2026-10-01 (Production: designated platform account CLEANED + PREPARED; Super Admin NOT yet bootstrapped)
 
 - **Production head `20260930100006`.** The approved atomic script `docs/admin/ops/prepare_platform_admin_account.sql` (sha256 `0e0639c3…6f8ac`, identical to the committed file) ran once, as the DB owner, for the designated account and committed (`PREPARED`). A read-only re-audit immediately before matched the approved artifact shape exactly. Pre-operation backup: `<operator-backup-dir>/2026-10-01-pre-platform-cleanup` (outside Git, SHA-256 recorded).

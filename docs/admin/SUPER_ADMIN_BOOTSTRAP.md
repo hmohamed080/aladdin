@@ -32,6 +32,8 @@ An authorized maintainer with **database-owner** access to the target environmen
    where lower(c.value) = lower('<the chosen person''s email>');
    ```
    Exactly one row must come back with `status = active`. Record the `id`.
+
+   > **Known gap (found 2026-10-01 in Production):** this query depends on `public.contacts`, which only the legacy passwordless flow filled (27 of 189 users). Accounts created through the canonical email + password sign-up have **no** `contacts` row, so the query returns nothing for them. For those accounts identify the target by the single **confirmed** `auth.users.email` instead (`select id, email_confirmed_at from auth.users where lower(email) = lower('<email>')` must return exactly one confirmed row, and `public.users.status` must be `active`), and have the second person confirm the id before the call.
 2. **Confirm no Super Admin exists yet** (must return `0`):
    ```sql
    select count(*) from public.admin_role_assignments a
