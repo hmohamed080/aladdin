@@ -106,7 +106,10 @@ export function AuditResults({ rows }: { rows: AuditRow[] }) {
     <div className="flex flex-col gap-md">
       {/* Desktop: a real table; the page never scrolls sideways (the table does, inside its own box). */}
       <div className="hidden overflow-hidden rounded-md border bg-surface shadow-card desktop:block">
-        <div className="overflow-x-auto">
+        {/* `relative` is load-bearing: the table holds `sr-only` (position:absolute) labels, and an absolutely
+            positioned box is clipped by a scroll container ONLY when that container is its containing block.
+            Without it the 1px labels escape the clip at the table's scrolled-out edge and widen the whole page. */}
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[64rem] border-collapse text-body">
             <caption className="sr-only">{t("admin.preview.audit.title")}</caption>
             <thead>

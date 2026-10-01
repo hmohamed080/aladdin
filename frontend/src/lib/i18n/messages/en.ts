@@ -1211,6 +1211,7 @@ export const en = {
           pendingOrgVerification: "Orgs pending verification",
           pendingNetworkReferrals: "Referrals pending",
           suspendedOrgs: "Suspended organizations",
+          organizationsIncludesArchived: "Includes {n} archived",
         },
         attentionSections: {
           pendingVerification: "Pending verification",
@@ -1471,6 +1472,7 @@ export const en = {
         },
         typeOrgRequest: "Organization request",
         separationNote: "Organization Requests and Network Referrals are separate workflows (PD-015): a request adds the requester's own business and carries no Points; a referral recommends a business someone knows and may earn Points.",
+        fixtureNote: "Counts cover real Production items only. Cards marked \"Preview only\" are samples for a workflow that is not connected yet; they are listed for design review and are never included in any count.",
         orgRequest: {
           requester: "Requester",
           orgName: "Organization name",
@@ -1762,6 +1764,10 @@ export const en = {
           analytics: "Analytics",
           admin_staff: "Admin Staff",
           roles: "Roles",
+          notes: "notes",
+          follow_ups: "follow_ups",
+          cases: "cases",
+          duplicates: "duplicates",
         },
         permissionDesc: {
           users: {
@@ -1799,6 +1805,21 @@ export const en = {
           roles: {
             read: "View roles and permissions",
             manage: "Create, edit, archive and restore roles",
+          },
+          notes: {
+            read: "Read internal Admin Notes on users and organizations.",
+            create: "Append an internal Admin Note (notes are never edited or deleted).",
+          },
+          follow_ups: {
+            read: "Read the Admin follow-up history of users and organizations.",
+            manage: "Log, assign and complete Admin follow-ups.",
+          },
+          cases: {
+            read: "Read internal Admin reports / cases.",
+            create: "Open an internal Admin report / case.",
+          },
+          duplicates: {
+            resolve: "Link a duplicate organization to its existing record, or dismiss the suggestion (no merge).",
           },
         },
         scopes: {

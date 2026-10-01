@@ -114,7 +114,12 @@ export default async function PreviewReviewQueuePage({
     verifications: "verification",
     salesReferrals: "salesReferral",
   };
-  const count = (k: Kind) => entries.filter((e) => e.kind === k).length;
+  // Counts are REAL Production items only. Fixture cards (no backend yet) stay listed, each badged
+  // "Preview only", but they never feed a counter — a number on a tab or header must not imply that
+  // sample data is a real queue.
+  const realEntries = entries.filter((e) => !e.fixture);
+  const count = (k: Kind) => realEntries.filter((e) => e.kind === k).length;
+  const hasFixtures = entries.some((e) => e.fixture);
 
   const query = (q ?? "").trim().toLowerCase();
   const filtered = entries
@@ -139,7 +144,7 @@ export default async function PreviewReviewQueuePage({
 
   return (
     <div className="flex flex-col gap-lg">
-      <AdminHeader locale={locale} title={t.title} subtitle={t.subtitle} count={filtered.length} />
+      <AdminHeader locale={locale} title={t.title} subtitle={t.subtitle} count={filtered.filter((e) => !e.fixture).length} />
 
       <TabLinks
         basePath="/admin/preview/review"
@@ -149,8 +154,8 @@ export default async function PreviewReviewQueuePage({
         keep={{ q }}
         label={t.title}
         tabs={[
-          { value: "", label: t.tabs.all, count: entries.length },
-          { value: "orgRequests", label: t.tabs.orgRequests, count: count("orgRequest") },
+          { value: "", label: t.tabs.all, count: realEntries.length },
+          { value: "orgRequests", label: `${t.tabs.orgRequests} · ${m.admin.preview.previewOnlyBadge}` },
           { value: "networkReferrals", label: t.tabs.networkReferrals, count: count("networkReferral") },
           { value: "verifications", label: t.tabs.verifications, count: count("verification") },
           { value: "salesReferrals", label: t.tabs.salesReferrals, count: count("salesReferral") },
@@ -160,6 +165,11 @@ export default async function PreviewReviewQueuePage({
       <p role="note" className="-mt-2 text-label text-fg-muted">
         {t.separationNote}
       </p>
+      {hasFixtures ? (
+        <p role="note" className="-mt-2 text-label text-fg-muted">
+          {t.fixtureNote}
+        </p>
+      ) : null}
 
       <AutoFilters fields={[{ kind: "text", name: "q", placeholder: m.admin.preview.users.searchPlaceholder }]} />
 

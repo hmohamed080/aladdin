@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { adminSummary } from "@/server/queries/admin";
 import { previewDashboardExtras } from "@/server/queries/admin-preview";
-import { getMessages } from "@/lib/i18n/translate";
+import { createTranslator, getMessages } from "@/lib/i18n/translate";
+import { formatCount } from "@/lib/ui/format";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { AdminHeader, DistList } from "@/features/admin/parts";
 import { Card, SectionTitle } from "@/components/ui/primitives";
@@ -47,6 +48,7 @@ export default async function AdminPreviewDashboardPage() {
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const m = getMessages(locale);
+  const t = createTranslator(locale);
   const [s, extras] = await Promise.all([adminSummary(supabase), previewDashboardExtras(supabase)]);
 
   const totalUsers = Object.values(s.usersByStatus).reduce((a, b) => a + b, 0);
@@ -55,6 +57,9 @@ export default async function AdminPreviewDashboardPage() {
   const suspendedUsers = s.usersByStatus.suspended ?? 0;
   const pendingOrgs = s.orgsByStatus.pending_verification ?? 0;
   const suspendedOrgs = s.orgsByStatus.suspended ?? 0;
+  // `orgsTotal` counts every stored organization, archived ones included; the Organizations directory
+  // lists non-archived ones only. Say so on the tile instead of leaving the two numbers to disagree.
+  const archivedOrgs = s.orgsByStatus.archived ?? 0;
 
   const cards = m.admin.preview.dashboard.cards;
   const tiles: Tile[] = [
@@ -94,7 +99,13 @@ export default async function AdminPreviewDashboardPage() {
       tone: "warning",
       href: "/admin/preview/users?status=suspended",
     },
-    { label: cards.organizations, value: s.orgsTotal, Icon: BuildingIcon, href: "/admin/preview/organizations" },
+    {
+      label: cards.organizations,
+      value: s.orgsTotal,
+      hint: archivedOrgs > 0 ? t("admin.preview.dashboard.cards.organizationsIncludesArchived", { n: formatCount(archivedOrgs, locale) }) : undefined,
+      Icon: BuildingIcon,
+      href: "/admin/preview/organizations",
+    },
     {
       label: cards.pendingOrgVerification,
       value: pendingOrgs,
