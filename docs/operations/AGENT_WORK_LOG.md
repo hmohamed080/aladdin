@@ -4,6 +4,24 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Admin Core Production rollout: PostgREST hook incident — local recovery, fix and final validation
+
+**Date:** 2026-10-01 · **Branch:** `feature/admin-core-user-org-operations` (worktree `.claude/worktrees/admin-core-user-org-operations`), recovered from `d693991` + three untracked files left by the previous session (the hook migration, its pgTAP file and the HTTP test; nothing was modified/uncommitted otherwise). **Local only — Production, Vercel and every hosted service untouched.**
+
+**Production state recorded.** Migration head `20260930100004` (Stages A–C applied; Stage C verified 64/64 and kept). Migration `20260930100002` is applied, but its `pgrst.db_pre_request = app.api_pre_request` hook was **disabled by an emergency manual `alter role authenticator reset pgrst.db_pre_request; notify pgrst, 'reload config'`** after intermittent service-role failures (`permission denied for schema app`). Production is healthy and currently has **no hook-based suspension enforcement**. Not re-enabled; no migration rolled back.
+
+**Root cause.** PostgREST prepares the hook as the request role; `service_role` has no `USAGE` on schema `app` (`anon`/`authenticated` do), and `service_role` already EXECUTEs 37 of ~130 `app` functions (24 explicit + 13 via PUBLIC), so a schema-wide grant was rejected. Only cold/new pooled connections and reloads expose it.
+
+**Fix (local, unapplied).** Resequenced the unapplied migrations: `20260930100005_postgrest_hook_service_role_compatibility.sql` (new schema `pgrst_hooks` with one SECURITY DEFINER function `pre_request()` delegating to `app.api_pre_request()`, USAGE/EXECUTE for the three request roles only, `app` untouched, repoints the hook) and `20260930100006_admin_platform_account_preparation.sql` (renamed from `100005`; its pgTAP file is now `70_…`). The earlier work-log entry below still says `100005` for the platform-preparation migration because it is a point-in-time record. The business-activation proposal (BL-033) stays under `docs/admin/proposals/` only.
+
+**Validation (isolated Production-matched stack `aladdin_prep2`: PostgREST v14.5, Postgres 17.6.1.155, rebuilt from zero).** HTTP regression extended with an old-hook CONTROL mode (`HOOK_MODE=old`), a pending-user case and `CYCLES`: old hook 43/3,330 service-role failures (all `permission denied for schema app`), fixed hook 0/3,300 and 28/28 functional checks (anon, active, pending, Administrator, service_role, installer pre-check, installer sign-up chain, `pending_registration_*`, suspended refused 403). pgTAP hook 34/34, platform preparation 46/46, full clean-DB suite 71 files / 2,858 tests PASS. Security audit: `service_role` has no `USAGE` on `app` (ACL unchanged), exactly `USAGE` on `pgrst_hooks`, the entry point is not exposed through the Data API (404 / PGRST106), same 37 executable `app` functions. Details: [`docs/admin/POSTGREST_PRE_REQUEST_HOOK.md`](../admin/POSTGREST_PRE_REQUEST_HOOK.md).
+
+**New finding — BL-035.** Deleting a user that has `audit_log` rows returns 500 (FK `ON DELETE SET NULL` vs. the append-only trigger); reproduced per sign-up stage. Code-path audit: only the installer phone sign-up rollback deletes users; email/password registration never does. Low–Medium, backlog-only, does not block this rollout, not fixed here.
+
+**Still owed (unchanged gates):** apply `100005` as a controlled step with live role checks → `100006` → platform-account cleanup + preparation → Super Admin bootstrap → app deploy → smoke tests. `<platform-admin-email>` remains the designated Super Admin account; nothing was run against it.
+
+---
+
 ## Session — Admin Core Production rollout (partial): Stage A applied; dedicated platform-account preparation built locally
 
 **Date:** 2026-10-01 · **Branch:** `feature/admin-core-user-org-operations` @ `170dfa2` + uncommitted work (worktree `.claude/worktrees/admin-core-user-org-operations`).
