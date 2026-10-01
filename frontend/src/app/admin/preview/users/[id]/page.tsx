@@ -22,6 +22,8 @@ import { RowActionsMenu, type RowAction } from "@/features/admin-preview/row-act
 import { EyeIcon } from "@/components/ui/icons";
 import { LabeledField, Textarea, Select, Input } from "@/components/ui/controls";
 import { requireAdminRoute } from "@/server/authorization/admin";
+import { loadStaffRanks } from "@/server/queries/admin-rbac";
+import { canSuspendUser, staffRankOf } from "@/features/admin-rbac/eligibility";
 
 export const dynamic = "force-dynamic";
 
@@ -116,7 +118,13 @@ export default async function PreviewUserDetailPage({
   }
   // Phase 1B-B operational reads: each tab loads only its own data, and only
   // when the caller holds that record's read permission (else a locked state).
-  const canSuspend = can(access, "users.suspend");
+  // Suspend / Restore is drawn only when the actor may use it on THIS user: not their own account, and not Admin
+  // Staff at or above their own rank (the same rule `admin_user_suspend` enforces; the RPC stays the judge).
+  const {
+    data: { user: caller },
+  } = await supabase.auth.getUser();
+  const staffRanks = await loadStaffRanks(supabase, access);
+  const canSuspend = canSuspendUser(access, caller?.id ?? "", { userId: user.id, staffRank: staffRankOf(staffRanks, user.id) });
   const suspension = user.status === "suspended" ? await loadSuspension(supabase, "user", user.id) : null;
   const timeline = tab === "activity" ? await loadTimeline(supabase, "user", user.id) : null;
   const notes = tab === "notes" && can(access, "notes.read") ? await loadNotes(supabase, "user", user.id) : null;

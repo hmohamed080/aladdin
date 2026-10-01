@@ -9,6 +9,7 @@ import {
   listAdminPermissions,
   listAdminRoles,
   listAdminStaff,
+  withAccountEmails,
   type AdminPermissionRow,
   type AdminRoleRow,
   type AdminStaffMember,
@@ -80,7 +81,7 @@ export default async function AdminStaffPage({
   const callerId = user?.id ?? "";
 
   const [staff, roles, catalog] = await Promise.all([
-    tab === "staff" ? listAdminStaff(supabase) : Promise.resolve(null),
+    tab === "staff" ? listAdminStaff(supabase).then((rows) => (rows ? withAccountEmails(supabase, access, rows) : rows)) : Promise.resolve(null),
     // The Staff tab needs roles for its "Change role" options (roles.read);
     // Roles/Permissions need them for their rows.
     can(access, "roles.read") ? listAdminRoles(supabase) : Promise.resolve(null),

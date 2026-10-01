@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, cleanup, screen } from "@testing-library/react";
+import { render, cleanup, screen, within } from "@testing-library/react";
+import { ADMIN_PERMISSIONS, type AdminAccess } from "@/lib/permissions/admin";
 import { I18nProvider } from "@/lib/i18n/context";
 import type { AdminDirectoryUser } from "@/features/admin-preview/directory-mappers";
 
@@ -10,9 +11,20 @@ import type { AdminDirectoryUser } from "@/features/admin-preview/directory-mapp
  * links the PROFILE id, never the user id.
  */
 const loadUsersDirectory = vi.fn();
+const loadStaffRanks = vi.fn();
+const requireAdminRoute = vi.fn();
+const CALLER_ID = "55555555-5555-4555-8555-555555555555";
 
-vi.mock("@/server/authorization/admin", () => ({ requireAdminRoute: vi.fn(async () => ({})) }));
-vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: vi.fn(async () => ({})) }));
+const ALL = [...ADMIN_PERMISSIONS];
+const acc = (rank: number, permissions: readonly (typeof ALL)[number][]): AdminAccess => ({ isStaff: true, rank, permissions, roles: [] });
+const administrator = acc(80, ALL.filter((p) => p !== "roles.manage"));
+const superAdmin = acc(100, ALL);
+
+vi.mock("@/server/authorization/admin", () => ({ requireAdminRoute: (...a: unknown[]) => requireAdminRoute(...a) }));
+vi.mock("@/server/queries/admin-rbac", () => ({ loadStaffRanks: (...a: unknown[]) => loadStaffRanks(...a) }));
+vi.mock("@/lib/supabase/server", () => ({
+  getServerSupabase: vi.fn(async () => ({ auth: { getUser: async () => ({ data: { user: { id: CALLER_ID } } }) } })),
+}));
 vi.mock("next/headers", () => ({ cookies: vi.fn(async () => ({ get: () => ({ value: "en" }) })) }));
 vi.mock("@/server/queries/admin-directory", () => ({ loadUsersDirectory: (...a: unknown[]) => loadUsersDirectory(...a) }));
 vi.mock("next/navigation", () => ({
@@ -64,7 +76,13 @@ const okPage = (rows: AdminDirectoryUser[], total = rows.length) => ({
   data: { rows, total, page: 1, pageSize: 10, counts: { all: total, pending: 0, verified: 0, suspended: 0, rejected: 0 } },
 });
 
-beforeEach(() => loadUsersDirectory.mockReset());
+beforeEach(() => {
+  loadUsersDirectory.mockReset();
+  loadStaffRanks.mockReset();
+  loadStaffRanks.mockResolvedValue(new Map());
+  requireAdminRoute.mockReset();
+  requireAdminRoute.mockResolvedValue(administrator);
+});
 afterEach(cleanup);
 
 describe("Users directory page", () => {
@@ -108,5 +126,72 @@ describe("Users directory page", () => {
     await renderPage({});
     expect(screen.getByText(/could not be loaded/i)).toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();
+  });
+});
+
+/**
+ * Rank-aware Suspend (Admin Core stabilization): the row control follows the SAME rule the database enforces in
+ * `admin_user_suspend` - never your own row, never Admin Staff at or above your rank (Super Admin excepted for
+ * others). The RPC stays the judge; these tests pin what the console DRAWS.
+ */
+describe("Users directory page - rank-aware Suspend", () => {
+  const SUPER_ID = "70000099-0000-4000-8000-000000000099";
+  const OTHER_SUPER_ID = "70000098-0000-4000-8000-000000000098";
+  const PEER_ID = "70000077-0000-4000-8000-000000000077";
+  const suspendButtons = (row: HTMLElement) => within(row).queryAllByRole("button", { name: /suspend/i });
+  const rowOf = (container: HTMLElement, id: string) => {
+    const link = container.querySelector(`tbody a[href$="/${id}"]`);
+    const row = link?.closest("tr");
+    if (!row) throw new Error(`row for ${id} not found`);
+    return row as HTMLElement;
+  };
+
+  it("an Administrator is not offered Suspend on a Super Admin, but is on an ordinary user", async () => {
+    loadStaffRanks.mockResolvedValue(new Map([[SUPER_ID, 100]]));
+    loadUsersDirectory.mockResolvedValue(
+      okPage([user({ id: SUPER_ID, displayName: { name: "Super Person", nameAr: null, nameEn: null } }), user({ id: USER_ID })]),
+    );
+    const { container } = await renderPage({});
+    expect(suspendButtons(rowOf(container, SUPER_ID))).toHaveLength(0);
+    expect(suspendButtons(rowOf(container, USER_ID))).toHaveLength(1);
+  });
+
+  it("nobody is offered Suspend on their own row", async () => {
+    loadStaffRanks.mockResolvedValue(new Map([[CALLER_ID, 80]]));
+    loadUsersDirectory.mockResolvedValue(okPage([user({ id: CALLER_ID }), user({ id: USER_ID })]));
+    const { container } = await renderPage({});
+    expect(suspendButtons(rowOf(container, CALLER_ID))).toHaveLength(0);
+    expect(suspendButtons(rowOf(container, USER_ID))).toHaveLength(1);
+  });
+
+  it("a Super Admin keeps Suspend on other staff (even other Super Admins) but not on themselves", async () => {
+    requireAdminRoute.mockResolvedValue(superAdmin);
+    loadStaffRanks.mockResolvedValue(new Map([[CALLER_ID, 100], [OTHER_SUPER_ID, 100]]));
+    loadUsersDirectory.mockResolvedValue(okPage([user({ id: CALLER_ID }), user({ id: OTHER_SUPER_ID }), user({ id: USER_ID })]));
+    const { container } = await renderPage({});
+    expect(suspendButtons(rowOf(container, CALLER_ID))).toHaveLength(0);
+    expect(suspendButtons(rowOf(container, OTHER_SUPER_ID))).toHaveLength(1);
+    expect(suspendButtons(rowOf(container, USER_ID))).toHaveLength(1);
+  });
+
+  it("an equal-rank Administrator row is not offered either", async () => {
+    loadStaffRanks.mockResolvedValue(new Map([[PEER_ID, 80]]));
+    loadUsersDirectory.mockResolvedValue(okPage([user({ id: PEER_ID })]));
+    const { container } = await renderPage({});
+    expect(suspendButtons(rowOf(container, PEER_ID))).toHaveLength(0);
+  });
+
+  it("when staff ranks cannot be read the control is drawn and the server stays the judge", async () => {
+    loadStaffRanks.mockResolvedValue(null);
+    loadUsersDirectory.mockResolvedValue(okPage([user({ id: SUPER_ID })]));
+    const { container } = await renderPage({});
+    expect(suspendButtons(rowOf(container, SUPER_ID))).toHaveLength(1);
+  });
+
+  it("without users.suspend there is never a Suspend control", async () => {
+    requireAdminRoute.mockResolvedValue(acc(40, ["users.read"]));
+    loadUsersDirectory.mockResolvedValue(okPage([user({ id: USER_ID })]));
+    const { container } = await renderPage({});
+    expect(suspendButtons(rowOf(container, USER_ID))).toHaveLength(0);
   });
 });

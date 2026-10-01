@@ -39,3 +39,31 @@ export function canManageMember(access: AdminAccess, callerId: string, member: M
 export function canEditRole(access: AdminAccess, role: Pick<RoleLike, "key" | "rank">): boolean {
   return can(access, "roles.manage") && role.key !== "super_admin" && role.rank < access.rank;
 }
+
+/**
+ * The target's Admin rank as the UI may use it: 0 for a user who is not Admin Staff, the highest active
+ * platform rank for staff, and `null` when the actor cannot see staff ranks at all (no `admin_staff.read`).
+ */
+export function staffRankOf(ranks: ReadonlyMap<string, number> | null, userId: string): number | null {
+  return ranks === null ? null : (ranks.get(userId) ?? 0);
+}
+
+/**
+ * The actor may suspend / restore this USER account (directory row or details header).
+ *
+ * Mirrors `admin_user_suspend` / `admin_user_restore`: never one's own account, and — unless the actor is a
+ * Super Admin — never Admin Staff at or above the actor's own rank. `staffRank` unknown (`null`) means the
+ * actor cannot see staff ranks, so the control is drawn and the database stays the only judge; a KNOWN
+ * higher-or-equal rank hides it. Presentation only: the RPCs re-check every rule.
+ */
+export function canSuspendUser(
+  access: AdminAccess,
+  callerId: string,
+  target: { userId: string; staffRank: number | null },
+): boolean {
+  if (!can(access, "users.suspend")) return false;
+  if (target.userId === callerId) return false;
+  if (isSuper(access)) return true;
+  if (target.staffRank === null) return true;
+  return target.staffRank < access.rank;
+}

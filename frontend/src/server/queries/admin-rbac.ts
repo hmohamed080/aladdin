@@ -2,6 +2,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
+import { can, type AdminAccess } from "@/lib/permissions/admin";
+import { loadUserDetail } from "@/server/queries/admin-directory";
 
 /**
  * Admin RBAC read models (Admin Core 1A) — Staff · Roles · Permissions.
@@ -146,4 +148,43 @@ export async function listAdminPermissions(supabase: Client): Promise<AdminPermi
   const { data, error } = await supabase.rpc("admin_rbac_permissions");
   if (error) return null;
   return (data ?? []).map((p) => ({ key: p.key, resource: p.resource, action: p.action, description: p.description }));
+}
+
+/**
+ * Active staff ranks by user id, for rank-aware controls on user pages (see `canSuspendUser`).
+ * `null` when the caller cannot read staff (no `admin_staff.read`) or the read fails — the UI then draws the
+ * control and the database remains the judge. A user absent from the map is not Admin Staff (rank 0).
+ */
+export async function loadStaffRanks(supabase: Client, access: AdminAccess): Promise<Map<string, number> | null> {
+  if (!can(access, "admin_staff.read")) return null;
+  const staff = await listAdminStaff(supabase);
+  if (!staff) return null;
+  return new Map(staff.filter((s) => s.isActive).map((s) => [s.userId, s.rank]));
+}
+
+const EMAIL_LOOKUP_CAP = 50;
+
+/**
+ * `admin_rbac_staff` reads the email from `public.contacts`, which canonical email + password accounts do not
+ * have (only the legacy passwordless flow wrote it). For those members, reuse the SAME source the Users directory
+ * uses — `admin_user_detail`, which returns `app.user_facing_email(auth.users.email)` — so the Staff list shows the
+ * real sign-in email. Needs `users.read`; without it (or on any failure) the member keeps `null`. Never creates a
+ * contacts row and never calls the Auth Admin API.
+ */
+export async function withAccountEmails(
+  supabase: Client,
+  access: AdminAccess,
+  staff: AdminStaffMember[],
+): Promise<AdminStaffMember[]> {
+  if (!can(access, "users.read")) return staff;
+  const missing = staff.filter((s) => !s.email).slice(0, EMAIL_LOOKUP_CAP);
+  if (missing.length === 0) return staff;
+  const found = new Map<string, string>();
+  await Promise.all(
+    missing.map(async (s) => {
+      const detail = await loadUserDetail(supabase, s.userId);
+      if (detail.ok && detail.data?.email) found.set(s.userId, detail.data.email);
+    }),
+  );
+  return staff.map((s) => (s.email || !found.has(s.userId) ? s : { ...s, email: found.get(s.userId)! }));
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ADMIN_PERMISSIONS, type AdminAccess, type AdminPermission } from "@/lib/permissions/admin";
-import { assignableRoles, canEditRole, canManageMember, canWieldRole } from "./eligibility";
+import { assignableRoles, canEditRole, canManageMember, canSuspendUser, canWieldRole, staffRankOf } from "./eligibility";
 
 const ALL = [...ADMIN_PERMISSIONS];
 const ADMIN_PERMS = ALL.filter((p) => p !== "roles.manage");
@@ -67,5 +67,51 @@ describe("canEditRole", () => {
     expect(canEditRole(superAdmin, { key: "super_admin", rank: 100 })).toBe(false);
     expect(canEditRole(superAdmin, { key: "administrator", rank: 80 })).toBe(true);
     expect(canEditRole(acc(70, ["roles.manage"]), { key: "x", rank: 70 })).toBe(false);
+  });
+});
+
+describe("Super Admin is never assignable or manageable by a lower rank", () => {
+  it("no role at or above an Administrator's rank is offered to them, and Super Admin never is", () => {
+    const offered = assignableRoles(administrator, ROLES).map((r) => r.key);
+    expect(offered).not.toContain("super_admin");
+    expect(offered).not.toContain("administrator");
+  });
+
+  it("an Administrator may not manage a Super Admin member or an equal-rank peer", () => {
+    expect(canManageMember(administrator, "me", { userId: "sa", rank: 100 })).toBe(false);
+    expect(canManageMember(administrator, "me", { userId: "peer", rank: 80 })).toBe(false);
+    expect(canManageMember(administrator, "me", { userId: "mod", rank: 60 })).toBe(true);
+  });
+});
+
+describe("staffRankOf", () => {
+  it("is null when ranks are unreadable, 0 for a non-staff user, the rank for staff", () => {
+    expect(staffRankOf(null, "u")).toBeNull();
+    expect(staffRankOf(new Map([["a", 80]]), "u")).toBe(0);
+    expect(staffRankOf(new Map([["a", 80]]), "a")).toBe(80);
+  });
+});
+
+describe("canSuspendUser", () => {
+  const ME = "me";
+  it("needs users.suspend", () => {
+    expect(canSuspendUser(acc(40, ["users.read"]), ME, { userId: "u", staffRank: 0 })).toBe(false);
+  });
+  it("never on yourself, for anyone", () => {
+    expect(canSuspendUser(administrator, ME, { userId: ME, staffRank: 80 })).toBe(false);
+    expect(canSuspendUser(superAdmin, ME, { userId: ME, staffRank: 100 })).toBe(false);
+  });
+  it("an Administrator: ordinary users and lower staff yes; equal or higher rank no", () => {
+    expect(canSuspendUser(administrator, ME, { userId: "u", staffRank: 0 })).toBe(true);
+    expect(canSuspendUser(administrator, ME, { userId: "mod", staffRank: 60 })).toBe(true);
+    expect(canSuspendUser(administrator, ME, { userId: "peer", staffRank: 80 })).toBe(false);
+    expect(canSuspendUser(administrator, ME, { userId: "sa", staffRank: 100 })).toBe(false);
+  });
+  it("a Super Admin may act on any other user, including other Super Admins", () => {
+    expect(canSuspendUser(superAdmin, ME, { userId: "sa2", staffRank: 100 })).toBe(true);
+    expect(canSuspendUser(superAdmin, ME, { userId: "u", staffRank: 0 })).toBe(true);
+  });
+  it("an unknown rank (viewer cannot read staff) draws the control; the server decides", () => {
+    expect(canSuspendUser(administrator, ME, { userId: "sa", staffRank: null })).toBe(true);
   });
 });

@@ -19,7 +19,8 @@ import { AutoFilters, SortableHeader } from "@/features/admin-preview/auto-filte
 import { TablePagination } from "@/features/admin-preview/table-pagination";
 import { EyeIcon, SettingsIcon, WhatsAppIcon, CheckIcon, XIcon } from "@/components/ui/icons";
 import { requireAdminRoute } from "@/server/authorization/admin";
-import { can } from "@/lib/permissions/admin";
+import { loadStaffRanks } from "@/server/queries/admin-rbac";
+import { canSuspendUser, staffRankOf } from "@/features/admin-rbac/eligibility";
 import { SuspensionAction } from "@/features/admin-ops/suspension";
 
 export const dynamic = "force-dynamic";
@@ -55,8 +56,13 @@ export default async function PreviewUsersPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const access = await requireAdminRoute("/admin/preview/users");
-  const canSuspend = can(access, "users.suspend");
   const supabase = await getServerSupabase();
+  // Row-level Suspend / Restore follows the server rule (see `canSuspendUser`): never your own row, never Admin
+  // Staff at or above your rank. The RPC remains the judge; this only avoids drawing an action that can never work.
+  const {
+    data: { user: caller },
+  } = await supabase.auth.getUser();
+  const staffRanks = await loadStaffRanks(supabase, access);
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const m = getMessages(locale);
@@ -274,7 +280,7 @@ export default async function PreviewUsersPage({
                 />
               </>
             ) : null}
-            {canSuspend ? (
+            {canSuspendUser(access, caller?.id ?? "", { userId: u.id, staffRank: staffRankOf(staffRanks, u.id) }) ? (
               <SuspensionAction m={m} subjectType="user" subjectId={u.id} suspended={u.status === "suspended"} compact />
             ) : null}
             <RowActionsMenu label={t.moreActions} actions={more} />
