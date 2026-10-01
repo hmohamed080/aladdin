@@ -6746,3 +6746,19 @@ compose, that a filtered queue really is filtered, and that every chip's `href` 
 being driven — rather than the latency of a synthetic click. 5/5, no retries, twice consecutively.
 
 Per instruction: no full E2E, no pgTAP, no Lighthouse, no persona matrix.
+
+## 2026-10-01 — Admin Core pre-Production stabilization (post-Preview QA findings)
+
+Fixes from the first Preview QA of Admin Core (Preview runs against the Production Supabase project; QA was read-only):
+
+- **Rank-aware actions.** An Administrator saw an enabled Suspend on a Super Admin's user page. `canSuspendUser` (`features/admin-rbac/eligibility.ts`) now mirrors `admin_user_suspend`: never your own account, and — unless Super Admin — never Admin Staff at or above your rank. Wired into the Users directory and the user-details header through `loadStaffRanks` (`server/queries/admin-rbac.ts`); an unknown rank (no `admin_staff.read`) draws the control and the RPC stays the judge. Role selectors were audited: Change role / Add role use `assignableRoles`, the role editor caps rank at `actorRank - 1`, the Invite dialog has no role selector.
+- **Staff email.** `admin_rbac_staff` reads email from `public.contacts`, which canonical accounts do not have. `withAccountEmails` reuses `admin_user_detail` (the Users directory source) when the caller holds `users.read`. No contacts row is created; the Auth Admin API is never called from the client.
+- **Review Center counts** are real Production items only; fixture Organization Requests stay listed, badged "Preview only", and feed no counter.
+- **Audit overflow.** The scroll wrapper around the table was not `position: relative`, so its `sr-only` labels escaped the clip and widened the page. Regression guard: `audit-results.test.tsx`.
+- **Arabic permission labels** for notes / follow-ups / cases / duplicates added (keys unchanged); coverage test `admin-permissions.test.ts`.
+- **Organizations total** now says it includes archived organizations.
+- **Audit "test" context** is the real archived organization's stored name, not fixture data. No data was changed.
+
+### UNRESOLVED — React #418 in the authenticated Admin shell on Vercel Preview
+
+Intermittent (~10–15% of loads in earlier Preview harness runs); not seen on public Preview pages. **Not fixed and root cause NOT identified.** Excluded this session with 0 reproductions: dev server and production build with the server TZ 20–24h away from the browser TZ (174 loads across `/admin`, users, staff, audit, review, English and Arabic/RTL). Excluded by code reading: theme (cookie + head script, `suppressHydrationWarning` on `<html>`), portals (`mounted`-gated), notification/chat badges (server-formatted, no client time), `useId` sites. Outstanding differences between local and Preview: real Production data, Vercel's runtime/CDN, and the user's browser. Next step is to capture React's dev-mode diff against Production-shaped data (or a Preview build with readable errors). **Do not promote to Production claiming this is fixed.**
