@@ -12,7 +12,7 @@ service-role key never reaches the browser; authorization stays in the database.
 
 | Route | Purpose |
 |---|---|
-| `/auth/sign-in` | Passwordless **Email-OTP** sign-in (two steps: email → 6-digit code). |
+| `/auth/sign-in` | Passwordless **Email-OTP** sign-in (two steps: email → 6-digit code). *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)* |
 | `/b2b` | Sales cockpit: my open leads, leads-by-stage, overdue + due-today follow-ups, recent activity, quick actions. |
 | `/b2b/customers` | Customer list — search (name/phone), status + branch filters; responsive table/cards. |
 | `/b2b/customers/new` | Create customer (real `create_customer` RPC). |
@@ -25,7 +25,7 @@ service-role key never reaches the browser; authorization stays in the database.
 ## Authentication
 
 - **Supabase Auth Email-OTP** via `@supabase/ssr` (cookie session). `signInWithOtp`
-  → `verifyOtp({ type: "email" })`. No passwords, no SMS, no WhatsApp (deferred).
+  → `verifyOtp({ type: "email" })`. No passwords, no SMS, no WhatsApp (deferred). *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 - **Sign In is not registration.** `signInWithOtp` runs with
   `shouldCreateUser: false`, so an unknown email never creates an `auth.users`
   row. A "user not found / signups not allowed" rejection is mapped to the SAME

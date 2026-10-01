@@ -41,7 +41,7 @@ describe("passwordSchema", () => {
 });
 
 describe("registrationSchema", () => {
-  const base = { email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: "a-very-long-passphrase-1" };
+  const base = { displayName: "Mona Adel", email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: "a-very-long-passphrase-1" };
 
   it("accepts matching password/confirmPassword", () => {
     const result = registrationSchema.safeParse({ ...base, confirmPassword: base.password });

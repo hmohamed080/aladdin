@@ -1,18 +1,13 @@
 import { test, expect, type Page, type APIRequestContext, type BrowserContext } from "@playwright/test";
-import { messageIdsFor, readNewOtp } from "./helpers/auth";
+import { registerWithPassword } from "./helpers/auth";
 
 /**
  * Registration account type → AUTHORITATIVE persona (staging-prep Increment
  * 11), end to end against the REAL local Supabase + Mailpit, through the
- * CANONICAL passwordless sign-up — which carries no CAPTCHA — and the real
- * `/onboarding/account-type` + `/onboarding/username` steps. Both steps call
- * the same authoritative RPCs (`onboarding_select_account_type`,
- * `profile_set_username`) the password-registration preview applies after
- * OTP, so this proves the persona assignment and profile-completion
- * reachability without Turnstile. The password-registration golden path
- * itself (Turnstile-gated) lives in auth-password-preview.spec.ts /
- * profile-completion.spec.ts and must run where challenges.cloudflare.com
- * loads.
+ * CANONICAL `/auth/sign-up` (Full Name, username and the account-type
+ * dropdown on Step 1; `onboarding_select_account_type` +
+ * `profile_set_username` applied after the OTP). Turnstile-gated like every
+ * Create Account: run where challenges.cloudflare.com loads.
  */
 
 const BASE = "http://127.0.0.1:3100";
@@ -26,10 +21,10 @@ async function english(context: BrowserContext): Promise<void> {
 }
 
 /**
- * Fresh account → consent → OTP → account type → username → app. Records
- * every URL the browser commits, so a test can prove no legacy wizard step
- * (/onboarding/profile, /contact, /professional, /consumer, /business) was
- * ever visited.
+ * Fresh account → sign-up (account type chosen in the dropdown) → OTP → app.
+ * Records every URL the browser commits, so a test can prove no legacy wizard
+ * step (/onboarding/profile, /contact, /professional, /consumer, /business)
+ * was ever visited.
  */
 async function registerAs(
   page: Page,
@@ -44,27 +39,7 @@ async function registerAs(
 
   const email = `rp-${tag}-${uniq()}@example.test`;
   const username = `rp${tag}${uniq()}`.slice(0, 24);
-  const seen = await messageIdsFor(request, email);
-
-  await page.goto("/auth/sign-up");
-  await page.getByLabel(/email address/i).fill(email);
-  await page.getByLabel(/terms of service/i).check();
-  await page.getByLabel(/privacy policy/i).check();
-  await page.getByLabel(/pilot release/i).check();
-  await page.getByRole("button", { name: /create account/i }).click();
-  await expect(page.getByText(/we sent a code/i)).toBeVisible();
-  const code = await readNewOtp(request, email, seen);
-  await page.getByLabel(/one-time code/i).pressSequentially(code);
-  await page.getByRole("button", { name: /verify/i }).click();
-
-  await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
-  await page.getByRole("button", { name: choice }).click();
-  await page.getByRole("button", { name: /^continue$/i }).click();
-
-  await page.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
-  await page.getByLabel(/^username$/i).fill(username);
-  await page.getByRole("button", { name: /^continue$/i }).click();
-  await page.waitForURL(/\/(home|b2b)(\/|$|\?)/, { waitUntil: "commit" });
+  await registerWithPassword(page, request, { email, username, accountType: choice, displayName: `E2E ${tag}` });
   return { visited, username };
 }
 
@@ -92,7 +67,7 @@ async function everyChecklistLinkIsReachable(page: Page): Promise<string[]> {
   return hrefs.map((e) => e.split("|")[0]!);
 }
 
-test.describe("Registration account type → authoritative persona (no CAPTCHA path)", () => {
+test.describe("Registration account type → authoritative persona", () => {
   test.setTimeout(120_000);
 
   test("Tradespeople: professional identity, trades editable, no legacy wizard, completion reachable", async ({ page, request, context }) => {
@@ -164,7 +139,9 @@ test.describe("Registration account type → authoritative persona (no CAPTCHA p
       await page.goto("/home");
       await expect(page.getByTestId("no-personal-workspace")).toBeVisible();
       const items = await everyChecklistLinkIsReachable(page);
-      expect(items).toEqual(expect.arrayContaining(["avatar", "phone", "display_name", "organization_setup"]));
+      expect(items).toEqual(expect.arrayContaining(["avatar", "phone", "organization_setup"]));
+      // The Full Name entered at sign-up is already the confirmed display name.
+      expect(items).not.toContain("display_name");
       expect(items).not.toContain("organization_activities"); // no organization to describe yet
 
       // The user identity is editable with no workspace at all.
@@ -172,14 +149,13 @@ test.describe("Registration account type → authoritative persona (no CAPTCHA p
       await page.getByTestId("no-workspace-edit-profile").click();
       await expect(page).toHaveURL(/\/settings\/profile$/);
       await expect(page.getByTestId("identity-card")).toBeVisible();
-      const before = Number((await page.getByTestId("complete-profile-percent").textContent())?.match(/\d+/)?.[0]);
+      await expect(page.getByLabel(/^display name$/i)).toHaveValue(`E2E ${tag}`);
+      await expect(page.getByTestId("display-name-status")).toHaveText(/^confirmed$/i);
       await page.getByLabel(/^display name$/i).fill(`E2E ${tag} Owner`);
       await page.locator("#display-name").getByRole("button", { name: /^save$/i }).click();
       await expect(page.getByTestId("display-name-status")).toHaveText(/^confirmed$/i);
       await page.reload();
       await expect(page.getByLabel(/^display name$/i)).toHaveValue(`E2E ${tag} Owner`);
-      const after = Number((await page.getByTestId("complete-profile-percent").textContent())?.match(/\d+/)?.[0]);
-      expect(after).toBeGreaterThan(before);
 
       // Organization-scoped editing is NOT available without an organization.
       await page.goto("/b2b/settings");

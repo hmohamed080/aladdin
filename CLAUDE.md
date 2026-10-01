@@ -41,7 +41,13 @@ AI-first operating system / digital infrastructure for Egypt's finishing, constr
 
 ### Authentication model (canonical)
 
-**Passwordless.** Register / sign in via **WhatsApp OTP** or **Email OTP / verification link**. User verifies exactly **one** primary contact during account creation; a secondary is added later from profile settings. **No passwords** — password / forgot / reset flows are legacy/superseded. WhatsApp OTP only for phone (no SMS). reCAPTCHA only on Create Account. One canonical identity regardless of verification method. Never surface technical implementation copy in the UI (no "WhatsApp Business API", "canonical account", server-side notes, etc.).
+**Email + Password** (canonical since 2026-09-28, PR #66):
+
+- **General accounts** — Sign up at `/auth/sign-up`: Full Name + Email + Username + Account Type + Password, then **Email OTP** verification. Sign in at `/auth/sign-in`: Email + Password. Forgot Password at `/auth/forgot-password`: Email OTP recovery.
+- **Installer/Technician exception** — `/installer/sign-up`: Full Name + Phone + Password (no email, OTP or username in that flow); `/installer/sign-in`: Phone + Password. Same canonical user/persona model (`installer_technician`). Installer Forgot Password is deferred. `/auth/sign-in` links to `/installer/sign-in`.
+- **CAPTCHA** — Supabase's global CAPTCHA stays **OFF**. Application-scoped Turnstile runs on Create Account, Resend Signup and the Forgot Password request only; Sign In has no CAPTCHA.
+
+One canonical identity regardless of sign-in method. Never surface technical implementation copy in the UI (no "WhatsApp Business API", "canonical account", server-side notes, etc.). *Superseded:* the earlier passwordless rule (WhatsApp/Email OTP only, "no passwords / no forgot or reset flows") — see the Change History in [`PRODUCT_DIRECTION_GUIDE.md`](docs/product/PRODUCT_DIRECTION_GUIDE.md).
 
 ### Design roadmap (order matters)
 

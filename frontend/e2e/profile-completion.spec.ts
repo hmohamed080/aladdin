@@ -1,5 +1,5 @@
 import { test, expect, type Page, type APIRequestContext, type BrowserContext } from "@playwright/test";
-import { IDENTITIES, messageIdsFor, readNewOtp, signIn } from "./helpers/auth";
+import { IDENTITIES, messageIdsFor, readNewOtp, selectAccountType, signIn } from "./helpers/auth";
 
 /**
  * Staging-prep registration + profile completion, end to end against the REAL
@@ -36,10 +36,11 @@ function uniqueEgMobile(): string {
 }
 
 async function fillSignUp(page: Page, email: string, username: string): Promise<void> {
-  await page.goto("/preview/auth-password/sign-up");
+  await page.goto("/auth/sign-up");
+  await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
   await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
   await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
-  await page.getByRole("button", { name: /tradespeople & technicians|الصنايعية/i }).click();
+  await selectAccountType(page);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
   await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
   await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -92,23 +93,29 @@ async function setLocale(context: BrowserContext, locale: "ar" | "en"): Promise<
   await context.addCookies([{ name: "NEXT_LOCALE", value: locale, url: "http://127.0.0.1:3100" }]);
 }
 
-test.describe("Registration — account-type step", () => {
-  test("shows exactly the 9 approved cards; Coming Soon ones are disabled; no standalone Installer", async ({ page, context }) => {
+test.describe("Registration — account-type dropdown", () => {
+  test("offers exactly the 9 approved types in one dropdown; Coming Soon ones are disabled; no standalone Installer", async ({ page, context }) => {
     await setLocale(context, "ar");
-    await page.goto("/preview/auth-password/sign-up");
-    const expected = ["المعرض", "المورد", "المصنع", "المستورد", "المقاول", "المهندس", "الصنايعية", "فريق المبيعات", "حساب شخصي"];
-    for (const name of expected) {
-      await expect(page.getByRole("button", { name: new RegExp(`^${name}`) })).toHaveCount(1);
-    }
-    for (const soon of ["المقاول", "المهندس", "حساب شخصي"]) {
-      await expect(page.getByRole("button", { name: new RegExp(`^${soon}`) })).toBeDisabled();
-    }
-    for (const open of ["المعرض", "المورد", "المصنع", "المستورد", "الصنايعية", "فريق المبيعات"]) {
-      await expect(page.getByRole("button", { name: new RegExp(`^${open}`) })).toBeEnabled();
-    }
+    await page.goto("/auth/sign-up");
+    const select = page.locator("select#accountType");
+    await expect(select).toHaveCount(1);
+    await expect(page.getByLabel(/^الاسم الكامل$/)).toBeVisible();
+    const options = await select.locator("option").evaluateAll((os) =>
+      (os as HTMLOptionElement[]).map((o) => ({ value: o.value, text: (o.textContent ?? "").trim(), disabled: o.disabled })),
+    );
+    expect(options[0]).toEqual({ value: "", text: "اختر نوع الحساب", disabled: true });
+    const byText = options.slice(1).map((o) => o.text);
+    expect(byText).toEqual([
+      "المعرض", "المورد", "المصنع", "المستورد", "المقاول — قريبًا", "المهندس — قريبًا", "الصنايعية", "فريق المبيعات", "حساب شخصي — قريبًا",
+    ]);
+    for (const o of options.slice(1)) expect(o.disabled, o.text).toBe(o.text.endsWith("قريبًا"));
     // Never a standalone Installer, never interior designer or wholesaler.
-    await expect(page.getByRole("button", { name: /مركّب|installer|مصمّم داخلي|تاجر جملة/i })).toHaveCount(0);
-    await expect(page.locator("select#accountType")).toHaveCount(0);
+    expect(byText.filter((t) => /مركّب|installer|مصمّم داخلي|تاجر جملة/i.test(t))).toEqual([]);
+    // The old card grid is gone.
+    await expect(page.getByRole("button", { name: /^المعرض/ })).toHaveCount(0);
+
+    await selectAccountType(page, /^فريق المبيعات$/);
+    await expect(select).toHaveValue("salesperson");
   });
 });
 
@@ -156,7 +163,7 @@ test.describe("Direct entry after registration", () => {
     // Both passed the Step-1 pre-flight (it is not a reservation); the
     // post-OTP claim is the authority, so A — verifying second — collides.
     await verify(pageA, request, emailA, seenA);
-    await pageA.waitForURL(/\/preview\/auth-password\/finish-registration\?reason=username_unavailable/, { waitUntil: "commit" });
+    await pageA.waitForURL(/\/auth\/finish-registration\?reason=username_unavailable/, { waitUntil: "commit" });
     const noLongerAvailable = /no longer available|لم يعد متاحًا/;
     await expect(pageA.getByRole("heading", { level: 1 })).toHaveText(noLongerAvailable);
 
@@ -165,7 +172,7 @@ test.describe("Direct entry after registration", () => {
     await expect(pageA.getByRole("heading", { level: 1 })).toHaveText(noLongerAvailable);
     await pageA.goto("/home");
     await pageA.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
-    await pageA.goto("/preview/auth-password/finish-registration?reason=username_unavailable");
+    await pageA.goto("/auth/finish-registration?reason=username_unavailable");
 
     // Only the username is asked for — never email, password or account type.
     await expect(pageA.getByLabel(/^password$|^كلمة المرور$/i)).toHaveCount(0);
@@ -188,17 +195,21 @@ test.describe("Complete your profile", () => {
     await register(page, request, "complete");
     await page.goto("/home/settings");
     const percent = page.getByTestId("complete-profile-percent");
-    // A fresh Tradesperson: 4 shared items + 4 professional items; only the
-    // username (mandatory at registration) is done yet — 1/8.
-    await expect(percent).toHaveText("13% complete");
+    // A fresh Tradesperson: 4 shared items + 4 professional items; the
+    // username AND the Full Name entered at sign-up (confirmed through
+    // profile_set_display_name after the OTP) are done — 2/8.
+    await expect(percent).toHaveText("25% complete");
     await expect(page.getByText(/preferred language|اللغة المفضّلة/i)).toHaveCount(0);
 
-    // Display name: the automatic value is NOT confirmed until saved here.
-    await expect(page.getByTestId("display-name-status")).toContainText("Not confirmed yet");
-    await page.getByLabel("Display name").fill("E2E Tester");
+    // Display name: the sign-up Full Name is already the confirmed value, and
+    // it stays editable here.
+    await expect(page.getByTestId("display-name-status")).toHaveText("Confirmed");
+    await expect(page.getByLabel("Display name")).toHaveValue("E2E Tester");
+    await page.getByLabel("Display name").fill("E2E Tester Renamed");
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByText("Saved", { exact: true })).toBeVisible();
     await page.reload();
+    await expect(page.getByLabel("Display name")).toHaveValue("E2E Tester Renamed");
     await expect(page.getByTestId("display-name-status")).toHaveText("Confirmed");
     await expect(percent).toHaveText("25% complete");
 

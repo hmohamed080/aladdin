@@ -50,7 +50,7 @@ Webhooks are **idempotent** (dedupe by provider message id), verify signatures, 
 | `addSecondaryContact` | user | `{channel, value}` | `{contact}` → triggers OTP | not duplicate; verify before primary-eligible |
 | `signOut` | user | — | ok | — |
 
-> **No password/forgot/reset actions exist** (passwordless).
+> **No password/forgot/reset actions exist** (passwordless). *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 
 ---
 

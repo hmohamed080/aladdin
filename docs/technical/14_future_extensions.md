@@ -13,7 +13,7 @@ What is **in the MVP** vs **deferred**, with rationale. This separates scope so 
 
 ## 1. In MVP (build these)
 
-Passwordless auth · onboarding/profiles · roles & derived navigation (one primary account type; no switcher) · portfolio · product catalog · smart search · AI assistant (consultation/intent/match-explanation/follow-up drafting, human-reviewed) · notifications · subscription (state only, no billing) · advertisement (moderated) · admin · **the core value journey** (AI consult → intent → discovery → search → matching → profile → product → RFQ → quote → project), built **Sales-first (05C → 05A → 05B → 05D → 05E)**.
+Passwordless auth · onboarding/profiles · roles & derived navigation (one primary account type; no switcher) · portfolio · product catalog · smart search · AI assistant (consultation/intent/match-explanation/follow-up drafting, human-reviewed) · notifications · subscription (state only, no billing) · advertisement (moderated) · admin · **the core value journey** (AI consult → intent → discovery → search → matching → profile → product → RFQ → quote → project), built **Sales-first (05C → 05A → 05B → 05D → 05E)**. *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 
 Cross-cutting: bilingual AR-RTL/EN-LTR, Light+Dark, responsive PWA, Egyptian localities + EGP, RLS tenant isolation, human-in-the-loop AI.
 
@@ -55,7 +55,7 @@ Cross-cutting: bilingual AR-RTL/EN-LTR, Light+Dark, responsive PWA, Egyptian loc
 - A generic, configurable horizontal CRM.
 - Merging roles / a Profile Switcher / "Use As" mode / persona (account-identity) switching UI. *(Selecting the active **work context** between the personal surface and organizations where the user has an active membership is **not** this, and is allowed — see §2.)*
 - A second user/auth identity for the same person (per role, per contact channel, or per business), or a generic `workspaces` table.
-- Passwords / forgot / reset flows (product is passwordless).
+- Passwords / forgot / reset flows (product is passwordless). *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 - Excluded infrastructure: Kubernetes, Kafka, RabbitMQ, Redis, Elasticsearch/OpenSearch, event sourcing, CQRS frameworks, service mesh, API gateway, second database, Vite/React SPA/React Router, Alembic (ADR-0001/0002).
 
 ## 5. Extension principle

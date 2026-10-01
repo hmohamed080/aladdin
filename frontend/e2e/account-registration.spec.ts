@@ -1,11 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
 import { signIn, IDENTITIES, messageIdsFor, readNewOtp } from "./helpers/auth";
+import { createConfirmedAccount } from "./helpers/fixtures";
 import { E2E_INVITE_TOKEN } from "./global-setup";
 
 /**
- * Sprint 7.2 — account access & registration. Exercises the REAL passwordless
- * Email-OTP path (no auth bypass; codes read from local Mailpit): Sign Up with
- * consent, resume at /onboarding, recovery, lost-email support, and token
+ * Sprint 7.2 — account access & registration (no auth bypass; codes read from
+ * local Mailpit): the canonical password Sign Up form with consent, resume at
+ * /onboarding, legacy Email-OTP recovery, lost-email support, and token
  * invitation entry (invalid + valid). Bilingual + light/dark are covered by
  * setting the locale/theme cookies.
  */
@@ -25,46 +26,35 @@ async function noOverflow(page: Page) {
 }
 
 test.describe("account registration", () => {
-  test("sign up: consent gate → create → verify → resume at /onboarding", async ({ page, request }) => {
+  test("sign up: the canonical password form, gated by the three consents", async ({ page }) => {
     await prefs(page, "en", "light");
-    const email = `signup+${Date.now()}@example.test`;
-    const seen = await messageIdsFor(request, email);
-
     await page.goto("/auth/sign-up");
     await noOverflow(page);
 
-    await page.getByLabel(/email address/i).fill(email);
+    // Full Name first, then email, username, the account-type dropdown and
+    // the password pair. (The full create → OTP → app journey is Turnstile-
+    // gated and covered by auth-password-preview.spec.ts.)
+    await expect(page.getByLabel(/^full name$/i)).toHaveAttribute("placeholder", "Enter your full name");
+    await expect(page.getByLabel(/^email address$/i)).toBeVisible();
+    await expect(page.getByLabel(/^username$/i)).toBeVisible();
+    await expect(page.locator('select[name="accountType"]')).toBeVisible();
+    await expect(page.getByLabel(/^password$/i)).toBeVisible();
+    await expect(page.getByLabel(/^confirm password$/i)).toBeVisible();
+
     const createBtn = page.getByRole("button", { name: /create account/i });
-    // Consent gate: cannot request a code until all three are accepted.
+    // Consent gate: cannot submit until all three are accepted.
     await expect(createBtn).toBeDisabled();
     await page.getByLabel(/terms of service/i).check();
     await page.getByLabel(/privacy policy/i).check();
     await page.getByLabel(/pilot release/i).check();
     await expect(createBtn).toBeEnabled();
+  });
 
-    await createBtn.click();
-    await expect(page.getByText(/we sent a code/i)).toBeVisible();
-    // Change-email returns to step 1 (no nested forms); resend is present.
-    await expect(page.getByRole("button", { name: /resend|resend in/i })).toBeVisible();
-
-    const code = await readNewOtp(request, email, seen);
-    // The canonical OTP control is one box per digit (`maxLength=1`);
-    // `.fill()` only ever lands the first character in box zero and never
-    // triggers the real auto-advance keyboard contract, leaving boxes 2-6
-    // empty and the submission rejected client-side — pre-existing bug,
-    // unrelated to any auth-architecture change (helpers/auth.ts's `signIn()`
-    // already documents and works around this exact issue). Found while
-    // live-regression-testing the canonical passwordless flow under
-    // `enable_confirmations=true` for the password-auth preview
-    // (docs/frontend/auth-password-preview.md).
-    await page.getByLabel(/one-time code/i).pressSequentially(code);
-    await page.getByRole("button", { name: /verify/i }).click();
-
-    // Verified + consented new account resumes at the first INCOMPLETE step —
-    // since Increment 7 that is the account type (the profile/contact wizard
-    // steps are no longer on the path).
-    await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
-
+  test("a verified account with an incomplete registration is funnelled back from Sign In", async ({ page, request }) => {
+    await prefs(page, "en", "light");
+    const email = `signup+${Date.now()}@example.test`;
+    createConfirmedAccount(email);
+    await signIn(page, request, email, /\/auth\/finish-registration$/);
     // Resume: a signed-in caller visiting Sign In is funnelled back into onboarding.
     await page.goto("/auth/sign-in");
     await page.waitForURL(/\/onboarding\/account-type$/, { waitUntil: "commit" });
@@ -77,6 +67,9 @@ test.describe("account registration", () => {
     await noOverflow(page);
     // Consent labels are Arabic; the English catalog strings must not appear.
     await expect(page.getByText(/شروط الخدمة/)).toBeVisible();
+    await expect(page.getByLabel(/^الاسم الكامل$/)).toHaveAttribute("placeholder", "اكتب اسمك الكامل");
+    await expect(page.locator('select[name="accountType"] option').first()).toHaveText("اختر نوع الحساب");
+    await expect(page.getByText(/full name|choose an account type/i)).toHaveCount(0);
     await expect(page.getByText(/I accept the Terms of Service/i)).toHaveCount(0);
     await expect(page.getByRole("button", { name: /إنشاء حساب/ })).toBeVisible();
   });

@@ -409,7 +409,7 @@ export const en = {
     account: {
       title: "Sign-in & account",
       signInContact: "Your sign-in contact",
-      signInBody: "Aladdin has no passwords. You sign in with a one-time code sent to your verified contact, so there is nothing to reset or leak.",
+      signInBody: "You sign in with your email address and your password. If you forget your password, reset it from the sign-in page with a code sent to your email.",
       signInBodyPhonePassword: "You sign in with the phone number you registered with and your password.",
       signInContactHint: "Change it from your professional profile.",
       signOut: "Sign out",
@@ -2878,7 +2878,7 @@ export const en = {
     manageTeam: "Manage the team",
     accessNote: "Access comes from your role in this business — an owner or manager changes it on the Team page.",
     signIn: "Sign-in & security",
-    signInBody: "Aladdin has no passwords. You sign in with a one-time code sent to your verified contact, so there is nothing to reset or leak.",
+    signInBody: "You sign in with your email address and your password. If you forget your password, reset it from the sign-in page with a code sent to your email.",
     signInBodyPhonePassword: "You sign in with the phone number you registered with and your password.",
     signInContact: "Your sign-in contact",
     signInContactHint: "Change it from your personal profile.",
@@ -4152,18 +4152,21 @@ export const en = {
     nameLength: "Enter a name (1–160 characters).",
     titleLength: "Enter a title (1–200 characters).",
   },
-  /* ISOLATED PREVIEW ONLY (docs/frontend/auth-password-preview.md) — password
-     registration/sign-in under review. Deliberately namespaced away from
-     `auth.*`, which remains the live passwordless copy, so this preview can
-     be deleted or promoted without touching production strings. */
+  /* Canonical password auth copy (docs/frontend/auth-password-preview.md) —
+     /auth/sign-up, /auth/sign-in, /auth/forgot-password/*, finish-registration.
+     The namespace keeps its historical name; `auth.*` holds the legacy
+     passwordless copy (/auth/verify, /auth/recovery) plus strings the canonical pages share
+     (brand panel, installer phone sign-in link). */
   authPasswordPreview: {
-    previewBanner: "Preview — password sign-in under security review. Not the live registration flow.",
     showPassword: "Show password",
     hidePassword: "Hide password",
+    fullNameLabel: "Full name",
+    fullNamePlaceholder: "Enter your full name",
     emailLabel: "Email address",
     emailPlaceholder: "you@company.com",
     accountTypeLabel: "How will you use Aladdin?",
     accountTypePlaceholder: "Choose an account type",
+    accountTypeComingSoonOption: "{label} — Coming soon",
     passwordLabel: "Password",
     confirmPasswordLabel: "Confirm password",
     newPasswordLabel: "New password",
@@ -4269,6 +4272,8 @@ export const en = {
       resetSent: "If an account exists for {email}, we sent a password reset code.",
     },
     error: {
+      fullNameRequired: "Enter your full name.",
+      fullNameTooLong: "Full name must be 80 characters or fewer.",
       invalidEmail: "Enter a valid email address.",
       invalidCode: "Enter the 6-digit code from your email.",
       invalidCredentials: "That email and password don't match. Check them and try again.",

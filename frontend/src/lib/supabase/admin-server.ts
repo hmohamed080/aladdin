@@ -4,7 +4,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readPublicEnv, parseServerEnv } from "@/lib/env";
 import type { Database } from "@/types/database.types";
 
-/** The one authoritative security flag this preview stamps into `app_metadata` — never `user_metadata`. */
+/** The one authoritative security flag canonical password auth stamps into `app_metadata` — never `user_metadata`. The value keeps its historical `preview` wording: it is stored on existing accounts and must not change. */
 export const PASSWORD_SET_FLAG = "aladdin_pw_preview_password_set";
 
 /**
@@ -13,7 +13,7 @@ export const PASSWORD_SET_FLAG = "aladdin_pw_preview_password_set";
  * guard above makes importing this file from a Client Component a build
  * error, not just a convention).
  *
- * Introduced by this preview for writing `app_metadata`. Supabase's regular
+ * Introduced (while password auth was still a preview) for writing `app_metadata`. Supabase's regular
  * (non-admin) client can only write `user_metadata`, which the account's own
  * owner can edit via `auth.updateUser({data})` — it is NOT authoritative for
  * any security-sensitive resume decision
@@ -40,7 +40,7 @@ function getAdminClient(): SupabaseClient<Database> {
   });
   if (!SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error(
-      "SUPABASE_SERVICE_ROLE_KEY is not set. Required locally for the password-auth preview's authoritative " +
+      "SUPABASE_SERVICE_ROLE_KEY is not set. Required for canonical password auth's authoritative " +
         "app_metadata writes (registration, migration, recovery) — see docs/frontend/auth-password-preview.md " +
         "§Authoritative password-state tracking. Get the local value from `supabase status` and add it to " +
         "frontend/.env.local yourself; this value is never read or logged by any Claude Code tool call.",
@@ -83,7 +83,7 @@ export async function savePendingRegistration(params: {
 }
 
 /**
- * The one authoritative write this preview performs: stamps
+ * The one authoritative write canonical password auth performs: stamps
  * `app_metadata.aladdin_pw_preview_password_set = true` for `userId`, via a
  * read-merge-write (Supabase's admin `updateUserById` REPLACES the whole
  * `app_metadata` object rather than deep-merging it, so a naive write would

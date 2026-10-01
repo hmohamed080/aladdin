@@ -1,5 +1,6 @@
-import { SignInForm } from "@/features/auth/sign-in-form";
+import { PasswordSignInForm } from "@/features/auth-password-preview/sign-in-form";
 import { sanitizeNext } from "@/server/auth/next";
+import { installerSignInHref } from "./installer-sign-in-href";
 
 export const dynamic = "force-dynamic";
 
@@ -9,9 +10,5 @@ export default async function SignInPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  const safeNext = sanitizeNext(next);
-  // The installer phone sign-in link forwards an EXPLICIT, validated `next`
-  // only — never a default, never the raw query value.
-  const installerSignInHref = next ? `/installer/sign-in?next=${encodeURIComponent(safeNext)}` : "/installer/sign-in";
-  return <SignInForm next={safeNext} installerSignInHref={installerSignInHref} />;
+  return <PasswordSignInForm next={sanitizeNext(next)} installerSignInHref={installerSignInHref(next)} />;
 }

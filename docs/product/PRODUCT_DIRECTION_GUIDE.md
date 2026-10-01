@@ -68,9 +68,13 @@ One person can legitimately relate to the platform in several capacities (End Co
 
 ## Canonical Identity Model
 - **One person = one user ID.** A human has exactly **one** authentication/user identity. Creating or joining another business **never** creates a second user for the same person.
-- **One canonical identity per person**, regardless of verification method (WhatsApp OTP or Email OTP/verification link). No duplicate accounts per role, per contact channel, or per business.
-- **Passwordless.** No passwords, and no password/forgot/reset flows anywhere — those are legacy/superseded.
-- A user verifies exactly **one** primary contact at account creation; a secondary is added later from profile settings.
+- **One canonical identity per person**, regardless of sign-in method (Email + Password, or the installer Phone + Password exception). No duplicate accounts per role, per contact channel, or per business.
+- **Email + Password is canonical** (since 2026-09-28, see Change History):
+  - *General accounts* — sign up with Full Name + Email + Username + Account Type + Password, then Email OTP verification; sign in with Email + Password; Forgot Password via Email OTP recovery.
+  - *Installer/Technician exception* — `/installer/sign-up`: Full Name + Phone + Password (no email, OTP or username in that flow); `/installer/sign-in`: Phone + Password; same canonical user/persona model; installer Forgot Password deferred.
+  - *CAPTCHA* — Supabase global CAPTCHA off; application-scoped Turnstile on Create Account, Resend Signup and the Forgot Password request only; no CAPTCHA on Sign In.
+- ~~**Passwordless.** No passwords, and no password/forgot/reset flows anywhere~~ — *superseded 2026-09-28.*
+- A general account verifies its email at account creation; further contacts (e.g. phone) are added later from profile settings.
 - **Organization membership, branch assignment, and permission capabilities are separate from identity** — they attach to the canonical account, they do not fork it.
 
 ## Personal Identity Is Not a Business
@@ -254,7 +258,7 @@ We **guide decisions; we are not a checkout.** The product optimizes for the *ri
 AI **drafts and ranks; it never auto-sends** or takes irreversible action on a user's behalf silently. Smart Share and follow-up drafting are AI-assisted but always human-reviewed before send. Human-in-the-loop is a product requirement, not a "later" nicety.
 
 ## MVP Boundaries
-See [`mvp-scope.md`](./mvp-scope.md) for the authoritative list and order. In short: passwordless auth, onboarding/profiles, roles, portfolio, catalog, smart search, AI assistant, notifications, subscription, advertisement, admin — plus the core value journey — built **Sales-first** (05C → 05A → 05B → 05D → 05E).
+See [`mvp-scope.md`](./mvp-scope.md) for the authoritative list and order. In short: authentication (Email + Password; installer Phone + Password), onboarding/profiles, roles, portfolio, catalog, smart search, AI assistant, notifications, subscription, advertisement, admin — plus the core value journey — built **Sales-first** (05C → 05A → 05B → 05D → 05E).
 
 ## Private-Pilot B2B Scope Boundaries (approved 2026-08-08 · reconciled 2026-08-17)
 
@@ -306,7 +310,7 @@ Build inner workflows **before** the dashboards that summarize them.
 
 ### Implementation roadmap (engineering build order)
 1. **Architecture hardening** — the foundation is scaffolded; reconcile and validate before feature work.
-2. **Identity and multi-tenancy** — canonical identity, passwordless verification, tenant model.
+2. **Identity and multi-tenancy** — canonical identity, Email + Password with Email OTP verification, tenant model.
 3. **Organizations, memberships, branches, and permissions** — the derivation inputs for navigation and access.
 4. **RLS and tenant-isolation tests** — the isolation spine, with tests, before feature data.
 5. **B2B Sales implementation** — the 05C workflow on top of the hardened foundation.
@@ -327,14 +331,14 @@ A **third roadmap axis** — the two above order *what screens get built* and *w
 3. **Cross-account end-to-end journeys** — flows that span more than one account (a Sales rep and a buyer on the same RFQ, a poster and an installer on the same job, and so on), reviewed after the individual accounts they compose are already sound.
 4. **Landing Page and public surfaces.**
 5. **Registration, onboarding, identity and authentication** (the flows as they exist today).
-6. **Authentication and identity security** — a dedicated hardening pass, not part of item 5's functional review: password login's return, password reset/change, Email OTP, Phone/SMS OTP, WhatsApp OTP, a provider and per-message cost comparison, standards-based TOTP compatible with authenticator apps, recovery codes, a trusted-device policy, new-device verification, session duration/refresh policy, risk-based and periodic re-authentication, step-up authentication before permission/identity/payment or other sensitive changes, and an active-device/session list with remote revocation. None of this is built yet — this item records the **order** it will be tackled in, not a claim that any of it exists. It does not reopen the canonical **passwordless** decision above; a password-login *return* means restoring it as an **additional** option, never replacing Email/WhatsApp OTP as the default.
+6. **Authentication and identity security** — a dedicated hardening pass, not part of item 5's functional review: password login's return, password reset/change, Email OTP, Phone/SMS OTP, WhatsApp OTP, a provider and per-message cost comparison, standards-based TOTP compatible with authenticator apps, recovery codes, a trusted-device policy, new-device verification, session duration/refresh policy, risk-based and periodic re-authentication, step-up authentication before permission/identity/payment or other sensitive changes, and an active-device/session list with remote revocation. None of this is built yet — this item records the **order** it will be tackled in, not a claim that any of it exists. Email + Password is now canonical (Change History 2026-09-28), so the "password login's return" part is done; this item still covers the hardening listed here. *(Superseded wording: it originally said this item did not reopen the canonical passwordless decision.)*
 7. **Global UI/UX audit** — Arabic/English parity, RTL/LTR, Desktop/Tablet/Mobile as responsive presentation lanes (never separate products — see [`UI_UX_SYSTEM_GUIDE.md`](../../UI-UX/UI_UX_SYSTEM_GUIDE.md)), Light/Dark presentation lanes where supported, accessibility, performance, and the Loading/Empty/Error/Success state of every surface.
 8. **Full application-security audit** — SQL injection, XSS, CSRF, IDOR, cross-tenant/cross-branch leakage, RLS bypass, privilege escalation, session/token leakage, brute-force and OTP abuse, account enumeration, password-reset attacks, upload and Storage security, API rate limiting, secrets handling, webhooks, audit logs, dependency risk, and security headers/CSP.
 9. **Remaining product features** — including Full Chat/Realtime (the next Pilot milestone named in `RUNTIME_STATE.md`) and any other roadmap items reconciled by this point.
 10. **Platform Admin, last** — expanded into a controlled **CMS / Platform Control Center**. See *Admin Control Requirements* below for how items feed it during the reviews above.
 11. **Final release / security / UAT gate.**
 
-This order is a sequencing decision, not a scope change: it does not add, remove, or redefine any feature, and every guardrail elsewhere in this guide (canonical identity, no persona switcher, passwordless-by-default, consultation-first, etc.) applies unchanged to every item in it.
+This order is a sequencing decision, not a scope change: it does not add, remove, or redefine any feature, and every guardrail elsewhere in this guide (canonical identity, no persona switcher, the canonical authentication model, consultation-first, etc.) applies unchanged to every item in it.
 
 #### Admin Control Requirements (backlog convention)
 
@@ -358,7 +362,7 @@ During every account review, Landing Page review, Registration review, and featu
 
 ## What Agents Must NEVER Do
 - **Never** build commerce/marketplace framing (add-to-cart, checkout, price-war bidding) — this is consultation-first.
-- **Never** add password/forgot/reset UI or flows — the product is **passwordless** (WhatsApp/Email OTP). *(One approved, role-specific exception: installer/technician accounts may register and sign in with phone + password at `/installer/sign-up` / `/installer/sign-in` — see the 2026-09-27 Change History entries. Every other account type stays passwordless.)*
+- **Never** add a sign-up, sign-in or recovery path outside the canonical model: Email + Password with Email OTP verification and Email OTP recovery for general accounts; Phone + Password at `/installer/sign-up` / `/installer/sign-in` for installers/technicians (Change History 2026-09-28). *(Superseded 2026-09-28: the earlier rule "never add password/forgot/reset UI or flows — the product is passwordless".)*
 - **Never** merge roles, and **never** add a Profile Switcher / "Use As" mode or any persona/account-identity-switching UI — roles stay separate in the taxonomy; navigation is **derived**, not toggled. One current primary account type at a time. *(Switching the active **work context** between the personal surface and organizations where the user has an active membership is a different, allowed concept — see [Switching](#switching-what-is-forbidden-what-is-allowed).)*
 - **Never** create a second user/auth identity for the same person — not for another role, another contact channel, or another business. A business is an **Organization**, never a second account.
 - **Never** copy business identity onto the user, or personal identity into organization records, as a second source of truth; after a draft is committed, read from the owning entity.
@@ -376,16 +380,22 @@ During every account review, Landing Page review, Registration review, and featu
 ## Change History
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
 
+### 2026-09-28 — Email + Password becomes the canonical authentication model
+- **What:** General accounts sign up at `/auth/sign-up` with Full Name + Email + Username + Account Type + Password and verify the email with a one-time code (Email OTP); they sign in at `/auth/sign-in` with Email + Password; Forgot Password (`/auth/forgot-password`) recovers access through an Email OTP. Installers/technicians keep the permanent exception: `/installer/sign-up` (Full Name + Phone + Password; no email, OTP or username) and `/installer/sign-in` (Phone + Password), with the same canonical user/persona model; `/auth/sign-in` links to it. Installer Forgot Password stays deferred. Supabase's global CAPTCHA stays off; application-scoped Turnstile covers Create Account, Resend Signup and the Forgot Password request; Sign In has no CAPTCHA.
+- **Supersedes:** the passwordless rule (WhatsApp/Email OTP only; no passwords; no forgot/reset flows) in this guide, `CLAUDE.md`, `PRODUCT.md` and `ARCHITECTURE_GUIDE.md`. Earlier entries below are kept as history.
+- **Implementation:** PR #66 (`feature/canonical-password-auth`); feature doc [`../frontend/auth-password-preview.md`](../frontend/auth-password-preview.md).
+- **Approved by:** product owner, 2026-09-28.
+
 ### 2026-09-27 — Installer phone + password entry point made permanent
 - **What:** The phone + password flow approved earlier the same day as a temporary exception is now the **permanent, role-specific authentication entry point for installer/technician accounts**: `/installer/sign-up` and `/installer/sign-in` (the old `/temporary/craftsman/*` URLs redirect there). The homepage's installer tile/role CTA links to it, and the shared `/auth/sign-in` carries a small secondary link for installers. Forgot-password stays hidden until phone OTP recovery (SMS/WhatsApp → verification → new password) exists.
-- **Unchanged:** the global authentication strategy. `/auth/sign-up` and `/auth/sign-in` keep serving the email/passwordless flow for every account type — including installers who registered by email, who keep using it (no account merging or identity linking). Showroom/Supplier/Manufacturer/Importer/Sales/Admin registration is untouched.
+- **Unchanged** *(superseded 2026-09-28 — `/auth/*` is now Email + Password)*: the global authentication strategy. `/auth/sign-up` and `/auth/sign-in` keep serving the email/passwordless flow for every account type — including installers who registered by email, who keep using it (no account merging or identity linking). Showroom/Supplier/Manufacturer/Importer/Sales/Admin registration is untouched.
 - **Details:** [`../frontend/installer-phone-auth.md`](../frontend/installer-phone-auth.md).
 - **Approved by:** User (installer route promotion task, 2026-09-27).
 
 ### 2026-09-27 — Temporary craftsman phone + password entry point (scoped exception)
 - **What:** A TEMPORARY, parallel registration/sign-in entry point for installer/technician (الصنايعي) accounts at `/installer/sign-up` and `/installer/sign-in`: full name + phone + password (+ consent + Turnstile), **no OTP**. Accounts are ordinary `professional / installer_technician` accounts on the one canonical identity model (same user ID model, same RPCs, same `/home` experience). The phone is canonicalized to E.164 and the account signs in with an internal, never-displayed login alias derived from it. Duplicate phones are disclosed ("يوجد حساب مسجل بالفعل بهذا الرقم"). Forgot password is hidden for these accounts.
 - **Why:** Craftsman registration through the canonical email-OTP flow is blocked for this audience; this unblocks it without changing the canonical flow.
-- **Scope:** The canonical passwordless model, `/auth/*`, email-OTP behavior, other account types and the hosted phone provider are **unchanged**. The "passwordless" guardrail stands for everything else. Implementation and limitations: [`../frontend/installer-phone-auth.md`](../frontend/installer-phone-auth.md).
+- **Scope** *(superseded 2026-09-28 — passwordless is no longer canonical)*: The canonical passwordless model, `/auth/*`, email-OTP behavior, other account types and the hosted phone provider are **unchanged**. The "passwordless" guardrail stands for everything else. Implementation and limitations: [`../frontend/installer-phone-auth.md`](../frontend/installer-phone-auth.md).
 - **Deferred:** removal of the temporary flow and migration of its accounts to a verified phone (WhatsApp OTP) or email identity; a recovery path for these accounts.
 - **Approved by:** User (temporary craftsman auth task, Option B, 2026-09-27).
 

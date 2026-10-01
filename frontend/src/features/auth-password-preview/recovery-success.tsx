@@ -9,7 +9,7 @@ import { AuthCard } from "@/features/auth/auth-card";
  * auto-redirect into the app (the session was already ended by Screen 3), a
  * single primary action back to Sign In.
  *
- * A Client Component, matching every other screen in this preview: `AuthCard`
+ * A Client Component, matching every other canonical password-auth screen: `AuthCard`
  * calls the `useI18n()` hook internally without its own `"use client"`
  * marker, so it only works when rendered from within an already-client
  * module graph (every other screen gets this for free because their forms
@@ -22,7 +22,7 @@ export function RecoverySuccess() {
   return (
     <AuthCard title={t("authPasswordPreview.recoverySuccess.title")} subtitle={t("authPasswordPreview.recoverySuccess.body")}>
       <Link
-        href="/preview/auth-password/sign-in"
+        href="/auth/sign-in"
         className="block w-full rounded-sm bg-primary px-md py-2 text-center text-label font-medium text-primary-foreground shadow-sm hover:opacity-90"
       >
         {t("authPasswordPreview.recoverySuccess.signIn")}

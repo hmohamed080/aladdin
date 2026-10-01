@@ -393,7 +393,7 @@ export const ar: Messages = {
     account: {
       title: "تسجيل الدخول والحساب",
       signInContact: "وسيلة تسجيل دخولك",
-      signInBody: "لا توجد كلمات مرور في علاء الدين. تسجّل الدخول برمز لمرة واحدة يُرسل إلى وسيلة تواصلك الموثّقة، فلا شيء لإعادة تعيينه أو تسريبه.",
+      signInBody: "تسجّل الدخول ببريدك الإلكتروني وكلمة المرور. إن نسيت كلمة المرور، أعد تعيينها من صفحة تسجيل الدخول برمز يُرسل إلى بريدك الإلكتروني.",
       signInBodyPhonePassword: "تسجّل الدخول برقم الهاتف الذي سجّلت به وكلمة المرور.",
       signInContactHint: "غيّرها من ملفك المهني.",
       signOut: "تسجيل الخروج",
@@ -1065,7 +1065,7 @@ export const ar: Messages = {
     signInLink: "تسجيل الدخول",
     signUpLink: "أنشئ حسابًا",
     troubleSigningIn: "تواجه مشكلة في تسجيل الدخول؟",
-    installerPhoneSignIn: "صنايعي؟ سجّل الدخول برقم الهاتف",
+    installerPhoneSignIn: "صنايعي أو فني؟ سجل الدخول برقم الهاتف",
     lostEmailAccess: "فقدت الوصول إلى بريدك الإلكتروني؟",
     getHelp: "احصل على المساعدة",
     info: { codeSent: "أرسلنا رمزًا إلى {email}. قد يستغرق وصوله لحظات." },
@@ -2772,7 +2772,7 @@ export const ar: Messages = {
     manageTeam: "إدارة الفريق",
     accessNote: "تأتي صلاحياتك من دورك في هذا النشاط — يغيّرها المالك أو المدير من صفحة الفريق.",
     signIn: "تسجيل الدخول والأمان",
-    signInBody: "لا توجد كلمات مرور في علاء الدين. تسجّل الدخول برمز لمرة واحدة يصل إلى وسيلة التواصل الموثّقة، فلا شيء يحتاج إعادة تعيين أو يمكن تسريبه.",
+    signInBody: "تسجّل الدخول ببريدك الإلكتروني وكلمة المرور. إن نسيت كلمة المرور، أعد تعيينها من صفحة تسجيل الدخول برمز يُرسل إلى بريدك الإلكتروني.",
     signInBodyPhonePassword: "تسجّل الدخول برقم الهاتف الذي سجّلت به وكلمة المرور.",
     signInContact: "وسيلة تسجيل الدخول",
     signInContactHint: "يمكنك تغييرها من ملفك الشخصي.",
@@ -4001,16 +4001,20 @@ export const ar: Messages = {
     nameLength: "أدخل اسمًا (من ١ إلى ١٦٠ حرفًا).",
     titleLength: "أدخل عنوانًا (من ١ إلى ٢٠٠ حرف).",
   },
-  /* معاينة معزولة فقط (docs/frontend/auth-password-preview.md) — تسجيل الدخول
-     بكلمة المرور قيد المراجعة الأمنية. منفصلة عمدًا عن auth.* الحيّة. */
+  /* Canonical password auth copy (docs/frontend/auth-password-preview.md).
+     The namespace keeps its historical name; `auth.*` holds the legacy
+     passwordless copy (/auth/verify, /auth/recovery) plus strings the canonical pages share
+     (brand panel, installer phone sign-in link). */
   authPasswordPreview: {
-    previewBanner: "معاينة — تسجيل الدخول بكلمة المرور قيد المراجعة الأمنية. هذا ليس تدفق التسجيل الفعلي.",
     showPassword: "إظهار كلمة المرور",
     hidePassword: "إخفاء كلمة المرور",
+    fullNameLabel: "الاسم الكامل",
+    fullNamePlaceholder: "اكتب اسمك الكامل",
     emailLabel: "البريد الإلكتروني",
     emailPlaceholder: "you@company.com",
     accountTypeLabel: "كيف ستستخدم علاء الدين؟",
     accountTypePlaceholder: "اختر نوع الحساب",
+    accountTypeComingSoonOption: "{label} — قريبًا",
     passwordLabel: "كلمة المرور",
     confirmPasswordLabel: "تأكيد كلمة المرور",
     newPasswordLabel: "كلمة المرور الجديدة",
@@ -4116,6 +4120,8 @@ export const ar: Messages = {
       resetSent: "إذا كان هناك حساب لـ {email}، فقد أرسلنا رمز إعادة تعيين كلمة المرور.",
     },
     error: {
+      fullNameRequired: "اكتب اسمك الكامل.",
+      fullNameTooLong: "يجب ألا يزيد الاسم الكامل عن ٨٠ حرفًا.",
       invalidEmail: "أدخل بريدًا إلكترونيًا صالحًا.",
       invalidCode: "أدخل الرمز المكوّن من ٦ أرقام من بريدك الإلكتروني.",
       invalidCredentials: "لا يتطابق البريد الإلكتروني وكلمة المرور. تحقق منهما وحاول مجددًا.",

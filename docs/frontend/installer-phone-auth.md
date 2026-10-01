@@ -1,10 +1,10 @@
 # Installer/technician phone + password authentication
 
 **Status:** the approved, permanent, role-specific authentication entry point for
-installer/technician (الصنايعية) accounts — the one documented exception to the
-passwordless model (PRODUCT_DIRECTION_GUIDE, Change History 2026-09-27). Visual
-implementation approved. Verified against local Supabase. **Not deployed; hosted
-Supabase untouched.** It creates ordinary `professional / installer_technician` accounts
+installer/technician (الصنايعية) accounts. The current authentication model is
+**General = Email + Password** (`/auth/*`) and **Installer = Phone + Password**
+(this flow) — PRODUCT_DIRECTION_GUIDE, Change History 2026-09-28. Visual
+implementation approved. **Live in Production and smoke-tested (2026-09-28).** It creates ordinary `professional / installer_technician` accounts
 through the existing infrastructure and hands them to the existing installer experience.
 
 - Sign up: **`/installer/sign-up`** — full name, phone, password, one consent checkbox
@@ -14,11 +14,14 @@ through the existing infrastructure and hands them to the existing installer exp
 - Compatibility: `/temporary/craftsman/sign-up` and `/temporary/craftsman/sign-in` are
   permanent (308) redirects to the routes above (`next.config.ts`), query string kept.
 
-The shared `/auth/sign-up` and `/auth/sign-in` routes keep serving the email/passwordless
-flow for **every** account type (including installers who registered by email); only a
-secondary link was added to `/auth/sign-in`. `server/actions/auth.ts`'s email-OTP
-behavior, the password preview (`/preview/auth-password/*`), other account types and the
-hosted phone provider are **unchanged**.
+The shared `/auth/sign-up` and `/auth/sign-in` routes serve the canonical Email + Password
+flow (`feature/canonical-password-auth`, PR #66) for **every** account type, and
+"Tradespeople & Technicians" stays selectable there: an installer may register either by
+email (email + username + password + OTP) or here (phone + password). Both resolve to the
+same `installer_technician` persona and `/home`; the two identities are never merged
+automatically. `/auth/sign-in` keeps the secondary link to `/installer/sign-in` (table
+below). This page's routes, actions, alias model and sign-out routing are unchanged by
+that promotion.
 
 **Naming.** `installer` is the canonical product/code term (DB persona
 `installer_technician`, the "Installer/Technician Pilot", `installer-dashboard`,
@@ -36,7 +39,7 @@ never change).
 | Homepage (production/local, `landing-v2`) — "الصنايعية والفنيون" audience tile | explicit role choice | `/installer/sign-up` |
 | Homepage (staging, `landing-preview`) — installers role dialog "إنشاء حساب" | explicit role choice | `/installer/sign-up` |
 | Every other role CTA/card/link | — | unchanged (`/auth/sign-up`) |
-| Shared `/auth/sign-in` | — | secondary link "صنايعي؟ سجّل الدخول برقم الهاتف" → `/installer/sign-in`, carrying `?next=` **only** when the page itself received one, re-validated with `sanitizeNext` |
+| Shared `/auth/sign-in` (Email + Password) | — | secondary link "صنايعي أو فني؟ سجل الدخول برقم الهاتف" / "Installer or technician? Sign in with your phone number" → `/installer/sign-in`, carrying `?next=` **only** when the page received one that `sanitizeNext` accepts unchanged (`app/auth/sign-in/installer-sign-in-href.ts`); otherwise the plain link |
 | Explicit sign-out (`signOut`, `server/actions/auth.ts`) | the signed-in account's own identity, read before the session ends | phone-alias account → `/installer/sign-in`; every other account → `/auth/sign-in` (as before) |
 | Expired session / signed-out visit to a protected route (`middleware.ts`, page guards) | none — no protected route is installer-only (`/home/*` is shared by every personal persona) | unchanged: `/auth/sign-in?next=…`; the installer uses the secondary link, which forwards that `next` |
 | Signed-in visit to `/installer/sign-up` or `/installer/sign-in` | session | `/onboarding` (middleware, same rule as `/auth/*`) → the caller's landing |
@@ -134,7 +137,7 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
   through the SQL RPCs — and each layer covers one. Neither replaces the other. The raw
   alias stays available internally wherever authentication needs it (alias derivation,
   `createUser`, `signInWithPassword`, `auth.users.email`); masking is presentation only.
-- **Phone accounts never enter the password-preview email flows.** `/preview/auth-password/migrate`
+- **Phone accounts never enter the password-auth email flows.** `/preview/auth-password/migrate`
   and `/change-password` (which delegates to it), plus their server actions
   (`requestMigrationCode`, `completeMigration`, `changePassword`), turn an alias account
   away on the server (`redirectPhoneLoginAccount` in `server/actions/auth-password-preview.ts`)
@@ -144,7 +147,7 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
 - **Settings copy follows the account's sign-in method.** `/home/settings` and `/b2b/settings`
   pick the sign-in text on the server from the same alias check: phone accounts read "You sign
   in with the phone number you registered with and your password." (AR: "تسجّل الدخول برقم الهاتف
-  الذي سجّلت به وكلمة المرور."); email accounts keep the passwordless one-time-code text. The
+  الذي سجّلت به وكلمة المرور."); email accounts read the email + password text. The
   "change it from your profile" hint is not shown to phone accounts — a profile phone edit does
   not change the number they sign in with (the alias is fixed at creation; see Known limitations).
 - Admin lists read `public.users`/`profiles`, never `auth.users.email`.
@@ -154,8 +157,8 @@ rate limits are reported separately. A non-`access_ready` account resumes `/onbo
 ## Known limitations
 
 - **Forgot password is hidden — PENDING authentication item (product decision, 2026-09-27).**
-  Every existing recovery flow is email-based (`/auth/recovery` email OTP;
-  `/preview/auth-password/forgot-password` → `resetPasswordForEmail`) and cannot reach a
+  Every existing recovery flow is email-based (`/auth/forgot-password` →
+  `resetPasswordForEmail`; the legacy `/auth/recovery` email OTP) and cannot reach a
   phone/alias account; there is no SMS/WhatsApp sender. These flows must NOT be linked
   from the craftsman pages, no interim workaround (support link, admin shortcut) is to be
   built, and the email recovery flows stay unchanged. The intended recovery flow, to be

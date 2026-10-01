@@ -196,11 +196,11 @@ test.describe("installer phone + password auth", () => {
     await expectNoAlias(page);
   });
 
-  test("the canonical /auth flow is unchanged (email OTP, no phone/password); sign-in gains one installer link", async ({ page }) => {
+  test("the canonical /auth flow is email + password (never phone); sign-in keeps one installer link", async ({ page }) => {
     for (const path of ["/auth/sign-up", "/auth/sign-in"]) {
       await page.goto(path);
       await expect(page.locator('input[type="email"]')).toHaveCount(1);
-      await expect(page.locator('input[type="password"]')).toHaveCount(0);
+      await expect(page.locator('input[name="password"]')).toHaveCount(1);
       await expect(page.locator('input[type="tel"]')).toHaveCount(0);
     }
     await page.goto("/auth/sign-up");
@@ -209,6 +209,16 @@ test.describe("installer phone + password auth", () => {
     const installerLink = page.locator('a[href^="/installer/"]');
     await expect(installerLink).toHaveCount(1);
     await expect(installerLink).toHaveAttribute("href", "/installer/sign-in");
+    await expect(installerLink).toHaveText("صنايعي أو فني؟ سجل الدخول برقم الهاتف");
+  });
+
+  test("/auth/sign-in forwards only a validated next to the installer link", async ({ page }) => {
+    await page.goto("/auth/sign-in?next=%2Fhome%2Fpoints");
+    await expect(page.locator('a[href^="/installer/"]')).toHaveAttribute("href", "/installer/sign-in?next=%2Fhome%2Fpoints");
+    for (const unsafe of ["%2F%2Fevil.example", "https%3A%2F%2Fevil.example", "%2F%5Cevil.example"]) {
+      await page.goto(`/auth/sign-in?next=${unsafe}`);
+      await expect(page.locator('a[href^="/installer/"]')).toHaveAttribute("href", "/installer/sign-in");
+    }
   });
 
   test("old /temporary/craftsman URLs permanently redirect to /installer, keeping the query", async ({ page, request }) => {
@@ -290,17 +300,17 @@ test.describe("installer phone + password auth", () => {
       const text = await page.locator("body").innerText();
       expect(text).not.toContain(ALIAS_MARKER);
       // The settings copy states how THIS account signs in: phone + password,
-      // never the passwordless one-time-code text (either locale).
+      // never the email + password text (either locale).
       expect(text).toMatch(/phone number you registered with and your password|برقم الهاتف الذي سجّلت به وكلمة المرور/);
-      expect(text).not.toMatch(/Aladdin has no passwords|لا توجد كلمات مرور/);
+      expect(text).not.toMatch(/your email address and your password|ببريدك الإلكتروني وكلمة المرور/);
     }
   });
 
-  test("an email account keeps the one-time-code sign-in copy in settings", async ({ page, request }) => {
+  test("an email account keeps the email + password sign-in copy in settings", async ({ page, request }) => {
     await signIn(page, request, "hossam@example.test", /\/home$/);
     await page.goto("/home/settings");
     const text = await page.locator("body").innerText();
-    expect(text).toMatch(/Aladdin has no passwords|لا توجد كلمات مرور/);
+    expect(text).toMatch(/your email address and your password|ببريدك الإلكتروني وكلمة المرور/);
     expect(text).not.toMatch(/phone number you registered with|برقم الهاتف الذي سجّلت به/);
   });
 

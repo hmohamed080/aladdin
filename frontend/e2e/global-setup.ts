@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { E2E_PASSWORD } from "./helpers/auth";
 
 /**
  * Deterministic local-E2E seed (Sprint 6.2 follow-up). Playwright runs this ONCE
@@ -59,7 +60,7 @@ update public.organizations set status = 'pending_verification', is_verified = f
 commit;
 `;
 
-function psql(sql: string): void {
+export function psql(sql: string): void {
   execSync(`docker exec -i ${DB} psql -U postgres -d postgres -v ON_ERROR_STOP=1`, {
     input: sql,
     stdio: ["pipe", "ignore", "inherit"],
@@ -78,4 +79,17 @@ export default function globalSetup(): void {
   // keeps the two paths identical — without this, running the suite left the
   // showroom acceptance account with empty pipeline panels until a full reset.
   seed("seed-showroom-sales.sql");
+
+  // The canonical sign-in is Email + Password. The product seeds carry NO
+  // passwords (they model the pre-password, passwordless pilot), so the
+  // seeded synthetic `@example.test` identities get the known E2E password
+  // here — LOCAL TEST DB ONLY, never a product seed, never production. Only
+  // accounts with no password yet are stamped, so a password a test set
+  // itself (recovery, migration) is never overwritten.
+  psql(`
+update auth.users
+   set encrypted_password = extensions.crypt('${E2E_PASSWORD}', extensions.gen_salt('bf'))
+ where email like '%@example.test'
+   and coalesce(encrypted_password, '') = '';
+`);
 }

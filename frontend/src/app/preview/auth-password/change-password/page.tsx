@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function AuthPasswordPreviewChangePasswordPage() {
   const eligibility = await migrationEligibility();
-  if (!eligibility) redirect("/preview/auth-password/sign-in");
+  if (!eligibility) redirect("/auth/sign-in");
   if (!eligibility.hasPassword) redirect("/preview/auth-password/migrate");
   return <ChangePasswordForm email={eligibility.email} />;
 }

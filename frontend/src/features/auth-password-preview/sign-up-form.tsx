@@ -10,12 +10,12 @@ import {
   type PasswordAuthState,
 } from "@/server/actions/auth-password-preview";
 import { AuthCard } from "@/features/auth/auth-card";
-import { Input, LabeledField, SubmitButton, Checkbox, ResendButton, Button } from "@/components/ui/controls";
+import { Input, LabeledField, SubmitButton, Checkbox, ResendButton, Button, Select } from "@/components/ui/controls";
 import { OtpInput } from "@/components/ui/otp-input";
-import { ChoiceCard } from "@/components/ui/choice-card";
 import { PasswordInput } from "./password-input";
 import { PasswordStrengthMeter } from "./password-strength-meter";
 import { TurnstileWidget } from "./turnstile-widget";
+import { DISPLAY_NAME_MAX_LENGTH } from "./password-policy";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
 
 const initial: PasswordAuthState = { ok: false };
@@ -23,7 +23,8 @@ const RESEND_COOLDOWN_SECONDS = 30;
 
 /**
  * Registration — Architecture B (docs/frontend/auth-password-preview.md
- * §Registration architecture): email + password + confirm, gated by the
+ * §Registration architecture): full name + email + username + account type
+ * (one dropdown) + password + confirm, gated by the
  * three required consents, submitted in ONE call to `signUp()`
  * (`requestPasswordSignUp`), which sets the password atomically. The OTP
  * step that follows ONLY ever collects the 6-digit confirmation code — there
@@ -52,6 +53,7 @@ export function PasswordSignUpForm() {
 
   const [editingEmail, setEditingEmail] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [accountTypeKey, setAccountTypeKey] = useState("");
   const [password, setPassword] = useState("");
@@ -99,7 +101,7 @@ export function PasswordSignUpForm() {
       footer={
         <p>
           {t("authPasswordPreview.signUp.haveAccount")}{" "}
-          <Link href="/preview/auth-password/sign-in" className="font-medium text-accent hover:underline">
+          <Link href="/auth/sign-in" className="font-medium text-accent hover:underline">
             {t("authPasswordPreview.signUp.signInLink")}
           </Link>
         </p>
@@ -107,6 +109,35 @@ export function PasswordSignUpForm() {
     >
       {!codeSent ? (
         <form action={dispatchSend} className="flex flex-col gap-md" noValidate>
+          <LabeledField
+            label={t("authPasswordPreview.fullNameLabel")}
+            htmlFor="displayName"
+            error={
+              sendState.code === "authPasswordPreview.error.fullNameRequired" ||
+              sendState.code === "authPasswordPreview.error.fullNameTooLong"
+                ? t(sendState.code)
+                : undefined
+            }
+          >
+            <Input
+              id="displayName"
+              name="displayName"
+              type="text"
+              autoComplete="name"
+              required
+              maxLength={DISPLAY_NAME_MAX_LENGTH}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder={t("authPasswordPreview.fullNamePlaceholder")}
+              aria-invalid={
+                sendState.code === "authPasswordPreview.error.fullNameRequired" ||
+                sendState.code === "authPasswordPreview.error.fullNameTooLong"
+                  ? true
+                  : undefined
+              }
+            />
+          </LabeledField>
+
           <LabeledField
             label={t("authPasswordPreview.emailLabel")}
             htmlFor="email"
@@ -158,30 +189,33 @@ export function PasswordSignUpForm() {
           <LabeledField
             label={t("authPasswordPreview.accountTypeLabel")}
             htmlFor="accountType"
+            hint={accountTypeKey ? t(`onboarding.accountType.types.${accountTypeKey}Desc`) : undefined}
             error={sendState.code === "authPasswordPreview.error.accountTypeRequired" ? t(sendState.code) : undefined}
           >
-            <input type="hidden" id="accountType" name="accountType" value={accountTypeKey} />
-            <div className="grid gap-2.5 tablet:grid-cols-2">
+            {/* One dropdown over the same ordered registration taxonomy. Coming
+                Soon types stay visible but are disabled options; the server
+                action re-checks every submitted key regardless. */}
+            <Select
+              id="accountType"
+              name="accountType"
+              required
+              value={accountTypeKey}
+              onChange={(e) => setAccountTypeKey(e.target.value)}
+              aria-invalid={sendState.code === "authPasswordPreview.error.accountTypeRequired" ? true : undefined}
+            >
+              <option value="" disabled>
+                {t("authPasswordPreview.accountTypePlaceholder")}
+              </option>
               {REGISTRATION_CHOICE_ORDER.map((key) => {
-                const choice = CHOICES_BY_KEY[key];
-                const comingSoon = choice?.comingSoon === true;
+                const comingSoon = CHOICES_BY_KEY[key]?.comingSoon === true;
+                const label = t(`onboarding.accountType.types.${key}`);
                 return (
-                  <ChoiceCard
-                    key={key}
-                    selected={accountTypeKey === key}
-                    disabled={comingSoon}
-                    badge={comingSoon ? t("onboarding.accountType.comingSoon") : undefined}
-                    title={t(`onboarding.accountType.types.${key}`)}
-                    description={
-                      comingSoon
-                        ? t("onboarding.accountType.comingSoonHint")
-                        : t(`onboarding.accountType.types.${key}Desc`)
-                    }
-                    onSelect={() => setAccountTypeKey(key)}
-                  />
+                  <option key={key} value={key} disabled={comingSoon}>
+                    {comingSoon ? t("authPasswordPreview.accountTypeComingSoonOption", { label }) : label}
+                  </option>
                 );
               })}
-            </div>
+            </Select>
           </LabeledField>
 
           <LabeledField
@@ -286,7 +320,7 @@ export function PasswordSignUpForm() {
               as "you already have an account." */}
           <p className="text-label text-fg-muted">
             {t("authPasswordPreview.signUp.noCodeHint")}{" "}
-            <Link href="/preview/auth-password/forgot-password" className="font-medium text-accent hover:underline">
+            <Link href="/auth/forgot-password" className="font-medium text-accent hover:underline">
               {t("authPasswordPreview.signIn.forgotPassword")}
             </Link>
           </p>

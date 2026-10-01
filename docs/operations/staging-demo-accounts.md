@@ -6,7 +6,7 @@ The 27 demo identities in the STAGING demo world: who they are, where they land,
 
 ## How these accounts sign in
 
-The application is **passwordless** — Email OTP and nothing else. There is no demo
+The application is **passwordless** — Email OTP and nothing else. There is no demo *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 password, no shared credential, and no bypass: each account requests a six-digit code
 and types it in, exactly as a real user does.
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import Cropper, { type Area } from "react-easy-crop";
 import { Button } from "@/components/ui/controls";
@@ -118,6 +118,7 @@ export function ImageCropDialog({
             step={0.05}
             value={zoom}
             onChange={(event) => setZoom(Number(event.target.value))}
+            style={{ "--range-progress": `${((zoom - 1) / 2) * 100}%` } as CSSProperties}
             className="installer-budget-range flex-1"
             aria-label={zoomLabel}
           />

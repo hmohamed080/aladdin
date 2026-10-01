@@ -128,9 +128,10 @@ export function PersonalSettings({
             </Field>
           ) : null}
           {/* No password row, no "change password", no 2FA toggle: email accounts
-              are passwordless, and a phone + password account has no
-              self-service password management yet — offering controls that do
-              not exist would misstate the security model. */}
+              reset their password through Forgot Password on the sign-in page,
+              and a phone + password account has no self-service password
+              management yet — offering controls that are not wired here would
+              misstate the security model. */}
           <p className="text-body text-fg-secondary">
             {signInMethod === "phone_password"
               ? t("personalSettings.account.signInBodyPhonePassword")

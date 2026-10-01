@@ -44,7 +44,7 @@ A single reusable module (`frontend/src/lib/validation/*`, mirrored in `backend/
 
 - **Tenancy assertion:** the target row's `organization_id`/`user_id` matches the caller's scope (defense-in-depth over RLS).
 - **State-transition guard:** only legal transitions ([`11_state_machines`](../technical/11_state_machines.md)); illegal → `CONFLICT`.
-- **No password fields anywhere** (passwordless); reject if present.
+- **No password fields anywhere** (passwordless); reject if present. *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 - **No commerce semantics** (no checkout/cart/price-war); product pricing is indicative ranges only.
 - **Idempotency key** validated on retryable operations.
 - **Bidi/RTL:** accept AR + EN; format EGP/numerals per locale; never encode meaning with italics in Arabic.

@@ -12,8 +12,8 @@ import { Brand } from "@/components/layout/brand";
 const initial: AccountTypeChoiceState = { ok: false };
 
 /**
- * The isolated preview's minimal recovery screen (see
- * `app/preview/auth-password/finish-registration/page.tsx`'s doc comment).
+ * Canonical password auth's minimal finish-registration screen (see
+ * `app/auth/finish-registration/page.tsx`'s doc comment).
  * `needsAccountType` covers the rarer gap (the pending-registration write
  * never landed at all — see `savePendingRegistration`'s best-effort
  * comment); the far more common case is `needsAccountType={false}` — the

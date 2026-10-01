@@ -7,7 +7,7 @@
  * identifiers. Composition variety only ever *adds* to the strength score —
  * it never substitutes for the three hard rejections below.
  *
- * This is a preview-grade, self-written heuristic (curated common-password
+ * This is a self-written heuristic (curated common-password
  * list + pattern detection), not a substitute for a real breach-corpus check.
  * See docs/frontend/auth-password-preview.md §Password policy for the
  * recommended production upgrade path (Supabase's native "Leaked password

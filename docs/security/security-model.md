@@ -8,7 +8,7 @@ State Aladdin's security posture and the invariants every feature must uphold.
 
 ## Current decision
 
-**Identity & auth (passwordless):** registration/sign-in via **WhatsApp OTP** or **Email OTP / verification link**. One verified primary contact per account; secondary added later from settings. **No passwords, no SMS.** reCAPTCHA only on account creation. One canonical identity regardless of verification method. Auth is backed by Supabase Auth; every session yields a JWT.
+**Identity & auth (passwordless):** registration/sign-in via **WhatsApp OTP** or **Email OTP / verification link**. One verified primary contact per account; secondary added later from settings. **No passwords, no SMS.** reCAPTCHA only on account creation. One canonical identity regardless of verification method. Auth is backed by Supabase Auth; every session yields a JWT. *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 
 **Authorization:** **Row Level Security is the spine.** Authorization is enforced in the database on every user/organization/verification/sales/project/file/AI table, with app-layer checks as defense in depth — never as the only line. Multi-tenant isolation (organization, and branch where applicable) is mandatory.
 

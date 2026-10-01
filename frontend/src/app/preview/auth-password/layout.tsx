@@ -10,17 +10,16 @@ import { Brand } from "@/components/layout/brand";
 import { AuthBrandPanel } from "@/features/auth/brand-panel";
 
 export const metadata: Metadata = {
-  title: "Password sign-in preview | Aladdin",
   robots: { index: false, follow: false },
 };
 
 /**
- * ISOLATED PREVIEW (docs/frontend/auth-password-preview.md). Same split-panel
- * chrome as `/auth/layout.tsx` (reusing the generic Brand Panel, language and
- * theme switchers — none of which are passwordless-specific), rebuilt here
- * rather than imported so this preview can be reviewed, changed, or deleted
- * without touching the production auth layout. A visible banner makes clear
- * this is not the live registration/sign-in surface.
+ * Chrome for the remaining `/preview/auth-password/*` routes
+ * (docs/frontend/auth-password-preview.md). The password flow itself now
+ * lives at the canonical `/auth/*` routes; what stays here is the legacy
+ * redirect stubs and the passwordless → password migration / change-password
+ * screens. Same split-panel chrome as `/auth/layout.tsx`, with no banner — the
+ * flow is canonical, not a preview.
  */
 export default async function AuthPasswordPreviewLayout({ children }: { children: ReactNode }) {
   const store = await cookies();
@@ -31,7 +30,7 @@ export default async function AuthPasswordPreviewLayout({ children }: { children
   return (
     <I18nProvider locale={locale} dir={directionFor(locale)}>
       <div className="grid min-h-dvh bg-canvas desktop:grid-cols-2">
-        <AuthBrandPanel name={m.common.appName} tagline={m.auth.brandTagline} note={m.authPasswordPreview.previewBanner} />
+        <AuthBrandPanel name={m.common.appName} tagline={m.auth.brandTagline} note={m.auth.brandNote} />
 
         <div className="flex min-h-dvh flex-col">
           <div className="flex items-center gap-sm px-md py-md">
@@ -42,10 +41,6 @@ export default async function AuthPasswordPreviewLayout({ children }: { children
               <LanguageSwitch />
               <ThemeSwitch current={theme} />
             </div>
-          </div>
-
-          <div role="status" className="mx-md rounded-md border border-warning/40 bg-warning/10 px-md py-2 text-center text-label text-warning">
-            {m.authPasswordPreview.previewBanner}
           </div>
 
           <main className="flex flex-1 items-center justify-center px-md pb-xl pt-md">
