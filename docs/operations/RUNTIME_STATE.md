@@ -1,5 +1,10 @@
 # Runtime State
 
+## Current continuation — 2026-10-01 (Production now at `20260930100005`: pre-request hook RE-ENABLED via `pgrst_hooks.pre_request`)
+
+- **Production head is `20260930100005`** (85 migrations). `authenticator` now has `pgrst.db_pre_request = pgrst_hooks.pre_request` (the emergency reset is superseded). Fresh pre-apply backup: `<operator-backup-dir>/2026-10-01-pre-hook-compat-100005` (outside Git, SHA-256 recorded). Verified live: anon / service_role HTTP, rolled-back simulation for anon, authenticated active + pending, Administrator, service_role (incl. `pending_registration_save`/`consume`) and a suspended subject refused (`42501`); cold-connection + reload churn 622 requests, 0 failures, 0 `permission denied for schema app`; `service_role` has no USAGE on `app`, exactly USAGE on `pgrst_hooks`, PUBLIC none, schema not exposed (exposed: `public, graphql_public`), 37 executable `app` functions unchanged; Vercel logs clean (no 5xx, no permission-denied). Emergency rollback was NOT needed.
+- **Not applied (still gated):** `20260930100006` platform-account preparation, account cleanup, Super Admin bootstrap, Admin Core app deploy. Details: [`docs/admin/POSTGREST_PRE_REQUEST_HOOK.md`](../admin/POSTGREST_PRE_REQUEST_HOOK.md).
+
 ## Current continuation — 2026-10-01 (Admin Core Production rollout: hook incident, local recovery and fix)
 
 - **Production (`kkpkgjrweysgvhvkhzun`, `aladdindecore.com`) is at migration head `20260930100004`** (Stages A–C applied; Stage C verified 64/64 and stays). Migration `20260930100002` is applied **but its PostgREST pre-request hook is DISABLED in Production** by an emergency `alter role authenticator reset pgrst.db_pre_request; notify pgrst, 'reload config';` after the hook intermittently broke service-role requests (`permission denied for schema app`). Production is healthy; **suspension is not enforced through the hook there until `20260930100005` is applied.** No hosted action was taken in this recovery session.
