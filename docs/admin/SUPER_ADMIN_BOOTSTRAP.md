@@ -22,6 +22,7 @@ An authorized maintainer with **database-owner** access to the target environmen
 
 ## Procedure (run once per environment)
 
+0. **If the chosen account is still `pending_verification`** (the canonical registration flow never activates anyone — [BL-033](ADMIN_IMPLEMENTATION_BACKLOG.md)) and is meant to be a **dedicated platform account** (no persona, no organization), prepare it first with `app.admin_prepare_platform_account()` — never by editing `users.status` — following [`PLATFORM_ADMIN_ACCOUNT_PREPARATION.md`](PLATFORM_ADMIN_ACCOUNT_PREPARATION.md). The bootstrap function below is unchanged and still requires an `active` account.
 1. **Choose the account explicitly.** The person must already have a normal, verified, `active` Aladdin account (created through the product sign-up). Pick them by their verified contact, never by guessing:
    ```sql
    select u.id, p.display_name, u.status, c.value as verified_email

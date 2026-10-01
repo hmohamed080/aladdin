@@ -4,6 +4,22 @@ Append-only log of substantive agent/contributor sessions. **Newest entry first.
 
 ---
 
+## Session — Admin Core Production rollout (partial): Stage A applied; dedicated platform-account preparation built locally
+
+**Date:** 2026-10-01 · **Branch:** `feature/admin-core-user-org-operations` @ `170dfa2` + uncommitted work (worktree `.claude/worktrees/admin-core-user-org-operations`).
+
+**Production state (project `kkpkgjrweysgvhvkhzun`, Vercel `aladdin-staging` = `aladdindecore.com`; the "staging" names are the live environment).** A pre-rollout dump was taken 07:58–08:00 UTC (outside git; SHA-256 recorded). **Stage A applied** — migrations `20260929090001`…`20260930100001` (5): history `20260930100001`, public routes 200, role-impersonation checks passed (admin_my_access, Users/Organizations read RPCs, profile read, anon read). **Stage B (`20260930100002`, the API-wide `db_pre_request` hook) and Stage C (`…100003`, `…100004`) NOT applied; app NOT deployed; no Super Admin exists** (0). The pre-rollout backup now predates Stage A — **take a new backup before the next Production write**.
+
+**Finding (separate backlog, NOT applied): Business Account Lifecycle / Activation Gap — [BL-033](../admin/ADMIN_IMPLEMENTATION_BACKLOG.md).** `users.status` becomes `active` only via `app.activate_personal_account()`, called from the consumer/professional terminals; the canonical flow ends at `access_ready` and business owners never reach either, so they stay `pending_verification` (Production: 127 of 177 users pending; business-track 3, professional-track 108, no-track 65). A tested proposal is preserved in `docs/admin/proposals/business-account-activation/` (`.proposed.sql`, deliberately **outside** `supabase/`). It was not applied and must not be used to make a platform account eligible. Also [BL-034](../admin/ADMIN_IMPLEMENTATION_BACKLOG.md): a persona-null staff account shows as "Business only" in the Admin type breakdown (cosmetic).
+
+**Built locally (Product Owner approved Option B + strict mode):** migration `20260930100005_admin_platform_account_preparation.sql` (`app.admin_prepare_platform_account`, DB-owner-only, audited `account.platform_prepared`); the atomic cleanup+preparation transaction `docs/admin/ops/prepare_platform_admin_account.sql`; procedure doc `docs/admin/PLATFORM_ADMIN_ACCOUNT_PREPARATION.md`; `SUPER_ADMIN_BOOTSTRAP.md` step 0. The bootstrap function and its safeguards are untouched.
+
+**Validation.** pgTAP `69_admin_platform_account_preparation_test.sql` 46/46; full clean-database suite from zero (85 migrations): **70 files / 2824 tests PASS**; isolated Production-shaped rehearsal of the atomic transaction (happy path, three failure injections incl. a late-step helper refusal rolling everything back, idempotent re-run, bootstrap afterwards → exactly one Super Admin). Nothing was run against Production for this work.
+
+**Still owed:** new Production backup → Stage B (hook checkpoint) → Stage C → apply `20260930100005` → cleanup+prepare for the chosen account → bootstrap → app deploy → smoke tests. The designated account is `<platform-admin-email>` (a business-track sign-up with one disposable, exclusively-owned organization).
+
+---
+
 ## Session — Admin Core Phase 1B-B: Users + Organizations operational workflows
 
 **Date:** 2026-09-30 · **Branch:** `feature/admin-core-user-org-operations` (worktree `.claude/worktrees/admin-core-user-org-operations`, created from exactly `2cdbacd` after confirming the Phase 1B-A worktree clean; Phase 1B-A has **8** commits since `bc16841` — the earlier "9" was a miscount in a progress message, history unchanged) · Not pushed; no PR; only the new isolated `aladdin_1bb` stack (ports 573xx) was used.
