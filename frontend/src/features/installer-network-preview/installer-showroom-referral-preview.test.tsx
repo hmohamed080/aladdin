@@ -32,10 +32,10 @@ describe("InstallerShowroomReferralPreview", () => {
     expect(screen.getAllByRole("radio")).toHaveLength(4);
     expect(screen.getByRole("radio", { name: "موان" })).toBeTruthy();
     expect(screen.getByLabelText("رقم هاتف المعرض *")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "الدولة" }));
+    const countrySelect = screen.getByRole("combobox", { name: "الدولة" });
+    expect(countrySelect).toHaveValue("EG");
     expect(screen.getByRole("option", { name: /مصر \+20/ })).toBeTruthy();
     expect(screen.getByRole("option", { name: /الولايات المتحدة \+1/ })).toBeTruthy();
-    fireEvent.click(screen.getByRole("option", { name: /مصر \+20/ }));
     expect(screen.getByLabelText("ملاحظة (اختياري)")).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText("المحافظة *"));
