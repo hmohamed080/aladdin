@@ -1,5 +1,5 @@
 -- pgTAP: dedicated platform-account preparation
--- (20260930100005_admin_platform_account_preparation.sql).
+-- (20260930100006_admin_platform_account_preparation.sql).
 --
 -- app.admin_prepare_platform_account() promotes ONE explicitly named, dedicated platform
 -- account (confirmed email, not banned, no persona, no active membership) from

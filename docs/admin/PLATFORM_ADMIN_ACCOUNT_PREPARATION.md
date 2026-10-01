@@ -14,7 +14,7 @@ Some people are **pure platform staff**: Auth identity + user/profile + an Admin
 
 | Piece | What it is |
 |---|---|
-| `app.admin_prepare_platform_account(user_id, reason)` — migration `20260930100005` | DB-owner-only helper. **Strict mode:** confirmed Auth email, not banned, not suspended/deactivated, **no persona**, **no active membership**; `pending_verification → active` only; already-active is a no-op; reason mandatory; audited `account.platform_prepared`. Creates no persona/organization/membership/onboarding/consent row. No client grant (not even `service_role`). |
+| `app.admin_prepare_platform_account(user_id, reason)` — migration `20260930100006` | DB-owner-only helper. **Strict mode:** confirmed Auth email, not banned, not suspended/deactivated, **no persona**, **no active membership**; `pending_verification → active` only; already-active is a no-op; reason mandatory; audited `account.platform_prepared`. Creates no persona/organization/membership/onboarding/consent row. No client grant (not even `service_role`). |
 | [`ops/prepare_platform_admin_account.sql`](ops/prepare_platform_admin_account.sql) | The **atomic** DBA transaction: re-checks every precondition under lock, archives the disposable sign-up organization, removes the account's membership/draft/onboarding row, calls the helper, verifies postconditions, commits. Any failure rolls back **everything**. |
 
 `app.admin_bootstrap_super_admin()` and the last-Super-Admin safeguards are **unchanged**; the bootstrap is a **separate** call after this commits and is verified.
@@ -38,7 +38,7 @@ If the person created the account through ordinary sign-up and went through busi
 ## Procedure
 
 1. A **fresh backup** of the target environment (the previous one predates intervening migrations).
-2. Migration `20260930100005` applied (it adds the helper and the audit action).
+2. Migration `20260930100005` (PostgREST hook compatibility fix) applied and verified **first**, then migration `20260930100006` (it adds the helper and the audit action).
 3. Review the target account with the read-only artifact audit; confirm it matches the preconditions above and record the choice (who, which account, why).
 4. Edit the single `v_email` constant in the ops script to the exact account and run it as the database owner. Success prints `PREPARED`; a repeat prints `NO-OP`.
 5. Verify (status `active`, organization archived, retained counts, one `account.platform_prepared` row, `my_registration_state()` = `active_personal`).
