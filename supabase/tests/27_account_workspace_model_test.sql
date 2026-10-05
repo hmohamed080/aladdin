@@ -79,6 +79,11 @@ select is(app.has_personal_persona('70000008-0000-4000-8000-000000000008'), true
 -- ===========================================================================
 -- Walk Ahmed to the business handoff, then create his FIRST business
 -- ===========================================================================
+-- Ahmed is an ENGINEER: the approved personal persona entitled to add businesses
+-- (business creation is database-enforced, 20260928090001). Engineer is Coming Soon
+-- for FRESH selection, but a caller who already holds it may re-select it.
+reset role;
+update public.users set primary_account_type = 'engineer' where id = '44444444-4444-4444-8444-444444444444';
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}';
 select public.record_consent(array['terms','privacy','pilot']::public.consent_type[], 'en');
@@ -87,7 +92,7 @@ select public.onboarding_save_contact('01012345678');
 -- He registers as an ENGINEER: a personal persona, chosen for himself.
 -- (Engineer is Coming Soon since Increment 13; the story only needs SOME
 -- personal persona, so he registers with an active one.)
-select public.onboarding_select_account_type('professional', 'installer_technician');
+select public.onboarding_select_account_type('professional', 'engineer');
 
 -- Draft 1 → AH Design Studio (showroom_dealer).
 select isnt(public.business_draft_save(
@@ -155,7 +160,7 @@ select is(
 select is(
   (select u.primary_account_type::text from public.users u
    where u.id = '44444444-4444-4444-8444-444444444444'),
-  'end_consumer',
+  'engineer',
   'B: the org type was NOT written onto the creator (his persona is untouched)');
 -- And a business classification can never be requested as a personal upgrade.
 -- Sprint 13 moved this from a hand-written guard inside the RPC (22023) to the

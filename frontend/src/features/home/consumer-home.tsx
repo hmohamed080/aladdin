@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/primitives";
-import { ClipboardIcon, UserIcon, BuildingIcon } from "@/components/ui/icons";
+import { ClipboardIcon, UserIcon } from "@/components/ui/icons";
 import type { PersonalHomeData } from "@/server/queries/personal-home";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import {
@@ -82,13 +82,9 @@ export function ConsumerHome({ data, t }: { data: PersonalHomeData; t: Translate
             label={t("personalHome.action.profile")}
             body={t("personalHome.action.profileBody")}
           />
-          {/* A consumer may own a business without becoming a second user. */}
-          <ActionCard
-            href="/business/new"
-            icon={<BuildingIcon size={20} />}
-            label={t("personalHome.action.addBusiness")}
-            body={t("personalHome.action.addBusinessBody")}
-          />
+          {/* No "add a business" card: creating a business is an entitlement of
+              specific account types (lib/workspace/entitlements), not of a
+              personal account. */}
         </ActionGrid>
       </HomeSection>
 

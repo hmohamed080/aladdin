@@ -72,7 +72,7 @@ test.describe("Registration account type → authoritative persona", () => {
 
   test("Tradespeople: professional identity, trades editable, no legacy wizard, completion reachable", async ({ page, request, context }) => {
     await english(context);
-    const { visited } = await registerAs(page, request, /tradespeople & technicians/i, "trade");
+    const { visited } = await registerAs(page, request, /craftsmen/i, "trade");
     noLegacyWizard(visited);
     await expect(page).toHaveURL(/\/home(\/|$|\?)/);
 

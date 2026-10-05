@@ -116,6 +116,8 @@ const SECTIONS: { section: PersonalNavSection; keys: PersonalNavKey[] }[] = [
 export type PersonalNavInput = {
   variant: "consumer" | "professional";
   isSalesPersona: boolean;
+  /** `canCreateBusiness` (lib/workspace/entitlements) — an entitlement of the account type, not of having a membership. */
+  canCreateBusiness?: boolean;
 };
 
 /** Whether one destination exists for this account. */
@@ -148,6 +150,8 @@ function isReachable(key: PersonalNavKey, input: PersonalNavInput): boolean {
       return input.variant === "professional";
     case "connectShowroom":
       return input.isSalesPersona;
+    case "addBusiness":
+      return input.canCreateBusiness === true;
     default:
       return true;
   }

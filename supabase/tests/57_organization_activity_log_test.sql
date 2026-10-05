@@ -173,6 +173,11 @@ select is(
 -- Requirement 2: a newly created organization grants its owner activity.read
 -- through app.organization_create_owned's array -- the path the backfill cannot
 -- cover, because those memberships do not exist when the migration runs.
+-- Business creation is entitled at the database boundary (20260928090001): a bare
+-- membership is not enough, so this caller is an Engineer — an approved creator.
+reset role;
+update public.users set primary_account_type = 'engineer' where id = '22222222-2222-4222-8222-222222222222';
+set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}';
 
 select public.business_draft_save(

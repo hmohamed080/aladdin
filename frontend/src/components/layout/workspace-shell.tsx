@@ -5,6 +5,9 @@ import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import type { WorkspaceContext } from "@/server/queries/context";
 import { BranchSwitcher, WorkspaceContextMobile } from "@/components/layout/context-switchers";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
+import { WorkplaceSwitcher } from "@/components/layout/workplace-switcher";
+import { showsGenericWorkspaceSwitcher } from "@/lib/workspace/entitlements";
+import { personalEntry } from "@/lib/workspace/model";
 import { AppHeader, HeaderSeparator } from "@/components/layout/app-header";
 import { WorkspaceNavPanel, MobileNav } from "@/components/layout/workspace-nav";
 import { SidebarShell } from "@/components/layout/sidebar-shell";
@@ -85,11 +88,27 @@ export async function WorkspaceShell({
           variant="card"
           context={
             <>
-              <WorkspaceSwitcher
-                entries={workspace.entries}
-                activeKey={active.organizationId}
-                activeDisplayName={orgDisplayName}
-              />
+              {/* The generic switcher is for the approved five categories. Everyone
+                  else who genuinely belongs here — an employee, a salesperson in
+                  an affiliated showroom — keeps moving between their workplaces
+                  through the narrow control, with no Add business and no
+                  ownership framing. Membership access itself is untouched. */}
+              {showsGenericWorkspaceSwitcher({
+                persona: personalEntry(workspace.entries)?.persona ?? null,
+                entries: workspace.entries,
+              }) ? (
+                <WorkspaceSwitcher
+                  entries={workspace.entries}
+                  activeKey={active.organizationId}
+                  activeDisplayName={orgDisplayName}
+                />
+              ) : (
+                <WorkplaceSwitcher
+                  entries={workspace.entries}
+                  activeKey={active.organizationId}
+                  activeDisplayName={orgDisplayName}
+                />
+              )}
               {/* The branch is a scope INSIDE the organization, so it reads as
                   the next crumb rather than as a second, unrelated chip. */}
               <HeaderSeparator />

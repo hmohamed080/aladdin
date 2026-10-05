@@ -1,3 +1,4 @@
+import { accountTypeLabel } from "@/lib/i18n/account-type-label";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Button, ButtonLink } from "@/components/ui/controls";
@@ -75,7 +76,7 @@ export function ProfileHub({
   t: TranslateFn;
 }) {
   const { professional: p, verification } = data;
-  const persona = t(`accountType.${data.accountType}`);
+  const persona = accountTypeLabel(t, data.accountType, "person");
   const name = data.displayName || t("personalHome.professional.friend");
 
   const tiles: Tile[] = [

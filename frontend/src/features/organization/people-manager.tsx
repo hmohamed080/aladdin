@@ -1,5 +1,6 @@
 "use client";
 
+import { accountTypeLabel } from "@/lib/i18n/account-type-label";
 import { useActionState, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
@@ -396,7 +397,7 @@ export function PeopleManager({
                           personal persona — show nothing rather than an empty
                           badge, since what matters here is their membership. */}
                       {member.accountType ? (
-                        <Badge tone="neutral">{t(`accountType.${member.accountType}`)}</Badge>
+                        <Badge tone="neutral">{accountTypeLabel(t, member.accountType, "person")}</Badge>
                       ) : null}
                     </div>
                     <p className="truncate text-label text-fg-muted">{member.emailMasked}</p>

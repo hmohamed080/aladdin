@@ -28,6 +28,11 @@ update auth.users set email_confirmed_at = now()
 update public.users set status = 'pending_verification'
   where id = '44444444-4444-4444-8444-444444444444';
 
+-- Omar is a genuine business registrant: a business-only identity holds NO personal
+-- persona (the seed fixture carries one, which would make him a persona-holder).
+update public.users set primary_account_type = null
+  where id = '44444444-4444-4444-8444-444444444444';
+
 set local role authenticated;
 
 -- ===== walk Omar through the shared steps to the business handoff =====
@@ -117,8 +122,8 @@ select is(
 select is(
   (select u.primary_account_type::text from public.users u
    where u.id = '44444444-4444-4444-8444-444444444444'),
-  'end_consumer',
-  'creating a supplier business does NOT make the creator a "supplier"');
+  null,
+  'creating a supplier business does NOT make the creator a "supplier" (a business-only identity holds no persona)');
 
 -- ===== audit + authorization boundaries =====
 reset role;

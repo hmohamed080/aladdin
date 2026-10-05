@@ -9,6 +9,7 @@ import { loadPersonalHome } from "@/server/queries/personal-home";
 import { personalNavKeys, personalMobileNavKeys } from "@/lib/nav/personal-modules";
 import { PersonalNavPanel, PersonalMobileNav } from "@/components/layout/personal-nav";
 import { PERSONAL_CONTEXT, personalEntry } from "@/lib/workspace/model";
+import { showsGenericWorkspaceSwitcher } from "@/lib/workspace/entitlements";
 import { AppHeader } from "@/components/layout/app-header";
 import { AppShell } from "@/components/layout/app-shell";
 import { SidebarShell } from "@/components/layout/sidebar-shell";
@@ -101,21 +102,20 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
           displayName={home.displayName}
           location={location}
           searchJobs={searchJobs}
-          context={
-            <WorkspaceSwitcher
-              entries={entries}
-              activeKey={PERSONAL_CONTEXT}
-              showConnectShowroom={false}
-            />
-          }
         >
           {children}
         </InstallerDashboardShell>
       </I18nProvider>
     );
   }
+  // The generic switcher belongs to the approved five categories only. A
+  // membership does not earn it (the caller still reaches their workplace through
+  // /b2b), and a salesperson's showroom affiliation is the nav's "Connect a
+  // showroom" row (`/home/showroom`), not a header control.
+  const persona = home?.accountType ?? personal?.persona ?? null;
+  const showSwitcher = showsGenericWorkspaceSwitcher({ persona, entries });
   const navKeys = home
-    ? personalNavKeys({ variant: home.variant, isSalesPersona: showConnectShowroom })
+    ? personalNavKeys({ variant: home.variant, isSalesPersona: showConnectShowroom, canCreateBusiness: showSwitcher })
     : [];
 
   return (
@@ -156,11 +156,7 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
                concern. */
             preferencesHref={navKeys.includes("settings") ? "/home/settings" : undefined}
             context={
-              <WorkspaceSwitcher
-                entries={entries}
-                activeKey={PERSONAL_CONTEXT}
-                showConnectShowroom={showConnectShowroom}
-              />
+              showSwitcher ? <WorkspaceSwitcher entries={entries} activeKey={PERSONAL_CONTEXT} /> : undefined
             }
           />
         }

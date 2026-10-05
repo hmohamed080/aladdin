@@ -1,5 +1,6 @@
 "use client";
 
+import { accountTypeLabel } from "@/lib/i18n/account-type-label";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Area } from "react-easy-crop";
@@ -773,7 +774,7 @@ function MobileProfileSummary({ locale, percent, completedStepIds }: { locale: L
         </span>
         <div className="min-w-0">
           <p className="truncate text-body-lg font-bold text-fg">{ar ? "أحمد محمود" : "Ahmed Mahmoud"}</p>
-          <p className="truncate text-label text-fg-secondary">{t("accountType.installer_technician")}</p>
+          <p className="truncate text-label text-fg-secondary">{accountTypeLabel(t, "installer_technician", "person")}</p>
         </div>
       </div>
       <div className="mt-md flex items-baseline justify-between gap-sm">

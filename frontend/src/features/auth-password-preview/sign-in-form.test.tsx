@@ -38,13 +38,13 @@ describe("PasswordSignInForm", () => {
 
   it("offers the installer phone sign-in link in Arabic, defaulting to /installer/sign-in", () => {
     renderWithI18n(<PasswordSignInForm next="/b2b" />);
-    const link = screen.getByRole("link", { name: "صنايعي أو فني؟ سجل الدخول برقم الهاتف" });
+    const link = screen.getByRole("link", { name: "صنايعي؟ سجل الدخول برقم الهاتف" });
     expect(link).toHaveAttribute("href", "/installer/sign-in");
   });
 
   it("offers the installer phone sign-in link in English", () => {
     renderWithI18n(<PasswordSignInForm next="/b2b" />, "en");
-    const link = screen.getByRole("link", { name: "Installer or technician? Sign in with your phone number" });
+    const link = screen.getByRole("link", { name: "Craftsman? Sign in with your phone number" });
     expect(link).toHaveAttribute("href", "/installer/sign-in");
   });
 

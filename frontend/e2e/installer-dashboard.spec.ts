@@ -63,4 +63,19 @@ test.describe("installer dashboard", () => {
     await signIn(page, request, IDENTITIES.consumer, /\/home(\/|$|\?)/);
     await expect(page.locator(".installer-surface")).toHaveCount(0);
   });
+
+  test("has no workspace / business switcher, labels the person صنايعي / Craftsman, and cannot open /business/new", async ({ page, request }) => {
+    await signIn(page, request, INSTALLER, /\/home$/);
+
+    await expect(page.getByTestId("installer-home")).toBeVisible();
+    await expect(page.getByTestId("workspace-switcher")).toHaveCount(0);
+    await expect(page.getByText(/add business|إضافة نشاط تجاري|connect a showroom|اربط معرضًا/i)).toHaveCount(0);
+    // The profile subtitle uses the person form, never the legacy category label.
+    await expect(page.getByTestId("profile-menu-trigger")).toContainText(/Craftsman|صنايعي/);
+    await expect(page.locator("body")).not.toContainText(/Installer \/ Technician|فني \/ مركّب/);
+
+    // Direct URL: the server-side entitlement sends a craftsman home.
+    await page.goto("/business/new");
+    await expect(page).toHaveURL(/\/home$/);
+  });
 });

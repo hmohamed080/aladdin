@@ -19,9 +19,9 @@ import {
  * of the stack has stopped telling.
  */
 describe("personalNavKeys", () => {
-  it("gives a consumer a home, Settings, and the option to start a business — and no profile", () => {
+  it("gives a consumer a home, Settings, and Settings — and no profile, and no way to start a business", () => {
     const keys = personalNavKeys({ variant: "consumer", isSalesPersona: false });
-    expect(keys).toEqual(["home", "settings", "addBusiness"]);
+    expect(keys).toEqual(["home", "settings"]);
     expect(keys).not.toContain("points");
     // Not withheld — a consumer has no professional profile to show.
     expect(keys).not.toContain("profile");
@@ -38,7 +38,6 @@ describe("personalNavKeys", () => {
       "myWork",
       "reviews",
       "network",
-      "addBusiness",
     ]);
   });
 
@@ -62,7 +61,6 @@ describe("personalNavKeys", () => {
       "reviews",
       "network",
       "connectShowroom",
-      "addBusiness",
     ]);
   });
 
@@ -85,16 +83,17 @@ describe("personalNavKeys", () => {
     }
   });
 
-  it("offers a business to everyone, because owning one is a relationship", () => {
+  it("offers Add business only to an account entitled to create one — never merely by having a variant", () => {
     for (const variant of ["consumer", "professional"] as const) {
-      expect(personalNavKeys({ variant, isSalesPersona: false })).toContain("addBusiness");
+      expect(personalNavKeys({ variant, isSalesPersona: false })).not.toContain("addBusiness");
+      expect(personalNavKeys({ variant, isSalesPersona: false, canCreateBusiness: true })).toContain("addBusiness");
     }
   });
 
   it("has a definition for every key it can emit — no dead entries", () => {
     const emitted = new Set<PersonalNavKey>([
-      ...personalNavKeys({ variant: "consumer", isSalesPersona: false }),
-      ...personalNavKeys({ variant: "professional", isSalesPersona: true }),
+      ...personalNavKeys({ variant: "consumer", isSalesPersona: false, canCreateBusiness: true }),
+      ...personalNavKeys({ variant: "professional", isSalesPersona: true, canCreateBusiness: true }),
     ]);
     // Every reachable key, across every persona, resolves to a real destination.
     for (const key of emitted) {
@@ -111,7 +110,7 @@ describe("personalNavKeys", () => {
 describe("personalNavSections", () => {
   it("drops a section with nothing in it rather than rendering an empty heading", () => {
     const sections = personalNavSections({ variant: "consumer", isSalesPersona: false });
-    expect(sections.map((s) => s.section)).toEqual(["account", "business"]);
+    expect(sections.map((s) => s.section)).toEqual(["account"]);
     expect(sections.every((s) => s.keys.length > 0)).toBe(true);
   });
 
@@ -209,7 +208,7 @@ describe("Job Opportunities in the personal rail", () => {
 
   it("puts Jobs, My Work and Reviews together in the work group", () => {
     const sections = personalNavSections({ variant: "professional", isSalesPersona: false });
-    expect(sections.map((s) => s.section)).toEqual(["account", "work", "business"]);
+    expect(sections.map((s) => s.section)).toEqual(["account", "work"]);
     /* Reviews joins the two rather than sitting under "account": the account
        group holds the caller's own record, and all three of these are the
        outside world — an opening, an engagement, and what came of it. */
@@ -342,9 +341,9 @@ describe("Settings in the personal rail", () => {
  * This is the fix: a fixed five-item priority list, not the full rail.
  */
 describe("personalMobileNavKeys", () => {
-  it("narrows a professional's nine destinations to five for the bottom bar", () => {
+  it("narrows a professional's eight destinations to five for the bottom bar", () => {
     const full = personalNavKeys({ variant: "professional", isSalesPersona: false });
-    expect(full.length).toBe(9);
+    expect(full.length).toBe(8);
     expect(personalMobileNavKeys(full)).toEqual(["home", "jobs", "myWork", "network", "profile"]);
   });
 

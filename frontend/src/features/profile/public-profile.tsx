@@ -1,3 +1,4 @@
+import { accountTypeLabel } from "@/lib/i18n/account-type-label";
 import { Badge, Card } from "@/components/ui/primitives";
 import type { PublicProfile } from "@/server/queries/professional-profile";
 import type { TranslateFn } from "@/lib/i18n/translate";
@@ -51,7 +52,7 @@ export function PublicProfileView({
   locale: Locale;
 }) {
   const name = profile.displayName?.trim() || t("profile.publicPage.unnamed");
-  const persona = profile.persona ? t(`accountType.${profile.persona}`) : null;
+  const persona = profile.persona ? accountTypeLabel(t, profile.persona, "person") : null;
   /**
    * ONE SPECIALTY SIGNAL, NOT TWO. `specialization` (free text) and `tradeKeys`
    * (canonical) are the same claim in two vocabularies — "Marble and granite
