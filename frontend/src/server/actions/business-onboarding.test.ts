@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   allowed: false,
-  rpc: vi.fn(async () => ({ data: "draft-1", error: null })),
+  rpc: vi.fn<(...args: unknown[]) => Promise<{ data: unknown; error: { code: string } | null }>>(
+    async () => ({ data: "draft-1", error: null }),
+  ),
 }));
 
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
@@ -39,5 +41,17 @@ describe("business draft writers — the same entitlement as the page", () => {
     const res = await saveBusiness({ displayName: "X" });
     expect(res).toEqual({ ok: true, draftId: "draft-1" });
     expect(state.rpc).toHaveBeenCalledWith("business_draft_save", expect.any(Object));
+  });
+
+  it("surfaces a database refusal (42501) as the same not-allowed code, not a generic save failure", async () => {
+    state.allowed = true; // the application gate passed; the database is the final authority
+    state.rpc.mockImplementationOnce(async () => ({ data: null, error: { code: "42501" } }));
+    expect(await saveBusiness({ displayName: "X" })).toEqual({ ok: false, code: "onboarding.error.businessNotAllowed" });
+  });
+
+  it("keeps other database failures as a generic save failure", async () => {
+    state.allowed = true;
+    state.rpc.mockImplementationOnce(async () => ({ data: null, error: { code: "22023" } }));
+    expect(await saveBusiness({ displayName: "X" })).toEqual({ ok: false, code: "onboarding.error.saveFailed" });
   });
 });

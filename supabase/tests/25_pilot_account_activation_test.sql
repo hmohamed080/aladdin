@@ -163,11 +163,14 @@ select is(
 -- remaining gate before access_ready is the mandatory username step.
 select is(public.my_registration_state(), 'username_pending',
   'the owner/manager with no username yet resolves to username_pending');
--- The real organization type is chosen (and validated) during business onboarding.
-select lives_ok(
+-- The generic choice carries no approved business type, so it is not a first-business
+-- registration and cannot open a draft: business creation is database-enforced
+-- (20260928090001_business_creation_entitlement.sql). A concrete approved type chosen
+-- at registration (supplier, showroom_dealer, ...) is what authorizes it.
+select throws_ok(
   $$ select public.business_save('Zayed Marble LLC', 'Zayed Marble', 'wholesaler'::public.organization_type,
        null, 'giza', 'sheikh_zayed', 'Main branch', true) $$,
-  'the owner then picks a REAL organization type during business onboarding');
+  '42501', null, 'the generic owner/manager choice cannot open a business draft');
 -- A consumer type on the business track is still refused.
 select throws_ok(
   $$ select public.onboarding_select_account_type('business', 'end_consumer') $$,

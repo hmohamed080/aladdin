@@ -43,6 +43,10 @@ const businessSchema = z.object({
 });
 export type BusinessInput = z.input<typeof businessSchema>;
 
+function notEntitled(error: { code?: string }): boolean {
+  return error.code === "42501";
+}
+
 /**
  * Persist the (accumulated) business draft. No organization is created and no
  * redirect happens. Returns the draft id so a client that started without one can
@@ -68,7 +72,9 @@ export async function saveBusiness(input: BusinessInput): Promise<BusinessAction
     p_city: v.city ?? undefined,
     p_primary_branch_name: v.primaryBranchName ?? undefined,
   });
-  if (error) return { ok: false, code: "onboarding.error.saveFailed" };
+  // The database is the final authority on who may open a business (42501 = not
+  // entitled, `20260928090001_business_creation_entitlement.sql`); say so plainly.
+  if (error) return { ok: false, code: notEntitled(error) ? "onboarding.error.businessNotAllowed" : "onboarding.error.saveFailed" };
   return { ok: true, draftId: data ?? undefined };
 }
 
@@ -91,8 +97,13 @@ export async function submitBusiness(input: BusinessInput): Promise<BusinessActi
     p_draft_id: input.draftId ?? saved.draftId ?? undefined,
   });
   if (error) {
-    // A required-field violation means the wizard is not actually complete.
-    return { ok: false, code: "onboarding.error.saveFailed", draftId: saved.draftId };
+    // A required-field violation means the wizard is not actually complete; 42501 is
+    // the database refusing a caller who is not entitled to create a business.
+    return {
+      ok: false,
+      code: notEntitled(error) ? "onboarding.error.businessNotAllowed" : "onboarding.error.saveFailed",
+      draftId: saved.draftId,
+    };
   }
 
   // Land the owner IN the business they just created, not in whatever context they
