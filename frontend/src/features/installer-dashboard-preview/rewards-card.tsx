@@ -7,21 +7,22 @@ import { formatNumber } from "@/lib/ui/format";
 import { ProgressMeter } from "@/components/ui/primitives";
 import { ClipboardIcon, GiftIcon, StarIcon } from "@/components/ui/icons";
 import { NetworkTrophyIcon } from "@/features/installer-network-preview/network-visuals";
-import { pick } from "./mock-data";
+import { pick } from "./localized";
 import type { InstallerRewardsVM } from "./view-model";
 
 /**
  * "My points and rewards" — a real rewards moment, not a fourth stat tile.
  *
- * `data.level` is null on real data: no points-level/progression system
- * exists in the backend (only a running balance, `points_ledger` + the
- * `points_balance()` RPC), so production never invents a "Silver Pro" tier or
- * a "points to next level" figure — the progress bar and level copy simply do
- * not render, and the card leads with the real balance instead.
+ * `data.level` on real data is `derivePointsLevel(balance)`: the approved,
+ * presentation-only band computed from the real balance (nothing is stored). It
+ * is null when no level should be shown, and then the progress bar and level
+ * copy simply do not render. Production never shows the preview's fictional
+ * "Silver"/"Gold" tiers.
  */
 export function RewardsCard({ data, viewAllHref }: { data: InstallerRewardsVM; viewAllHref?: string }) {
   const { locale } = useI18n();
-  const remaining = data.level ? data.level.nextAt - data.points : null;
+  const level = data.level;
+  const remaining = level && level.nextAt !== null ? Math.max(0, level.nextAt - Math.max(0, data.points)) : null;
 
   return (
     <div
@@ -55,20 +56,27 @@ export function RewardsCard({ data, viewAllHref }: { data: InstallerRewardsVM; v
         />
       </div>
 
-      {data.level && remaining !== null ? (
+      {level ? (
         <div className="mt-md flex flex-col gap-2 desktop:mt-2 desktop:gap-1">
+          {level.label ? <p className="text-label font-semibold text-fg">{pick(locale, level.label)}</p> : null}
           <p className="text-caption text-fg-secondary">
-            {locale === "ar"
-              ? `باقي ${formatNumber(remaining, locale)} نقطة للمستوى التالي (${pick(locale, data.level.nextLabel)})`
-              : `${formatNumber(remaining, locale)} points to ${pick(locale, data.level.nextLabel)}`}
+            {remaining !== null && level.nextLabel
+              ? locale === "ar"
+                ? `باقي ${formatNumber(remaining, locale)} نقطة للمستوى التالي (${pick(locale, level.nextLabel)})`
+                : `${formatNumber(remaining, locale)} points to ${pick(locale, level.nextLabel)}`
+              : locale === "ar"
+                ? "بلغت أعلى مستوى"
+                : "Highest level reached"}
           </p>
           <ProgressMeter
-            value={(data.points / data.level.nextAt) * 100}
+            value={level.progressPct}
             tone="iris"
             size="md"
             label={locale === "ar" ? "التقدم نحو المستوى التالي" : "Progress to next level"}
           />
-          <p className="text-end font-mono text-caption tabular-nums text-fg-secondary">{formatNumber(data.points, locale)} / {formatNumber(data.level.nextAt, locale)}</p>
+          {level.nextAt !== null ? (
+            <p className="text-end font-mono text-caption tabular-nums text-fg-secondary">{formatNumber(data.points, locale)} / {formatNumber(level.nextAt, locale)}</p>
+          ) : null}
         </div>
       ) : null}
 
@@ -110,7 +118,7 @@ export function RewardsCard({ data, viewAllHref }: { data: InstallerRewardsVM; v
         )}
       </div>
 
-      {!data.level && (data.rating !== null || data.completedJobs > 0) ? (
+      {data.showReputation && (data.rating !== null || data.completedJobs > 0) ? (
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-strong pt-2 text-body text-fg-secondary">
           <span className="flex items-center gap-1.5">
             <StarIcon size={18} className="text-accent-solid" />

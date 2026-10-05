@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n/locales";
+import { formatNumber } from "@/lib/ui/format";
 import type {
   InstallerBrandItemVM,
   InstallerFeaturedLearningVM,
@@ -23,12 +24,12 @@ import type {
  * doc comment.
  */
 
-/** A bilingual string pair. The product is Arabic-first; English is a first-class switch — never a string that only exists in one. */
-export type Bi = { ar: string; en: string };
-
-export function pick(locale: Locale, bi: Bi): string {
-  return locale === "ar" ? bi.ar : bi.en;
-}
+// `Bi` and `pick` live in `localized.ts` so shared components (which production
+// also renders) never have to import this fixture module. Re-exported here so
+// preview code that already imports them from `mock-data` keeps working.
+import { pick, type Bi } from "./localized";
+export { pick };
+export type { Bi };
 
 export type TradeKey = "spc" | "ac" | "marble_alt" | "paint" | "wallpaper" | "wood_alt";
 
@@ -275,7 +276,10 @@ export const NEARBY_OPPORTUNITIES_COUNT = 3;
 export function mockWelcome(locale: Locale): InstallerWelcomeVM {
   return {
     firstName: pick(locale, PROFILE.name).split(" ")[0] ?? "",
-    nearbyOpportunitiesCount: NEARBY_OPPORTUNITIES_COUNT,
+    opportunitiesLine:
+      locale === "ar"
+        ? `${formatNumber(NEARBY_OPPORTUNITIES_COUNT, locale)} فرص جديدة بالقرب منك`
+        : `${formatNumber(NEARBY_OPPORTUNITIES_COUNT, locale)} new opportunities near you`,
     points: REWARDS.points,
   };
 }
@@ -303,6 +307,7 @@ export function mockOpportunities(): InstallerOpportunityVM[] {
     distanceKm: job.distanceKm,
     matchPercent: job.matchPercent,
     paymentEGP: job.paymentEGP,
+    tradeKey: null,
     durationDays: job.durationDays,
     publishedAgo: job.publishedAgo,
     tradeLabel: TRADE_LABEL[job.trade],
@@ -341,7 +346,12 @@ export function mockLearning(): { featured: InstallerFeaturedLearningVM; items: 
 export function mockRewards(locale: Locale): InstallerRewardsVM {
   return {
     points: REWARDS.points,
-    level: { label: REWARDS.levelLabel, nextLabel: REWARDS.nextLevelLabel, nextAt: REWARDS.nextLevelAt },
+    level: {
+      label: null,
+      nextLabel: REWARDS.nextLevelLabel,
+      nextAt: REWARDS.nextLevelAt,
+      progressPct: (REWARDS.points / REWARDS.nextLevelAt) * 100,
+    },
     recentActivity: {
       title: pick(locale, REWARDS.recentReward),
       body: null,
@@ -351,5 +361,6 @@ export function mockRewards(locale: Locale): InstallerRewardsVM {
     rating: PROFILE.rating,
     ratingCount: PROFILE.ratingCount,
     completedJobs: PROFILE.completedJobs,
+    showReputation: false,
   };
 }

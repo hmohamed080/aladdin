@@ -255,6 +255,22 @@ export const en = {
       addBusinessBody: "Own a showroom, distribution, or trading business? Set it up on the same account.",
     },
     pilot: { title: "You're in the Aladdin Pilot" },
+    /* The installer dashboard (`/home`). Each opportunity line states only what
+       the data proves. "Near you" requires a catalogue-resolved city/governorate
+       match on both sides; "new" is deliberately absent — nothing records which
+       openings a person has already seen, so "new" cannot be claimed. */
+    installer: {
+      opportunitiesNearby: "You have {count} work opportunities near you",
+      opportunitiesNearbyOne: "You have 1 work opportunity near you",
+      opportunitiesAvailable: "You have {count} work opportunities available",
+      opportunitiesAvailableOne: "You have 1 work opportunity available",
+      opportunitiesNone: "No work opportunities available right now",
+      opportunitiesTitle: "Open opportunities",
+      attention: {
+        scheduled: "Scheduled and ready to start",
+        start: "Start work",
+      },
+    },
     completeness: {
       title: "Profile completeness",
       count: "{done} of {total} details added",
@@ -3365,6 +3381,8 @@ export const en = {
          trade filter lives, because that control is the one thing on this page a
          professional could reasonably mistake for a rule about eligibility. */
       offTradeNote: "You can apply for any job here, including trades outside the ones on your profile.",
+      budgetUnspecified: "Budget not specified",
+      viewAndApply: "View details and apply",
     },
 
     detail: {

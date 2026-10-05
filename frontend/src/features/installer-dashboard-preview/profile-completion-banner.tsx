@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { formatNumber } from "@/lib/ui/format";
 import { ProgressMeter } from "@/components/ui/primitives";
 import { BadgeCheckIcon, UserIcon, XIcon } from "@/components/ui/icons";
-import { pick } from "./mock-data";
+import { pick } from "./localized";
 import type { InstallerProfileCompletionVM } from "./view-model";
 
 /**

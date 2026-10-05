@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import {
+  countOpenJobOpportunities,
   listJobOpportunities,
   listMyApplications,
   listOpportunityGovernorates,
@@ -226,5 +227,24 @@ describe("canReapply", () => {
     for (const status of ["accepted", "rejected", "submitted"] as const) {
       expect(canReapply({ status, job_status: "open" }, true)).toBe(false);
     }
+  });
+});
+
+describe("countOpenJobOpportunities", () => {
+  it("counts the open openings the caller has not applied to, from the same view as the list", async () => {
+    const { supabase, calls } = client({ count: 27, error: null } as never);
+    expect(await countOpenJobOpportunities(supabase)).toBe(27);
+    expect(calls.tables).toContain("open_job_opportunities");
+    expect(calls.filters).toContainEqual(["eq", "has_applied", false]);
+  });
+
+  it("is zero, not an error, when there is nothing open", async () => {
+    const { supabase } = client({ count: null, error: null } as never);
+    expect(await countOpenJobOpportunities(supabase)).toBe(0);
+  });
+
+  it("surfaces a read failure instead of reporting a number", async () => {
+    const { supabase } = client({ count: null, error: new Error("boom") } as never);
+    await expect(countOpenJobOpportunities(supabase)).rejects.toThrow("boom");
   });
 });

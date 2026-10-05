@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import type { SidebarMode } from "@/lib/ui/sidebar-mode";
 import { InstallerSidebar } from "./installer-sidebar";
-import { InstallerTopbar } from "./installer-topbar";
+import { InstallerTopbarCore } from "./installer-topbar-core";
 import type { InstallerOpportunityVM } from "./view-model";
 import { INSTALLER_CONTENT_FRAME_CLASS, INSTALLER_SHELL_GUTTER_CLASS } from "./installer-layout";
 
@@ -29,7 +29,10 @@ export function InstallerDashboardShell({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <div className="flex min-h-dvh bg-workspace">
+    // `installer-surface` scopes the approved Installer palette
+    // (`styles/installer-theme.css`) to this shell and everything inside it, so
+    // no other persona's chrome is touched.
+    <div className="installer-surface flex min-h-dvh bg-workspace">
       <InstallerSidebar
         initialMode={sidebarMode}
         mobileOpen={mobileNavOpen}
@@ -37,7 +40,7 @@ export function InstallerDashboardShell({
         production
       />
       <div className={`${INSTALLER_SHELL_GUTTER_CLASS} flex min-w-0 flex-1 flex-col tablet:gap-6 tablet:pb-10 tablet:pt-6 desktop:pt-8`}>
-        <InstallerTopbar
+        <InstallerTopbarCore
           theme={theme}
           onMenuClick={() => setMobileNavOpen(true)}
           displayName={displayName}

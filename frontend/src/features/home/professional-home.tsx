@@ -23,12 +23,14 @@ import { AvailabilityBadge } from "@/features/profile/availability-status";
 import type { CompletenessItemKey } from "@/lib/profile/completeness";
 import type { Locale } from "@/lib/i18n/locales";
 import type { MyAssignmentRow } from "@/server/queries/job-assignments";
+import type { ProfileCompletion } from "@/server/queries/profile-identity";
 import { CurrentWorkBlock } from "./current-work-block";
 import { OpportunityCard } from "@/features/jobs/opportunity-list";
 import type { OpportunityRow } from "@/server/queries/job-opportunities";
 import type { PointsEntrySource } from "@/features/points/view-model";
 import { formatNumber } from "@/lib/ui/format";
 import { InstallerHome } from "./installer-home";
+import type { OpportunitySummary } from "./installer-dashboard-data";
 
 /**
  * The PROFESSIONAL variant of the personal surface — an operational dashboard,
@@ -89,6 +91,9 @@ export function ProfessionalHome({
   data,
   currentWork,
   opportunities,
+  opportunitySummary = { availableCount: 0, nearbyCount: null },
+  assignments = [],
+  completion = null,
   pointsBalance,
   recentPointsEntry,
   reviewsAverage,
@@ -103,6 +108,12 @@ export function ProfessionalHome({
   currentWork: MyAssignmentRow | null;
   /** A REAL, bounded preview — never the full board. */
   opportunities: readonly OpportunityRow[];
+  /** Installer dashboard only: available count + provable nearby count. */
+  opportunitySummary?: OpportunitySummary;
+  /** Installer dashboard only: the caller's assignments (needs-action). */
+  assignments?: readonly MyAssignmentRow[];
+  /** Installer dashboard only: `my_profile_completion()`, or null. */
+  completion?: ProfileCompletion | null;
   pointsBalance: number;
   /** The caller's single most recent points-ledger entry — the installer
    *  dashboard's "recent activity" row. Null when the ledger is empty. */
@@ -119,6 +130,9 @@ export function ProfessionalHome({
       <InstallerHome
         data={data}
         opportunities={opportunities}
+        opportunitySummary={opportunitySummary}
+        assignments={assignments}
+        completion={completion}
         pointsBalance={pointsBalance}
         recentPointsEntry={recentPointsEntry}
         reviewsAverage={reviewsAverage}

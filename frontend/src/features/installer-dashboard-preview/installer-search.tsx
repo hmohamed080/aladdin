@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
 import { CommandIcon, EnterKeyIcon, SearchIcon, XIcon } from "@/components/ui/icons";
-import { pick } from "./mock-data";
+import { pick } from "./localized";
 import { INSTALLER_PRIMARY_NAV, INSTALLER_QUICK_NAV, type InstallerNavItem } from "./installer-nav";
 import type { InstallerOpportunityVM } from "./view-model";
 import styles from "./installer-search.module.css";
@@ -165,8 +165,7 @@ export function InstallerSearch({
           "group flex items-center gap-2 border border-field-line bg-field text-field-fg",
           "transition-[background-color,border-color,box-shadow,color] duration-fast ease-standard motion-reduce:transition-none",
           "focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-field-focus",
-          production ? "h-7 w-8" : "h-10 w-10 justify-center",
-          "shrink-0 rounded-sm px-2 text-label",
+          "h-10 w-10 shrink-0 justify-center rounded-sm px-2 text-label",
           "tablet:h-10 tablet:w-full tablet:min-w-0 tablet:rounded-lg tablet:px-3.5 tablet:text-body",
         )}
       >

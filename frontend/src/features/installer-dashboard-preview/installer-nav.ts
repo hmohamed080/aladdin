@@ -13,7 +13,7 @@ import {
   StorefrontIcon,
   UserIcon,
 } from "@/components/ui/icons";
-import type { Bi } from "./mock-data";
+import type { Bi } from "./localized";
 
 export type InstallerNavItem = {
   id: string;

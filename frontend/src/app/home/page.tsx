@@ -16,7 +16,12 @@ import {
   featuredAssignment,
   countAssignmentsByStatus,
 } from "@/server/queries/job-assignments";
-import { listJobOpportunities } from "@/server/queries/job-opportunities";
+import {
+  OPPORTUNITY_LIST_LIMIT,
+  countOpenJobOpportunities,
+  listJobOpportunities,
+} from "@/server/queries/job-opportunities";
+import { buildOpportunityFeed, installerLocationFrom } from "@/lib/installer/opportunity-location";
 import { getPointsBalance, listPointsEntries } from "@/server/queries/points";
 import { loadMyReviewSummary } from "@/server/queries/reviews";
 import { listMyNetworkOrganizations } from "@/server/queries/network";
@@ -111,23 +116,51 @@ export default async function PersonalHomePage() {
     );
   }
 
-  const [assignments, opportunities, pointsBalance, recentPointsEntries, reviews, network] = await Promise.all([
+  // The installer dashboard leads with the real number of open opportunities
+  // (not the three cards it previews) and carries its own profile-completion
+  // banner, fed by the same `my_profile_completion()` as the card — so the
+  // generic card is not drawn a second time above it.
+  const isInstaller = data.accountType === "installer_technician";
+
+  const [assignments, opportunities, pointsBalance, recentPointsEntries, reviews, network, availableOpportunitiesCount] =
+    await Promise.all([
     listMyAssignments(supabase),
-    listJobOpportunities(supabase, { limit: HOME_OPPORTUNITIES_PREVIEW }),
+    // An installer reads the whole (capped) board so openings in their own city
+    // and governorate can lead and be counted; everyone else keeps the small
+    // bounded preview.
+    listJobOpportunities(supabase, isInstaller ? {} : { limit: HOME_OPPORTUNITIES_PREVIEW }),
     getPointsBalance(supabase),
     listPointsEntries(supabase, { limit: 1 }),
     loadMyReviewSummary(),
     listMyNetworkOrganizations(supabase),
+    isInstaller ? countOpenJobOpportunities(supabase) : Promise.resolve(0),
   ]);
   const completedJobsCount = countAssignmentsByStatus(assignments).completed;
 
+  // Nearby = the installer's catalogue city/governorate against the job's own
+  // location text, resolved exactly (see `lib/installer/opportunity-location`).
+  // No coordinates exist, so there is no distance and no "nearest" order. The
+  // feed is built from the WHOLE board read above: the three cards are a slice
+  // of it, the nearby count is not, and the count is null (unknown) rather than
+  // approximate when the board may exceed the read's row cap.
+  const location = isInstaller ? installerLocationFrom(data.professional) : null;
+  const feed = isInstaller
+    ? buildOpportunityFeed(opportunities, location, {
+        previewLimit: HOME_OPPORTUNITIES_PREVIEW,
+        listLimit: OPPORTUNITY_LIST_LIMIT,
+      })
+    : { cards: opportunities, nearbyCount: null };
+
   return (
     <div className="flex flex-col gap-lg">
-      {completionCard}
+      {isInstaller ? null : completionCard}
       <ProfessionalHome
         data={data}
         currentWork={featuredAssignment(assignments)}
-        opportunities={opportunities}
+        opportunities={feed.cards}
+        opportunitySummary={{ availableCount: availableOpportunitiesCount, nearbyCount: feed.nearbyCount }}
+        assignments={assignments}
+        completion={completion}
         pointsBalance={pointsBalance}
         recentPointsEntry={recentPointsEntries[0] ?? null}
         reviewsAverage={reviews.average}

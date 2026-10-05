@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useI18n } from "@/lib/i18n/context";
 import { FactoryIcon, GiftIcon, PackageIcon, ScrollIcon, VideoIcon } from "@/components/ui/icons";
 import { ModuleCard } from "./module-card";
-import { pick } from "./mock-data";
+import { pick } from "./localized";
 import type { InstallerBrandItemVM } from "./view-model";
 
 /**

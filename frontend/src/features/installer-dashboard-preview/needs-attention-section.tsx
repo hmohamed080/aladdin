@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { BoltIcon } from "@/components/ui/icons";
 import { ModuleCard, ModuleFooterLink } from "./module-card";
-import { pick } from "./mock-data";
+import { pick } from "./localized";
 import type { InstallerNeedsActionItemVM } from "./view-model";
 
 const ICON_SRC: Record<InstallerNeedsActionItemVM["icon"], string> = {
