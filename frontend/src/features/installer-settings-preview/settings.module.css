@@ -1,72 +1,10 @@
-/* User-approved preview exception; deliberately not imported by any other route. */
-.theme {
-  --settings-sand: #D8C7A6;
-  --settings-clay: #B96F52;
-  --settings-cream: #F2E9D8;
-  --settings-navy: #071A2D;
-  --canvas: var(--settings-cream);
-  --workspace: var(--settings-cream);
-  --surface: var(--settings-cream);
-  --surface-2: var(--settings-sand);
-  --fg: var(--settings-navy);
-  --fg-secondary: var(--settings-navy);
-  --fg-muted: var(--settings-navy);
-  --border: var(--settings-sand);
-  --border-strong: var(--settings-sand);
-  --field-line: var(--settings-sand);
-  --field: var(--canvas);
-  --field-fg: var(--fg);
-  --field-hint: var(--fg-secondary);
-  --field-placeholder: var(--fg-secondary);
-  --field-focus: var(--settings-clay);
-  --primary: var(--settings-navy);
-  --primary-foreground: var(--settings-cream);
-  --accent: var(--settings-navy);
-  --accent-solid: var(--settings-clay);
-  --on-accent: var(--settings-navy);
-  --focus: var(--settings-clay);
-  --danger: var(--settings-navy);
-  --shell: var(--settings-navy);
-  --shell-2: var(--settings-navy);
-  --shell-lit: var(--settings-navy);
-  --shell-deep: var(--settings-navy);
-  --shell-pool: var(--settings-navy);
-  --shell-gold: var(--settings-sand);
-  --shell-gold-soft: var(--settings-navy);
-  --lumen: var(--settings-clay);
-  --shell-active: var(--settings-sand);
-  --shell-active-fg: var(--settings-navy);
-  --shell-fg: var(--settings-cream);
-  --shell-fg-secondary: var(--settings-sand);
-  --shell-fg-muted: var(--settings-sand);
-  --shell-line: var(--settings-sand);
-  --iris-solid: var(--settings-clay);
-  --iris: var(--settings-clay);
-  --workspace-line: var(--settings-sand);
-}
-:global(.dark) .theme {
-  --canvas: var(--settings-navy);
-  --workspace: var(--settings-navy);
-  --surface: var(--settings-navy);
-  --surface-2: var(--settings-navy);
-  --fg: var(--settings-cream);
-  --fg-secondary: var(--settings-sand);
-  --fg-muted: var(--settings-sand);
-  --accent: var(--settings-sand);
-  --primary: var(--settings-sand);
-  --primary-foreground: var(--settings-navy);
-  --danger: var(--settings-clay);
-}
 .theme :global([data-app-header]) {
   background: var(--canvas) !important;
   border-color: var(--border) !important;
   box-shadow: none !important;
 }
-.phone input { min-width: 0; width: 0; }
-.phone select { width: 10rem; max-width: 10rem; }
-.phone :global(.relative) { flex-shrink: 0; }
-.theme :global(.text-white) { color: var(--settings-cream); }
-.theme :global(.border-danger) { border-color: var(--settings-clay); }
+.theme :global(.text-white) { color: var(--soft-cream); }
+.theme :global(.border-danger) { border-color: var(--muted-terracotta); }
 .toggle {
   position: relative;
   min-width: 3rem;
@@ -76,7 +14,7 @@
   border-radius: var(--radius-pill, 999px);
   background: var(--surface-2);
 }
-.toggle[aria-checked="true"] { background: var(--settings-clay); }
+.toggle[aria-checked="true"] { background: var(--muted-terracotta); }
 .thumb {
   position: absolute;
   inset-inline-start: 0.25rem;
@@ -85,4 +23,4 @@
   border-radius: 50%;
   background: var(--fg);
 }
-.toggle[aria-checked="true"] .thumb { inset-inline-start: auto; inset-inline-end: 0.25rem; background: var(--settings-navy); }
+.toggle[aria-checked="true"] .thumb { inset-inline-start: auto; inset-inline-end: 0.25rem; background: var(--deep-navy); }

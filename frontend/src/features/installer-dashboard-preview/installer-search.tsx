@@ -165,7 +165,8 @@ export function InstallerSearch({
           "group flex items-center gap-2 border border-field-line bg-field text-field-fg",
           "transition-[background-color,border-color,box-shadow,color] duration-fast ease-standard motion-reduce:transition-none",
           "focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-field-focus",
-          "h-7 w-8 shrink-0 rounded-sm px-2 text-label",
+          production ? "h-7 w-8" : "h-10 w-10 justify-center",
+          "shrink-0 rounded-sm px-2 text-label",
           "tablet:h-10 tablet:w-full tablet:min-w-0 tablet:rounded-lg tablet:px-3.5 tablet:text-body",
         )}
       >

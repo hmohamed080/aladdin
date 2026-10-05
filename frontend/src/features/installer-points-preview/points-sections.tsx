@@ -13,12 +13,15 @@ function copy(locale: Locale, value: LocalizedText) {
 export function PointsHero({ locale }: { locale: Locale }) {
   const ar = locale === "ar";
   return (
-    <section aria-labelledby="points-title" className="relative isolate min-h-44 overflow-hidden rounded-md border border-strong bg-canvas tablet:min-h-52">
-      <Image src="/assets/installer-points/points-hero.png" alt="" fill priority sizes="(min-width: 1280px) 82vw, 100vw" className="object-cover object-top" />
-      <div className="absolute inset-y-0 right-0 z-raised flex w-[57%] items-center justify-center px-lg tablet:w-[54%] tablet:px-2xl wide:w-[52%]">
+    <section aria-labelledby="points-title" className="relative isolate h-32 overflow-hidden rounded-md border border-strong bg-canvas tablet:h-auto tablet:min-h-52">
+      <Image src="/assets/installer-points/points-hero.png" alt="" fill priority sizes="(min-width: 1280px) 82vw, 100vw" className="object-cover object-center tablet:object-top" />
+      {/* The artwork is 3:1 with its cream panel on the right half. At phone
+          width the box is cropped to that ratio, so the title sits inside the
+          panel beside the photograph instead of under it. */}
+      <div className="absolute inset-y-0 right-[3%] z-raised flex w-[50%] items-center justify-center px-2 tablet:right-0 tablet:w-[54%] tablet:px-2xl wide:w-[52%]">
         <div className="max-w-xl text-center" dir={ar ? "rtl" : "ltr"}>
-          <h1 id="points-title" className="text-display font-bold text-brand-basalt">{ar ? "نقاطي ومكافآتي" : "My points & rewards"}</h1>
-          <p className="mt-2 text-body-lg text-brand-basalt/70">{ar ? "تابع نقاطك، مستواك، والمكافآت التي تستحقها" : "Track your points, level, and the rewards you have earned"}</p>
+          <h1 id="points-title" className="text-title font-bold leading-tight text-brand-basalt tablet:text-display">{ar ? "نقاطي ومكافآتي" : "My points & rewards"}</h1>
+          <p className="mt-1 text-caption leading-snug text-brand-basalt/70 tablet:mt-2 tablet:text-body-lg">{ar ? "تابع نقاطك، مستواك، والمكافآت التي تستحقها" : "Track your points, level, and the rewards you have earned"}</p>
         </div>
       </div>
     </section>
@@ -41,9 +44,9 @@ function ProgressCard({ locale }: { locale: Locale }) {
     <article dir={ar ? "rtl" : "ltr"} className="relative min-h-52 overflow-hidden rounded-md border border-strong bg-surface p-lg shadow-card">
       <div className="flex items-center justify-between gap-md">
         <h2 className="flex items-center gap-sm text-title text-fg"><IconBubble><BarChartIcon size={22} /></IconBubble>{ar ? "التقدم نحو المستوى التالي" : "Progress to the next level"}</h2>
-        <Image src={POINTS_LEVEL_BADGE_ASSET[3]} alt="" width={118} height={118} className="h-24 w-24 shrink-0 object-contain tablet:h-28 tablet:w-28" />
+        <Image src={POINTS_LEVEL_BADGE_ASSET[3]} alt="" width={118} height={118} className="h-16 w-16 shrink-0 object-contain tablet:h-28 tablet:w-28" />
       </div>
-      <p className="-mt-8 pe-28 text-body font-semibold text-fg-secondary tablet:pe-32">{ar ? <>باقي <strong className="text-accent-solid">250 نقطة</strong> للوصول إلى المستوى الذهبي</> : <>Only <strong className="text-accent-solid">250 points</strong> to reach Gold</>}</p>
+      <p className="mt-sm text-body font-semibold text-fg-secondary tablet:-mt-8 tablet:pe-32">{ar ? <>باقي <strong className="text-accent-solid">250 نقطة</strong> للوصول إلى المستوى الذهبي</> : <>Only <strong className="text-accent-solid">250 points</strong> to reach Gold</>}</p>
       <div className="mt-lg rounded-pill border border-strong bg-canvas p-1" role="progressbar" aria-valuemin={0} aria-valuemax={1500} aria-valuenow={1250} aria-label={ar ? "التقدم إلى المستوى الذهبي" : "Progress to Gold level"}>
         <div className="h-5 w-5/6 rounded-pill bg-accent-solid" />
       </div>
@@ -83,7 +86,7 @@ export function PointSources({ locale }: { locale: Locale }) {
   return (
     <section dir={ar ? "rtl" : "ltr"} aria-labelledby="sources-title" className="rounded-md border border-strong bg-surface p-lg shadow-card">
       <header className="mb-md"><h2 id="sources-title" className="flex items-center gap-sm text-title text-fg"><IconBubble><GiftIcon size={22} /></IconBubble>{ar ? "مصادر النقاط" : "Ways to earn points"}</h2><p className="mt-1 text-body text-fg-secondary">{ar ? "هذه أمثلة توضيحية لكيفية كسب النقاط في تجربة المعاينة." : "These are preview examples of how points could be earned."}</p></header>
-      <div className="grid gap-sm tablet:grid-cols-2 desktop:grid-cols-3 wide:grid-cols-5">
+      <div className="grid gap-sm min-[430px]:grid-cols-2 desktop:grid-cols-3 wide:grid-cols-5">
         {POINT_SOURCES.map(({ id, title, points, description, Icon }) => (
           <article key={id} className="flex min-h-48 flex-col rounded-md border border-strong bg-canvas p-md">
             <div className="flex items-center justify-between gap-sm"><IconBubble large><Icon size={26} /></IconBubble><h3 className="text-body-lg font-bold text-fg">{copy(locale, title)}</h3></div>

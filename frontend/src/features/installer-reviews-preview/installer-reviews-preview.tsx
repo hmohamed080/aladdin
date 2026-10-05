@@ -269,9 +269,9 @@ function ReviewsWorkspace({ locale }: { locale: Locale }) {
           <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} className={cn("flex h-8 items-center gap-xs rounded-sm px-sm text-label focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", view === "list" ? "bg-surface-2 font-semibold text-fg" : "text-fg-muted hover:text-fg")}><ListIcon size={15} />{ar ? "قائمة" : "List"}</button>
           <button type="button" aria-pressed={view === "grid"} onClick={() => setView("grid")} className={cn("flex h-8 items-center gap-xs rounded-sm px-sm text-label focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", view === "grid" ? "bg-surface-2 font-semibold text-fg" : "text-fg-muted hover:text-fg")}><GridIcon size={15} />{ar ? "شبكة" : "Grid"}</button>
         </div>
-        <div className="flex flex-wrap items-center gap-sm">
+        <div className="grid w-full grid-cols-2 items-center gap-sm tablet:flex tablet:w-auto tablet:flex-wrap [&>*]:min-w-0">
           <DateRangeFilter compact locale={locale} value={dateRange} onChange={(next) => { setDateRange(next); setVisibleCount(REVIEWS_PAGE_SIZE); }} />
-          <MenuSelect compact className="w-56" icon={<CalendarCheckIcon size={15} className="text-info" />} label={ar ? "ترتيب التقييمات" : "Review order"} value={sort} options={[
+          <MenuSelect compact className="w-full tablet:w-56" icon={<CalendarCheckIcon size={15} className="text-info" />} label={ar ? "ترتيب التقييمات" : "Review order"} value={sort} options={[
             { value: "newest", label: ar ? "الترتيب: الأحدث أولًا" : "Sort: Newest first" },
             { value: "highest", label: ar ? "الأعلى تقييمًا" : "Highest rated" },
             { value: "oldest", label: ar ? "الأقدم أولًا" : "Oldest first" },

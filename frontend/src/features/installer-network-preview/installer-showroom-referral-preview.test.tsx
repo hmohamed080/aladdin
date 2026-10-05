@@ -4,6 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 import { renderWithI18n } from "@/test/render";
 import { InstallerShowroomReferralPreview } from "./installer-showroom-referral-preview";
 
+vi.mock("next/dynamic", async () => {
+  const { InstallerPhoneField } = await import("@/features/installer-dashboard-preview/installer-phone-field");
+  return { default: () => InstallerPhoneField };
+});
 vi.mock("next/navigation", () => ({
   usePathname: () => "/preview/installer-network/refer",
   useRouter: () => ({ push: vi.fn() }),
@@ -32,10 +36,12 @@ describe("InstallerShowroomReferralPreview", () => {
     expect(screen.getAllByRole("radio")).toHaveLength(4);
     expect(screen.getByRole("radio", { name: "موان" })).toBeTruthy();
     expect(screen.getByLabelText("رقم هاتف المعرض *")).toBeTruthy();
-    const countrySelect = screen.getByRole("combobox", { name: "الدولة" });
-    expect(countrySelect).toHaveValue("EG");
-    expect(screen.getByRole("option", { name: /مصر \+20/ })).toBeTruthy();
-    expect(screen.getByRole("option", { name: /الولايات المتحدة \+1/ })).toBeTruthy();
+    const countryTrigger = screen.getByRole("button", { name: "الدولة" });
+    expect(countryTrigger).toHaveTextContent("+20");
+    fireEvent.click(countryTrigger);
+    expect(screen.getByRole("option", { name: /مصر/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /الولايات المتحدة/ })).toBeTruthy();
+    fireEvent.click(countryTrigger);
     expect(screen.getByLabelText("ملاحظة (اختياري)")).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText("المحافظة *"));

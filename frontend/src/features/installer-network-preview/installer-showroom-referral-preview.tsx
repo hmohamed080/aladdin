@@ -14,7 +14,7 @@ import {
   StorefrontIcon,
 } from "@/components/ui/icons";
 import { menuItemClass, menuSurfaceClass } from "@/components/ui/menu";
-import { PhoneField } from "@/components/ui/phone-field";
+import dynamic from "next/dynamic";
 import { InstallerSidebar } from "@/features/installer-dashboard-preview/installer-sidebar";
 import { InstallerTopbar } from "@/features/installer-dashboard-preview/installer-topbar";
 import {
@@ -30,6 +30,13 @@ import {
 import { cn } from "@/lib/ui/cn";
 import type { SidebarMode } from "@/lib/ui/sidebar-mode";
 import type { CanonicalPhone } from "@/lib/contact/phone";
+
+// Intl country names differ between Node and browser ICU versions; keep the
+// shared control client-rendered here (same approach as the settings preview).
+const PhoneField = dynamic(() => import("@/features/installer-dashboard-preview/installer-phone-field").then((module) => module.InstallerPhoneField), {
+  ssr: false,
+  loading: () => <div className="h-11 rounded-md border bg-canvas" aria-busy="true" />,
+});
 
 const SHOWROOM_ACTIVITIES = [
   "decor_showroom",
@@ -304,16 +311,20 @@ export function InstallerShowroomReferralPreview({
 
         <main id="top" className={`${INSTALLER_CONTENT_FRAME_CLASS} flex flex-1 flex-col gap-md`}>
           <section className="relative isolate overflow-hidden rounded-lg border border-strong bg-surface" aria-labelledby="referral-page-title">
-            <div dir="ltr" className="relative min-h-44 overflow-hidden tablet:min-h-48 desktop:min-h-52">
-              <Image
-                src="/assets/installer-network/showroom-referral-hero.png"
-                alt=""
-                fill
-                priority
-                sizes="100vw"
-                className="object-cover object-left"
-              />
-              <div dir={dir} className="absolute inset-y-0 right-0 z-raised flex w-[51%] flex-col justify-center px-md py-md text-center tablet:w-[44%] tablet:px-xl desktop:px-12">
+            <div dir="ltr" className="relative flex flex-col overflow-hidden tablet:block tablet:min-h-48 desktop:min-h-52">
+              {/* Phones: a short artwork strip with the title on a solid surface
+                  beneath it, because the baked-in text panel only exists at wider crops. */}
+              <div className="relative h-32 tablet:absolute tablet:inset-0 tablet:h-auto">
+                <Image
+                  src="/assets/installer-network/showroom-referral-hero.png"
+                  alt=""
+                  fill
+                  priority
+                  sizes="100vw"
+                  className="object-cover object-left"
+                />
+              </div>
+              <div dir={dir} className="relative z-raised flex w-full flex-col justify-center px-md py-md text-start tablet:absolute tablet:inset-y-0 tablet:right-0 tablet:w-[44%] tablet:px-xl tablet:text-center desktop:px-12">
                 <h1 id="referral-page-title" className="text-title font-bold tracking-tight text-fg tablet:text-headline desktop:text-display">
                   {c.heroTitle}
                 </h1>
@@ -396,7 +407,7 @@ export function InstallerShowroomReferralPreview({
 
                   <fieldset aria-invalid={Boolean(errors.activity) || undefined} className="space-y-1.5">
                     <legend className="text-label font-medium text-fg-secondary">{c.activity}</legend>
-                    <div className="grid gap-sm tablet:grid-cols-2 desktop:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-sm desktop:grid-cols-4">
                       {SHOWROOM_ACTIVITIES.map((option) => {
                         const Icon = ACTIVITY_ICONS[option];
                         const selected = activity === option;
@@ -462,7 +473,7 @@ export function InstallerShowroomReferralPreview({
                 </form>
               </div>
 
-              <div dir={dir} className="relative flex h-full min-h-72 items-center justify-center tablet:min-h-80 desktop:min-h-0" aria-hidden="true">
+              <div dir={dir} className="relative hidden h-full min-h-72 items-center justify-center tablet:flex tablet:min-h-80 desktop:min-h-0" aria-hidden="true">
                 <span className="absolute h-64 w-64 rounded-pill bg-accent-solid/10 desktop:h-72 desktop:w-72" />
                 <span className="absolute h-72 w-72 rounded-pill border border-accent/35 desktop:h-80 desktop:w-80" />
                 <Image

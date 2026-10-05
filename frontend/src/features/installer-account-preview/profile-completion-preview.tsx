@@ -143,24 +143,28 @@ function ProfileHero({ locale }: { locale: Locale }) {
   };
 
   return (
-    <header className="relative isolate min-h-56 overflow-hidden rounded-md border border-strong bg-surface shadow-card tablet:min-h-60">
-      <Image
-        src={coverUrl}
-        alt=""
-        fill
-        priority
-        unoptimized={coverUrl.startsWith("blob:")}
-        sizes="(min-width: 1024px) 80vw, 100vw"
-        className="-z-20 object-cover object-center"
-      />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-l from-canvas/45 via-canvas/10 to-transparent ltr:bg-gradient-to-r" />
-      <div className="flex min-h-56 items-center justify-start gap-lg px-lg py-xl tablet:min-h-60 tablet:px-xl">
+    <header className="relative isolate overflow-hidden rounded-md border border-strong bg-surface shadow-card tablet:min-h-60">
+      {/* Phones: the cover is a short strip the avatar overlaps, so the title
+          and actions sit on a solid surface instead of over the photograph. */}
+      <div className="absolute inset-x-0 top-0 -z-20 h-28 tablet:inset-0 tablet:h-auto">
+        <Image
+          src={coverUrl}
+          alt=""
+          fill
+          priority
+          unoptimized={coverUrl.startsWith("blob:")}
+          sizes="(min-width: 1024px) 80vw, 100vw"
+          className="object-cover object-center"
+        />
+        <div className="absolute inset-0 hidden bg-gradient-to-l from-canvas/45 via-canvas/10 to-transparent tablet:block ltr:tablet:bg-gradient-to-r" />
+      </div>
+      <div className="flex flex-col items-start gap-md px-md pb-sm pt-[4.5rem] tablet:min-h-60 tablet:flex-row tablet:items-center tablet:justify-start tablet:gap-lg tablet:px-xl tablet:py-xl">
         <div className="order-2 max-w-xl text-start">
-          <h1 className="text-headline font-bold text-fg">{ar ? "كمّل ملفك الشخصي" : "Complete your profile"}</h1>
-          <p className="mt-2 text-body-lg text-fg-secondary">{ar ? "خلّي شغلك يوصل للناس المناسبة" : "Help your work reach the right people"}</p>
+          <h1 className="text-title font-bold text-fg tablet:text-headline">{ar ? "كمّل ملفك الشخصي" : "Complete your profile"}</h1>
+          <p className="mt-1 text-body text-fg-secondary tablet:mt-2 tablet:text-body-lg">{ar ? "خلّي شغلك يوصل للناس المناسبة" : "Help your work reach the right people"}</p>
         </div>
 
-        <div className="relative order-1 me-sm shrink-0">
+        <div className="relative order-1 shrink-0 tablet:me-sm">
           <span className="relative block h-24 w-24 overflow-hidden rounded-pill border-4 border-canvas bg-surface-2 shadow-raised tablet:h-28 tablet:w-28">
             <Image src={avatarUrl} alt={ar ? "صورة أحمد محمود" : "Ahmed Mahmoud profile"} fill sizes="112px" unoptimized={avatarUrl.startsWith("blob:")} className="object-cover" />
           </span>
@@ -170,17 +174,17 @@ function ProfileHero({ locale }: { locale: Locale }) {
       </div>
       <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp" aria-label={ar ? "رفع صورة الغلاف" : "Upload cover photo"} className="sr-only" onChange={(event) => onPickImage("cover", event)} />
       <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp" aria-label={ar ? "رفع صورة الملف" : "Upload profile photo"} className="sr-only" onChange={(event) => onPickImage("avatar", event)} />
-      <div className="absolute bottom-md end-md z-raised flex flex-wrap gap-sm">
-        <button type="button" onClick={() => coverInputRef.current?.click()} className="flex min-h-10 items-center gap-xs rounded-md border border-accent bg-accent-solid px-md text-label font-bold text-on-accent shadow-raised transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+      <div className="relative z-raised flex flex-wrap gap-sm px-md pb-md tablet:absolute tablet:bottom-md tablet:end-md tablet:p-0">
+        <button type="button" onClick={() => coverInputRef.current?.click()} className="flex min-h-11 items-center gap-xs rounded-md border border-accent bg-accent-solid px-md text-label font-bold text-on-accent shadow-raised transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           <CameraIcon size={17} />
           {ar ? "تغيير صورة الغلاف" : "Change cover photo"}
         </button>
-        <button type="button" onClick={() => setActiveCrop({ kind: "cover", source: coverUrl, owned: false })} className="flex min-h-10 items-center gap-xs rounded-md border border-strong bg-surface px-md text-label font-bold text-fg shadow-raised transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+        <button type="button" onClick={() => setActiveCrop({ kind: "cover", source: coverUrl, owned: false })} className="flex min-h-11 items-center gap-xs rounded-md border border-strong bg-surface px-md text-label font-bold text-fg shadow-raised transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           <PencilIcon size={16} />
           {ar ? "ضبط الصورة الحالية" : "Adjust current photo"}
         </button>
       </div>
-      {error && !activeCrop ? <p role="alert" className="absolute bottom-md start-md z-raised rounded-md bg-surface px-sm py-xs text-label text-danger shadow-raised">{error}</p> : null}
+      {error && !activeCrop ? <p role="alert" className="relative z-raised mx-md mb-md rounded-md bg-surface px-sm py-xs text-label text-danger shadow-raised tablet:absolute tablet:bottom-md tablet:start-md tablet:m-0">{error}</p> : null}
       {activeCrop ? (
         <ImageCropDialog
           image={activeCrop.source}
@@ -749,6 +753,51 @@ function ProfileActions({ locale }: { locale: Locale }) {
 }
 
 function ProfileProgress({ locale, percent, completedStepIds }: { locale: Locale; percent: number; completedStepIds: Set<string> }) {
+  return (
+    <>
+      <MobileProfileSummary locale={locale} percent={percent} completedStepIds={completedStepIds} />
+      <DesktopProfileProgress locale={locale} percent={percent} completedStepIds={completedStepIds} />
+    </>
+  );
+}
+
+/** Phones: who this profile is, how complete it is, and the four steps as one compact row. */
+function MobileProfileSummary({ locale, percent, completedStepIds }: { locale: Locale; percent: number; completedStepIds: Set<string> }) {
+  const ar = locale === "ar";
+  const { t } = useI18n();
+  return (
+    <section aria-label={ar ? "ملخص اكتمال الملف" : "Profile completion summary"} className="rounded-md border border-strong bg-surface p-md shadow-card tablet:hidden">
+      <div className="flex items-center gap-md">
+        <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-pill border-2 border-accent-solid bg-surface-2">
+          <Image src="/assets/installer-account/profile-ahmed.png" alt="" fill sizes="56px" className="object-cover" />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-body-lg font-bold text-fg">{ar ? "أحمد محمود" : "Ahmed Mahmoud"}</p>
+          <p className="truncate text-label text-fg-secondary">{t("accountType.installer_technician")}</p>
+        </div>
+      </div>
+      <div className="mt-md flex items-baseline justify-between gap-sm">
+        <span className="text-label font-medium text-fg-secondary">{ar ? "اكتمال الملف الشخصي" : "Profile completion"}</span>
+        <strong className="text-headline font-bold tabular-nums text-fg">{percent}%</strong>
+      </div>
+      <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label={ar ? "اكتمال الملف الشخصي" : "Profile completion"} className="mt-1.5 h-2.5 overflow-hidden rounded-pill bg-surface-2">
+        <div className="h-full rounded-pill bg-primary" style={{ width: `${percent}%` }} />
+      </div>
+      <ol className="mt-md grid grid-cols-4 gap-xs">
+        {PROFILE_STEPS.map((step) => (
+          <li key={step.id}>
+            <a href={`#${step.id}`} className={cn("flex min-h-12 flex-col items-center gap-1 text-center text-caption leading-tight transition-colors hover:text-fg", completedStepIds.has(step.id) ? "font-semibold text-fg" : "text-fg-secondary")}>
+              <span className={cn("grid h-6 w-6 shrink-0 place-items-center rounded-pill text-caption font-semibold", completedStepIds.has(step.id) ? "bg-primary text-primary-foreground" : "bg-surface-2 text-fg-muted")}>{step.number}</span>
+              <span className="line-clamp-2">{pick(locale, step.label)}</span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function DesktopProfileProgress({ locale, percent, completedStepIds }: { locale: Locale; percent: number; completedStepIds: Set<string> }) {
   const ar = locale === "ar";
   const circumference = 251;
   const progressLength = circumference * (percent / 100);
@@ -756,7 +805,7 @@ function ProfileProgress({ locale, percent, completedStepIds }: { locale: Locale
   const segmentGap = 5;
   const segmentColors = ["var(--primary)", "var(--accent-solid)", "var(--bronze-sem)", "var(--surface-2)"];
   return (
-    <section aria-label={ar ? "تقدم إكمال الملف" : "Profile completion progress"} className="@container rounded-md border border-strong bg-surface p-md shadow-card">
+    <section aria-label={ar ? "تقدم إكمال الملف" : "Profile completion progress"} className="@container hidden rounded-md border border-strong bg-surface p-md shadow-card tablet:block">
       <div className="grid grid-cols-[minmax(0,1fr)_4rem] items-center gap-sm">
         <h2 className="whitespace-nowrap text-caption font-semibold text-fg @[13rem]:text-label">{ar ? "مستوى إكمال الملف" : "Profile completion"}</h2>
         <div className="relative grid h-16 w-16 shrink-0 place-items-center">
@@ -795,7 +844,7 @@ function ProfileProgress({ locale, percent, completedStepIds }: { locale: Locale
 function PremiumProfileCard({ locale }: { locale: Locale }) {
   const ar = locale === "ar";
   return (
-    <section className="relative min-h-52 overflow-hidden rounded-md border border-strong bg-primary text-primary-foreground shadow-card">
+    <section className="relative hidden min-h-52 overflow-hidden rounded-md border border-strong bg-primary text-primary-foreground shadow-card tablet:block">
       <Image src="/assets/installer-account/profile-completion-hero-2026.png" alt="" fill sizes="(min-width: 1024px) 20vw, 100vw" className="object-cover object-left" />
       <div className="absolute inset-0 bg-primary/45" />
       <div className="relative flex min-h-52 flex-col items-center justify-center p-md text-center">
@@ -810,7 +859,7 @@ function PremiumProfileCard({ locale }: { locale: Locale }) {
 function QuickTipsCard({ locale }: { locale: Locale }) {
   const ar = locale === "ar";
   return (
-    <section className="rounded-md border border-strong bg-surface p-lg shadow-card">
+    <section className="hidden rounded-md border border-strong bg-surface p-lg shadow-card tablet:block">
       <h2 className="flex items-center gap-sm text-title text-bronze"><LightbulbIcon size={24} />{ar ? "نصائح سريعة" : "Quick tips"}</h2>
       <ul className="mt-md space-y-sm">
         {QUICK_TIPS.map((tip) => <li key={tip.en} className="flex items-start gap-sm text-label leading-relaxed text-fg-secondary"><span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-pill border border-bronze text-bronze"><CheckIcon size={12} /></span>{pick(locale, tip)}</li>)}

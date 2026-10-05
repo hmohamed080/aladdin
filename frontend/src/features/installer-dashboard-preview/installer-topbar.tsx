@@ -92,13 +92,17 @@ export function InstallerTopbar({
   return (
     <header
       data-app-header="card"
-      className="sticky top-0 z-header isolate flex h-14 min-w-0 shrink-0 items-center gap-2.5 border-b px-3.5 shadow-raised backdrop-blur tablet:rounded-[1.25rem] tablet:border tablet:px-5 tablet:shadow-card desktop:h-12"
+      className={cn(
+        "sticky top-0 z-header isolate flex min-w-0 shrink-0 items-center gap-2.5 border-b px-3.5 shadow-raised backdrop-blur tablet:rounded-[1.25rem] tablet:border tablet:px-5 tablet:shadow-card desktop:h-12",
+        // Preview phones: a second row carries the location, so the bar grows.
+        production ? "h-14" : "h-auto min-h-14 flex-wrap py-1.5 tablet:h-14 tablet:min-h-0 tablet:flex-nowrap tablet:py-0",
+      )}
     >
       <button
         type="button"
         onClick={onMenuClick}
         aria-label={locale === "ar" ? "فتح القائمة" : "Open menu"}
-        className="grid h-8 w-8 shrink-0 place-items-center rounded-sm text-fg-secondary hover:bg-surface-2 hover:text-fg desktop:hidden"
+        className={cn("grid shrink-0 place-items-center rounded-sm text-fg-secondary hover:bg-surface-2 hover:text-fg desktop:hidden", production ? "h-8 w-8" : "h-10 w-10")}
       >
         <MenuIcon size={19} />
       </button>
@@ -122,14 +126,14 @@ export function InstallerTopbar({
           <button
             type="button"
             aria-label={locale === "ar" ? "الإشعارات" : "Notifications"}
-            className="relative grid h-8 w-8 shrink-0 place-items-center rounded-sm text-fg-secondary hover:bg-surface-2 hover:text-fg"
+            className="relative grid h-10 w-10 shrink-0 place-items-center rounded-sm text-fg-secondary hover:bg-surface-2 hover:text-fg tablet:h-8 tablet:w-8"
           >
             <BellIcon size={18} />
             <span className="absolute end-1.5 top-1.5 h-1.5 w-1.5 rounded-pill bg-danger" aria-hidden="true" />
           </button>
         )}
 
-        <div className="hidden shrink-0 items-center gap-0.5 tablet:flex">
+        <div className={cn("shrink-0 items-center gap-0.5", production ? "hidden tablet:flex" : "flex")}>
           <ThemeSwitch current={theme} compact />
           <LanguageSwitch />
         </div>
@@ -183,6 +187,13 @@ export function InstallerTopbar({
           </div>
         ) : null}
       </div>
+      {/* Preview phones: the service area is part of the shell, not hidden. */}
+      {production ? null : (
+        <div className="order-last flex basis-full items-center gap-1.5 border-t pt-1.5 text-label font-medium text-fg-secondary tablet:hidden">
+          <MapPinIcon size={15} className="shrink-0 text-fg-muted" />
+          <span className="min-w-0 truncate">{locale === "ar" ? "الشيخ زايد، الجيزة" : "Sheikh Zayed, Giza"}</span>
+        </div>
+      )}
     </header>
   );
 }

@@ -16,7 +16,7 @@ type Icon = ComponentType<{ size?: number; className?: string }>;
 
 // Intl country names differ between Node and browser ICU versions. Keep the
 // shared control client-rendered in this preview without changing auth callers.
-const PhoneField = dynamic(() => import("@/components/ui/phone-field").then((module) => module.PhoneField), {
+const PhoneField = dynamic(() => import("@/features/installer-dashboard-preview/installer-phone-field").then((module) => module.InstallerPhoneField), {
   ssr: false,
   loading: () => <div className="h-11 rounded-md border bg-canvas" aria-busy="true" />,
 });
@@ -72,7 +72,7 @@ export function InstallerSettingsPreview({ theme, sidebarMode }: { theme: "light
     </div>
   );
 
-  return <div dir={dir} data-installer-settings-preview className={`${styles.theme} installer-surface flex min-h-dvh bg-workspace text-fg`}>
+  return <div dir={dir} data-installer-settings-preview data-installer-theme="flat" className={`${styles.theme} installer-surface flex min-h-dvh bg-workspace text-fg`}>
     <InstallerSidebar initialMode={sidebarMode} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} previewActiveItemId="settings" />
     <div className={`${INSTALLER_SHELL_GUTTER_CLASS} flex min-w-0 flex-1 flex-col gap-md pb-lg pt-2 tablet:pt-3`}>
       <InstallerTopbar theme={theme} onMenuClick={() => setMobileOpen(true)} />
@@ -86,8 +86,8 @@ export function InstallerSettingsPreview({ theme, sidebarMode }: { theme: "light
             <LabeledField htmlFor="settings-name" label={c.name}><Input id="settings-name" name="displayName" required maxLength={100} defaultValue={locale === "ar" ? "أحمد محمود" : "Ahmed Mahmoud"} autoComplete="name" /></LabeledField>
             <LabeledField htmlFor="settings-email" label={c.email} optional={c.optional}><Input id="settings-email" name="email" type="email" dir="ltr" placeholder="example@mail.com" autoComplete="email" /></LabeledField>
             <LabeledField htmlFor="settings-username" label={c.username}><Input id="settings-username" name="username" required pattern="[a-zA-Z0-9_]{3,30}" dir="ltr" defaultValue="ahmed123" aria-describedby="settings-username-hint" /><p id="settings-username-hint" className="text-caption text-fg-secondary">{c.usernameHint}</p></LabeledField>
-            <div className={styles.phone}><LabeledField htmlFor="settings-phone" label={c.phone}><PhoneField id="settings-phone" defaultCountryIso2="EG" placeholder="01012345678" onChange={(value) => setPhoneValid(value !== null)} error={submitted && !phoneValid ? c.phoneError : undefined} /></LabeledField></div>
-            {secondary && <div className={`${styles.phone} tablet:col-span-2`}><LabeledField htmlFor="settings-secondary-phone" label={c.secondaryPhone} optional={c.optional}><PhoneField id="settings-secondary-phone" defaultCountryIso2="EG" onChange={(value) => setSecondPhoneValid(value !== null)} error={submitted && !secondPhoneValid ? c.phoneError : undefined} /></LabeledField></div>}
+            <div><LabeledField htmlFor="settings-phone" label={c.phone}><PhoneField id="settings-phone" defaultCountryIso2="EG" placeholder="01012345678" onChange={(value) => setPhoneValid(value !== null)} error={submitted && !phoneValid ? c.phoneError : undefined} /></LabeledField></div>
+            {secondary && <div className="tablet:col-span-2"><LabeledField htmlFor="settings-secondary-phone" label={c.secondaryPhone} optional={c.optional}><PhoneField id="settings-secondary-phone" defaultCountryIso2="EG" onChange={(value) => setSecondPhoneValid(value !== null)} error={submitted && !secondPhoneValid ? c.phoneError : undefined} /></LabeledField></div>}
             <div className="flex flex-wrap items-center justify-between gap-md tablet:col-span-2">
               <Button type="submit">{c.save}</Button>
               <Button variant="outline" onClick={() => { setSecondary(!secondary); setSecondPhoneValid(true); setSaved(false); }}><PlusIcon size={16} />{secondary ? c.removePhone : c.addPhone}</Button>

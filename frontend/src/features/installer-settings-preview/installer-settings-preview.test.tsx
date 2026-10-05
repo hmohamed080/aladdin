@@ -7,8 +7,8 @@ import { InstallerSidebar } from "@/features/installer-dashboard-preview/install
 vi.mock("next/navigation", () => ({ usePathname: () => "/preview/installer-settings", useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/server/actions/auth", () => ({ signOut: vi.fn() }));
 vi.mock("next/dynamic", async () => {
-  const { PhoneField } = await import("@/components/ui/phone-field");
-  return { default: () => PhoneField };
+  const { InstallerPhoneField } = await import("@/features/installer-dashboard-preview/installer-phone-field");
+  return { default: () => InstallerPhoneField };
 });
 
 describe("installer settings preview", () => {
@@ -18,8 +18,8 @@ describe("installer settings preview", () => {
     for (const name of ["البيانات الشخصية", "الخصوصية والأمان", "الإشعارات", "إعدادات الحساب", "طرق تسجيل الدخول", "الجلسات النشطة", "الأجهزة الموثوقة", "استعادة الحساب", "تغيير كلمة المرور"]) expect(screen.getByRole("heading", { name })).toBeInTheDocument();
     expect(screen.getByLabelText("اسم المستخدم")).toHaveValue("ahmed123");
     expect(screen.getByLabelText("رقم الهاتف")).toHaveAttribute("type", "tel");
-    const country = screen.getAllByRole("combobox")[0]!;
-    expect(within(country).getAllByRole("option").length).toBeGreaterThan(200);
+    fireEvent.click(screen.getAllByRole("button", { name: "الدولة" })[0]!);
+    expect(within(screen.getByRole("listbox", { name: "الدولة" })).getAllByRole("option").length).toBeGreaterThan(200);
     expect(screen.getByText("Google")).toBeInTheDocument();
     expect(screen.getByText("Facebook")).toBeInTheDocument();
     expect(screen.getAllByText("متصل")).toHaveLength(2);

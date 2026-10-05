@@ -29,7 +29,7 @@ describe("InstallerProfileCompletionPreview", () => {
     expect(screen.getAllByText("إتاحة العمل").length).toBeGreaterThan(0);
     expect(screen.getAllByText("سابقة الأعمال").length).toBeGreaterThan(0);
     expect(screen.getAllByText("نطاق العمل").length).toBeGreaterThan(0);
-    expect(screen.getByText("100%")).toBeTruthy();
+    expect(screen.getAllByText("100%")).toHaveLength(2); // phone summary + tablet-up ring
     const about = screen.getByRole("textbox", { name: "تعريف عني (اختياري)" });
     expect(about).toHaveAttribute("maxlength", "250");
     expect(screen.getByText("0/250")).toBeTruthy();
@@ -41,7 +41,7 @@ describe("InstallerProfileCompletionPreview", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByRole("button", { name: "خلال أسبوع" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "خلال شهر" }));
-    expect(screen.getByText("100%")).toBeTruthy();
+    expect(screen.getAllByText("100%")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "خلال شهر" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("heading", { name: "تركيب أرضيات خشبية" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "تشطيب فيلا خاصة" })).toBeTruthy();
@@ -65,9 +65,9 @@ describe("InstallerProfileCompletionPreview", () => {
     fireEvent.click(cities.getByRole("option", { name: /مدينة أخرى/ }));
     const customCity = screen.getByRole("textbox", { name: "اسم المدينة *" });
     expect(customCity).toBeTruthy();
-    expect(screen.getByText("90%")).toBeTruthy();
+    expect(screen.getAllByText("90%")).toHaveLength(2);
     fireEvent.change(customCity, { target: { value: "سموحة" } });
-    expect(screen.getByText("100%")).toBeTruthy();
+    expect(screen.getAllByText("100%")).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "تأكيد" }));
     expect(screen.getByRole("button", { name: /المدينة.*سموحة/ })).toBeTruthy();
     expect(screen.queryByRole("textbox", { name: "اسم المدينة *" })).toBeNull();
@@ -82,9 +82,9 @@ describe("InstallerProfileCompletionPreview", () => {
     expect(screen.queryByRole("button", { name: "+ إضافة محافظة" })).toBeNull();
 
     for (const deleteButton of screen.getAllByRole("button", { name: "حذف المشروع" })) fireEvent.click(deleteButton);
-    expect(screen.getByText("90%")).toBeTruthy();
+    expect(screen.getAllByText("90%")).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: /إضافة مشروع جديد/ }));
-    expect(screen.getByText("100%")).toBeTruthy();
+    expect(screen.getAllByText("100%")).toHaveLength(2);
   });
 
   it("keeps the complete flow localized in English", () => {
