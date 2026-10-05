@@ -1,5 +1,9 @@
 # Runtime State
 
+## Local preview continuation — 2026-10-05: installer settings
+
+In `C:/Users/scorp/.codex/worktrees/installer-experience-pr-clean/aladdin` on `feature/installer-experience-pr-clean`, `/preview/installer-settings` is available for review. It contains local-only personal details, security demonstrations, notification switches and inert account actions. Its explicitly approved four-color theme is scoped to the new route; production settings/auth and Supabase remain untouched. The old installer source worktree and main checkout were not edited. No push, deploy or PR authorized. See the newest work-log entry for validation.
+
 ## Current continuation — 2026-09-28 (latest): post-rollout auth cleanup
 
 - Canonical password auth (PR #66) is **merged and smoke-tested on Production**: General = Email + Password (`/auth/sign-up`, `/auth/sign-in`, `/auth/forgot-password/*`, `/auth/finish-registration`); Installer = Phone + Password (`/installer/sign-up`, `/installer/sign-in`).
