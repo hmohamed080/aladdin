@@ -39,6 +39,8 @@ export const APPLICATION_STATUSES = [
 ] as const;
 
 const LIST_LIMIT = 100;
+/** The row cap of `listJobOpportunities`. A result shorter than this is the COMPLETE set. */
+export const OPPORTUNITY_LIST_LIMIT = LIST_LIMIT;
 
 export type OpportunityFilters = {
   /** Free text over title, description and the posting organization's name. */
@@ -88,6 +90,23 @@ export async function listJobOpportunities(
   const { data, error } = await q;
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * How many open opportunities the caller has not applied to yet.
+ *
+ * A count, not a sample: the dashboard previews only a few cards, and a
+ * headline derived from the cards on screen would claim "3" whatever the real
+ * number is. `head: true` fetches no rows. Same view, same definer, so it can
+ * never disagree with the list about what is discoverable.
+ */
+export async function countOpenJobOpportunities(supabase: DB): Promise<number> {
+  const { count, error } = await supabase
+    .from("open_job_opportunities")
+    .select("id", { count: "exact", head: true })
+    .eq("has_applied", false);
+  if (error) throw error;
+  return count ?? 0;
 }
 
 /**

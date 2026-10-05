@@ -23,7 +23,7 @@ import {
   PanelIcon,
   XIcon,
 } from "@/components/ui/icons";
-import { pick } from "./mock-data";
+import { pick } from "./localized";
 import { INSTALLER_PRIMARY_NAV, INSTALLER_QUICK_NAV, type InstallerNavItem } from "./installer-nav";
 import { signOut } from "@/server/actions/auth";
 

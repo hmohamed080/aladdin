@@ -239,6 +239,18 @@ export const ar: Messages = {
       addBusinessBody: "تملك معرضًا أو شركة توريد أو تجارة؟ أنشئها من الحساب نفسه.",
     },
     pilot: { title: "أنت ضمن النسخة التجريبية من علاء الدين" },
+    installer: {
+      opportunitiesNearby: "لديك {count} فرص عمل بالقرب منك",
+      opportunitiesNearbyOne: "لديك فرصة عمل بالقرب منك",
+      opportunitiesAvailable: "لديك {count} فرص عمل متاحة",
+      opportunitiesAvailableOne: "لديك فرصة عمل متاحة",
+      opportunitiesNone: "لا توجد فرص عمل متاحة الآن",
+      opportunitiesTitle: "فرص متاحة",
+      attention: {
+        scheduled: "مجدولة وجاهزة للبدء",
+        start: "ابدأ العمل",
+      },
+    },
     completeness: {
       title: "اكتمال الملف الشخصي",
       count: "أضفت {done} من {total} من البيانات",
@@ -3239,6 +3251,8 @@ export const ar: Messages = {
       clear: "مسح التصفية",
       myApplications: "طلباتي",
       offTradeNote: "يمكنك التقدّم لأي فرصة هنا، حتى في مهن غير المسجّلة في ملفك.",
+      budgetUnspecified: "لم يتم تحديد الميزانية",
+      viewAndApply: "عرض التفاصيل والتقديم",
     },
 
     detail: {

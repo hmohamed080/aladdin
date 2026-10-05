@@ -24,13 +24,7 @@ export function InstallerWelcome({ data, pointsHref = "#rewards" }: { data: Inst
         </p>
         <p className="mt-2 flex items-center gap-1.5 text-body text-fg-secondary">
           <span className="h-2 w-2 shrink-0 rounded-pill bg-success" aria-hidden="true" />
-          {data.nearbyOpportunitiesCount > 0
-            ? locale === "ar"
-              ? `${formatNumber(data.nearbyOpportunitiesCount, locale)} فرص جديدة بالقرب منك`
-              : `${formatNumber(data.nearbyOpportunitiesCount, locale)} new opportunities near you`
-            : locale === "ar"
-              ? "لا توجد فرص جديدة الآن"
-              : "No new opportunities right now"}
+          {data.opportunitiesLine}
         </p>
       </div>
 

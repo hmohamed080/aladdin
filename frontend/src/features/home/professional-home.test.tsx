@@ -275,8 +275,215 @@ describe("ProfessionalHome — installer_technician (shared with /preview/instal
     expect(screen.getByText("640")).toBeTruthy();
     expect(screen.getByText("4.8")).toBeTruthy();
     expect(screen.getByText("7")).toBeTruthy();
-    // The mock's fictional level/progression copy must never appear on real data.
-    expect(container.textContent).not.toMatch(/Silver Pro|Gold Pro|next level/i);
+    // The preview's fictional tiers must never appear on real data.
+    expect(container.textContent).not.toMatch(/Silver|Gold/i);
+  });
+
+  it("shows the level DERIVED from the real balance (the approved bands), not stored or invented", () => {
+    // Bands begin at 0 / 100 / 250 / 500 / 1000. 640 sits in level 4; 360 points reach level 5.
+    renderWithI18n(<ProfessionalHome {...installerProps} pointsBalance={640} />, "en");
+    expect(screen.getByText("Level 4")).toBeTruthy();
+    expect(screen.getByText("360 points to Level 5")).toBeTruthy();
+    expect(screen.getByText("640 / 1,000")).toBeTruthy();
+  });
+
+  it("derives level 1 for an empty ledger and the highest level without a next target", () => {
+    const { unmount } = renderWithI18n(<ProfessionalHome {...installerProps} pointsBalance={0} />, "en");
+    expect(screen.getByText("Level 1")).toBeTruthy();
+    expect(screen.getByText("100 points to Level 2")).toBeTruthy();
+    unmount();
+    renderWithI18n(<ProfessionalHome {...installerProps} pointsBalance={1250} />, "en");
+    expect(screen.getByText("Level 5")).toBeTruthy();
+    expect(screen.getByText("Highest level reached")).toBeTruthy();
+  });
+
+  describe("welcome sentence — only what the data proves", () => {
+    const welcome = (summary: { availableCount: number; nearbyCount: number | null }, lang: "en" | "ar" = "en") =>
+      renderWithI18n(
+        <ProfessionalHome {...installerProps} locale={lang} t={createTranslator(lang)} opportunitySummary={summary} />,
+        lang,
+      );
+
+    it("says 'near you' only when a nearby count is proven, and states that count", () => {
+      const { unmount } = welcome({ availableCount: 12, nearbyCount: 4 });
+      expect(screen.getByText("You have 4 work opportunities near you")).toBeTruthy();
+      unmount();
+      welcome({ availableCount: 12, nearbyCount: 1 });
+      expect(screen.getByText("You have 1 work opportunity near you")).toBeTruthy();
+    });
+
+    it("falls back to 'available' — never 'near you' — when location cannot be established (nearby unknown)", () => {
+      const { container } = welcome({ availableCount: 12, nearbyCount: null });
+      expect(screen.getByText("You have 12 work opportunities available")).toBeTruthy();
+      expect(container.textContent).not.toMatch(/near you/i);
+    });
+
+    it("also falls back to 'available' when a location is known but nothing nearby exists", () => {
+      const { container } = welcome({ availableCount: 12, nearbyCount: 0 });
+      expect(screen.getByText("You have 12 work opportunities available")).toBeTruthy();
+      expect(container.textContent).not.toMatch(/near you/i);
+    });
+
+    it("uses a grammatical sentence for exactly one available opening", () => {
+      welcome({ availableCount: 1, nearbyCount: null });
+      expect(screen.getByText("You have 1 work opportunity available")).toBeTruthy();
+    });
+
+    it("says there is nothing when nothing is open", () => {
+      welcome({ availableCount: 0, nearbyCount: null });
+      expect(screen.getByText("No work opportunities available right now")).toBeTruthy();
+    });
+
+    it("never calls an opening 'new': nothing records what the caller has already seen", () => {
+      for (const summary of [
+        { availableCount: 12, nearbyCount: 4 },
+        { availableCount: 12, nearbyCount: null },
+        { availableCount: 1, nearbyCount: null },
+        { availableCount: 0, nearbyCount: null },
+      ]) {
+        const { container, unmount } = welcome(summary);
+        const line = container.querySelector("p.mt-2")?.textContent ?? "";
+        expect(line).not.toMatch(/\bnew\b/i);
+        unmount();
+      }
+    });
+
+    it("words every state in Arabic", () => {
+      const { container, unmount } = welcome({ availableCount: 12, nearbyCount: 4 }, "ar");
+      expect(container.textContent).toContain("لديك");
+      expect(container.textContent).toContain("فرص عمل بالقرب منك");
+      unmount();
+      const second = welcome({ availableCount: 12, nearbyCount: null }, "ar");
+      expect(second.container.textContent).toContain("فرص عمل متاحة");
+      expect(second.container.textContent).not.toMatch(/بالقرب|جديدة/);
+      second.unmount();
+      const third = welcome({ availableCount: 1, nearbyCount: null }, "ar");
+      expect(third.container.textContent).toContain("لديك فرصة عمل متاحة");
+      third.unmount();
+      const none = welcome({ availableCount: 0, nearbyCount: null }, "ar");
+      expect(none.container.textContent).toContain("لا توجد فرص عمل متاحة الآن");
+    });
+  });
+
+  it("labels the opportunity list for what it is — every open opening, not a personalised match", () => {
+    renderWithI18n(<ProfessionalHome {...installerProps} opportunities={[opportunity()]} />, "en");
+    expect(screen.getByRole("heading", { name: "Open opportunities" })).toBeTruthy();
+    expect(screen.queryByText("Opportunities for you")).toBeNull();
+  });
+
+  it("never prints a zero budget: a missing amount reads as 'Budget not specified'", () => {
+    const { container } = renderWithI18n(
+      <ProfessionalHome {...installerProps} opportunities={[opportunity({ offered_amount: null })]} />,
+      "en",
+    );
+    expect(screen.getByText("Budget not specified")).toBeTruthy();
+    expect(container.textContent).not.toMatch(/EGP\s?0\b|\b0\s?EGP/);
+  });
+
+  it("still shows the real amount when there is one", () => {
+    const { container } = renderWithI18n(
+      <ProfessionalHome {...installerProps} opportunities={[opportunity({ offered_amount: 4500 })]} />,
+      "en",
+    );
+    expect(container.textContent).toMatch(/4,500/);
+    expect(screen.queryByText("Budget not specified")).toBeNull();
+  });
+
+  it("never attaches a stock photograph to a real opening", () => {
+    const { container } = renderWithI18n(
+      <ProfessionalHome {...installerProps} opportunities={[opportunity(), opportunity({ id: "op-2", title: "Second job" })]} />,
+      "en",
+    );
+    expect(container.querySelector("img[src*='/assets/installer-dashboard/jobs/']")).toBeNull();
+  });
+
+  it("draws the generic illustration for the opening's REAL trade when it has no photo", () => {
+    const { container } = renderWithI18n(
+      <ProfessionalHome {...installerProps} opportunities={[opportunity({ trade_key: "tiling" })]} />,
+      "en",
+    );
+    const card = container.querySelector("#opportunities li")!;
+    expect(card.querySelector('svg[data-illustration="tile"]')).toBeTruthy();
+    expect(card.querySelector("img")).toBeNull();
+  });
+
+  it("chooses the illustration from the trade alone, never from list position", () => {
+    const a = opportunity({ id: "op-a", title: "A", trade_key: "painting" });
+    const b = opportunity({ id: "op-b", title: "B", trade_key: "plumbing" });
+    const families = (list: OpportunityRow[]) => {
+      const { container, unmount } = renderWithI18n(<ProfessionalHome {...installerProps} opportunities={list} />, "en");
+      const out = [...container.querySelectorAll("#opportunities li")].map((li) => [
+        li.querySelector("h3")?.textContent,
+        li.querySelector("svg[data-illustration]")?.getAttribute("data-illustration"),
+      ]);
+      unmount();
+      return Object.fromEntries(out);
+    };
+    expect(families([a, b])).toEqual(families([b, a]));
+    expect(families([a, b])).toEqual({ A: "paint", B: "plumbing" });
+  });
+
+  it("uses the neutral toolbox for a trade the catalogue does not draw, rather than guessing", () => {
+    const { container } = renderWithI18n(
+      <ProfessionalHome {...installerProps} opportunities={[opportunity({ trade_key: "something_new" })]} />,
+      "en",
+    );
+    expect(container.querySelector('svg[data-illustration="generic"]')).toBeTruthy();
+  });
+
+  it("offers only what the backend can honour on a real card: link to the opening, no fake Apply, no unsaved heart", () => {
+    const { container } = renderWithI18n(
+      <ProfessionalHome {...installerProps} opportunities={[opportunity()]} />,
+      "en",
+    );
+    expect(screen.queryByRole("button", { name: /apply now/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /save opportunity/i })).toBeNull();
+    const link = screen.getByRole("link", { name: "View details and apply" });
+    expect(link.getAttribute("href")).toBe("/home/jobs/op-1");
+    expect(container.textContent).not.toMatch(/\d+% skill match|\bkm\b/);
+  });
+
+  it("reflects a real application: 'You applied' instead of an Apply action", () => {
+    renderWithI18n(
+      <ProfessionalHome {...installerProps} opportunities={[opportunity({ has_applied: true })]} />,
+      "en",
+    );
+    expect(screen.getByText("You applied")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "View details and apply" })).toBeNull();
+  });
+
+  it("lists only assignments the caller can start now (scheduled), linked to the assignment", () => {
+    const mk = (over: Record<string, unknown>) => ({ id: "a", job_title: "Job", poster_org_name: "Org", ...over }) as never;
+    const { container } = renderWithI18n(
+      <ProfessionalHome
+        {...installerProps}
+        assignments={[
+          mk({ id: "s1", job_title: "Scheduled job", status: "scheduled", last_progress_at: null }),
+          mk({ id: "p1", job_title: "Silent job", status: "in_progress", last_progress_at: null }),
+          mk({ id: "p2", job_title: "Reported job", status: "in_progress", last_progress_at: "2026-09-30T10:00:00Z" }),
+          mk({ id: "c1", job_title: "Finished job", status: "completed", last_progress_at: null }),
+          mk({ id: "x1", job_title: "Cancelled job", status: "cancelled", last_progress_at: null }),
+        ]}
+      />,
+      "en",
+    );
+    expect(screen.getByText("Scheduled job")).toBeTruthy();
+    expect(container.querySelector('a[href="/home/work/s1"]')).toBeTruthy();
+    expect(screen.getByText("Start work")).toBeTruthy();
+    // An in-progress job with no report yet is NOT due anything: no rule makes a report due.
+    expect(screen.queryByText("Silent job")).toBeNull();
+    expect(container.querySelector('a[href="/home/work/p1"]')).toBeNull();
+    expect(screen.queryByText("Reported job")).toBeNull();
+    expect(screen.queryByText("Finished job")).toBeNull();
+    expect(screen.queryByText("Cancelled job")).toBeNull();
+    expect(screen.queryByText("Nothing needs your action right now.")).toBeNull();
+  });
+
+  it("shows the honest empty state when nothing is actionable, even with work in progress", () => {
+    const inProgress = { id: "p1", job_title: "Silent job", status: "in_progress", last_progress_at: null, poster_org_name: "Org" } as never;
+    renderWithI18n(<ProfessionalHome {...installerProps} assignments={[inProgress]} />, "en");
+    expect(screen.getByText("Nothing needs your action right now.")).toBeTruthy();
+    expect(screen.queryByText("Silent job")).toBeNull();
   });
 
   it("does not render the old bespoke Current-work or My-network modules", () => {
@@ -298,16 +505,24 @@ describe("ProfessionalHome — installer_technician (shared with /preview/instal
     expect(screen.queryByText("Verification", { selector: "h2, h3" })).toBeNull();
   });
 
-  it("shows the profile-completion banner when completeness is under 100%, with the real percentage", () => {
+  it("shows the profile-completion banner from the database-defined completion, with its real percentage", () => {
     renderWithI18n(
-      <ProfessionalHome
-        {...installerProps}
-        data={installerData({ completeness: { percent: 62, completed: 5, total: 8, missing: ["bio"] } })}
-      />,
+      <ProfessionalHome {...installerProps} completion={{ percent: 62, missing: ["bio"] }} />,
       "en",
     );
     expect(screen.getByText("Complete your profile to appear more to showrooms")).toBeTruthy();
     expect(screen.getByText("62%")).toBeTruthy();
+  });
+
+  it("draws no banner when the database completion is unavailable or complete — it never substitutes another figure", () => {
+    // A different, locally derived percentage exists on `data.completeness`; it must not leak in.
+    const stale = installerData({ completeness: { percent: 62, completed: 5, total: 8, missing: ["bio"] } });
+    const { unmount } = renderWithI18n(<ProfessionalHome {...installerProps} data={stale} completion={null} />, "en");
+    expect(screen.queryByText("62%")).toBeNull();
+    expect(screen.queryByText("Complete your profile to appear more to showrooms")).toBeNull();
+    unmount();
+    renderWithI18n(<ProfessionalHome {...installerProps} data={stale} completion={{ percent: 100, missing: [] }} />, "en");
+    expect(screen.queryByText("Complete your profile to appear more to showrooms")).toBeNull();
   });
 
   it("renders in Arabic with no key leak", () => {

@@ -19,6 +19,7 @@ import { InstallerDashboardShell } from "@/features/installer-dashboard-preview/
 import { getServerSupabase } from "@/lib/supabase/server";
 import { listJobOpportunities } from "@/server/queries/job-opportunities";
 import { toOpportunityVMs } from "@/features/home/installer-dashboard-data";
+import { installerLocationLabel } from "@/lib/installer/opportunity-location";
 
 /** Bounded read backing the topbar's search overlay — a handful of recent,
  *  open opportunities to jump to, never the full board (see
@@ -87,7 +88,8 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
   const home = personal ? await loadPersonalHome() : null;
 
   if (home?.accountType === "installer_technician") {
-    const location = [home.professional.city, home.professional.governorate].filter(Boolean).join("، ") || null;
+    // Stored values are catalogue keys ("new-cairo"); show the place's name.
+    const location = installerLocationLabel(home.professional, locale);
     const supabase = await getServerSupabase();
     const searchOpportunities = await listJobOpportunities(supabase, { limit: SEARCH_OPPORTUNITIES_LIMIT });
     const searchJobs = toOpportunityVMs(searchOpportunities, createTranslator(locale), locale);

@@ -38,12 +38,20 @@ export function JobOpportunitiesSection({
    *  `sortable={false}` and the list simply stays in the query's own
    *  newest-first order rather than offering a control with nothing to sort. */
   sortable = true,
+  /** The section heading. Defaults to the preview's "Opportunities for you";
+   *  production passes an honest one, because a list of every open opening is
+   *  not personalised. */
+  title,
+  /** "production" strips the card's demo-only interactions — see `JobOpportunityCard`. */
+  variant = "preview",
 }: {
   opportunities: readonly InstallerOpportunityVM[];
   emptyTitle: string;
   emptyBody: string;
   viewAllHref?: string;
   sortable?: boolean;
+  title?: string;
+  variant?: "preview" | "production";
 }) {
   const { locale, dir } = useI18n();
   const [sort, setSort] = useState<SortKey>("match");
@@ -66,7 +74,7 @@ export function JobOpportunitiesSection({
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-sm bg-iris-solid/10 text-iris">
             <BriefcaseIcon size={17} />
           </span>
-          <h2 className="text-headline text-fg">{locale === "ar" ? "فرص مناسبة لي" : "Opportunities for you"}</h2>
+          <h2 className="text-headline text-fg">{title ?? (locale === "ar" ? "فرص مناسبة لي" : "Opportunities for you")}</h2>
         </div>
 
         {sortable ? (
@@ -113,7 +121,7 @@ export function JobOpportunitiesSection({
       ) : (
         <ul className="grid gap-4 tablet:grid-cols-2 desktop:grid-cols-3">
           {jobs.map((job) => (
-            <JobOpportunityCard key={job.id} job={job} />
+            <JobOpportunityCard key={job.id} job={job} variant={variant} />
           ))}
         </ul>
       )}
