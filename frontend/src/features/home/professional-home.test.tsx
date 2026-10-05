@@ -165,7 +165,15 @@ describe("ProfessionalHome", () => {
     const { container } = renderWithI18n(<ProfessionalHome {...baseProps} />, "en");
     expect(container.querySelector('a[href="/home/profile/edit"]')).toBeTruthy();
     expect(container.querySelector('a[href="/home/settings"]')).toBeTruthy();
+    // `baseProps` is an engineer — one of the five approved creators.
     expect(container.querySelector('a[href="/business/new"]')).toBeTruthy();
+  });
+
+  it("does not offer Add a business to a persona that is not entitled to create one", () => {
+    for (const accountType of ["sales", "installer_technician", "contractor", "trainee"] as const) {
+      const { container } = renderWithI18n(<ProfessionalHome {...baseProps} data={data({ accountType })} />, "en");
+      expect(container.querySelector('a[href="/business/new"]'), accountType).toBeNull();
+    }
   });
 
   it("offers the verification review link only when it needs attention", () => {

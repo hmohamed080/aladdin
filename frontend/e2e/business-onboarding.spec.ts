@@ -59,7 +59,7 @@ test.describe("business onboarding", () => {
     await toAccountType(page, "Founder One");
 
     // Choose Distributor (business track) → enters the shared business wizard.
-    await page.getByRole("button", { name: /distributor/i }).click();
+    await page.getByRole("button", { name: /^supplier/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
     await page.waitForURL(/\/onboarding\/business$/, { waitUntil: "commit" });
     await noOverflow(page);

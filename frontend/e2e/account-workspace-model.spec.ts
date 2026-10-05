@@ -81,6 +81,17 @@ async function createBusiness(page: Page, name: string, branch: string, orgType?
 // run on both viewports.
 const switcher = (page: Page) => page.locator('[data-testid="workspace-switcher"]:visible').first();
 
+// The narrow WORKPLACE control (inside /b2b) for people who work in an
+// organization without being one of the approved five categories: no "Workspace"
+// framing, no Add business, no ownership semantics. Tablet-and-up header only.
+const workplaceSwitcher = (page: Page) => page.locator('[data-testid="workplace-switcher"]:visible').first();
+// Sign-out lives in the account menu (the header's loose sign-out button is gone).
+async function signOutFromAccountMenu(page: Page) {
+  await page.getByTestId("profile-menu-trigger").click();
+  await page.getByTestId("profile-sign-out").click();
+}
+const workplaceMenu = (page: Page) => page.locator('[data-testid="workplace-menu"]:visible').first();
+
 async function openSwitcher(page: Page) {
   await switcher(page).click();
   await expect(page.locator('[data-testid="workspace-menu"]:visible').first()).toBeVisible();
@@ -102,7 +113,7 @@ test.describe("1 — new business registration", () => {
     await expect(page.getByText(/for my business/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /organization owner \/ manager/i })).toHaveCount(0);
 
-    await page.getByRole("button", { name: /^showroom \/ dealer/i }).click();
+    await page.getByRole("button", { name: /^showroom/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
     await page.waitForURL(/\/onboarding\/business$/, { waitUntil: "commit" });
 
@@ -196,14 +207,14 @@ test.describe("2 + 3 + 5 — an existing professional adds businesses", () => {
     await noOverflow(page);
 
     // Sign back in later: the same identity still holds both businesses.
-    await page.getByRole("button", { name: /sign out/i }).click();
+    await signOutFromAccountMenu(page);
     await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
     await signIn(page, request, email, /\/(b2b|home)(\/|$)/);
   });
 });
 
-test.describe("4 — consumer plus business", () => {
-  test("a consumer adds a business and keeps a working personal home", async ({ page, request }) => {
+test.describe("4 — consumer and business creation", () => {
+  test("a consumer is never offered Add business, cannot open /business/new, and keeps a working personal home", async ({ page, request }) => {
     await prefs(page, "en", "light");
     await registerToAccountType(page, request, "Mona Consumer");
 
@@ -213,15 +224,12 @@ test.describe("4 — consumer plus business", () => {
     await page.getByRole("button", { name: /skip setup for now/i }).click();
     await page.waitForURL(/\/home$/, { waitUntil: "commit" });
 
-    await openSwitcher(page);
-    await page.getByRole("menuitem", { name: /add business/i }).click();
-    await page.waitForURL(/\/business\/new$/, { waitUntil: "commit" });
-    await createBusiness(page, "Mona Supplies", "Maadi HQ", /^supplier/i);
-
-    // Business reaches /b2b…
-    await expect(page.getByText("Mona Supplies", { exact: true }).first()).toBeAttached();
-    // …and Personal still reaches /home, unchanged by owning a business.
-    await switchTo(page, /Mona Consumer|^Personal$/, /\/home$/);
+    // Creating a business is not a personal-account action: no generic switcher,
+    // no Add business, and the server-side entitlement turns the URL away.
+    await expect(page.getByTestId("workspace-switcher")).toHaveCount(0);
+    await expect(page.getByText(/add business/i)).toHaveCount(0);
+    await page.goto("/business/new");
+    await expect(page).toHaveURL(/\/home$/);
     await expect(page.getByRole("heading", { name: /welcome, mona consumer/i })).toBeVisible();
   });
 });
@@ -251,12 +259,16 @@ test.describe("7 — invitation regression", () => {
 
     // The invariant that matters: he joined the EXISTING organization. Exactly one
     // Organization A entry, no second organization, and no second identity — the
-    // switcher is read from his own memberships, so a duplicate would show here.
+    // workplace control is read from his own memberships, so a duplicate would show
+    // here. He is an employee, not one of the approved five: no generic switcher.
     await page.goto("/home");
-    await openSwitcher(page);
-    const menu = page.locator('[data-testid="workspace-menu"]:visible').first();
+    await expect(page.getByTestId("workspace-switcher")).toHaveCount(0);
+    await page.goto("/b2b");
+    await workplaceSwitcher(page).click();
+    const menu = workplaceMenu(page);
     await expect(menu.getByRole("menuitem", { name: /Nile Finishing Supplies/ })).toHaveCount(1);
     await expect(menu.getByRole("menuitem", { name: /Karim|^Personal$/ })).toHaveCount(1);
+    await expect(menu.getByText(/add business/i)).toHaveCount(0);
   });
 });
 
@@ -268,12 +280,11 @@ test.describe("6 — revoked membership", () => {
 
     // Karim (the Cairo branch rep) belongs to exactly one organization.
     await signIn(page, request, IDENTITIES.branchLimited, /\/(home|b2b)(\/|$)/);
-    await openSwitcher(page);
-    await expect(
-      page.locator('[data-testid="workspace-menu"]:visible').first().getByRole("menuitem", { name: /Nile Finishing Supplies/ }),
-    ).toBeVisible();
+    await page.goto("/b2b");
+    await workplaceSwitcher(page).click();
+    await expect(workplaceMenu(page).getByRole("menuitem", { name: /Nile Finishing Supplies/ })).toBeVisible();
     await page.keyboard.press("Escape");
-    await page.getByRole("button", { name: /sign out/i }).click();
+    await signOutFromAccountMenu(page);
     await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
 
     // Amina (the org manager) revokes him through the existing people-ops path.
@@ -286,7 +297,7 @@ test.describe("6 — revoked membership", () => {
     if (await confirm.isVisible().catch(() => false)) await confirm.click();
     await expect(page.locator("div.shadow-card").filter({ hasText: "Karim" }).first())
       .toContainText(/revoked/i);
-    await page.getByRole("button", { name: /sign out/i }).click();
+    await signOutFromAccountMenu(page);
     await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
 
     // Karim now has no business workspace: the organization is gone from the

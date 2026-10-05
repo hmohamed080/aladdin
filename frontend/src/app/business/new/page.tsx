@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
-import { getBusinessOnboardingData } from "@/server/queries/onboarding";
+import { loadBusinessCreationAccess } from "@/server/queries/business-creation-access";
 import { businessOrgTypeFromAccountType } from "@/lib/onboarding/account-types";
 import { BusinessFlow } from "@/features/onboarding/business-flow";
 
@@ -26,8 +26,13 @@ export default async function AddBusinessPage() {
   // now an optional in-app action available from either, not a gated step.
   if (!hasAppAccess(state)) redirect("/onboarding");
 
-  const data = await getBusinessOnboardingData();
+  // The server-side entitlement. Reached by URL, "add business" from the header
+  // is not the only door: a caller who is neither mid-registration, nor holding an
+  // open draft, nor in one of the approved categories is sent home. An in-progress
+  // registration is never blocked merely because they have no organization yet.
+  const { allowed, data } = await loadBusinessCreationAccess();
   if (!data) redirect("/auth/sign-in");
+  if (!allowed) redirect("/home");
 
   // A type chosen at registration carries through, so it is never asked twice.
   const presetOrgType = businessOrgTypeFromAccountType(data.selectedAccountType);

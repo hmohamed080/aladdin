@@ -122,7 +122,7 @@ export async function waitForCaptchaToken(page: Page): Promise<void> {
  * Picks an account type from the canonical sign-up dropdown by its visible
  * (localized) label. Coming Soon options are disabled and cannot be picked.
  */
-export async function selectAccountType(page: Page, label: RegExp = /tradespeople & technicians|الصنايعية/i): Promise<void> {
+export async function selectAccountType(page: Page, label: RegExp = /craftsmen|الصنايعية/i): Promise<void> {
   const select = page.locator('select[name="accountType"]');
   const value = await select.locator("option").evaluateAll(
     (options, source) => {
@@ -149,7 +149,7 @@ export async function registerWithPassword(
     email,
     username,
     displayName = "E2E Tester",
-    accountType = /tradespeople & technicians|الصنايعية/i,
+    accountType = /craftsmen|الصنايعية/i,
     landing = /\/(home|b2b)(\/|$|\?)/,
   }: { email: string; username: string; displayName?: string; accountType?: RegExp; landing?: RegExp },
 ): Promise<void> {

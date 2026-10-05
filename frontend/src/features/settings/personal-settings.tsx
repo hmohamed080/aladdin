@@ -1,3 +1,4 @@
+import { accountTypeLabel } from "@/lib/i18n/account-type-label";
 import { HomeHeader, HomeSection } from "@/features/home/parts";
 import { Card, Field } from "@/components/ui/primitives";
 import { ButtonLink, SubmitButton } from "@/components/ui/controls";
@@ -84,7 +85,7 @@ export function PersonalSettings({
             <div className="flex flex-wrap items-center justify-between gap-sm">
               <div className="min-w-0">
                 <p className="truncate text-body-lg font-medium text-fg">{home.displayName}</p>
-                <p className="text-label text-fg-muted">{t(`accountType.${home.accountType}`)}</p>
+                <p className="text-label text-fg-muted">{accountTypeLabel(t, home.accountType, "person")}</p>
               </div>
               <ButtonLink href="/home/profile/edit" variant="outline" size="sm" className="shrink-0">
                 {t("personalSettings.profile.edit")}

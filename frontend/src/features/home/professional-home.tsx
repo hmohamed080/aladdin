@@ -1,3 +1,5 @@
+import { accountTypeLabel } from "@/lib/i18n/account-type-label";
+import { canCreateBusiness } from "@/lib/workspace/entitlements";
 import type { ComponentType, ReactNode } from "react";
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/controls";
@@ -146,7 +148,7 @@ export function ProfessionalHome({
 
   const { completeness, verification } = data;
   const name = data.displayName || t("personalHome.professional.friend");
-  const persona = t(`accountType.${data.accountType}`);
+  const persona = accountTypeLabel(t, data.accountType, "person");
   const nextStep = completeness.missing[0] ? STEP_FOR_ITEM[completeness.missing[0]] : "/home/profile/edit";
   const needsVerificationAttention = verification.state === "rejected" || verification.state === "needs_more_info";
 
@@ -202,7 +204,9 @@ export function ProfessionalHome({
                   />
                 ) : null}
                 <QuickLink href="/home/settings" Icon={SettingsIcon} label={t("personalNav.settings")} />
-                <QuickLink href="/business/new" Icon={BuildingIcon} label={t("personalHome.action.addBusiness")} />
+                {canCreateBusiness({ persona: data.accountType, entries: [] }) ? (
+                  <QuickLink href="/business/new" Icon={BuildingIcon} label={t("personalHome.action.addBusiness")} />
+                ) : null}
               </ul>
             </Panel>
 

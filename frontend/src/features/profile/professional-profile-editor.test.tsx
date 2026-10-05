@@ -88,7 +88,7 @@ describe("ProfessionalProfileEditor", () => {
       <ProfessionalProfileEditor answers={answers} concreteType="installer_technician" />,
       "en",
     );
-    expect(screen.getByText("Installer / Technician")).toBeTruthy();
+    expect(screen.getByText("Craftsman")).toBeTruthy();
     expect(screen.queryByLabelText(/profession/i)).toBeNull();
   });
 

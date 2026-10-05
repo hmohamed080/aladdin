@@ -15,7 +15,6 @@ export function InstallerDashboardShell({
   displayName,
   location,
   searchJobs,
-  context,
 }: {
   children: ReactNode;
   theme: "light" | "dark";
@@ -24,7 +23,6 @@ export function InstallerDashboardShell({
   location: string | null;
   /** Real, bounded opportunities the shared search overlay can jump to. */
   searchJobs: readonly InstallerOpportunityVM[];
-  context?: ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -46,7 +44,6 @@ export function InstallerDashboardShell({
           displayName={displayName}
           location={location}
           searchJobs={searchJobs}
-          context={context}
           production
         />
         <main id="top" className={`${INSTALLER_CONTENT_FRAME_CLASS} flex flex-1 flex-col py-4 tablet:py-6 desktop:py-7`}>

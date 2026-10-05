@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { loadBusinessCreationAccess } from "@/server/queries/business-creation-access";
 import { BUSINESS_ORG_TYPES } from "@/lib/onboarding/account-types";
 import { ORG_COOKIE, BRANCH_COOKIE } from "@/lib/workspace/model";
 import type { Database } from "@/types/database.types";
@@ -51,6 +52,10 @@ export async function saveBusiness(input: BusinessInput): Promise<BusinessAction
   const parsed = businessSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "onboarding.error.saveFailed" };
   const v = parsed.data;
+
+  // The same entitlement the page applies — a direct post to this action must not
+  // be a way around it. (No RLS change: the database rules are untouched.)
+  if (!(await loadBusinessCreationAccess()).allowed) return { ok: false, code: "onboarding.error.businessNotAllowed" };
 
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("business_draft_save", {

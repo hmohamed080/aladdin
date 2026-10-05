@@ -27,19 +27,12 @@ import { menuItemClass, menuSectionLabelClass, menuSurfaceClass } from "@/compon
 export function WorkspaceSwitcher({
   entries,
   activeKey,
-  showConnectShowroom = false,
   activeDisplayName,
 }: {
   /** Personal + every organization with an active membership. */
   entries: WorkspaceEntry[];
   /** `personal`, or the active organization id. */
   activeKey: string;
-  /**
-   * Offer "connect a showroom" — the affiliation path, distinct from creating a
-   * business. Shown for a Salesperson, whose Sales tools live in someone else's
-   * business (Sprint 13).
-   */
-  showConnectShowroom?: boolean;
   /**
    * The active organization's own Arabic/English trading name, already
    * resolved for the caller's locale (see `resolveBilingualText`) — an
@@ -193,11 +186,10 @@ export function WorkspaceSwitcher({
             })}
           </ul>
 
-          {/* Two DIFFERENT things, kept visibly apart. "Add business" creates a
-              business the person will OWN. "Connect a showroom" asks to join a
-              business someone else owns — the salesperson becomes a member, never
-              its owner. Collapsing them into one entry is how a salesperson ends up
-              accidentally creating a duplicate of their own employer. */}
+          {/* This control is only mounted for the approved five categories
+              (`showsGenericWorkspaceSwitcher`), so "Add business" is always
+              theirs to offer. A Salesperson's "connect a showroom" is a different
+              concept and lives on `/home/showroom`, never here. */}
           <div className="flex flex-col border-t">
             <a
               href="/business/new"
@@ -207,16 +199,6 @@ export function WorkspaceSwitcher({
               <PlusIcon size={16} className="shrink-0" />
               {t("workspace.addBusiness")}
             </a>
-            {showConnectShowroom ? (
-              <a
-                href="/home/showroom"
-                role="menuitem"
-                className="flex w-full items-center gap-2.5 px-3 pb-2.5 text-start text-body font-medium text-accent transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:bg-surface-hover"
-              >
-                <BuildingIcon size={16} className="shrink-0" />
-                {t("workspace.connectShowroom")}
-              </a>
-            ) : null}
           </div>
         </div>
       ) : null}

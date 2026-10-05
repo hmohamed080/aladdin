@@ -152,10 +152,10 @@ test.describe("individual persona onboarding", () => {
     await noOverflow(page);
   });
 
-  test("Installer / Technician (Arabic + dark): fixed type, RTL, submits for review", async ({ page, request }) => {
+  test("Craftsman (Arabic + dark): fixed type, RTL, submits for review", async ({ page, request }) => {
     await prefs(page, "ar", "dark");
     await toAccountType(page, request);
-    await pickType(page, /فنّي تركيب/, /\/onboarding\/professional$/);
+    await pickType(page, /صنايعي/, /\/onboarding\/professional$/);
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await noOverflow(page);
 

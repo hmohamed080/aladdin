@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { accountTypeLabel } from "@/lib/i18n/account-type-label";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
@@ -54,7 +55,6 @@ export function InstallerTopbarCore({
   location,
   production = false,
   searchJobs,
-  context,
 }: {
   theme: "light" | "dark";
   onMenuClick: () => void;
@@ -64,7 +64,6 @@ export function InstallerTopbarCore({
   /** Real, bounded opportunities for the shared search overlay — required in
    *  production; the preview falls back to its own mock list. */
   searchJobs?: readonly InstallerOpportunityVM[];
-  context?: ReactNode;
 }) {
   const { locale, t } = useI18n();
   const resolvedName = displayName || (locale === "ar" ? "حسابي" : "My account");
@@ -114,8 +113,6 @@ export function InstallerTopbarCore({
 
       <div className={dividerClass} aria-hidden="true" />
 
-      {production && context ? <div className="hidden shrink-0 tablet:block">{context}</div> : null}
-
       <div className="min-w-0 flex-1">
         <InstallerSearch jobs={searchJobs ?? []} production={production} />
       </div>
@@ -156,7 +153,7 @@ export function InstallerTopbarCore({
           <span className="hidden min-w-0 max-w-32 flex-col items-start desktop:flex">
             <span className="w-full truncate text-label font-medium leading-tight text-fg">{resolvedName}</span>
             <span className="w-full truncate text-[11px] leading-tight text-fg-muted">
-              {t("accountType.installer_technician")}
+              {accountTypeLabel(t, "installer_technician", "person")}
             </span>
           </span>
           <ChevronDownIcon size={15} className="hidden shrink-0 text-fg-muted desktop:block" />

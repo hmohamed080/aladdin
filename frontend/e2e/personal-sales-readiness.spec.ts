@@ -143,8 +143,21 @@ const registerSalesperson = (page: Page, request: APIRequestContext, name: strin
     service: label((m) => m.onboarding.professional.serviceItems.showroom_advice),
   });
 
-/** The switcher is rendered twice (desktop slot + mobile row); use the visible one. */
-const switcher = (page: Page) => page.getByTestId("workspace-switcher").locator("visible=true");
+/**
+ * The GENERIC workspace switcher exists only for the approved five categories
+ * (showroom, supplier, manufacturer, importer, engineer). A Consumer, a Salesperson
+ * and a Contractor never get it — whatever memberships they hold.
+ */
+const genericSwitcher = (page: Page) => page.getByTestId("workspace-switcher");
+
+/**
+ * The narrow WORKPLACE control inside /b2b, for someone who WORKS in an organization
+ * (an affiliated salesperson, an employee) — no "Workspace" framing, no Add
+ * business, no ownership semantics. Header-only at tablet width and up; phones show
+ * the organization as a plain label.
+ */
+const workplaceSwitcher = (page: Page) => page.getByTestId("workplace-switcher").locator("visible=true");
+const isWide = (page: Page) => (page.viewportSize()?.width ?? 0) >= 768;
 
 test.describe("Sprint 13 — personal experience + sales affiliation", () => {
   /* ============================ 1. Consumer home ============================ */
@@ -183,8 +196,11 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     // The previous three prominent "coming soon" cards are gone.
     await expect(page.getByRole("heading", { name: /coming up in the pilot/i })).toHaveCount(0);
 
-    // Nothing gates the page, and the workspace switcher is reachable.
-    await expect(switcher(page)).toBeVisible();
+    // Nothing gates the page. A Consumer has NO generic workspace switcher and is
+    // never offered "Add business" — creating a business is not a personal-account
+    // action.
+    await expect(genericSwitcher(page)).toHaveCount(0);
+    await expect(page.getByText(/add business|إضافة نشاط تجاري/i)).toHaveCount(0);
     await noOverflow(page);
   });
 
@@ -331,12 +347,22 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     await expect(page.getByRole("heading", { name: /your showrooms/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /cairo ceramics showroom/i }).first()).toBeVisible();
 
-    // It appears in the workspace switcher...
-    await switcher(page).click();
-    await expect(page.getByRole("menu").getByText(/cairo ceramics showroom/i)).toBeVisible();
-    await page.getByRole("menuitem", { name: /cairo ceramics showroom/i }).click();
+    // A Salesperson has NO generic switcher on /home and is never offered Add
+    // business; the affiliation card is the way in.
+    await expect(genericSwitcher(page)).toHaveCount(0);
+    await expect(page.getByText(/add business|إضافة نشاط تجاري/i)).toHaveCount(0);
+    await page.getByRole("link", { name: /cairo ceramics showroom/i }).first().click();
     // ...and the B2B Sales workspace is reachable.
     await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
+    await expect(genericSwitcher(page)).toHaveCount(0);
+    if (isWide(page)) {
+      // Inside /b2b the narrow workplace control moves between real workplaces only.
+      await workplaceSwitcher(page).click();
+      const wp = page.getByTestId("workplace-menu");
+      await expect(wp.getByRole("menuitem", { name: /cairo ceramics showroom/i })).toBeVisible();
+      await expect(wp.getByText(/add business|workspace/i)).toHaveCount(0);
+      await page.keyboard.press("Escape");
+    }
     await page.goto("/b2b/customers");
     await expect(page).toHaveURL(/\/b2b\/customers/);
     await noOverflow(page);
@@ -408,12 +434,21 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     await signIn(page, request, email, /\/(home|b2b)(\/|$)/);
     await page.goto("/home");
     await expect(page.getByRole("heading", { name: /your showrooms/i })).toBeVisible();
-    await switcher(page).click();
-    const menu = page.getByRole("menu");
-    await expect(menu.getByText(showroom)).toBeVisible();
-    // Their relationship is Member — never Owner.
-    await expect(menu.getByText(/^member$/i).first()).toBeVisible();
-    await expect(menu.getByText(/^owner$/i)).toHaveCount(0);
+    // No generic switcher and no business creation for a Salesperson.
+    await expect(genericSwitcher(page)).toHaveCount(0);
+    await expect(page.getByText(/add business|إضافة نشاط تجاري/i)).toHaveCount(0);
+    const showroomLink = page.getByRole("link", { name: new RegExp(esc(showroom), "i") }).first();
+    await expect(showroomLink).toBeVisible();
+    await showroomLink.click();
+    await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
+    if (isWide(page)) {
+      // They belong as a MEMBER: the workplace control offers the showroom and
+      // nothing that reads as ownership or business creation.
+      await workplaceSwitcher(page).click();
+      const wp = page.getByTestId("workplace-menu");
+      await expect(wp.getByText(showroom)).toBeVisible();
+      await expect(wp.getByText(/owner|add business/i)).toHaveCount(0);
+    }
   });
 
   /* ==================== 8. Last-workspace restoration ===================== */
@@ -425,12 +460,24 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     // Mostafa owns Horizon Contracting AND is a personal contractor: both contexts.
     await signIn(page, request, "mostafa@example.test", /\/(home|b2b)(\/|$)/);
 
-    // Select Personal → sign out → back in → Personal is restored.
+    // A Contractor (not one of the approved five) has NO generic switcher on /home.
     await page.goto("/home");
-    await switcher(page).click();
-    // The Personal entry's accessible name LEADS with the display name and carries
-    // "Personal" as its subtitle, so an anchored match would never hit it.
-    await page.getByRole("menuitem").filter({ hasText: /personal/i }).click();
+    await expect(genericSwitcher(page)).toHaveCount(0);
+    await expect(page.getByText(/add business|إضافة نشاط تجاري/i)).toHaveCount(0);
+
+    // Phones show the organization as a plain label; the workplace control is a
+    // tablet-and-up header control, so the context-restoration journey runs wide.
+    await page.goto("/b2b");
+    await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
+    await expect(genericSwitcher(page)).toHaveCount(0);
+    if (!isWide(page)) {
+      await expect(page.getByText("Horizon Contracting", { exact: true }).locator("visible=true").first()).toBeVisible();
+      return;
+    }
+
+    // Select Personal → sign out → back in → Personal is restored.
+    await workplaceSwitcher(page).click();
+    await page.getByTestId("workplace-menu").getByRole("menuitem", { name: /^personal$/i }).click();
     await page.waitForURL(/\/home$/, { waitUntil: "commit" });
     await signOutFromAccountMenu(page);
     await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });
@@ -438,10 +485,9 @@ test.describe("Sprint 13 — personal experience + sales affiliation", () => {
     await expect(page).toHaveURL(/\/home$/);
 
     // Select the Business → sign out → back in → the Business is restored.
-    await switcher(page).click();
-    // EXACT accessible name: a business entry reads "<org name> <relationship>",
-    // and an anchored match keeps this off the Personal entry above it.
-    await page.getByRole("menuitem", { name: "Horizon Contracting Owner", exact: true }).click();
+    await page.goto("/b2b");
+    await workplaceSwitcher(page).click();
+    await page.getByTestId("workplace-menu").getByRole("menuitem", { name: "Horizon Contracting", exact: true }).click();
     await page.waitForURL(/\/b2b(\/|$)/, { waitUntil: "commit" });
     await signOutFromAccountMenu(page);
     await page.waitForURL(/\/auth\/sign-in/, { waitUntil: "commit" });

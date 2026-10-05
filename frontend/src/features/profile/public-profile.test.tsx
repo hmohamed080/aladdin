@@ -42,14 +42,14 @@ describe("PublicProfileView", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Ahmed Mahmoud" })).toBeTruthy();
     expect(screen.getByText("Painting and finishing")).toBeTruthy();
     expect(screen.getByText(/Twelve years of interior finishing work/)).toBeTruthy();
-    expect(screen.getByText("Installer / Technician")).toBeTruthy();
+    expect(screen.getByText("Craftsman")).toBeTruthy();
   });
 
   it("renders under the default Arabic locale", () => {
     render(<PublicProfileView profile={profile()} t={createTranslator("ar")} locale="ar" />);
     expect(screen.getByRole("heading", { level: 1, name: "Ahmed Mahmoud" })).toBeTruthy();
     // The persona label is localized, not the person's own text.
-    expect(screen.queryByText("Installer / Technician")).toBeNull();
+    expect(screen.queryByText("Craftsman")).toBeNull();
   });
 
   it("invents NOTHING the projection cannot supply", () => {

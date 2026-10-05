@@ -77,7 +77,7 @@ describe("SignInForm (Arabic-first passwordless)", () => {
     renderWithI18n(<SignInForm next="/home/points" installerSignInHref="/installer/sign-in?next=%2Fhome%2Fpoints" />);
     const link = screen.getByRole("link", { name: ar.auth.installerPhoneSignIn });
     expect(link).toHaveAttribute("href", "/installer/sign-in?next=%2Fhome%2Fpoints");
-    expect(ar.auth.installerPhoneSignIn).toBe("صنايعي أو فني؟ سجل الدخول برقم الهاتف");
+    expect(ar.auth.installerPhoneSignIn).toBe("صنايعي؟ سجل الدخول برقم الهاتف");
   });
 
   it("defaults the installer link to /installer/sign-in", () => {

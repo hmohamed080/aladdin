@@ -61,7 +61,7 @@ test.describe("shared onboarding", () => {
 
     // Coming Soon types are visible but cannot be chosen.
     await expect(page.getByRole("button", { name: /^engineer/i })).toBeDisabled();
-    await page.getByRole("button", { name: /tradespeople & technicians/i }).click();
+    await page.getByRole("button", { name: /craftsmen/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
 
     await page.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
@@ -117,7 +117,7 @@ test.describe("shared onboarding", () => {
   test("sign-out then sign-in resumes the next incomplete step", async ({ page, request }) => {
     await prefs(page, "en", "light");
     const email = await registerFreshUser(page, request);
-    await page.getByRole("button", { name: /tradespeople & technicians/i }).click();
+    await page.getByRole("button", { name: /craftsmen/i }).click();
     await page.getByRole("button", { name: /^continue$/i }).click();
     await page.waitForURL(/\/onboarding\/username$/, { waitUntil: "commit" });
 

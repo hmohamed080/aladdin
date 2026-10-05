@@ -241,7 +241,7 @@ function groupsFor(keys: readonly PersonalNavKey[]) {
   // `personalNavSections` needs the derivation input; the caller has already run
   // it, so re-group the resolved keys instead of re-deriving and risking a
   // different answer from the one the page was built with.
-  const shape: PersonalNavInput = { variant: "professional", isSalesPersona: true };
+  const shape: PersonalNavInput = { variant: "professional", isSalesPersona: true, canCreateBusiness: true };
   return personalNavSections(shape)
     .map((g) => ({ section: g.section, keys: g.keys.filter((k) => set.has(k)) }))
     .filter((g) => g.keys.length > 0);

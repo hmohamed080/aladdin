@@ -209,7 +209,7 @@ test.describe("installer phone + password auth", () => {
     const installerLink = page.locator('a[href^="/installer/"]');
     await expect(installerLink).toHaveCount(1);
     await expect(installerLink).toHaveAttribute("href", "/installer/sign-in");
-    await expect(installerLink).toHaveText("صنايعي أو فني؟ سجل الدخول برقم الهاتف");
+    await expect(installerLink).toHaveText("صنايعي؟ سجل الدخول برقم الهاتف");
   });
 
   test("/auth/sign-in forwards only a validated next to the installer link", async ({ page }) => {
