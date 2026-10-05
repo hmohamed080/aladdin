@@ -1,0 +1,26 @@
+.theme :global([data-app-header]) {
+  background: var(--canvas) !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+.theme :global(.text-white) { color: var(--soft-cream); }
+.theme :global(.border-danger) { border-color: var(--muted-terracotta); }
+.toggle {
+  position: relative;
+  min-width: 3rem;
+  min-height: 1.75rem;
+  padding: 0;
+  border: 1px solid var(--fg);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--surface-2);
+}
+.toggle[aria-checked="true"] { background: var(--muted-terracotta); }
+.thumb {
+  position: absolute;
+  inset-inline-start: 0.25rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  background: var(--fg);
+}
+.toggle[aria-checked="true"] .thumb { inset-inline-start: auto; inset-inline-end: 0.25rem; background: var(--deep-navy); }

@@ -143,7 +143,7 @@ export function InstallerSidebar({
             {INSTALLER_QUICK_NAV.filter((item) =>
               production ? Boolean(item.href) : !PREVIEW_HIDDEN_QUICK_NAV_IDS.has(item.id),
             ).map((item) => (
-              <NavRow key={item.id} item={item} locale={locale} active={false} narrow={narrow} production={production} />
+              <NavRow key={item.id} item={item} locale={locale} active={!production && item.id === previewActiveItemId} narrow={narrow} production={production} />
             ))}
           </ul>
         </nav>
@@ -472,7 +472,9 @@ function NavRow({
 
   return (
     <li>
-      {production && item.href ? (
+      {!production && item.id === "settings" ? (
+        <Link href="/preview/installer-settings" aria-current={active ? "page" : undefined} aria-label={narrow ? label : undefined} title={narrow ? label : undefined} className={className}>{content}</Link>
+      ) : production && item.href ? (
         <Link href={item.href} aria-current={active ? "page" : undefined} aria-label={narrow ? label : undefined} title={narrow ? label : undefined} className={className}>{content}</Link>
       ) : (
         <a href={item.anchor ? `#${item.anchor}` : "#"} onClick={item.anchor ? undefined : (event) => event.preventDefault()} aria-current={active ? "page" : undefined} aria-label={narrow ? label : undefined} title={narrow ? label : undefined} className={className}>{content}</a>

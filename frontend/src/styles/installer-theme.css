@@ -1,0 +1,391 @@
+/* ------------------------------------------------------------------
+ * INSTALLER / CRAFTSMAN THEME — the approved four-colour palette
+ *
+ *   Deep Navy         #071A2D   ink, shell, dark ground
+ *   Warm Sand         #D8C7A6   hairlines, secondary surfaces, muted text
+ *   Soft Cream        #F2E9D8   light ground, text on navy
+ *   Muted Terracotta  #B96F52   accent, selected, progress, focus
+ *
+ * WHY THIS FILE EXISTS
+ * The four colours live as GLOBAL tokens on feature/installer-experience-
+ * promotion (564b3af, 3036e39). This branch was cut before those commits, so
+ * its global tokens are still the pre-2026 Quartz / Basalt / Lumen / Iris /
+ * Lapis set, and every installer screen rendered in that set. Landing the
+ * palette globally would repaint every other persona, so it is instead scoped
+ * to `.installer-surface`, the one wrapper every installer preview already
+ * uses.
+ *
+ * WHY EVERY ONE OF THESE TOKENS IS REDECLARED HERE
+ * A `var()` is resolved where the property is DECLARED, not where it is used.
+ * `--canvas: var(--quartz)` on :root has already become Quartz by the time it
+ * inherits into the page, so overriding `--quartz` on `.installer-surface`
+ * alone changes nothing. The primitives AND every semantic token that reaches
+ * them (surface, fg, success, danger, series, shell …) are redeclared in the
+ * same scope so they resolve against the four colours.
+ *
+ * VALUES ARE A MECHANICAL MIRROR of the promotion branch's
+ * frontend/src/styles/tokens.css (design 2.1.0/2.1.1, design/tokens/colors.json).
+ * When the global tokens land, delete this file; nothing else needs to change.
+ *
+ * `:where()` keeps specificity at zero so a route can still override a single
+ * token without a specificity contest. Settings no longer does that: it selects
+ * the shared `flat` variant at the end of this file with
+ * `data-installer-theme="flat"` instead of carrying its own palette copy.
+ * ------------------------------------------------------------------ */
+:where(.installer-surface) {
+  --deep-navy: #071a2d;
+  --warm-sand: #d8c7a6;
+  --muted-terracotta: #b96f52;
+  --soft-cream: #f2e9d8;
+  --terracotta-ink: var(--muted-terracotta);
+  --basalt: var(--deep-navy);
+  --basalt-2: var(--deep-navy);
+  --basalt-3: var(--deep-navy);
+  --navy-edge: var(--deep-navy);
+  --navy-air: var(--warm-sand);
+  --navy-text: var(--soft-cream);
+  --navy-text-secondary: var(--warm-sand);
+  --navy-text-muted: var(--warm-sand);
+  --carbon: var(--deep-navy);
+  --carbon-2: var(--deep-navy);
+  --carbon-3: var(--deep-navy);
+  --carbon-4: var(--deep-navy);
+  --carbon-line: var(--warm-sand);
+  --carbon-line-strong: var(--warm-sand);
+  --carbon-text: var(--soft-cream);
+  --carbon-text-secondary: var(--warm-sand);
+  --carbon-text-muted: var(--warm-sand);
+  --limestone: var(--soft-cream);
+  --plaster: var(--soft-cream);
+  --sand: var(--warm-sand);
+  --quartz: var(--soft-cream);
+  --quartz-raised: var(--soft-cream);
+  --quartz-sunk: var(--warm-sand);
+  --quartz-hover: var(--warm-sand);
+  --quartz-line: var(--warm-sand);
+  --quartz-line-strong: var(--muted-terracotta);
+  --ink: var(--deep-navy);
+  --lumen: var(--muted-terracotta);
+  --lumen-deep: var(--muted-terracotta);
+  --lumen-ink: var(--terracotta-ink);
+  --lumen-soft: var(--warm-sand);
+  --bronze: var(--warm-sand);
+  --bronze-deep: var(--muted-terracotta);
+  --bronze-ink: var(--terracotta-ink);
+  --lapis: var(--deep-navy);
+  --lapis-bright: var(--warm-sand);
+  --iris: var(--muted-terracotta);
+  --iris-deep: var(--muted-terracotta);
+  --iris-ink: var(--muted-terracotta);
+  --iris-bright: var(--warm-sand);
+  --verdigris: var(--deep-navy);
+  --verdigris-deep: var(--deep-navy);
+  --ochre: var(--warm-sand);
+  --ochre-deep: var(--muted-terracotta);
+  --oxide: var(--muted-terracotta);
+  --stone: var(--deep-navy);
+  --stone-muted: var(--deep-navy);
+  --graphite: var(--deep-navy);
+  --line-dark: var(--deep-navy);
+  --line-light: var(--warm-sand);
+  --line-light-strong: var(--warm-sand);
+  --on-dark: var(--soft-cream);
+  --on-dark-secondary: var(--warm-sand);
+  --on-dark-muted: var(--warm-sand);
+  --verdigris-bright: var(--warm-sand);
+  --ochre-bright: var(--warm-sand);
+  --oxide-bright: var(--muted-terracotta);
+  --canvas: var(--quartz);
+  --surface: var(--quartz-raised);
+  --surface-2: var(--quartz-sunk);
+  --surface-hover: var(--quartz-hover);
+  --fg: var(--ink);
+  --fg-secondary: var(--stone);
+  --fg-muted: var(--stone-muted);
+  --border: var(--quartz-line);
+  --border-strong: var(--quartz-line-strong);
+  --primary: var(--ink);
+  --primary-foreground: var(--limestone);
+  --accent: var(--lumen-ink);
+  --accent-solid: var(--lumen);
+  --on-accent: var(--basalt);
+  --bronze-sem: var(--bronze-ink);
+  --lapis-sem: var(--lapis);
+  --iris-sem: var(--iris-ink);
+  --iris-solid: var(--iris);
+  --success: var(--verdigris-deep);
+  --warning: var(--ochre-deep);
+  --danger: var(--oxide);
+  --info: var(--lapis);
+  --focus: var(--lumen-ink);
+  --series-1: var(--lumen-deep);
+  --series-2: var(--lapis);
+  --series-3: var(--verdigris-deep);
+  --series-4: var(--bronze-deep);
+  --series-5: var(--oxide);
+  --series-6: var(--stone);
+  --scrollbar-thumb: var(--warm-sand);
+  --scrollbar-thumb-hover: var(--muted-terracotta);
+  --chart-grid: var(--quartz-line);
+  --shadow-raised: 0 1px 2px color-mix(in srgb, var(--deep-navy) 6%, transparent);
+  --shadow-card: 0 1px 2px color-mix(in srgb, var(--deep-navy) 4%, transparent), 0 8px 24px color-mix(in srgb, var(--deep-navy) 5%, transparent);
+  --shadow-overlay: 0 10px 30px color-mix(in srgb, var(--deep-navy) 10%, transparent), 0 2px 8px color-mix(in srgb, var(--deep-navy) 6%, transparent);
+  --field: var(--quartz);
+  --field-line: var(--warm-sand);
+  --field-fg: var(--ink);
+  --field-placeholder: var(--deep-navy);
+  --field-hint: var(--muted-terracotta);
+  --field-focus: color-mix(in srgb, var(--muted-terracotta) 38%, transparent);
+  --shell: var(--deep-navy);
+  --shell-lit: var(--deep-navy);
+  --shell-deep: var(--deep-navy);
+  --shell-2: color-mix(in srgb, var(--soft-cream) 5.5%, transparent);
+  --shell-line: color-mix(in srgb, var(--soft-cream) 9%, transparent);
+  --shell-fg: var(--navy-text);
+  --shell-fg-secondary: var(--navy-text-secondary);
+  --shell-fg-muted: var(--navy-text-muted);
+  --shell-active: color-mix(in srgb, var(--soft-cream) 14%, var(--shell-lit));
+  --shell-active-fg: var(--shell-fg);
+  --shell-gold: color-mix(in srgb, var(--warm-sand) 50%, transparent);
+  --shell-gold-soft: color-mix(in srgb, var(--warm-sand) 12%, transparent);
+  --shell-pool: var(--muted-terracotta);
+  --workspace: var(--soft-cream);
+  --workspace-line: color-mix(in srgb, var(--deep-navy) 6%, transparent);
+  --workspace-shadow: 0 1px 2px color-mix(in srgb, var(--deep-navy) 5%, transparent), 0 12px 32px -12px color-mix(in srgb, var(--deep-navy) 16%, transparent), 0 2px 8px -4px color-mix(in srgb, var(--deep-navy) 8%, transparent);
+  --workspace-mesh: var(--soft-cream);
+  --workspace-mesh-lit: var(--soft-cream);
+  --workspace-pool-cool: var(--navy-air);
+  --workspace-pool-cool-2: var(--navy-edge);
+  --workspace-pool-warm: var(--lumen);
+  /* Operational screens place many adjacent cards, controls and nested regions
+     on one workspace. Promote the strong hairline so those boundaries stay
+     visible without thicker strokes or heavier shadows. */
+  --border: var(--border-strong);
+  --field-line: var(--border-strong);
+}
+
+:where(.dark) :where(.installer-surface) {
+  --deep-navy: #071a2d;
+  --warm-sand: #d8c7a6;
+  --muted-terracotta: #b96f52;
+  --soft-cream: #f2e9d8;
+  --terracotta-ink: var(--muted-terracotta);
+  --basalt: var(--deep-navy);
+  --basalt-2: var(--deep-navy);
+  --basalt-3: var(--deep-navy);
+  --navy-edge: var(--deep-navy);
+  --navy-air: var(--warm-sand);
+  --navy-text: var(--soft-cream);
+  --navy-text-secondary: var(--warm-sand);
+  --navy-text-muted: var(--warm-sand);
+  --carbon: var(--deep-navy);
+  --carbon-2: var(--deep-navy);
+  --carbon-3: var(--deep-navy);
+  --carbon-4: var(--deep-navy);
+  --carbon-line: var(--warm-sand);
+  --carbon-line-strong: var(--warm-sand);
+  --carbon-text: var(--soft-cream);
+  --carbon-text-secondary: var(--warm-sand);
+  --carbon-text-muted: var(--warm-sand);
+  --limestone: var(--soft-cream);
+  --plaster: var(--soft-cream);
+  --sand: var(--warm-sand);
+  --quartz: var(--soft-cream);
+  --quartz-raised: var(--soft-cream);
+  --quartz-sunk: var(--warm-sand);
+  --quartz-hover: var(--warm-sand);
+  --quartz-line: var(--warm-sand);
+  --quartz-line-strong: var(--muted-terracotta);
+  --ink: var(--deep-navy);
+  --lumen: var(--muted-terracotta);
+  --lumen-deep: var(--muted-terracotta);
+  --lumen-ink: var(--terracotta-ink);
+  --lumen-soft: var(--warm-sand);
+  --bronze: var(--warm-sand);
+  --bronze-deep: var(--muted-terracotta);
+  --bronze-ink: var(--terracotta-ink);
+  --lapis: var(--deep-navy);
+  --lapis-bright: var(--warm-sand);
+  --iris: var(--muted-terracotta);
+  --iris-deep: var(--muted-terracotta);
+  --iris-ink: var(--muted-terracotta);
+  --iris-bright: var(--warm-sand);
+  --verdigris: var(--deep-navy);
+  --verdigris-deep: var(--deep-navy);
+  --ochre: var(--warm-sand);
+  --ochre-deep: var(--muted-terracotta);
+  --oxide: var(--muted-terracotta);
+  --stone: var(--deep-navy);
+  --stone-muted: var(--deep-navy);
+  --graphite: var(--deep-navy);
+  --line-dark: var(--deep-navy);
+  --line-light: var(--warm-sand);
+  --line-light-strong: var(--warm-sand);
+  --on-dark: var(--soft-cream);
+  --on-dark-secondary: var(--warm-sand);
+  --on-dark-muted: var(--warm-sand);
+  --verdigris-bright: var(--warm-sand);
+  --ochre-bright: var(--warm-sand);
+  --oxide-bright: var(--muted-terracotta);
+  --canvas: var(--deep-navy);
+  --surface: color-mix(in srgb, var(--soft-cream) 3%, var(--deep-navy));
+  --surface-2: color-mix(in srgb, var(--warm-sand) 10%, var(--deep-navy));
+  --surface-hover: color-mix(in srgb, var(--warm-sand) 14%, var(--deep-navy));
+  --fg: var(--soft-cream);
+  --fg-secondary: var(--warm-sand);
+  --fg-muted: color-mix(in srgb, var(--warm-sand) 72%, var(--deep-navy));
+  --border: color-mix(in srgb, var(--warm-sand) 20%, transparent);
+  --border-strong: color-mix(in srgb, var(--warm-sand) 48%, transparent);
+  --primary: var(--muted-terracotta);
+  --primary-foreground: var(--deep-navy);
+  --accent: var(--muted-terracotta);
+  --accent-solid: var(--muted-terracotta);
+  --on-accent: var(--deep-navy);
+  --bronze-sem: var(--muted-terracotta);
+  --lapis-sem: var(--lapis-bright);
+  --iris-sem: var(--iris-bright);
+  --iris-solid: var(--muted-terracotta);
+  --success: var(--verdigris-bright);
+  --warning: var(--ochre-bright);
+  --danger: var(--oxide-bright);
+  --info: var(--lapis-bright);
+  --focus: var(--warm-sand);
+  --series-1: var(--lumen);
+  --series-2: var(--lapis-bright);
+  --series-3: var(--verdigris-bright);
+  --series-4: var(--bronze);
+  --series-5: var(--oxide-bright);
+  --series-6: var(--carbon-text-muted);
+  --scrollbar-thumb: var(--warm-sand);
+  --scrollbar-thumb-hover: var(--muted-terracotta);
+  --chart-grid: var(--carbon-4);
+  --shadow-raised: 0 1px 2px color-mix(in srgb, var(--deep-navy) 72%, transparent);
+  --shadow-card: 0 1px 2px color-mix(in srgb, var(--deep-navy) 82%, transparent), 0 10px 26px color-mix(in srgb, var(--deep-navy) 54%, transparent);
+  --shadow-overlay: 0 10px 30px color-mix(in srgb, var(--deep-navy) 84%, transparent), 0 2px 8px color-mix(in srgb, var(--deep-navy) 62%, transparent);
+  --field: color-mix(in srgb, var(--soft-cream) 2%, var(--deep-navy));
+  --field-line: color-mix(in srgb, var(--warm-sand) 36%, transparent);
+  --field-fg: var(--soft-cream);
+  --field-placeholder: var(--warm-sand);
+  --field-hint: var(--warm-sand);
+  --field-focus: color-mix(in srgb, var(--muted-terracotta) 62%, transparent);
+  --shell: var(--deep-navy);
+  --shell-lit: var(--deep-navy);
+  --shell-deep: var(--deep-navy);
+  --shell-2: color-mix(in srgb, var(--soft-cream) 4.5%, transparent);
+  --shell-line: color-mix(in srgb, var(--soft-cream) 7%, transparent);
+  --shell-fg: var(--carbon-text);
+  --shell-fg-secondary: var(--warm-sand);
+  --shell-fg-muted: var(--warm-sand);
+  --shell-active: color-mix(in srgb, var(--soft-cream) 14%, var(--shell-lit));
+  --shell-active-fg: var(--shell-fg);
+  --shell-gold: color-mix(in srgb, var(--warm-sand) 50%, transparent);
+  --shell-gold-soft: color-mix(in srgb, var(--warm-sand) 12%, transparent);
+  --shell-pool: var(--muted-terracotta);
+  --workspace: var(--deep-navy);
+  --workspace-line: color-mix(in srgb, var(--warm-sand) 18%, transparent);
+  --workspace-shadow: 0 0 0 1px color-mix(in srgb, var(--soft-cream) 4%, transparent), 0 16px 40px -16px color-mix(in srgb, var(--deep-navy) 70%, transparent);
+  --workspace-mesh: var(--deep-navy);
+  --workspace-mesh-lit: var(--deep-navy);
+  --workspace-pool-cool: var(--navy-air);
+  --workspace-pool-cool-2: var(--navy-edge);
+  --workspace-pool-warm: var(--lumen);
+  --border: var(--border-strong);
+  --field-line: var(--border-strong);
+}
+
+/* TOUCH TARGETS — phones and tablets (below the desktop breakpoint). Icon buttons, filter/sort triggers and tabs across
+   the installer screens were 28–32px tall. Raise the floor to 40px for every
+   pressable control in the surface in one place instead of per page. Switches
+   and checkboxes are excluded: they are sized by their own track/box and are
+   reached through their label row. */
+@media (max-width: 1023px) {
+  .installer-surface :is(button, [role="button"], [role="tab"], summary):not([role="switch"], [role="checkbox"], [role="radio"]) {
+    min-height: 2.5rem;
+    min-width: 2.5rem;
+  }
+  .installer-surface select {
+    min-height: 2.75rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  /* Button-styled links (cards' "Details", "Complete profile", "View all"). */
+  .installer-surface a:is([class*="rounded"], [class*="border"], [class*="hover:underline"]) {
+    min-height: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+  }
+  /* Switches stay visually compact; the pressable area grows invisibly. */
+  .installer-surface [role="switch"] { position: relative; }
+  .installer-surface [role="switch"]::after {
+    content: "";
+    position: absolute;
+    inset: -0.5rem -0.25rem;
+  }
+}
+
+/* ------------------------------------------------------------------
+ * FLAT VARIANT — `data-installer-theme="flat"` on the `.installer-surface` root
+ *
+ * The approved Settings look maps the four colours more literally than the
+ * default installer theme above: sand hairlines, navy ink/accent, cream
+ * surfaces (flat navy in dark), no tonal steps. It used to be a route-level
+ * copy of the palette inside the settings CSS module; it lives here now so the
+ * palette has ONE source. Everything is expressed through the primitives
+ * declared above, so changing a brand colour changes it everywhere.
+ * ------------------------------------------------------------------ */
+:where(.installer-surface[data-installer-theme="flat"]) {
+  --canvas: var(--soft-cream);
+  --workspace: var(--soft-cream);
+  --surface: var(--soft-cream);
+  --surface-2: var(--warm-sand);
+  --fg: var(--deep-navy);
+  --fg-secondary: var(--deep-navy);
+  --fg-muted: var(--deep-navy);
+  --border: var(--warm-sand);
+  --border-strong: var(--warm-sand);
+  --field-line: var(--warm-sand);
+  --field: var(--canvas);
+  --field-fg: var(--fg);
+  --field-hint: var(--fg-secondary);
+  --field-placeholder: var(--fg-secondary);
+  --field-focus: var(--muted-terracotta);
+  --primary: var(--deep-navy);
+  --primary-foreground: var(--soft-cream);
+  --accent: var(--deep-navy);
+  --accent-solid: var(--muted-terracotta);
+  --on-accent: var(--deep-navy);
+  --focus: var(--muted-terracotta);
+  --danger: var(--deep-navy);
+  --shell: var(--deep-navy);
+  --shell-2: var(--deep-navy);
+  --shell-lit: var(--deep-navy);
+  --shell-deep: var(--deep-navy);
+  --shell-pool: var(--deep-navy);
+  --shell-gold: var(--warm-sand);
+  --shell-gold-soft: var(--deep-navy);
+  --lumen: var(--muted-terracotta);
+  --shell-active: var(--warm-sand);
+  --shell-active-fg: var(--deep-navy);
+  --shell-fg: var(--soft-cream);
+  --shell-fg-secondary: var(--warm-sand);
+  --shell-fg-muted: var(--warm-sand);
+  --shell-line: var(--warm-sand);
+  --iris-solid: var(--muted-terracotta);
+  --iris: var(--muted-terracotta);
+  --workspace-line: var(--warm-sand);
+}
+
+:where(.dark) :where(.installer-surface[data-installer-theme="flat"]) {
+  --canvas: var(--deep-navy);
+  --workspace: var(--deep-navy);
+  --surface: var(--deep-navy);
+  --surface-2: var(--deep-navy);
+  --fg: var(--soft-cream);
+  --fg-secondary: var(--warm-sand);
+  --fg-muted: var(--warm-sand);
+  --accent: var(--warm-sand);
+  --primary: var(--warm-sand);
+  --primary-foreground: var(--deep-navy);
+  --danger: var(--muted-terracotta);
+}

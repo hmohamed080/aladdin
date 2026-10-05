@@ -295,7 +295,7 @@ export function InstallerNetworkPreview({
                   </div>
                 </div>
 
-                <div role="tablist" aria-label={c.title} className="flex min-w-0 overflow-x-auto border-b border-strong px-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div role="tablist" aria-label={c.title} className="grid min-w-0 grid-cols-3 border-b border-strong tablet:flex tablet:overflow-x-auto tablet:px-md tablet:[scrollbar-width:none] tablet:[&::-webkit-scrollbar]:hidden">
                   {(["all", "joined", "pending"] as const).map((tab) => (
                     <button
                       key={tab}
@@ -304,12 +304,12 @@ export function InstallerNetworkPreview({
                       aria-selected={activeTab === tab}
                       onClick={() => setActiveTab(tab)}
                       className={cn(
-                        "relative shrink-0 px-md py-3 text-label font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus",
+                        "relative min-w-0 px-1 py-3 text-center text-label font-semibold leading-snug transition-colors tablet:shrink-0 tablet:px-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus",
                         activeTab === tab ? "text-fg" : "text-fg-muted hover:text-fg",
                       )}
                     >
-                      {c.tabs[tab]} <span className="tabular-nums">({c.counts[tab]})</span>
-                      {activeTab === tab ? <span className="absolute inset-x-md bottom-0 h-0.5 rounded-pill bg-primary" /> : null}
+                      {c.tabs[tab]} <span className="block tabular-nums tablet:inline">({c.counts[tab]})</span>
+                      {activeTab === tab ? <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-pill bg-primary tablet:inset-x-md" /> : null}
                     </button>
                   ))}
                 </div>

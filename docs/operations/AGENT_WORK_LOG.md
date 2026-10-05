@@ -1,5 +1,14 @@
 # Agent Work Log
 
+## Session — 2026-10-05: isolated installer settings preview
+
+- Worktree: `C:/Users/scorp/.codex/worktrees/installer-experience-pr-clean/aladdin`; branch `feature/installer-experience-pr-clean`, base `e7e7c50`.
+- Added `/preview/installer-settings`, reference-style four numbered sections, AR/EN and responsive layouts. Reuses installer shell and shared controls/PhoneField.
+- User explicitly resolved the palette conflict: use only sand `#D8C7A6`, clay `#B96F52`, cream `#F2E9D8`, navy `#071A2D` in this route-scoped preview. No global token or other-page redesign is approved.
+- Form save and switches are local only. Security/suspend/delete actions show honest preview-only feedback. Settings preview navigation uses Next Link; production destination remains `/home/settings`.
+- Validation: typecheck passed; lint passed with one existing sidebar-shell hook warning; full frontend suite passed (160 files, 1876 tests). Desktop/mobile visual verification caught shared Intl country-name hydration drift; PhoneField is client-rendered only on this preview. No production/auth/DB edits, push, deploy or PR.
+- Pending: user visual review. No promotion authorized.
+
 Append-only log of substantive agent/contributor sessions. **Newest entry first.** Each entry is a point-in-time record — it is not edited after the session it describes (later corrections go in a new entry). For durable decisions, see the [ADRs](../decisions/).
 
 ---

@@ -429,9 +429,10 @@ function WorkHistory({
         <span className="shrink-0 text-label text-fg-muted">{formatNumber(filteredRows.length, locale)} {ar ? "أعمال" : "items"}</span>
       </div>
 
-      <div className="shrink-0 border-b bg-surface">
-        <div className="flex flex-wrap items-center justify-between gap-sm border-b px-md py-sm">
-          <div className="flex min-w-0 items-center gap-sm">
+      <div className="shrink-0 border-b bg-surface max-tablet:flex max-tablet:flex-wrap max-tablet:items-center max-tablet:gap-sm max-tablet:px-md max-tablet:py-sm">
+        {/* Phones flatten the three desktop rows into one wrapping row (display: contents) so the same controls re-compose with CSS only: search + filter button, then date + sort, then the count. Saved-search and view controls are desktop-only here and live in the filters sheet on phones. */}
+        <div className="flex flex-wrap items-center justify-between gap-sm border-b px-md py-sm max-tablet:contents">
+          <div className="flex min-w-0 items-center gap-sm max-tablet:hidden">
             <button type="button" onClick={resetSearch} className="text-label font-semibold text-info hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
               {ar ? "بحث جديد" : "New search"}
             </button>
@@ -449,21 +450,21 @@ function WorkHistory({
             />
           </div>
 
-          <div className="flex min-w-0 flex-nowrap items-center gap-sm overflow-x-auto">
-            <Button size="sm" variant="outline" className="gap-1.5" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(true)}>
-              <FilterIcon size={15} />
-              {ar ? "كل الفلاتر" : "All filters"}
-              {activeDrawerFilters > 0 ? <span className="rounded-pill bg-surface-2 px-1.5 tabular-nums text-fg">{formatNumber(activeDrawerFilters, locale)}</span> : null}
+          <div className="flex min-w-0 flex-nowrap items-center gap-sm overflow-x-auto max-tablet:contents">
+            <Button size="sm" variant="outline" className="relative gap-1.5 max-tablet:order-2 max-tablet:h-11 max-tablet:w-11 max-tablet:shrink-0 max-tablet:gap-0 max-tablet:px-0" aria-expanded={filtersOpen} aria-haspopup="dialog" onClick={() => setFiltersOpen(true)}>
+              <FilterIcon size={15} className="max-tablet:h-[18px] max-tablet:w-[18px]" />
+              <span className="max-tablet:sr-only">{ar ? "كل الفلاتر" : "All filters"}</span>
+              {activeDrawerFilters > 0 ? <span className="rounded-pill bg-surface-2 px-1.5 tabular-nums text-fg max-tablet:absolute max-tablet:-end-1 max-tablet:-top-1 max-tablet:grid max-tablet:h-5 max-tablet:min-w-5 max-tablet:place-items-center max-tablet:bg-accent-solid max-tablet:px-1 max-tablet:text-caption max-tablet:font-bold max-tablet:text-on-accent">{formatNumber(activeDrawerFilters, locale)}</span> : null}
             </Button>
-            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setSaveDialogOpen(true)}>
+            <Button size="sm" variant="outline" className="gap-1.5 max-tablet:hidden" onClick={() => setSaveDialogOpen(true)}>
               <BookmarkIcon size={15} />
               {ar ? "حفظ البحث" : "Save search"}
             </Button>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-sm border-b px-md py-sm">
-          <div className="flex flex-wrap items-center gap-sm">
+        <div className="flex flex-wrap items-center justify-between gap-sm border-b px-md py-sm max-tablet:contents">
+          <div className="flex flex-wrap items-center gap-sm max-tablet:order-3 max-tablet:grid max-tablet:w-full max-tablet:grid-cols-2 max-tablet:[&>*]:min-w-0">
             <DateRangeFilter
               compact
               locale={locale}
@@ -472,7 +473,7 @@ function WorkHistory({
             />
             <MenuSelect
               compact
-              className="w-56 shrink-0"
+              className="w-full tablet:w-56 tablet:shrink-0"
               label={ar ? "الترتيب" : "Sort"}
               value={sort}
               placeholder={ar ? "اختر الترتيب" : "Select sort"}
@@ -487,7 +488,7 @@ function WorkHistory({
             />
           </div>
 
-          <div className="flex items-center gap-xs" aria-label={ar ? "طريقة العرض" : "View mode"}>
+          <div className="flex items-center gap-xs max-tablet:hidden" aria-label={ar ? "طريقة العرض" : "View mode"}>
             <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} className={cn("inline-flex min-h-8 items-center gap-1.5 rounded-sm px-sm text-label font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", view === "list" ? "bg-surface-2 text-fg" : "text-fg-muted hover:text-fg")}>
               <ListIcon size={15} />{ar ? "قائمة" : "List"}
             </button>
@@ -497,17 +498,16 @@ function WorkHistory({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-md px-md py-sm">
-          <div className="relative min-w-52 flex-1">
+        <div className="flex flex-wrap items-center gap-md px-md py-sm max-tablet:contents">
+          <div className="relative min-w-52 flex-1 max-tablet:order-1 max-tablet:min-w-0">
             <SearchIcon size={15} className="pointer-events-none absolute start-sm top-1/2 -translate-y-1/2 text-fg-muted" />
-            <Input type="search" aria-label={ar ? "البحث في الأعمال" : "Search work"} value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(WORK_PAGE_SIZE); }} placeholder={ar ? "ابحث في جميع أعمالك" : "Search all work"} className="min-h-9 py-1.5 pe-sm ps-8 text-label" />
+            <Input type="search" aria-label={ar ? "البحث في الأعمال" : "Search work"} value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(WORK_PAGE_SIZE); }} placeholder={ar ? "ابحث في جميع أعمالك" : "Search all work"} className="min-h-9 py-1.5 pe-sm ps-8 text-label max-tablet:min-h-11" />
           </div>
-          <span className="shrink-0 text-label text-fg-muted" aria-live="polite">
+          <span className="shrink-0 text-label text-fg-muted max-tablet:order-4 max-tablet:w-full" aria-live="polite">
             {ar ? `عرض ${formatNumber(paginatedRows.length, locale)} من ${formatNumber(filteredRows.length, locale)} نتيجة` : `Showing ${formatNumber(paginatedRows.length, locale)} of ${formatNumber(filteredRows.length, locale)} results`}
           </span>
         </div>
       </div>
-
       {filteredRows.length === 0 ? (
         <div className="px-md py-xl text-center">
           <p className="text-body-lg font-medium text-fg">{ar ? "لا توجد أعمال في هذه الحالة" : "No work in this status"}</p>
@@ -560,6 +560,25 @@ function WorkHistory({
       {filtersOpen ? (
         <WorkFiltersDrawer
           locale={locale}
+          phoneExtras={(
+            <div className="space-y-lg tablet:hidden">
+              <FilterField label={ar ? "عمليات البحث المحفوظة" : "Saved searches"}>
+                <MenuSelect
+                  label={ar ? "عمليات البحث المحفوظة" : "Saved searches"}
+                  value={selectedSavedId}
+                  placeholder={ar ? "المحفوظة" : "Saved"}
+                  options={savedSearches.map((item) => ({ value: item.id, label: item.name }))}
+                  onChange={(id) => { applySavedSearch(id); setFiltersOpen(false); }}
+                  onDeleteOption={deleteSavedSearch}
+                  deleteLabel={ar ? "حذف" : "Delete"}
+                />
+              </FilterField>
+              <div className="grid grid-cols-2 gap-sm">
+                <Button variant="outline" className="gap-1.5" onClick={() => { resetSearch(); setFiltersOpen(false); }}>{ar ? "بحث جديد" : "New search"}</Button>
+                <Button variant="outline" className="gap-1.5" onClick={() => { setFiltersOpen(false); setSaveDialogOpen(true); }}><BookmarkIcon size={15} />{ar ? "حفظ البحث" : "Save search"}</Button>
+              </div>
+            </div>
+          )}
           activeTab={activeTab}
           contactFilter={contactFilter}
           companyFilter={companyFilter}
@@ -636,7 +655,7 @@ export function DateRangeFilter({ locale, value, onChange, compact = false }: { 
 
   return (
     <>
-      <button type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)} className={cn("flex items-center justify-between gap-sm rounded-sm border border-strong bg-surface px-sm text-start text-fg hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", compact ? "h-10 w-44 shrink-0 text-label" : "min-h-11 w-full text-body")}>
+      <button type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)} className={cn("flex items-center justify-between gap-sm rounded-sm border border-strong bg-surface px-sm text-start text-fg hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", compact ? "h-10 w-full min-w-0 shrink-0 text-label tablet:w-44" : "min-h-11 w-full text-body")}>
         <span className="flex min-w-0 items-center gap-sm leading-normal"><CalendarIcon size={17} className="shrink-0 text-fg-muted" /><span className="truncate">{label}</span></span>
         <ChevronDownIcon size={15} className="shrink-0 text-fg-muted" />
       </button>
@@ -764,6 +783,7 @@ function WorkFiltersDrawer({
   contactFilter,
   companyFilter,
   companies,
+  phoneExtras,
   onClose,
   onApply,
 }: {
@@ -772,6 +792,8 @@ function WorkFiltersDrawer({
   contactFilter: ContactFilter;
   companyFilter: string;
   companies: readonly string[];
+  /** Phone only: the saved-search controls that are not worth permanent toolbar space. */
+  phoneExtras?: React.ReactNode;
   onClose: () => void;
   onApply: (filters: { activeTab: WorkTabKey; contactFilter: ContactFilter; companyFilter: string }) => void;
 }) {
@@ -790,13 +812,14 @@ function WorkFiltersDrawer({
 
   return (
     <div className="fixed inset-0 z-modal bg-brand-basalt/60" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <aside ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="absolute inset-y-0 end-0 flex w-full max-w-sm flex-col border-s bg-surface shadow-lg">
+      <aside ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="absolute inset-x-0 bottom-0 flex max-h-[88dvh] w-full flex-col rounded-t-lg border-t bg-surface shadow-lg tablet:inset-x-auto tablet:inset-y-0 tablet:end-0 tablet:max-h-none tablet:max-w-sm tablet:rounded-none tablet:border-s tablet:border-t-0">
         <div className="flex items-center justify-between gap-md border-b px-lg py-md">
           <h3 id={titleId} className="text-title text-fg">{ar ? "الفلاتر" : "Filters"}</h3>
           <button type="button" onClick={onClose} aria-label={ar ? "إغلاق الفلاتر" : "Close filters"} className="grid h-9 w-9 place-items-center rounded-sm text-fg-secondary hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"><XIcon size={18} /></button>
         </div>
 
         <div className="flex-1 space-y-lg overflow-y-auto px-lg py-lg">
+          {phoneExtras}
           <FilterField label={ar ? "الحالة" : "Status"}>
             <MenuSelect label={ar ? "الحالة" : "Status"} value={draftStatus} placeholder={ar ? "اختر" : "Select"} options={WORK_TABS.filter((tab) => tab.key !== "current").map((tab) => ({ value: tab.key, label: pick(locale, tab.label) }))} onChange={(next) => setDraftStatus(next as WorkTabKey)} />
           </FilterField>

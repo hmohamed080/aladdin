@@ -1,4 +1,5 @@
 @import "../styles/tokens.css";
+@import "../styles/installer-theme.css";
 
 /* ------------------------------------------------------------------
  * LANDING PAGE (`/`) — ONE SHARED VISIBLE GUTTER
@@ -39,15 +40,9 @@
   --landing-preview-gutter: clamp(24px, 3.6vw, 64px);
 }
 
-/* INSTALLER / CRAFTSMAN SURFACE SEPARATION
-   Operational installer screens place many adjacent cards, controls and nested
-   regions on one workspace. Promote the existing neutral border token inside
-   this shared scope so those boundaries remain visible in both themes without
-   thicker strokes, raw colours or heavier shadows. */
-.installer-surface {
-  --border: var(--border-strong);
-  --field-line: var(--border-strong);
-}
+/* INSTALLER / CRAFTSMAN SURFACE — the approved four-colour palette and the
+   strong-hairline separation are both defined, scoped to `.installer-surface`,
+   in ../styles/installer-theme.css. */
 
 @tailwind base;
 @tailwind components;

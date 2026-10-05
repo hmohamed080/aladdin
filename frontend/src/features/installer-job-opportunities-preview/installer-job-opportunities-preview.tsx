@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { usePhoneLayout } from "@/lib/ui/use-phone-layout";
 import { Button } from "@/components/ui/controls";
-import { FilterIcon, HeartFilledIcon, SearchIcon } from "@/components/ui/icons";
+import { FilterIcon, HeartFilledIcon, SearchIcon, XIcon } from "@/components/ui/icons";
 import { StatePanel } from "@/components/ui/primitives";
 import type { Locale } from "@/lib/i18n/locales";
 import { useI18n } from "@/lib/i18n/context";
@@ -38,9 +39,12 @@ export function InstallerJobOpportunitiesPreview({
   const { locale, dir } = useI18n();
   const ar = locale === "ar";
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const phone = usePhoneLayout();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
   const [view, setView] = useState<"grid" | "list">("grid");
+  // Phones have one presentation only: the approved single-column card layout.
+  const effectiveView = phone ? "grid" : view;
   const [savedOnly, setSavedOnly] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<string>>(
     () => new Set(PREVIEW_OPPORTUNITIES.filter((opportunity) => opportunity.initiallySaved).map((opportunity) => opportunity.id)),
@@ -57,6 +61,25 @@ export function InstallerJobOpportunitiesPreview({
     [duration, maxBudget, radiusKm, savedIds, savedOnly, sort, trades],
   );
   const visibleOpportunities = expanded ? opportunities : opportunities.slice(0, 6);
+
+  const activeFilterCount = trades.size + (maxBudget < 12000 ? 1 : 0) + (duration !== "all" ? 1 : 0) + (radiusKm !== 15 ? 1 : 0);
+
+  // Below `wide` the filters are a bottom sheet: Escape closes it and the page
+  // behind does not scroll while it is open.
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFiltersOpen(false);
+    };
+    const previousOverflow = document.body.style.overflow;
+    const narrow = window.matchMedia("(max-width: 1439px)").matches;
+    if (narrow) document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [filtersOpen]);
 
   const toggleTrade = (trade: TradeKey) => {
     setTrades((current) => {
@@ -131,11 +154,12 @@ export function InstallerJobOpportunitiesPreview({
             </div>
 
             <div className="flex items-center justify-between gap-sm">
-              <Button variant="outline" size="sm" className="gap-2 wide:hidden" onClick={() => setFiltersOpen((current) => !current)} aria-expanded={filtersOpen}>
+              <Button variant={activeFilterCount > 0 ? "primary" : "outline"} size="sm" className="w-full justify-center gap-2 tablet:w-auto wide:hidden" onClick={() => setFiltersOpen((current) => !current)} aria-expanded={filtersOpen} aria-haspopup="dialog">
                 <FilterIcon size={16} />
                 {ar ? "الفلاتر" : "Filters"}
+                {activeFilterCount > 0 ? <span className="grid h-5 min-w-5 place-items-center rounded-pill bg-primary-foreground px-1 text-caption font-bold tabular-nums text-primary">{formatCount(activeFilterCount, locale)}</span> : null}
               </Button>
-              <div className="inline-flex rounded-sm border bg-surface p-1 shadow-card" role="group" aria-label={ar ? "طريقة عرض الفرص" : "Opportunity view"}>
+              <div className="inline-flex rounded-sm border bg-surface p-1 shadow-card max-tablet:hidden" role="group" aria-label={ar ? "طريقة عرض الفرص" : "Opportunity view"}>
                 <ViewButton active={view === "grid"} label={ar ? "عرض شبكي" : "Grid view"} onClick={() => setView("grid")}><GridViewIcon /></ViewButton>
                 <ViewButton active={view === "list"} label={ar ? "عرض قائمة" : "List view"} onClick={() => setView("list")}><ListViewIcon /></ViewButton>
               </div>
@@ -158,7 +182,7 @@ export function InstallerJobOpportunitiesPreview({
                   body={ar ? "جرّب توسيع نطاق الموقع أو تعديل نوع العمل والميزانية." : "Try widening the location radius or adjusting work type and budget."}
                 />
               ) : (
-                <ul className={cn("grid gap-md", view === "grid" ? "tablet:grid-cols-2 wide:grid-cols-3" : "grid-cols-1")}>
+                <ul className={cn("grid gap-md", effectiveView === "grid" ? "tablet:grid-cols-2 wide:grid-cols-3" : "grid-cols-1")}>
                   {visibleOpportunities.map((opportunity) => (
                     <li key={opportunity.id} className="min-w-0">
                       <OpportunityCard
@@ -166,7 +190,7 @@ export function InstallerJobOpportunitiesPreview({
                         locale={locale}
                         saved={savedIds.has(opportunity.id)}
                         applied={appliedIds.has(opportunity.id)}
-                        view={view}
+                        view={effectiveView}
                         onToggleSaved={() => toggleSaved(opportunity.id)}
                         onApply={() => setAppliedIds((current) => new Set(current).add(opportunity.id))}
                       />
@@ -184,7 +208,29 @@ export function InstallerJobOpportunitiesPreview({
               ) : null}
             </section>
 
-            <div dir={dir} className={cn(filtersOpen ? "block" : "hidden", "wide:block wide:h-full wide:min-h-0 wide:overflow-hidden")}>
+            {filtersOpen ? <div className="fixed inset-0 z-modal bg-primary/50 wide:hidden" aria-hidden="true" onClick={() => setFiltersOpen(false)} /> : null}
+            <div
+              dir={dir}
+              role={filtersOpen ? "dialog" : undefined}
+              aria-label={filtersOpen ? (ar ? "تصفية النتائج" : "Filter results") : undefined}
+              className={cn(
+                filtersOpen
+                  ? "fixed inset-x-0 bottom-0 z-modal block max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-lg bg-canvas px-sm pb-[max(1rem,env(safe-area-inset-bottom))] pt-xs shadow-lg tablet:inset-x-auto tablet:end-0 tablet:start-0 tablet:mx-auto tablet:max-w-xl"
+                  : "hidden",
+                "wide:static wide:block wide:h-full wide:min-h-0 wide:max-h-none wide:overflow-hidden wide:rounded-none wide:bg-transparent wide:p-0 wide:shadow-none",
+              )}
+            >
+              <div className="relative flex h-10 items-center justify-center wide:hidden">
+                <span className="h-1 w-10 rounded-pill bg-fg-muted/50" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  aria-label={ar ? "إغلاق الفلاتر" : "Close filters"}
+                  className="absolute end-0 top-0 grid h-10 w-10 place-items-center rounded-sm text-fg-secondary hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                >
+                  <XIcon size={18} />
+                </button>
+              </div>
               <OpportunityFilters
                 locale={locale}
                 selectedTrades={trades}
