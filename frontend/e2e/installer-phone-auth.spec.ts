@@ -232,11 +232,16 @@ test.describe("installer phone + password auth", () => {
     await expect(page).toHaveURL(/\/installer\/sign-up$/);
   });
 
-  test("homepage installer tile leads to the installer phone sign-up", async ({ page }) => {
+  test("homepage installer role leads to the installer phone sign-up", async ({ page }) => {
     await page.goto("/");
-    const tile = page.locator('[data-landing-v2-part="AudienceStrip"] a[href="/installer/sign-up"]');
-    await expect(tile).toHaveCount(1);
-    await tile.click();
+    // The canonical Landing (LandingEcosystem) lists every role as a card; the
+    // installers' card opens a dialog whose register link is the phone sign-up.
+    const card = page.locator("article").filter({ hasText: /للصنايعية|Installers/ });
+    await expect(card).toHaveCount(1);
+    await card.getByRole("button").click();
+    const register = page.locator('dialog[open] a[href="/installer/sign-up"]');
+    await expect(register).toHaveCount(1);
+    await register.click();
     await expect(page).toHaveURL(/\/installer\/sign-up$/);
   });
 
