@@ -1,5 +1,14 @@
 # Runtime State
 
+## Current continuation — 2026-10-05: installer UI final polish on PR #70
+
+- Installer UI final polish is on **PR #70** (`feature/installer-ui-final-polish` → `main`), PR head `b696ac38f095769456f6afefe2bca9f087d7c908`. It is open and not yet merged.
+- Scope remains **preview/UI-only**: the approved four-colour installer theme (`frontend/src/styles/installer-theme.css`, scoped to `.installer-surface`, with a `flat` variant that Settings selects via `data-installer-theme="flat"`), the responsive/mobile pass across the installer previews, the Settings preview, and the rounded installer phone/country selector. No auth, Supabase, backend or unrelated-persona changes.
+- **Production `/home/*` routes have NOT been promoted yet.** Nothing in this PR touches them.
+- Checks on the PR: CI passed, `supabase-rls` passed, the Vercel preview is Ready.
+- Validation recorded before the PR: full frontend tests passed (161 files / 1877 tests); targeted installer tests passed (17 files / 89 tests); typecheck clean; lint 0 errors (one pre-existing `sidebar-shell.tsx` hook warning).
+- **Next phase after merge:** promote the approved installer previews to the production routes using real production data and actions instead of preview fixtures.
+
 ## Local preview continuation — 2026-10-05: installer settings
 
 In `C:/Users/scorp/.codex/worktrees/installer-experience-pr-clean/aladdin` on `feature/installer-experience-pr-clean`, `/preview/installer-settings` is available for review. It contains local-only personal details, security demonstrations, notification switches and inert account actions. Its explicitly approved four-color theme is scoped to the new route; production settings/auth and Supabase remain untouched. The old installer source worktree and main checkout were not edited. No push, deploy or PR authorized. See the newest work-log entry for validation.

@@ -28,7 +28,9 @@
  * When the global tokens land, delete this file; nothing else needs to change.
  *
  * `:where()` keeps specificity at zero so a route can still override a single
- * token (the settings preview does) without a specificity contest.
+ * token without a specificity contest. Settings no longer does that: it selects
+ * the shared `flat` variant at the end of this file with
+ * `data-installer-theme="flat"` instead of carrying its own palette copy.
  * ------------------------------------------------------------------ */
 :where(.installer-surface) {
   --deep-navy: #071a2d;
