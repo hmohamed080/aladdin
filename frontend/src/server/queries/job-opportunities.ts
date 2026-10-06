@@ -42,15 +42,35 @@ const LIST_LIMIT = 100;
 /** The row cap of `listJobOpportunities`. A result shorter than this is the COMPLETE set. */
 export const OPPORTUNITY_LIST_LIMIT = LIST_LIMIT;
 
+/** Real buckets over `expected_duration_days`. A job with no stated duration is in none of them. */
+export type OpportunityDuration = "short" | "medium" | "long";
+/** The two orderings the data can honestly support: when it was posted, and what it pays. */
+export type OpportunitySort = "newest" | "highest";
+
+/** Inclusive day bounds of each duration bucket. `long` is open-ended. */
+export const DURATION_BUCKETS: Record<OpportunityDuration, { min?: number; max?: number }> = {
+  short: { max: 2 },
+  medium: { min: 3, max: 5 },
+  long: { min: 6 },
+};
+
 export type OpportunityFilters = {
   /** Free text over title, description and the posting organization's name. */
   search?: string;
   /** A canonical trade KEY, never an id — ids differ per environment. */
   tradeKey?: string;
+  /** Several canonical trade keys (any of). Empty/undefined = ALL trades. */
+  tradeKeys?: readonly string[];
   /** The governorate exactly as some poster typed it (the column is free text). */
   governorate?: string;
   /** "no" = not yet applied, "yes" = already applied, undefined = both. */
   applied?: "yes" | "no";
+  /** Real numeric bounds on `offered_amount`, in EGP, both inclusive and both optional. No ceiling is assumed. */
+  minAmount?: number;
+  maxAmount?: number;
+  duration?: OpportunityDuration;
+  /** Defaults to "newest". */
+  sort?: OpportunitySort;
   /** Row cap. Defaults to `LIST_LIMIT` — a caller previewing a handful on
    *  `/home` (Increment 14) passes a small number rather than fetching the
    *  full page and slicing client-side. */
@@ -58,23 +78,21 @@ export type OpportunityFilters = {
 };
 
 /**
- * Open opportunities, newest published first.
+ * Open opportunities, newest published first by default.
  *
- * Ordering is `published_at desc` and nothing else: it is the one ordering that
- * is both deterministic and honest here. Every alternative the reference pack
- * shows — nearest, best paid, most applied to — needs either geography the
- * domain does not hold or a competitor count the poster's side deliberately does
- * not publish.
+ * Two orderings exist and both are honest: `published_at desc` (the default) and
+ * `offered_amount desc` (highest pay, newest breaking ties). The reference pack's
+ * other orderings — nearest, most applied to — need geography the domain does not
+ * hold or a competitor count the poster's side deliberately does not publish.
  */
 export async function listJobOpportunities(
   supabase: DB,
   f: OpportunityFilters = {},
 ): Promise<OpportunityRow[]> {
-  let q = supabase
-    .from("open_job_opportunities")
-    .select("*")
-    .order("published_at", { ascending: false })
-    .limit(f.limit ?? LIST_LIMIT);
+  let q = supabase.from("open_job_opportunities").select("*");
+  // Highest pay first, newest breaking ties; otherwise newest first and nothing else.
+  if (f.sort === "highest") q = q.order("offered_amount", { ascending: false });
+  q = q.order("published_at", { ascending: false }).limit(f.limit ?? LIST_LIMIT);
 
   const term = f.search ? sanitizeSearchTerm(f.search) : "";
   if (term) {
@@ -82,10 +100,19 @@ export async function listJobOpportunities(
       `title.ilike.%${term}%,description.ilike.%${term}%,poster_org_name.ilike.%${term}%`,
     );
   }
-  if (f.tradeKey) q = q.eq("trade_key", f.tradeKey);
+  const tradeKeys = [...new Set([...(f.tradeKey ? [f.tradeKey] : []), ...(f.tradeKeys ?? [])])];
+  if (tradeKeys.length === 1) q = q.eq("trade_key", tradeKeys[0]!);
+  else if (tradeKeys.length > 1) q = q.in("trade_key", tradeKeys);
   if (f.governorate) q = q.eq("governorate", f.governorate);
   if (f.applied === "yes") q = q.eq("has_applied", true);
   if (f.applied === "no") q = q.eq("has_applied", false);
+  if (f.minAmount !== undefined && Number.isFinite(f.minAmount)) q = q.gte("offered_amount", f.minAmount);
+  if (f.maxAmount !== undefined && Number.isFinite(f.maxAmount)) q = q.lte("offered_amount", f.maxAmount);
+  if (f.duration) {
+    const { min, max } = DURATION_BUCKETS[f.duration];
+    if (min !== undefined) q = q.gte("expected_duration_days", min);
+    if (max !== undefined) q = q.lte("expected_duration_days", max);
+  }
 
   const { data, error } = await q;
   if (error) throw error;
