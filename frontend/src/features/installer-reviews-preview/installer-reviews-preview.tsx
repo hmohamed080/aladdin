@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/icons";
 import { Badge, ProgressMeter } from "@/components/ui/primitives";
 import { Stars } from "@/features/reviews/parts";
-import { DateRangeFilter, type WorkDateRange } from "@/features/installer-my-work-preview/installer-my-work-preview";
+import { DateRangeFilter, type WorkDateRange } from "@/components/ui/date-range-filter";
 import { InstallerSidebar } from "@/features/installer-dashboard-preview/installer-sidebar";
 import { InstallerTopbar } from "@/features/installer-dashboard-preview/installer-topbar";
 import { INSTALLER_CONTENT_FRAME_CLASS, INSTALLER_SHELL_GUTTER_CLASS } from "@/features/installer-dashboard-preview/installer-layout";
