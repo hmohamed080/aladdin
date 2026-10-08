@@ -10,6 +10,7 @@ import { canCancel, canReportProgress, canStart, readyForCompletion } from "@/li
 import { JobIdentity, ReadyForConfirmation, WorkProgress } from "./parts";
 import { CancelAssignmentDialog, ReportProgressDialog, StartWorkDialog } from "./lifecycle";
 import { AssignmentReview } from "@/features/reviews/assignment-review";
+import { placeLabel } from "@/lib/installer/opportunity-location";
 
 /**
  * The installer's operational record for ONE assignment.
@@ -59,7 +60,7 @@ export function AssignmentDetail({
   const jobId = a.job_id ?? "";
   const percent = a.latest_progress_percent ?? 0;
   const ready = readyForCompletion(a);
-  const location = [a.city, a.governorate].filter(Boolean).join(", ");
+  const location = placeLabel(locale, a.governorate, a.city);
 
   return (
     <div className="flex flex-col gap-md">

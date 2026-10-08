@@ -26,8 +26,12 @@ export type WorkRowVM = {
   location: string | null;
   company: string | null;
   companyInitials: string;
-  /** Preview only — no contact data is exposed to the installer in production. */
-  contact: { phone: string; fullPhone: string; email?: string } | null;
+  /**
+   * How to reach the organization behind this work. Preview: demo values. Production:
+   * the real contact from `my_assignment_contacts` (only the assigned installer, only
+   * while in progress or completed), or null when there is nothing to reach them by.
+   */
+  contact: { name?: string | null; phone: string | null; fullPhone: string | null; email?: string | null } | null;
   /** Preview only — there is no client rating on an assignment row. */
   rating: number | null;
   /** Agreed amount in EGP. */
@@ -46,6 +50,12 @@ export type WorkRowVM = {
   lastActionMs: number | null;
   /** The row's one action. `href` null = the preview's demo notice. */
   action: { label: string; href: string | null };
+  /**
+   * The overflow (three-dot) menu — production only. Each entry is a real link the
+   * server would authorise for this row's status; entries are absent when they do
+   * not apply, and the menu is absent when it would only repeat `action`.
+   */
+  moreActions?: readonly { key: string; label: string; href: string }[];
 };
 
 export type WorkTabVM = {
@@ -54,6 +64,61 @@ export type WorkTabVM = {
   count: number;
   /** The row statuses this tab shows; null = every row. */
   statuses: readonly string[] | null;
+  /** False = reachable by URL (and the summary rail) but not offered in the filter drawer. */
+  inFilter?: boolean;
+};
+
+/** The filter state a saved search stores: flat strings, nothing transient. */
+export type WorkSearchState = {
+  tab: string;
+  q: string;
+  company: string;
+  from: string;
+  to: string;
+  contact: string;
+  sort: string;
+};
+
+export type SavedWorkSearch = { id: string; name: string; state: WorkSearchState };
+
+/**
+ * SERVER-DRIVEN MODE (production). When the route passes `remote`, the View neither
+ * filters, orders, counts nor pages the rows it is given: they ARE the requested range
+ * of the filtered set, `total` is the database's exact filtered count, and every
+ * control reports a new state (a new URL) instead of changing local state. The preview
+ * passes no `remote` and keeps filtering its fixtures in the browser.
+ */
+export type WorkRemote = {
+  /** The URL's state: tab, search, company, planned range, contact and sort. */
+  state: WorkSearchState;
+  /** A changed filter or sort: the route starts again from the first page. */
+  onStateChange: (next: WorkSearchState) => void;
+  /** The EXACT number of assignments matching `state`. */
+  total: number;
+  /** The organizations to offer in the Company filter (from the database, not from the rows on screen). */
+  companies: readonly string[];
+  /** There are more matching rows than the ones given. */
+  hasMore: boolean;
+  /** Fewer rows than are currently shown could be shown. */
+  canShowFewer: boolean;
+  onShowMore: () => void;
+  onShowFewer: () => void;
+  /** A new state, or the next page, is being fetched. */
+  pending?: boolean;
+  /** The last request for another page failed (the rows already shown are untouched). */
+  loadError?: boolean;
+};
+
+/**
+ * Where saved searches live. The preview keeps its own in-memory list (it has no
+ * backend); production passes a store backed by `saved_searches`, so what the View
+ * lists, applies and deletes is what the database holds. Both return a finished,
+ * localised error message instead of throwing.
+ */
+export type SavedSearchStore = {
+  items: readonly SavedWorkSearch[];
+  save: (input: { mode: "new" | "update"; id: string | null; name: string; state: WorkSearchState }) => Promise<{ ok: true; id: string } | { ok: false; message: string }>;
+  remove: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
 };
 
 export type ActiveWorkVM = {

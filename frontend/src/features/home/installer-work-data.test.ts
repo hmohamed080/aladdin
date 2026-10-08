@@ -7,11 +7,16 @@ import {
   deliveryHint,
   initialsOf,
   rowAction,
+  rowMoreActions,
+  contactsOf,
+  filtersToState,
+  stateToFilters,
   tabFromState,
   toActiveWorkVM,
   toWorkRowVM,
   toWorkRowVMs,
   toWorkTabs,
+  workResultsTitle,
 } from "./installer-work-data";
 
 const t = createTranslator("en");
@@ -78,7 +83,7 @@ describe("toWorkRowVM — the four real statuses only", () => {
     });
   });
 
-  it("never supplies contact details or a client rating", () => {
+  it("never supplies contact details (the read model holds none) and never a rating without a real review", () => {
     const vm = toWorkRowVM(row(), t, "en", NOW)!;
     expect(vm.contact).toBeNull();
     expect(vm.rating).toBeNull();
@@ -119,23 +124,76 @@ describe("row actions are offered only where the server would authorise them", (
   });
 });
 
+describe("overflow menu — every action that genuinely applies, and no other", () => {
+  const menu = (over: Partial<MyAssignmentRow>, review: { rating: number } | null = null) =>
+    rowMoreActions(row(over), "en", review).map((a) => a.label);
+
+  it("in progress: View details, and Update progress because canReportProgress", () => {
+    expect(menu({ status: "in_progress" })).toEqual(["View details", "Update progress"]);
+  });
+  it("completed: View details, and View rating only when a REAL review exists", () => {
+    expect(menu({ status: "completed" })).toEqual(["View details"]);
+    expect(menu({ status: "completed" }, { rating: 4 })).toEqual(["View details", "View rating"]);
+  });
+  it("scheduled: View details and Start work (canStart)", () => {
+    expect(menu({ status: "scheduled" })).toEqual(["View details", "Start work"]);
+  });
+  it("cancelled: View details only, even if a review were passed", () => {
+    expect(menu({ status: "cancelled" })).toEqual(["View details"]);
+    expect(menu({ status: "cancelled" }, { rating: 5 })).toEqual(["View details"]);
+  });
+  it("a rating is never offered for work that is not completed", () => {
+    expect(menu({ status: "in_progress" }, { rating: 5 })).not.toContain("View rating");
+  });
+  it("every entry is a link to the assignment's own page", () => {
+    expect(rowMoreActions(row({ status: "completed" }), "en", { rating: 5 }).map((a) => a.href)).toEqual(["/home/work/a-1", "/home/work/a-1"]);
+  });
+  it("carries the real rating onto the row, and null without a review", () => {
+    expect(toWorkRowVMs([row({ status: "completed" })], t, "en", NOW, new Map([["a-1", { rating: 4 }]]))[0]!.rating).toBe(4);
+    expect(toWorkRowVMs([row({ status: "completed" })], t, "en", NOW)[0]!.rating).toBeNull();
+  });
+});
+
+describe("assignment contact — real or absent", () => {
+  const contact = { org_name: "Al Alwan Showroom", contact_name: "Mostafa Bakr", phone: "+201000000001", email: "m@example.test" };
+  const vm = (c: Parameters<typeof toWorkRowVMs>[5] extends ReadonlyMap<string, infer V> | undefined ? V | null : never) =>
+    toWorkRowVMs([row({ id: "a-1" })], t, "en", NOW, new Map(), c ? new Map([["a-1", c]]) : new Map())[0]!;
+
+  it("shows the released contact exactly", () => {
+    expect(vm(contact).contact).toEqual({ name: "Mostafa Bakr", phone: "+201000000001", fullPhone: "+201000000001", email: "m@example.test" });
+  });
+  it("is null when the database released none — never a placeholder", () => {
+    expect(vm(null).contact).toBeNull();
+  });
+  it("is null when the row carries neither a phone nor an e-mail", () => {
+    expect(vm({ ...contact, phone: null, email: null }).contact).toBeNull();
+  });
+  it("an e-mail alone is a real contact; so is a phone alone", () => {
+    expect(vm({ ...contact, phone: null }).contact).toMatchObject({ phone: null, email: "m@example.test" });
+    expect(vm({ ...contact, email: null }).contact).toMatchObject({ phone: "+201000000001", email: null });
+  });
+});
+
 describe("tabs", () => {
   const counts = countAssignmentsByStatus([
     row({ status: "scheduled" }), row({ status: "in_progress" }), row({ status: "in_progress" }), row({ status: "completed" }),
   ]);
   const tabs = toWorkTabs(counts, t);
 
-  it("is all + current + the four real statuses — no paused, review or archived", () => {
-    expect(tabs.map((x) => x.key)).toEqual([ALL_TAB, "current", "scheduled", "in_progress", "completed", "cancelled"]);
-    expect(tabs.map((x) => x.key)).not.toContain("paused");
-    expect(tabs.map((x) => x.key)).not.toContain("review");
-    expect(tabs.map((x) => x.key)).not.toContain("archived");
-    expect(tabs.map((x) => x.key)).not.toContain("accepted");
+  it("offers all + in progress + completed in the filter, and keeps current / scheduled / cancelled reachable but out of it", () => {
+    expect(tabs.map((x) => x.key)).toEqual([ALL_TAB, "in_progress", "completed", "current", "scheduled", "cancelled"]);
+    expect(tabs.filter((x) => x.inFilter !== false).map((x) => x.key)).toEqual([ALL_TAB, "in_progress", "completed"]);
+    for (const k of ["paused", "review", "archived", "accepted"]) expect(tabs.map((x) => x.key)).not.toContain(k);
+  });
+
+  it("'All' is exactly the in-progress + completed work — scheduled and cancelled are not in it", () => {
+    expect(tabs.find((x) => x.key === ALL_TAB)!.statuses).toEqual(["in_progress", "completed"]);
+    expect(tabs.find((x) => x.key === ALL_TAB)!.count).toBe(3);
   });
 
   it("counts come from the same rows, and current is scheduled + in progress", () => {
     const by = Object.fromEntries(tabs.map((x) => [x.key, x.count]));
-    expect(by).toEqual({ all: 4, current: 3, scheduled: 1, in_progress: 2, completed: 1, cancelled: 0 });
+    expect(by).toEqual({ all: 3, in_progress: 2, completed: 1, current: 3, scheduled: 1, cancelled: 0 });
   });
 
   it("uses the real status labels, not a second vocabulary", () => {
@@ -144,7 +202,6 @@ describe("tabs", () => {
 
   it("'current' is a presentation composite over two real statuses", () => {
     expect(tabs.find((x) => x.key === "current")!.statuses).toEqual(["scheduled", "in_progress"]);
-    expect(tabs.find((x) => x.key === ALL_TAB)!.statuses).toBeNull();
   });
 
   it("?state= resolves to a real tab, or all", () => {
@@ -153,6 +210,41 @@ describe("tabs", () => {
     expect(tabFromState("completed")).toBe("completed");
     expect(tabFromState("paused")).toBe("all");
     expect(tabFromState("archived")).toBe("all");
+  });
+
+  it("an out-of-list view is titled as such; the default views keep 'All your work'", () => {
+    expect(workResultsTitle(ALL_TAB, tabs, "en")).toBeUndefined();
+    expect(workResultsTitle("completed", tabs, "en")).toBeUndefined();
+    expect(workResultsTitle("scheduled", tabs, "en")).toBe(`Your work — ${t("jobs.assignmentStatus.scheduled" as never)}`);
+  });
+});
+
+describe("saved-search state <-> stored filters", () => {
+  it("round-trips, storing only non-blank values", () => {
+    const state = { tab: "completed", q: "villa", company: "", from: "2026-10-01", to: "", contact: "available", sort: "last-action" };
+    const stored = stateToFilters(state);
+    expect(stored).toEqual({ tab: "completed", q: "villa", from: "2026-10-01", contact: "available", sort: "last-action" });
+    expect(filtersToState(stored)).toEqual(state);
+  });
+  it("fills every missing key with its default", () => {
+    expect(filtersToState({})).toEqual({ tab: "all", q: "", company: "", from: "", to: "", contact: "all", sort: "default" });
+  });
+  it("never trusts a stored value this page no longer offers", () => {
+    expect(filtersToState({ tab: "archived", contact: "phone-only", sort: "last-added", from: "soon" })).toEqual({ tab: "all", q: "", company: "", from: "", to: "", contact: "all", sort: "default" });
+  });
+});
+
+describe("contactsOf — the contact the database released with a page of rows", () => {
+  const page = (over: Record<string, unknown>) =>
+    ({ id: "a-1", poster_org_name: "Horizon", contact_name: null, contact_phone: null, contact_email: null, ...over }) as never;
+
+  it("keys each released contact by its assignment", () => {
+    const map = contactsOf([page({ contact_name: "Mostafa", contact_phone: "+201000000001" }), page({ id: "a-2", contact_email: "m@example.test" })]);
+    expect(map.get("a-1")).toEqual({ org_name: "Horizon", contact_name: "Mostafa", phone: "+201000000001", email: null });
+    expect(map.get("a-2")).toMatchObject({ phone: null, email: "m@example.test" });
+  });
+  it("has no entry for a row with no contact — nothing is invented", () => {
+    expect(contactsOf([page({})]).size).toBe(0);
   });
 });
 

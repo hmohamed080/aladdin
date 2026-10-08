@@ -2,15 +2,15 @@ import type { Locale } from "@/lib/i18n/locales";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import { formatDate, formatRelativeTime } from "@/lib/ui/format";
 import { formatEgp } from "@/lib/ui/egp-format";
-import type { ActiveWorkVM, WorkRowVM, WorkTabVM, WorkTone } from "@/features/installer-my-work-preview/view-model";
+import type { ActiveWorkVM, WorkRowVM, WorkSearchState, WorkTabVM, WorkTone } from "@/features/installer-my-work-preview/view-model";
 import {
-  ASSIGNMENT_STATUSES,
   CURRENT_STATUSES,
   canReportProgress,
   canStart,
   type JobAssignmentStatus,
 } from "@/lib/work/assignment-state";
-import type { MyAssignmentRow } from "@/server/queries/job-assignments";
+import { ALL_TAB, CURRENT_TAB, WORK_LIST_STATUSES, sanitizeWorkState } from "@/lib/installer/work-board-params";
+import type { MyAssignmentRow, WorkPageRow } from "@/server/queries/job-assignments";
 
 /**
  * THE REAL SIDE OF THE MY WORK DATA-ADAPTER BOUNDARY.
@@ -38,8 +38,8 @@ import type { MyAssignmentRow } from "@/server/queries/job-assignments";
  * Not `server-only`: a pure transform of rows already fetched.
  */
 
-export const ALL_TAB = "all";
-export const CURRENT_TAB = "current";
+// The tab vocabulary and the meaning of "All your work" live with the URL state they belong to.
+export { ALL_TAB, CURRENT_TAB, WORK_LIST_STATUSES, tabFromState } from "@/lib/installer/work-board-params";
 
 const TONES: Record<JobAssignmentStatus, WorkTone> = {
   scheduled: "info",
@@ -95,7 +95,44 @@ export function rowAction(a: MyAssignmentRow, locale: Locale): { label: string; 
   return { label: locale === "ar" ? "عرض" : "View", href };
 }
 
-export function toWorkRowVM(a: MyAssignmentRow, t: TranslateFn, locale: Locale, now: Date = new Date()): WorkRowVM | null {
+/** The review the installer received for a completed assignment, as read from `job_reviews`. */
+export type AssignmentReview = { rating: number };
+
+/** How to reach the organization behind an assignment, as read from `my_assignment_contacts`. */
+export type AssignmentContact = { org_name: string | null; contact_name: string | null; phone: string | null; email: string | null };
+
+/**
+ * The three-dot menu: every action that genuinely applies to this row, each a link
+ * to the assignment's own page — which owns the real start / progress dialogs and
+ * shows the review. Nothing is offered that the server would refuse:
+ *   View details     always
+ *   Start work       only when `canStart` (scheduled)
+ *   Update progress  only when `canReportProgress` (in progress)
+ *   View rating      only when a REAL review of this completed work exists
+ */
+export function rowMoreActions(
+  a: MyAssignmentRow,
+  locale: Locale,
+  review: AssignmentReview | null,
+): { key: string; label: string; href: string }[] {
+  const ar = locale === "ar";
+  const href = `/home/work/${a.id}`;
+  return [
+    { key: "details", label: ar ? "عرض التفاصيل" : "View details", href },
+    ...(canStart(a) ? [{ key: "start", label: ar ? "ابدأ الشغل" : "Start work", href }] : []),
+    ...(canReportProgress(a) ? [{ key: "update", label: ar ? "تحديث التقدم" : "Update progress", href }] : []),
+    ...(a.status === "completed" && review ? [{ key: "rating", label: ar ? "عرض التقييم" : "View rating", href }] : []),
+  ];
+}
+
+export function toWorkRowVM(
+  a: MyAssignmentRow,
+  t: TranslateFn,
+  locale: Locale,
+  now: Date = new Date(),
+  review: AssignmentReview | null = null,
+  contact: AssignmentContact | null = null,
+): WorkRowVM | null {
   // Every view column is nullable to the type generator — a row without an id or a
   // title is skipped rather than drawn half blank.
   if (!a.id || !a.job_title) return null;
@@ -107,8 +144,12 @@ export function toWorkRowVM(a: MyAssignmentRow, t: TranslateFn, locale: Locale, 
     location: place(a),
     company: a.poster_org_name || null,
     companyInitials: initialsOf(a.poster_org_name),
-    contact: null,
-    rating: null,
+    // Real, or null: only when the database released a contact for this assignment.
+    contact: contact && (contact.phone || contact.email)
+      ? { name: contact.contact_name, phone: contact.phone, fullPhone: contact.phone, email: contact.email }
+      : null,
+    // Real, from `job_reviews` — and only for a completed assignment that has one.
+    rating: review?.rating ?? null,
     value: a.agreed_amount,
     status: a.status ?? "",
     statusLabel: statusLabel(a.status, t),
@@ -120,36 +161,50 @@ export function toWorkRowVM(a: MyAssignmentRow, t: TranslateFn, locale: Locale, 
     createdAtMs: ms(a.created_at),
     lastActionMs: ms(a.last_progress_at),
     action: rowAction(a, locale),
+    moreActions: rowMoreActions(a, locale, review),
   };
 }
 
-export function toWorkRowVMs(rows: readonly MyAssignmentRow[], t: TranslateFn, locale: Locale, now: Date = new Date()): WorkRowVM[] {
+export function toWorkRowVMs(
+  rows: readonly MyAssignmentRow[],
+  t: TranslateFn,
+  locale: Locale,
+  now: Date = new Date(),
+  reviews: ReadonlyMap<string, AssignmentReview> = new Map(),
+  contacts: ReadonlyMap<string, AssignmentContact> = new Map(),
+): WorkRowVM[] {
   return rows.flatMap((row) => {
-    const vm = toWorkRowVM(row, t, locale, now);
+    const vm = toWorkRowVM(row, t, locale, now, row.id ? (reviews.get(row.id) ?? null) : null, row.id ? (contacts.get(row.id) ?? null) : null);
     return vm ? [vm] : [];
   });
 }
 
-/** The tabs, with the SAME counts the summary rail shows — both come from the rows. */
+/**
+ * The views, with the SAME counts the summary rail shows — both come from the rows.
+ *
+ * "All" is the in-progress + completed work the list is about. The filter drawer
+ * offers only `all`, in progress and completed; the composite "current" and the
+ * scheduled / cancelled views stay reachable by URL (the summary rail links to
+ * them) so no record is hidden, but they are not mixed into "All your work".
+ */
 export function toWorkTabs(counts: Record<JobAssignmentStatus, number>, t: TranslateFn): WorkTabVM[] {
-  const total = ASSIGNMENT_STATUSES.reduce((sum, s) => sum + counts[s], 0);
+  const label = (s: JobAssignmentStatus) => t(`jobs.assignmentStatus.${s}` as never);
+  const single = (s: JobAssignmentStatus, inFilter: boolean): WorkTabVM => ({ key: s, label: label(s), count: counts[s], statuses: [s], inFilter });
   return [
-    { key: ALL_TAB, label: t("work.tab.all"), count: total, statuses: null },
-    { key: CURRENT_TAB, label: t("work.tab.current"), count: counts.scheduled + counts.in_progress, statuses: CURRENT_STATUSES },
-    ...ASSIGNMENT_STATUSES.map((s) => ({
-      key: s,
-      // The SAME four labels every badge on the page uses.
-      label: t(`jobs.assignmentStatus.${s}` as never),
-      count: counts[s],
-      statuses: [s] as readonly string[],
-    })),
+    { key: ALL_TAB, label: t("work.tab.all"), count: counts.in_progress + counts.completed, statuses: WORK_LIST_STATUSES, inFilter: true },
+    single("in_progress", true),
+    single("completed", true),
+    { key: CURRENT_TAB, label: t("work.tab.current"), count: counts.scheduled + counts.in_progress, statuses: CURRENT_STATUSES, inFilter: false },
+    single("scheduled", false),
+    single("cancelled", false),
   ];
 }
 
-/** `?state=` -> a tab key. Anything that is not a real tab is "all". */
-export function tabFromState(state: string | undefined): string {
-  if (state === CURRENT_TAB) return CURRENT_TAB;
-  return state && (ASSIGNMENT_STATUSES as readonly string[]).includes(state) ? state : ALL_TAB;
+/** The results card's heading: "All your work", or which other view the URL asked for. */
+export function workResultsTitle(activeTab: string, tabs: readonly WorkTabVM[], locale: Locale): string | undefined {
+  const tab = tabs.find((x) => x.key === activeTab);
+  if (!tab || tab.inFilter !== false) return undefined;
+  return locale === "ar" ? `أعمالك — ${tab.label}` : `Your work — ${tab.label}`;
 }
 
 /**
@@ -206,4 +261,29 @@ export function toActiveWorkVM(
         ? { label: ar ? "تحديث التقدم" : "Update progress", href }
         : null,
   };
+}
+
+/** A saved search's state as the flat string map the database stores (blank values are simply not stored). */
+export function stateToFilters(state: WorkSearchState): Record<string, string> {
+  return Object.fromEntries(Object.entries(state).filter(([, value]) => value !== ""));
+}
+
+/** …and back, with every missing or no-longer-offered value at its default. */
+export function filtersToState(filters: Record<string, string>): WorkSearchState {
+  return sanitizeWorkState(filters);
+}
+
+/**
+ * The work contacts the database released with a page of assignments, keyed by assignment id.
+ * `my_work_page` fills them only for in-progress / completed work that has a recorded contact,
+ * so an absent entry simply means "no contact".
+ */
+export function contactsOf(rows: readonly WorkPageRow[]): Map<string, AssignmentContact> {
+  const out = new Map<string, AssignmentContact>();
+  for (const r of rows) {
+    if (r.contact_phone || r.contact_email) {
+      out.set(r.id, { org_name: r.poster_org_name, contact_name: r.contact_name, phone: r.contact_phone, email: r.contact_email });
+    }
+  }
+  return out;
 }

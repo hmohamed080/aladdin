@@ -29,9 +29,14 @@ import { useDialogFocus } from "@/lib/ui/use-dialog-focus";
 import { overlapsPlannedWindow } from "@/lib/work/planned-window";
 import { formatEgp } from "@/lib/ui/egp-format";
 import { TradeIllustration } from "@/features/installer-dashboard-preview/trade-illustration";
+import { FloatingMenu } from "@/components/ui/floating-menu";
 import {
   rowMatchesTab,
   type ActiveWorkVM,
+  type SavedSearchStore,
+  type SavedWorkSearch,
+  type WorkRemote,
+  type WorkSearchState,
   type WorkPreviewFeatures,
   type WorkRowVM,
   type WorkSort,
@@ -39,16 +44,9 @@ import {
 } from "./view-model";
 
 const WORK_PAGE_SIZE = 6;
-type ContactFilter = "all" | "email" | "phone-only";
+/** "email" / "phone-only" are the preview's demo split; "available" / "none" are the real contact states. */
+type ContactFilter = "all" | "email" | "phone-only" | "available" | "none";
 type WorkView = "list" | "grid";
-type SavedSearch = {
-  id: string;
-  name: string;
-  activeTab: string;
-  contact: ContactFilter;
-  sort: WorkSort;
-  dateRange: WorkDateRange;
-};
 
 const SORT_LABELS: Record<WorkSort, { ar: string; en: string }> = {
   default: { ar: "الترتيب: الافتراضي", en: "Sort: Default" },
@@ -64,9 +62,11 @@ const SORT_LABELS: Record<WorkSort, { ar: string; en: string }> = {
  * CONTENT ONLY: no sidebar, no topbar, no `<main>`. The preview wraps it in its
  * own shell; production gets the shell from `app/home/layout.tsx`.
  *
- * It is controlled where the route owns the state — `activeTab` / `onTabChange`
- * (production: the `?state=` URL) — and local for what is purely a view over the
- * rows already in hand (search, company, planned-period range, ordering, paging).
+ * It runs in one of two modes. LOCAL (the preview): `activeTab` / `onTabChange` are
+ * controlled and everything else — search, company, planned-period range, ordering,
+ * paging — is a view over the fixture rows in hand. SERVER-DRIVEN (production, `remote`):
+ * the rows are already the requested range of the filtered set, the total is exact, and
+ * every control reports a new state back to the route (the URL).
  *
  * `features` is the whole difference between the preview and production. When it
  * is present the preview-only features it names are drawn (the contact column,
@@ -92,10 +92,14 @@ export function InstallerMyWorkView({
   onActiveAction,
   dateInitialMonth,
   datePlaceholder,
+  savedStore,
+  contactMode,
+  resultsTitle,
+  remote,
 }: {
   /** The featured current assignment, or null (a designed empty state is drawn). */
   activeWork: ActiveWorkVM | null;
-  /** EVERY row; the tab, search, company and date filters run here. */
+  /** Local mode: EVERY row (the tab, search, company and date filters run here). Server-driven mode: the requested range. */
   rows: readonly WorkRowVM[];
   tabs: readonly WorkTabVM[];
   activeTab: string;
@@ -114,6 +118,14 @@ export function InstallerMyWorkView({
   onActiveAction?: (kind: "details" | "update") => void;
   dateInitialMonth?: string;
   datePlaceholder?: string;
+  /** Production: persisted saved searches. Without it, `features.savedSearches` keeps the preview's local demo list. */
+  savedStore?: SavedSearchStore;
+  /** "real": the contact column and filter are drawn from real data (production). */
+  contactMode?: "real";
+  /** The results card's heading; defaults to "All your work". */
+  resultsTitle?: string;
+  /** Production: the route owns filtering, ordering, counting and paging — see `WorkRemote`. */
+  remote?: WorkRemote;
 }) {
   const { locale, dir } = useI18n();
   const ar = locale === "ar";
@@ -153,8 +165,17 @@ export function InstallerMyWorkView({
         </Card>
       )}
 
-      <div dir="ltr" className="grid items-start gap-md desktop:items-stretch desktop:grid-cols-[minmax(0,1fr)_18rem]">
-        <div dir={dir} className={cn("min-w-0 desktop:flex desktop:h-full desktop:min-h-0 desktop:flex-col", features && "desktop:overflow-hidden desktop:[contain:size]")}>
+      <div dir="ltr" className={cn("grid items-start gap-md desktop:grid-cols-[minmax(0,1fr)_18rem]", features && "desktop:items-stretch")}>
+        {/* Preview: the column is as tall as its fixture rail. Production: the RESULTS are the scrolling region, capped at one screen and scrolling inside the card, so the header, filters and the natural-height summary rail stay in view instead of the whole page growing with every row. Phones keep ordinary page scroll. */}
+        <div
+          dir={dir}
+          className={cn(
+            "min-w-0 desktop:flex desktop:min-h-0 desktop:flex-col",
+            features
+              ? "desktop:h-full desktop:overflow-hidden desktop:[contain:size]"
+              : "desktop:max-h-[min(48rem,calc(100dvh-7rem))]",
+          )}
+        >
           <WorkHistory
             rows={rows}
             locale={locale}
@@ -167,6 +188,10 @@ export function InstallerMyWorkView({
             onRowAction={onRowAction}
             dateInitialMonth={dateInitialMonth}
             datePlaceholder={datePlaceholder}
+            savedStore={savedStore}
+            contactMode={contactMode}
+            resultsTitle={resultsTitle}
+            remote={remote}
           />
         </div>
 
@@ -282,22 +307,21 @@ function MenuSelect({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const listId = useId();
   const selected = options.find((option) => option.value === value);
 
+  // Opening puts focus on the chosen option, so the keyboard continues from where the value is.
   useEffect(() => {
     if (!open) return;
-    const closeOutside = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", closeOutside);
-    return () => document.removeEventListener("mousedown", closeOutside);
-  }, [open]);
+    const list = document.getElementById(listId);
+    (list?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]') ?? list?.querySelector<HTMLElement>('[role="option"]'))?.focus();
+  }, [open, listId]);
 
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
+    <div className={cn("relative", className)}>
       <button
+        ref={trigger}
         type="button"
         aria-label={label}
         aria-haspopup="listbox"
@@ -320,8 +344,7 @@ function MenuSelect({
         <ChevronDownIcon size={15} className={cn("shrink-0 transition-transform", open && "rotate-180")} />
       </button>
 
-      {open ? (
-        <div id={listId} role="listbox" aria-label={label} className="absolute start-0 top-full z-popover mt-1 max-h-64 min-w-full overflow-y-auto rounded-md border bg-surface p-xs shadow-lg">
+      <FloatingMenu id={listId} open={open} onClose={() => setOpen(false)} anchorRef={trigger} role="listbox" aria-label={label} placement="bottom-start" matchAnchorWidth className="max-h-64 p-xs">
           {options.map((option) => (
             <div key={option.value} className="flex items-center gap-xs rounded-sm hover:bg-surface-2">
               <button
@@ -348,8 +371,7 @@ function MenuSelect({
               ) : null}
             </div>
           ))}
-        </div>
-      ) : null}
+      </FloatingMenu>
     </div>
   );
 }
@@ -367,6 +389,10 @@ function WorkHistory({
   onRowAction,
   dateInitialMonth,
   datePlaceholder,
+  savedStore,
+  contactMode,
+  resultsTitle,
+  remote,
 }: {
   rows: readonly WorkRowVM[];
   locale: Locale;
@@ -379,33 +405,93 @@ function WorkHistory({
   onRowAction?: (row: WorkRowVM) => void;
   dateInitialMonth?: string;
   datePlaceholder?: string;
+  savedStore?: SavedSearchStore;
+  contactMode?: "real";
+  resultsTitle?: string;
+  remote?: WorkRemote;
 }) {
   const ar = locale === "ar";
   const [visibleCount, setVisibleCount] = useState(WORK_PAGE_SIZE);
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<WorkSort>("default");
-  const [contactFilter, setContactFilter] = useState<ContactFilter>("all");
-  const [companyFilter, setCompanyFilter] = useState("all");
-  const [dateRange, setDateRange] = useState<WorkDateRange>({ from: "", to: "" });
-  const [view, setView] = useState<WorkView>("list");
+  // LOCAL state: what the preview filters its fixtures by. Server-driven mode ignores it and reads `remote.state`.
+  const [localQuery, setLocalQuery] = useState("");
+  const [localSort, setLocalSort] = useState<WorkSort>("default");
+  const [localContact, setLocalContact] = useState<ContactFilter>("all");
+  const [localCompany, setLocalCompany] = useState("all");
+  const [localRange, setLocalRange] = useState<WorkDateRange>({ from: "", to: "" });
+  // Server-driven search: the box answers every keystroke at once, the URL follows once typing pauses.
+  const [draftQuery, setDraftQuery] = useState(remote?.state.q ?? "");
+  const remoteRef = useRef(remote);
+  remoteRef.current = remote;
+  const pushedQuery = useRef(remote?.state.q ?? "");
+  const remoteQuery = remote?.state.q;
+  useEffect(() => {
+    if (remoteQuery === undefined) return;
+    if (draftQuery.trim() === remoteQuery) return;
+    const id = window.setTimeout(() => {
+      const current = remoteRef.current;
+      if (!current) return;
+      pushedQuery.current = draftQuery.trim();
+      current.onStateChange({ ...current.state, q: draftQuery.trim() });
+    }, 350);
+    return () => window.clearTimeout(id);
+  }, [draftQuery, remoteQuery]);
+  useEffect(() => {
+    // A change that did not come from this box (a saved search, "New search") replaces what it shows.
+    if (remoteQuery !== undefined && remoteQuery !== pushedQuery.current) {
+      pushedQuery.current = remoteQuery;
+      setDraftQuery(remoteQuery);
+    }
+  }, [remoteQuery]);
+
+  const query = remote ? draftQuery : localQuery;
+  const sort = remote ? (remote.state.sort as WorkSort) : localSort;
+  const contactFilter = (remote ? remote.state.contact : localContact) as ContactFilter;
+  const companyFilter = remote ? remote.state.company || "all" : localCompany;
+  const remoteFrom = remote?.state.from;
+  const remoteTo = remote?.state.to;
+  const dateRange = useMemo<WorkDateRange>(
+    () => (remoteFrom !== undefined ? { from: remoteFrom, to: remoteTo ?? "" } : localRange),
+    [remoteFrom, remoteTo, localRange],
+  );
+  /** One way to change a filter, whichever mode: the route is told, or the local state moves. Either way paging starts again. */
+  const patch = (next: Partial<WorkSearchState>) => {
+    if (remote) {
+      remote.onStateChange({ ...remote.state, ...next });
+      return;
+    }
+    if (next.q !== undefined) setLocalQuery(next.q);
+    if (next.sort !== undefined) setLocalSort(next.sort as WorkSort);
+    if (next.contact !== undefined) setLocalContact(next.contact as ContactFilter);
+    if (next.company !== undefined) setLocalCompany(next.company || "all");
+    if (next.from !== undefined || next.to !== undefined) setLocalRange({ from: next.from ?? localRange.from, to: next.to ?? localRange.to });
+    if (next.tab !== undefined) onTabChange(next.tab);
+    setVisibleCount(WORK_PAGE_SIZE);
+  };
+  // GRID is the default view wherever a page offers both; the choice lasts for this visit only.
+  const [view, setView] = useState<WorkView>("grid");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [selectedSavedId, setSelectedSavedId] = useState("");
-  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([
+  // The preview's in-memory list (it has no backend). Production passes `savedStore`.
+  const [localSaved, setLocalSaved] = useState<SavedWorkSearch[]>([
     {
       id: "in-progress",
       name: ar ? "أعمال قيد التنفيذ" : "Work in progress",
-      activeTab: "in_progress",
-      contact: "all",
-      sort: "default",
-      dateRange: { from: "", to: "" },
+      state: { tab: "in_progress", q: "", company: "", from: "", to: "", contact: "all", sort: "default" },
     },
   ]);
-  const savedEnabled = Boolean(features?.savedSearches);
-  const contactEnabled = Boolean(features?.contact);
-  const companies = useMemo(() => Array.from(new Set(rows.map((row) => row.company).filter((c): c is string => Boolean(c)))), [rows]);
+  const savedSearches: readonly SavedWorkSearch[] = savedStore ? savedStore.items : localSaved;
+  const savedEnabled = Boolean(features?.savedSearches) || Boolean(savedStore);
+  const realContact = contactMode === "real";
+  const contactEnabled = Boolean(features?.contact) || realContact;
+  const companies = useMemo(
+    () => (remote ? [...remote.companies] : Array.from(new Set(rows.map((row) => row.company).filter((c): c is string => Boolean(c))))),
+    [remote, rows],
+  );
   const currentTab = tabs.find((tab) => tab.key === activeTab);
   const filteredRows = useMemo(() => {
+    // Server-driven: the rows ARE the requested range of the filtered, ordered set.
+    if (remote) return rows;
     const collator = locale === "ar" ? "ar-EG" : "en-EG";
     const normalizedQuery = query.trim().toLocaleLowerCase(collator);
     const matchingRows = rows.filter((row) => {
@@ -416,7 +502,9 @@ function WorkHistory({
       const matchesQuery = normalizedQuery.length === 0 || searchable.includes(normalizedQuery);
       const matchesContact = contactFilter === "all"
         || (contactFilter === "email" && Boolean(row.contact?.email))
-        || (contactFilter === "phone-only" && !row.contact?.email);
+        || (contactFilter === "phone-only" && !row.contact?.email)
+        || (contactFilter === "available" && Boolean(row.contact))
+        || (contactFilter === "none" && !row.contact);
       const matchesCompany = companyFilter === "all" || row.company === companyFilter;
       const matchesDateRange = overlapsPlannedWindow({ startsOn: row.startsOn, endsBy: row.endsBy }, dateRange);
       return matchesQuery && matchesContact && matchesCompany && matchesDateRange;
@@ -430,52 +518,81 @@ function WorkHistory({
     if (sort === "recent-added") return [...matchingRows].sort(byDesc("createdAtMs"));
     if (sort === "last-action") return [...matchingRows].sort(byDesc("lastActionMs"));
     return matchingRows;
-  }, [companyFilter, contactFilter, currentTab, dateRange, locale, query, rows, sort]);
-  const paginatedRows = filteredRows.slice(0, visibleCount);
-  const hasMore = visibleCount < filteredRows.length;
+  }, [companyFilter, contactFilter, currentTab, dateRange, locale, query, remote, rows, sort]);
+  const total = remote ? remote.total : filteredRows.length;
+  const paginatedRows = remote ? filteredRows : filteredRows.slice(0, visibleCount);
+  const hasMore = remote ? remote.hasMore : visibleCount < filteredRows.length;
+  const canShowFewer = remote ? remote.canShowFewer : visibleCount > WORK_PAGE_SIZE;
   const activeDrawerFilters = Number(activeTab !== defaultTab) + Number(contactFilter !== "all") + Number(companyFilter !== "all");
 
   const resetSearch = () => {
-    setQuery("");
-    setSort("default");
-    setContactFilter("all");
-    setCompanyFilter("all");
-    setDateRange({ from: "", to: "" });
-    setVisibleCount(WORK_PAGE_SIZE);
     setSelectedSavedId("");
+    if (remote) {
+      remote.onStateChange({ tab: defaultTab, q: "", company: "", from: "", to: "", contact: "all", sort: "default" });
+      return;
+    }
+    setLocalQuery("");
+    setLocalSort("default");
+    setLocalContact("all");
+    setLocalCompany("all");
+    setLocalRange({ from: "", to: "" });
+    setVisibleCount(WORK_PAGE_SIZE);
     onTabChange(defaultTab);
   };
+
+  /** The CURRENT, meaningful filter state — never a drawer's open/closed flag. */
+  const currentState = (): WorkSearchState => ({
+    tab: activeTab,
+    q: query.trim(),
+    company: companyFilter === "all" ? "" : companyFilter,
+    from: dateRange.from,
+    to: dateRange.to,
+    contact: contactFilter,
+    sort,
+  });
 
   const applySavedSearch = (id: string) => {
     setSelectedSavedId(id);
     const saved = savedSearches.find((item) => item.id === id);
     if (!saved) return;
-    setSort(saved.sort);
-    setContactFilter(saved.contact);
-    setCompanyFilter("all");
-    setDateRange(saved.dateRange);
-    setVisibleCount(WORK_PAGE_SIZE);
-    onTabChange(saved.activeTab);
+    const state = saved.state;
+    // A stored value this page no longer offers falls back to its default rather than being trusted.
+    const next: WorkSearchState = {
+      tab: tabs.some((tab) => tab.key === state.tab) ? state.tab : defaultTab,
+      q: state.q,
+      company: state.company && (remote || companies.includes(state.company)) ? state.company : "",
+      from: state.from,
+      to: state.to,
+      contact: (["all", "email", "phone-only", "available", "none"] as const).includes(state.contact as ContactFilter) ? state.contact : "all",
+      sort: sortOptions.includes(state.sort as WorkSort) ? state.sort : "default",
+    };
+    if (remote) {
+      remote.onStateChange(next);
+      return;
+    }
+    patch(next);
   };
 
-  const saveSearch = (name: string, mode: "new" | "update") => {
-    const next: SavedSearch = {
-      id: mode === "update" && selectedSavedId ? selectedSavedId : `saved-${Date.now()}`,
-      name,
-      activeTab,
-      contact: contactFilter,
-      sort,
-      dateRange,
-    };
-    setSavedSearches((current) => mode === "update" && selectedSavedId
-      ? current.map((item) => item.id === selectedSavedId ? next : item)
-      : [...current, next]);
-    setSelectedSavedId(next.id);
+  /** Returns an error message to show in the dialog, or null once saved. */
+  const saveSearch = async (name: string, mode: "new" | "update", targetId: string): Promise<string | null> => {
+    const state = currentState();
+    const id = mode === "update" ? targetId : null;
+    if (savedStore) {
+      const result = await savedStore.save({ mode, id, name, state });
+      if (!result.ok) return result.message;
+      setSelectedSavedId(result.id);
+    } else {
+      const next: SavedWorkSearch = { id: id ?? `saved-${Date.now()}`, name, state };
+      setLocalSaved((current) => (id ? current.map((item) => (item.id === id ? next : item)) : [...current, next]));
+      setSelectedSavedId(next.id);
+    }
     setSaveDialogOpen(false);
+    return null;
   };
 
   const deleteSavedSearch = (id: string) => {
-    setSavedSearches((current) => current.filter((item) => item.id !== id));
+    if (savedStore) void savedStore.remove(id);
+    else setLocalSaved((current) => current.filter((item) => item.id !== id));
     if (selectedSavedId === id) setSelectedSavedId("");
   };
 
@@ -484,11 +601,15 @@ function WorkHistory({
   return (
     <section
       aria-labelledby="all-work-title"
-      className="overflow-hidden rounded-md border bg-surface shadow-card desktop:flex desktop:min-h-0 desktop:flex-1 desktop:flex-col"
+      aria-busy={remote?.pending ? true : undefined}
+      className={cn(
+        "overflow-hidden rounded-md border bg-surface shadow-card transition-opacity desktop:flex desktop:min-h-0 desktop:flex-1 desktop:flex-col",
+        remote?.pending && "opacity-70",
+      )}
     >
       <div className="flex items-center justify-between gap-md border-b px-md py-3">
-        <h2 id="all-work-title" className="text-body-lg font-semibold text-fg">{ar ? "جميع أعمالك" : "All your work"}</h2>
-        <span className="shrink-0 text-label text-fg-muted">{formatNumber(filteredRows.length, locale)} {ar ? "أعمال" : "items"}</span>
+        <h2 id="all-work-title" className="text-body-lg font-semibold text-fg">{resultsTitle ?? (ar ? "جميع أعمالك" : "All your work")}</h2>
+        <span className="shrink-0 text-label text-fg-muted">{formatNumber(total, locale)} {ar ? "أعمال" : "items"}</span>
       </div>
 
       <div className="shrink-0 border-b bg-surface max-tablet:flex max-tablet:flex-wrap max-tablet:items-center max-tablet:gap-sm max-tablet:px-md max-tablet:py-sm">
@@ -539,7 +660,7 @@ function WorkHistory({
               value={dateRange}
               initialMonth={dateInitialMonth}
               placeholder={datePlaceholder}
-              onChange={(next) => { setDateRange(next); setVisibleCount(WORK_PAGE_SIZE); }}
+              onChange={(next) => patch({ from: next.from, to: next.to })}
             />
             <MenuSelect
               compact
@@ -548,16 +669,16 @@ function WorkHistory({
               value={sort}
               placeholder={ar ? "اختر الترتيب" : "Select sort"}
               options={sortOptions.map((value) => ({ value, label: ar ? SORT_LABELS[value].ar : SORT_LABELS[value].en }))}
-              onChange={(next) => setSort(next as WorkSort)}
+              onChange={(next) => patch({ sort: next })}
             />
           </div>
 
           <div className="flex items-center gap-xs max-tablet:hidden" aria-label={ar ? "طريقة العرض" : "View mode"}>
-            <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} className={cn("inline-flex min-h-8 items-center gap-1.5 rounded-sm px-sm text-label font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", view === "list" ? "bg-surface-2 text-fg" : "text-fg-muted hover:text-fg")}>
-              <ListIcon size={15} />{ar ? "قائمة" : "List"}
-            </button>
             <button type="button" aria-pressed={view === "grid"} onClick={() => setView("grid")} className={cn("inline-flex min-h-8 items-center gap-1.5 rounded-sm px-sm text-label font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", view === "grid" ? "bg-surface-2 text-fg" : "text-fg-muted hover:text-fg")}>
-              <GridIcon size={15} />{ar ? "شبكة" : "Grid"}
+              <GridIcon size={15} />{ar ? "عرض الشبكة" : "Grid view"}
+            </button>
+            <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} className={cn("inline-flex min-h-8 items-center gap-1.5 rounded-sm px-sm text-label font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", view === "list" ? "bg-surface-2 text-fg" : "text-fg-muted hover:text-fg")}>
+              <ListIcon size={15} />{ar ? "عرض القائمة" : "List view"}
             </button>
           </div>
         </div>
@@ -565,21 +686,22 @@ function WorkHistory({
         <div className="flex flex-wrap items-center gap-md px-md py-sm max-tablet:contents">
           <div className="relative min-w-52 flex-1 max-tablet:order-1 max-tablet:min-w-0">
             <SearchIcon size={15} className="pointer-events-none absolute start-sm top-1/2 -translate-y-1/2 text-fg-muted" />
-            <Input type="search" aria-label={ar ? "البحث في الأعمال" : "Search work"} value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(WORK_PAGE_SIZE); }} placeholder={ar ? "ابحث في جميع أعمالك" : "Search all work"} className="min-h-9 py-1.5 pe-sm ps-8 text-label max-tablet:min-h-11" />
+            <Input type="search" aria-label={ar ? "البحث في الأعمال" : "Search work"} value={query} onChange={(event) => { if (remote) setDraftQuery(event.target.value); else patch({ q: event.target.value }); }} placeholder={ar ? "ابحث في جميع أعمالك" : "Search all work"} className="min-h-9 py-1.5 pe-sm ps-8 text-label max-tablet:min-h-11" />
           </div>
           <span className="shrink-0 text-label text-fg-muted max-tablet:order-4 max-tablet:w-full" aria-live="polite">
-            {ar ? `عرض ${formatNumber(paginatedRows.length, locale)} من ${formatNumber(filteredRows.length, locale)} نتيجة` : `Showing ${formatNumber(paginatedRows.length, locale)} of ${formatNumber(filteredRows.length, locale)} results`}
+            {ar ? `عرض ${formatNumber(paginatedRows.length, locale)} من ${formatNumber(total, locale)} نتيجة` : `Showing ${formatNumber(paginatedRows.length, locale)} of ${formatNumber(total, locale)} results`}
+            {remote?.loadError ? <span role="alert" className="block text-caption font-medium text-danger">{ar ? "تعذّر تحميل المزيد. حاول مرة أخرى." : "Could not load more. Please try again."}</span> : null}
           </span>
         </div>
       </div>
-      {filteredRows.length === 0 ? (
+      {total === 0 ? (
         <div className="px-md py-xl text-center">
           <p className="text-body-lg font-medium text-fg">{ar ? "لا توجد أعمال في هذه الحالة" : "No work in this status"}</p>
           <p className="mt-1 text-body text-fg-muted">{ar ? "اختر حالة أخرى لمراجعة باقي أعمالك." : "Choose another status to review the rest of your work."}</p>
         </div>
       ) : (
         <>
-          <div className={cn("hidden overflow-x-auto tablet:block desktop:min-h-0 desktop:flex-1 desktop:overflow-y-auto desktop:overscroll-contain", view === "grid" && "tablet:hidden")}>
+          <div className={cn("relative hidden overflow-x-auto tablet:block desktop:min-h-0 desktop:flex-1 desktop:overflow-y-auto desktop:overscroll-contain", view === "grid" && "tablet:hidden")}>
             <table className="w-full border-collapse text-start">
               <thead className="bg-surface-2 text-label text-fg-secondary">
                 <tr>
@@ -593,32 +715,44 @@ function WorkHistory({
                 </tr>
               </thead>
               <tbody id="work-history-results" className="divide-y divide-strong">
-                {paginatedRows.map((row) => <WorkTableRow key={row.id} row={row} locale={locale} features={features} onAction={act} />)}
+                {paginatedRows.map((row) => <WorkTableRow key={row.id} row={row} locale={locale} features={features} showContact={contactEnabled} onAction={act} />)}
               </tbody>
             </table>
           </div>
 
           <ul id="work-history-results-mobile" className={cn("divide-y divide-strong tablet:hidden", view === "grid" && "hidden")}>
-            {paginatedRows.map((row) => <WorkMobileRow key={row.id} row={row} locale={locale} features={features} onAction={act} />)}
+            {paginatedRows.map((row) => <WorkMobileRow key={row.id} row={row} locale={locale} features={features} showContact={contactEnabled} onAction={act} />)}
           </ul>
           {view === "grid" ? (
             <ul id="work-history-results-grid" className="grid min-h-0 flex-1 grid-cols-1 gap-sm overflow-y-auto p-md tablet:grid-cols-2">
-              {paginatedRows.map((row) => <WorkGridCard key={row.id} row={row} locale={locale} features={features} onAction={act} />)}
+              {paginatedRows.map((row) => <WorkGridCard key={row.id} row={row} locale={locale} features={features} showContact={contactEnabled} onAction={act} />)}
             </ul>
           ) : null}
         </>
       )}
 
-      {filteredRows.length > 0 ? (
-        <button
-          type="button"
-          aria-controls="work-history-results work-history-results-mobile work-history-results-grid"
-          disabled={!hasMore}
-          onClick={() => setVisibleCount((count) => Math.min(count + WORK_PAGE_SIZE, filteredRows.length))}
-          className="w-full shrink-0 border-t px-md py-3 text-label font-medium text-accent hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:cursor-default disabled:text-fg-muted disabled:hover:bg-transparent"
-        >
-          {hasMore ? (ar ? "عرض المزيد" : "Show more") : (ar ? "تم عرض كل الأعمال" : "All work shown")}
-        </button>
+      {total > 0 ? (
+        <div className="flex w-full shrink-0 border-t">
+          <button
+            type="button"
+            aria-controls="work-history-results work-history-results-mobile work-history-results-grid"
+            disabled={!hasMore}
+            onClick={() => (remote ? remote.onShowMore() : setVisibleCount((count) => Math.min(count + WORK_PAGE_SIZE, filteredRows.length)))}
+            className="min-w-0 flex-1 px-md py-3 text-label font-medium text-accent hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:cursor-default disabled:text-fg-muted disabled:hover:bg-transparent"
+          >
+            {hasMore ? (ar ? "عرض المزيد" : "Show more") : (ar ? "تم عرض كل الأعمال" : "All work shown")}
+          </button>
+          {canShowFewer ? (
+            <button
+              type="button"
+              aria-controls="work-history-results work-history-results-mobile work-history-results-grid"
+              onClick={() => (remote ? remote.onShowFewer() : setVisibleCount((count) => Math.max(WORK_PAGE_SIZE, Math.min(count, filteredRows.length) - WORK_PAGE_SIZE)))}
+              className="min-w-0 flex-1 border-s px-md py-3 text-label font-medium text-accent hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+            >
+              {ar ? "عرض أقل" : "Show less"}
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {filtersOpen ? (
@@ -647,15 +781,13 @@ function WorkHistory({
           defaultTab={defaultTab}
           activeTab={activeTab}
           showContact={contactEnabled}
+          contactMode={realContact ? "real" : "preview"}
           contactFilter={contactFilter}
           companyFilter={companyFilter}
           companies={companies}
           onClose={() => setFiltersOpen(false)}
           onApply={(next) => {
-            onTabChange(next.activeTab);
-            setContactFilter(next.contactFilter);
-            setCompanyFilter(next.companyFilter);
-            setVisibleCount(WORK_PAGE_SIZE);
+            patch({ tab: next.activeTab, contact: next.contactFilter, company: next.companyFilter === "all" ? "" : next.companyFilter });
             setFiltersOpen(false);
           }}
         />
@@ -679,6 +811,7 @@ function WorkFiltersDrawer({
   defaultTab,
   activeTab,
   showContact,
+  contactMode,
   contactFilter,
   companyFilter,
   companies,
@@ -691,6 +824,7 @@ function WorkFiltersDrawer({
   defaultTab: string;
   activeTab: string;
   showContact: boolean;
+  contactMode: "real" | "preview";
   contactFilter: ContactFilter;
   companyFilter: string;
   companies: readonly string[];
@@ -723,11 +857,25 @@ function WorkFiltersDrawer({
         <div className="flex-1 space-y-lg overflow-y-auto px-lg py-lg">
           {phoneExtras}
           <FilterField label={ar ? "الحالة" : "Status"}>
-            <MenuSelect label={ar ? "الحالة" : "Status"} value={draftStatus} placeholder={ar ? "اختر" : "Select"} options={tabs.filter((tab) => tab.key !== defaultTab).map((tab) => ({ value: tab.key, label: tab.label }))} onChange={setDraftStatus} />
+            <MenuSelect label={ar ? "الحالة" : "Status"} value={draftStatus} placeholder={ar ? "اختر" : "Select"} options={tabs.filter((tab) => tab.key !== defaultTab && tab.inFilter !== false).map((tab) => ({ value: tab.key, label: tab.label }))} onChange={setDraftStatus} />
           </FilterField>
           {showContact ? (
             <FilterField label={ar ? "بيانات التواصل" : "Contact details"}>
-              <MenuSelect label={ar ? "بيانات التواصل" : "Contact details"} value={draftContact} placeholder={ar ? "اختر" : "Select"} options={[{ value: "email", label: ar ? "هاتف وبريد إلكتروني" : "Phone and email" }, { value: "phone-only", label: ar ? "هاتف فقط" : "Phone only" }]} onChange={(next) => setDraftContact(next as ContactFilter)} />
+              {contactMode === "real" ? (
+                <MenuSelect
+                  label={ar ? "بيانات التواصل" : "Contact details"}
+                  value={draftContact}
+                  placeholder={ar ? "كل حالات التواصل" : "All contact states"}
+                  options={[
+                    { value: "all", label: ar ? "كل حالات التواصل" : "All contact states" },
+                    { value: "available", label: ar ? "التواصل متاح" : "Contact available" },
+                    { value: "none", label: ar ? "لا توجد بيانات تواصل" : "No contact data" },
+                  ]}
+                  onChange={(next) => setDraftContact(next as ContactFilter)}
+                />
+              ) : (
+                <MenuSelect label={ar ? "بيانات التواصل" : "Contact details"} value={draftContact} placeholder={ar ? "اختر" : "Select"} options={[{ value: "email", label: ar ? "هاتف وبريد إلكتروني" : "Phone and email" }, { value: "phone-only", label: ar ? "هاتف فقط" : "Phone only" }]} onChange={(next) => setDraftContact(next as ContactFilter)} />
+              )}
             </FilterField>
           ) : null}
           {companies.length > 0 ? (
@@ -758,10 +906,10 @@ function SaveSearchDialog({
   onSave,
 }: {
   locale: Locale;
-  savedSearches: readonly SavedSearch[];
+  savedSearches: readonly SavedWorkSearch[];
   selectedSavedId: string;
   onClose: () => void;
-  onSave: (name: string, mode: "new" | "update") => void;
+  onSave: (name: string, mode: "new" | "update", targetId: string) => Promise<string | null>;
 }) {
   const ar = locale === "ar";
   const titleId = useId();
@@ -770,6 +918,8 @@ function SaveSearchDialog({
   const [targetId, setTargetId] = useState(selectedSavedId || savedSearches[0]?.id || "");
   const selected = savedSearches.find((item) => item.id === targetId);
   const [name, setName] = useState(ar ? "بحث جديد" : "New search");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (mode === "new") setName(ar ? "بحث جديد" : "New search");
@@ -796,12 +946,24 @@ function SaveSearchDialog({
             </FilterField>
           ) : null}
           <FilterField label={ar ? "الاسم" : "Name"}>
-            <Input aria-label={ar ? "الاسم" : "Name"} value={name} onChange={(event) => setName(event.target.value)} />
+            <Input aria-label={ar ? "الاسم" : "Name"} maxLength={60} value={name} onChange={(event) => setName(event.target.value)} />
           </FilterField>
+          {error ? <p role="alert" className="text-label text-danger">{error}</p> : null}
         </div>
 
         <div className="flex gap-sm border-t px-lg py-md">
-          <Button disabled={!name.trim() || (mode === "update" && !targetId)} onClick={() => onSave(name.trim(), mode)}>{ar ? "حفظ البحث" : "Save search"}</Button>
+          <Button
+            disabled={saving || !name.trim() || (mode === "update" && !targetId)}
+            onClick={async () => {
+              setSaving(true);
+              setError(null);
+              const message = await onSave(name.trim(), mode, targetId);
+              if (message) {
+                setError(message);
+                setSaving(false);
+              }
+            }}
+          >{ar ? "حفظ البحث" : "Save search"}</Button>
           <Button variant="outline" onClick={onClose}>{ar ? "إلغاء" : "Cancel"}</Button>
         </div>
       </div>
@@ -839,9 +1001,9 @@ function Value({ row, locale }: { row: WorkRowVM; locale: Locale }) {
   return row.value !== null ? <>{formatEgp(row.value, locale)}</> : <span className="text-fg-muted">—</span>;
 }
 
-type RowProps = { row: WorkRowVM; locale: Locale; features?: WorkPreviewFeatures; onAction: (row: WorkRowVM) => void };
+type RowProps = { row: WorkRowVM; locale: Locale; features?: WorkPreviewFeatures; showContact: boolean; onAction: (row: WorkRowVM) => void };
 
-function WorkGridCard({ row, locale, features, onAction }: RowProps) {
+function WorkGridCard({ row, locale, features, showContact, onAction }: RowProps) {
   return (
     <li className="rounded-md border bg-surface p-md">
       <div className="flex items-start gap-sm">
@@ -849,16 +1011,19 @@ function WorkGridCard({ row, locale, features, onAction }: RowProps) {
         <div className="min-w-0 flex-1"><p className="font-medium text-fg" dir="auto">{row.title}</p>{row.company ? <p className="mt-1 text-label text-fg-muted"><bdi dir="auto">{row.company}</bdi></p> : null}</div>
         <StatusBadge row={row} />
       </div>
-      <div className={cn("mt-md grid gap-sm border-t pt-md", features?.contact ? "grid-cols-2" : "grid-cols-1")}>
-        {features?.contact && row.contact ? <ContactCell row={row} locale={locale} /> : null}
-        <div className={features?.contact ? "text-end" : ""}><p className="font-mono text-body font-medium text-fg"><Value row={row} locale={locale} /></p><div className="mt-1 text-label text-fg-muted"><Delivery row={row} locale={locale} /></div></div>
+      <div className={cn("mt-md grid gap-sm border-t pt-md", showContact ? "grid-cols-2" : "grid-cols-1")}>
+        {showContact && row.contact ? <ContactCell row={row} locale={locale} /> : null}
+        <div className={showContact ? "text-end" : ""}><p className="font-mono text-body font-medium text-fg"><Value row={row} locale={locale} /></p><div className="mt-1 text-label text-fg-muted"><Delivery row={row} locale={locale} /></div></div>
       </div>
-      <RowAction row={row} onAction={onAction} className="mt-md w-full justify-center" />
+      <div className="mt-md flex items-center gap-sm">
+        <RowAction row={row} onAction={onAction} className="flex-1 justify-center" />
+        {features ? null : <RowMenu row={row} locale={locale} />}
+      </div>
     </li>
   );
 }
 
-function WorkTableRow({ row, locale, features, onAction }: RowProps) {
+function WorkTableRow({ row, locale, features, showContact, onAction }: RowProps) {
   const ar = locale === "ar";
   return (
     <tr className="transition-colors hover:bg-surface-hover">
@@ -869,7 +1034,7 @@ function WorkTableRow({ row, locale, features, onAction }: RowProps) {
         </div>
       </td>
       <td className="px-sm py-3 text-center"><CompanyCell row={row} locale={locale} showRating={Boolean(features?.rating)} centered /></td>
-      {features?.contact ? <td className="px-sm py-3">{row.contact ? <ContactCell row={row} locale={locale} /> : null}</td> : null}
+      {showContact ? <td className="px-sm py-3 text-center">{row.contact ? <ContactCell row={row} locale={locale} /> : <span className="text-label text-fg-muted" title={ar ? "لا توجد بيانات تواصل" : "No contact data"}>—</span>}</td> : null}
       <td className="px-sm py-3 text-center"><StatusBadge row={row} /></td>
       <td className="whitespace-nowrap px-sm py-3 text-center font-mono text-body font-medium text-fg"><Value row={row} locale={locale} /></td>
       <td className="whitespace-nowrap px-sm py-3 text-center"><Delivery row={row} locale={locale} /></td>
@@ -878,14 +1043,16 @@ function WorkTableRow({ row, locale, features, onAction }: RowProps) {
           <RowAction row={row} onAction={onAction} className="min-w-20 justify-center" />
           {features ? (
             <button type="button" aria-label={ar ? "المزيد من الإجراءات" : "More actions"} className="grid h-8 w-8 place-items-center rounded-sm border text-fg-secondary hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"><MoreHorizontalIcon size={16} className="rotate-90" /></button>
-          ) : null}
+          ) : (
+            <RowMenu row={row} locale={locale} />
+          )}
         </div>
       </td>
     </tr>
   );
 }
 
-function WorkMobileRow({ row, locale, features, onAction }: RowProps) {
+function WorkMobileRow({ row, locale, features, showContact, onAction }: RowProps) {
   return (
     <li className="p-md">
       <div className="flex gap-sm">
@@ -896,9 +1063,12 @@ function WorkMobileRow({ row, locale, features, onAction }: RowProps) {
       <div className="mt-md grid grid-cols-2 gap-sm border-t pt-sm">
         <CompanyCell row={row} locale={locale} showRating={Boolean(features?.rating)} />
         <div><p className="font-mono text-body font-medium text-fg"><Value row={row} locale={locale} /></p><div className="text-label text-fg-muted"><Delivery row={row} locale={locale} /></div></div>
-        {features?.contact && row.contact ? <div className="col-span-2"><ContactCell row={row} locale={locale} /></div> : null}
+        {showContact && row.contact ? <div className="col-span-2"><ContactCell row={row} locale={locale} /></div> : null}
       </div>
-      <RowAction row={row} onAction={onAction} className="mt-md w-full justify-center" />
+      <div className="mt-md flex items-center gap-sm">
+        <RowAction row={row} onAction={onAction} className="flex-1 justify-center" />
+        {features ? null : <RowMenu row={row} locale={locale} />}
+      </div>
     </li>
   );
 }
@@ -920,17 +1090,20 @@ function ContactCell({ row, locale }: { row: WorkRowVM; locale: Locale }) {
   if (!contact) return null;
   return (
     <div className="w-32 space-y-1 text-start">
-      <button
-        type="button"
-        aria-expanded={revealed === "phone"}
-        aria-label={ar ? "إظهار رقم الهاتف كاملًا" : "Show full phone number"}
-        onClick={() => setRevealed((value) => value === "phone" ? null : "phone")}
-        className="flex w-full items-center gap-1.5 whitespace-nowrap rounded-xs text-label text-fg hover:text-info focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        dir="ltr"
-      >
-        <PhoneIcon size={13} className="text-fg-muted" />
-        {revealed === "phone" ? contact.fullPhone : contact.phone}
-      </button>
+      {contact.name ? <p className="truncate text-label font-medium text-fg" dir="auto" title={contact.name}>{contact.name}</p> : null}
+      {contact.phone ? (
+        <button
+          type="button"
+          aria-expanded={revealed === "phone"}
+          aria-label={ar ? "إظهار رقم الهاتف كاملًا" : "Show full phone number"}
+          onClick={() => setRevealed((value) => value === "phone" ? null : "phone")}
+          className="flex w-full items-center gap-1.5 whitespace-nowrap rounded-xs text-label text-fg hover:text-info focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          dir="ltr"
+        >
+          <PhoneIcon size={13} className="text-fg-muted" />
+          {revealed === "phone" ? (contact.fullPhone ?? contact.phone) : contact.phone}
+        </button>
+      ) : null}
       <button
         type="button"
         disabled={!contact.email}
@@ -944,6 +1117,63 @@ function ContactCell({ row, locale }: { row: WorkRowVM; locale: Locale }) {
         <span className={cn("min-w-0", revealed === "email" ? "break-all text-start" : "truncate")}>{contact.email ?? (ar ? "غير متاح" : "Not available")}</span>
       </button>
     </div>
+  );
+}
+
+/**
+ * The vertical three-dot menu, production rows only. Entries are the row's real,
+ * contextual `moreActions`; with none, nothing is drawn. It is the shared floating
+ * surface (portal + Floating UI), so the results region's overflow cannot clip it and
+ * it flips / shifts away from the viewport edge in either writing direction.
+ */
+function RowMenu({ row, locale }: { row: WorkRowVM; locale: Locale }) {
+  const ar = locale === "ar";
+  const actions = row.moreActions ?? [];
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+
+  // Opening puts focus on the first action.
+  useEffect(() => {
+    if (open) document.getElementById(menuId)?.querySelector<HTMLElement>("a")?.focus();
+  }, [open, menuId]);
+
+  if (actions.length === 0) return null;
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={ar ? "المزيد من الإجراءات" : "More actions"}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-sm border text-fg-secondary hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+      >
+        <MoreHorizontalIcon size={16} className="rotate-90" />
+      </button>
+      <FloatingMenu id={menuId} open={open} onClose={() => setOpen(false)} anchorRef={buttonRef} role="menu" aria-label={ar ? "إجراءات العمل" : "Work actions"} placement="bottom-end" className="w-44 p-xs">
+        {actions.map((action) => (
+          <Link
+            key={action.key}
+            role="menuitem"
+            href={action.href}
+            onClick={() => setOpen(false)}
+            className="flex min-h-9 items-center rounded-sm px-sm text-start text-label text-fg hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            {action.label}
+          </Link>
+        ))}
+      </FloatingMenu>
+    </>
   );
 }
 
