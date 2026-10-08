@@ -847,12 +847,17 @@ select is(
       and coalesce(qual, '') || coalesce(with_check, '') like '%user_trades%')::int,
   0, 'NO RLS POLICY IN THE JOBS DOMAIN REFERENCES user_trades');
 
--- Nor may any of its write paths or readers.
+-- Nor may any of its write paths or readers. The named exceptions are
+-- `job_match_rows` (the Overall Match) and `job_opportunities_page` (its Best Match tiers):
+-- DISPLAY / RECOMMENDATION SIGNALS ONLY. They describe how a job sits with the caller's own
+-- trades and gate nothing — no policy, capability, apply/accept path or discoverability
+-- rule consults them (test 74 asserts that).
 select is(
   (select count(*) from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
    where n.nspname in ('public', 'app')
      and (p.proname like 'job\_%' or p.proname like '\_open\_job%' or p.proname like '\_my\_job%')
+     and p.proname not in ('job_match_rows', 'job_opportunities_page')
      and pg_get_functiondef(p.oid) like '%user_trades%')::int,
   0, 'NO JOBS FUNCTION READS user_trades — trade is a signal, never authority');
 

@@ -36,7 +36,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(38);
+select plan(45);
 
 update auth.users set email_confirmed_at = now()
   where id in ('70000009-0000-4000-8000-000000000009', '71000006-0000-4000-8000-000000000006',
@@ -63,7 +63,7 @@ select has_column('public'::name, 'profiles'::name, 'availability_updated_at'::n
   'profiles.availability_updated_at exists');
 
 select col_not_null('public'::name, 'profiles'::name, 'available_for_work'::name,
-  'available_for_work is NOT NULL — there is no third, unknown state');
+  'available_for_work stays a two-valued NOT NULL boolean — NOT DECLARED is carried by availability_updated_at IS NULL, never inferred from false');
 select col_is_null('public'::name, 'profiles'::name, 'availability_updated_at'::name,
   'availability_updated_at is nullable — NULL means "never set", not "false since forever"');
 
@@ -270,6 +270,52 @@ select is(
   false, 'a real change from true to false is applied');
 
 -- ===========================================================================
+-- F2. UNKNOWN is not UNAVAILABLE — the declaration marker
+-- ===========================================================================
+-- available_for_work is NOT NULL DEFAULT false, so the boolean cannot tell "I said no" from "I never said".
+-- availability_updated_at can: NULL = NOT DECLARED; a stamped false = explicitly UNAVAILABLE. The trigger therefore
+-- also fires on the FIRST write to the column from an undeclared row, even when the value equals the default.
+-- 70000003 is a consumer who has never declared anything (the claim above was refused, so nothing was stamped).
+select is(
+  (select availability_updated_at from public.profiles where user_id = '70000003-0000-4000-8000-000000000003'),
+  null, 'a profile nobody touched is NOT DECLARED: no stamp');
+select is(
+  (select available_for_work from public.profiles where user_id = '70000003-0000-4000-8000-000000000003'),
+  false, 'and its flag is the default false — the flag alone cannot say whether it was ever answered');
+update public.profiles set available_for_work = false where user_id = '70000003-0000-4000-8000-000000000003';
+select isnt(
+  (select availability_updated_at from public.profiles where user_id = '70000003-0000-4000-8000-000000000003'),
+  null, 'the FIRST explicit "unavailable" (false -> false) IS recorded — it is now a declaration, not a default');
+
+-- Re-asserting an already-declared value must not re-stamp (the age must stay truthful). Same transaction means the
+-- same now(), so pin the stamp to an old value with the trigger paused, then write the current value again.
+alter table public.profiles disable trigger stamp_profiles_availability;
+update public.profiles set availability_updated_at = timestamptz '2021-03-04 05:06:07+00'
+  where user_id = '70000003-0000-4000-8000-000000000003';
+alter table public.profiles enable trigger stamp_profiles_availability;
+update public.profiles set available_for_work = false where user_id = '70000003-0000-4000-8000-000000000003';
+select is(
+  (select availability_updated_at from public.profiles where user_id = '70000003-0000-4000-8000-000000000003'),
+  timestamptz '2021-03-04 05:06:07+00',
+  're-asserting a DECLARED value does not re-stamp — only a change or a first declaration does');
+
+-- A write that does not SET the column never enters the trigger: an undeclared row stays undeclared.
+create temp table undeclared as
+  select user_id from public.profiles
+   where availability_updated_at is null and deleted_at is null limit 1;
+update public.profiles set headline = 'Another unrelated edit' where user_id = (select user_id from undeclared);
+select is(
+  (select availability_updated_at from public.profiles where user_id = (select user_id from undeclared)),
+  null, 'an unrelated edit (headline) leaves an undeclared profile undeclared — nothing else can declare for the person');
+
+select is(
+  (select (pg_get_triggerdef(tg.oid) ~ 'UPDATE OF available_for_work') and (pg_get_triggerdef(tg.oid) ~ 'availability_updated_at IS NULL')
+     from pg_trigger tg where tg.tgname = 'stamp_profiles_availability' and tg.tgrelid = 'public.profiles'::regclass),
+  true, 'the trigger fires only on statements that SET available_for_work, and on a first declaration');
+select col_is_null('public'::name, 'profiles'::name, 'availability_updated_at'::name,
+  'the declaration marker is nullable by design: NULL is the NOT DECLARED state');
+
+-- ===========================================================================
 -- G. No automatic expiry (O3)
 -- ===========================================================================
 -- The guarantee is structural: the ONLY trigger that can touch these columns is
@@ -290,7 +336,10 @@ select is(
     where n.nspname in ('app', 'public')
       and p.prosrc like '%available_for_work%'
       and p.proname <> 'stamp_availability'
-      and p.proname <> '_profile_public_directory'),
+      and p.proname <> '_profile_public_directory'
+      -- app.job_match_rows READS it, to score availability in the Overall Match presentation signal (test 74).
+      -- It is read-only, writes nothing, expires nothing, and gates nothing.
+      and p.proname <> 'job_match_rows'),
   0, 'no other function in app/public writes or reads available_for_work — no expiry job exists');
 
 -- ===========================================================================
