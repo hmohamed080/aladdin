@@ -25,6 +25,7 @@ export function toPreviewCardVM(o: PreviewOpportunity, locale: Locale): JobCardV
     href: "#",
     distanceKm: o.distanceKm,
     matchPercent: o.matchPercent,
+    match: null,
   };
 }
 

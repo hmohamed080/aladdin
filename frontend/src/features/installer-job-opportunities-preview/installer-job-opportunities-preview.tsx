@@ -78,7 +78,6 @@ export function InstallerJobOpportunitiesPreview({
             onSortChange={setSort}
             sortOptions={PREVIEW_SORTS}
             tradeOptions={tradeOptions}
-            governorates={[]}
             preview={{
               savedIds,
               onToggleSaved: (id) =>

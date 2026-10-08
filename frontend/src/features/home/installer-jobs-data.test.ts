@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createTranslator } from "@/lib/i18n/translate";
 import type { OpportunityRow } from "@/server/queries/job-opportunities";
-import { jobCountLabel, toJobCardVM, toJobCardVMs } from "./installer-jobs-data";
+import { jobCountLabel, jobPageLabel, toJobCardVM, toJobCardVMs } from "./installer-jobs-data";
 
 const t = createTranslator("en");
 
@@ -33,7 +33,7 @@ describe("toJobCardVM — real rows, honest omissions", () => {
       id: "job-1",
       title: "Install SPC flooring",
       org: "Modern Floors",
-      place: "New Cairo، Cairo",
+      place: "New Cairo, Cairo", // the catalogue's own English names, joined with the language's comma
       tradeKey: "flooring",
       durationDays: 3,
       amount: 4500,
@@ -92,5 +92,23 @@ describe("jobCountLabel — never claims a total from a capped read", () => {
   it("is localised", () => {
     expect(jobCountLabel(100, 100, "ar")).toContain("حتى");
     expect(jobCountLabel(3, 100, "ar")).toContain("٣");
+  });
+});
+
+describe("jobPageLabel — a REAL page states an exact total", () => {
+  it("says 'Showing X of N' while more exist", () => {
+    expect(jobPageLabel(6, 23, "en")).toBe("Showing 6 of 23 opportunities");
+    expect(jobPageLabel(6, 23, "ar")).toBe("عرض ٦ من ٢٣ فرصة");
+  });
+  it("reads like the unpaged label once everything is shown", () => {
+    expect(jobPageLabel(8, 8, "en")).toBe("8 opportunities available");
+    expect(jobPageLabel(1, 1, "en")).toBe("1 opportunity available");
+  });
+});
+
+describe("jobPageLabel for Nearest — the same exact sentence, because Nearest is a real page now", () => {
+  it("states the database's exact total whatever the ordering, with no 'among the newest N' qualifier", () => {
+    expect(jobPageLabel(6, 340, "en")).toBe("Showing 6 of 340 opportunities");
+    expect(jobPageLabel(6, 340, "en")).not.toMatch(/newest/i);
   });
 });

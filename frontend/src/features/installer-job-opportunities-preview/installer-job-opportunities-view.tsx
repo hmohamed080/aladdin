@@ -54,12 +54,14 @@ export function InstallerJobOpportunitiesView({
   onSortChange,
   sortOptions,
   tradeOptions,
-  governorates,
   subtitle,
   headerAction,
   preview,
   scroll,
   pending = false,
+  paging,
+  notice,
+  saves,
 }: {
   /** Already filtered and ordered by the adapter (production: by the real query). */
   opportunities: readonly JobCardVM[];
@@ -71,7 +73,6 @@ export function InstallerJobOpportunitiesView({
   onSortChange: (next: BoardSort) => void;
   sortOptions: readonly BoardSort[];
   tradeOptions: readonly TradeOption[];
-  governorates: readonly string[];
   subtitle?: string;
   /** Production: the "My applications" link. The preview passes its saved-jobs button. */
   headerAction?: ReactNode;
@@ -79,6 +80,16 @@ export function InstallerJobOpportunitiesView({
   /** "contained": the preview's fixed-viewport columns. "page": ordinary page scroll with a sticky filter rail. */
   scroll: "contained" | "page";
   pending?: boolean;
+  /**
+   * Production: the REAL page the route fetched. When present, `opportunities` is
+   * shown whole and the footer asks the route for a bigger or smaller range. The
+   * preview omits it and reveals its fixture list locally.
+   */
+  paging?: { total: number; hasMore: boolean; canShowFewer: boolean; onShowMore: () => void; onShowFewer: () => void };
+  /** A short honest note under the count (e.g. why "Nearest" cannot rank yet). */
+  notice?: ReactNode;
+  /** Production: the persisted saved-opportunity ids and the action that changes them. */
+  saves?: { ids: ReadonlySet<string>; onToggle: (id: string) => void };
 }) {
   const { locale, dir, t } = useI18n();
   const ar = locale === "ar";
@@ -89,7 +100,9 @@ export function InstallerJobOpportunitiesView({
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const stateKey = JSON.stringify([filters, sort, preview?.savedOnly ?? false]);
   const expanded = expandedKey === stateKey;
-  const visible = expanded ? opportunities : opportunities.slice(0, INITIAL_VISIBLE);
+  const visible = paging || expanded ? opportunities : opportunities.slice(0, INITIAL_VISIBLE);
+  // "Nearest" is "الأقرب لي" in the approved preview; in production it is a city/governorate tier, not a distance, so it is only "Nearest".
+  const sortLabels = preview ? SORT_LABELS : { ...SORT_LABELS, nearest: { ar: "الأقرب", en: "Nearest" } };
   const contained = scroll === "contained";
 
   const count = activeFilterCount(filters, Boolean(preview), preview?.budgetCeiling);
@@ -153,7 +166,7 @@ export function InstallerJobOpportunitiesView({
                 sort === value ? "bg-primary text-primary-foreground" : "text-fg-secondary hover:bg-surface-2 hover:text-fg",
               )}
             >
-              {ar ? SORT_LABELS[value].ar : SORT_LABELS[value].en}
+              {ar ? sortLabels[value].ar : sortLabels[value].en}
             </button>
           ))}
         </div>
@@ -165,18 +178,26 @@ export function InstallerJobOpportunitiesView({
             {count > 0 ? <span className="grid h-5 min-w-5 place-items-center rounded-pill bg-primary-foreground px-1 text-caption font-bold tabular-nums text-primary">{formatCount(count, locale)}</span> : null}
           </Button>
           <div className="inline-flex rounded-sm border bg-surface p-1 shadow-card max-tablet:hidden" role="group" aria-label={ar ? "طريقة عرض الفرص" : "Opportunity view"}>
-            <ViewButton active={view === "grid"} label={ar ? "عرض شبكي" : "Grid view"} onClick={() => setView("grid")}><GridViewIcon /></ViewButton>
-            <ViewButton active={view === "list"} label={ar ? "عرض قائمة" : "List view"} onClick={() => setView("list")}><ListViewIcon /></ViewButton>
+            <ViewButton active={view === "grid"} label={ar ? "عرض الشبكة" : "Grid view"} onClick={() => setView("grid")}><GridViewIcon /></ViewButton>
+            <ViewButton active={view === "list"} label={ar ? "عرض القائمة" : "List view"} onClick={() => setView("list")}><ListViewIcon /></ViewButton>
           </div>
         </div>
       </div>
 
-      <div dir="ltr" className={cn("grid min-h-0 flex-1 items-start gap-md wide:grid-cols-[minmax(0,1fr)_18rem]", contained && "wide:overflow-hidden")}>
-        <section dir={dir} aria-live="polite" aria-busy={pending || undefined} className={cn("min-w-0", contained && "wide:h-full wide:min-h-0 wide:overflow-y-auto wide:pe-sm", pending && "opacity-70 transition-opacity")}>
+      {/* On desktop the RESULTS are their own scroll region next to the filters (the preview fills its fixed viewport; production takes one screen's height minus the header), so adding cards never makes the page longer. Phones and tablets keep ordinary page scroll. */}
+      <div
+        dir="ltr"
+        className={cn(
+          "grid min-h-0 flex-1 items-start gap-md wide:grid-cols-[minmax(0,1fr)_18rem] wide:overflow-hidden",
+          !contained && "wide:h-[calc(100dvh-21rem)] wide:min-h-[26rem] wide:flex-none wide:items-stretch",
+        )}
+      >
+        <section dir={dir} data-testid="job-results" aria-live="polite" aria-busy={pending || undefined} className={cn("relative min-w-0 wide:h-full wide:min-h-0 wide:overflow-y-auto wide:pe-sm", pending && "opacity-70 transition-opacity")}>
           <div className="mb-sm flex items-center justify-between gap-sm">
             <p className="text-label text-fg-secondary">{countLabel}</p>
             {preview?.savedOnly ? <span className="text-label font-medium text-accent">{ar ? "المحفوظة فقط" : "Saved only"}</span> : null}
           </div>
+          {notice ? <p className="-mt-xs mb-sm text-caption text-fg-muted">{notice}</p> : null}
 
           {visible.length === 0 ? (
             preview ? (
@@ -184,6 +205,12 @@ export function InstallerJobOpportunitiesView({
                 icon={<SearchIcon size={20} />}
                 title={ar ? "لا توجد فرص بهذه الفلاتر" : "No opportunities match these filters"}
                 body={ar ? "جرّب توسيع نطاق الموقع أو تعديل نوع العمل والميزانية." : "Try widening the location radius or adjusting work type and budget."}
+              />
+            ) : filters.saved && !narrowedAnyway ? (
+              <StatePanel
+                icon={<HeartFilledIcon size={20} />}
+                title={ar ? "لا توجد فرص محفوظة" : "No saved opportunities"}
+                body={ar ? "اضغط على القلب في أي فرصة لحفظها والعودة إليها لاحقًا." : "Tap the heart on an opportunity to save it and come back to it later."}
               />
             ) : (
               <StatePanel
@@ -210,13 +237,29 @@ export function InstallerJobOpportunitiesView({
                           }
                         : undefined
                     }
+                    save={saves ? { saved: saves.ids.has(job.id), onToggle: () => saves.onToggle(job.id) } : undefined}
                   />
                 </li>
               ))}
             </ul>
           )}
 
-          {!expanded && opportunities.length > INITIAL_VISIBLE ? (
+          {paging ? (
+            paging.hasMore || paging.canShowFewer ? (
+              <div className="mt-lg flex flex-wrap justify-center gap-sm">
+                {paging.hasMore ? (
+                  <Button variant="outline" onClick={paging.onShowMore} disabled={pending}>
+                    {ar ? "عرض المزيد من الفرص" : "View more opportunities"}
+                  </Button>
+                ) : null}
+                {paging.canShowFewer ? (
+                  <Button variant="outline" onClick={paging.onShowFewer} disabled={pending}>
+                    {ar ? "عرض فرص أقل" : "Show fewer opportunities"}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null
+          ) : !expanded && opportunities.length > INITIAL_VISIBLE ? (
             <div className="mt-lg flex justify-center">
               <Button variant="outline" onClick={() => setExpandedKey(stateKey)}>
                 {ar ? "عرض المزيد من الفرص" : "View more opportunities"}
@@ -234,9 +277,7 @@ export function InstallerJobOpportunitiesView({
             filtersOpen
               ? "fixed inset-x-0 bottom-0 z-modal block max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-lg bg-canvas px-sm pb-[max(1rem,env(safe-area-inset-bottom))] pt-xs shadow-lg tablet:inset-x-auto tablet:end-0 tablet:start-0 tablet:mx-auto tablet:max-w-xl"
               : "hidden",
-            contained
-              ? "wide:static wide:block wide:h-full wide:min-h-0 wide:max-h-none wide:overflow-hidden wide:rounded-none wide:bg-transparent wide:p-0 wide:shadow-none"
-              : "wide:sticky wide:top-md wide:block wide:max-h-[calc(100dvh-2rem)] wide:self-start wide:overflow-y-auto wide:rounded-none wide:bg-transparent wide:p-0 wide:shadow-none",
+            "wide:static wide:block wide:h-full wide:min-h-0 wide:max-h-none wide:overflow-hidden wide:rounded-none wide:bg-transparent wide:p-0 wide:shadow-none",
           )}
         >
           <div className="relative flex h-10 items-center justify-center wide:hidden">
@@ -254,8 +295,7 @@ export function InstallerJobOpportunitiesView({
             locale={locale}
             filters={filters}
             tradeOptions={tradeOptions}
-            governorates={governorates}
-            resultCount={opportunities.length}
+            resultCount={paging?.total ?? opportunities.length}
             previewBudgetCeiling={preview?.budgetCeiling}
             onFiltersChange={onFiltersChange}
             onApply={() => setFiltersOpen(false)}

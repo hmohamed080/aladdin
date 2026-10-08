@@ -20,7 +20,14 @@ import { cn } from "@/lib/ui/cn";
 import type { Locale } from "@/lib/i18n/locales";
 import { formatEgp } from "@/lib/ui/egp-format";
 import { TradeIllustration } from "@/features/installer-dashboard-preview/trade-illustration";
+import { MatchBadge } from "./match-badge";
 import type { JobCardVM } from "./view-model";
+
+/** The REAL save state of one card (production): `saved` comes from the database, `onToggle` persists it. */
+export type CardSaveState = {
+  saved: boolean;
+  onToggle: () => void;
+};
 
 /** The interactions only the preview fixtures can honour (see `PreviewInteractions`). */
 export type CardPreviewState = {
@@ -36,10 +43,11 @@ export type CardPreviewState = {
  * `preview` present  -> the approved design with its local demo behaviour: a save
  *                       heart and an Apply button that flips local state.
  * `preview` absent   -> the same card carrying only what the backend can honour:
- *   - no save heart (there is no saved-jobs model);
- *   - no in-card Apply: applying is a deliberate act on the opening's own page,
- *     which owns the real `applyToJobAction`, so the card LINKS there;
- *   - no skill-match badge and no distance (no such data exists);
+ *   - the save heart is the REAL persisted state (`save`), never a local flip;
+ *   - no local Apply state: "Apply now" LINKS to the opening's own page, which
+ *     opens the real confirmation dialog around `applyToJobAction`;
+ *   - the match badge is the database's canonical Overall Match (trade + specialty + location +
+ *     availability) with its breakdown; no distance (no such data exists);
  *   - the image is the generic illustration of the opening's REAL trade unless a
  *     photograph genuinely belongs to it;
  *   - an honest "budget not specified" instead of a zero.
@@ -49,14 +57,18 @@ export function OpportunityCard({
   locale,
   view,
   preview,
+  save,
 }: {
   job: JobCardVM;
   locale: Locale;
   view: "grid" | "list";
   preview?: CardPreviewState;
+  save?: CardSaveState;
 }) {
   const { t } = useI18n();
   const ar = locale === "ar";
+  // The heart is the preview's local demo OR production's persisted state — never both.
+  const heart = preview ? { saved: preview.saved, onToggle: preview.onToggleSaved } : save;
   const meta: { key: string; icon: React.ReactNode; label: string }[] = [];
   if (job.place) meta.push({ key: "place", icon: <MapPinIcon size={14} />, label: job.place });
   if (job.distanceKm !== null) {
@@ -87,22 +99,27 @@ export function OpportunityCard({
         )}
         <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-sm p-sm">
           {job.matchPercent !== null ? (
-            <span className="flex items-center gap-1 rounded-pill bg-success px-2.5 py-1 text-label font-semibold text-white shadow-sm">
-              <TargetIcon size={13} />
-              {ar
-                ? `${formatNumber(job.matchPercent, locale)}% مناسب لمهاراتك`
-                : `${formatNumber(job.matchPercent, locale)}% skill match`}
-            </span>
+            preview ? (
+              <span className="flex items-center gap-1 rounded-pill bg-success px-2.5 py-1 text-label font-semibold text-white shadow-sm">
+                <TargetIcon size={13} />
+                {ar
+                  ? `${formatNumber(job.matchPercent, locale)}% مناسب لمهاراتك`
+                  : `${formatNumber(job.matchPercent, locale)}% skill match`}
+              </span>
+            ) : job.match ? (
+              // Production: the canonical Overall Match from the database, with its breakdown one press away.
+              <MatchBadge match={job.match} locale={locale} />
+            ) : <span />
           ) : <span />}
-          {preview ? (
+          {heart ? (
             <button
               type="button"
-              aria-label={preview.saved ? (ar ? "إزالة من الفرص المحفوظة" : "Remove from saved jobs") : ar ? "حفظ الفرصة" : "Save opportunity"}
-              aria-pressed={preview.saved}
-              onClick={preview.onToggleSaved}
+              aria-label={heart.saved ? (ar ? "إزالة من الفرص المحفوظة" : "Remove from saved jobs") : ar ? "حفظ الفرصة" : "Save opportunity"}
+              aria-pressed={heart.saved}
+              onClick={heart.onToggle}
               className="grid h-9 w-9 place-items-center rounded-pill bg-white/90 text-fg-secondary shadow-sm backdrop-blur transition-colors hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
-              {preview.saved ? <HeartFilledIcon size={19} className="text-danger" /> : <HeartIcon size={19} />}
+              {heart.saved ? <HeartFilledIcon size={19} className="text-danger" /> : <HeartIcon size={19} />}
             </button>
           ) : null}
         </div>
@@ -150,15 +167,21 @@ export function OpportunityCard({
                   <CheckIcon size={14} />
                   {t("jobs.opportunities.appliedBadge")}
                 </span>
-                <Link href={job.href} className="rounded-sm border border-strong px-2.5 py-1.5 text-label font-medium text-fg transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-                  {ar ? "تفاصيل أكثر" : "More details"}
+                <Link href={job.href} className={DETAILS_LINK}>
+                  {ar ? "تفاصيل" : "Details"}
                 </Link>
               </>
             ) : (
-              <Link href={job.href} className="flex items-center gap-1.5 rounded-sm bg-primary px-2.5 py-1.5 text-label font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-                <SendIcon size={14} />
-                {t("jobs.opportunities.viewAndApply")}
-              </Link>
+              <>
+                <Link href={job.href} className={DETAILS_LINK}>
+                  {ar ? "تفاصيل" : "Details"}
+                </Link>
+                {/* The real application flow: the detail page opens its own confirmation dialog, so applying is still a deliberate act with the terms restated — never a one-tap local state. */}
+                <Link href={`${job.href}?apply=1`} className="flex items-center gap-1.5 rounded-sm bg-primary px-2.5 py-1.5 text-label font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+                  <SendIcon size={14} />
+                  {ar ? "قدّم الآن" : "Apply now"}
+                </Link>
+              </>
             )}
           </div>
         </div>
@@ -166,6 +189,9 @@ export function OpportunityCard({
     </article>
   );
 }
+
+const DETAILS_LINK =
+  "rounded-sm border border-strong px-2.5 py-1.5 text-label font-medium text-fg transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
 
 function Meta({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (

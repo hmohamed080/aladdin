@@ -3,7 +3,9 @@ import type { TranslateFn } from "@/lib/i18n/translate";
 import { tradeLabel } from "@/lib/i18n/trade-label";
 import { formatRelativeTime } from "@/lib/ui/format";
 import type { JobCardVM } from "@/features/installer-job-opportunities-preview/view-model";
+import { toMatchBreakdown, type MatchColumns } from "@/lib/installer/overall-match";
 import type { OpportunityRow } from "@/server/queries/job-opportunities";
+import { placeLabel } from "@/lib/installer/opportunity-location";
 
 /**
  * THE REAL SIDE OF THE JOB BOARD'S DATA-ADAPTER BOUNDARY.
@@ -14,7 +16,7 @@ import type { OpportunityRow } from "@/server/queries/job-opportunities";
  *
  * Nothing is invented. A field the data cannot supply is `null` and the card draws
  * its honest state instead:
- *   - distance and skill-match: no geolocation or skills model exists;
+ *   - distance: no geolocation exists, so no km is ever shown;
  *   - image: no job carries media (no column, no bucket) — the card draws the
  *     generic illustration for `tradeKey`, never a stock photo that would read as
  *     this job's picture;
@@ -23,11 +25,14 @@ import type { OpportunityRow } from "@/server/queries/job-opportunities";
  * Not `server-only`, like `installer-dashboard-data.ts`: it is a pure transform of
  * rows already fetched. The reads themselves stay in `server/queries/*`.
  */
-export function toJobCardVM(job: OpportunityRow, t: TranslateFn, locale: Locale): JobCardVM | null {
+/** A discovery row, optionally carrying the canonical Overall Match columns (the paged board's rows do). */
+export type MatchedJobRow = OpportunityRow & Partial<MatchColumns>;
+
+export function toJobCardVM(job: MatchedJobRow, t: TranslateFn, locale: Locale): JobCardVM | null {
   // Every view column is nullable to the type generator — a row without an id or a
   // title is skipped rather than drawn half blank.
   if (!job.id || !job.title) return null;
-  const place = [job.city, job.governorate].filter(Boolean).join("، ");
+  const place = placeLabel(locale, job.governorate, job.city);
   return {
     id: job.id,
     title: job.title,
@@ -42,11 +47,12 @@ export function toJobCardVM(job: OpportunityRow, t: TranslateFn, locale: Locale)
     hasApplied: Boolean(job.has_applied),
     href: `/home/jobs/${job.id}`,
     distanceKm: null,
-    matchPercent: null,
+    matchPercent: job.overall_percent ?? null,
+    match: job.overall_percent === undefined ? null : toMatchBreakdown(job as MatchColumns),
   };
 }
 
-export function toJobCardVMs(jobs: readonly OpportunityRow[], t: TranslateFn, locale: Locale): JobCardVM[] {
+export function toJobCardVMs(jobs: readonly MatchedJobRow[], t: TranslateFn, locale: Locale): JobCardVM[] {
   return jobs.flatMap((job) => {
     const vm = toJobCardVM(job, t, locale);
     return vm ? [vm] : [];
@@ -67,4 +73,17 @@ export function jobCountLabel(loaded: number, limit: number, locale: Locale): st
   }
   if (locale === "ar") return loaded === 1 ? "فرصة واحدة متاحة" : `${fmt.format(loaded)} فرصة متاحة`;
   return loaded === 1 ? "1 opportunity available" : `${fmt.format(loaded)} opportunities available`;
+}
+
+/**
+ * The count sentence for a REAL page: `total` is the database's exact count of
+ * matching opportunities, so it is stated as a fact. Fewer shown than exist reads
+ * "Showing 6 of 23"; everything shown reads like the unpaged label.
+ */
+export function jobPageLabel(shown: number, total: number, locale: Locale): string {
+  if (shown >= total) return jobCountLabel(total, Number.POSITIVE_INFINITY, locale);
+  const fmt = new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-EG");
+  return locale === "ar"
+    ? `عرض ${fmt.format(shown)} من ${fmt.format(total)} فرصة`
+    : `Showing ${fmt.format(shown)} of ${fmt.format(total)} opportunities`;
 }

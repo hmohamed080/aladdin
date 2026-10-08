@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { Button, Input } from "@/components/ui/controls";
-import { ChevronDownIcon, SearchIcon } from "@/components/ui/icons";
+import { SearchIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
 import type { Locale } from "@/lib/i18n/locales";
-import { cn } from "@/lib/ui/cn";
 import { formatEgp } from "@/lib/ui/egp-format";
+import { CITIES_BY_GOVERNORATE, GOVERNORATE_OPTIONS, type LocationOption } from "@/lib/installer/location-data";
+import { ListboxSelect } from "@/components/ui/listbox";
 import {
   DEFAULT_BOARD_FILTERS,
   type AppliedFilter,
@@ -18,7 +19,8 @@ import {
 /**
  * The filter rail / bottom sheet — one panel for the preview and for production.
  *
- * Production sections: Search, Location (governorate), Work type, Budget
+ * Production sections: Search, Location (governorate + city, from the canonical
+ * Egypt catalogue), Work type, Budget
  * (minimum and maximum, both optional and unbounded), Duration, Applied.
  * Preview-only sections (their data does not exist in production): the map, the
  * distance radius and the budget slider with its fixture ceiling.
@@ -31,7 +33,6 @@ export function OpportunityFilters({
   locale,
   filters,
   tradeOptions,
-  governorates,
   resultCount,
   previewBudgetCeiling,
   onFiltersChange,
@@ -40,7 +41,6 @@ export function OpportunityFilters({
   locale: Locale;
   filters: BoardFilters;
   tradeOptions: readonly TradeOption[];
-  governorates: readonly string[];
   resultCount: number;
   /** Present only in the preview, which keeps its slider (and map and radius). */
   previewBudgetCeiling?: number;
@@ -116,22 +116,13 @@ export function OpportunityFilters({
         </FilterSection>
       ) : (
         <FilterSection title={ar ? "الموقع" : "Location"}>
-          <FilterMenuSelect
-            label={ar ? "المحافظة" : "Governorate"}
-            value={filters.governorate}
-            options={[
-              { value: "", label: t("jobs.opportunities.allLocations") },
-              // Free text the posters wrote, so the label IS the value.
-              ...governorates.map((g) => ({ value: g, label: g })),
-            ]}
-            onChange={(value) => set({ governorate: value })}
-          />
+          <LocationFilter locale={locale} filters={filters} set={set} allGovernorates={t("jobs.opportunities.allGovernorates")} allCities={t("jobs.opportunities.allCities")} />
         </FilterSection>
       )}
 
       {tradeOptions.length > 0 ? (
         <FilterSection title={ar ? "نوع العمل" : "Work type"}>
-          <div className="grid max-h-72 gap-2 overflow-y-auto wide:gap-1">
+          <div tabIndex={0} aria-label={ar ? "أنواع العمل" : "Work types"} className="grid max-h-36 gap-2 overflow-y-auto overscroll-contain pe-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus wide:gap-1">
             {tradeOptions.map((option) => (
               <label key={option.key} className="flex cursor-pointer items-center gap-2.5 text-body text-fg-secondary">
                 <input
@@ -205,12 +196,15 @@ export function OpportunityFilters({
         </FilterSection>
       )}
 
-      <div className="flex justify-center p-md wide:p-sm wide:pe-0">
-        <Button className="w-full max-w-56 justify-center gap-2" onClick={onApply}>
-          {ar ? "تطبيق الفلاتر" : "Apply filters"}
-          <span className="rounded-pill bg-primary-foreground/15 px-2 py-0.5 text-label tabular-nums">{resultCount}</span>
-        </Button>
-      </div>
+      {/* Production filters are live (every change navigates), so a final "Apply" would apply nothing. The preview keeps its approved button, which only closes its sheet. */}
+      {preview ? (
+        <div className="flex justify-center p-md wide:p-sm wide:pe-0">
+          <Button className="w-full max-w-56 justify-center gap-2" onClick={onApply}>
+            {ar ? "تطبيق الفلاتر" : "Apply filters"}
+            <span className="rounded-pill bg-primary-foreground/15 px-2 py-0.5 text-label tabular-nums">{resultCount}</span>
+          </Button>
+        </div>
+      ) : null}
     </aside>
   );
 }
@@ -306,81 +300,71 @@ function BudgetRange({
   );
 }
 
+/** A filter dropdown: the shared accessible listbox (portal + Floating UI), so it can never be clipped by this rail's scroll area. */
 function FilterMenuSelect({
   label,
   value,
   options,
   onChange,
   className,
+  disabled = false,
 }: {
   label: string;
   value: string;
   options: readonly { value: string; label: string }[];
   onChange: (value: string) => void;
   className?: string;
+  disabled?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const listId = useId();
-  const selected = options.find((option) => option.value === value);
+  return <ListboxSelect label={label} value={value} options={options} onChange={onChange} className={className} disabled={disabled} />;
+}
 
-  useEffect(() => {
-    if (!open) return;
-    const closeOutside = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", closeOutside);
-    return () => document.removeEventListener("mousedown", closeOutside);
-  }, [open]);
+const pickName = (locale: Locale, o: LocationOption) => (locale === "ar" ? o.ar : o.en);
 
+/**
+ * Governorate + city, side by side, from the SAME canonical catalogue the
+ * showroom-referral form uses (`lib/installer/location-data`) — no second list.
+ * The city list follows the governorate. A job's location is stored as these same
+ * catalogue keys, so "Other city" is just another key to filter on — no free text.
+ */
+function LocationFilter({
+  locale,
+  filters,
+  set,
+  allGovernorates,
+  allCities,
+}: {
+  locale: Locale;
+  filters: BoardFilters;
+  set: (patch: Partial<BoardFilters>) => void;
+  allGovernorates: string;
+  allCities: string;
+}) {
+  const ar = locale === "ar";
+  const cities = filters.governorate ? (CITIES_BY_GOVERNORATE[filters.governorate] ?? []) : [];
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
-      <button
-        type="button"
-        aria-label={label}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={listId}
-        onClick={() => setOpen((current) => !current)}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowDown") {
-            event.preventDefault();
-            setOpen(true);
-          }
-        }}
-        className="flex min-h-10 w-full items-center justify-between gap-sm rounded-sm border border-strong bg-surface px-sm text-start text-body text-fg transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-      >
-        <span className="min-w-0 truncate">{selected?.label}</span>
-        <ChevronDownIcon size={15} className={cn("shrink-0 text-fg-muted transition-transform", open && "rotate-180")} />
-      </button>
-
-      {open ? (
-        <div
-          id={listId}
-          role="listbox"
-          aria-label={label}
-          className="absolute start-0 top-full z-popover mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-strong bg-surface p-xs shadow-lg"
-        >
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="option"
-              aria-selected={option.value === value}
-              onClick={() => {
-                onChange(option.value);
-                setOpen(false);
-              }}
-              className={cn(
-                "flex min-h-9 w-full items-center rounded-sm px-sm text-start text-label text-fg transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
-                option.value === value && "bg-info/10 font-semibold text-info",
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
+    <div>
+      <div className="grid grid-cols-2 gap-sm">
+        <div className="grid min-w-0 content-start gap-1 text-label text-fg-secondary">
+          <span>{ar ? "المحافظة" : "Governorate"}</span>
+          <FilterMenuSelect
+            label={ar ? "المحافظة" : "Governorate"}
+            value={filters.governorate}
+            options={[{ value: "", label: allGovernorates }, ...GOVERNORATE_OPTIONS.map((o) => ({ value: o.value, label: pickName(locale, o) }))]}
+            onChange={(value) => set({ governorate: value, city: "" })}
+          />
         </div>
-      ) : null}
+        <div className="grid min-w-0 content-start gap-1 text-label text-fg-secondary">
+          <span>{ar ? "المدينة" : "City"}</span>
+          <FilterMenuSelect
+            label={ar ? "المدينة" : "City"}
+            value={filters.city}
+            disabled={!filters.governorate}
+            options={[{ value: "", label: allCities }, ...cities.map((o) => ({ value: o.value, label: pickName(locale, o) }))]}
+            onChange={(value) => set({ city: value })}
+          />
+        </div>
+      </div>
     </div>
   );
 }

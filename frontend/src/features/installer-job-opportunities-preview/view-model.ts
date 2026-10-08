@@ -1,3 +1,4 @@
+import type { MatchBreakdown } from "@/lib/installer/overall-match";
 /**
  * THE JOB BOARD VIEW MODEL — the boundary between presentation and source.
  *
@@ -33,7 +34,10 @@ export type JobCardVM = {
   href: string;
   /** Preview-only: no geolocation or skills model exists in production. */
   distanceKm: number | null;
+  /** The Overall Match percentage (the database's `overall_percent`); null in the preview. */
   matchPercent: number | null;
+  /** The breakdown the percentage came from, as the database returned it; null in the preview. */
+  match: MatchBreakdown | null;
 };
 
 export type DurationFilter = "all" | "short" | "medium" | "long";

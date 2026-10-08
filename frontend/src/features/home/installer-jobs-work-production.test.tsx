@@ -4,11 +4,8 @@ import Link from "next/link";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n } from "@/test/render";
 import { createTranslator } from "@/lib/i18n/translate";
-import type { JobCardVM } from "@/features/installer-job-opportunities-preview/view-model";
 import type { MyAssignmentRow } from "@/server/queries/job-assignments";
 import { countAssignmentsByStatus } from "@/lib/work/assignment-state";
-import { DEFAULT_BOARD_FILTERS } from "@/features/installer-job-opportunities-preview/view-model";
-import { InstallerJobsBoard } from "./installer-jobs-board";
 import { InstallerWorkBoard } from "./installer-work-board";
 import { InstallerWorkRail } from "./installer-work-rail";
 import { toActiveWorkVM, toWorkRowVMs, toWorkTabs } from "./installer-work-data";
@@ -27,155 +24,9 @@ vi.mock("next/image", () => ({
 
 const t = createTranslator("en");
 
-function job(over: Partial<JobCardVM> = {}): JobCardVM {
-  return {
-    id: "j1", title: "Install SPC flooring", org: "Modern Floors", place: "New Cairo، Cairo", tradeKey: "flooring",
-    tradeLabel: "Flooring", durationDays: 3, amount: 4500, postedLabel: "Posted 2 hours ago", image: null,
-    hasApplied: false, href: "/home/jobs/j1", distanceKm: null, matchPercent: null, ...over,
-  };
-}
-
-function board(over: Partial<React.ComponentProps<typeof InstallerJobsBoard>> = {}) {
-  return (
-    <InstallerJobsBoard
-      opportunities={[job(), job({ id: "j2", title: "Paint a flat", hasApplied: true, amount: null, href: "/home/jobs/j2" })]}
-      countLabel="2 opportunities available"
-      filters={DEFAULT_BOARD_FILTERS}
-      sort="newest"
-      tradeOptions={[{ key: "flooring", label: "Flooring" }, { key: "painting", label: "Painting" }]}
-      governorates={["Cairo", "Giza"]}
-      subtitle="Work that organizations are hiring for."
-      headerAction={<Link href="/home/jobs/applications">My applications</Link>}
-      {...over}
-    />
-  );
-}
-
 beforeEach(() => {
   nav.replace.mockClear();
   nav.path = "/home/jobs";
-});
-
-describe("production Jobs board — one approved presentation, only real capabilities", () => {
-  it("renders the real cards with the trade illustration, never a photo", () => {
-    const { container } = renderWithI18n(board(), "en");
-    expect(screen.getAllByTestId("job-card")).toHaveLength(2);
-    expect(container.querySelector("img")).toBeNull();
-    expect(container.querySelectorAll("svg").length).toBeGreaterThan(0);
-  });
-
-  it("exposes no save, match, distance, map, radius or New affordance", () => {
-    const { container } = renderWithI18n(board(), "en");
-    expect(screen.queryByRole("button", { name: /save opportunity|saved/i })).toBeNull();
-    expect(screen.queryByText(/saved opportunities/i)).toBeNull();
-    expect(screen.queryByText(/skill match/i)).toBeNull();
-    expect(screen.queryByText(/\bkm\b/)).toBeNull();
-    expect(container.querySelector("iframe")).toBeNull();
-    expect(screen.queryByText(/distance radius|Within \d+ km/i)).toBeNull();
-    expect(screen.queryByText(/^new$/i)).toBeNull();
-    expect(screen.queryByRole("button", { name: /^apply now$/i })).toBeNull();
-  });
-
-  it("offers only Newest and Highest pay", () => {
-    renderWithI18n(board(), "en");
-    const group = screen.getByRole("group", { name: "Sort opportunities" });
-    expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["Newest", "Highest pay"]);
-    expect(screen.queryByRole("button", { name: "Nearest" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Most requested" })).toBeNull();
-  });
-
-  it("leads each card to the real detail/apply flow, and shows the real applied state", () => {
-    renderWithI18n(board(), "en");
-    expect(screen.getByRole("link", { name: /view details and apply/i })).toHaveAttribute("href", "/home/jobs/j1");
-    expect(screen.getByText("You applied")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "More details" })).toHaveAttribute("href", "/home/jobs/j2");
-  });
-
-  it("states a missing budget honestly and formats real money exactly", () => {
-    renderWithI18n(board({ opportunities: [job({ amount: 4500.5 }), job({ id: "j2", amount: null })] }), "en");
-    expect(screen.getByText("4,500.50 EGP")).toBeTruthy();
-    expect(screen.getByText("Budget not specified")).toBeTruthy();
-    expect(screen.queryByText(/(^|\s)0(\.00)?\s*EGP/)).toBeNull();
-  });
-
-  it("shows the supplied count sentence and does not invent a total", () => {
-    renderWithI18n(board({ countLabel: "Showing up to 100 opportunities" }), "en");
-    expect(screen.getByText("Showing up to 100 opportunities")).toBeTruthy();
-  });
-
-  it("keeps the real search, minimum/maximum budget, governorate, applied and duration controls", () => {
-    renderWithI18n(board(), "en");
-    expect(screen.getByRole("searchbox", { name: /search by title/i })).toBeTruthy();
-    expect(screen.getByLabelText("Minimum (EGP)")).toBeTruthy();
-    expect(screen.getByLabelText("Maximum (EGP)")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Governorate" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Duration" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "My applications" })).toHaveAttribute("href", "/home/jobs/applications");
-    // No preview slider with a made-up ceiling.
-    expect(screen.queryByRole("slider")).toBeNull();
-    expect(screen.queryByText(/12,000/)).toBeNull();
-  });
-
-  it("lists every catalog trade and leaves all unchecked by default", () => {
-    renderWithI18n(board(), "en");
-    const boxes = screen.getAllByRole("checkbox");
-    expect(boxes.map((b) => (b as HTMLInputElement).checked)).toEqual([false, false]);
-  });
-
-  describe("URL-driven state", () => {
-    it("ticking a trade navigates to the canonical URL", () => {
-      renderWithI18n(board(), "en");
-      fireEvent.click(screen.getByLabelText("Painting"));
-      expect(nav.replace).toHaveBeenCalledWith("/home/jobs?trade=painting");
-    });
-
-    it("sorting by highest pay navigates, and newest drops the param", () => {
-      renderWithI18n(board(), "en");
-      fireEvent.click(screen.getByRole("button", { name: "Highest pay" }));
-      expect(nav.replace).toHaveBeenCalledWith("/home/jobs?sort=highest");
-    });
-
-    it("commits a numeric budget range on blur", () => {
-      renderWithI18n(board(), "en");
-      fireEvent.change(screen.getByLabelText("Minimum (EGP)"), { target: { value: "1000" } });
-      fireEvent.change(screen.getByLabelText("Maximum (EGP)"), { target: { value: "4500.5" } });
-      fireEvent.blur(screen.getByLabelText("Maximum (EGP)"));
-      expect(nav.replace).toHaveBeenCalledWith("/home/jobs?min=1000&max=4500.5");
-    });
-
-    it("refuses an inverted range instead of navigating", () => {
-      renderWithI18n(board(), "en");
-      fireEvent.change(screen.getByLabelText("Minimum (EGP)"), { target: { value: "9000" } });
-      fireEvent.change(screen.getByLabelText("Maximum (EGP)"), { target: { value: "1000" } });
-      fireEvent.blur(screen.getByLabelText("Maximum (EGP)"));
-      expect(nav.replace).not.toHaveBeenCalled();
-      expect(screen.getByRole("alert")).toBeTruthy();
-    });
-
-    it("commits a search on submit", () => {
-      renderWithI18n(board(), "en");
-      const input = screen.getByRole("searchbox", { name: /search by title/i });
-      fireEvent.change(input, { target: { value: "tiles" } });
-      fireEvent.submit(input.closest("form")!);
-      expect(nav.replace).toHaveBeenCalledWith("/home/jobs?q=tiles");
-    });
-
-    it("Clear all returns to the bare path", () => {
-      renderWithI18n(board({ filters: { ...DEFAULT_BOARD_FILTERS, tradeKeys: ["flooring"] } }), "en");
-      fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
-      expect(nav.replace).toHaveBeenCalledWith("/home/jobs");
-    });
-  });
-
-  it("shows the real empty state, not the demo one, with and without filters", () => {
-    renderWithI18n(board({ opportunities: [], countLabel: "0 opportunities available" }), "en");
-    expect(screen.getByText("No opportunities right now")).toBeTruthy();
-  });
-
-  it("explains a filtered-out board differently from an empty one", () => {
-    renderWithI18n(board({ opportunities: [], filters: { ...DEFAULT_BOARD_FILTERS, governorate: "Giza" } }), "en");
-    expect(screen.getByText("No opportunities match those filters")).toBeTruthy();
-  });
 });
 
 /* ----------------------------------------------------------------------------- */

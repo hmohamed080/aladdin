@@ -8,6 +8,7 @@ import { tradeLabel } from "@/lib/i18n/trade-label";
 import { formatMoney, formatDate, formatRelativeTime } from "@/lib/ui/format";
 import type { Locale } from "@/lib/i18n/locales";
 import type { OpportunityRow } from "@/server/queries/job-opportunities";
+import { placeLabel } from "@/lib/installer/opportunity-location";
 
 /**
  * The professional's discovery surface.
@@ -79,7 +80,7 @@ export function OpportunityCard({
   locale: Locale;
 }) {
   const { t } = useI18n();
-  const place = [o.city, o.governorate].filter(Boolean).join(", ");
+  const place = placeLabel(locale, o.governorate, o.city);
 
   return (
     <Card pad="sm" className="flex h-full flex-col gap-sm">

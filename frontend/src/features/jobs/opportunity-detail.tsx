@@ -8,9 +8,12 @@ import { MapPinIcon, BriefcaseIcon, ShieldIcon } from "@/components/ui/icons";
 import { tradeLabel } from "@/lib/i18n/trade-label";
 import { formatMoney, formatDate, EMPTY } from "@/lib/ui/format";
 import type { Locale } from "@/lib/i18n/locales";
+import { MatchBreakdownBody } from "@/features/installer-job-opportunities-preview/match-badge";
+import { MATCH_TITLE, type MatchBreakdown } from "@/lib/installer/overall-match";
 import { ApplicationStatusBadge, JobStatusBadge, DecisionReason } from "./badges";
 import { applyToJobAction, withdrawApplicationAction } from "@/server/actions/application-forms";
 import type { FormState } from "@/server/actions/job-forms";
+import { placeLabel } from "@/lib/installer/opportunity-location";
 
 /**
  * The professional's DECISION surface for one opening.
@@ -66,7 +69,9 @@ export function OpportunityDetail({
   application,
   canApply,
   assignmentId = null,
+  openApply = false,
   locale,
+  match = null,
 }: {
   job: OpportunityView;
   application: MyCandidacy | null;
@@ -74,10 +79,14 @@ export function OpportunityDetail({
   canApply: boolean;
   /** The assignment this candidacy became, resolved server-side (§20). */
   assignmentId?: string | null;
+  /** Arrived from "Apply now": open the confirmation straight away (still needs the person to confirm). */
+  openApply?: boolean;
   locale: Locale;
+  /** The caller's canonical Overall Match for this job, from the same database authority as every card. Presentation only. */
+  match?: MatchBreakdown | null;
 }) {
   const { t } = useI18n();
-  const place = [job.city, job.governorate].filter(Boolean).join(", ");
+  const place = placeLabel(locale, job.governorate, job.city);
   const live = job.discoverable;
 
   return (
@@ -128,6 +137,16 @@ export function OpportunityDetail({
             : EMPTY}
         </Field>
       </Card>
+
+      {/* 2b. How this opening fits the caller: the canonical Overall Match with its full breakdown. It never limits applying. */}
+      {match ? (
+        <div data-testid="job-match">
+          <Card className="flex flex-col gap-sm">
+            <h2 className="text-title text-fg">{MATCH_TITLE[locale === "ar" ? "ar" : "en"]}</h2>
+            <MatchBreakdownBody match={match} locale={locale} />
+          </Card>
+        </div>
+      ) : null}
 
       {/* 3. The work itself. */}
       {job.description ? (
@@ -184,7 +203,7 @@ export function OpportunityDetail({
             body={t("jobs.apply.deniedBody")}
           />
         ) : (
-          <ApplyDialog job={job} locale={locale} />
+          <ApplyDialog job={job} locale={locale} defaultOpen={openApply} />
         )}
       </Card>
     </div>
@@ -307,10 +326,12 @@ function ApplyDialog({
   job,
   locale,
   again = false,
+  defaultOpen = false,
 }: {
   job: OpportunityView;
   locale: Locale;
   again?: boolean;
+  defaultOpen?: boolean;
 }) {
   const { t } = useI18n();
 
@@ -323,6 +344,7 @@ function ApplyDialog({
       confirmLabel={t("jobs.apply.confirm")}
       confirmVariant="accent"
       formAction={applyToJobAction}
+      defaultOpen={defaultOpen}
     >
       {(state: FormState) => (
         <div className="flex flex-col gap-md text-start">
