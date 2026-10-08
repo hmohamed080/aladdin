@@ -35,3 +35,17 @@ describe("canonical profile phone (libphonenumber-js)", () => {
     expect(toE164("01002003040")).toBe("+201002003040");
   });
 });
+
+describe("splitE164", () => {
+  it("turns a stored E.164 number back into country + national digits", async () => {
+    const { splitE164 } = await import("./phone");
+    expect(splitE164("+201001112222")).toEqual({ countryIso2: "EG", national: "1001112222" });
+  });
+  it("is null for anything it cannot place — the field starts empty rather than guessing", async () => {
+    const { splitE164 } = await import("./phone");
+    expect(splitE164(null)).toBeNull();
+    expect(splitE164("")).toBeNull();
+    expect(splitE164("+2010")).toBeNull();
+    expect(splitE164("not a number")).toBeNull();
+  });
+});

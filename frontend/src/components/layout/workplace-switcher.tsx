@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { selectWorkspace } from "@/server/actions/context";
 import { PERSONAL_CONTEXT, type WorkspaceEntry } from "@/lib/workspace/model";
 import { BuildingIcon, CheckIcon, ChevronDownIcon, UserIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/ui/cn";
-import { menuItemClass, menuSectionLabelClass, menuSurfaceClass } from "@/components/ui/menu";
+import { menuItemClass, menuSectionLabelClass } from "@/components/ui/menu";
+import { FloatingMenu } from "@/components/ui/floating-menu";
 
 /**
  * The narrow WORKPLACE control — for someone who WORKS in an organization (an
@@ -33,23 +34,7 @@ export function WorkplaceSwitcher({
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
-  const root = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: MouseEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  const trigger = useRef<HTMLButtonElement>(null);
 
   const active = entries.find((e) =>
     e.kind === "personal" ? activeKey === PERSONAL_CONTEXT : e.organizationId === activeKey,
@@ -74,8 +59,9 @@ export function WorkplaceSwitcher({
   };
 
   return (
-    <div ref={root} className="relative">
+    <div className="relative">
       <button
+        ref={trigger}
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={pending}
@@ -95,8 +81,15 @@ export function WorkplaceSwitcher({
         <ChevronDownIcon size={14} className="shrink-0 text-fg-muted" />
       </button>
 
-      {open ? (
-        <div role="menu" data-testid="workplace-menu" className={cn(menuSurfaceClass, "absolute top-full mt-1 start-0 z-popover w-64")}>
+      <FloatingMenu
+          open={open}
+          onClose={() => setOpen(false)}
+          anchorRef={trigger}
+          role="menu"
+          data-testid="workplace-menu"
+          placement="bottom-start"
+          className="w-64"
+        >
           <p className={cn(menuSectionLabelClass, "px-3 pt-2.5 pb-1")}>{t("workspace.workplaces")}</p>
           <ul className="flex flex-col py-0.5">
             {entries.map((entry) => {
@@ -125,8 +118,7 @@ export function WorkplaceSwitcher({
               );
             })}
           </ul>
-        </div>
-      ) : null}
+        </FloatingMenu>
     </div>
   );
 }

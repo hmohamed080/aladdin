@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/ui/cn";
 import { DEFAULT_PERIOD, type PeriodKey } from "@/lib/workspace/period";
 import { CalendarIcon, ChevronDownIcon, CheckIcon } from "@/components/ui/icons";
-import { menuSurfaceClass } from "@/components/ui/menu";
+import { FloatingMenu } from "@/components/ui/floating-menu";
 
 /**
  * This menu's rows are deliberately NOT `menuItemClass`.
@@ -88,7 +88,6 @@ export function PeriodSelect({
   const params = useSearchParams();
 
   const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -102,25 +101,6 @@ export function PeriodSelect({
      shell follows. Escape also RESTORES FOCUS, which the others can leave to the
      browser but this one cannot: focus is sitting on a menu item that is about to
      unmount, and dropping it sends the user back to the top of the document. */
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: MouseEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        trigger.current?.focus();
-      }
-    };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   /* Opening lands focus on the CHOSEN row rather than the first one — what a
      native select does, and the reason arrowing through an open list starts from
      where you already are. */
@@ -154,7 +134,7 @@ export function PeriodSelect({
   };
 
   return (
-    <div ref={root} className="relative inline-flex">
+    <div className="relative inline-flex">
       <button
         ref={trigger}
         type="button"
@@ -191,20 +171,16 @@ export function PeriodSelect({
         </span>
       </button>
 
-      {open ? (
-        <div
+      <FloatingMenu
+          open={open}
+          onClose={() => setOpen(false)}
+          anchorRef={trigger}
           role="menu"
           aria-label={label}
           data-testid="period-menu"
-          // `start-0`: the list hangs from the LEADING edge of the chip, which is
-          // the right edge in Arabic. The viewport cap rides along inside
-          // `menuSurfaceClass`, so a narrow phone cannot push it off-screen.
-          /* `min-w-full` measures the WRAPPER, which shrink-wraps the chip — so
-             the list is never narrower than the trigger it hangs from, and reads
-             as attached to it rather than as a panel that happens to be nearby.
-             `w-max` lets a longer label push it wider; the viewport cap inside
-             `menuSurfaceClass` stops that at the screen edge. */
-          className={cn(menuSurfaceClass, "absolute start-0 top-full mt-1 z-popover min-w-full w-max")}
+          placement="bottom-start"
+          matchAnchorWidth
+          className="w-max"
         >
           <ul className="flex flex-col py-0.5">
             {options.map((o, i) => {
@@ -236,8 +212,7 @@ export function PeriodSelect({
               );
             })}
           </ul>
-        </div>
-      ) : null}
+        </FloatingMenu>
     </div>
   );
 }

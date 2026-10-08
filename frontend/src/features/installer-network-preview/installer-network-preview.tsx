@@ -37,6 +37,7 @@ import {
   type PendingInvitation,
 } from "./preview-data";
 import { NetworkClockIcon, NetworkPeopleIcon, NetworkStarIcon, NetworkStoreIcon, NetworkTrophyIcon, ShowroomLogo } from "./network-visuals";
+import { FloatingMenu } from "@/components/ui/floating-menu";
 
 type NetworkTab = "all" | "joined" | "pending";
 
@@ -150,23 +151,7 @@ export function InstallerNetworkPreview({
   const [area, setArea] = useState<AreaFilter>("all");
   const [filterOpen, setFilterOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(6);
-  const filterRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!filterOpen) return;
-    const close = (event: MouseEvent) => {
-      if (!filterRef.current?.contains(event.target as Node)) setFilterOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setFilterOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [filterOpen]);
+  const filterButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => setVisibleCount(6), [activeTab, area, query]);
 
@@ -260,8 +245,9 @@ export function InstallerNetworkPreview({
                       className="h-10 w-full rounded-sm border border-strong bg-canvas pe-md ps-10 text-label text-fg outline-none placeholder:text-fg-muted focus-visible:ring-2 focus-visible:ring-focus"
                     />
                   </label>
-                  <div ref={filterRef} className="relative shrink-0">
+                  <div className="relative shrink-0">
                     <Button
+                      ref={filterButton}
                       variant="outline"
                       className="w-full tablet:w-auto"
                       onClick={() => setFilterOpen((value) => !value)}
@@ -272,8 +258,7 @@ export function InstallerNetworkPreview({
                       {area === "all" ? c.filter : c.areas[area]}
                       <ChevronDownIcon size={15} />
                     </Button>
-                    {filterOpen ? (
-                      <div role="menu" className="absolute end-0 top-[calc(100%+6px)] z-popover w-48 overflow-hidden rounded-md border border-strong bg-surface py-1 shadow-lg">
+                    <FloatingMenu open={filterOpen} onClose={() => setFilterOpen(false)} anchorRef={filterButton} role="menu" aria-label={c.filter} placement="bottom-end" className="w-48 py-1">
                         {AREA_OPTIONS.map((option) => (
                           <button
                             key={option}
@@ -290,8 +275,7 @@ export function InstallerNetworkPreview({
                             {area === option ? <CheckIcon size={14} className="text-accent" /> : null}
                           </button>
                         ))}
-                      </div>
-                    ) : null}
+                    </FloatingMenu>
                   </div>
                 </div>
 

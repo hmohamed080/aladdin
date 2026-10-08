@@ -15,6 +15,7 @@
     "e2e:install": "playwright install chromium"
   },
   "dependencies": {
+    "@floating-ui/react-dom": "^2.1.9",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.48.1",
     "libphonenumber-js": "^1.13.14",

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { selectWorkspace } from "@/server/actions/context";
 import { PERSONAL_CONTEXT, type WorkspaceEntry } from "@/lib/workspace/model";
 import { BuildingIcon, ChevronDownIcon, PlusIcon, UserIcon, CheckIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/ui/cn";
-import { menuItemClass, menuSectionLabelClass, menuSurfaceClass } from "@/components/ui/menu";
+import { menuItemClass, menuSectionLabelClass } from "@/components/ui/menu";
+import { FloatingMenu } from "@/components/ui/floating-menu";
 
 /**
  * The WORKSPACE switcher — it changes WHERE the user is working, never WHO they
@@ -46,25 +47,7 @@ export function WorkspaceSwitcher({
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
-  const root = useRef<HTMLDivElement>(null);
-
-  // Dismiss on outside click / Escape — a menu that traps the page is worse than
-  // no menu at all.
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: MouseEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  const trigger = useRef<HTMLButtonElement>(null);
 
   const active = entries.find((e) =>
     e.kind === "personal" ? activeKey === PERSONAL_CONTEXT : e.organizationId === activeKey,
@@ -94,8 +77,9 @@ export function WorkspaceSwitcher({
   };
 
   return (
-    <div ref={root} className="relative">
+    <div className="relative">
       <button
+        ref={trigger}
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={pending}
@@ -136,15 +120,14 @@ export function WorkspaceSwitcher({
         <ChevronDownIcon size={14} className="shrink-0 text-fg-muted" />
       </button>
 
-      {open ? (
-        <div
+      <FloatingMenu
+          open={open}
+          onClose={() => setOpen(false)}
+          anchorRef={trigger}
           role="menu"
           data-testid="workspace-menu"
-          // `z-popover`, not the drawer layer this used to sit on. It carried
-          // BOTH a dead `z-50` class and an inline `zIndex: 300`; the inline
-          // value won, which put this menu on the same layer as the sidebar
-          // hover-reveal and one layer BELOW its own sibling in the header.
-          className={cn(menuSurfaceClass, "absolute top-full mt-1 start-0 z-popover w-64")}
+          placement="bottom-start"
+          className="w-64"
         >
           <p className={cn(menuSectionLabelClass, "px-3 pt-2.5 pb-1")}>
             {t("workspace.title")}
@@ -200,8 +183,7 @@ export function WorkspaceSwitcher({
               {t("workspace.addBusiness")}
             </a>
           </div>
-        </div>
-      ) : null}
+        </FloatingMenu>
     </div>
   );
 }

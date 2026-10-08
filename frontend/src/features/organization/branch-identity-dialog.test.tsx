@@ -49,6 +49,7 @@ describe("BranchIdentityDialog", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: ar.common.edit }));
     expect((screen.getByLabelText(ar.settings.field.timezone, { exact: false }) as HTMLSelectElement).value).toBe("");
-    expect(screen.getByText(ar.settings.timezoneUnset)).toBeInTheDocument();
+    // The "not set" label is what the person SEES on the control (the native option behind it is hidden and says the same).
+    expect(screen.getAllByText(ar.settings.timezoneUnset).some((el) => !el.closest("select"))).toBe(true);
   });
 });

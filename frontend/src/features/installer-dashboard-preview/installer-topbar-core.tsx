@@ -1,7 +1,7 @@
 "use client";
 
 import { accountTypeLabel } from "@/lib/i18n/account-type-label";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
@@ -19,6 +19,7 @@ import {
 import { InstallerSearch } from "./installer-search";
 import type { InstallerOpportunityVM } from "./view-model";
 import { signOut } from "@/server/actions/auth";
+import { FloatingMenu } from "@/components/ui/floating-menu";
 
 const dividerClass = "hidden h-5 w-px border-e tablet:block";
 
@@ -69,23 +70,7 @@ export function InstallerTopbarCore({
   const resolvedName = displayName || (locale === "ar" ? "حسابي" : "My account");
   const initial = resolvedName.charAt(0);
   const [accountOpen, setAccountOpen] = useState(false);
-  const accountRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!accountOpen) return;
-    const onPointer = (e: MouseEvent) => {
-      if (!accountRef.current?.contains(e.target as Node)) setAccountOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setAccountOpen(false);
-    };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [accountOpen]);
+  const accountButton = useRef<HTMLButtonElement>(null);
 
   return (
     <header
@@ -137,8 +122,9 @@ export function InstallerTopbarCore({
 
       <div className={dividerClass} aria-hidden="true" />
 
-      <div ref={accountRef} className="relative shrink-0">
+      <div className="relative shrink-0">
         <button
+          ref={accountButton}
           type="button"
           onClick={() => setAccountOpen((v) => !v)}
           aria-haspopup="menu"
@@ -159,11 +145,15 @@ export function InstallerTopbarCore({
           <ChevronDownIcon size={15} className="hidden shrink-0 text-fg-muted desktop:block" />
         </button>
 
-        {accountOpen ? (
-          <div
-            role="menu"
-            className="absolute end-0 top-[calc(100%+8px)] z-popover w-52 overflow-hidden rounded-md border bg-surface py-1 shadow-lg"
-          >
+        <FloatingMenu
+          open={accountOpen}
+          onClose={() => setAccountOpen(false)}
+          anchorRef={accountButton}
+          role="menu"
+          aria-label={locale === "ar" ? "الحساب" : "Account"}
+          placement="bottom-end"
+          className="w-52 py-1"
+        >
             {production ? (
               <>
                 <MenuLink href="/home/profile" icon={UserIcon} label={locale === "ar" ? "ملفي الشخصي" : "My profile"} />
@@ -180,8 +170,7 @@ export function InstallerTopbarCore({
                 <MenuRow icon={LogOutIcon} label={locale === "ar" ? "تسجيل خروج" : "Sign out"} tone="danger" />
               </>
             )}
-          </div>
-        ) : null}
+        </FloatingMenu>
       </div>
       {/* Phones: the service area is part of the shell, not hidden. */}
       <div className="order-last flex basis-full items-center gap-1.5 border-t pt-1.5 text-label font-medium text-fg-secondary tablet:hidden">

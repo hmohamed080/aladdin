@@ -17,8 +17,9 @@ import { readableColumnClass } from "@/components/layout/content-column";
  * path with nothing missing, and nothing extra is asked of the salesperson.
  *
  * The city list is rendered for every governorate at once and filtered by the
- * browser only for convenience; the server validates the pair regardless, and a
- * plain <select> keeps the form usable without client JavaScript.
+ * browser only for convenience; the server validates the pair regardless. Both
+ * choices are the shared Select (a real native <select> carries the value into
+ * the form; the person operates the design-system listbox).
  */
 export function ShowroomReferralForm({
   referral,

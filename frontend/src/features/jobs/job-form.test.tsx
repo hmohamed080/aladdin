@@ -97,7 +97,7 @@ describe("JobForm and a retired trade", () => {
       />,
       "en",
     );
-    expect(screen.getByRole("option", { name: /Marble & granite.*no longer offered/i })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /Marble & granite.*no longer offered/i, hidden: true })).toBeTruthy();
   });
 
   /**

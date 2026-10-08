@@ -55,8 +55,11 @@ describe("InstallerReviewsPreview", () => {
     expect(screen.getByText("Tarek Mansour")).toBeTruthy();
     expect(screen.getByText("Showing 15 of 15 results")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "View more" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
-    expect(screen.getByRole("button", { name: "Grid" }).getAttribute("aria-pressed")).toBe("true");
+    // GRID is the default view; the list is one explicit choice away.
+    expect(screen.getByRole("button", { name: "Grid view" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "List view" }));
+    expect(screen.getByRole("button", { name: "List view" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Grid view" }).getAttribute("aria-pressed")).toBe("false");
   });
 
   it("omits the unnecessary saved-search management toolbar", () => {

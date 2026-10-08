@@ -10,7 +10,7 @@ import {
   type DashboardPeriodKey,
 } from "@/lib/workspace/dashboard-period";
 import { CalendarIcon, ChevronDownIcon, CheckIcon } from "@/components/ui/icons";
-import { menuSurfaceClass } from "@/components/ui/menu";
+import { FloatingMenu } from "@/components/ui/floating-menu";
 
 const rowClass = (selected: boolean) =>
   cn(
@@ -68,7 +68,6 @@ export function DashboardPeriodSelect({
   // needs its own flag, reset to match the committed period every time the
   // menu opens fresh.
   const [showCustom, setShowCustom] = useState(value === "custom");
-  const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -77,25 +76,6 @@ export function DashboardPeriodSelect({
     0,
   );
   const current = options[selectedIndex];
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: MouseEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        trigger.current?.focus();
-      }
-    };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   useEffect(() => {
     if (open) items.current[selectedIndex]?.focus();
@@ -159,7 +139,7 @@ export function DashboardPeriodSelect({
   };
 
   return (
-    <div ref={root} className="relative inline-flex">
+    <div className="relative inline-flex">
       <button
         ref={trigger}
         type="button"
@@ -189,25 +169,16 @@ export function DashboardPeriodSelect({
         </span>
       </button>
 
-      {open ? (
-        <div
+      <FloatingMenu
+          open={open}
+          onClose={() => setOpen(false)}
+          anchorRef={trigger}
           role="menu"
           aria-label={label}
           data-testid="dashboard-period-menu"
-          /* `end-0`, not `start-0`: the trigger sits at the FAR end of the
-             dashboard's header row (a `justify-between` row with the period
-             control last), so anchoring the panel's leading/`start` edge to
-             the trigger let a `w-max` panel grow straight past the viewport's
-             trailing edge in LTR. Anchoring the panel's OWN trailing edge to
-             the trigger instead makes it grow back inward — toward the
-             viewport, not away from it — in both LTR and RTL, since `end`
-             flips with direction the same way `start` does. The width cap
-             keeps the custom-range sub-form (two date fields) from doing the
-             same thing sideways on a narrow phone viewport. */
-          className={cn(
-            menuSurfaceClass,
-            "absolute end-0 top-full mt-1 z-popover min-w-full w-max max-w-[min(20rem,calc(100vw-2rem))]",
-          )}
+          placement="bottom-end"
+          matchAnchorWidth
+          className="w-max max-w-[min(20rem,calc(100vw-2rem))]"
         >
           <ul className="flex flex-col py-0.5">
             {options.map((o, i) => {
@@ -281,8 +252,7 @@ export function DashboardPeriodSelect({
               </button>
             </div>
           ) : null}
-        </div>
-      ) : null}
+        </FloatingMenu>
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type { Area } from "react-easy-crop";
 import { Button, Input, LabeledField, Textarea } from "@/components/ui/controls";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
-import { menuItemClass, menuSurfaceClass } from "@/components/ui/menu";
+import { menuItemClass } from "@/components/ui/menu";
 import {
   BookmarkIcon,
   BuildingIcon,
@@ -49,6 +49,7 @@ import {
   QUICK_TIPS,
   SPECIALTIES,
 } from "./profile-completion-data";
+import { FloatingMenu } from "@/components/ui/floating-menu";
 
 export function InstallerProfileCompletionPreview({
   theme,
@@ -299,7 +300,7 @@ function BasicInformationSection({ locale, onCompletionChange }: { locale: Local
   const [about, setAbout] = useState("");
   const aboutHasPhoneNumber = PHONE_LIKE_SEQUENCE.test(about);
   const aboutPhoneError = ar ? "لا تضع أرقام تليفونات في تعريف عنك." : "Do not include phone numbers in your introduction.";
-  const specialtiesRef = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const completed = [
@@ -311,22 +312,6 @@ function BasicInformationSection({ locale, onCompletionChange }: { locale: Local
     ].filter(Boolean).length;
     onCompletionChange({ completed, total: 5 });
   }, [city, customCity, experience, governorate, onCompletionChange, professionalName, selected]);
-
-  useEffect(() => {
-    if (!open) return;
-    const closeOutside = (event: MouseEvent) => {
-      if (!specialtiesRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const closeWithEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", closeOutside);
-    document.addEventListener("keydown", closeWithEscape);
-    return () => {
-      document.removeEventListener("mousedown", closeOutside);
-      document.removeEventListener("keydown", closeWithEscape);
-    };
-  }, [open]);
 
   function toggleSpecialty(value: string) {
     setSelected((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
@@ -362,7 +347,7 @@ function BasicInformationSection({ locale, onCompletionChange }: { locale: Local
           </div>
         </div>
 
-        <div ref={specialtiesRef} className="relative min-w-0 tablet:col-span-6">
+        <div className="relative min-w-0 tablet:col-span-6">
           <span className="mb-1.5 block text-label font-medium text-fg-secondary">{ar ? "التخصص *" : "Specialties *"}</span>
           <div className="flex h-11 min-w-0 items-center gap-2 overflow-hidden rounded-md border border-strong bg-canvas p-1.5">
             <div className="scrollbar-chip-row flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden pb-0.5">
@@ -372,6 +357,7 @@ function BasicInformationSection({ locale, onCompletionChange }: { locale: Local
               })}
             </div>
             <button
+        ref={trigger}
               type="button"
               aria-label={ar ? "اختيار التخصصات" : "Choose specialties"}
               aria-expanded={open}
@@ -381,8 +367,14 @@ function BasicInformationSection({ locale, onCompletionChange }: { locale: Local
               <ChevronDownIcon size={18} />
             </button>
           </div>
-          {open ? (
-            <div className={cn(menuSurfaceClass, "absolute inset-x-0 top-full z-popover mt-2")}>
+          <FloatingMenu
+              open={open}
+              onClose={() => setOpen(false)}
+              anchorRef={trigger}
+              role="dialog"
+              placement="bottom-start"
+              matchAnchorWidth
+            >
               <div role="listbox" aria-label={ar ? "قائمة التخصصات" : "Specialties list"} aria-multiselectable="true" className="grid max-h-64 gap-1 overflow-y-auto p-2 tablet:grid-cols-2">
                 {SPECIALTIES.map((specialty) => {
                   const checked = selected.includes(specialty.value);
@@ -401,8 +393,7 @@ function BasicInformationSection({ locale, onCompletionChange }: { locale: Local
                   );
                 })}
               </div>
-            </div>
-          ) : null}
+            </FloatingMenu>
         </div>
 
         <div className="tablet:col-span-6">
@@ -494,7 +485,7 @@ function ProfileSelect({
   };
 }) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const customInputRef = useRef<HTMLInputElement>(null);
   const selected = options.find((option) => option.value === value) ?? options[0];
   const customEntryActive = customEntry?.optionValue === value;
@@ -504,26 +495,11 @@ function ProfileSelect({
     if (open && customEntryActive) customInputRef.current?.focus();
   }, [customEntryActive, open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const closeOutside = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const closeWithEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", closeOutside);
-    document.addEventListener("keydown", closeWithEscape);
-    return () => {
-      document.removeEventListener("mousedown", closeOutside);
-      document.removeEventListener("keydown", closeWithEscape);
-    };
-  }, [open]);
-
   return (
-    <div ref={rootRef} className="relative flex flex-col gap-1.5">
+    <div className="relative flex flex-col gap-1.5">
       <span id={`${id}-label`} className="text-label font-medium text-fg-secondary">{label}</span>
       <button
+        ref={trigger}
         id={id}
         type="button"
         aria-labelledby={`${id}-label ${id}`}
@@ -538,8 +514,16 @@ function ProfileSelect({
         </span>
         <ChevronDownIcon size={17} className={cn("shrink-0 text-fg-secondary transition-transform", open && "rotate-180")} />
       </button>
-      {open ? (
-        <div className={cn(menuSurfaceClass, "absolute inset-x-0 top-full z-popover mt-2 max-h-72 overflow-y-auto p-1")} role="listbox" aria-labelledby={`${id}-label`}>
+      <FloatingMenu
+          open={open}
+          onClose={() => setOpen(false)}
+          anchorRef={trigger}
+          role="listbox"
+          aria-labelledby={`${id}-label`}
+          placement="bottom-start"
+          matchAnchorWidth
+          className="max-h-72 overflow-y-auto p-1"
+        >
           {options.map((option) => {
             const active = option.value === value;
             return (
@@ -581,8 +565,7 @@ function ProfileSelect({
               </div>
             </div>
           ) : null}
-        </div>
-      ) : null}
+        </FloatingMenu>
     </div>
   );
 }
@@ -672,28 +655,12 @@ function CoverageSection({ locale, onCompletionChange }: { locale: Locale; onCom
   const [otherAreas, setOtherAreas] = useState(true);
   const [areas, setAreas] = useState(["cairo", "giza", "qalyubia"]);
   const [open, setOpen] = useState(false);
-  const addAreaRef = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const availableAreas = GOVERNORATE_OPTIONS.filter((option) => !areas.includes(option.value));
 
   useEffect(() => {
     onCompletionChange({ completed: !otherAreas || areas.length > 0 ? 1 : 0, total: 1 });
   }, [areas.length, onCompletionChange, otherAreas]);
-
-  useEffect(() => {
-    if (!open) return;
-    const closeOutside = (event: MouseEvent) => {
-      if (!addAreaRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const closeWithEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", closeOutside);
-    document.addEventListener("keydown", closeWithEscape);
-    return () => {
-      document.removeEventListener("mousedown", closeOutside);
-      document.removeEventListener("keydown", closeWithEscape);
-    };
-  }, [open]);
 
   return (
     <ProfileSection id="coverage" step={4} title={ar ? "نطاق العمل" : "Work coverage"} description={ar ? "هل تعمل في محافظات أخرى؟" : "Do you work in other governorates?"}>
@@ -711,12 +678,20 @@ function CoverageSection({ locale, onCompletionChange }: { locale: Locale; onCom
             const area = GOVERNORATE_OPTIONS.find((option) => option.value === value);
             return area ? <span key={value} className="inline-flex items-center gap-1.5 rounded-pill border bg-surface-2 px-3 py-1.5 text-label font-medium text-fg">{pick(locale, area)}<CheckIcon size={13} className="text-accent" /></span> : null;
           })}
-          <div ref={addAreaRef} className="relative">
-            <button type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)} className="rounded-pill px-3 py-1.5 text-label font-semibold text-accent hover:bg-accent-solid/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+          <div className="relative">
+            <button
+        ref={trigger} type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)} className="rounded-pill px-3 py-1.5 text-label font-semibold text-accent hover:bg-accent-solid/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
               {ar ? "+ إضافة محافظة" : "+ Add governorate"}
             </button>
-            {open ? (
-              <div className={cn(menuSurfaceClass, "absolute bottom-full start-0 z-popover mb-2 w-56 max-h-72 overflow-y-auto p-1")} role="listbox" aria-label={ar ? "اختر محافظة إضافية" : "Choose another governorate"}>
+            <FloatingMenu
+                open={open}
+                onClose={() => setOpen(false)}
+                anchorRef={trigger}
+                role="listbox"
+                aria-label={ar ? "اختر محافظة إضافية" : "Choose another governorate"}
+                placement="top-start"
+                className="w-56 max-h-72 overflow-y-auto p-1"
+              >
                 {availableAreas.map((option) => (
                   <button
                     key={option.value}
@@ -734,8 +709,7 @@ function CoverageSection({ locale, onCompletionChange }: { locale: Locale; onCom
                   </button>
                 ))}
                 {availableAreas.length === 0 ? <p className="px-3 py-2 text-label text-fg-secondary">{ar ? "تمت إضافة كل المحافظات" : "All governorates added"}</p> : null}
-              </div>
-            ) : null}
+              </FloatingMenu>
           </div>
         </div> : null}
       </div>

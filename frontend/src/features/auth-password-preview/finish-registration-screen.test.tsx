@@ -39,6 +39,8 @@ describe("FinishRegistrationScreen — username recovery copy", () => {
   it("still asks for the account type — not the username — when that is what is missing", () => {
     renderWithI18n(<FinishRegistrationScreen needsAccountType usernameUnavailable />, "en");
     expect(screen.queryByText("The username you selected is no longer available.")).toBeNull();
-    expect(screen.getByRole("combobox")).toBeTruthy();
+    // The account type is a dropdown: the shared Select — a listbox button over a hidden native select named accountType.
+    expect(screen.getByRole("button", { name: /account type/i })).toHaveAttribute("aria-haspopup", "listbox");
+    expect(document.querySelector('select[name="accountType"]')).not.toBeNull();
   });
 });

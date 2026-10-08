@@ -33,6 +33,7 @@ export function ConfirmDialog({
   action,
   formAction,
   confirmDisabled = false,
+  defaultOpen = false,
   children,
 }: {
   trigger: string;
@@ -50,11 +51,13 @@ export function ConfirmDialog({
    * no knowledge of what makes a submission unsafe; the caller decides.
    */
   confirmDisabled?: boolean;
+  /** Opens on first render (a deep link into the confirmation). Nothing is submitted until the person confirms. */
+  defaultOpen?: boolean;
   children?: ReactNode | ((state: FormState) => ReactNode);
 }) {
   const { t } = useI18n();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
@@ -84,8 +87,9 @@ export function ConfirmDialog({
       Array.from(
         dialogRef.current?.querySelectorAll<HTMLElement>(
           // Exclude hidden inputs — focusing one is a no-op, which would leave the
-          // dialog without focus (and break the trap) when a form leads with them.
-          'button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])',
+          // dialog without focus (and break the trap) when a form leads with them. Likewise the shared Select's
+          // aria-hidden native <select> (its form-value carrier): the visible button is the focusable control.
+          'button, [href], input:not([type="hidden"]), select:not([aria-hidden="true"]), textarea, [tabindex]:not([tabindex="-1"])',
         ) ?? [],
       ).filter((el) => !el.hasAttribute("disabled"));
     focusables()[0]?.focus();

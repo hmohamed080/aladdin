@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/controls";
 import {
   CalendarIcon,
@@ -14,7 +14,7 @@ import {
   GiftIcon,
   ListIcon,
 } from "@/components/ui/icons";
-import { menuSurfaceClass } from "@/components/ui/menu";
+import { FloatingMenu } from "@/components/ui/floating-menu";
 import { InstallerSidebar } from "@/features/installer-dashboard-preview/installer-sidebar";
 import { InstallerTopbar } from "@/features/installer-dashboard-preview/installer-topbar";
 import {
@@ -217,48 +217,32 @@ function IconBubble({ children }: { children: ReactNode }) {
 
 function FilterMenu<T extends string>({ label, value, options, onChange, icon }: { label: string; value: T; options: FilterOption<T>[]; onChange: (value: T) => void; icon?: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-  const items = useRef<(HTMLButtonElement | null)[]>([]);
+  const listId = useId();
   const selectedIndex = Math.max(options.findIndex((option) => option.value === value), 0);
 
+  // Opening puts focus on the chosen option, so the keyboard continues from where the value is.
   useEffect(() => {
     if (!open) return;
-    const onPointer = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
-    const onEscape = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") { setOpen(false); trigger.current?.focus(); } };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onEscape);
-    return () => { document.removeEventListener("mousedown", onPointer); document.removeEventListener("keydown", onEscape); };
-  }, [open]);
-
-  useEffect(() => { if (open) items.current[selectedIndex]?.focus(); }, [open, selectedIndex]);
-
-  const onItemKey = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
-    let next: number | null = null;
-    if (event.key === "ArrowDown") next = index === options.length - 1 ? 0 : index + 1;
-    if (event.key === "ArrowUp") next = index === 0 ? options.length - 1 : index - 1;
-    if (event.key === "Home") next = 0;
-    if (event.key === "End") next = options.length - 1;
-    if (next !== null) { event.preventDefault(); items.current[next]?.focus(); }
-  };
+    const list = document.getElementById(listId);
+    list?.querySelectorAll<HTMLElement>('[role="menuitemradio"]')[selectedIndex]?.focus();
+  }, [open, listId, selectedIndex]);
 
   return (
-    <div ref={root} className="relative min-w-0">
+    <div className="relative min-w-0">
       <span className="mb-1.5 block text-label text-fg-secondary">{label}</span>
       <button ref={trigger} type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((current) => !current)} onKeyDown={(event) => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setOpen(true); } }} className="flex h-11 w-full items-center gap-sm rounded-md border border-strong bg-canvas px-md text-body text-fg transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
         {icon ? <span className="shrink-0 text-fg-secondary">{icon}</span> : null}
         <span className="min-w-0 flex-1 truncate text-start">{options[selectedIndex]?.label}</span>
         <ChevronDownIcon size={16} className="shrink-0 text-fg-secondary" />
       </button>
-      {open ? (
-        <div role="menu" aria-label={label} className={cn(menuSurfaceClass, "absolute start-0 top-full z-popover mt-1 max-h-60 min-w-full overflow-y-auto")}>
-          {options.map((option, index) => (
-            <button key={option.value} ref={(element) => { items.current[index] = element; }} type="button" role="menuitemradio" aria-checked={option.value === value} onKeyDown={(event) => onItemKey(event, index)} onClick={() => { onChange(option.value); setOpen(false); trigger.current?.focus(); }} className={cn("flex w-full items-center gap-sm px-md py-2 text-start text-label transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2", option.value === value ? "font-semibold text-fg" : "text-fg-secondary")}>
-              <span className="min-w-0 flex-1 truncate">{option.label}</span>{option.value === value ? <CheckIcon size={15} className="shrink-0 text-accent-solid" /> : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <FloatingMenu id={listId} open={open} onClose={() => setOpen(false)} anchorRef={trigger} role="menu" aria-label={label} placement="bottom-start" matchAnchorWidth className="max-h-60">
+        {options.map((option) => (
+          <button key={option.value} type="button" role="menuitemradio" aria-checked={option.value === value} onClick={() => { onChange(option.value); setOpen(false); trigger.current?.focus(); }} className={cn("flex w-full items-center gap-sm px-md py-2 text-start text-label transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2", option.value === value ? "font-semibold text-fg" : "text-fg-secondary")}>
+            <span className="min-w-0 flex-1 truncate">{option.label}</span>{option.value === value ? <CheckIcon size={15} className="shrink-0 text-accent-solid" /> : null}
+          </button>
+        ))}
+      </FloatingMenu>
     </div>
   );
 }

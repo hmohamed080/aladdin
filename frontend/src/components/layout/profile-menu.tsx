@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
-import { menuItemClass, menuSectionLabelClass, menuSurfaceClass } from "@/components/ui/menu";
+import { menuItemClass, menuSectionLabelClass } from "@/components/ui/menu";
 import { signOut } from "@/server/actions/auth";
 import { setLocale, setTheme } from "@/server/actions/preferences";
 import { LOCALES, type Locale } from "@/lib/i18n/locales";
@@ -19,6 +19,7 @@ import {
   MonitorIcon,
   GlobeIcon,
 } from "@/components/ui/icons";
+import { FloatingMenu } from "@/components/ui/floating-menu";
 
 /**
  * The account menu behind the header avatar.
@@ -71,30 +72,7 @@ export function ProfileMenu({
   // previous choice after the user had already changed it there. See
   // lib/theme/use-theme.
   const { preference: theme } = useThemeState(themePreference, "light");
-  const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-
-  // Outside click and Escape both close. Escape also returns focus to the
-  // trigger — a menu that closes and leaves focus on <body> strands a keyboard
-  // user at the top of the document.
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: MouseEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        trigger.current?.focus();
-      }
-    };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   const chooseLocale = (next: Locale) => {
     // Deliberately NO `next === locale` early return. `locale` is a prop from
@@ -151,7 +129,7 @@ export function ProfileMenu({
   };
 
   return (
-    <div ref={root} className="relative">
+    <div className="relative">
       <button
         ref={trigger}
         type="button"
@@ -169,14 +147,14 @@ export function ProfileMenu({
         <span aria-hidden="true">{initials}</span>
       </button>
 
-      {open ? (
-        <div
+      <FloatingMenu
+          open={open}
+          onClose={() => setOpen(false)}
+          anchorRef={trigger}
           role="menu"
           data-testid="profile-menu"
-          // `end-0` and not `right-0`: the panel hangs from the trailing edge of
-          // the trigger, which is the left edge in Arabic. A physical property
-          // here would push the menu off-screen in RTL.
-          className={cn(menuSurfaceClass, "absolute end-0 top-full mt-2 w-72 z-popover")}
+          placement="bottom-end"
+          className="w-72"
         >
           <div className="border-b px-3 py-3">
             <p className={menuSectionLabelClass}>
@@ -272,8 +250,7 @@ export function ProfileMenu({
               {t("account.signOut")}
             </button>
           </form>
-        </div>
-      ) : null}
+        </FloatingMenu>
     </div>
   );
 }
