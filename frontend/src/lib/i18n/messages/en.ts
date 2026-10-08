@@ -3242,6 +3242,11 @@ export const en = {
       governorate: "Governorate",
       city: "City",
       siteAddress: "Site address",
+      requiredSpecialty: "Required specialty (optional)",
+      workContact: "Work contact",
+      contactName: "Contact name",
+      contactPhone: "Phone number",
+      contactEmail: "E-mail",
       offer: "Offered compensation",
       duration: "Expected duration",
       startsOn: "Starts on",
@@ -3258,6 +3263,9 @@ export const en = {
 
     hint: {
       siteAddress: "Only the professional you award the job to will see this.",
+      specialty: "Shown only when this trade has specialties. Leave it empty if any would do — it never stops anyone from applying.",
+      legacyLocation: "This job's place was entered before places were standardised: {place}. Choose from the lists to update it, or leave them empty to keep it as it is.",
+      workContact: "Optional. Shared only with the professional you award this job to, once their work begins. It is not taken from anyone's personal profile.",
       offer: "In EGP. This is what you are offering for the work — Aladdin does not handle payment.",
       duration: "Working days, if you know.",
       offerLocked: "The trade and the offered amount cannot change, because someone has already applied.",
@@ -3268,6 +3276,9 @@ export const en = {
       title: "e.g. Marble staircase cladding",
       description: "Scope, materials, access — anything a professional needs in order to judge the work.",
       chooseTrade: "Choose a trade",
+      chooseGovernorate: "Choose a governorate",
+      chooseCity: "Choose a city",
+      noSpecialty: "Any specialty in this trade",
     },
 
     days: "{count} days",
@@ -3382,10 +3393,12 @@ export const en = {
         "The offer and trade cannot change once someone has applied. Stop recruiting and post a new job instead.",
       unverified: "Your organization has to be verified before a job can be published.",
       tradeUnavailable: "That trade is not available.",
+      contactNotSaved: "The job was saved, but its work contact could not be. Check the contact details and save again.",
       awardedCancel:
         "An awarded job cannot be cancelled on its own — the assignment has to be ended first.",
       alreadyDecided: "That application has already been decided.",
       inactiveOrg: "This organization cannot post work.",
+      location: "Choose the governorate and city from the lists.",
     },
 
     validation: {
@@ -3394,6 +3407,11 @@ export const en = {
       offerRequired: "Enter the amount you are offering.",
       offerPositive: "The amount has to be more than zero.",
       dateOrder: "The finish date cannot be before the start date.",
+      governorateRequired: "Choose a governorate.",
+      cityRequired: "Choose a city.",
+      contactPhoneInvalid: "Enter a valid phone number, or leave it empty.",
+      contactEmailInvalid: "Enter a valid e-mail address, or leave it empty.",
+      contactReach: "Add a phone number or an e-mail so the professional can reach this contact.",
       reasonRequired: "Give a reason.",
       noteTooLong: "That message is too long — keep it under 1000 characters.",
     },

@@ -1,18 +1,22 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { tradeLabel } from "@/lib/i18n/trade-label";
+import { specialtyLabel, tradeLabel } from "@/lib/i18n/trade-label";
 import {
   createJobAction,
   updateJobAction,
   type FormState,
 } from "@/server/actions/job-forms";
 import { Card, SectionTitle, InlineError } from "@/components/ui/primitives";
-import { Input, Textarea, Select, LabeledField, SubmitButton } from "@/components/ui/controls";
+import { Input, Textarea, LabeledField, SubmitButton } from "@/components/ui/controls";
+import { ListboxSelect } from "@/components/ui/listbox";
+import { CITIES_BY_GOVERNORATE, GOVERNORATE_OPTIONS } from "@/lib/installer/location-data";
 import { readableColumnClass } from "@/components/layout/content-column";
-import type { Trade } from "@/server/queries/trades";
-import type { JobListRow } from "@/server/queries/jobs";
+import { PhoneField } from "@/components/ui/phone-field";
+import { splitE164, type CanonicalPhone } from "@/lib/contact/phone";
+import type { Specialty, Trade } from "@/server/queries/trades";
+import type { JobListRow, JobWorkContact } from "@/server/queries/jobs";
 
 const initial: FormState = { ok: false };
 
@@ -36,22 +40,50 @@ export function JobForm({
   orgId,
   branchId,
   trades,
+  specialties = [],
   job,
   applicationCount = 0,
+  contact = null,
+  initialError,
 }: {
   mode: "create" | "edit";
   orgId: string;
   branchId?: string | null;
   trades: Trade[];
+  /** Every active specialty with its trade's key. A trade with none shows no specialty field at all. */
+  specialties?: readonly Specialty[];
   job?: JobListRow;
   applicationCount?: number;
+  /** The job's current work contact (edit mode). Provided by the poster for THIS job — never a profile. */
+  contact?: JobWorkContact | null;
+  /** A translation key to show on arrival (e.g. the job was created but its contact could not be saved). */
+  initialError?: string;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const parts = splitE164(contact?.phoneE164);
+  const [phone, setPhone] = useState<CanonicalPhone | null>(
+    contact?.phoneE164 && parts ? { countryIso2: parts.countryIso2, national: parts.national, e164: contact.phoneE164 } : null,
+  );
+  const [phoneInvalid, setPhoneInvalid] = useState(false);
   const [state, action] = useActionState(
     mode === "create" ? createJobAction : updateJobAction,
     initial,
   );
   const fe = state.fieldErrors ?? {};
+
+  // The trade, the place and the optional specialty are controlled, because each depends on the one before it: a
+  // specialty belongs to ONE trade, and a city belongs to ONE governorate.
+  const [tradeKey, setTradeKey] = useState(job?.tradeKey ?? "");
+  const [governorateKey, setGovernorateKey] = useState(job?.governorate_key ?? "");
+  const [cityKey, setCityKey] = useState(job?.city_key ?? "");
+  const [specialtyId, setSpecialtyId] = useState(job?.required_specialty_id ?? "");
+  const tradeSpecialties = specialties.filter((spec) => spec.tradeKey === tradeKey);
+  const pick = (o: { ar: string; en: string }) => (locale === "ar" ? o.ar : o.en);
+  // A job whose old free-text place never resolved keeps it unless the poster chooses a new one from the lists.
+  const legacyPlace =
+    mode === "edit" && job && !job.governorate_key && (job.governorate || job.city)
+      ? [job.city, job.governorate].filter(Boolean).join(", ")
+      : null;
 
   // O7, on screen. Once one person has applied against a stated trade and a
   // stated amount, both are frozen — every later applicant has to be bidding on
@@ -121,31 +153,39 @@ export function JobForm({
               error={fe.tradeKey ? t(fe.tradeKey) : undefined}
               hint={offerLocked ? t("jobs.hint.offerLocked") : undefined}
             >
-              <Select
+              <ListboxSelect
                 id="tradeKey"
                 name="tradeKey"
-                defaultValue={job?.tradeKey ?? ""}
+                label={t("jobs.field.trade")}
+                value={tradeKey}
+                placeholder={t("jobs.placeholder.chooseTrade")}
                 disabled={offerLocked}
-              >
-                <option value="" disabled>
-                  {t("jobs.placeholder.chooseTrade")}
-                </option>
-                {historicalTrade ? (
-                  <option value={historicalTrade}>
-                    {tradeLabel(t, historicalTrade)} · {t("jobs.hint.tradeRetired")}
-                  </option>
-                ) : null}
-                {trades.map((tr) => (
-                  <option key={tr.id} value={tr.key}>
-                    {tradeLabel(t, tr.key)}
-                  </option>
-                ))}
-              </Select>
+                invalid={Boolean(fe.tradeKey)}
+                onChange={(next) => {
+                  setTradeKey(next);
+                  // A specialty belongs to one trade: changing the trade clears it.
+                  setSpecialtyId("");
+                }}
+                options={[
+                  ...(historicalTrade ? [{ value: historicalTrade, label: `${tradeLabel(t, historicalTrade)} · ${t("jobs.hint.tradeRetired")}` }] : []),
+                  ...trades.map((tr) => ({ value: tr.key, label: tradeLabel(t, tr.key) })),
+                ]}
+              />
             </LabeledField>
-            {/* A disabled control submits nothing, so the value the server needs
-                travels beside it. The server would refuse a CHANGE anyway; this
-                just means an unrelated edit does not arrive with an empty trade. */}
-            {offerLocked ? <input type="hidden" name="tradeKey" value={job?.tradeKey ?? ""} /> : null}
+            {/* OPTIONAL REQUIRED SPECIALTY — shown only when this trade HAS specialties (never an empty selector). It is a
+                presentation / ranking input: it never decides who may apply. */}
+            {tradeSpecialties.length > 0 ? (
+              <LabeledField label={t("jobs.field.requiredSpecialty")} htmlFor="requiredSpecialtyId" hint={t("jobs.hint.specialty")}>
+                <ListboxSelect
+                  id="requiredSpecialtyId"
+                  name="requiredSpecialtyId"
+                  label={t("jobs.field.requiredSpecialty")}
+                  value={specialtyId}
+                  onChange={setSpecialtyId}
+                  options={[{ value: "", label: t("jobs.placeholder.noSpecialty") }, ...tradeSpecialties.map((spec) => ({ value: spec.id, label: specialtyLabel(t, spec.key) }))]}
+                />
+              </LabeledField>
+            ) : null}
           </div>
         </Card>
 
@@ -212,17 +252,42 @@ export function JobForm({
         <Card>
           <SectionTitle>{t("jobs.field.location")}</SectionTitle>
           <div className="mt-md grid gap-md tablet:grid-cols-2">
-            <LabeledField label={t("jobs.field.governorate")} htmlFor="governorate">
-              <Input
-                id="governorate"
-                name="governorate"
-                defaultValue={job?.governorate ?? ""}
-                maxLength={80}
+            {/* THE PLACE IS CHOSEN FROM THE CATALOGUE, never typed: governorate, then a city inside it — the same lists the
+                Jobs filters and a professional's service areas use, so a job's place is one of the places somebody can be near. */}
+            <LabeledField label={t("jobs.field.governorate")} htmlFor="governorateKey" error={fe.governorate ? t(fe.governorate) : undefined}>
+              <ListboxSelect
+                id="governorateKey"
+                name="governorateKey"
+                label={t("jobs.field.governorate")}
+                value={governorateKey}
+                placeholder={t("jobs.placeholder.chooseGovernorate")}
+                invalid={Boolean(fe.governorate)}
+                onChange={(next) => {
+                  setGovernorateKey(next);
+                  setCityKey("");
+                }}
+                options={GOVERNORATE_OPTIONS.map((o) => ({ value: o.value, label: pick(o) }))}
               />
             </LabeledField>
-            <LabeledField label={t("jobs.field.city")} htmlFor="city">
-              <Input id="city" name="city" defaultValue={job?.city ?? ""} maxLength={80} />
+            <LabeledField label={t("jobs.field.city")} htmlFor="cityKey" error={fe.city ? t(fe.city) : undefined}>
+              <ListboxSelect
+                id="cityKey"
+                name="cityKey"
+                label={t("jobs.field.city")}
+                value={cityKey}
+                placeholder={t("jobs.placeholder.chooseCity")}
+                disabled={!governorateKey}
+                invalid={Boolean(fe.city)}
+                onChange={setCityKey}
+                options={(CITIES_BY_GOVERNORATE[governorateKey] ?? []).map((o) => ({ value: o.value, label: pick(o) }))}
+              />
             </LabeledField>
+            {legacyPlace ? (
+              <div className="tablet:col-span-2">
+                <p className="text-label text-fg-muted">{t("jobs.hint.legacyLocation", { place: legacyPlace })}</p>
+                {!governorateKey ? <input type="hidden" name="keepLegacyLocation" value="1" /> : null}
+              </div>
+            ) : null}
             {/* Withheld from every discovery projection until the job is awarded
                 (§11). The hint says so, because a person typing a street address
                 into a public-looking form deserves to know who will read it. */}
@@ -243,7 +308,56 @@ export function JobForm({
           </div>
         </Card>
 
+        <Card>
+          <SectionTitle>{t("jobs.field.workContact")}</SectionTitle>
+          <p className="mt-xs text-label text-fg-muted">{t("jobs.hint.workContact")}</p>
+          <div className="mt-md grid gap-md tablet:grid-cols-2">
+            <div className="tablet:col-span-2">
+              <LabeledField label={t("jobs.field.contactName")} htmlFor="contactName">
+                <Input id="contactName" name="contactName" defaultValue={contact?.name ?? ""} maxLength={120} autoComplete="off" />
+              </LabeledField>
+            </div>
+            {/* The number is the point of this field: it takes the full row, with a narrow country picker beside it. */}
+            <div className="tablet:col-span-2">
+              <LabeledField
+                label={t("jobs.field.contactPhone")}
+                htmlFor="contactPhone-national"
+                error={fe.contactPhone ? t(fe.contactPhone) : undefined}
+              >
+                <PhoneField
+                  id="contactPhone-national"
+                  compact
+                  defaultCountryIso2={parts?.countryIso2 ?? null}
+                  defaultNational={parts?.national ?? null}
+                  onChange={setPhone}
+                  onInvalidChange={setPhoneInvalid}
+                />
+              </LabeledField>
+            </div>
+            <input type="hidden" name="contactPhone" value={phone?.e164 ?? ""} />
+            {phoneInvalid ? <input type="hidden" name="contactPhoneInvalid" value="1" /> : null}
+            <div className="tablet:col-span-2">
+              <LabeledField
+                label={t("jobs.field.contactEmail")}
+                htmlFor="contactEmail"
+                error={fe.contactEmail ? t(fe.contactEmail) : undefined}
+              >
+                <Input
+                  id="contactEmail"
+                  name="contactEmail"
+                  type="email"
+                  dir="ltr"
+                  defaultValue={contact?.email ?? ""}
+                  maxLength={254}
+                  autoComplete="off"
+                />
+              </LabeledField>
+            </div>
+          </div>
+        </Card>
+
         <div className="flex flex-col gap-sm">
+          {initialError && !state.code ? <InlineError>{t(initialError)}</InlineError> : null}
           {state.code && !state.ok ? <InlineError>{t(state.code)}</InlineError> : null}
           <div>
             <SubmitButton variant="accent" pendingLabel={t("common.saving")}>

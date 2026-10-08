@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
 
 type State = { ok: boolean; code?: string; fieldErrors?: Record<string, string> };
@@ -28,8 +28,18 @@ const trades = [
 /** The catalog as it looks after `marble_granite` is retired: without it. */
 const tradesWithoutMarble = trades.filter((t) => t.key !== "marble_granite");
 
-const options = (c: HTMLElement) =>
-  [...c.querySelectorAll("#tradeKey option")].map((o) => (o as HTMLOptionElement).value);
+/** The trade control is the shared listbox: open it and read what it offers (labels), or read the value it submits. */
+const tradeOptions = () => {
+  fireEvent.click(document.querySelector("#tradeKey")!);
+  const labels = within(screen.getByRole("listbox", { name: "Trade" })).getAllByRole("option").map((o) => o.textContent);
+  fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+  return labels;
+};
+const submitted = (c: HTMLElement, name: string) => c.querySelector<HTMLInputElement>(`input[type="hidden"][name="${name}"]`)?.value;
+const choose = (control: string, label: string) => {
+  fireEvent.click(document.querySelector(control)!);
+  fireEvent.click(screen.getByRole("option", { name: label }));
+};
 
 const job = (over: Partial<JobListRow> = {}): JobListRow =>
   ({
@@ -43,6 +53,9 @@ const job = (over: Partial<JobListRow> = {}): JobListRow =>
     offered_currency: "EGP",
     governorate: "Cairo",
     city: "New Cairo",
+    governorate_key: "cairo",
+    city_key: "new-cairo",
+    required_specialty_id: null,
     site_address: "12 Street 90",
     expected_duration_days: 10,
     starts_on: null,
@@ -81,10 +94,9 @@ describe("JobForm and a retired trade", () => {
       />,
       "en",
     );
-    expect(options(container)).toContain("marble_granite");
-    expect((container.querySelector("#tradeKey") as HTMLSelectElement).value).toBe(
-      "marble_granite",
-    );
+    expect(tradeOptions().some((label) => /Marble & granite/.test(label ?? ""))).toBe(true);
+    expect(submitted(container, "tradeKey")).toBe("marble_granite");
+    expect(document.querySelector("#tradeKey")!.textContent).toMatch(/Marble & granite/);
   });
 
   it("marks it as history rather than presenting it as a current choice", () => {
@@ -97,7 +109,8 @@ describe("JobForm and a retired trade", () => {
       />,
       "en",
     );
-    expect(screen.getByRole("option", { name: /Marble & granite.*no longer offered/i, hidden: true })).toBeTruthy();
+    fireEvent.click(document.querySelector("#tradeKey")!);
+    expect(screen.getByRole("option", { name: /Marble & granite.*no longer offered/i })).toBeTruthy();
   });
 
   /**
@@ -110,7 +123,8 @@ describe("JobForm and a retired trade", () => {
       <JobForm mode="create" orgId="o1" trades={tradesWithoutMarble} />,
       "en",
     );
-    expect(options(container)).toEqual(["", "kitchens_doors", "plumbing"]);
+    expect(tradeOptions()).toEqual(["Kitchens & doors", "Plumbing"]);
+    expect(submitted(container, "tradeKey")).toBe("");
   });
 
   it("adds nothing when the job's own trade is still current", () => {
@@ -118,7 +132,8 @@ describe("JobForm and a retired trade", () => {
       <JobForm mode="edit" orgId="o1" trades={trades} job={job()} />,
       "en",
     );
-    expect(options(container)).toEqual(["", "kitchens_doors", "plumbing", "marble_granite"]);
+    expect(tradeOptions()).toEqual(["Kitchens & doors", "Plumbing", "Marble & granite"]);
+    expect(submitted(container, "tradeKey")).toBe("marble_granite");
   });
 
   /**
@@ -137,12 +152,10 @@ describe("JobForm and a retired trade", () => {
       />,
       "en",
     );
-    const select = container.querySelector("#tradeKey") as HTMLSelectElement;
+    const select = container.querySelector("#tradeKey") as HTMLButtonElement;
     expect(select.disabled).toBe(true);
-    expect(select.value).toBe("marble_granite");
-    expect(
-      container.querySelector('input[type="hidden"][name="tradeKey"]')?.getAttribute("value"),
-    ).toBe("marble_granite");
+    expect(select.textContent).toMatch(/Marble & granite/);
+    expect(submitted(container, "tradeKey")).toBe("marble_granite");
   });
 });
 
@@ -152,7 +165,8 @@ describe("JobForm", () => {
       <JobForm mode="create" orgId="o1" trades={trades} />,
       "en",
     );
-    const options = Array.from(container.querySelectorAll("option")).map((o) => o.textContent);
+    void container;
+    const options = tradeOptions();
     expect(options).toContain("Kitchens & doors");
     expect(options).toContain("Marble & granite");
   });
@@ -166,10 +180,10 @@ describe("JobForm", () => {
       <JobForm mode="create" orgId="o1" trades={trades} />,
       "en",
     );
-    const values = Array.from(container.querySelectorAll("option"))
-      .map((o) => (o as HTMLOptionElement).value)
-      .filter(Boolean);
-    expect(values).toEqual(["kitchens_doors", "plumbing", "marble_granite"]);
+    choose("#tradeKey", "Plumbing");
+    expect(submitted(container, "tradeKey")).toBe("plumbing");
+    choose("#tradeKey", "Marble & granite");
+    expect(submitted(container, "tradeKey")).toBe("marble_granite");
     expect(container.textContent).not.toMatch(/\bt1\b|\bt2\b/);
   });
 
@@ -194,6 +208,7 @@ describe("JobForm", () => {
     expect(container.textContent).toContain("EGP");
     expect(container.querySelector('[name="offeredCurrency"]')).toBeNull();
     expect(container.querySelector('select[name*="urrency"]')).toBeNull();
+    expect(container.querySelector('button[name*="urrency"]')).toBeNull();
   });
 
   it("carries the org id on create and the version on edit", () => {
@@ -220,7 +235,12 @@ describe("JobForm", () => {
     );
     expect(container.querySelector<HTMLInputElement>("#offeredAmount")?.value).toBe("8500");
     expect(container.querySelector<HTMLInputElement>("#siteAddress")?.value).toBe("12 Street 90");
-    expect(container.querySelector<HTMLSelectElement>("#tradeKey")?.value).toBe("marble_granite");
+    expect(submitted(container, "tradeKey")).toBe("marble_granite");
+    // the place is the job's own canonical keys
+    expect(submitted(container, "governorateKey")).toBe("cairo");
+    expect(submitted(container, "cityKey")).toBe("new-cairo");
+    expect(container.querySelector("#governorateKey")!.textContent).toBe("Cairo");
+    expect(container.querySelector("#cityKey")!.textContent).toBe("New Cairo");
   });
 
   /**
@@ -239,7 +259,7 @@ describe("JobForm", () => {
       />,
       "en",
     );
-    expect(container.querySelector<HTMLSelectElement>("#tradeKey")?.disabled).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>("#tradeKey")?.disabled).toBe(true);
     expect(container.querySelector<HTMLInputElement>("#offeredAmount")?.disabled).toBe(true);
     expect(screen.getByText(/cannot change/i)).toBeTruthy();
   });
@@ -276,7 +296,7 @@ describe("JobForm", () => {
       />,
       "en",
     );
-    expect(container.querySelector<HTMLSelectElement>("#tradeKey")?.disabled).toBe(false);
+    expect(container.querySelector<HTMLButtonElement>("#tradeKey")?.disabled).toBe(false);
     expect(container.querySelector<HTMLInputElement>("#offeredAmount")?.disabled).toBe(false);
   });
 
@@ -294,5 +314,200 @@ describe("JobForm", () => {
   it("tells the poster who will see the site address", () => {
     renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, "en");
     expect(screen.getByText(/only the professional you award/i)).toBeTruthy();
+  });
+});
+
+describe("JobForm — work contact section", () => {
+  it("is an optional, clearly labelled section (English)", () => {
+    renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, "en");
+    expect(screen.getByText("Work contact")).toBeTruthy();
+    expect(screen.getByLabelText("Contact name")).toBeTruthy();
+    expect(screen.getByLabelText("E-mail")).toBeTruthy();
+    expect(screen.getByLabelText("Phone number")).toBeTruthy();
+    expect(screen.getByText(/not taken from anyone's personal profile/i)).toBeTruthy();
+  });
+
+  it("and in Arabic, with the requested labels", () => {
+    renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, "ar");
+    expect(screen.getByText("بيانات التواصل الخاصة بالعمل")).toBeTruthy();
+    expect(screen.getByLabelText("اسم جهة التواصل")).toBeTruthy();
+    expect(screen.getByLabelText("رقم الهاتف")).toBeTruthy();
+    expect(screen.getByLabelText("البريد الإلكتروني")).toBeTruthy();
+  });
+
+  it("uses the shared phone picker, Egypt first", () => {
+    renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, "en");
+    expect(screen.getByRole("button", { name: /country/i })).toHaveAttribute("aria-haspopup", "listbox");
+  });
+
+  it("starts empty when creating, and submits canonical values as hidden fields", () => {
+    const { container } = renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, "en");
+    expect((container.querySelector("#contactName") as HTMLInputElement).value).toBe("");
+    expect((container.querySelector("input[name=contactPhone]") as HTMLInputElement).value).toBe("");
+    fireEvent.change(container.querySelector("#contactPhone-national")!, { target: { value: "01001112222" } });
+    expect((container.querySelector("input[name=contactPhone]") as HTMLInputElement).value).toBe("+201001112222");
+    expect(container.querySelector("input[name=contactPhoneInvalid]")).toBeNull();
+  });
+
+  it("flags digits that are not a valid number so the server refuses instead of dropping them", () => {
+    const { container } = renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, "en");
+    fireEvent.change(container.querySelector("#contactPhone-national")!, { target: { value: "123" } });
+    expect((container.querySelector("input[name=contactPhone]") as HTMLInputElement).value).toBe("");
+    expect((container.querySelector("input[name=contactPhoneInvalid]") as HTMLInputElement).value).toBe("1");
+  });
+
+  it("editing a job prefills its existing work contact", () => {
+    const { container } = renderWithI18n(
+      <JobForm
+        mode="edit"
+        orgId="o1"
+        trades={trades}
+        job={job()}
+        contact={{ name: "Site coordinator", phoneE164: "+201001112222", email: "work@horizon.example.test" }}
+      />,
+      "en",
+    );
+    expect((container.querySelector("#contactName") as HTMLInputElement).value).toBe("Site coordinator");
+    expect((container.querySelector("#contactEmail") as HTMLInputElement).value).toBe("work@horizon.example.test");
+    expect((container.querySelector("#contactPhone-national") as HTMLInputElement).value).toBe("1001112222");
+    expect((container.querySelector("input[name=contactPhone]") as HTMLInputElement).value).toBe("+201001112222");
+  });
+
+  it("shows the server's field errors beside the contact fields", async () => {
+    // The mocked action returns ok; field errors arrive via state, so render the error path directly.
+    renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} initialError="jobs.errors.contactNotSaved" />, "en");
+    expect(screen.getByText(/work contact could not be/i)).toBeTruthy();
+  });
+
+  it("does not use any profile data: the form has no profile prop and no profile-sourced default", () => {
+    const { container } = renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, "en");
+    expect(container.querySelectorAll("input[name^=contact]").length).toBeGreaterThanOrEqual(3);
+    expect((container.querySelector("#contactEmail") as HTMLInputElement).value).toBe("");
+  });
+
+  for (const locale of ["en", "ar"] as const) {
+    it(`${locale}: the work-contact phone takes the full row — a narrow country picker and a wide number input`, () => {
+      const { container } = renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, locale);
+      const number = container.querySelector("#contactPhone-national") as HTMLInputElement;
+      expect(number.className).toContain("flex-1");
+      expect(number.className).toContain("min-w-0");
+      const picker = screen.getByRole("button", { name: locale === "en" ? /country/i : /الدولة/ });
+      expect(picker.parentElement!.className).toContain("w-[7rem]");
+      expect(picker.className).not.toContain("w-[9.5rem]");
+      expect(number.closest("[class*=\"col-span-2\"]")).toBeTruthy();
+      expect(number.getAttribute("dir")).toBe("ltr"); // digits stay left-to-right inside an RTL form
+    });
+
+    it(`${locale}: the edit form uses the same compact phone layout`, () => {
+      const { container } = renderWithI18n(
+        <JobForm mode="edit" orgId="o1" trades={trades} job={job()} contact={{ name: "Site", phoneE164: "+201001112222", email: null }} />,
+        locale,
+      );
+      expect(container.querySelector("#contactPhone-national")!.className).toContain("min-w-0");
+      expect(container.querySelector("div[class*='w-[7rem]'] button[aria-haspopup='listbox']")).toBeTruthy();
+    });
+  }
+});
+
+describe("JobForm — the place is chosen from the catalogue", () => {
+  it("offers a governorate list and a city list, and no free-text place input", () => {
+    const { container } = renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, "en");
+    expect(container.querySelector("input#governorate")).toBeNull();
+    expect(container.querySelector("input#city")).toBeNull();
+    expect(screen.getByRole("button", { name: "Governorate" })).toHaveAttribute("aria-haspopup", "listbox");
+    expect(screen.getByRole("button", { name: "City" })).toBeDisabled(); // a city belongs to a governorate
+  });
+
+  it("the city list follows the governorate and submits the KEYS", () => {
+    const { container } = renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, "en");
+    choose("#governorateKey", "Giza");
+    expect(screen.getByRole("button", { name: "City" })).not.toBeDisabled();
+    fireEvent.click(document.querySelector("#cityKey")!);
+    const cities = within(screen.getByRole("listbox", { name: "City" })).getAllByRole("option").map((o) => o.textContent);
+    expect(cities).toContain("Dokki");
+    expect(cities).not.toContain("Maadi"); // that is a Cairo city
+    fireEvent.click(screen.getByRole("option", { name: "Dokki" }));
+    expect(submitted(container, "governorateKey")).toBe("giza");
+    expect(submitted(container, "cityKey")).toBe("dokki");
+  });
+
+  it("changing the governorate clears the city (a city of the old governorate must not travel with the new one)", () => {
+    const { container } = renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, "en");
+    choose("#governorateKey", "Cairo");
+    choose("#cityKey", "Maadi");
+    expect(submitted(container, "cityKey")).toBe("maadi");
+    choose("#governorateKey", "Giza");
+    expect(submitted(container, "cityKey")).toBe("");
+  });
+
+  it("reads in Arabic from the same catalogue", () => {
+    renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, "ar");
+    fireEvent.click(document.querySelector("#governorateKey")!);
+    const names = within(screen.getByRole("listbox", { name: "المحافظة" })).getAllByRole("option").map((o) => o.textContent);
+    expect(names).toContain("القاهرة");
+    expect(names).toContain("الجيزة");
+  });
+
+  it("a legacy job whose old text never resolved shows what it says and may keep it by choosing nothing", () => {
+    const { container } = renderWithI18n(
+      <JobForm mode="edit" orgId="o1" trades={trades} job={job({ governorate: "Atlantis", city: "Nowhere", governorate_key: null, city_key: null })} />,
+      "en",
+    );
+    expect(screen.getByText(/entered before places were standardised: Nowhere, Atlantis/)).toBeTruthy();
+    expect(submitted(container, "keepLegacyLocation")).toBe("1");
+    choose("#governorateKey", "Cairo");
+    expect(container.querySelector('input[name="keepLegacyLocation"]')).toBeNull(); // a new choice replaces it
+  });
+
+  it("a job with canonical keys carries no legacy flag", () => {
+    const { container } = renderWithI18n(<JobForm mode="edit" orgId="o1" trades={trades} job={job()} />, "en");
+    expect(container.querySelector('input[name="keepLegacyLocation"]')).toBeNull();
+  });
+});
+
+describe("JobForm — the optional required specialty", () => {
+  const specialties = [
+    { id: "s1", key: "spec_a", tradeKey: "plumbing" },
+    { id: "s2", key: "spec_b", tradeKey: "plumbing" },
+    { id: "s3", key: "spec_c", tradeKey: "kitchens_doors" },
+  ];
+
+  it("shows NOTHING when the catalogue is empty (the schema exists, the names are approved separately)", () => {
+    renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} />, "en");
+    expect(document.querySelector("#requiredSpecialtyId")).toBeNull();
+    expect(screen.queryByText("Required specialty (optional)")).toBeNull();
+  });
+
+  it("shows no empty selector for a trade that has no specialties", () => {
+    renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} specialties={specialties} />, "en");
+    choose("#tradeKey", "Marble & granite");
+    expect(document.querySelector("#requiredSpecialtyId")).toBeNull();
+  });
+
+  it("appears once the chosen trade has specialties, offers only THAT trade's, and submits the id", () => {
+    const { container } = renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} specialties={specialties} />, "en");
+    choose("#tradeKey", "Plumbing");
+    fireEvent.click(document.querySelector("#requiredSpecialtyId")!);
+    const labels = within(screen.getByRole("listbox", { name: "Required specialty (optional)" })).getAllByRole("option").map((o) => o.textContent);
+    expect(labels).toEqual(["Any specialty in this trade", "spec_a", "spec_b"]); // no name is invented: the key is shown until a name is approved
+    fireEvent.click(screen.getByRole("option", { name: "spec_b" }));
+    expect(submitted(container, "requiredSpecialtyId")).toBe("s2");
+  });
+
+  it("changing the trade clears the specialty — it belongs to one trade", () => {
+    const { container } = renderWithI18n(<JobForm mode="create" orgId="o1" trades={trades} specialties={specialties} />, "en");
+    choose("#tradeKey", "Plumbing");
+    choose("#requiredSpecialtyId", "spec_a");
+    expect(submitted(container, "requiredSpecialtyId")).toBe("s1");
+    choose("#tradeKey", "Kitchens & doors");
+    expect(submitted(container, "requiredSpecialtyId")).toBe("");
+  });
+
+  it("an edit starts from the job's own requirement", () => {
+    const { container } = renderWithI18n(
+      <JobForm mode="edit" orgId="o1" trades={trades} specialties={specialties} job={job({ tradeKey: "plumbing", required_specialty_id: "s2" })} />,
+      "en",
+    );
+    expect(submitted(container, "requiredSpecialtyId")).toBe("s2");
   });
 });

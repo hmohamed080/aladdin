@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
-import { getOrgJob } from "@/server/queries/jobs";
-import { loadTradeCatalog } from "@/server/queries/trades";
+import { getJobWorkContact, getOrgJob } from "@/server/queries/jobs";
+import { loadTradeCatalog, loadSpecialtyCatalog } from "@/server/queries/trades";
 import { PageHeader } from "@/components/ui/workspace-layout";
 import { StatePanel } from "@/components/ui/primitives";
 import { BackLink } from "@/features/sales/page-parts";
@@ -18,7 +18,13 @@ export const dynamic = "force-dynamic";
  * than rendering a form whose Save button is guaranteed to fail: a read-only
  * notice is a smaller disappointment than a filled-in form that is rejected.
  */
-export default async function EditJobPage({ params }: { params: Promise<{ jobId: string }> }) {
+export default async function EditJobPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ jobId: string }>;
+  searchParams: Promise<{ contact?: string }>;
+}) {
   const ctx = await getPageContext();
   if (!ctx) return null;
   const { supabase, org, locale } = ctx;
@@ -50,6 +56,9 @@ export default async function EditJobPage({ params }: { params: Promise<{ jobId:
              that would be refused. */
           applicationCount={job.applicationCount}
           trades={await loadTradeCatalog()}
+          specialties={await loadSpecialtyCatalog()}
+          contact={await getJobWorkContact(supabase, job.id)}
+          initialError={(await searchParams).contact === "failed" ? "jobs.errors.contactNotSaved" : undefined}
         />
       )}
     </div>
