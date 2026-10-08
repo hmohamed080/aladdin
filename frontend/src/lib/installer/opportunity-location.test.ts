@@ -176,3 +176,21 @@ describe("buildOpportunityFeed — the count comes from the whole board, not the
     expect(feed.cards.map((j) => j.id)).toEqual(["n1", "far1", "n2"]);
   });
 });
+
+describe("placeLabel — a place in the viewer's language", () => {
+  it("names a catalogue place in Arabic and English, whichever language the poster used", async () => {
+    const { placeLabel } = await import("./opportunity-location");
+    expect(placeLabel("en", "Cairo", "Maadi")).toBe("Maadi, Cairo");
+    expect(placeLabel("ar", "Cairo", "Maadi")).toBe("المعادي، القاهرة");
+    expect(placeLabel("en", "القاهرة", "المعادي")).toBe("Maadi, Cairo");
+    expect(placeLabel("ar", "القاهرة", "المعادي")).toBe("المعادي، القاهرة");
+  });
+
+  it("keeps the poster's own words when the text does not resolve — an old job still reads as written", async () => {
+    const { placeLabel } = await import("./opportunity-location");
+    expect(placeLabel("en", "Atlantis", "Nowhere")).toBe("Nowhere, Atlantis");
+    expect(placeLabel("en", "Cairo", "Some neighbourhood")).toBe("Some neighbourhood, Cairo");
+    expect(placeLabel("en", null, null)).toBe("");
+    expect(placeLabel("ar", "Giza", null)).toBe("الجيزة");
+  });
+});

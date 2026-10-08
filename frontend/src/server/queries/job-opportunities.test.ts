@@ -4,7 +4,6 @@ vi.mock("server-only", () => ({}));
 
 import {
   countOpenJobOpportunities,
-  listJobOpportunities,
   listMyApplications,
   listOpportunityGovernorates,
   discoverableJobIds,
@@ -23,17 +22,21 @@ function client(result: Result, byTable: Record<string, Result> = {}) {
     tables: string[];
     select?: string;
     or?: string;
+    ors: string[];
     filters: [string, string, unknown][];
-  } = { tables: [], filters: [] };
+  } = { tables: [], ors: [], filters: [] };
   let current = result;
   const builder: Record<string, unknown> = {};
   const chain = (name: string) => (...args: unknown[]) => {
     if (name === "select") calls.select = args[0] as string;
-    else if (name === "or") calls.or = args[0] as string;
+    else if (name === "or") {
+      calls.or = args[0] as string;
+      calls.ors.push(args[0] as string);
+    }
     else calls.filters.push([name, args[0] as string, args[1]]);
     return builder;
   };
-  for (const m of ["select", "eq", "neq", "in", "or", "order", "limit", "gte", "lte"]) builder[m] = chain(m);
+  for (const m of ["select", "eq", "neq", "in", "or", "order", "limit", "range", "gte", "lte", "ilike"]) builder[m] = chain(m);
   builder.then = (res: (v: unknown) => unknown) => Promise.resolve(current).then(res);
   builder.maybeSingle = () => Promise.resolve(current);
   return {
@@ -48,86 +51,6 @@ function client(result: Result, byTable: Record<string, Result> = {}) {
     } as never,
   };
 }
-
-describe("listJobOpportunities", () => {
-  /**
-   * The whole authority of this page. `open_job_opportunities` decides open-ness
-   * and the poster's CURRENT verification inside its own definer; a query that
-   * reached `jobs` directly would have to reproduce both, and would get one of
-   * them wrong the first time verification lapsed.
-   */
-  it("reads the discovery projection, never the jobs table", async () => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase);
-    expect(calls.table).toBe("open_job_opportunities");
-  });
-
-  it("orders newest published first, deterministically", async () => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase);
-    expect(calls.filters).toContainEqual(["order", "published_at", { ascending: false }]);
-  });
-
-  it("applies no filter at all when none was asked for", async () => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase);
-    expect(calls.or).toBeUndefined();
-    expect(calls.filters.filter(([m]) => m === "eq")).toEqual([]);
-  });
-
-  /**
-   * O5, AT THE QUERY LAYER. The default list is everything, and the trade filter
-   * only appears when the reader chose one. A default of "my trades" would be
-   * the restriction the database refuses to make, reintroduced as a convenience.
-   */
-  it("filters by trade ONLY when the reader picked one", async () => {
-    const a = client({ data: [], error: null });
-    await listJobOpportunities(a.supabase, {});
-    expect(a.calls.filters.some(([m, c]) => m === "eq" && c === "trade_key")).toBe(false);
-
-    const b = client({ data: [], error: null });
-    await listJobOpportunities(b.supabase, { tradeKey: "electrical" });
-    expect(b.calls.filters).toContainEqual(["eq", "trade_key", "electrical"]);
-  });
-
-  it("never consults the caller's declared trades", async () => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase, { tradeKey: "tiling" });
-    expect(calls.tables).not.toContain("user_trades");
-  });
-
-  it("searches title, description and the posting organization together", async () => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase, { search: "marble" });
-    expect(calls.or).toBe(
-      "title.ilike.%marble%,description.ilike.%marble%,poster_org_name.ilike.%marble%",
-    );
-  });
-
-  /** PostgREST reads `,` `(` `)` as grammar — a raw term would rewrite the filter. */
-  it("neutralizes a search term before it reaches the filter grammar", async () => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase, { search: "a,b)%*" });
-    // The `%` around the value is OURS. What must be clean is the term inside it.
-    const term = calls.or!.slice("title.ilike.%".length, calls.or!.indexOf("%,"));
-    expect(term).toBe("a b");
-  });
-
-  it("filters by application state in both directions", async () => {
-    const a = client({ data: [], error: null });
-    await listJobOpportunities(a.supabase, { applied: "no" });
-    expect(a.calls.filters).toContainEqual(["eq", "has_applied", false]);
-
-    const b = client({ data: [], error: null });
-    await listJobOpportunities(b.supabase, { applied: "yes" });
-    expect(b.calls.filters).toContainEqual(["eq", "has_applied", true]);
-  });
-
-  it("throws rather than swallowing a database error", async () => {
-    const { supabase } = client({ data: null, error: { message: "boom" } });
-    await expect(listJobOpportunities(supabase)).rejects.toBeTruthy();
-  });
-});
 
 describe("listOpportunityGovernorates", () => {
   /**
@@ -246,76 +169,5 @@ describe("countOpenJobOpportunities", () => {
   it("surfaces a read failure instead of reporting a number", async () => {
     const { supabase } = client({ count: null, error: new Error("boom") } as never);
     await expect(countOpenJobOpportunities(supabase)).rejects.toThrow("boom");
-  });
-});
-
-describe("listJobOpportunities — board filters and sorts", () => {
-  const run = async (f: Parameters<typeof listJobOpportunities>[1]) => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase, f);
-    return calls;
-  };
-
-  it("filters on real numeric amount bounds, both inclusive and independent", async () => {
-    const both = await run({ minAmount: 2000, maxAmount: 4500.5 });
-    expect(both.filters).toContainEqual(["gte", "offered_amount", 2000]);
-    expect(both.filters).toContainEqual(["lte", "offered_amount", 4500.5]);
-
-    const onlyMin = await run({ minAmount: 1000 });
-    expect(onlyMin.filters.some(([m]) => m === "lte")).toBe(false);
-    const onlyMax = await run({ maxAmount: 9000 });
-    expect(onlyMax.filters.some(([m]) => m === "gte")).toBe(false);
-  });
-
-  it("invents no threshold: no bound means no amount filter at all", async () => {
-    const none = await run({});
-    expect(none.filters.some(([, col]) => col === "offered_amount")).toBe(false);
-  });
-
-  it("accepts a bound of zero as a real bound", async () => {
-    const calls = await run({ minAmount: 0 });
-    expect(calls.filters).toContainEqual(["gte", "offered_amount", 0]);
-  });
-
-  it("maps each duration bucket to its inclusive day range", async () => {
-    const short = await run({ duration: "short" });
-    expect(short.filters).toContainEqual(["lte", "expected_duration_days", 2]);
-    expect(short.filters.some(([m]) => m === "gte")).toBe(false);
-
-    const medium = await run({ duration: "medium" });
-    expect(medium.filters).toContainEqual(["gte", "expected_duration_days", 3]);
-    expect(medium.filters).toContainEqual(["lte", "expected_duration_days", 5]);
-
-    const long = await run({ duration: "long" });
-    expect(long.filters).toContainEqual(["gte", "expected_duration_days", 6]);
-    expect(long.filters.some(([m]) => m === "lte")).toBe(false);
-  });
-
-  it("highest pay orders by amount first and newest second", async () => {
-    const calls = await run({ sort: "highest" });
-    const orders = calls.filters.filter(([m]) => m === "order");
-    expect(orders[0]).toEqual(["order", "offered_amount", { ascending: false }]);
-    expect(orders[1]).toEqual(["order", "published_at", { ascending: false }]);
-  });
-
-  it("newest (the default) orders by publication time only", async () => {
-    const calls = await run({ sort: "newest" });
-    expect(calls.filters.filter(([m]) => m === "order")).toEqual([["order", "published_at", { ascending: false }]]);
-  });
-
-  it("several trades narrow with IN; one trade with EQ; none leaves every trade", async () => {
-    const many = await run({ tradeKeys: ["tiling", "painting"] });
-    expect(many.filters).toContainEqual(["in", "trade_key", ["tiling", "painting"]]);
-
-    const one = await run({ tradeKeys: ["tiling"] });
-    expect(one.filters).toContainEqual(["eq", "trade_key", "tiling"]);
-
-    const none = await run({ tradeKeys: [] });
-    expect(none.filters.some(([, col]) => col === "trade_key")).toBe(false);
-  });
-
-  it("still accepts the single legacy tradeKey", async () => {
-    const calls = await run({ tradeKey: "tiling" });
-    expect(calls.filters).toContainEqual(["eq", "trade_key", "tiling"]);
   });
 });

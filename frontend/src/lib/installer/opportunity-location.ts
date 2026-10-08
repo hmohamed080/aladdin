@@ -182,3 +182,20 @@ export function installerLocationLabel(
   const parts = [cityText, governorateText].filter(Boolean);
   return parts.length ? parts.join("، ") : null;
 }
+
+/**
+ * A job's place as WORDS in the viewer's language: the catalogue's own Arabic / English names when the stored text
+ * resolves exactly (it always does for a job created or edited since places became catalogue choices), and the text as
+ * typed otherwise — so an old job still shows what its poster wrote, and a new one reads in the viewer's language
+ * whichever language the poster used. City first, then governorate, joined with the language's own comma.
+ */
+export function placeLabel(locale: Locale, governorate: string | null | undefined, city: string | null | undefined): string {
+  const gk = resolveGovernorateKey(governorate);
+  const governorateOption = gk ? GOVERNORATE_OPTIONS.find((option) => option.value === gk) : undefined;
+  const ck = gk ? resolveCityKey(gk, city) : null;
+  const cityOption = gk && ck ? (CITIES_BY_GOVERNORATE[gk] ?? []).find((option) => option.value === ck) : undefined;
+  const pick = (option: LocationOption) => (locale === "ar" ? option.ar : option.en);
+  return [cityOption ? pick(cityOption) : city, governorateOption ? pick(governorateOption) : governorate]
+    .filter(Boolean)
+    .join(locale === "ar" ? "، " : ", ");
+}

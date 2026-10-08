@@ -8,13 +8,12 @@ import { sanitizeSearchTerm } from "./sales";
 /**
  * The INSTALLER side of Jobs: discovery, and the caller's own candidacies.
  *
- * Two read seams, both from Increment 6, and neither of them takes a user id.
- * `open_job_opportunities` resolves the caller from `auth.uid()` inside its
- * definer to compute `has_applied`; `my_job_applications` resolves it to decide
- * which rows exist at all. So there is no parameter here that could be pointed
- * at somebody else's applications, and nothing in this file re-implements an
- * authority check — a filter can narrow what the database already allows and can
- * never widen it.
+ * The read seams, and none of them takes a user id. `job_opportunities_page` /
+ * `job_opportunities_total` (the board) and `job_matches` (the Overall Match) resolve the caller from
+ * `auth.uid()` inside the database; `my_job_applications` resolves it to decide which rows exist at all.
+ * So there is no parameter here that could be pointed at somebody else, and nothing in this file
+ * re-implements an authority check — a filter or a cursor can narrow what the database already allows
+ * and can never widen it.
  *
  * THE TRADE FILTER IS NOT AN AUTHORITY (O5). `open_job_opportunities` applies no
  * trade filter of its own, and nothing here reads `user_trades`. A professional
@@ -27,6 +26,12 @@ import { sanitizeSearchTerm } from "./sales";
 type DB = SupabaseClient<Database>;
 
 export type OpportunityRow = Database["public"]["Views"]["open_job_opportunities"]["Row"];
+/**
+ * One row of the PAGED board (`job_opportunities_page`): the discovery columns, whether the caller has applied /
+ * saved it, its canonical location keys, its optional required specialty, the two ORDERING tiers (Near me = location
+ * only, Best match = trade + specialty only) and the canonical Overall Match breakdown with stable reason codes.
+ */
+export type BoardOpportunityRow = Database["public"]["Functions"]["job_opportunities_page"]["Returns"][number];
 export type MyApplicationRow = Database["public"]["Views"]["my_job_applications"]["Row"];
 export type JobApplicationStatus = Database["public"]["Enums"]["job_application_status"];
 
@@ -41,11 +46,19 @@ export const APPLICATION_STATUSES = [
 const LIST_LIMIT = 100;
 /** The row cap of `listJobOpportunities`. A result shorter than this is the COMPLETE set. */
 export const OPPORTUNITY_LIST_LIMIT = LIST_LIMIT;
+/** The database refuses a page larger than this (one extra row is read to learn whether another page exists). */
+const DB_PAGE_MAX = 101;
 
 /** Real buckets over `expected_duration_days`. A job with no stated duration is in none of them. */
 export type OpportunityDuration = "short" | "medium" | "long";
-/** The two orderings the data can honestly support: when it was posted, and what it pays. */
-export type OpportunitySort = "newest" | "highest";
+/**
+ * The orderings of the board, all applied INSIDE the database statement (`job_opportunities_page`):
+ *   newest    published_at DESC, id DESC
+ *   highest   offered_amount DESC (NULLS LAST — vacuous, the column is NOT NULL), published_at DESC, id DESC
+ *   nearest   LOCATION tier ASC, published_at DESC, id DESC — 0 same city, 1 same primary governorate,
+ *             2 another declared service area, 3 the rest. Canonical keys only; no GPS, no distance, no Overall Match.
+ */
+export type OpportunitySort = "newest" | "highest" | "nearest";
 
 /** Inclusive day bounds of each duration bucket. `long` is open-ended. */
 export const DURATION_BUCKETS: Record<OpportunityDuration, { min?: number; max?: number }> = {
@@ -61,62 +74,170 @@ export type OpportunityFilters = {
   tradeKey?: string;
   /** Several canonical trade keys (any of). Empty/undefined = ALL trades. */
   tradeKeys?: readonly string[];
-  /** The governorate exactly as some poster typed it (the column is free text). */
-  governorate?: string;
+  /** A catalogue governorate KEY. Every job stores the same key (`jobs.governorate_key`); nothing is resolved from text at read time. */
+  governorateKey?: string;
+  /** A catalogue city KEY inside `governorateKey` (`other` is the catalogue's own entry). */
+  cityKey?: string;
   /** "no" = not yet applied, "yes" = already applied, undefined = both. */
   applied?: "yes" | "no";
   /** Real numeric bounds on `offered_amount`, in EGP, both inclusive and both optional. No ceiling is assumed. */
   minAmount?: number;
   maxAmount?: number;
   duration?: OpportunityDuration;
+  /** Only the opportunities the CALLER has saved — a predicate inside the database statement, so there is no list to cap. */
+  saved?: boolean;
   /** Defaults to "newest". */
   sort?: OpportunitySort;
-  /** Row cap. Defaults to `LIST_LIMIT` — a caller previewing a handful on
-   *  `/home` (Increment 14) passes a small number rather than fetching the
-   *  full page and slicing client-side. */
+  /** Row cap of `listJobOpportunities`. Defaults to `LIST_LIMIT`. */
   limit?: number;
 };
 
+type PageArgs = Database["public"]["Functions"]["job_opportunities_page"]["Args"];
+type TotalArgs = Database["public"]["Functions"]["job_opportunities_total"]["Args"];
+
+/** The filters, as the database's own parameters. Only what is set is sent; nothing here names a user. */
+function filterArgs(f: OpportunityFilters): TotalArgs {
+  const tradeKeys = [...new Set([...(f.tradeKey ? [f.tradeKey] : []), ...(f.tradeKeys ?? [])])];
+  const bucket = f.duration ? DURATION_BUCKETS[f.duration] : undefined;
+  const term = f.search ? sanitizeSearchTerm(f.search) : "";
+  const finite = (n: number | undefined) => (n !== undefined && Number.isFinite(n) ? n : undefined);
+  return {
+    p_search: term || undefined,
+    p_trade_keys: tradeKeys.length ? tradeKeys : undefined,
+    p_governorate_key: f.governorateKey || undefined,
+    p_city_key: f.governorateKey && f.cityKey ? f.cityKey : undefined,
+    p_min_amount: finite(f.minAmount),
+    p_max_amount: finite(f.maxAmount),
+    p_min_duration: bucket?.min,
+    p_max_duration: bucket?.max,
+    p_applied: f.applied === "yes" ? true : f.applied === "no" ? false : undefined,
+    p_saved: f.saved ? true : undefined,
+  };
+}
+
 /**
- * Open opportunities, newest published first by default.
- *
- * Two orderings exist and both are honest: `published_at desc` (the default) and
- * `offered_amount desc` (highest pay, newest breaking ties). The reference pack's
- * other orderings — nearest, most applied to — need geography the domain does not
- * hold or a competitor count the poster's side deliberately does not publish.
+ * Open opportunities, newest published first by default — one page of the database, never a view-wide read.
+ * Used for small flat lists (global search suggestions, the home preview), capped at `limit` (default 100).
  */
 export async function listJobOpportunities(
   supabase: DB,
   f: OpportunityFilters = {},
-): Promise<OpportunityRow[]> {
-  let q = supabase.from("open_job_opportunities").select("*");
-  // Highest pay first, newest breaking ties; otherwise newest first and nothing else.
-  if (f.sort === "highest") q = q.order("offered_amount", { ascending: false });
-  q = q.order("published_at", { ascending: false }).limit(f.limit ?? LIST_LIMIT);
-
-  const term = f.search ? sanitizeSearchTerm(f.search) : "";
-  if (term) {
-    q = q.or(
-      `title.ilike.%${term}%,description.ilike.%${term}%,poster_org_name.ilike.%${term}%`,
-    );
-  }
-  const tradeKeys = [...new Set([...(f.tradeKey ? [f.tradeKey] : []), ...(f.tradeKeys ?? [])])];
-  if (tradeKeys.length === 1) q = q.eq("trade_key", tradeKeys[0]!);
-  else if (tradeKeys.length > 1) q = q.in("trade_key", tradeKeys);
-  if (f.governorate) q = q.eq("governorate", f.governorate);
-  if (f.applied === "yes") q = q.eq("has_applied", true);
-  if (f.applied === "no") q = q.eq("has_applied", false);
-  if (f.minAmount !== undefined && Number.isFinite(f.minAmount)) q = q.gte("offered_amount", f.minAmount);
-  if (f.maxAmount !== undefined && Number.isFinite(f.maxAmount)) q = q.lte("offered_amount", f.maxAmount);
-  if (f.duration) {
-    const { min, max } = DURATION_BUCKETS[f.duration];
-    if (min !== undefined) q = q.gte("expected_duration_days", min);
-    if (max !== undefined) q = q.lte("expected_duration_days", max);
-  }
-
-  const { data, error } = await q;
+): Promise<BoardOpportunityRow[]> {
+  const { data, error } = await supabase.rpc("job_opportunities_page", {
+    ...filterArgs(f),
+    p_sort: f.sort ?? "newest",
+    p_limit: Math.min(Math.max(Math.floor(f.limit ?? LIST_LIMIT), 1), DB_PAGE_MAX),
+  });
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * The orderings of the installer DASHBOARD's "Opportunities for you" strip. A strip, not a board: it shows a
+ * handful, so it is a bounded top-N read of the SAME paging function the board uses and needs no cursor.
+ *   best     BEST MATCH — TRADE + SPECIALTY ONLY (70 trade + specialty / 50 trade only / 0), newest breaking ties.
+ *            It does not look at location or availability.
+ *   nearest  NEAR ME — LOCATION ONLY: same city, primary governorate, another declared area, the rest.
+ *   newest   published_at DESC
+ *   oldest   published_at ASC
+ * Every mode lists every discoverable job — a low or zero match is still listed and still applicable — and every
+ * ordering ends on the id, so the strip is deterministic. The cards still DISPLAY the Overall Match.
+ */
+export type DashboardOpportunityMode = "best" | "nearest" | "newest" | "oldest";
+export const DASHBOARD_OPPORTUNITY_MODES: readonly DashboardOpportunityMode[] = ["best", "nearest", "newest", "oldest"];
+
+export async function listDashboardOpportunities(
+  supabase: DB,
+  mode: DashboardOpportunityMode,
+  limit: number,
+): Promise<BoardOpportunityRow[]> {
+  const { data, error } = await supabase.rpc("job_opportunities_page", {
+    p_sort: mode,
+    p_limit: Math.min(Math.max(Math.floor(limit), 1), DB_PAGE_MAX),
+  });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Where the NEXT page of the board starts: the ordering keys of the last row already shown. It is a position in
+ * the sort order, never a row count, so rows inserted, removed or re-ranked while a viewer pages cannot make a page
+ * repeat or skip a row. One shape per sort, each ending on `publishedAt` then `id` (the id breaks every tie):
+ *
+ *   newest   published_at DESC, id DESC
+ *   highest  offered_amount DESC, published_at DESC, id DESC
+ *   nearest  location tier ASC, published_at DESC, id DESC
+ *
+ * A cursor only ever narrows a position inside what the database already allows this caller to see; the database
+ * applies discoverability to every page regardless of the cursor, so a forged one cannot widen anything.
+ */
+export type JobKeyset =
+  | { sort: "newest"; publishedAt: string; id: string }
+  | { sort: "highest"; amount: number; publishedAt: string; id: string }
+  | { sort: "nearest"; tier: number; publishedAt: string; id: string };
+
+/** The keyset of a row, for the sort it was read under. Throws when the row lacks a key (published jobs always have both). */
+export function keysetOf(
+  sort: OpportunitySort,
+  row: Pick<BoardOpportunityRow, "id" | "published_at" | "offered_amount" | "proximity_tier">,
+): JobKeyset {
+  if (!row.id || !row.published_at) throw new Error("an opportunity without an id or a publication time cannot anchor a page");
+  if (sort === "highest") return { sort, amount: Number(row.offered_amount), publishedAt: row.published_at, id: row.id };
+  if (sort === "nearest") return { sort, tier: Number(row.proximity_tier), publishedAt: row.published_at, id: row.id };
+  return { sort: "newest", publishedAt: row.published_at, id: row.id };
+}
+
+/** The keyset as the database's cursor parameters. */
+function cursorArgs(after: JobKeyset | null): Partial<PageArgs> {
+  if (!after) return {};
+  if (after.sort === "highest") return { p_after_id: after.id, p_after_published_at: after.publishedAt, p_after_amount: after.amount };
+  if (after.sort === "nearest") return { p_after_id: after.id, p_after_published_at: after.publishedAt, p_after_tier: after.tier };
+  return { p_after_id: after.id, p_after_published_at: after.publishedAt };
+}
+
+/**
+ * One REAL page of the board: up to `size` rows AFTER the keyset `after` (the first page when it is null) of the
+ * filtered, ordered set, and the keyset of the next page (null when this page is the last). The whole question —
+ * discoverability, filters, sort, cursor and LIMIT — is ONE database statement that walks a partial index in sort
+ * order and stops after a page, so page 20 costs what page 1 costs and nothing materialises the discoverable set.
+ *
+ * THE EXACT TOTAL is a separate, deliberately rarer read. It is asked for only when `withTotal` is set — the first
+ * page, a filter change, a sort change, switching saved/all — and the board keeps it while later pages append, so a
+ * count is never paid per appended page. (`null` is "not asked", never zero.)
+ *
+ * `next` is known without a count: one extra row is read.
+ */
+export async function listJobOpportunityPage(
+  supabase: DB,
+  f: OpportunityFilters,
+  size: number,
+  after: JobKeyset | null = null,
+  options: { withTotal?: boolean } = {},
+): Promise<{ rows: BoardOpportunityRow[]; total: number | null; next: JobKeyset | null }> {
+  const sort = f.sort ?? "newest";
+  if (after && after.sort !== sort) throw new Error("the cursor belongs to a different ordering");
+  const take = Math.min(Math.max(Math.floor(size), 1), DB_PAGE_MAX - 1);
+  const [rowsRes, totalRes] = await Promise.all([
+    supabase.rpc("job_opportunities_page", { ...filterArgs(f), p_sort: sort, p_limit: take + 1, ...cursorArgs(after) }),
+    options.withTotal ? supabase.rpc("job_opportunities_total", filterArgs(f)) : Promise.resolve(null),
+  ]);
+  if (rowsRes.error) throw rowsRes.error;
+  if (totalRes?.error) throw totalRes.error;
+  const fetched = rowsRes.data ?? [];
+  const rows = fetched.slice(0, take);
+  const last = rows[rows.length - 1];
+  return {
+    rows,
+    total: totalRes ? Number(totalRes.data ?? rows.length) : null,
+    next: fetched.length > take && last ? keysetOf(sort, last) : null,
+  };
+}
+
+/** Does the caller have a service location the catalogue recognises? Only used to explain why Nearest shows newest-first. */
+export async function callerHasServiceLocation(supabase: DB): Promise<boolean> {
+  const { data, error } = await supabase.rpc("caller_has_service_location");
+  if (error) throw error;
+  return data === true;
 }
 
 /**

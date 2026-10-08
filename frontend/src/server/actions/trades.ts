@@ -54,6 +54,19 @@ export async function setTradesAction(
     p_primary_key: primary,
   });
 
+  // SPECIALTIES, when the form carries them (it does only where a specialty catalogue exists): the COMPLETE set,
+  // written after the trades so a specialty never outlives the trade it sits under.
+  if (!error && fd.has("specialties")) {
+    const ids = String(fd.get("specialties") ?? "")
+      .split("\n")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const { error: specialtyError } = await supabase.rpc("user_trade_specialties_set", { p_specialty_ids: ids });
+    if (specialtyError) {
+      return { ok: false, code: specialtyError.code === "22023" ? "profile.trades.unavailable" : "profile.trades.saveFailed" };
+    }
+  }
+
   if (error) {
     return {
       ok: false,

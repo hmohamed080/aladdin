@@ -108,3 +108,30 @@ export const loadMyTrades = cache(async function loadMyTrades(): Promise<MyTrade
     primaryKey: rows.find((r) => r.is_primary)?.trades?.key ?? null,
   };
 });
+
+/** One detailed specialty: a child of exactly one trade. `key` is the i18n label key. */
+export type Specialty = { id: string; key: string; tradeKey: string };
+
+/**
+ * Every ACTIVE specialty, with the key of the trade it belongs to. The catalogue is empty until a product-approved
+ * migration seeds it — and every surface that reads this stays hidden for a trade that has none, so an empty
+ * catalogue renders nothing (never an empty, meaningless selector).
+ */
+export const loadSpecialtyCatalog = cache(async function loadSpecialtyCatalog(): Promise<Specialty[]> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase
+    .from("trade_specialties")
+    .select("id, key, sort_order, trades!inner(key)")
+    .order("sort_order", { ascending: true })
+    .order("key", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).flatMap((row) => (row.trades ? [{ id: row.id, key: row.key, tradeKey: row.trades.key }] : []));
+});
+
+/** The caller's own specialties (RLS restricts the rows to `auth.uid()`). */
+export const loadMySpecialtyIds = cache(async function loadMySpecialtyIds(): Promise<string[]> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.from("user_trade_specialties").select("specialty_id");
+  if (error) throw error;
+  return (data ?? []).map((row) => row.specialty_id);
+});

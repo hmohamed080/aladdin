@@ -46,13 +46,17 @@ export type BoardFilters = {
   /** Canonical `trades.key`s. Empty = ALL trades (the default; never narrowed
    *  by the viewer's own declared trades). */
   tradeKeys: readonly string[];
-  /** A governorate exactly as posters typed it, or "". */
+  /** A catalogue governorate KEY (`lib/installer/location-data`), or "" = all governorates. */
   governorate: string;
+  /** A catalogue city key inside `governorate`, or "" = all cities. `other` is the catalogue's own "Other city" key. */
+  city: string;
   applied: AppliedFilter;
   /** Real numeric bounds on the offered amount, in EGP. Null = unbounded. */
   minAmount: number | null;
   maxAmount: number | null;
   duration: DurationFilter;
+  /** Production: show only the caller's saved opportunities. */
+  saved: boolean;
   /** Preview-only. */
   radiusKm: number;
 };
@@ -61,10 +65,12 @@ export const DEFAULT_BOARD_FILTERS: BoardFilters = {
   q: "",
   tradeKeys: [],
   governorate: "",
+  city: "",
   applied: "",
   minAmount: null,
   maxAmount: null,
   duration: "all",
+  saved: false,
   radiusKm: 15,
 };
 
@@ -93,6 +99,7 @@ export function activeFilterCount(f: BoardFilters, preview: boolean, budgetCeili
     base +
     (f.q.trim() ? 1 : 0) +
     (f.governorate ? 1 : 0) +
+    (f.city ? 1 : 0) +
     (f.applied ? 1 : 0) +
     (f.minAmount !== null ? 1 : 0) +
     (f.maxAmount !== null ? 1 : 0)

@@ -65,3 +65,16 @@ export function specializationLabel(t: TranslateFn, value: string): string {
   const label = t(messageKey);
   return label === messageKey ? trimmed : label;
 }
+
+/**
+ * The display name for a detailed specialty key (`trade_specialties.key`).
+ *
+ * Names live in the i18n catalogs under `trades.specialties.<key>`, exactly like trades. The specialty catalogue is
+ * approved and seeded separately, so until a name is added there this returns the KEY — never a message path and never
+ * a guessed translation.
+ */
+export function specialtyLabel(t: TranslateFn, key: string): string {
+  const messageKey = `trades.specialties.${key}`;
+  const label = t(messageKey);
+  return label === messageKey ? key : label;
+}
