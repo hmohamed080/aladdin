@@ -6,9 +6,9 @@ import { Badge, Card, InlineError, InlineSuccess } from "@/components/ui/primiti
 import { SubmitButton } from "@/components/ui/controls";
 import { ChoiceChip } from "@/features/onboarding/wizard";
 import { StarIcon } from "@/components/ui/icons";
-import { tradeLabel } from "@/lib/i18n/trade-label";
+import { specialtyLabel, tradeLabel } from "@/lib/i18n/trade-label";
 import { setTradesAction, type TradesState } from "@/server/actions/trades";
-import type { Trade, MyTrades } from "@/server/queries/trades";
+import type { Trade, MyTrades, Specialty } from "@/server/queries/trades";
 
 const INITIAL: TradesState = { ok: false };
 
@@ -40,6 +40,10 @@ const INITIAL: TradesState = { ok: false };
  * would have to explain a half-saved profile. The availability control on the
  * hub already works this way for the same reason.
  *
+ * DETAILED SPECIALTIES live UNDER a selected trade, and only where that trade has some: a trade with no catalogued
+ * specialty shows nothing extra (never an empty selector), and the whole feature is invisible until the catalogue
+ * is seeded. They are saved by the same button as the trades (one write after the other), as a complete set.
+ *
  * NO RAW KEYS REACH THE SCREEN. Every visible string goes through `tradeLabel`,
  * which falls back to the key rather than to a message path — and the keys
  * themselves travel only in hidden inputs.
@@ -47,9 +51,14 @@ const INITIAL: TradesState = { ok: false };
 export function TradeSelector({
   catalog,
   mine,
+  specialties = [],
+  mySpecialtyIds = [],
 }: {
   catalog: Trade[];
   mine: MyTrades;
+  /** Every active specialty, each with its trade's key. Empty until the catalogue is approved and seeded. */
+  specialties?: readonly Specialty[];
+  mySpecialtyIds?: readonly string[];
 }) {
   const { t } = useI18n();
   const [state, submit] = useActionState(setTradesAction, INITIAL);
@@ -61,11 +70,17 @@ export function TradeSelector({
   // `user_trades_set` deletes any held trade missing from that set (see
   // trades.ts's MyTrades.legacyKeys doc comment).
   const legacyKeys = mine.legacyKeys ?? [];
+  const [chosenSpecialties, setChosenSpecialties] = useState<string[]>([...mySpecialtyIds]);
+  const specialtiesOf = (tradeKey: string) => specialties.filter((spec) => spec.tradeKey === tradeKey);
+  const toggleSpecialty = (id: string) =>
+    setChosenSpecialties((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const toggle = (key: string) => {
     setSelected((prev) => {
       if (prev.includes(key)) {
         const next = prev.filter((k) => k !== key);
+        // A specialty never outlives its trade.
+        setChosenSpecialties((chosen) => chosen.filter((id) => specialties.find((spec) => spec.id === id)?.tradeKey !== key));
         // Deselecting the primary promotes the first survivor rather than
         // leaving a selection with nothing leading it. Same rule the RPC applies
         // when no primary is named, so the two can never disagree.
@@ -131,6 +146,21 @@ export function TradeSelector({
                       the state — a button that does nothing is worse than no
                       button, and its absence is itself the clearest statement of
                       which row is primary. */}
+                  {specialtiesOf(key).length > 0 ? (
+                    <div className="flex basis-full flex-col gap-1.5 border-t border-strong/40 pt-2" data-testid={`specialties-${key}`}>
+                      <p className="text-label font-medium text-fg-secondary">{t("profile.trades.specialtiesTitle")}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {specialtiesOf(key).map((spec) => (
+                          <ChoiceChip
+                            key={spec.id}
+                            selected={chosenSpecialties.includes(spec.id)}
+                            label={specialtyLabel(t, spec.key)}
+                            onToggle={() => toggleSpecialty(spec.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   {isPrimary ? null : (
                     <button
                       type="button"
@@ -178,6 +208,8 @@ export function TradeSelector({
             set, so omitting them here would silently erase them on every save. */}
         <input type="hidden" name="keys" value={[...ordered, ...legacyKeys].join("\n")} />
         <input type="hidden" name="primary" value={primary ?? ""} />
+        {/* Present only where a specialty catalogue exists: the action then writes the complete set after the trades. */}
+        {specialties.length > 0 ? <input type="hidden" name="specialties" value={chosenSpecialties.filter((id) => ordered.includes(specialties.find((spec) => spec.id === id)?.tradeKey ?? "")).join("\n")} /> : null}
         <SubmitButton variant="primary" size="sm" pendingLabel={t("profile.trades.saving")}>
           {t("profile.trades.save")}
         </SubmitButton>

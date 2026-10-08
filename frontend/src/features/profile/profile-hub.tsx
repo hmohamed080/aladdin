@@ -102,7 +102,7 @@ export function ProfileHub({
         meta={
           <>
             <VerificationBadge state={verification.state} t={t} />
-            <AvailabilityBadge available={data.availability.available} t={t} />
+            <AvailabilityBadge state={data.availability.state} t={t} />
             <ButtonLink href="/home/profile/edit" variant="outline" size="sm">
               {t("profile.hub.edit")}
             </ButtonLink>

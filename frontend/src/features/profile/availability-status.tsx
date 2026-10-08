@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/primitives";
+import type { AvailabilityState } from "@/lib/profile/availability-state";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/locales";
 import { formatRelativeTime } from "@/lib/ui/format";
@@ -15,23 +16,33 @@ import { formatRelativeTime } from "@/lib/ui/format";
  * state honestly, and would push everyone toward leaving the flag on, which is
  * exactly how an availability signal becomes worthless.
  *
- * THREE STATES, NOT TWO. "Never set" is its own answer and must not collapse into
+ * THREE STATES, NOT TWO. "Not specified" (never declared) is its own answer and must not collapse into
  * "unavailable": a default the person has never touched is not a claim they made,
  * and showing it as one would have the platform speaking for them (O3, from the
  * other direction). It renders with no age line, because there is no change to
- * date.
+ * date. The state is derived by `availabilityState` — the database's declaration
+ * marker, never `false` alone.
  *
  * Server components — presentational only. No control lives here, so the public
  * page ships no client JavaScript for it.
  */
-export function AvailabilityBadge({ available, t }: { available: boolean; t: TranslateFn }) {
+export function AvailabilityBadge({ state, t }: { state: AvailabilityState; t: TranslateFn }) {
+  const label =
+    state === "available"
+      ? "profile.availability.available"
+      : state === "unavailable"
+        ? "profile.availability.unavailable"
+        : "profile.availability.notSpecified";
   return (
-    <Badge tone={available ? "success" : "neutral"}>
+    <Badge tone={state === "available" ? "success" : "neutral"} data-availability-state={state}>
       <span
         aria-hidden="true"
-        className={`size-1.5 rounded-pill ${available ? "bg-success" : "bg-fg-muted"}`}
+        // Not specified is a HOLLOW dot: it is the absence of a statement, not a muted "no".
+        className={`size-1.5 rounded-pill ${
+          state === "available" ? "bg-success" : state === "unavailable" ? "bg-fg-muted" : "border border-strong"
+        }`}
       />
-      {t(available ? "profile.availability.available" : "profile.availability.unavailable")}
+      {t(label)}
     </Badge>
   );
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { availabilityState, type AvailabilityState } from "@/lib/profile/availability-state";
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -102,6 +103,11 @@ export type Availability = {
   available: boolean;
   /** When it last CHANGED — stamped by the database, never by the client. */
   updatedAt: string | null;
+  /**
+   * available / unavailable / unknown. "Unknown" (never declared) is NOT "unavailable": derive it only through
+   * `availabilityState`, never from `available` alone.
+   */
+  state: AvailabilityState;
 };
 
 export type PersonalHomeData = {
@@ -240,6 +246,7 @@ export const loadPersonalHome = cache(async function loadPersonalHome(): Promise
       // no-profile-row case rather than papering over a real null.
       available: profile?.available_for_work ?? false,
       updatedAt: profile?.availability_updated_at ?? null,
+      state: availabilityState(profile?.available_for_work ?? false, profile?.availability_updated_at ?? null),
     },
     consumer: input.consumer,
     professional: { ...input.professional, additionalServices: io?.prof_additional_services ?? [] },

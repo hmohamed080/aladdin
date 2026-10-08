@@ -18,6 +18,7 @@ import {
   TargetIcon,
 } from "@/components/ui/icons";
 import { pick } from "./localized";
+import { MatchBadge } from "@/features/installer-job-opportunities-preview/match-badge";
 import { TradeIllustration } from "./trade-illustration";
 import type { InstallerOpportunityVM } from "./view-model";
 
@@ -25,9 +26,13 @@ import type { InstallerOpportunityVM } from "./view-model";
  * `variant="preview"` is the approved design with local demo interactions (a
  * save heart, an Apply button that flips local state). `variant="production"`
  * keeps the same card but only carries what the backend can honour:
- *   - no save heart (there is no saved-jobs model),
- *   - no in-card Apply (applying happens on the opening's own page, which owns
- *     the real `applyToJobAction`); the card links there instead of pretending,
+ *   - the save heart is the REAL saved-jobs state (`save`, the same `saved_jobs` authority as /home/jobs), never a local
+ *     flip: it is drawn only when the owner supplies `save`, and shows `aria-pressed`,
+ *   - TWO separate actions beside each other — "Details" (the opening's page) and
+ *     "Apply now" (the same page with `?apply=1`, which opens the real confirmation
+ *     dialog around `applyToJobAction`). The card never applies by itself. An
+ *     opening the caller already applied to shows the honest applied state and
+ *     Details, never a second active Apply,
  *   - an image only when one genuinely belongs to the opening, otherwise a
  *     generic illustration of the opening's REAL trade (obviously a drawing),
  *   - an honest "budget not specified" instead of a zero amount.
@@ -35,9 +40,12 @@ import type { InstallerOpportunityVM } from "./view-model";
 export function JobOpportunityCard({
   job,
   variant = "preview",
+  save,
 }: {
   job: InstallerOpportunityVM;
   variant?: "preview" | "production";
+  /** Production: the persisted saved state of THIS opening and the action that changes it. */
+  save?: { saved: boolean; onToggle: () => void };
 }) {
   const { locale, t } = useI18n();
   const production = variant === "production";
@@ -73,7 +81,16 @@ export function JobOpportunityCard({
           <TradeIllustration tradeKey={job.tradeKey} className="absolute inset-y-2 end-3 h-[calc(100%-1rem)] w-auto max-w-[70%]" />
         )}
 
-        {job.matchPercent !== null ? (
+        {production ? (
+          // Production: the canonical Overall Match (the database's `overall_percent`) with its breakdown one press
+          // away — the same badge as the Jobs board and the job page. A low or zero match is shown plainly and
+          // never hides or disables the card.
+          job.match ? (
+            <div className="absolute start-2.5 top-2.5">
+              <MatchBadge match={job.match} locale={locale} />
+            </div>
+          ) : null
+        ) : job.matchPercent !== null ? (
           <span className="absolute start-2.5 top-2.5 flex items-center gap-1 rounded-pill bg-success px-2.5 py-1 text-label font-semibold text-white shadow-sm">
             <TargetIcon size={13} />
             {locale === "ar"
@@ -82,7 +99,20 @@ export function JobOpportunityCard({
           </span>
         ) : null}
 
-        {production ? null : (
+        {production ? (
+          save ? (
+            <button
+              type="button"
+              onClick={save.onToggle}
+              aria-pressed={save.saved}
+              aria-label={save.saved ? (locale === "ar" ? "إزالة من الفرص المحفوظة" : "Remove from saved jobs") : locale === "ar" ? "حفظ الفرصة" : "Save opportunity"}
+              data-testid="dashboard-save"
+              className="absolute end-2.5 top-2.5 grid h-8 w-8 place-items-center rounded-pill bg-white/90 text-fg-secondary shadow-sm backdrop-blur transition-colors hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              {save.saved ? <HeartFilledIcon size={17} className="text-danger" /> : <HeartIcon size={17} />}
+            </button>
+          ) : null
+        ) : (
           <button
             type="button"
             onClick={() => setSaved((v) => !v)}
@@ -147,24 +177,30 @@ export function JobOpportunityCard({
                     <CheckIcon size={14} />
                     {t("jobs.opportunities.appliedBadge")}
                   </span>
-                  <Link href={job.href} className="rounded-sm border border-strong px-2.5 py-1.5 text-label font-medium text-fg transition-colors hover:bg-surface-2">
-                    {locale === "ar" ? "تفاصيل أكثر" : "More details"}
+                  <Link href={job.href} className={DETAILS_ACTION}>
+                    {locale === "ar" ? "تفاصيل" : "Details"}
                   </Link>
                 </>
               ) : (
-                <Link href={job.href} className="flex items-center gap-1.5 rounded-sm bg-primary px-2.5 py-1.5 text-label font-medium text-primary-foreground transition-opacity hover:opacity-90">
-                  <SendIcon size={14} />
-                  {t("jobs.opportunities.viewAndApply")}
-                </Link>
+                <>
+                  <Link href={job.href} className={DETAILS_ACTION}>
+                    {locale === "ar" ? "تفاصيل" : "Details"}
+                  </Link>
+                  {/* The real application flow: the opening's own page opens its confirmation dialog around `applyToJobAction`, so applying stays a deliberate act — never a local state flip on the dashboard. */}
+                  <Link href={`${job.href}?apply=1`} className="flex items-center gap-1.5 rounded-sm bg-primary px-2.5 py-1.5 text-label font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+                    <SendIcon size={14} />
+                    {locale === "ar" ? "قدّم الآن" : "Apply now"}
+                  </Link>
+                </>
               )
             ) : (
               <>
                 <Link
                   href={job.href}
                   onClick={job.href === "#" ? (e) => e.preventDefault() : undefined}
-                  className="rounded-sm border border-strong px-2.5 py-1.5 text-label font-medium text-fg transition-colors hover:bg-surface-2"
+                  className={DETAILS_ACTION}
                 >
-                  {locale === "ar" ? "تفاصيل أكثر" : "More details"}
+                  {locale === "ar" ? "تفاصيل" : "Details"}
                 </Link>
                 <button
                   type="button"
@@ -176,7 +212,7 @@ export function JobOpportunityCard({
                   )}
                 >
                   {applied ? <CheckIcon size={14} /> : <SendIcon size={14} />}
-                  {applied ? (locale === "ar" ? "تم التقديم" : "Applied") : locale === "ar" ? "قدم الآن" : "Apply now"}
+                  {applied ? (locale === "ar" ? "تم التقديم" : "Applied") : locale === "ar" ? "قدّم الآن" : "Apply now"}
                 </button>
               </>
             )}
@@ -186,3 +222,6 @@ export function JobOpportunityCard({
     </li>
   );
 }
+
+const DETAILS_ACTION =
+  "rounded-sm border border-strong px-2.5 py-1.5 text-label font-medium text-fg transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";

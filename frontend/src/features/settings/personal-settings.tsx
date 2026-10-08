@@ -4,6 +4,8 @@ import { Card, Field } from "@/components/ui/primitives";
 import { ButtonLink, SubmitButton } from "@/components/ui/controls";
 import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import { AvailabilityControl } from "@/features/profile/availability-control";
+import { AvailabilityWindows } from "@/features/profile/availability-windows";
+import type { AvailabilityWindow } from "@/server/queries/service-areas";
 import { signOut } from "@/server/actions/auth";
 import type { PersonalHomeData } from "@/server/queries/personal-home";
 import type { MyIdentity, ProfileCompletion } from "@/server/queries/profile-identity";
@@ -43,8 +45,11 @@ export function PersonalSettings({
   t,
   identity = null,
   completion = null,
+  availabilityWindows = [],
 }: {
   home: PersonalHomeData;
+  /** The caller's own availability date windows (professionals only). */
+  availabilityWindows?: readonly AvailabilityWindow[];
   /** Already masked (or null when the auth read failed) — never the raw address. */
   signInEmail: string | null;
   /**
@@ -98,7 +103,11 @@ export function PersonalSettings({
 
       {isProfessional ? (
         <HomeSection title={t("personalSettings.availability.title")}>
-          <AvailabilityControl availability={home.availability} />
+          <div className="flex flex-col gap-md">
+            <AvailabilityControl availability={home.availability} />
+            {/* WHEN: the dates they can take work, beside the "taking work" switch the Overall Match also reads. */}
+            <AvailabilityWindows windows={availabilityWindows} />
+          </div>
         </HomeSection>
       ) : null}
 

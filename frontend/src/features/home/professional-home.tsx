@@ -178,7 +178,7 @@ export function ProfessionalHome({
             <VerificationBadge state={verification.state} t={t} />
             {/* The STATE only — the control and the "last updated" line live on
                 the Account Overview. */}
-            <AvailabilityBadge available={data.availability.available} t={t} />
+            <AvailabilityBadge state={data.availability.state} t={t} />
           </>
         }
       />

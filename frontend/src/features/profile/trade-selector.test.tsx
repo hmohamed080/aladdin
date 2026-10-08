@@ -248,3 +248,52 @@ describe("TradeSummary", () => {
     expect(container.textContent).not.toMatch(/profile\.|onboarding\.|electrical|plumbing/);
   });
 });
+
+describe("TradeSelector — detailed specialties live under a selected trade", () => {
+  const specialties = [
+    { id: "s1", key: "spec_a", tradeKey: "plumbing" },
+    { id: "s2", key: "spec_b", tradeKey: "plumbing" },
+    { id: "s3", key: "spec_c", tradeKey: "tiling" },
+  ];
+  const specs = (container: HTMLElement) => container.querySelector<HTMLInputElement>('input[name="specialties"]')?.value.split("\n").filter(Boolean);
+
+  it("shows nothing — and posts no specialties field — while the catalogue is empty", () => {
+    const { container } = renderWithI18n(<TradeSelector catalog={catalog} mine={{ keys: ["plumbing"], primaryKey: "plumbing" }} />, "en");
+    expect(screen.queryByTestId("specialties-plumbing")).toBeNull();
+    expect(container.querySelector('input[name="specialties"]')).toBeNull(); // the action then leaves specialties untouched
+  });
+
+  it("appears under a selected trade that HAS specialties, and not under one that has none", () => {
+    renderWithI18n(<TradeSelector catalog={catalog} mine={{ keys: ["plumbing", "electrical"], primaryKey: "plumbing" }} specialties={specialties} />, "en");
+    expect(screen.getByTestId("specialties-plumbing")).toBeTruthy();
+    expect(screen.queryByTestId("specialties-electrical")).toBeNull(); // no empty selector for a trade without specialties
+  });
+
+  it("is hidden for a trade that is not selected, and appears when the trade is chosen", () => {
+    renderWithI18n(<TradeSelector catalog={catalog} mine={{ keys: [], primaryKey: null }} specialties={specialties} />, "en");
+    expect(screen.queryByTestId("specialties-tiling")).toBeNull();
+    fireEvent.click(chip("Tiling"));
+    expect(screen.getByTestId("specialties-tiling")).toBeTruthy();
+  });
+
+  it("posts the complete set of chosen specialties, only inside held trades", () => {
+    const { container } = renderWithI18n(
+      <TradeSelector catalog={catalog} mine={{ keys: ["plumbing", "tiling"], primaryKey: "plumbing" }} specialties={specialties} mySpecialtyIds={["s1", "s3"]} />,
+      "en",
+    );
+    expect(specs(container)).toEqual(["s1", "s3"]);
+    fireEvent.click(chip("spec_b"));
+    expect(specs(container)).toEqual(["s1", "s3", "s2"]);
+    fireEvent.click(chip("spec_a"));
+    expect(specs(container)).toEqual(["s3", "s2"]);
+  });
+
+  it("deselecting a trade drops its specialties with it — a specialty never outlives its trade", () => {
+    const { container } = renderWithI18n(
+      <TradeSelector catalog={catalog} mine={{ keys: ["plumbing", "tiling"], primaryKey: "plumbing" }} specialties={specialties} mySpecialtyIds={["s1", "s3"]} />,
+      "en",
+    );
+    fireEvent.click(chip("Tiling")); // deselect
+    expect(specs(container)).toEqual(["s1"]);
+  });
+});

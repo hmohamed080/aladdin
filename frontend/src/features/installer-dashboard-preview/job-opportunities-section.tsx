@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/ui/cn";
@@ -13,12 +13,29 @@ import {
   MapPinIcon,
   StarOutlineIcon,
 } from "@/components/ui/icons";
-import { menuItemClass, menuSurfaceClass } from "@/components/ui/menu";
+import { FloatingMenu } from "@/components/ui/floating-menu";
+import { menuItemClass } from "@/components/ui/menu";
+import type { DashboardDateOrder, DashboardSort } from "@/lib/installer/dashboard-opportunities";
 import { JobOpportunityCard } from "./job-opportunity-card";
 import type { InstallerOpportunityVM } from "./view-model";
 
-type SortKey = "match" | "distance" | "recent";
-type DateOrder = "newest" | "oldest";
+type SortKey = DashboardSort;
+type DateOrder = DashboardDateOrder;
+
+/**
+ * SERVER-DRIVEN ORDERING (production). The section does not sort the cards it is given: it states which quick
+ * filter is active and asks its owner to load that ordering from the database. Where this is absent (the preview)
+ * the section sorts its fixture cards itself, as before.
+ */
+export type RemoteSort = {
+  sort: SortKey;
+  dateOrder: DateOrder;
+  onChange: (sort: SortKey, dateOrder: DateOrder) => void;
+  /** An ordering is being loaded: the cards on screen are the previous ones. */
+  pending?: boolean;
+  /** The last ordering could not be loaded; the cards on screen are unchanged. */
+  failed?: boolean;
+};
 
 const SORTERS: Record<SortKey, { ar: string; en: string }> = {
   match: { ar: "مناسب لمهاراتي", en: "Best match" },
@@ -44,6 +61,10 @@ export function JobOpportunitiesSection({
   title,
   /** "production" strips the card's demo-only interactions — see `JobOpportunityCard`. */
   variant = "preview",
+  /** Production: the quick filters are real database orderings, loaded by the owner (see `RemoteSort`). */
+  remoteSort,
+  /** Production: which openings the caller has saved, and the persisted toggle (the same `saved_jobs` authority as /home/jobs). */
+  save,
 }: {
   opportunities: readonly InstallerOpportunityVM[];
   emptyTitle: string;
@@ -52,20 +73,34 @@ export function JobOpportunitiesSection({
   sortable?: boolean;
   title?: string;
   variant?: "preview" | "production";
+  remoteSort?: RemoteSort;
+  save?: { isSaved: (id: string) => boolean; onToggle: (id: string) => void };
 }) {
   const { locale, dir } = useI18n();
   const [sort, setSort] = useState<SortKey>("match");
   const [dateOrder, setDateOrder] = useState<DateOrder>("newest");
   const Forward = dir === "rtl" ? ChevronLeftIcon : ChevronRightIcon;
 
+  const showControls = sortable || Boolean(remoteSort);
+  const activeSort = remoteSort ? remoteSort.sort : sort;
+  const activeDateOrder = remoteSort ? remoteSort.dateOrder : dateOrder;
+  const chooseSort = (key: Exclude<SortKey, "recent">) => (remoteSort ? remoteSort.onChange(key, activeDateOrder) : setSort(key));
+  const chooseDateOrder = (value: DateOrder) => {
+    if (remoteSort) remoteSort.onChange("recent", value);
+    else {
+      setDateOrder(value);
+      setSort("recent");
+    }
+  };
+
   const jobs = useMemo(() => {
-    if (!sortable) return opportunities;
+    if (!sortable || remoteSort) return opportunities;
     const list = [...opportunities];
     if (sort === "match") return list.sort((a, b) => (b.matchPercent ?? 0) - (a.matchPercent ?? 0));
     if (sort === "distance") return list.sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
     // The source is newest-first, so the dropdown only needs to reverse it.
     return dateOrder === "oldest" ? list.reverse() : list;
-  }, [dateOrder, opportunities, sort, sortable]);
+  }, [dateOrder, opportunities, remoteSort, sort, sortable]);
 
   return (
     <section id="opportunities" className="scroll-mt-24">
@@ -77,8 +112,8 @@ export function JobOpportunitiesSection({
           <h2 className="text-headline text-fg">{title ?? (locale === "ar" ? "فرص مناسبة لي" : "Opportunities for you")}</h2>
         </div>
 
-        {sortable ? (
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label={locale === "ar" ? "ترتيب الفرص" : "Sort opportunities"}>
+        {showControls ? (
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label={locale === "ar" ? "ترتيب الفرص" : "Sort opportunities"} aria-busy={remoteSort?.pending ? true : undefined}>
             {QUICK_SORTS.map((key) => {
               const SortIcon = key === "distance" ? MapPinIcon : StarOutlineIcon;
 
@@ -86,11 +121,11 @@ export function JobOpportunitiesSection({
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setSort(key)}
-                  aria-pressed={sort === key}
+                  onClick={() => chooseSort(key)}
+                  aria-pressed={activeSort === key}
                   className={cn(
                     "inline-flex items-center gap-2 rounded-pill px-3.5 py-1.5 text-label font-medium transition-colors",
-                    sort === key
+                    activeSort === key
                       ? "bg-primary text-primary-foreground"
                       : "border border-strong bg-surface text-fg-secondary hover:bg-surface-2",
                   )}
@@ -101,17 +136,16 @@ export function JobOpportunitiesSection({
               );
             })}
 
-            <DateSortMenu
-              value={dateOrder}
-              active={sort === "recent"}
-              onChange={(value) => {
-                setDateOrder(value);
-                setSort("recent");
-              }}
-            />
+            <DateSortMenu value={activeDateOrder} active={activeSort === "recent"} onChange={chooseDateOrder} />
           </div>
         ) : null}
       </div>
+
+      {remoteSort?.failed ? (
+        <p role="alert" className="mb-2 text-label font-medium text-danger">
+          {locale === "ar" ? "تعذّر تحديث الفرص. حاول مرة أخرى." : "Could not update the opportunities. Please try again."}
+        </p>
+      ) : null}
 
       {jobs.length === 0 ? (
         <div className="rounded-lg border bg-surface p-6 text-center shadow-card">
@@ -119,9 +153,14 @@ export function JobOpportunitiesSection({
           <p className="mt-1 text-body text-fg-secondary">{emptyBody}</p>
         </div>
       ) : (
-        <ul className="grid gap-4 tablet:grid-cols-2 desktop:grid-cols-3">
+        <ul className={cn("grid gap-4 tablet:grid-cols-2 desktop:grid-cols-3", remoteSort?.pending && "opacity-70")} aria-busy={remoteSort?.pending ? true : undefined}>
           {jobs.map((job) => (
-            <JobOpportunityCard key={job.id} job={job} variant={variant} />
+            <JobOpportunityCard
+              key={job.id}
+              job={job}
+              variant={variant}
+              save={save ? { saved: save.isSaved(job.id), onToggle: () => save.onToggle(job.id) } : undefined}
+            />
           ))}
         </ul>
       )}
@@ -151,7 +190,6 @@ function DateSortMenu({
 }) {
   const { locale, dir } = useI18n();
   const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
   const selectedIndex = DATE_ORDERS.indexOf(value);
@@ -162,41 +200,11 @@ function DateSortMenu({
       : locale === "ar" ? "الأقدم" : "Oldest";
 
   useEffect(() => {
-    if (!open) return;
-    const onPointer = (event: MouseEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        trigger.current?.focus();
-      }
-    };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  useEffect(() => {
     if (open) items.current[selectedIndex]?.focus();
   }, [open, selectedIndex]);
 
-  const onItemKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
-    let next: number | null = null;
-    if (event.key === "ArrowDown") next = index === DATE_ORDERS.length - 1 ? 0 : index + 1;
-    else if (event.key === "ArrowUp") next = index === 0 ? DATE_ORDERS.length - 1 : index - 1;
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = DATE_ORDERS.length - 1;
-    if (next === null) return;
-    event.preventDefault();
-    items.current[next]?.focus();
-  };
-
   return (
-    <div ref={root} className="relative inline-flex">
+    <div className="relative inline-flex">
       <button
         ref={trigger}
         type="button"
@@ -222,16 +230,16 @@ function DateSortMenu({
         <ChevronDownIcon size={15} aria-hidden="true" className={active ? "text-primary-foreground" : "text-fg-muted"} />
       </button>
 
-      {open ? (
-        <div
-          role="menu"
-          aria-label={label}
-          className={cn(
-            menuSurfaceClass,
-            "absolute top-full z-popover mt-1 min-w-full w-36 py-1",
-            dir === "rtl" ? "start-0" : "end-0",
-          )}
-        >
+      <FloatingMenu
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={trigger}
+        role="menu"
+        aria-label={label}
+        placement={dir === "rtl" ? "bottom-start" : "bottom-end"}
+        matchAnchorWidth
+        className="w-36 py-1"
+      >
           {DATE_ORDERS.map((option, index) => {
             const selected = option === value;
             return (
@@ -248,7 +256,6 @@ function DateSortMenu({
                   setOpen(false);
                   trigger.current?.focus();
                 }}
-                onKeyDown={(event) => onItemKeyDown(event, index)}
                 className={menuItemClass(selected)}
               >
                 <span className="min-w-0 flex-1">{optionLabel(option)}</span>
@@ -256,8 +263,7 @@ function DateSortMenu({
               </button>
             );
           })}
-        </div>
-      ) : null}
+      </FloatingMenu>
     </div>
   );
 }

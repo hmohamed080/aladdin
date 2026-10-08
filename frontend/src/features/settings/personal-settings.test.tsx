@@ -4,6 +4,11 @@ import { renderWithI18n } from "@/test/render";
 import { createTranslator } from "@/lib/i18n/translate";
 import type { PersonalHomeData } from "@/server/queries/personal-home";
 
+vi.mock("@/server/actions/service-areas", () => ({
+  addAvailabilityWindowAction: vi.fn(),
+  removeAvailabilityWindowAction: vi.fn(),
+  setServiceAreasAction: vi.fn(),
+}));
 vi.mock("@/server/actions/availability", () => ({
   setAvailabilityAction: async () => ({ ok: true }),
 }));
