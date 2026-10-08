@@ -254,6 +254,11 @@ The **design language** is global. The **navigation content and the modules are 
 - **Passwordless:** no password/confirm-password/forgot-password fields anywhere. OTP/verification uses the approved verification-field component. *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)*
 - Long flows support **autosave / save-and-continue** with a visible indicator; show a `Progress Header` with step count.
 
+## Dropdowns, Selects & Menus
+- **One system, website-wide.** Every dropdown, select or menu we control is drawn through the shared abstraction — `FloatingMenu` (the portaled, collision-aware surface), `ListboxSelect` / `Select` (single choice) and `CountryPicker` — never a native browser picker and never a page-local `absolute` popover. Rounded Aladdin surface, never clipped, RTL/LTR, Arabic/English, light/dark, keyboard (open, arrows, Home/End, type-ahead, Escape returns focus), proper roles, usable on a phone.
+- `Select` is the drop-in for `<select><option/></select>`: the person operates the design-system list while a hidden native `<select>` carries `name`/`value`/`required`/`ref`/`onChange` into the form, so forms and Server Actions are unchanged.
+- **Native exceptions only:** date / time / range / file inputs (system pickers), in-flow `<details>` disclosures, and the sidebar's hover-driven mode menu (already a fixed body portal). Details, the route-by-route audit and the automation notes: `docs/frontend/dropdowns-and-selects.md`.
+
 ## Modals & Drawers
 - Use sparingly for **focused, interruptive** tasks. Prefer a **drawer** for contextual side-tasks that keep the parent visible; a **modal** for a blocking decision.
 - Never nest modals. One clear primary action; explicit dismiss; **Esc + backdrop** close (unless data-loss risk → confirm).
