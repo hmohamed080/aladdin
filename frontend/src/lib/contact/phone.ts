@@ -76,8 +76,8 @@ export type PhoneCountryOption = {
 /**
  * Every ISO-3166 country libphonenumber-js knows a numbering plan for, Egypt
  * first (the approved default), then the rest in ISO2 order. Display names are
- * resolved by the caller via `Intl.DisplayNames` (a platform API, not a second
- * dependency) rather than baked in here, so the label follows the UI's locale.
+ * resolved by the caller from `lib/contact/country-names` (data, identical on the
+ * server and in the browser — `Intl.DisplayNames` is not, see that file).
  */
 export function listPhoneCountries(): PhoneCountryOption[] {
   const rest = getCountries()
@@ -109,4 +109,16 @@ export function toCanonicalPhone(national: string, countryIso2: CountryCode): Ca
   const parsed = parsePhoneNumberFromString(trimmed, countryIso2);
   if (!parsed || !parsed.isValid()) return null;
   return { countryIso2, national: parsed.nationalNumber, e164: parsed.number };
+}
+
+/**
+ * A stored E.164 number back into the picker's two parts (country + national
+ * digits), for editing. Null when it cannot be parsed — the field then simply
+ * starts empty rather than showing a guess.
+ */
+export function splitE164(e164: string | null | undefined): { countryIso2: CountryCode; national: string } | null {
+  if (!e164) return null;
+  const parsed = parsePhoneNumberFromString(e164);
+  if (!parsed || !parsed.country || !parsed.isValid()) return null;
+  return { countryIso2: parsed.country, national: parsed.nationalNumber };
 }

@@ -10,6 +10,7 @@ import type { MyAssignmentRow } from "@/server/queries/job-assignments";
 import { canReportProgress, canStart, readyForCompletion } from "@/lib/work/assignment-state";
 import { JobIdentity, Metric, ReadyBadge, WorkProgress } from "./parts";
 import { ReportProgressDialog, StartWorkDialog } from "./lifecycle";
+import { placeLabel } from "@/lib/installer/opportunity-location";
 
 /**
  * THE FEATURED CURRENT ASSIGNMENT — the reference's large current-work area,
@@ -42,7 +43,7 @@ export function CurrentWork({
   const id = a.id ?? "";
   const percent = a.latest_progress_percent ?? 0;
   const ready = readyForCompletion(a);
-  const location = [a.city, a.governorate].filter(Boolean).join(", ");
+  const location = placeLabel(locale, a.governorate, a.city);
 
   return (
     <section

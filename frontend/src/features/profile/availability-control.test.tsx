@@ -1,5 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { act, screen } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
+import { I18nProvider } from "@/lib/i18n/context";
 import { renderWithI18n } from "@/test/render";
 
 type State = { ok: boolean; code?: string };
@@ -10,12 +13,15 @@ vi.mock("@/server/actions/availability", () => ({
 }));
 
 import { AvailabilityControl } from "./availability-control";
+import { availabilityState } from "@/lib/profile/availability-state";
 
-const avail = (over: Partial<{ available: boolean; updatedAt: string | null }> = {}) => ({
-  available: false,
-  updatedAt: null,
-  ...over,
-});
+const DECLARED = new Date(Date.now() - 3 * 86_400_000).toISOString();
+
+/** Defaults to NOT DECLARED (false, no marker). The state is derived exactly as the server derives it. */
+const avail = (over: Partial<{ available: boolean; updatedAt: string | null }> = {}) => {
+  const base = { available: false, updatedAt: null as string | null, ...over };
+  return { ...base, state: availabilityState(base.available, base.updatedAt) };
+};
 
 beforeEach(() => {
   result.value = { ok: true };
@@ -32,7 +38,7 @@ beforeEach(() => {
  */
 describe("AvailabilityControl", () => {
   it("states the current state and offers the opposite one — English", () => {
-    renderWithI18n(<AvailabilityControl availability={avail({ available: false })} />, "en");
+    renderWithI18n(<AvailabilityControl availability={avail({ available: false, updatedAt: DECLARED })} />, "en");
     expect(screen.getByText("Not taking work")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Mark me available" })).toBeTruthy();
     // The button must not name the state the person is already in.
@@ -45,12 +51,23 @@ describe("AvailabilityControl", () => {
     expect(screen.getByRole("button", { name: "Mark me unavailable" })).toBeTruthy();
   });
 
+  it("NOT SPECIFIED is its own state: it is not called unavailable, and it offers BOTH answers", () => {
+    const { container } = renderWithI18n(<AvailabilityControl availability={avail()} />, "en");
+    expect(screen.getByText("Not specified")).toBeTruthy();
+    expect(screen.queryByText("Not taking work")).toBeNull();
+    expect(screen.getByRole("button", { name: "Mark me available" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Mark me unavailable" })).toBeTruthy();
+    const values = [...container.querySelectorAll('input[name="available"]')].map((i) => (i as HTMLInputElement).value);
+    expect(values.sort()).toEqual(["0", "1"]);
+    expect(container.querySelector('[data-availability-state="unknown"]')).toBeTruthy();
+  });
+
   it("posts the DESTINATION value, so a double-click converges", () => {
     // The hidden field carries the value being requested. If this posted a
     // "toggle" instead, two rapid submissions would land the person on the
     // opposite of what they clicked.
     const { container } = renderWithI18n(
-      <AvailabilityControl availability={avail({ available: false })} />,
+      <AvailabilityControl availability={avail({ available: false, updatedAt: DECLARED })} />,
       "en",
     );
     const hidden = container.querySelector('input[name="available"]') as HTMLInputElement;
@@ -66,12 +83,13 @@ describe("AvailabilityControl", () => {
   it("never posts a timestamp", () => {
     const { container } = renderWithI18n(<AvailabilityControl availability={avail()} />, "en");
     const names = [...container.querySelectorAll("input")].map((i) => i.getAttribute("name"));
-    expect(names).toEqual(["available"]);
+    expect(names.length).toBeGreaterThan(0);
+    expect(names.every((n) => n === "available")).toBe(true);
   });
 
-  it("shows the age, and 'not set' when there is none", () => {
+  it("shows the age, and invites a first answer when there is none", () => {
     const { unmount } = renderWithI18n(<AvailabilityControl availability={avail()} />, "en");
-    expect(screen.getByText("Not set yet")).toBeTruthy();
+    expect(screen.getByText(/You haven't said yet/)).toBeTruthy();
     unmount();
 
     renderWithI18n(
@@ -100,5 +118,47 @@ describe("AvailabilityControl", () => {
     expect(screen.getByText("متاح للعمل")).toBeTruthy();
     expect(screen.getByRole("button", { name: "حدِّد أنك غير متاح" })).toBeTruthy();
     expect(container.textContent).not.toMatch(/profile\./);
+  });
+});
+
+/**
+ * HYDRATION. The age ("Updated 3 minutes ago") is relative to NOW, and this component is server-rendered and then
+ * hydrated a moment later — often across a minute boundary. If the hydrated text differs from the server's, React
+ * throws a hydration error (#418) and throws the server markup away. The line is therefore allowed to differ on the
+ * first client render (`suppressHydrationWarning`) and is re-derived from the client's own clock right after mount.
+ */
+describe("AvailabilityControl hydration", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("does not trip a hydration mismatch when the page ages between the server render and hydration", async () => {
+    const T = new Date("2027-03-01T12:00:00Z").getTime();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(T);
+    const declaredAt = new Date(T - 2 * 60_000).toISOString(); // "2 minutes ago" when the server renders
+    const tree = (
+      <I18nProvider locale="en" dir="ltr">
+        <AvailabilityControl availability={avail({ available: true, updatedAt: declaredAt })} />
+      </I18nProvider>
+    );
+    const html = renderToString(tree);
+    expect(html).toContain("Updated 2 minutes ago");
+
+    // The browser hydrates three minutes later.
+    vi.setSystemTime(T + 3 * 60_000);
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    document.body.appendChild(container);
+    const recoverable: unknown[] = [];
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await act(async () => {
+      hydrateRoot(container, tree, { onRecoverableError: (error) => recoverable.push(error) });
+    });
+    const hydrationErrors = consoleError.mock.calls.filter((call) => /hydrat|did not match/i.test(String(call[0])));
+    consoleError.mockRestore();
+    expect(recoverable).toEqual([]);
+    expect(hydrationErrors).toEqual([]);
+    // and once mounted it shows the client's own age, not the stale server text
+    expect(container.textContent).toContain("Updated 5 minutes ago");
+    container.remove();
   });
 });

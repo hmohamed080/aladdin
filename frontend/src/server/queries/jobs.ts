@@ -126,6 +126,24 @@ export async function listOrgJobs(
   return withHistoricalTradeLabels(supabase, rows);
 }
 
+export type JobWorkContact = { name: string | null; phoneE164: string | null; email: string | null };
+
+/**
+ * The work contact the poster set for a job, or null. `job_work_contacts` is
+ * readable only by the posting organization's members (RLS), so this is the poster
+ * editing their own data — an installer reaches a contact only through the
+ * assignment snapshot, never here.
+ */
+export async function getJobWorkContact(supabase: DB, jobId: string): Promise<JobWorkContact | null> {
+  const { data, error } = await supabase
+    .from("job_work_contacts")
+    .select("contact_name, contact_phone_e164, contact_email")
+    .eq("job_id", jobId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? { name: data.contact_name, phoneE164: data.contact_phone_e164, email: data.contact_email } : null;
+}
+
 /** One job, with its trade key. Null when RLS says the caller cannot see it. */
 export const getOrgJob = cache(async function getOrgJob(
   supabase: DB,

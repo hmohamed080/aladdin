@@ -24,22 +24,33 @@ const FIXED = new Date(Date.now() - 3 * 86_400_000).toISOString();
 describe("AvailabilityBadge", () => {
   it("names both states in English", () => {
     const t = createTranslator("en");
-    const { unmount } = render(<AvailabilityBadge available t={t} />);
+    const { unmount } = render(<AvailabilityBadge state="available" t={t} />);
     expect(screen.getByText("Available for work")).toBeTruthy();
     unmount();
 
-    render(<AvailabilityBadge available={false} t={t} />);
+    render(<AvailabilityBadge state="unavailable" t={t} />);
     expect(screen.getByText("Not taking work")).toBeTruthy();
   });
 
   it("names both states in Arabic, the default locale", () => {
     const t = createTranslator("ar");
-    const { unmount } = render(<AvailabilityBadge available t={t} />);
+    const { unmount } = render(<AvailabilityBadge state="available" t={t} />);
     expect(screen.getByText("متاح للعمل")).toBeTruthy();
     unmount();
 
-    render(<AvailabilityBadge available={false} t={t} />);
+    render(<AvailabilityBadge state="unavailable" t={t} />);
     expect(screen.getByText("لا أقبل أعمالًا حاليًا")).toBeTruthy();
+  });
+
+  it("names NOT SPECIFIED in both languages, and it is not the word for unavailable", () => {
+    const en = render(<AvailabilityBadge state="unknown" t={createTranslator("en")} />);
+    expect(screen.getByText("Not specified")).toBeTruthy();
+    expect(screen.queryByText("Not taking work")).toBeNull();
+    expect(en.container.innerHTML).not.toMatch(/danger/);
+    en.unmount();
+    render(<AvailabilityBadge state="unknown" t={createTranslator("ar")} />);
+    expect(screen.getByText("غير محدد")).toBeTruthy();
+    expect(screen.queryByText("لا أقبل أعمالًا حاليًا")).toBeNull();
   });
 
   it("does NOT paint unavailable as an error", () => {
@@ -47,21 +58,21 @@ describe("AvailabilityBadge", () => {
     // is not taking work; a danger tone would editorialise about an honest answer
     // and push everyone toward leaving the flag on, which is how the signal dies.
     const { container } = render(
-      <AvailabilityBadge available={false} t={createTranslator("en")} />,
+      <AvailabilityBadge state="unavailable" t={createTranslator("en")} />,
     );
     expect(container.innerHTML).not.toMatch(/danger/);
   });
 
   it("marks available with a success tone", () => {
-    const { container } = render(<AvailabilityBadge available t={createTranslator("en")} />);
+    const { container } = render(<AvailabilityBadge state="available" t={createTranslator("en")} />);
     expect(container.innerHTML).toMatch(/success/);
   });
 
   it("never leaks a message key", () => {
     for (const locale of ["en", "ar"] as const) {
-      for (const available of [true, false]) {
+      for (const state of ["available", "unavailable", "unknown"] as const) {
         const { container, unmount } = render(
-          <AvailabilityBadge available={available} t={createTranslator(locale)} />,
+          <AvailabilityBadge state={state} t={createTranslator(locale)} />,
         );
         expect(container.textContent).not.toMatch(/profile\./);
         unmount();

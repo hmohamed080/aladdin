@@ -15,7 +15,7 @@ const data = (over: Partial<PersonalHomeData> = {}): PersonalHomeData => ({
   phone: null,
   completeness: { percent: 100, completed: 8, total: 8, missing: [] },
   verification: { state: "verified", reason: null, decidedAt: null },
-  availability: { available: false, updatedAt: null },
+  availability: { available: false, updatedAt: null, state: "unknown" },
   consumer: { intent: null, interests: [], governorate: null, city: null, budget: null },
   professional: {
     concreteType: "installer_technician",
@@ -71,7 +71,9 @@ const baseProps = {
 describe("ProfileHub", () => {
   it("shows the live availability as a read-only badge in the identity header, not an editable control", () => {
     renderWithI18n(<ProfileHub {...baseProps} />, "en");
-    expect(screen.getAllByText("Not taking work").length).toBeGreaterThan(0);
+    // The fixture has never declared availability: that reads "Not specified", NOT "Not taking work".
+    expect(screen.getAllByText("Not specified").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Not taking work")).toBeNull();
     // The toggle itself moved to /home/settings — the Overview states the
     // fact, it does not offer the control.
     expect(screen.queryByRole("button", { name: "Mark me available" })).toBeNull();
@@ -85,6 +87,7 @@ describe("ProfileHub", () => {
           availability: {
             available: true,
             updatedAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+            state: "available",
           },
         })}
       />,
@@ -118,7 +121,7 @@ describe("ProfileHub", () => {
       <ProfileHub {...baseProps} locale="ar" t={createTranslator("ar")} />,
       "ar",
     );
-    expect(screen.getAllByText("لا أقبل أعمالًا حاليًا").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("غير محدد").length).toBeGreaterThan(0);
     expect(container.textContent).not.toMatch(/profile\.|onboarding\./);
   });
 

@@ -12,6 +12,7 @@ import { ApplicationStatusBadge, JobStatusBadge, DecisionReason } from "./badges
 import { withdrawApplicationAction } from "@/server/actions/application-forms";
 import type { FormState } from "@/server/actions/job-forms";
 import type { MyApplicationRow } from "@/server/queries/job-opportunities";
+import { placeLabel } from "@/lib/installer/opportunity-location";
 
 /**
  * "What have I applied to, and what happened?"
@@ -97,7 +98,7 @@ function ApplicationCard({
   locale: Locale;
 }) {
   const { t } = useI18n();
-  const place = [a.city, a.governorate].filter(Boolean).join(", ");
+  const place = placeLabel(locale, a.governorate, a.city);
   const canWithdraw = a.status === "submitted";
   // §12: the SAME two gates the RPC applies to a withdrawn row.
   const canReapply = a.status === "withdrawn" && jobIsDiscoverable;

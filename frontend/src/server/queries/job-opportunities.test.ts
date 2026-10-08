@@ -4,7 +4,6 @@ vi.mock("server-only", () => ({}));
 
 import {
   countOpenJobOpportunities,
-  listJobOpportunities,
   listMyApplications,
   listOpportunityGovernorates,
   discoverableJobIds,
@@ -23,17 +22,21 @@ function client(result: Result, byTable: Record<string, Result> = {}) {
     tables: string[];
     select?: string;
     or?: string;
+    ors: string[];
     filters: [string, string, unknown][];
-  } = { tables: [], filters: [] };
+  } = { tables: [], ors: [], filters: [] };
   let current = result;
   const builder: Record<string, unknown> = {};
   const chain = (name: string) => (...args: unknown[]) => {
     if (name === "select") calls.select = args[0] as string;
-    else if (name === "or") calls.or = args[0] as string;
+    else if (name === "or") {
+      calls.or = args[0] as string;
+      calls.ors.push(args[0] as string);
+    }
     else calls.filters.push([name, args[0] as string, args[1]]);
     return builder;
   };
-  for (const m of ["select", "eq", "neq", "in", "or", "order", "limit"]) builder[m] = chain(m);
+  for (const m of ["select", "eq", "neq", "in", "or", "order", "limit", "range", "gte", "lte", "ilike"]) builder[m] = chain(m);
   builder.then = (res: (v: unknown) => unknown) => Promise.resolve(current).then(res);
   builder.maybeSingle = () => Promise.resolve(current);
   return {
@@ -48,86 +51,6 @@ function client(result: Result, byTable: Record<string, Result> = {}) {
     } as never,
   };
 }
-
-describe("listJobOpportunities", () => {
-  /**
-   * The whole authority of this page. `open_job_opportunities` decides open-ness
-   * and the poster's CURRENT verification inside its own definer; a query that
-   * reached `jobs` directly would have to reproduce both, and would get one of
-   * them wrong the first time verification lapsed.
-   */
-  it("reads the discovery projection, never the jobs table", async () => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase);
-    expect(calls.table).toBe("open_job_opportunities");
-  });
-
-  it("orders newest published first, deterministically", async () => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase);
-    expect(calls.filters).toContainEqual(["order", "published_at", { ascending: false }]);
-  });
-
-  it("applies no filter at all when none was asked for", async () => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase);
-    expect(calls.or).toBeUndefined();
-    expect(calls.filters.filter(([m]) => m === "eq")).toEqual([]);
-  });
-
-  /**
-   * O5, AT THE QUERY LAYER. The default list is everything, and the trade filter
-   * only appears when the reader chose one. A default of "my trades" would be
-   * the restriction the database refuses to make, reintroduced as a convenience.
-   */
-  it("filters by trade ONLY when the reader picked one", async () => {
-    const a = client({ data: [], error: null });
-    await listJobOpportunities(a.supabase, {});
-    expect(a.calls.filters.some(([m, c]) => m === "eq" && c === "trade_key")).toBe(false);
-
-    const b = client({ data: [], error: null });
-    await listJobOpportunities(b.supabase, { tradeKey: "electrical" });
-    expect(b.calls.filters).toContainEqual(["eq", "trade_key", "electrical"]);
-  });
-
-  it("never consults the caller's declared trades", async () => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase, { tradeKey: "tiling" });
-    expect(calls.tables).not.toContain("user_trades");
-  });
-
-  it("searches title, description and the posting organization together", async () => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase, { search: "marble" });
-    expect(calls.or).toBe(
-      "title.ilike.%marble%,description.ilike.%marble%,poster_org_name.ilike.%marble%",
-    );
-  });
-
-  /** PostgREST reads `,` `(` `)` as grammar — a raw term would rewrite the filter. */
-  it("neutralizes a search term before it reaches the filter grammar", async () => {
-    const { supabase, calls } = client({ data: [], error: null });
-    await listJobOpportunities(supabase, { search: "a,b)%*" });
-    // The `%` around the value is OURS. What must be clean is the term inside it.
-    const term = calls.or!.slice("title.ilike.%".length, calls.or!.indexOf("%,"));
-    expect(term).toBe("a b");
-  });
-
-  it("filters by application state in both directions", async () => {
-    const a = client({ data: [], error: null });
-    await listJobOpportunities(a.supabase, { applied: "no" });
-    expect(a.calls.filters).toContainEqual(["eq", "has_applied", false]);
-
-    const b = client({ data: [], error: null });
-    await listJobOpportunities(b.supabase, { applied: "yes" });
-    expect(b.calls.filters).toContainEqual(["eq", "has_applied", true]);
-  });
-
-  it("throws rather than swallowing a database error", async () => {
-    const { supabase } = client({ data: null, error: { message: "boom" } });
-    await expect(listJobOpportunities(supabase)).rejects.toBeTruthy();
-  });
-});
 
 describe("listOpportunityGovernorates", () => {
   /**

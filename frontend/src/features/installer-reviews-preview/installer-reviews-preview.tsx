@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/icons";
 import { Badge, ProgressMeter } from "@/components/ui/primitives";
 import { Stars } from "@/features/reviews/parts";
-import { DateRangeFilter, type WorkDateRange } from "@/features/installer-my-work-preview/installer-my-work-preview";
+import { DateRangeFilter, type WorkDateRange } from "@/components/ui/date-range-filter";
 import { InstallerSidebar } from "@/features/installer-dashboard-preview/installer-sidebar";
 import { InstallerTopbar } from "@/features/installer-dashboard-preview/installer-topbar";
 import { INSTALLER_CONTENT_FRAME_CLASS, INSTALLER_SHELL_GUTTER_CLASS } from "@/features/installer-dashboard-preview/installer-layout";
@@ -39,6 +39,7 @@ import { useI18n } from "@/lib/i18n/context";
 import type { Locale } from "@/lib/i18n/locales";
 import type { SidebarMode } from "@/lib/ui/sidebar-mode";
 import { cn } from "@/lib/ui/cn";
+import { FloatingMenu } from "@/components/ui/floating-menu";
 import {
   CUSTOMER_HIGHLIGHTS,
   DISTRIBUTION,
@@ -171,29 +172,21 @@ function MenuSelect({
   deleteLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const listId = useId();
   const selected = options.find((option) => option.value === value);
 
+  // Opening puts focus on the chosen option, so the keyboard continues from where the value is.
   useEffect(() => {
     if (!open) return;
-    const closeOutside = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", closeOutside);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("mousedown", closeOutside);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [open]);
+    const list = document.getElementById(listId);
+    (list?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]') ?? list?.querySelector<HTMLElement>('[role="option"]'))?.focus();
+  }, [open, listId]);
 
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
+    <div className={cn("relative", className)}>
       <button
+        ref={trigger}
         type="button"
         aria-label={label}
         aria-haspopup="listbox"
@@ -216,8 +209,7 @@ function MenuSelect({
         <ChevronDownIcon size={15} className={cn("shrink-0 transition-transform", open && "rotate-180")} />
       </button>
 
-      {open ? (
-        <div id={listId} role="listbox" aria-label={label} className="absolute start-0 top-full z-popover mt-1 max-h-64 min-w-full overflow-y-auto rounded-md border bg-surface p-xs shadow-lg">
+      <FloatingMenu id={listId} open={open} onClose={() => setOpen(false)} anchorRef={trigger} role="listbox" aria-label={label} placement="bottom-start" matchAnchorWidth className="max-h-64 p-xs">
           {options.map((option) => (
             <div key={option.value} className="flex items-center gap-xs">
               <button
@@ -235,8 +227,7 @@ function MenuSelect({
               {onDeleteOption ? <button type="button" aria-label={`${deleteLabel ?? "Delete"} ${option.label}`} onClick={() => onDeleteOption(option.value)} className="grid h-8 w-8 shrink-0 place-items-center rounded-sm text-danger hover:bg-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"><TrashIcon size={14} /></button> : null}
             </div>
           ))}
-        </div>
-      ) : null}
+      </FloatingMenu>
     </div>
   );
 }
@@ -246,7 +237,8 @@ function ReviewsWorkspace({ locale }: { locale: Locale }) {
   const [sort, setSort] = useState<SortOrder>("newest");
   const [dateRange, setDateRange] = useState<WorkDateRange>({ from: "", to: "" });
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<ReviewsView>("list");
+  // GRID is the default view wherever a page offers both; the choice lasts for this visit only.
+  const [view, setView] = useState<ReviewsView>("grid");
   const [visibleCount, setVisibleCount] = useState(REVIEWS_PAGE_SIZE);
   const rows = useMemo(() => {
     const filtered = REVIEW_FIXTURES.filter((review) => {
@@ -266,8 +258,8 @@ function ReviewsWorkspace({ locale }: { locale: Locale }) {
 
       <div className="flex flex-wrap items-center justify-between gap-sm border-b px-md py-sm">
         <div className="flex items-center gap-xs" role="group" aria-label={ar ? "طريقة العرض" : "View mode"}>
-          <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} className={cn("flex h-8 items-center gap-xs rounded-sm px-sm text-label focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", view === "list" ? "bg-surface-2 font-semibold text-fg" : "text-fg-muted hover:text-fg")}><ListIcon size={15} />{ar ? "قائمة" : "List"}</button>
-          <button type="button" aria-pressed={view === "grid"} onClick={() => setView("grid")} className={cn("flex h-8 items-center gap-xs rounded-sm px-sm text-label focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", view === "grid" ? "bg-surface-2 font-semibold text-fg" : "text-fg-muted hover:text-fg")}><GridIcon size={15} />{ar ? "شبكة" : "Grid"}</button>
+          <button type="button" aria-pressed={view === "grid"} onClick={() => setView("grid")} className={cn("flex h-8 items-center gap-xs rounded-sm px-sm text-label focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", view === "grid" ? "bg-surface-2 font-semibold text-fg" : "text-fg-muted hover:text-fg")}><GridIcon size={15} />{ar ? "عرض الشبكة" : "Grid view"}</button>
+          <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} className={cn("flex h-8 items-center gap-xs rounded-sm px-sm text-label focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", view === "list" ? "bg-surface-2 font-semibold text-fg" : "text-fg-muted hover:text-fg")}><ListIcon size={15} />{ar ? "عرض القائمة" : "List view"}</button>
         </div>
         <div className="grid w-full grid-cols-2 items-center gap-sm tablet:flex tablet:w-auto tablet:flex-wrap [&>*]:min-w-0">
           <DateRangeFilter compact locale={locale} value={dateRange} onChange={(next) => { setDateRange(next); setVisibleCount(REVIEWS_PAGE_SIZE); }} />

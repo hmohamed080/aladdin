@@ -114,12 +114,13 @@ describe("DashboardPeriodSelect — custom range", () => {
   it("anchors the popover to its own trailing edge, not the leading one, so it grows back into the viewport", () => {
     // Regression for the popover clipping past the right edge of an LTR
     // desktop viewport: the trigger sits at the far end of the header row, so
-    // the panel must hug its OWN end edge (`end-0`) and grow inward.
+    // the panel must hug its OWN end edge and grow inward. The shared floating surface places it `bottom-end`
+    // (RTL-aware) and Floating UI flips / shifts it away from any viewport edge on top of that.
     renderSelect(DEFAULT_DASHBOARD_PERIOD);
     open();
     const menu = screen.getByTestId("dashboard-period-menu");
-    expect(menu.className).toContain("end-0");
-    expect(menu.className).not.toMatch(/(?<!-)start-0/);
+    expect(menu).toHaveAttribute("data-floating-menu");
+    expect(menu.getAttribute("data-placement")).toMatch(/^bottom-end$|^top-end$/);
   });
 
   it("Apply is disabled until both dates are present and ordered", () => {

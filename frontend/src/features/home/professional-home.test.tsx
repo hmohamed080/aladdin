@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
 import { createTranslator } from "@/lib/i18n/translate";
 import type { PersonalHomeData } from "@/server/queries/personal-home";
 import type { OpportunityRow } from "@/server/queries/job-opportunities";
 import { ProfessionalHome } from "./professional-home";
+
+// The dashboard strip loads its other quick filters through a server action; these tests render the server-supplied strip only.
+vi.mock("@/server/actions/dashboard-opportunities", () => ({ loadDashboardOpportunitiesAction: vi.fn() }));
+vi.mock("@/server/actions/saved-jobs", () => ({ setJobSavedAction: vi.fn() }));
 
 /**
  * Defaults to a non-installer persona (`engineer`) so these tests exercise the
@@ -21,7 +25,7 @@ const data = (over: Partial<PersonalHomeData> = {}): PersonalHomeData => ({
   phone: null,
   completeness: { percent: 100, completed: 8, total: 8, missing: [] },
   verification: { state: "verified", reason: null, decidedAt: null },
-  availability: { available: false, updatedAt: null },
+  availability: { available: false, updatedAt: null, state: "unknown" },
   consumer: { intent: null, interests: [], governorate: null, city: null, budget: null },
   professional: {
     concreteType: "engineer",
@@ -373,10 +377,10 @@ describe("ProfessionalHome — installer_technician (shared with /preview/instal
     });
   });
 
-  it("labels the opportunity list for what it is — every open opening, not a personalised match", () => {
+  it("carries the approved heading, 'Opportunities for you' — the strip is ordered for the caller by the database, and lists every open opening", () => {
     renderWithI18n(<ProfessionalHome {...installerProps} opportunities={[opportunity()]} />, "en");
-    expect(screen.getByRole("heading", { name: "Open opportunities" })).toBeTruthy();
-    expect(screen.queryByText("Opportunities for you")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Opportunities for you" })).toBeTruthy();
+    expect(screen.queryByText("Open opportunities")).toBeNull();
   });
 
   it("never prints a zero budget: a missing amount reads as 'Budget not specified'", () => {
@@ -439,15 +443,18 @@ describe("ProfessionalHome — installer_technician (shared with /preview/instal
     expect(container.querySelector('svg[data-illustration="generic"]')).toBeTruthy();
   });
 
-  it("offers only what the backend can honour on a real card: link to the opening, no fake Apply, no unsaved heart", () => {
+  it("offers only what the backend can honour on a real card: two separate links into the real flow, no local Apply, and a heart that is the REAL saved state", () => {
     const { container } = renderWithI18n(
       <ProfessionalHome {...installerProps} opportunities={[opportunity()]} />,
       "en",
     );
+    // No button can apply from here: applying is a link into the opening's own page. The heart is the persisted
+    // saved-jobs state (pressed = what the database says), never a local flip.
     expect(screen.queryByRole("button", { name: /apply now/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /save opportunity/i })).toBeNull();
-    const link = screen.getByRole("link", { name: "View details and apply" });
-    expect(link.getAttribute("href")).toBe("/home/jobs/op-1");
+    expect(screen.getByRole("button", { name: /save opportunity/i })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("link", { name: "Details" }).getAttribute("href")).toBe("/home/jobs/op-1");
+    expect(screen.getByRole("link", { name: "Apply now" }).getAttribute("href")).toBe("/home/jobs/op-1?apply=1");
+    expect(screen.queryByRole("link", { name: "View details and apply" })).toBeNull();
     expect(container.textContent).not.toMatch(/\d+% skill match|\bkm\b/);
   });
 
@@ -457,7 +464,8 @@ describe("ProfessionalHome — installer_technician (shared with /preview/instal
       "en",
     );
     expect(screen.getByText("You applied")).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "View details and apply" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Apply now" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Details" }).getAttribute("href")).toBe("/home/jobs/op-1");
   });
 
   it("lists only assignments the caller can start now (scheduled), linked to the assignment", () => {

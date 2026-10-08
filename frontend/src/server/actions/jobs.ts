@@ -31,6 +31,11 @@ export async function createJob(
     description?: string;
     governorate?: string;
     city?: string;
+    /** The catalogue keys chosen in the form (the canonical location). */
+    governorateKey?: string;
+    cityKey?: string;
+    /** Optional required specialty (an id from `trade_specialties`, belonging to `tradeKey`). */
+    requiredSpecialtyId?: string;
     siteAddress?: string;
     expectedDurationDays?: number;
     startsOn?: string;
@@ -51,9 +56,30 @@ export async function createJob(
     p_starts_on: input.startsOn,
     p_ends_by: input.endsBy,
     p_branch_id: input.branchId,
+    p_governorate_key: input.governorateKey,
+    p_city_key: input.cityKey,
+    p_required_specialty_id: input.requiredSpecialtyId,
   });
   if (error) throw error;
   return data as string;
+}
+
+/**
+ * Sets, changes or clears a job's WORK CONTACT (`job_work_contact_set`). All three
+ * values empty clears it. The database decides who may (the posting organization,
+ * while the job is a draft or open) and validates the values.
+ */
+export async function setJobWorkContact(
+  supabase: Client,
+  input: { jobId: string; name?: string; phoneE164?: string; email?: string },
+): Promise<void> {
+  const { error } = await supabase.rpc("job_work_contact_set", {
+    p_job_id: input.jobId,
+    p_contact_name: input.name ?? "",
+    p_phone_e164: input.phoneE164 ?? "",
+    p_email: input.email ?? "",
+  });
+  if (error) throw error;
 }
 
 export async function updateJob(
@@ -67,6 +93,9 @@ export async function updateJob(
     description?: string;
     governorate?: string;
     city?: string;
+    governorateKey?: string;
+    cityKey?: string;
+    requiredSpecialtyId?: string;
     siteAddress?: string;
     expectedDurationDays?: number;
     startsOn?: string;
@@ -86,6 +115,9 @@ export async function updateJob(
     p_expected_duration_days: input.expectedDurationDays,
     p_starts_on: input.startsOn,
     p_ends_by: input.endsBy,
+    p_governorate_key: input.governorateKey,
+    p_city_key: input.cityKey,
+    p_required_specialty_id: input.requiredSpecialtyId,
   });
   if (error) throw error;
   return data as number;

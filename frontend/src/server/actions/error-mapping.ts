@@ -107,6 +107,8 @@ export function mapJobError(error: unknown): string {
   if (msg.includes("cannot be accepted") || msg.includes("cannot be rejected"))
     return "jobs.errors.alreadyDecided";
   if (msg.includes("cannot post work")) return "jobs.errors.inactiveOrg";
+  if (msg.includes("unknown governorate") || msg.includes("unknown city") || msg.includes("needs its governorate") || msg.includes("does not match its key")) return "jobs.errors.location";
+  if (msg.includes("unknown specialty")) return "jobs.errors.tradeUnavailable";
   if (msg.includes("only an open job") || msg.includes("not accepting applications"))
     return "jobs.errors.notOpen";
   if (code === "42501" || msg.includes("required") || msg.includes("not a member"))

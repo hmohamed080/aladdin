@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
 import { createTranslator } from "@/lib/i18n/translate";
 import type { PersonalHomeData } from "@/server/queries/personal-home";
 
+vi.mock("@/server/actions/service-areas", () => ({
+  addAvailabilityWindowAction: vi.fn(),
+  removeAvailabilityWindowAction: vi.fn(),
+  setServiceAreasAction: vi.fn(),
+}));
 vi.mock("@/server/actions/availability", () => ({
   setAvailabilityAction: async () => ({ ok: true }),
 }));
@@ -150,9 +155,11 @@ describe("PersonalSettings", () => {
     expect(screen.getByTestId("identity-card")).toBeTruthy();
     expect(screen.getByLabelText("Display name")).toBeTruthy();
     expect(screen.getByTestId("avatar-field")).toBeTruthy();
-    // Egypt is the default country, not the only one.
-    expect((screen.getByLabelText("Country") as HTMLSelectElement).value).toBe("EG");
-    expect(screen.getByLabelText("Country").querySelectorAll("option").length).toBeGreaterThan(200);
+    // Egypt is the default country, not the only one: the shared searchable picker shows +20 and offers every other plan.
+    const picker = screen.getByRole("button", { name: "Country" });
+    expect(picker.textContent).toContain("+20");
+    fireEvent.click(picker);
+    expect(within(screen.getByRole("listbox", { name: "Country" })).getAllByRole("option").length).toBeGreaterThan(200);
   });
 
   it("flags an automatic display name as NOT confirmed until it is saved here", () => {

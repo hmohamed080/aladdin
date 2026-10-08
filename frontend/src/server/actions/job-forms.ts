@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import * as jobs from "@/server/actions/jobs";
 import { mapJobError } from "@/server/actions/error-mapping";
+import { readWorkContact } from "@/lib/jobs/work-contact";
+import { CITIES_BY_GOVERNORATE, GOVERNORATE_OPTIONS } from "@/lib/installer/location-data";
 
 /**
  * Server Actions the organization Jobs forms bind to.
@@ -50,6 +52,11 @@ function readContent(fd: FormData) {
   const offeredAmount = num(fd, "offeredAmount");
   const startsOn = str(fd, "startsOn");
   const endsBy = str(fd, "endsBy");
+  // LOCATION is chosen from the catalogue (governorate, then a city inside it) — never typed. A job being edited whose
+  // old free-text place never resolved may keep it by choosing nothing (`keepLegacyLocation`).
+  const governorateKey = str(fd, "governorateKey");
+  const cityKey = str(fd, "cityKey");
+  const keepLegacyLocation = fd.get("keepLegacyLocation") === "1";
 
   const fieldErrors: Record<string, string> = {};
   if (!title) fieldErrors.title = "jobs.validation.titleRequired";
@@ -60,6 +67,11 @@ function readContent(fd: FormData) {
   // well is not duplicated authority — it is the difference between a field
   // error next to the date and a generic failure after a round trip.
   if (startsOn && endsBy && endsBy < startsOn) fieldErrors.endsBy = "jobs.validation.dateOrder";
+  if (!governorateKey && !keepLegacyLocation) fieldErrors.governorate = "jobs.validation.governorateRequired";
+  else if (governorateKey && !cityKey) fieldErrors.city = "jobs.validation.cityRequired";
+  // The readable wording is the catalogue's own English name for the chosen keys; the database validates the keys.
+  const governorateName = GOVERNORATE_OPTIONS.find((o) => o.value === governorateKey)?.en;
+  const cityName = governorateKey ? (CITIES_BY_GOVERNORATE[governorateKey] ?? []).find((o) => o.value === cityKey)?.en : undefined;
 
   return {
     fieldErrors,
@@ -68,8 +80,11 @@ function readContent(fd: FormData) {
       tradeKey: tradeKey!,
       offeredAmount: offeredAmount!,
       description: str(fd, "description"),
-      governorate: str(fd, "governorate"),
-      city: str(fd, "city"),
+      governorate: governorateName,
+      city: cityName,
+      governorateKey,
+      cityKey,
+      requiredSpecialtyId: str(fd, "requiredSpecialtyId"),
       siteAddress: str(fd, "siteAddress"),
       expectedDurationDays: int(fd, "expectedDurationDays"),
       startsOn,
@@ -87,7 +102,9 @@ export async function createJobAction(_p: FormState, fd: FormData): Promise<Form
   const orgId = str(fd, "orgId");
   if (!orgId) return { ok: false, code: "states.genericRetry" };
   const { fieldErrors, values } = readContent(fd);
-  if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
+  const contact = readWorkContact(fd);
+  const allErrors = { ...fieldErrors, ...contact.fieldErrors };
+  if (Object.keys(allErrors).length) return { ok: false, fieldErrors: allErrors };
 
   const supabase = await getServerSupabase();
   let newId: string;
@@ -95,6 +112,16 @@ export async function createJobAction(_p: FormState, fd: FormData): Promise<Form
     newId = await jobs.createJob(supabase, { orgId, branchId: str(fd, "branchId"), ...values });
   } catch (e) {
     return { ok: false, code: mapJobError(e) };
+  }
+  // Only when a contact was actually entered: a job without one is entirely valid.
+  if (contact.present && (contact.values.phoneE164 || contact.values.email)) {
+    try {
+      await jobs.setJobWorkContact(supabase, { jobId: newId, ...contact.values });
+    } catch {
+      // The draft exists; send the poster to its edit page rather than leave them to re-create it.
+      revalidatePath("/b2b/jobs");
+      redirect(`/b2b/jobs/${newId}/edit?contact=failed`);
+    }
   }
   revalidatePath("/b2b/jobs");
   redirect(`/b2b/jobs/${newId}?created=1`);
@@ -105,11 +132,15 @@ export async function updateJobAction(_p: FormState, fd: FormData): Promise<Form
   const expectedVersion = int(fd, "expectedVersion");
   if (!jobId || expectedVersion === undefined) return { ok: false, code: "states.genericRetry" };
   const { fieldErrors, values } = readContent(fd);
-  if (Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
+  const contact = readWorkContact(fd);
+  const allErrors = { ...fieldErrors, ...contact.fieldErrors };
+  if (Object.keys(allErrors).length) return { ok: false, fieldErrors: allErrors };
 
   const supabase = await getServerSupabase();
   try {
     await jobs.updateJob(supabase, { jobId, expectedVersion, ...values });
+    // The form always carries the contact fields; empty ones clear the contact.
+    if (contact.present) await jobs.setJobWorkContact(supabase, { jobId, ...contact.values });
   } catch (e) {
     return { ok: false, code: mapJobError(e) };
   }

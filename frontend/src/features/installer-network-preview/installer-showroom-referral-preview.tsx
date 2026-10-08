@@ -13,7 +13,7 @@ import {
   SendIcon,
   StorefrontIcon,
 } from "@/components/ui/icons";
-import { menuItemClass, menuSurfaceClass } from "@/components/ui/menu";
+import { menuItemClass } from "@/components/ui/menu";
 import dynamic from "next/dynamic";
 import { InstallerSidebar } from "@/features/installer-dashboard-preview/installer-sidebar";
 import { InstallerTopbar } from "@/features/installer-dashboard-preview/installer-topbar";
@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/ui/cn";
 import type { SidebarMode } from "@/lib/ui/sidebar-mode";
 import type { CanonicalPhone } from "@/lib/contact/phone";
+import { FloatingMenu } from "@/components/ui/floating-menu";
 
 // Intl country names differ between Node and browser ICU versions; keep the
 // shared control client-rendered here (same approach as the settings preview).
@@ -152,7 +153,7 @@ function ReferralLocationSelect({
   };
 }) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const customInputRef = useRef<HTMLInputElement>(null);
   const selected = options.find((option) => option.value === value);
   const customEntryActive = customEntry?.optionValue === value;
@@ -164,26 +165,11 @@ function ReferralLocationSelect({
     if (open && customEntryActive) customInputRef.current?.focus();
   }, [customEntryActive, open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const closeOutside = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const closeWithEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", closeOutside);
-    document.addEventListener("keydown", closeWithEscape);
-    return () => {
-      document.removeEventListener("mousedown", closeOutside);
-      document.removeEventListener("keydown", closeWithEscape);
-    };
-  }, [open]);
-
   return (
-    <div ref={rootRef} className="relative flex flex-col gap-1.5">
+    <div className="relative flex flex-col gap-1.5">
       <span id={`${id}-label`} className="text-label font-medium text-fg-secondary">{label}</span>
       <button
+        ref={trigger}
         id={id}
         type="button"
         aria-label={label}
@@ -197,8 +183,16 @@ function ReferralLocationSelect({
         <span className={cn("truncate", !selected && !customEntryActive && "text-fg-muted")}>{displayedLabel}</span>
         <ChevronDownIcon size={17} className={cn("shrink-0 text-fg-secondary transition-transform", open && "rotate-180")} />
       </button>
-      {open ? (
-        <div className={cn(menuSurfaceClass, "absolute inset-x-0 top-full z-popover mt-2 max-h-72 overflow-y-auto p-1")} role="listbox" aria-labelledby={`${id}-label`}>
+      <FloatingMenu
+          open={open}
+          onClose={() => setOpen(false)}
+          anchorRef={trigger}
+          role="listbox"
+          aria-labelledby={`${id}-label`}
+          placement="bottom-start"
+          matchAnchorWidth
+          className="max-h-72 overflow-y-auto p-1"
+        >
           {options.map((option) => {
             const active = option.value === value;
             return (
@@ -240,8 +234,7 @@ function ReferralLocationSelect({
               </div>
             </div>
           ) : null}
-        </div>
-      ) : null}
+        </FloatingMenu>
       {error ? <p id={`${id}-error`} role="alert" className="text-label text-danger">{error}</p> : null}
     </div>
   );

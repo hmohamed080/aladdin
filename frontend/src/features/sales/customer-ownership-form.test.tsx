@@ -60,7 +60,7 @@ describe("CustomerOwnershipForm — assignee dropdown reflects resolved teammate
     // assignee's id, because a real <option> exists for it — not the first
     // option ("Unassigned") a browser falls back to when no option matches.
     expect(select.value).toBe(YOUSSEF);
-    expect(within(select).getByRole("option", { name: "Youssef Amin" })).toBeInTheDocument();
+    expect(within(select).getByRole("option", { name: "Youssef Amin", hidden: true })).toBeInTheDocument();
   });
 
   it("lists every resolved teammate as a real name — never a raw membership id", async () => {
@@ -83,7 +83,7 @@ describe("CustomerOwnershipForm — assignee dropdown reflects resolved teammate
     openDialog();
     const select = (await screen.findByLabelText(ar.customers.assignee)) as HTMLSelectElement;
     const optionTexts = within(select)
-      .getAllByRole("option")
+      .getAllByRole("option", { hidden: true })
       .map((o) => o.textContent);
     expect(optionTexts).toEqual(expect.arrayContaining(["Hana Mansour", "Youssef Amin"]));
     for (const text of optionTexts) {
@@ -107,7 +107,7 @@ describe("CustomerOwnershipForm — assignee dropdown reflects resolved teammate
     );
     openDialog();
     const select = (await screen.findByLabelText(ar.customers.assignee)) as HTMLSelectElement;
-    expect(within(select).getAllByRole("option")).toHaveLength(1);
+    expect(within(select).getAllByRole("option", { hidden: true })).toHaveLength(1);
     expect(select.value).toBe("");
   });
 });
@@ -134,12 +134,12 @@ describe("CustomerOwnershipForm — branch-reactive candidates never strand or s
     openDialog();
     const branchSelect = (await screen.findByLabelText(ar.customers.branch)) as HTMLSelectElement;
     const assigneeSelect = screen.getByLabelText(ar.customers.assignee) as HTMLSelectElement;
-    expect(within(assigneeSelect).queryByRole("option", { name: "Hana Mansour" })).not.toBeInTheDocument();
+    expect(within(assigneeSelect).queryByRole("option", { name: "Hana Mansour", hidden: true })).not.toBeInTheDocument();
 
     fireEvent.change(branchSelect, { target: { value: ZAYED } });
 
-    expect(within(assigneeSelect).getByRole("option", { name: "Hana Mansour" })).toBeInTheDocument();
-    expect(within(assigneeSelect).queryByRole("option", { name: "Youssef Amin" })).not.toBeInTheDocument();
+    expect(within(assigneeSelect).getByRole("option", { name: "Hana Mansour", hidden: true })).toBeInTheDocument();
+    expect(within(assigneeSelect).queryByRole("option", { name: "Youssef Amin", hidden: true })).not.toBeInTheDocument();
   });
 
   it("moving to a branch that strands the current assignee keeps them selected (flagged), never silently clears or drops them", async () => {

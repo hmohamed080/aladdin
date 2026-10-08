@@ -369,12 +369,21 @@ select is(
 -- trade. That function is INFORMATIONAL ONLY — never consulted by
 -- my_registration_state() or any capability/can_* predicate — so it reads the
 -- relation to describe the caller to themselves, and gates nothing.
+-- `app.job_match_rows` and `public.job_opportunities_page` joined it as a DISPLAY / RECOMMENDATION SIGNAL
+-- ONLY: the first scores a job against the caller's own declared trades (the Overall Match), the second
+-- orders the board's Best Match tiers by the same trade relation. Both read the caller's OWN rows and
+-- return numbers / an order; no capability, RLS policy, view, write path or discoverability rule consults
+-- them, and test 74 proves a score of 0 neither hides a job nor blocks opening or applying to it.
+-- `user_trade_specialties_set` is the writer of the sibling relation (a specialty is held only inside a
+-- trade the caller holds); it reads user_trades to enforce that, and grants nothing because of it.
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('app', 'public')
       and p.prosrc like '%user_trades%'
       and p.proname not in ('user_trades_set', '_profile_public_directory',
-                            '_job_applicants', 'my_profile_completion')),
+                            '_job_applicants', 'my_profile_completion',
+                            'job_match_rows', 'job_opportunities_page',
+                            'user_trade_specialties_set')),
   0::bigint,
   'and the ONLY functions that mention it are its writer and two DISPLAY projections — no capability, no can_* predicate');
 

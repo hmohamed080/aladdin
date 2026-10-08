@@ -1,4 +1,5 @@
 import { accountTypeLabel } from "@/lib/i18n/account-type-label";
+import { availabilityState } from "@/lib/profile/availability-state";
 import { Badge, Card } from "@/components/ui/primitives";
 import type { PublicProfile } from "@/server/queries/professional-profile";
 import type { TranslateFn } from "@/lib/i18n/translate";
@@ -102,7 +103,7 @@ export function PublicProfileView({
                 deciding whether to make contact needs — and paired with its age,
                 which is the only thing that makes the claim weighable. */}
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              <AvailabilityBadge available={profile.availableForWork} t={t} />
+              <AvailabilityBadge state={availabilityState(profile.availableForWork, profile.availabilityUpdatedAt)} t={t} />
               <AvailabilityAge updatedAt={profile.availabilityUpdatedAt} locale={locale} t={t} />
             </div>
           </div>

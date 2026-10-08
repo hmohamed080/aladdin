@@ -5,8 +5,10 @@ import { loadWorkspaces } from "@/server/queries/workspace";
 import { personalEntry } from "@/lib/workspace/model";
 import { loadPersonalHome } from "@/server/queries/personal-home";
 import { getIndividualOnboardingData } from "@/server/queries/onboarding";
-import { loadTradeCatalog, loadMyTrades } from "@/server/queries/trades";
+import { loadTradeCatalog, loadMyTrades, loadSpecialtyCatalog, loadMySpecialtyIds } from "@/server/queries/trades";
 import { TradeSelector } from "@/features/profile/trade-selector";
+import { ServiceAreasEditor } from "@/features/profile/service-areas-editor";
+import { loadMyServiceAreas } from "@/server/queries/service-areas";
 import { ProfessionalProfileEditor } from "@/features/profile/professional-profile-editor";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
 import { ActivitySelector } from "@/features/profile/activity-selector";
@@ -72,11 +74,14 @@ export default async function EditProfilePage() {
   // Tradespeople use the trade taxonomy above instead and have no persona
   // activities, so their catalog is empty and the selector renders nothing.
   const persona = asPersona(concreteType);
-  const [catalog, mine, activityCatalog, myActivities] = await Promise.all([
+  const [catalog, mine, activityCatalog, myActivities, specialties, mySpecialtyIds, serviceAreas] = await Promise.all([
     loadTradeCatalog(),
     loadMyTrades(),
     persona ? loadPersonaActivityCatalog(persona) : Promise.resolve([] as string[]),
     loadMyActivities(),
+    loadSpecialtyCatalog(),
+    loadMySpecialtyIds(),
+    loadMyServiceAreas(),
   ]);
 
   return (
@@ -87,7 +92,10 @@ export default async function EditProfilePage() {
           disagree — leaving the page to explain a half-saved profile. Placed
           first because the canonical trade is now the profile's category, and the
           free-text fields below it are description. */}
-      <TradeSelector catalog={catalog} mine={mine} />
+      <TradeSelector catalog={catalog} mine={mine} specialties={specialties} mySpecialtyIds={mySpecialtyIds} />
+      {/* WHERE YOU WORK: the canonical service areas (primary governorate, cities, other governorates). They feed Near me
+          and the location part of the Overall Match; they never limit which jobs a person can open or apply to. */}
+      <ServiceAreasEditor value={serviceAreas} />
       <ActivitySelector catalog={activityCatalog} selected={myActivities} action={setMyActivitiesAction} />
       <ProfessionalProfileEditor answers={individual.professional} concreteType={concreteType} />
     </div>

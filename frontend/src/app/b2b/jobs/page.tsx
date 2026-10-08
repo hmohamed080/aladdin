@@ -11,6 +11,7 @@ import { JobStatusBadge } from "@/features/jobs/badges";
 import { formatDate, formatMoney } from "@/lib/ui/format";
 import { BriefcaseIcon, UsersIcon, CheckIcon, FileTextIcon } from "@/components/ui/icons";
 import type { JobListRow } from "@/server/queries/jobs";
+import { placeLabel } from "@/lib/installer/opportunity-location";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,7 @@ export default async function JobsPage({
       key: "location",
       header: m.jobs.field.location,
       desktopOnly: true,
-      cell: (j) => [j.city, j.governorate].filter(Boolean).join(", ") || "—",
+      cell: (j) => placeLabel(locale, j.governorate, j.city) || "—",
     },
     {
       key: "offer",

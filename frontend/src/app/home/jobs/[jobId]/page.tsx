@@ -19,6 +19,7 @@ import {
   getMyApplicationForJob,
 } from "@/server/queries/job-opportunities";
 import { assignmentIdsByApplication } from "@/server/queries/job-assignments";
+import { getJobMatch } from "@/server/queries/job-match";
 
 export const dynamic = "force-dynamic";
 
@@ -43,8 +44,10 @@ export const dynamic = "force-dynamic";
  */
 export default async function JobOpportunityPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ jobId: string }>;
+  searchParams: Promise<{ apply?: string }>;
 }) {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
@@ -62,9 +65,11 @@ export default async function JobOpportunityPage({
   const m = getMessages(locale);
   const { jobId } = await params;
 
-  const [opportunity, application] = await Promise.all([
+  const [opportunity, application, match] = await Promise.all([
     getJobOpportunity(supabase, jobId),
     getMyApplicationForJob(supabase, jobId),
+    // The canonical Overall Match (the same database authority every card reads). Presentation only.
+    home.variant === "professional" ? getJobMatch(supabase, jobId) : Promise.resolve(null),
   ]);
 
   if (!opportunity && !application) {
@@ -140,7 +145,9 @@ export default async function JobOpportunityPage({
         application={candidacy}
         canApply={home.variant === "professional"}
         assignmentId={assignmentId}
+        openApply={(await searchParams).apply === "1"}
         locale={locale}
+        match={match}
       />
     </div>
   );

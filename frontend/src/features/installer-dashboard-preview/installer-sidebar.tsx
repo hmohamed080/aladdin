@@ -26,6 +26,7 @@ import {
 import { pick } from "./localized";
 import { INSTALLER_PRIMARY_NAV, INSTALLER_QUICK_NAV, type InstallerNavItem } from "./installer-nav";
 import { signOut } from "@/server/actions/auth";
+import { menuSurfaceClass } from "@/components/ui/menu";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 const MENU_HOVER_DELAY_MS = 350;
@@ -380,7 +381,7 @@ function SidebarModeControl({ mode, onPick }: { mode: SidebarMode; onPick: (mode
               data-testid="installer-sidebar-menu"
               onMouseEnter={clearCloseTimer}
               onMouseLeave={scheduleClose}
-              className="fixed z-popover w-44 overflow-hidden rounded-md border bg-surface py-1 shadow-lg"
+              className={cn(menuSurfaceClass, "fixed z-popover w-44 py-1")}
               style={{ top: menuPosition.top, insetInlineStart: menuPosition.insetInlineStart }}
             >
               {SIDEBAR_MODES.map((value) => {

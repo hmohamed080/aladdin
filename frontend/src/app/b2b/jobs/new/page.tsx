@@ -1,6 +1,6 @@
 import { getPageContext } from "@/server/queries/page-context";
 import { getMessages } from "@/lib/i18n/translate";
-import { loadTradeCatalog } from "@/server/queries/trades";
+import { loadTradeCatalog, loadSpecialtyCatalog } from "@/server/queries/trades";
 import { PageHeader } from "@/components/ui/workspace-layout";
 import { StatePanel } from "@/components/ui/primitives";
 import { BackLink } from "@/features/sales/page-parts";
@@ -38,6 +38,7 @@ export default async function NewJobPage() {
           orgId={org.organizationId}
           branchId={org.activeBranchId}
           trades={await loadTradeCatalog()}
+          specialties={await loadSpecialtyCatalog()}
         />
       ) : (
         <StatePanel tone="warning" title={m.jobs.postDenied.title} body={m.jobs.postDenied.body} />

@@ -13,9 +13,11 @@ import type {
 import { toPointsEntryView, type PointsEntrySource } from "@/features/points/view-model";
 import { derivePointsLevel } from "@/lib/network/points-level";
 import type { MyAssignmentRow } from "@/server/queries/job-assignments";
+import { toMatchBreakdown, type MatchColumns } from "@/lib/installer/overall-match";
 import type { OpportunityRow } from "@/server/queries/job-opportunities";
 import type { PersonalHomeData } from "@/server/queries/personal-home";
 import type { ProfileCompletion } from "@/server/queries/profile-identity";
+import { placeLabel } from "@/lib/installer/opportunity-location";
 
 /**
  * THE REAL SIDE OF THE DATA-ADAPTER BOUNDARY.
@@ -48,21 +50,28 @@ function real(value: string): Bi {
  *  underlying function guarantees (the same caveat `server/queries/network.ts`
  *  documents) — a row missing its id or title is skipped rather than drawn
  *  half blank. */
+/** A discovery row, optionally carrying the Overall Match columns and whether the caller saved it (the paged board's rows do). */
+export type MatchedOpportunityRow = OpportunityRow & Partial<MatchColumns> & { is_saved?: boolean | null };
+
 export function toOpportunityVM(
-  job: OpportunityRow,
+  job: MatchedOpportunityRow,
   t: TranslateFn,
   locale: Locale,
 ): InstallerOpportunityVM | null {
   if (!job.id || !job.title) return null;
-  const place = [job.city, job.governorate].filter(Boolean).join("، ");
+  const place = placeLabel(locale, job.governorate, job.city);
   return {
     id: job.id,
     title: real(job.title),
     org: job.poster_org_name ? real(job.poster_org_name) : null,
     place: place ? real(place) : null,
-    // No geolocation or skills-match model exists yet — never fabricated.
+    // There is no geolocation, so no distance — never fabricated. The match is the canonical Overall Match as the
+    // database computed it for THIS caller (the same breakdown every surface shows); a row that did not carry one
+    // simply shows no badge.
     distanceKm: null,
-    matchPercent: null,
+    matchPercent: job.overall_percent ?? null,
+    match: job.overall_percent === undefined ? null : toMatchBreakdown(job as MatchColumns),
+    isSaved: Boolean(job.is_saved),
     // A missing amount stays missing: the card says "budget not specified"
     // rather than printing a zero nobody offered.
     paymentEGP: job.offered_amount,
@@ -80,7 +89,7 @@ export function toOpportunityVM(
 }
 
 export function toOpportunityVMs(
-  jobs: readonly OpportunityRow[],
+  jobs: readonly MatchedOpportunityRow[],
   t: TranslateFn,
   locale: Locale,
 ): InstallerOpportunityVM[] {

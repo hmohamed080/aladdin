@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/ui/cn";
 import { ChevronDownIcon, CheckIcon } from "@/components/ui/icons";
-import { menuSurfaceClass, menuItemClass } from "@/components/ui/menu";
+import { FloatingMenu } from "@/components/ui/floating-menu";
+import { menuItemClass } from "@/components/ui/menu";
 import type { AttentionKind } from "@/features/home/supply-attention";
 
 /**
@@ -34,27 +35,7 @@ export function StageSelect({
   query?: Record<string, string>;
 }) {
   const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: MouseEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        trigger.current?.focus();
-      }
-    };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   const href = (stage: AttentionKind | null) => {
     const params = new URLSearchParams(query);
@@ -67,7 +48,7 @@ export function StageSelect({
   const current = value ? (options.find((o) => o.key === value)?.label ?? allLabel) : allLabel;
 
   return (
-    <div ref={root} className="relative inline-flex">
+    <div className="relative inline-flex">
       <button
         ref={trigger}
         type="button"
@@ -86,12 +67,16 @@ export function StageSelect({
         <ChevronDownIcon size={14} className="shrink-0 text-fg-muted" />
       </button>
 
-      {open ? (
-        <div
+      <FloatingMenu
+          open={open}
+          onClose={() => setOpen(false)}
+          anchorRef={trigger}
           role="menu"
           aria-label={label}
           data-testid="attention-type-menu"
-          className={cn(menuSurfaceClass, "absolute end-0 top-full mt-1 z-popover min-w-full w-max")}
+          placement="bottom-end"
+          matchAnchorWidth
+          className="w-max"
         >
           <ul className="flex flex-col py-0.5">
             <li>
@@ -124,8 +109,7 @@ export function StageSelect({
               );
             })}
           </ul>
-        </div>
-      ) : null}
+        </FloatingMenu>
     </div>
   );
 }

@@ -20,6 +20,7 @@ import { formatDate, formatMoney } from "@/lib/ui/format";
 import { useActionState } from "react";
 import type { JobListRow, JobAssignmentRow } from "@/server/queries/jobs";
 import type { ProgressUpdateRow } from "@/server/queries/job-assignments";
+import { placeLabel } from "@/lib/installer/opportunity-location";
 
 const initial: FormState = { ok: false };
 
@@ -121,7 +122,7 @@ export function JobDetail({
         <dl className="mt-md grid grid-cols-2 gap-md tablet:grid-cols-4">
           <Field label={t("jobs.field.offer")}>{formatMoney(job.offered_amount, locale)}</Field>
           <Field label={t("jobs.field.location")}>
-            {[job.city, job.governorate].filter(Boolean).join(", ") || "—"}
+            {placeLabel(locale, job.governorate, job.city) || "—"}
           </Field>
           <Field label={t("jobs.field.duration")}>
             {job.expected_duration_days != null

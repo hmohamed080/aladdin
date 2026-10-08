@@ -3,7 +3,7 @@ import type { Locale } from "@/lib/i18n/locales";
 export type Bi = { ar: string; en: string };
 export type TradeKey = "spc" | "painting" | "marble" | "wpc" | "gypsum" | "decorative" | "ac";
 export type SortKey = "newest" | "nearest" | "highest" | "demanded";
-export type DurationKey = "all" | "short" | "medium";
+export type DurationKey = "all" | "short" | "medium" | "long";
 
 export type PreviewOpportunity = {
   id: string;
@@ -21,6 +21,9 @@ export type PreviewOpportunity = {
   postedLabel: Bi;
   initiallySaved: boolean;
 };
+
+/** The preview slider's fixture ceiling. A demo constant — production has no budget ceiling. */
+export const PREVIEW_BUDGET_CEILING = 12000;
 
 export const TRADE_OPTIONS: ReadonlyArray<{ key: TradeKey; label: Bi }> = [
   { key: "spc", label: { ar: "تركيب SPC", en: "SPC installation" } },
@@ -169,7 +172,8 @@ export function filterPreviewOpportunities(
     const durationMatches =
       filters.duration === "all" ||
       (filters.duration === "short" && opportunity.durationDays <= 2) ||
-      (filters.duration === "medium" && opportunity.durationDays >= 3 && opportunity.durationDays <= 5);
+      (filters.duration === "medium" && opportunity.durationDays >= 3 && opportunity.durationDays <= 5) ||
+      (filters.duration === "long" && opportunity.durationDays >= 6);
     return (
       tradeMatches &&
       opportunity.budget <= filters.maxBudget &&

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { cn } from "@/lib/ui/cn";
 import { MoreHorizontalIcon } from "@/components/ui/icons";
-import { menuSurfaceClass, menuItemClass } from "@/components/ui/menu";
+import { FloatingMenu } from "@/components/ui/floating-menu";
+import { menuItemClass } from "@/components/ui/menu";
 import { cancelNetworkReferral } from "@/server/actions/network-referrals";
 
 /**
@@ -24,30 +25,10 @@ export function PendingRowMenu({
   withdrawLabel: string;
 }) {
   const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: MouseEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        trigger.current?.focus();
-      }
-    };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   return (
-    <div ref={root} className="relative inline-flex">
+    <div className="relative inline-flex">
       <button
         ref={trigger}
         type="button"
@@ -64,16 +45,22 @@ export function PendingRowMenu({
         <MoreHorizontalIcon size={16} />
       </button>
 
-      {open ? (
-        <div role="menu" aria-label={label} className={cn(menuSurfaceClass, "absolute end-0 top-full z-popover mt-1 w-40")}>
+      <FloatingMenu
+          open={open}
+          onClose={() => setOpen(false)}
+          anchorRef={trigger}
+          role="menu"
+          aria-label={label}
+          placement="bottom-end"
+          className="w-40"
+        >
           <form action={cancelNetworkReferral}>
             <input type="hidden" name="referralId" value={referralId} />
             <button type="submit" role="menuitem" className={menuItemClass(false, "text-danger")}>
               <span className="truncate">{withdrawLabel}</span>
             </button>
           </form>
-        </div>
-      ) : null}
+        </FloatingMenu>
     </div>
   );
 }

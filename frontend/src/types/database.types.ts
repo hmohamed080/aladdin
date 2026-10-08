@@ -73,6 +73,51 @@ export type Database = {
         }
         Relationships: []
       }
+      assignment_contacts: {
+        Row: {
+          assignment_id: string
+          contact_name: string | null
+          created_at: string
+          email: string | null
+          organization_id: string
+          phone_e164: string | null
+          source: string
+        }
+        Insert: {
+          assignment_id: string
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          organization_id: string
+          phone_e164?: string | null
+          source: string
+        }
+        Update: {
+          assignment_id?: string
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          organization_id?: string
+          phone_e164?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_contacts_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: true
+            referencedRelation: "job_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_contacts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -1151,9 +1196,45 @@ export type Database = {
           },
         ]
       }
+      job_work_contacts: {
+        Row: {
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone_e164: string | null
+          created_at: string
+          job_id: string
+          updated_at: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone_e164?: string | null
+          created_at?: string
+          job_id: string
+          updated_at?: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone_e164?: string | null
+          created_at?: string
+          job_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_work_contacts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           city: string | null
+          city_key: string | null
           closed_at: string | null
           created_at: string
           created_by: string
@@ -1161,12 +1242,14 @@ export type Database = {
           ends_by: string | null
           expected_duration_days: number | null
           governorate: string | null
+          governorate_key: string | null
           id: string
           offered_amount: number
           offered_currency: string
           poster_branch_id: string | null
           poster_org_id: string
           published_at: string | null
+          required_specialty_id: string | null
           site_address: string | null
           starts_on: string | null
           status: Database["public"]["Enums"]["job_status"]
@@ -1177,6 +1260,7 @@ export type Database = {
         }
         Insert: {
           city?: string | null
+          city_key?: string | null
           closed_at?: string | null
           created_at?: string
           created_by: string
@@ -1184,12 +1268,14 @@ export type Database = {
           ends_by?: string | null
           expected_duration_days?: number | null
           governorate?: string | null
+          governorate_key?: string | null
           id?: string
           offered_amount: number
           offered_currency?: string
           poster_branch_id?: string | null
           poster_org_id: string
           published_at?: string | null
+          required_specialty_id?: string | null
           site_address?: string | null
           starts_on?: string | null
           status?: Database["public"]["Enums"]["job_status"]
@@ -1200,6 +1286,7 @@ export type Database = {
         }
         Update: {
           city?: string | null
+          city_key?: string | null
           closed_at?: string | null
           created_at?: string
           created_by?: string
@@ -1207,12 +1294,14 @@ export type Database = {
           ends_by?: string | null
           expected_duration_days?: number | null
           governorate?: string | null
+          governorate_key?: string | null
           id?: string
           offered_amount?: number
           offered_currency?: string
           poster_branch_id?: string | null
           poster_org_id?: string
           published_at?: string | null
+          required_specialty_id?: string | null
           site_address?: string | null
           starts_on?: string | null
           status?: Database["public"]["Enums"]["job_status"]
@@ -1228,6 +1317,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_jobs_required_specialty"
+            columns: ["trade_id", "required_specialty_id"]
+            isOneToOne: false
+            referencedRelation: "trade_specialties"
+            referencedColumns: ["trade_id", "id"]
           },
           {
             foreignKeyName: "jobs_created_by_fkey"
@@ -3226,6 +3322,39 @@ export type Database = {
           },
         ]
       }
+      saved_jobs: {
+        Row: {
+          created_at: string
+          job_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          job_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          job_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_jobs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_jobs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_products: {
         Row: {
           created_at: string
@@ -3275,6 +3404,82 @@ export type Database = {
             columns: ["saved_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_searches: {
+        Row: {
+          created_at: string
+          filters: Json
+          id: string
+          name: string
+          scope: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name: string
+          scope: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name?: string
+          scope?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_searches_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trade_specialties: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          sort_order: number
+          trade_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          sort_order?: number
+          trade_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          sort_order?: number
+          trade_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_specialties_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
             referencedColumns: ["id"]
           },
         ]
@@ -3332,6 +3537,122 @@ export type Database = {
           },
           {
             foreignKeyName: "user_activities_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_availability_windows: {
+        Row: {
+          available_from: string
+          available_to: string | null
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          available_from: string
+          available_to?: string | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          available_from?: string
+          available_to?: string | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_availability_windows_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_service_areas: {
+        Row: {
+          city_key: string | null
+          created_at: string
+          governorate_key: string
+          id: string
+          is_primary: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          city_key?: string | null
+          created_at?: string
+          governorate_key: string
+          id?: string
+          is_primary?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          city_key?: string | null
+          created_at?: string
+          governorate_key?: string
+          id?: string
+          is_primary?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_service_areas_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_trade_specialties: {
+        Row: {
+          created_at: string
+          specialty_id: string
+          trade_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          specialty_id: string
+          trade_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          specialty_id?: string
+          trade_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_user_trade_specialties_specialty"
+            columns: ["trade_id", "specialty_id"]
+            isOneToOne: false
+            referencedRelation: "trade_specialties"
+            referencedColumns: ["trade_id", "id"]
+          },
+          {
+            foreignKeyName: "fk_user_trade_specialties_user_trade"
+            columns: ["user_id", "trade_id"]
+            isOneToOne: false
+            referencedRelation: "user_trades"
+            referencedColumns: ["user_id", "trade_id"]
+          },
+          {
+            foreignKeyName: "user_trade_specialties_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -3584,6 +3905,16 @@ export type Database = {
           job_id: string | null
           trade_is_active: boolean | null
           trade_key: string | null
+        }
+        Relationships: []
+      }
+      my_assignment_contacts: {
+        Row: {
+          assignment_id: string | null
+          contact_name: string | null
+          email: string | null
+          org_name: string | null
+          phone: string | null
         }
         Relationships: []
       }
@@ -4586,6 +4917,21 @@ export type Database = {
           },
         ]
       }
+      saved_job_opportunities: {
+        Row: {
+          job_id: string | null
+          saved_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_jobs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_product_list: {
         Row: {
           brand: string | null
@@ -4772,6 +5118,7 @@ export type Database = {
         Returns: undefined
       }
       business_submit: { Args: never; Returns: string }
+      caller_has_service_location: { Args: never; Returns: boolean }
       cancel_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
       cancel_order: { Args: { p_order_id: string }; Returns: undefined }
       cancel_rfq: { Args: { p_rfq_id: string }; Returns: undefined }
@@ -5023,18 +5370,103 @@ export type Database = {
         Args: {
           p_branch_id?: string
           p_city?: string
+          p_city_key?: string
           p_description?: string
           p_ends_by?: string
           p_expected_duration_days?: number
           p_governorate?: string
+          p_governorate_key?: string
           p_offered_amount: number
           p_org_id: string
+          p_required_specialty_id?: string
           p_site_address?: string
           p_starts_on?: string
           p_title: string
           p_trade_key: string
         }
         Returns: string
+      }
+      job_matches: {
+        Args: { p_job_ids: string[] }
+        Returns: {
+          availability_points: number
+          availability_reason: string
+          job_id: string
+          location_points: number
+          location_reason: string
+          overall_percent: number
+          specialty_points: number
+          specialty_reason: string
+          trade_points: number
+          trade_reason: string
+        }[]
+      }
+      job_opportunities_page: {
+        Args: {
+          p_after_amount?: number
+          p_after_id?: string
+          p_after_published_at?: string
+          p_after_tier?: number
+          p_applied?: boolean
+          p_city_key?: string
+          p_governorate_key?: string
+          p_limit?: number
+          p_max_amount?: number
+          p_max_duration?: number
+          p_min_amount?: number
+          p_min_duration?: number
+          p_saved?: boolean
+          p_search?: string
+          p_sort?: string
+          p_trade_keys?: string[]
+        }
+        Returns: {
+          availability_points: number
+          availability_reason: string
+          city: string
+          city_key: string
+          description: string
+          ends_by: string
+          expected_duration_days: number
+          governorate: string
+          governorate_key: string
+          has_applied: boolean
+          id: string
+          is_saved: boolean
+          location_points: number
+          location_reason: string
+          offered_amount: number
+          offered_currency: string
+          overall_percent: number
+          poster_org_id: string
+          poster_org_name: string
+          proximity_tier: number
+          published_at: string
+          required_specialty_key: string
+          skill_rank: number
+          specialty_points: number
+          specialty_reason: string
+          starts_on: string
+          title: string
+          trade_key: string
+          trade_points: number
+          trade_reason: string
+        }[]
+      }
+      job_opportunities_total: {
+        Args: {
+          p_applied?: boolean
+          p_city_key?: string
+          p_governorate_key?: string
+          p_max_amount?: number
+          p_max_duration?: number
+          p_min_amount?: number
+          p_min_duration?: number
+          p_saved?: boolean
+          p_search?: string
+          p_trade_keys?: string[]
+        }
+        Returns: number
       }
       job_progress_add: {
         Args: {
@@ -5057,22 +5489,36 @@ export type Database = {
         Args: { p_assignment_id: string; p_comment?: string; p_rating: number }
         Returns: string
       }
+      job_save: { Args: { p_job_id: string }; Returns: undefined }
+      job_unsave: { Args: { p_job_id: string }; Returns: undefined }
       job_update: {
         Args: {
           p_city?: string
+          p_city_key?: string
           p_description?: string
           p_ends_by?: string
           p_expected_duration_days?: number
           p_expected_version: number
           p_governorate?: string
+          p_governorate_key?: string
           p_job_id: string
           p_offered_amount: number
+          p_required_specialty_id?: string
           p_site_address?: string
           p_starts_on?: string
           p_title: string
           p_trade_key: string
         }
         Returns: number
+      }
+      job_work_contact_set: {
+        Args: {
+          p_contact_name: string
+          p_email: string
+          p_job_id: string
+          p_phone_e164: string
+        }
+        Returns: undefined
       }
       mark_all_notifications_read: {
         Args: { p_org_id?: string }
@@ -5141,6 +5587,67 @@ export type Database = {
           primary_branch_name: string
           reviewed_at: string
           status: Database["public"]["Enums"]["referral_status"]
+        }[]
+      }
+      my_work_companies: {
+        Args: never
+        Returns: {
+          company: string
+        }[]
+      }
+      my_work_counts: {
+        Args: never
+        Returns: {
+          assignment_count: number
+          status: Database["public"]["Enums"]["job_assignment_status"]
+        }[]
+      }
+      my_work_page: {
+        Args: {
+          p_after_id?: string
+          p_after_key?: string
+          p_after_key2?: string
+          p_company?: string
+          p_contact?: string
+          p_from?: string
+          p_limit?: number
+          p_search?: string
+          p_sort?: string
+          p_states?: string[]
+          p_to?: string
+        }
+        Returns: {
+          agreed_amount: number
+          agreed_currency: string
+          application_id: string
+          cancellation_reason: string
+          cancelled_at: string
+          city: string
+          completed_at: string
+          contact_email: string
+          contact_name: string
+          contact_phone: string
+          created_at: string
+          ends_by: string
+          expected_duration_days: number
+          governorate: string
+          id: string
+          job_description: string
+          job_id: string
+          job_status: Database["public"]["Enums"]["job_status"]
+          job_title: string
+          last_progress_at: string
+          latest_progress_percent: number
+          poster_org_name: string
+          published_at: string
+          site_address: string
+          started_at: string
+          starts_on: string
+          status: Database["public"]["Enums"]["job_assignment_status"]
+          total_count: number
+          trade_is_active: boolean
+          trade_key: string
+          version: number
         }[]
       }
       my_workspaces: {
@@ -5362,6 +5869,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      saved_search_create: {
+        Args: { p_filters: Json; p_name: string; p_scope: string }
+        Returns: string
+      }
+      saved_search_delete: { Args: { p_id: string }; Returns: undefined }
+      saved_search_update: {
+        Args: { p_filters?: Json; p_id: string; p_name?: string }
+        Returns: undefined
+      }
       send_message: {
         Args: { p_body: string; p_conversation_id: string }
         Returns: string
@@ -5569,6 +6085,14 @@ export type Database = {
       }
       user_activities_set: {
         Args: { p_activity_keys: string[] }
+        Returns: undefined
+      }
+      user_service_areas_set: {
+        Args: { p_areas?: Json; p_primary_governorate_key: string }
+        Returns: undefined
+      }
+      user_trade_specialties_set: {
+        Args: { p_specialty_ids: string[] }
         Returns: undefined
       }
       user_trades_set: {

@@ -12,6 +12,7 @@ import { maskEmail } from "@/lib/ui/mask-email";
 import { isCraftsmanLoginAlias, userFacingEmail } from "@/lib/auth/craftsman-login-alias";
 import { PersonalSettings } from "@/features/settings/personal-settings";
 import { loadMyIdentity, loadMyProfileCompletion } from "@/server/queries/profile-identity";
+import { loadMyAvailabilityWindows } from "@/server/queries/service-areas";
 
 export const dynamic = "force-dynamic";
 
@@ -33,10 +34,12 @@ export default async function PersonalSettingsPage() {
   const t = createTranslator(locale);
   const theme = store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light";
 
-  const [{ data: auth }, identity, completion] = await Promise.all([
+  const [{ data: auth }, identity, completion, availabilityWindows] = await Promise.all([
     supabase.auth.getUser(),
     loadMyIdentity(),
     loadMyProfileCompletion(),
+    // The caller's own availability dates (RLS: own rows only). Only a professional sees the control that uses them.
+    home.variant === "professional" ? loadMyAvailabilityWindows() : Promise.resolve([]),
   ]);
   // An installer phone account's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
   const visibleEmail = userFacingEmail(auth?.user?.email);
@@ -51,6 +54,7 @@ export default async function PersonalSettingsPage() {
       t={t}
       identity={identity}
       completion={completion}
+      availabilityWindows={availabilityWindows}
     />
   );
 }

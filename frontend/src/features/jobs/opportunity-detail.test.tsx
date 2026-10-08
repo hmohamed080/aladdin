@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
@@ -43,6 +43,43 @@ const candidacy = (over: Partial<MyCandidacy> = {}): MyCandidacy => ({
 });
 
 const base = { canApply: true, locale: "en" as const };
+
+describe("OpportunityDetail — the Overall Match", () => {
+  const match = {
+    overallPercent: 85, tradePoints: 50, specialtyPoints: 20, locationPoints: 15, availabilityPoints: 0,
+    tradeReason: "trade_matches" as const, specialtyReason: "specialty_matches" as const, locationReason: "same_city" as const, availabilityReason: "window_not_covering" as const,
+  };
+
+  it("shows the complete breakdown the database returned, from the same authority as every card", () => {
+    renderWithI18n(<OpportunityDetail job={job()} application={null} canApply locale="en" match={match} />, "en");
+    const panel = within(screen.getByTestId("job-match"));
+    expect(panel.getByRole("heading", { name: "Overall Match" })).toBeTruthy();
+    expect(panel.getByText(/85%/)).toBeTruthy();
+    expect(panel.getByText(/Strong match/)).toBeTruthy();
+    expect(panel.getByTestId("match-line-trade")).toHaveTextContent("Trade matches");
+    expect(panel.getByTestId("match-line-specialty")).toHaveTextContent("Specialty requirement matches");
+    expect(panel.getByTestId("match-line-location")).toHaveTextContent("In your city");
+    expect(panel.getByTestId("match-line-availability")).toHaveTextContent("Your availability doesn't cover the job period");
+  });
+
+  it("is worded in Arabic", () => {
+    renderWithI18n(<OpportunityDetail job={job()} application={null} canApply locale="ar" match={match} />, "ar");
+    expect(within(screen.getByTestId("job-match")).getByText(/توافق قوي/)).toBeTruthy();
+  });
+
+  it("shows no card at all when there is no match to show — and Apply is unaffected either way", () => {
+    renderWithI18n(<OpportunityDetail job={job()} application={null} canApply locale="en" match={null} />, "en");
+    expect(screen.queryByTestId("job-match")).toBeNull();
+    expect(screen.getByRole("button", { name: /apply/i })).toBeTruthy();
+  });
+
+  it("a 0% match never removes Apply: the score is presentation, not eligibility", () => {
+    const zero = { ...match, overallPercent: 0, tradePoints: 0, specialtyPoints: 0, locationPoints: 0, tradeReason: "trade_mismatch" as const, specialtyReason: "trade_mismatch" as const, locationReason: "outside_service_area" as const };
+    renderWithI18n(<OpportunityDetail job={job()} application={null} canApply locale="en" match={zero} />, "en");
+    expect(screen.getByText(/0%/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /apply/i })).toBeEnabled();
+  });
+});
 
 describe("OpportunityDetail", () => {
   it("leads with the opening, who is offering it, and the terms", () => {

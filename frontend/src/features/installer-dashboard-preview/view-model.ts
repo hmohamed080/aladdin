@@ -1,3 +1,4 @@
+import type { MatchBreakdown } from "@/lib/installer/overall-match";
 import type { Bi } from "./localized";
 
 /**
@@ -22,7 +23,12 @@ export type InstallerOpportunityVM = {
   org: Bi | null;
   place: Bi | null;
   distanceKm: number | null;
+  /** The Overall Match percentage (the database's `overall_percent`), or null when no match was computed. */
   matchPercent: number | null;
+  /** The whole breakdown the percentage came from — points and stable reason codes. Never recomputed in React. */
+  match: MatchBreakdown | null;
+  /** Whether the CALLER has saved this opening (the same `saved_jobs` authority as /home/jobs). */
+  isSaved: boolean;
   /** Null when the opening states no budget — shown as such, never as 0 EGP. */
   paymentEGP: number | null;
   durationDays: number | null;

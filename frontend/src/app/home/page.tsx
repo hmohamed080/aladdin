@@ -19,8 +19,10 @@ import {
 import {
   OPPORTUNITY_LIST_LIMIT,
   countOpenJobOpportunities,
+  listDashboardOpportunities,
   listJobOpportunities,
 } from "@/server/queries/job-opportunities";
+import { DASHBOARD_OPPORTUNITY_COUNT, dashboardModeFor, DEFAULT_DASHBOARD_DATE_ORDER, DEFAULT_DASHBOARD_SORT } from "@/lib/installer/dashboard-opportunities";
 import { buildOpportunityFeed, installerLocationFrom } from "@/lib/installer/opportunity-location";
 import { getPointsBalance, listPointsEntries } from "@/server/queries/points";
 import { loadMyReviewSummary } from "@/server/queries/reviews";
@@ -122,7 +124,7 @@ export default async function PersonalHomePage() {
   // generic card is not drawn a second time above it.
   const isInstaller = data.accountType === "installer_technician";
 
-  const [assignments, opportunities, pointsBalance, recentPointsEntries, reviews, network, availableOpportunitiesCount] =
+  const [assignments, opportunities, pointsBalance, recentPointsEntries, reviews, network, availableOpportunitiesCount, installerStrip] =
     await Promise.all([
     listMyAssignments(supabase),
     // An installer reads the whole (capped) board so openings in their own city
@@ -134,9 +136,17 @@ export default async function PersonalHomePage() {
     loadMyReviewSummary(),
     listMyNetworkOrganizations(supabase),
     isInstaller ? countOpenJobOpportunities(supabase) : Promise.resolve(0),
+    // The installer's "Opportunities for you" strip, for the default quick filter, ordered by the DATABASE (Match V1 from the
+    // ranked view). The other filters (Near me, Newest, Oldest) are loaded on demand by the same strip.
+    isInstaller
+      ? listDashboardOpportunities(supabase, dashboardModeFor(DEFAULT_DASHBOARD_SORT, DEFAULT_DASHBOARD_DATE_ORDER), DASHBOARD_OPPORTUNITY_COUNT)
+      : Promise.resolve([]),
   ]);
   const completedJobsCount = countAssignmentsByStatus(assignments).completed;
 
+  // The welcome sentence's "nearby" count (below) still reads the whole board; the CARDS of the strip do not — they come
+  // from the database's own orderings (`installerStrip`).
+  //
   // Nearby = the installer's catalogue city/governorate against the job's own
   // location text, resolved exactly (see `lib/installer/opportunity-location`).
   // No coordinates exist, so there is no distance and no "nearest" order. The
@@ -157,7 +167,7 @@ export default async function PersonalHomePage() {
       <ProfessionalHome
         data={data}
         currentWork={featuredAssignment(assignments)}
-        opportunities={feed.cards}
+        opportunities={isInstaller ? installerStrip : feed.cards}
         opportunitySummary={{ availableCount: availableOpportunitiesCount, nearbyCount: feed.nearbyCount }}
         assignments={assignments}
         completion={completion}

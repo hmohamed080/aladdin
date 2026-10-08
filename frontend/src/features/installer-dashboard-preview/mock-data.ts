@@ -306,6 +306,8 @@ export function mockOpportunities(): InstallerOpportunityVM[] {
     place: { ar: `${job.area.ar} · ${job.city.ar}`, en: `${job.area.en} · ${job.city.en}` },
     distanceKm: job.distanceKm,
     matchPercent: job.matchPercent,
+    match: null,
+    isSaved: false,
     paymentEGP: job.paymentEGP,
     tradeKey: null,
     durationDays: job.durationDays,
