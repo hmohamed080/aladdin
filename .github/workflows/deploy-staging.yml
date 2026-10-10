@@ -38,9 +38,10 @@ on:
         options: [plan, deploy]
         default: plan
 
-# One run at a time and NEVER cancel one that may be in the middle of a migration. GitHub keeps only the newest
-# pending run; an older commit is then handled by the "superseded" check below (db push applies every pending
-# migration of the newer commit anyway, and a stale commit is never promoted over a newer one).
+# One run at a time and NEVER cancel one that may be in the middle of a migration. This serialises runs; it does NOT stop
+# main from advancing while a run is in progress, so the head of main is re-checked (scripts/main-head-check.mjs) at the
+# initial step and again immediately before `db push` and before `vercel promote`. A superseded run writes nothing further:
+# the database is forward-only, and the run for the newer commit continues from the forward-compatible schema.
 concurrency:
   group: deploy-staging
   cancel-in-progress: false
@@ -109,24 +110,19 @@ jobs:
             exit 1
           fi
 
-      # A newer commit on main means this run is stale. Never migrate or promote an older commit over a newer one.
-      - name: Check this commit is still the head of main
-        id: fresh
-        env:
-          EXPECTED: ${{ github.sha }}
-        run: |
-          head="$(git ls-remote origin refs/heads/main | cut -f1)"
-          if [ "$head" = "$EXPECTED" ]; then
-            echo "current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "current=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Superseded: main is now at $head. This run will not write anything."
-            echo "Superseded by $head: no migration and no promotion from this run." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
+
+      # --- freshness: ONE helper (scripts/main-head-check.mjs), three call sites -------------------------------------
+      # main can advance while this run installs, plans, migrates or waits for Vercel, so "is this commit still the head
+      # of main?" is asked again immediately before each write: here, before `db push`, and before `vercel promote`.
+      # It compares the FULL 40-character SHA and fails closed (job fails, nothing written) if it cannot tell.
+      - name: Check this commit is still the head of main (initial)
+        id: fresh
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: node scripts/main-head-check.mjs --stage initial --sha "$COMMIT_SHA"
 
       - name: Enable pnpm (corepack, pinned to packageManager)
         run: |
@@ -241,9 +237,17 @@ jobs:
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
         run: node scripts/vercel-deploy.mjs check-project
 
+      # IMMEDIATELY before the only database write. Superseded -> `current=false`: no migration, no promotion, safe exit.
+      - name: Re-check main head immediately before the database write
+        id: fresh_migrate
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: node scripts/main-head-check.mjs --stage pre-migrate --sha "$COMMIT_SHA"
+
       - name: Migrate the database (supabase db push)
         id: migrate
-        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh_migrate.outputs.current == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
@@ -251,7 +255,7 @@ jobs:
 
       - name: Verify - history matches and nothing is pending
         id: verify
-        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh_migrate.outputs.current == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
@@ -262,7 +266,7 @@ jobs:
 
       - name: Find the READY Vercel deployment built from this exact commit
         id: vercel
-        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh_migrate.outputs.current == 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
@@ -272,7 +276,7 @@ jobs:
 
       - name: Note the deployment that is live now (for the rollback instruction)
         id: previous
-        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh_migrate.outputs.current == 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
@@ -280,9 +284,18 @@ jobs:
           NEW_DEPLOYMENT_ID: ${{ steps.vercel.outputs.deployment_id }}
         run: node scripts/vercel-deploy.mjs previous-production --exclude "$NEW_DEPLOYMENT_ID"
 
+      # IMMEDIATELY before the promotion. Superseded after the migration -> do NOT promote, do NOT roll the database back
+      # (it is forward-only): the run for the newer commit continues from the forward-compatible schema.
+      - name: Re-check main head immediately before promotion
+        id: fresh_promote
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh_migrate.outputs.current == 'true'
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: node scripts/main-head-check.mjs --stage pre-promote --sha "$COMMIT_SHA"
+
       - name: Promote that existing deployment (no rebuild)
         id: promote
-        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true' && steps.vercel.outputs.already_promoted != 'true'
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh_promote.outputs.current == 'true' && steps.vercel.outputs.already_promoted != 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
@@ -292,12 +305,12 @@ jobs:
 
       # --- 6. authenticated smoke (read-only) -----------------------------------------------------------------------
       - name: Install the smoke browser
-        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh_promote.outputs.current == 'true'
         run: pnpm --filter frontend exec playwright install --with-deps chromium
 
       - name: Authenticated smoke against the live staging URL
         id: smoke
-        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh_promote.outputs.current == 'true'
         env:
           SMOKE_BASE_URL: ${{ vars.STAGING_BASE_URL }}
           SMOKE_INSTALLER_PHONE: ${{ secrets.SMOKE_INSTALLER_PHONE }}

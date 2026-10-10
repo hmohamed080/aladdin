@@ -455,14 +455,26 @@ main commit
   -> pin the Supabase target                                      supabase link + project-ref check
   -> migration-history plan                                       supabase migration list --linked --output-format json  +  scripts/migration-history-guard.mjs
   -> database dry run                                             supabase db push --linked --dry-run
+  -> re-check that this commit is still main's head               scripts/main-head-check.mjs --stage pre-migrate
   -> migrate                                                      supabase db push --linked --yes        (once; stops on the first failure)
   -> verify                                                       0 mismatches, nothing pending, dry run upToDate
   -> find the READY Vercel deployment built from EXACTLY this commit   scripts/vercel-deploy.mjs find-deployment
+  -> re-check that this commit is still main's head               scripts/main-head-check.mjs --stage pre-promote
   -> promote that existing deployment (no rebuild)                vercel promote
   -> authenticated smoke (read-only)                              frontend/e2e-staging/staging-smoke.spec.ts
 ```
 
-A failed migration, verification or promotion stops the run: nothing is promoted and the previous deployment keeps serving. A run for a commit that is no longer the head of `main` writes nothing ("superseded"), so an older commit is never migrated or promoted over a newer one.
+A failed migration, verification or promotion stops the run: nothing is promoted and the previous deployment keeps serving.
+
+**An older commit is never migrated or promoted after a newer one has become `main`.** `cancel-in-progress: false` serialises runs, but it does not stop `main` from advancing while a run is installing, planning, migrating or waiting for Vercel, so the head of `main` is re-checked at three points by one helper, `scripts/main-head-check.mjs` (full 40-character SHA comparison, never a prefix; it fails closed if it cannot tell):
+
+| Check | Where | If superseded |
+|---|---|---|
+| `initial` | right after checkout | nothing is written |
+| `pre-migrate` | immediately before `supabase db push` | **no migration**, no promotion; the run exits safely and the newer commit's run deploys it |
+| `pre-promote` | immediately before `vercel promote` | **no promotion**; the database is **not** rolled back (it is forward-only) and the newer commit's run continues from the forward-compatible schema |
+
+The last case is exactly why every migration must be backward-compatible (expand/contract, below). A superseded run is a normal, green outcome with a notice and a summary, not a failure. `scripts/deploy-staging-workflow.test.mjs` evaluates the workflow's real step conditions for every combination of answers and fails if `db push --yes`, `vercel promote` or the smoke can run after their own check says superseded.
 
 ### What is never automatic
 
