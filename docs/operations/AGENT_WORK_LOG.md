@@ -1,5 +1,17 @@
 # Agent Work Log
 
+## Session — 2026-10-10: migration-first staging deployment safety
+
+- Worktree: `C:/Users/scorp/.codex/worktrees/staging-deployment-safety/aladdin`; branch `chore/staging-deployment-safety`, base `236dd48` (PR #74 merged). Not pushed; no PR yet.
+- **Incident this answers:** after PR #73 merged, Vercel promoted `main` while staging lacked 13 migrations, so every authenticated installer page threw (`app/home/layout.tsx` -> `job_opportunities_page` -> PGRST202). Cookies were a red herring. The staging database was then brought current (14 migrations, authorised) and the ten Admin migrations that shared staging had recorded were reconciled into `main` (PR #74).
+- **Added:** `scripts/migration-history-guard.mjs` (classifies `supabase migration list --output-format json`: pending / remote-only drift / out-of-order / malformed; cross-checks `db push --dry-run`), `scripts/migration-policy.mjs` + the `migration-policy` job in `ci.yml` (review aid for destructive migrations; expand/contract; applied migrations immutable), `scripts/vercel-deploy.mjs` (exact-SHA READY deployment selection, live `autoAssignCustomDomains` check), `.github/workflows/deploy-staging.yml` (link -> plan -> migrate -> verify -> find -> promote -> smoke; plan-only unless `STAGING_PROMOTION_ENABLED=true`), `frontend/e2e-staging/` smoke + `playwright.staging-smoke.config.ts`, `app/error.tsx` + `app/global-error.tsx` (shared `components/error/error-recovery.tsx`), and the runbook section "Migration-first deployment".
+- **Decisions:** Node `.mjs` + `node:test` (no new dependency; the deploy job already needs Node); Vercel CLI pinned (`59.26.0`); actions pinned by full SHA in the new workflow; no automatic rollback in v1 (database forward-only, previous app not assumed compatible); one master switch plus a live Vercel-setting check so nothing can migrate-and-promote before the owner has configured it.
+- **Verified locally:** 45 script tests; 11 boundary tests; the smoke spec against the isolated stack's review app (6/6 pass; with `job_opportunities_page` hidden it fails on `/home` with HTTP 500, i.e. it catches the incident); the guard against live staging (read-only). Nothing was written to staging.
+- **Owner actions still required before the workflow may write:** GitHub `staging` Environment (secrets, variables, branch restriction), two smoke accounts, Vercel *Auto-assign Custom Production Domains* OFF, a plan-mode dry run, then `STAGING_PROMOTION_ENABLED=true`, and `migration-policy` as a required check. See the runbook.
+- **Open:** the optional informational `db diff` drift report is documented as a follow-up; the 66 baseline Chromium E2E failures that also fail on clean `main` still need their own triage.
+
+---
+
 ## Session — 2026-10-05: isolated installer settings preview
 
 - Worktree: `C:/Users/scorp/.codex/worktrees/installer-experience-pr-clean/aladdin`; branch `feature/installer-experience-pr-clean`, base `e7e7c50`.
