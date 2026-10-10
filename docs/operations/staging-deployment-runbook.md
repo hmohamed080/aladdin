@@ -119,6 +119,8 @@ That leaves exactly one hosted setting that the code genuinely depends on, and i
 
 ## Migration safety protocol
 
+> **Superseded for routine deploys.** Merged changes now reach staging through the migration-first workflow described in [Migration-first deployment](#migration-first-deployment). The manual steps below remain the procedure for an emergency or a one-off reconciliation, and the pre-migration snapshot guidance still applies to risky (destructive) migrations.
+
 Added after a real incident: hosted `aladdin-staging` was found 21 migrations behind `main`, requiring a full Phase 0 reconciliation (inspection, rehearsal, a manual pre-migration snapshot, the real push, then post-push verification) before interactive account QA could safely begin. This protocol exists so that gap does not recur silently.
 
 **Before any interactive staging QA session:**
@@ -439,6 +441,134 @@ Out of scope for this runbook; each needs its own change:
 - **Stable custom domain** (optional but recommended) — attach it in Vercel, then update the Supabase **Site URL** and Redirect URLs to match.
 - **WhatsApp OTP** — the canonical model includes it; only Email OTP is implemented today.
 
+## Migration-first deployment
+
+> **Invariant.** The application must never become customer-facing while the database schema is older than the application expects.
+
+**Why this exists.** After PR #73 merged, Vercel promoted the new `main` build automatically while the staging database still lacked 13 migrations. Every authenticated installer page failed with Next's generic "Application error", because `app/home/layout.tsx` calls `job_opportunities_page` for every `/home/*` page. Clearing cookies "fixed" it only because it signed the caller out. It was a deployment-ordering failure, not an auth failure, and it was the second time staging had fallen behind `main` (see [Migration safety protocol](#migration-safety-protocol)). A manual checklist did not prevent the repeat, so the order is now enforced by [`.github/workflows/deploy-staging.yml`](../../.github/workflows/deploy-staging.yml).
+
+### The flow, for the exact commit that triggered the run
+
+```
+main commit
+  -> Vercel BUILDS it but does NOT make it customer-facing        (project setting, owner action below)
+  -> pin the Supabase target                                      supabase link + project-ref check
+  -> migration-history plan                                       supabase migration list --linked --output-format json  +  scripts/migration-history-guard.mjs
+  -> database dry run                                             supabase db push --linked --dry-run
+  -> re-check that this commit is still main's head               scripts/main-head-check.mjs --stage pre-migrate
+  -> migrate                                                      supabase db push --linked --yes        (once; stops on the first failure)
+  -> verify                                                       0 mismatches, nothing pending, dry run upToDate
+  -> find the READY Vercel deployment built from EXACTLY this commit   scripts/vercel-deploy.mjs find-deployment
+  -> re-check that this commit is still main's head               scripts/main-head-check.mjs --stage pre-promote
+  -> promote that existing deployment (no rebuild)                vercel promote
+  -> authenticated smoke (read-only)                              frontend/e2e-staging/staging-smoke.spec.ts
+```
+
+A failed migration, verification or promotion stops the run: nothing is promoted and the previous deployment keeps serving.
+
+**An older commit is never migrated or promoted after a newer one has become `main`.** `cancel-in-progress: false` serialises runs, but it does not stop `main` from advancing while a run is installing, planning, migrating or waiting for Vercel, so the head of `main` is re-checked at three points by one helper, `scripts/main-head-check.mjs` (full 40-character SHA comparison, never a prefix; it fails closed if it cannot tell):
+
+| Check | Where | If superseded |
+|---|---|---|
+| `initial` | right after checkout | nothing is written |
+| `pre-migrate` | immediately before `supabase db push` | **no migration**, no promotion; the run exits safely and the newer commit's run deploys it |
+| `pre-promote` | immediately before `vercel promote` | **no promotion**; the database is **not** rolled back (it is forward-only) and the newer commit's run continues from the forward-compatible schema |
+
+The last case is exactly why every migration must be backward-compatible (expand/contract, below). A superseded run is a normal, green outcome with a notice and a summary, not a failure. `scripts/deploy-staging-workflow.test.mjs` evaluates the workflow's real step conditions for every combination of answers and fails if `db push --yes`, `vercel promote` or the smoke can run after their own check says superseded.
+
+### What is never automatic
+
+`--include-all`, `supabase migration repair`, `supabase db reset`, raw SQL that bypasses the migration system, a database rollback, and a Vercel rollback. History drift and out-of-order migrations **fail the run and need a human**.
+
+### The migration-history guard (`scripts/migration-history-guard.mjs`)
+
+The Supabase CLI is the only authority on history; the script keeps no second model of it and never reads the database itself. It classifies the rows of `supabase migration list --linked --output-format json`:
+
+| Case | Meaning | Result |
+|---|---|---|
+| matched | local version == remote version | fine |
+| local-only, **newer** than the newest remote version | a normal pending migration | valid; listed |
+| local-only, **older** than a version already applied | out-of-order history | **FAIL** |
+| remote-only | applied to the database but absent from the repository (history drift) | **FAIL** |
+| malformed CLI output | unusable | **FAIL closed** (exit 2) |
+
+In the *verify* step the same guard runs with `--expect up-to-date`, so anything still pending reads "Database schema behind application". It also cross-checks `db push --dry-run` against the list; the two must agree. Unit tests: `node --test scripts/*.test.mjs` (also run on every PR by the `migration-policy` job).
+
+There is **no permanent `staging-known-extras.txt`**: the ten Admin migrations that shared staging had recorded from an unmerged branch were reconciled into `main` by PR #74, and `supabase migration list --linked` from `main` shows 0 mismatches.
+
+### Expand / contract (required)
+
+Because the database is migrated **before** the new application is promoted, the **old** application briefly runs against the **new** schema. Every migration must therefore be backward-compatible with the application that is currently promoted.
+
+- **Release N** adds compatible schema: a new column, table, or function signature *alongside* the old one. Old and new application both work. Promote the new application.
+- **Release N+1** removes the old schema or signature, only after nothing that is still promoted depends on it.
+
+`20261007090004_job_canonical_location_and_specialty.sql` is the pattern to avoid: it drops and recreates the `job_create` / `job_update` signatures in a single migration. (It was applied before this policy; it is history and is not rewritten.) `scripts/migration-policy.mjs`, run on pull requests by the `migration-policy` check, surfaces this class of change: drop table/column/function/view/type, renames, column type changes, `truncate`, and drop-and-recreate of a function signature. A destructive-looking migration **fails** unless the file carries a reviewed marker that states why it is safe and which earlier release made it safe:
+
+```sql
+-- migration-policy: destructive-reviewed - release N added new_rpc and was promoted; nothing calls old_rpc any more
+```
+
+The policy also fails any PR that edits, deletes or renames an already-merged migration (applied migrations are immutable), and any new migration whose version is not newer than the newest on the base branch (unless it carries `-- migration-policy: out-of-order-reviewed - <reason>`, as PR #74 would have). It is a **review aid, not a proof**: it cannot see dynamic SQL, and 14 of the 100 migrations that existed when it was written would have been flagged, because drop-and-recreate has been routine here. Treat a pass as "nothing obvious", not as "backward-compatible".
+
+### Environment policy
+
+| Environment | Database | Rule |
+|---|---|---|
+| **Local** | local Supabase (`supabase start`) | `db reset` is allowed and expected. |
+| **Feature branch with database changes** | **isolated local Supabase only** | Never write a migration to shared staging from a branch. (Supabase preview branches need a paid plan; the local stack is what CI already uses.) |
+| **Code-only preview** | currently shared staging | A **temporary compromise**, and explicitly **non-isolated**: it shares data, mutations, the auth backend and server-side effects with staging. No schema writes from a preview. A PR with migrations is tested locally, never previewed against staging. Later: an isolated Supabase preview branch per PR. |
+| **Shared staging** | `aladdin-staging` | Merged `main` only. Migration-first -> verify -> promote -> smoke, by `deploy-staging.yml`. |
+| **Production** (future) | its own Supabase project and its own Vercel project | The same migration-first architecture, a GitHub `production` Environment, and a required human approval before migration and promotion. |
+
+### One-time setup (owner actions)
+
+Nothing in `deploy-staging.yml` writes anything until **all** of this is done. Until then every run is **plan-only**: read-only checks that migrate nothing and promote nothing.
+
+1. **GitHub Environment `staging`** (Settings -> Environments). Restrict *Deployment branches* to `main`; optionally add required reviewers. Secrets and variables are environment-scoped, not repository-wide:
+
+   | Kind | Name | Used for |
+   |---|---|---|
+   | secret | `SUPABASE_ACCESS_TOKEN` | the Supabase CLI |
+   | secret | `SUPABASE_DB_PASSWORD` | `supabase link` / `db push` |
+   | secret | `VERCEL_TOKEN` | listing and promoting deployments (project-scoped token) |
+   | secret | `SMOKE_INSTALLER_PHONE`, `SMOKE_INSTALLER_PASSWORD` | the installer smoke account |
+   | secret | `SMOKE_BUSINESS_EMAIL`, `SMOKE_BUSINESS_PASSWORD` | the business smoke account |
+   | variable | `SUPABASE_PROJECT_REF` | the explicit Supabase target |
+   | variable | `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | the explicit Vercel target |
+   | variable | `STAGING_BASE_URL` | the live staging `https://` URL the smoke visits (never inferred) |
+   | variable | `STAGING_PROMOTION_ENABLED` | the master switch; anything but exactly `true` keeps the workflow plan-only |
+
+   No value is printed by the workflow, and none is committed.
+2. **Smoke accounts.** Two dedicated, non-human staging accounts, not anyone's personal or manual-QA account: an installer/craftsman (`/installer/sign-in`, phone + password) and a business/poster (`/auth/sign-in`, email + password). Sign-in has no CAPTCHA, but sign-up does (Turnstile), so they are created once by hand through the real sign-up flows, then fully onboarded (the installer must reach `/home`; the business account must belong to an organization so `/b2b` and `/b2b/jobs` render). Passwords live **only** in the GitHub Environment, never in a migration, seed, source file or doc.
+3. **Vercel: stop automatic promotion.** Project -> Settings -> Environments -> **Production** -> Branch Tracking -> turn **off** *Auto-assign Custom Production Domains* (API field `autoAssignCustomDomains = false`; verify the label in the current Vercel docs, it has moved before). Then a `main` build is *staged* and only `vercel promote` makes it live. The workflow reads this setting live and **refuses to migrate while it is on**. Run it once in plan mode first: it prints the current value without failing.
+4. **Dry run.** Run *Deploy staging* manually with `mode = plan` and read the summary (migration history compatible, dry run agrees, Vercel setting reported).
+5. **Switch on.** Set `STAGING_PROMOTION_ENABLED=true`. From then on a push to `main` migrates, promotes and smokes automatically.
+6. **Require the check.** Add `migration-policy` to the `main` ruleset's required status checks.
+
+Switching `STAGING_PROMOTION_ENABLED` back to anything else returns the workflow to plan-only without a code change.
+
+### If something fails
+
+| Failure | What happens | What a human does |
+|---|---|---|
+| plan: drift or out-of-order history | run fails before any write | reconcile the history through a reviewed PR; never `repair` or `--include-all` to make it pass |
+| migrate fails | run fails; nothing is promoted; the previous deployment keeps serving; migrations are transactional per file | fix forward with a new migration; the failed file is not edited |
+| verify fails | run fails; nothing is promoted | investigate; do not promote by hand |
+| no READY deployment for the commit | run fails after waiting (25 min) | check the Vercel build |
+| promote fails | run fails | re-run, or promote that deployment in Vercel |
+| smoke fails **after** promotion | run goes **red**, prints the previous production deployment and the exact `vercel rollback` command; **nothing is rolled back automatically** | decide: roll back only if the previous application is known to be compatible with every migration just applied, otherwise fix forward |
+
+The database is **forward-only**. Automatic alias rollback is deliberately not part of v1: it is only safe once expand/contract is enforced, because the previous application may not work against a schema that has just moved on.
+
+### Error boundaries (defence in depth, not the fix)
+
+`frontend/src/app/error.tsx` and `frontend/src/app/global-error.tsx` replace Next's generic "Application error" with an Aladdin-branded, Arabic/English, theme-aware recovery screen (Retry, Home, and an opaque reference code). They show no raw error text, never touch the session cookie, log only the error's name and digest, and never substitute empty data for a failed page: a missing migration still shows as a failure, and the deployment guard still fails first. `app/error.tsx` is what catches an exception thrown by a segment *layout* such as `app/home/layout.tsx`, which a segment's own `error.tsx` cannot.
+
+### Follow-up (not in v1): schema-drift report
+
+`supabase db diff --linked --schema public,app` (about a minute) correctly shows when staging's *definitions* differ from the repository, which a version-only check cannot. It is too noisy to gate on: a database populated from CRLF migration files differs in every function body, and it lists default-privilege lines and comment-only changes. A manual or scheduled, **informational** report that normalizes carriage returns and never modifies the database, and never blocks promotion, is the intended next step.
+
 ## Scope
 
 The first cloud STAGING environment: which services exist, which variables they need, how schema and demo data reach them, and how to verify the result.
@@ -453,7 +583,7 @@ The first cloud STAGING environment: which services exist, which variables they 
 ## Consequences
 
 - Staging holds **synthetic data only** and can be recreated by rebuilding the project and re-running [steps 2](#2-push-the-schema) and [4](#4-load-the-staging-demo-data).
-- Schema changes reach staging through `supabase db push` and nothing else; the local `db reset` flow stays local.
+- Schema changes reach staging through `supabase db push` and nothing else - run by the migration-first workflow (see [Migration-first deployment](#migration-first-deployment)), never from a feature branch; the local `db reset` flow stays local.
 - Adding an environment variable means adding it to `frontend/src/lib/env/index.ts` (where the exposure test enforces the public/secret split), to `frontend/.env.example`, and to the table above.
 
 ## Related files

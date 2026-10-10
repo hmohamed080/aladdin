@@ -5,7 +5,8 @@
 # with corepack (bundled with Node) for pnpm and pipx (preinstalled on runners)
 # for the uv tool — so there are no third-party actions to vet.
 #
-# Stable status-check job names for branch protection: `frontend`, `backend`, `docs`.
+# Stable status-check job names for branch protection: `frontend`, `backend`, `docs`,
+# and `migration-policy` (PRs only; add it to the ruleset's required checks once merged).
 # Hardening follow-ups (documented in docs/technical/TECHNICAL_DEBT.md):
 #   - pin actions to full commit SHAs;
 #   - add Docker image build + Supabase RLS/isolation jobs once reliable in CI.
@@ -93,3 +94,29 @@ jobs:
             echo "::error::merge-conflict markers found"; exit 1
           fi
           echo "no conflict markers"
+
+  # Pull requests only. A review aid for `supabase/migrations`: see scripts/migration-policy.mjs and the
+  # expand/contract rules in docs/operations/staging-deployment-runbook.md. It also runs the unit tests of the
+  # migration-history guard and the Vercel deployment selector that the staging deploy workflow depends on.
+  migration-policy:
+    name: migration-policy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Unit tests (migration-history guard, migration policy, deployment selector)
+        run: node --test scripts/*.test.mjs
+      - name: Review the migrations changed by this PR
+        run: |
+          git diff --name-status --no-renames "$BASE_SHA"...HEAD -- supabase/migrations > "$RUNNER_TEMP/migration-changes.txt"
+          git ls-tree -r --name-only "$BASE_SHA" -- supabase/migrations > "$RUNNER_TEMP/migration-base-files.txt"
+          node scripts/migration-policy.mjs \
+            --changes "$RUNNER_TEMP/migration-changes.txt" \
+            --base-files "$RUNNER_TEMP/migration-base-files.txt"

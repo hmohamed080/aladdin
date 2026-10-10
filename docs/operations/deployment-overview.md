@@ -28,7 +28,7 @@ Both application services deploy through **Vercel Services**, declared in the re
 - Tests + typecheck/lint green before deploy; clean working tree.
 - **Deploy to Staging before Production.**
 - Build once, promote the same artifact; never rebuild for prod.
-- Database migrations are **backward-compatible** and applied via the Supabase workflow (expand → backfill → contract).
+- Database migrations are **backward-compatible** (expand → backfill → contract) and are applied **before** the application is promoted, because the old application briefly runs against the new schema; destructive changes ship one release after the code stops using the old schema ([`staging-deployment-runbook.md`](staging-deployment-runbook.md#expand--contract-required)).
 - Every release has a documented rollback (Vercel rollback restores both services together / migration contract deferred).
 - Tag releases; commit config changes with WHAT/WHY.
 
@@ -44,7 +44,7 @@ Deployment topology and release process. Monitoring is in `monitoring-and-observ
 
 ## What is deferred
 
-The CI/CD pipeline implementation, environment promotion gates, and rollback automation — a later task. No production connections during foundation work.
+Production rollout and automatic rollback. **Staging** has a migration-first pipeline (database migrated and verified, then the exact built Vercel deployment promoted, then an authenticated smoke) in `.github/workflows/deploy-staging.yml`; it is plan-only until the owner enables it - see [`staging-deployment-runbook.md`](staging-deployment-runbook.md#migration-first-deployment). Production will reuse the same architecture with its own Supabase and Vercel projects and a required approval. No production connections during foundation work.
 
 ## Consequences
 
