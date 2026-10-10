@@ -1,0 +1,331 @@
+# Aladdin - shared STAGING deployment: DATABASE FIRST, then promote, then smoke.
+#
+# THE INVARIANT: the application must never become customer-facing while the database schema is older than the
+# application expects. The order, for the exact commit that triggered the run, is:
+#
+#   Vercel builds the commit but does NOT make it customer-facing (project setting, see below)
+#   -> pin the Supabase target explicitly           (supabase link + project-ref check)
+#   -> migration-history plan                       (supabase migration list --output-format json + guard)
+#   -> database dry run                             (supabase db push --dry-run)
+#   -> migrate                                      (supabase db push, once; stops on the first failure)
+#   -> verify                                       (0 mismatches, nothing pending, dry run up to date)
+#   -> find the READY Vercel deployment built from EXACTLY this commit
+#   -> promote that existing deployment             (vercel promote; nothing is rebuilt)
+#   -> authenticated smoke                          (read-only Playwright against the live staging URL)
+#
+# SAFE BY DEFAULT. Nothing below the "plan" steps runs, and nothing is written, unless BOTH are true:
+#   1. the GitHub Environment variable STAGING_PROMOTION_ENABLED is exactly "true", and
+#   2. (checked live, before any write) the Vercel project has "Auto-assign Custom Production Domains" OFF, i.e.
+#      autoAssignCustomDomains = false. With it ON, Vercel makes every main deployment live BEFORE this workflow
+#      can migrate, which is the incident this workflow exists to prevent.
+# Until the owner has done both, every run is plan-only: read-only checks that migrate nothing and promote nothing.
+# See docs/operations/staging-deployment-runbook.md ("Migration-first deployment").
+#
+# NEVER used by an automatic run: --include-all, `migration repair`, `db reset`, raw SQL. History drift or
+# out-of-order migrations FAIL the run and need a human. There is NO automatic database rollback and NO
+# automatic Vercel rollback: if smoke fails after promotion the run turns red and prints the rollback command.
+
+name: Deploy staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "plan = read-only checks. deploy = migrate, promote, smoke (refused unless STAGING_PROMOTION_ENABLED is true)."
+        type: choice
+        options: [plan, deploy]
+        default: plan
+
+# One run at a time and NEVER cancel one that may be in the middle of a migration. GitHub keeps only the newest
+# pending run; an older commit is then handled by the "superseded" check below (db push applies every pending
+# migration of the newer commit anyway, and a stale commit is never promoted over a newer one).
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # The Vercel CLI is pinned: an unpinned `npx vercel` would run whatever is newest at deploy time.
+  VERCEL_CLI_VERSION: "59.26.0"
+
+jobs:
+  deploy:
+    name: deploy-staging
+    runs-on: ubuntu-latest
+    # The GitHub Environment holds every secret and variable. Restrict it to the `main` branch and (optionally) add
+    # required reviewers in the repository settings; see the runbook.
+    environment: staging
+    timeout-minutes: 60
+    steps:
+      # --- 0. only ever main --------------------------------------------------------------------------------------
+      - name: Refuse anything but main
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::The staging deployment only runs for main (got $REF)."
+            exit 1
+          fi
+
+      # --- 1. decide plan vs deploy -------------------------------------------------------------------------------
+      - name: Decide plan or deploy
+        id: gate
+        env:
+          EVENT: ${{ github.event_name }}
+          REQUESTED_MODE: ${{ inputs.mode }}
+          PROMOTION_ENABLED: ${{ vars.STAGING_PROMOTION_ENABLED }}
+        run: |
+          deploy=false
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$REQUESTED_MODE" = "deploy" ]; then
+            if [ "$PROMOTION_ENABLED" != "true" ]; then
+              echo "::error::mode=deploy was requested but STAGING_PROMOTION_ENABLED is not 'true' in the staging environment. Refusing (no silent downgrade to plan)."
+              exit 1
+            fi
+            deploy=true
+          elif [ "$EVENT" = "push" ] && [ "$PROMOTION_ENABLED" = "true" ]; then
+            deploy=true
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+          if [ "$deploy" = "true" ]; then
+            echo "### Mode: DEPLOY (migrate, promote, smoke)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Mode: PLAN ONLY (read-only; nothing is migrated or promoted)" >> "$GITHUB_STEP_SUMMARY"
+            echo "Automatic deployment is switched off until STAGING_PROMOTION_ENABLED=true in the staging environment." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Confirm the checkout is the triggering commit
+        env:
+          EXPECTED: ${{ github.sha }}
+        run: |
+          actual="$(git rev-parse HEAD)"
+          if [ "$actual" != "$EXPECTED" ]; then
+            echo "::error::Checked out $actual but the run is for $EXPECTED."
+            exit 1
+          fi
+
+      # A newer commit on main means this run is stale. Never migrate or promote an older commit over a newer one.
+      - name: Check this commit is still the head of main
+        id: fresh
+        env:
+          EXPECTED: ${{ github.sha }}
+        run: |
+          head="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [ "$head" = "$EXPECTED" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Superseded: main is now at $head. This run will not write anything."
+            echo "Superseded by $head: no migration and no promotion from this run." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+
+      - name: Enable pnpm (corepack, pinned to packageManager)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+
+      - run: pnpm install --frozen-lockfile
+
+      # The unit tests of the very scripts that gate this deployment run first: a broken guard must not be trusted.
+      - name: Unit tests of the deployment guards
+        run: node --test scripts/*.test.mjs
+
+      # --- 2. preflight: configuration present (names only, never values) ----------------------------------------
+      - name: Preflight - configuration present
+        id: preflight
+        env:
+          DEPLOY: ${{ steps.gate.outputs.deploy }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+          SMOKE_INSTALLER_PHONE: ${{ secrets.SMOKE_INSTALLER_PHONE }}
+          SMOKE_INSTALLER_PASSWORD: ${{ secrets.SMOKE_INSTALLER_PASSWORD }}
+          SMOKE_BUSINESS_EMAIL: ${{ secrets.SMOKE_BUSINESS_EMAIL }}
+          SMOKE_BUSINESS_PASSWORD: ${{ secrets.SMOKE_BUSINESS_PASSWORD }}
+        run: |
+          # Names only, never values.
+          missing=""
+          need() { [ -n "${!1:-}" ] || missing="$missing $1"; }
+          need SUPABASE_ACCESS_TOKEN; need SUPABASE_DB_PASSWORD; need SUPABASE_PROJECT_REF
+          if [ "$DEPLOY" = "true" ]; then
+            need VERCEL_TOKEN; need VERCEL_ORG_ID; need VERCEL_PROJECT_ID; need STAGING_BASE_URL
+            need SMOKE_INSTALLER_PHONE; need SMOKE_INSTALLER_PASSWORD; need SMOKE_BUSINESS_EMAIL; need SMOKE_BUSINESS_PASSWORD
+          fi
+          if [ -n "$missing" ]; then
+            # A plan-only run on an environment that has not been set up AT ALL yet is skipped with a notice (nothing
+            # is at stake: it writes nothing). Anything partly configured, and every deploy run, fails.
+            if [ "$DEPLOY" != "true" ] && [ -z "${SUPABASE_ACCESS_TOKEN}${SUPABASE_DB_PASSWORD}${SUPABASE_PROJECT_REF}" ]; then
+              echo "configured=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::The staging environment is not configured yet; the plan was skipped. Nothing was migrated or promoted."
+              echo "Staging environment not configured yet: plan skipped (see docs/operations/staging-deployment-runbook.md)." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "::error::Missing staging environment configuration:$missing"
+            exit 1
+          fi
+          case "$STAGING_BASE_URL" in ""|https://*) ;; *) echo "::error::STAGING_BASE_URL must be an https:// URL"; exit 1 ;; esac
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          echo "Configuration present."
+
+      # --- 3. pin the Supabase target explicitly (no implicit default project) ------------------------------------
+      - name: Supabase CLI is the repo-pinned version
+        if: steps.preflight.outputs.configured == 'true'
+        run: |
+          expected="$(node -p "require('./package.json').devDependencies.supabase")"
+          actual="$(pnpm exec supabase --version | tail -1)"
+          echo "pinned $expected, running $actual"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::Supabase CLI $actual is not the repo-pinned $expected."
+            exit 1
+          fi
+
+      - name: Link the Supabase project and verify the target
+        if: steps.preflight.outputs.configured == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          pnpm exec supabase link --project-ref "$SUPABASE_PROJECT_REF" -p "$SUPABASE_DB_PASSWORD" --yes
+          linked="$(tr -d '[:space:]' < supabase/.temp/project-ref)"
+          if [ "$linked" != "$SUPABASE_PROJECT_REF" ]; then
+            echo "::error::Linked project does not match SUPABASE_PROJECT_REF. Refusing before any write."
+            exit 1
+          fi
+          echo "Linked project matches the environment's SUPABASE_PROJECT_REF."
+
+      # --- 4. plan (read-only) --------------------------------------------------------------------------------------
+      - name: Plan - migration history and database dry run
+        if: steps.preflight.outputs.configured == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          pnpm exec supabase migration list --linked -p "$SUPABASE_DB_PASSWORD" --output-format json > "$RUNNER_TEMP/migration-list.json"
+          pnpm exec supabase db push --linked --dry-run -p "$SUPABASE_DB_PASSWORD" > "$RUNNER_TEMP/dry-run.json"
+          node scripts/migration-history-guard.mjs "$RUNNER_TEMP/migration-list.json" --expect plan --dry-run "$RUNNER_TEMP/dry-run.json"
+
+      # Reported in plan mode too (it never fails there) so the owner can see the live value before enabling.
+      - name: Vercel - report the auto-promotion setting (plan mode)
+        if: steps.preflight.outputs.configured == 'true' && steps.gate.outputs.deploy != 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "Vercel configuration is not set yet; skipping the report."
+            exit 0
+          fi
+          node scripts/vercel-deploy.mjs check-project --report-only
+
+      # --- 5. deploy (only with the switch on, only for the head of main) -----------------------------------------
+      - name: Vercel - production domains must NOT be auto-assigned (blocks any write)
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+        run: node scripts/vercel-deploy.mjs check-project
+
+      - name: Migrate the database (supabase db push)
+        id: migrate
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: pnpm exec supabase db push --linked --yes -p "$SUPABASE_DB_PASSWORD"
+
+      - name: Verify - history matches and nothing is pending
+        id: verify
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          pnpm exec supabase migration list --linked -p "$SUPABASE_DB_PASSWORD" --output-format json > "$RUNNER_TEMP/migration-list-after.json"
+          pnpm exec supabase db push --linked --dry-run -p "$SUPABASE_DB_PASSWORD" > "$RUNNER_TEMP/dry-run-after.json"
+          node scripts/migration-history-guard.mjs "$RUNNER_TEMP/migration-list-after.json" --expect up-to-date --dry-run "$RUNNER_TEMP/dry-run-after.json"
+
+      - name: Find the READY Vercel deployment built from this exact commit
+        id: vercel
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: node scripts/vercel-deploy.mjs find-deployment --sha "$COMMIT_SHA" --ref main
+
+      - name: Note the deployment that is live now (for the rollback instruction)
+        id: previous
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          NEW_DEPLOYMENT_ID: ${{ steps.vercel.outputs.deployment_id }}
+        run: node scripts/vercel-deploy.mjs previous-production --exclude "$NEW_DEPLOYMENT_ID"
+
+      - name: Promote that existing deployment (no rebuild)
+        id: promote
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true' && steps.vercel.outputs.already_promoted != 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          DEPLOYMENT_URL: ${{ steps.vercel.outputs.deployment_url }}
+        run: npx --yes "vercel@$VERCEL_CLI_VERSION" promote "$DEPLOYMENT_URL" --yes --timeout 5m --scope "$VERCEL_ORG_ID"
+
+      # --- 6. authenticated smoke (read-only) -----------------------------------------------------------------------
+      - name: Install the smoke browser
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        run: pnpm --filter frontend exec playwright install --with-deps chromium
+
+      - name: Authenticated smoke against the live staging URL
+        id: smoke
+        if: steps.gate.outputs.deploy == 'true' && steps.fresh.outputs.current == 'true'
+        env:
+          SMOKE_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+          SMOKE_INSTALLER_PHONE: ${{ secrets.SMOKE_INSTALLER_PHONE }}
+          SMOKE_INSTALLER_PASSWORD: ${{ secrets.SMOKE_INSTALLER_PASSWORD }}
+          SMOKE_BUSINESS_EMAIL: ${{ secrets.SMOKE_BUSINESS_EMAIL }}
+          SMOKE_BUSINESS_PASSWORD: ${{ secrets.SMOKE_BUSINESS_PASSWORD }}
+        run: pnpm --filter frontend run e2e:staging-smoke
+
+      # --- 7. nothing is rolled back automatically ------------------------------------------------------------------
+      - name: Smoke failed after promotion - human rollback instructions
+        if: failure() && steps.smoke.outcome == 'failure'
+        env:
+          PREVIOUS_URL: ${{ steps.previous.outputs.previous_url }}
+          PREVIOUS_ID: ${{ steps.previous.outputs.previous_id }}
+          NEW_URL: ${{ steps.vercel.outputs.deployment_url }}
+          ORG: ${{ vars.VERCEL_ORG_ID }}
+        run: |
+          {
+            echo "### SMOKE FAILED AFTER PROMOTION - this run is red and NOTHING was rolled back"
+            echo ""
+            echo "- Promoted (now live): \`$NEW_URL\`"
+            echo "- Previously promoted (most recent before it): \`${PREVIOUS_URL:-unknown}\` (\`${PREVIOUS_ID:-unknown}\`)"
+            echo "- The database is forward-only and was NOT rolled back. Do not assume the previous application is compatible with every migration just applied."
+            echo ""
+            echo "If the previous deployment is known to be compatible, a human can roll back with:"
+            echo ""
+            echo "    npx vercel@$VERCEL_CLI_VERSION rollback ${PREVIOUS_URL:-<previous-deployment-url>} --scope $ORG"
+            echo ""
+            echo "Otherwise fix forward."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "::error::Smoke failed after promotion. No automatic rollback. See the run summary for the rollback command."
