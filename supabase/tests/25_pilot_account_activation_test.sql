@@ -136,8 +136,12 @@ reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"e4000000-0000-4000-8000-0000000000e4","role":"authenticated"}';
 
-select lives_ok($$ select public.individual_complete_consumer() $$,
-  'a suspended caller may still reach the consumer terminal');
+-- Admin Core 1B-B (PD-010): suspension is now enforced server-side, so a
+-- suspended caller no longer reaches the onboarding terminal at all — stronger
+-- than, and consistent with, this section's rule that onboarding never revives
+-- a blocked identity (asserted next).
+select throws_ok($$ select public.individual_complete_consumer() $$, '42501', 'account suspended',
+  'a suspended caller is refused at the consumer terminal (PD-010)');
 select is((select status::text from public.users where id = 'e4000000-0000-4000-8000-0000000000e4'),
   'suspended', 'onboarding never re-activates a suspended account');
 select is(public.my_registration_state(), 'manually_blocked',

@@ -376,12 +376,17 @@ select is(
 -- them, and test 74 proves a score of 0 neither hides a job nor blocks opening or applying to it.
 -- `user_trade_specialties_set` is the writer of the sibling relation (a specialty is held only inside a
 -- trade the caller holds); it reads user_trades to enforce that, and grants nothing because of it.
+-- Admin Core Phase 1B-A moved that formula, verbatim, into
+-- `app.profile_completion(user_id)` (my_profile_completion is now a thin
+-- wrapper that no longer mentions the relation) so Admin reads the same
+-- percentage; the entry follows the formula. Still informational only: its
+-- callers are my_profile_completion and the users.read-guarded Admin reads.
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('app', 'public')
       and p.prosrc like '%user_trades%'
       and p.proname not in ('user_trades_set', '_profile_public_directory',
-                            '_job_applicants', 'my_profile_completion',
+                            '_job_applicants', 'profile_completion',
                             'job_match_rows', 'job_opportunities_page',
                             'user_trade_specialties_set')),
   0::bigint,
