@@ -94,9 +94,11 @@ select is((select published_at from public.jobs where id = current_setting('t.aw
   'awarded -> open preserves exactly the original timestamp (and does not republish)');
 
 -- the final schema carries no migration-only helper, and the guard is in place
+-- Exactly the temporary helper this migration once used and then inlined: nothing else is asserted, so unrelated
+-- functions that merely mention "backfill" (e.g. an admin RBAC helper) are free to exist.
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-            where p.proname ilike '%backfill%' and n.nspname in ('app', 'public')), 0,
-  'no backfill-only helper function is left in the runtime schema');
+            where p.proname = '_backfill_job_published_at' and n.nspname in ('app', 'public')), 0,
+  'the migration-only helper app._backfill_job_published_at() is not left in the runtime schema');
 select is((select count(*)::int from pg_trigger where tgrelid = 'public.jobs'::regclass and tgname = 'jobs_published_at_immutable' and not tgisinternal), 1,
   'the immutability guard trigger exists on public.jobs');
 
