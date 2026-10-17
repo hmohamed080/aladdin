@@ -1,5 +1,12 @@
 # Runtime State
 
+## Business verification (Verified badge) — 2026-10-17
+
+- Branch `claude/showroom-v2-admin-verification-vdrldz` (draft PR) from `main` @ `9d9a1b6`. Adds `/showroom/verification`, `/admin/business-verification` and `/admin/business-verification/[id]`, and the document stream `/business-verification/file/<org>/<file>`.
+- Migrations `20261017160000` and `20261017160001` are NOT applied to any hosted project. They must be applied in that order, after any migration already on the target, and only with the owner's approval. New private bucket `business-verification-documents`, new permission `verification.approve`.
+- `organizations.is_verified` still means "approved/active" for every gate; `organizations.business_verified_at` drives the Verified badge.
+- Validation: typecheck, lint, Vitest, build and pgTAP (local shim) passed; browser journeys not run here.
+
 ## Showroom/Installer entry pages: Google, Facebook, email — 2026-10-17
 
 - Branch `claude/auth-oauth-email-g90ajg` (draft PR) from `main` @ `282210b`. Adds Google/Facebook OAuth (`/auth/callback`), email + password sign-in and email + OTP sign-up to `/showroom/*` and `/installer/*` sign-in/up; phone + password unchanged and still the default tab. [Details](../frontend/entry-auth-methods.md).

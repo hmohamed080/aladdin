@@ -3279,6 +3279,8 @@ export type Database = {
       }
       organizations: {
         Row: {
+          business_verification_id: string | null
+          business_verified_at: string | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string
@@ -3303,6 +3305,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          business_verification_id?: string | null
+          business_verified_at?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -3327,6 +3331,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          business_verification_id?: string | null
+          business_verified_at?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -7489,6 +7495,58 @@ export type Database = {
         Returns: undefined
       }
       business_submit: { Args: never; Returns: string }
+      business_verification_approve: {
+        Args: { p_reason: string; p_verification_id: string }
+        Returns: undefined
+      }
+      business_verification_detail: {
+        Args: { p_verification_id: string }
+        Returns: Json
+      }
+      business_verification_document_confirm: {
+        Args: { p_object_key: string }
+        Returns: string
+      }
+      business_verification_document_remove: {
+        Args: { p_document_id: string }
+        Returns: string
+      }
+      business_verification_document_request_upload: {
+        Args: {
+          p_content_type: string
+          p_doc_type: string
+          p_file_name: string
+          p_org_id: string
+          p_size_bytes: number
+        }
+        Returns: string
+      }
+      business_verification_queue: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_org_type?: Database["public"]["Enums"]["organization_type"]
+          p_search?: string
+          p_status?: string[]
+        }
+        Returns: Json
+      }
+      business_verification_reject: {
+        Args: { p_reason: string; p_verification_id: string }
+        Returns: undefined
+      }
+      business_verification_request_info: {
+        Args: { p_reason: string; p_verification_id: string }
+        Returns: undefined
+      }
+      business_verification_start_review: {
+        Args: { p_verification_id: string }
+        Returns: undefined
+      }
+      business_verification_submit: {
+        Args: { p_note?: string; p_org_id: string }
+        Returns: string
+      }
       caller_has_service_location: { Args: never; Returns: boolean }
       cancel_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
       cancel_order: { Args: { p_order_id: string }; Returns: undefined }
@@ -7972,6 +8030,7 @@ export type Database = {
         Returns: undefined
       }
       my_account_status: { Args: never; Returns: Json }
+      my_business_verification: { Args: { p_org_id: string }; Returns: Json }
       my_branches: {
         Args: { p_org_id: string }
         Returns: {
@@ -9159,6 +9218,7 @@ export type Database = {
         | "co_owner"
         | "branch_location"
         | "independent_publisher"
+        | "business"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -9482,6 +9542,7 @@ export const Constants = {
         "co_owner",
         "branch_location",
         "independent_publisher",
+        "business",
       ],
     },
   },

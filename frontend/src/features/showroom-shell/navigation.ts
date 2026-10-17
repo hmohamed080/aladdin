@@ -1,4 +1,4 @@
-import { HomeIcon, ClipboardIcon, StorefrontIcon, UserIcon, UsersIcon, BriefcaseIcon, GiftIcon, SettingsIcon, StarIcon, ScrollIcon, TagIcon, BarChartIcon, ActivityIcon, LayersIcon } from "@/components/ui/icons";
+import { HomeIcon, ClipboardIcon, StorefrontIcon, UserIcon, UsersIcon, BriefcaseIcon, GiftIcon, SettingsIcon, StarIcon, ScrollIcon, TagIcon, BarChartIcon, ActivityIcon, LayersIcon, BadgeCheckIcon } from "@/components/ui/icons";
 import type { InstallerNavItem } from "@/features/installer-dashboard-preview/installer-nav";
 import { NAV_CAPS } from "@/lib/nav/modules";
 
@@ -59,6 +59,8 @@ export const SHOWROOM_GROUPS = [
     legacy("reports", `${LEGACY}/reports`, "التقارير والتحليلات", "Reports & analytics", BarChartIcon, NAV_CAPS.reports ?? []),
     legacy("activity", `${LEGACY}/activity`, "سجل النشاط", "Activity log", ActivityIcon, NAV_CAPS.activity ?? []),
     legacy("points", `${LEGACY}/points`, "النقاط", "Points", GiftIcon),
+    // The Verified badge request; owners only (the RPCs require org.manage on this organization).
+    v2("verification", "توثيق النشاط", "Business verification", BadgeCheckIcon, ["org.manage"]),
     v2("settings", "الإعدادات", "Settings", SettingsIcon),
   ] },
 ];

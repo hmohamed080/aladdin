@@ -128,14 +128,15 @@ async function BusinessSection({ ctx, locale, canManageOrg }: { ctx: Ctx; locale
   const [{ data: record }, identityState, imageUrl] = await Promise.all([
     supabase
       .from("organizations")
-      .select("name, org_type, status, is_verified, name_ar, name_en, timezone, description")
+      .select("name, org_type, status, business_verified_at, name_ar, name_en, timezone, description")
       .eq("id", org.organizationId)
       .maybeSingle(),
     // A verified organization's name changes only through a review request (never a direct edit).
     canManageOrg ? loadIdentityState(org.organizationId) : Promise.resolve(null),
     loadOrganizationImageUrl(supabase, org.organizationId),
   ]);
-  const verified = record?.is_verified ?? false;
+  // The badge is business verification, not approval of the application (status above).
+  const verified = record?.business_verified_at != null;
   const pending = record?.status === "pending_verification";
   return (
     <>
@@ -171,6 +172,11 @@ async function BusinessSection({ ctx, locale, canManageOrg }: { ctx: Ctx; locale
           </div>
           <p className="text-body text-fg-secondary">{verified ? m.settings.verifiedBody : m.settings.unverifiedBody}</p>
           {pending ? <p className="text-label text-fg-muted">{m.settings.verificationPending}</p> : null}
+          {canManageOrg ? (
+            <Link href={`${SHOWROOM_ROOT}/verification`} className={buttonLink} data-testid="settings-business-verification-link">
+              <BadgeCheckIcon size={16} />{t("businessVerification.owner.title")}
+            </Link>
+          ) : null}
         </div>
       </Card>
     </>

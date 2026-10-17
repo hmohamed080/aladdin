@@ -71,6 +71,14 @@ export const AUDIT_ACTIONS = [
   "project.created",
   "project.activated",
   "project.completed",
+  // 20261017160001: business verification (the Verified badge), separate from organization approval.
+  "business_verification.document_added",
+  "business_verification.document_removed",
+  "business_verification.submitted",
+  "business_verification.review_started",
+  "business_verification.info_requested",
+  "business_verification.approved",
+  "business_verification.rejected",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

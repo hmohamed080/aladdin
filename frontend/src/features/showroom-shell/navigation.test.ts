@@ -10,7 +10,7 @@ describe("showroom phase 1 navigation", () => {
   const items = SHOWROOM_GROUPS.flatMap((group) => group.items);
   it("has the agreed group order, directional commerce and no institutions", () => {
     expect(SHOWROOM_GROUPS.map((group) => group.label.ar)).toEqual(["", "المشتريات", "المبيعات", "المنتجات", "الشبكة", "الفريق", "إدارة النشاط"]);
-    expect(items.map((item) => item.id)).toEqual(["home", "purchase-requests", "pricing-requests-sent", "quotes-received", "purchase-orders", "customer-rfqs", "customer-quotes", "customers", "leads", "follow-ups", "catalog", "offers", "saved", "my-products", "my-offers", "suppliers", "craftsmen", "jobs", "sales-team", "projects", "reports", "activity", "points", "settings"]);
+    expect(items.map((item) => item.id)).toEqual(["home", "purchase-requests", "pricing-requests-sent", "quotes-received", "purchase-orders", "customer-rfqs", "customer-quotes", "customers", "leads", "follow-ups", "catalog", "offers", "saved", "my-products", "my-offers", "suppliers", "craftsmen", "jobs", "sales-team", "projects", "reports", "activity", "points", "verification", "settings"]);
     // Suite pages live under the suite root; finished modules keep their existing routes inside the same shell.
     for (const item of items) expect(item.href.startsWith(`${SHOWROOM_ROOT}/`) || item.href.startsWith("/b2b/")).toBe(true);
   });

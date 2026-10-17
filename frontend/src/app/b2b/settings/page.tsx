@@ -74,7 +74,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const [{ data: record }, { data: auth }, { data: branchRows }] = await Promise.all([
     supabase
       .from("organizations")
-      .select("name, slug, org_type, status, is_verified, primary_locale, name_ar, name_en, timezone, contact_phone, contact_email")
+      .select("name, slug, org_type, status, business_verified_at, primary_locale, name_ar, name_en, timezone, contact_phone, contact_email")
       .eq("id", org.organizationId)
       .maybeSingle(),
     supabase.auth.getUser(),
@@ -93,7 +93,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const canManageOrg = org.capabilities.includes("org.manage");
   const canManageBranches = canManageOrg || org.capabilities.includes("branch.manage");
   const reachable = allowedNavKeys(org.capabilities).filter((k) => k !== "home" && k !== "settings");
-  const verified = record?.is_verified ?? false;
+  // The Verified badge is business verification, not approval of the application.
+  const verified = record?.business_verified_at != null;
   const pending = record?.status === "pending_verification";
   // An installer phone account's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
   const visibleEmail = userFacingEmail(auth?.user?.email);
