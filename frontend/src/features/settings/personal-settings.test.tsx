@@ -21,6 +21,12 @@ vi.mock("@/server/actions/profile-identity", () => ({
   requestAvatarUploadAction: async () => ({ ok: false, code: "profileIdentity.avatar.errorUpload" }),
   confirmAvatarUploadAction: async () => ({ ok: false, code: "profileIdentity.avatar.errorUpload" }),
 }));
+vi.mock("@/server/actions/secondary-phone", () => ({
+  saveSecondaryPhoneAction: vi.fn(),
+  renewSecondaryPhoneAction: vi.fn(),
+  cancelSecondaryPhoneAction: vi.fn(),
+  makeSecondaryPhonePrimaryAction: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 import { PersonalSettings } from "./personal-settings";
@@ -145,6 +151,8 @@ describe("PersonalSettings", () => {
     phoneNational: null,
     phoneE164: null,
     avatarUrl: null,
+    phoneLogin: false,
+    secondaryPhone: null,
   };
 
   it("offers the shared identity fields to EVERY audience, consumers included", () => {
@@ -156,10 +164,13 @@ describe("PersonalSettings", () => {
     expect(screen.getByLabelText("Display name")).toBeTruthy();
     expect(screen.getByTestId("avatar-field")).toBeTruthy();
     // Egypt is the default country, not the only one: the shared searchable picker shows +20 and offers every other plan.
-    const picker = screen.getByRole("button", { name: "Country" });
+    // Scoped to the main phone form: the second-phone form below has its own picker.
+    const picker = within(document.getElementById("phone")!).getByRole("button", { name: "Country" });
     expect(picker.textContent).toContain("+20");
     fireEvent.click(picker);
     expect(within(screen.getByRole("listbox", { name: "Country" })).getAllByRole("option").length).toBeGreaterThan(200);
+    // The unverified second phone is offered to every audience too, behind the current password.
+    expect(screen.getByTestId("secondary-phone").textContent).toContain("Not verified");
   });
 
   it("flags an automatic display name as NOT confirmed until it is saved here", () => {

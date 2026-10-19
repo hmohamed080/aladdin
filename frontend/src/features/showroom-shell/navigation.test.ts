@@ -10,7 +10,7 @@ describe("showroom phase 1 navigation", () => {
   const items = SHOWROOM_GROUPS.flatMap((group) => group.items);
   it("has the agreed group order, directional commerce and no institutions", () => {
     expect(SHOWROOM_GROUPS.map((group) => group.label.ar)).toEqual(["", "المشتريات", "المبيعات", "المنتجات", "الشبكة", "الفريق", "إدارة النشاط"]);
-    expect(items.map((item) => item.id)).toEqual(["home", "purchase-requests", "pricing-requests-sent", "quotes-received", "purchase-orders", "customer-rfqs", "customer-quotes", "customers", "leads", "follow-ups", "catalog", "offers", "saved", "my-products", "my-offers", "suppliers", "craftsmen", "jobs", "sales-team", "projects", "reports", "activity", "points", "settings"]);
+    expect(items.map((item) => item.id)).toEqual(["home", "purchase-requests", "pricing-requests-sent", "quotes-received", "purchase-orders", "customer-rfqs", "customer-quotes", "customers", "leads", "follow-ups", "catalog", "offers", "saved", "my-products", "my-offers", "suppliers", "craftsmen", "jobs", "sales-team", "projects", "reports", "activity", "points", "verification", "settings"]);
     // Suite pages live under the suite root; finished modules keep their existing routes inside the same shell.
     for (const item of items) expect(item.href.startsWith(`${SHOWROOM_ROOT}/`) || item.href.startsWith("/b2b/")).toBe(true);
   });
@@ -28,7 +28,7 @@ describe("showroom phase 1 navigation", () => {
 describe("no placeholder in primary navigation", () => {
   const all = SHOWROOM_GROUPS.flatMap((g) => g.items);
   it("hides exactly the unfinished Shared Purchase Requests entry", () => {
-    expect(all.filter((i) => i.hidden).map((i) => i.id)).toEqual(["purchase-requests", "offers", "my-offers"]); // rc1: Offers are not in the first release
+    expect(all.filter((i) => i.hidden).map((i) => i.id)).toEqual(["purchase-requests"]);
     expect(showroomNavigation(["org.manage"]).flatMap((g) => g.items).some((i) => i.id === "purchase-requests")).toBe(false);
   });
   it("never routes a visible item to the placeholder page", () => {
@@ -70,9 +70,9 @@ describe("product offers navigation", () => {
   });
   it("shows the feed with browse rights and the management page with product rights", () => {
     const ids = (caps: string[]) => showroomNavigation(caps).flatMap((g) => g.items).map((i) => i.id);
-    expect(ids(["catalog.read"])).not.toContain("offers"); // rc1: hidden
+    expect(ids(["catalog.read"])).toContain("offers");
     expect(ids(["catalog.read"])).not.toContain("my-offers");
-    expect(ids(["catalog.write"])).not.toContain("my-offers"); // rc1: hidden
+    expect(ids(["catalog.write"])).toContain("my-offers");
   });
 });
 

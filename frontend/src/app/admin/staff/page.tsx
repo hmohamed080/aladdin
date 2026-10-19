@@ -399,7 +399,7 @@ function StaffTab({
   return (
     <>
       {!manages ? <p className="text-label text-fg-muted">{t.readOnlyNote}</p> : null}
-      <AutoFilters fields={[{ kind: "text", name: "q", placeholder: m.admin.preview.users.searchPlaceholder }]} />
+      <AutoFilters fields={[{ kind: "text", name: "q", placeholder: t.searchPlaceholder }]} />
       <DataTable
         columns={columns}
         rows={slice.rows}
@@ -407,7 +407,7 @@ function StaffTab({
         caption={t.title}
         minWidth="68rem"
         stackBelow="desktop"
-        empty={<StatePanel title={m.admin.preview.duplicates.none} />}
+        empty={<StatePanel title={t.empty} />}
       />
       {filtered.length > 0 ? <TablePagination {...slice} pageSize={clampPageSize(pageSizeParam)} /> : null}
     </>

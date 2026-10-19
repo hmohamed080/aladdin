@@ -212,7 +212,7 @@ export default async function PreviewUserDetailPage({
           <Card>
             <dl className="grid gap-md tablet:grid-cols-3">
               <Field label={m.admin.users.type}>
-                {user.accountType ? (typeLabels[user.accountType] ?? user.accountType) : m.admin.users.businessOnly}
+                {user.accountType ? (typeLabels[user.accountType] ?? user.accountType) : m.admin.preview.users.accountTypeNone}
               </Field>
               <Field label={m.admin.users.status}>{statusLabels[user.status] ?? user.status}</Field>
               <Field label={m.admin.users.joined}>{formatAdminDate(user.createdAt, locale)}</Field>

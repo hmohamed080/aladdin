@@ -13,6 +13,7 @@ import {
   BadgeCheckIcon,
   ShieldIcon,
   MoneyIcon,
+  PhoneIcon,
   UserIcon,
   BarChartIcon,
   ScrollIcon,
@@ -29,6 +30,9 @@ const items: Item[] = [
   // Verification, referral and organization decisions are still taken here; the
   // Review Center's Approve / Reject remain Preview until they are wired.
   { href: "/admin/verifications", key: "admin.nav.verifications", exact: false, Icon: ShieldIcon },
+  // The Verified badge: its own queue, separate from approving an organization's application.
+  { href: "/admin/business-verification", key: "businessVerification.admin.title", exact: false, Icon: BadgeCheckIcon },
+  { href: "/admin/phone-cooldowns", key: "phoneCooldown.title", exact: false, Icon: PhoneIcon },
   { href: "/admin/points", key: "admin.preview.nav.points", exact: false, Icon: MoneyIcon },
   { href: "/admin/staff", key: "admin.preview.nav.staff", exact: false, Icon: UserIcon },
   { href: "/admin/analytics", key: "admin.preview.nav.analytics", exact: false, Icon: BarChartIcon },

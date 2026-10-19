@@ -739,3 +739,31 @@
  * The `[data-shell-palette]` switch is gone with the proposal. A shell palette
  * is not a user preference, and leaving the switch wired would have made it one.
  * ================================================================== */
+
+/* ---- Small type steps, per script (design/tokens/typography.json → roles.label/caption `arabic`) ----
+ * `label` (13px) and `caption` (12px) were tuned on Latin. Readex Pro's Arabic letter bodies sit in a
+ * shorter band than its Latin x-height, so at the same font-size Arabic small text renders visibly smaller
+ * — a 13px muted hint under a phone field read as undersized, and with it lower in contrast, than the same
+ * hint in English (owner review, mobile dark profile page). Arabic therefore takes one step up, more leading
+ * for its marks above and below, and ZERO tracking: positive letter-spacing pulls apart a cursive script
+ * that must join (the rule the business-onboarding headings already follow). Latin values are unchanged.
+ * `[lang]` is matched on any element, so an English island inside an Arabic page keeps the Latin values.
+ */
+:root,
+[lang]:not([lang|="ar"]) {
+  --type-label-size: 0.8125rem;
+  --type-label-leading: 1.2;
+  --type-label-tracking: 0.02em;
+  --type-caption-size: 0.75rem;
+  --type-caption-leading: 1.35;
+  --type-caption-tracking: 0.01em;
+}
+
+[lang|="ar"] {
+  --type-label-size: 0.875rem;
+  --type-label-leading: 1.4;
+  --type-label-tracking: 0;
+  --type-caption-size: 0.8125rem;
+  --type-caption-leading: 1.45;
+  --type-caption-tracking: 0;
+}

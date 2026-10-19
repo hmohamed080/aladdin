@@ -134,6 +134,8 @@ describe("organizations", () => {
     expect(d?.referredBy?.userId).toBe("u9");
     expect(d?.branches[0]).toMatchObject({ id: "b1", nameAr: "الرئيسي", isActive: true });
     expect(d).not.toHaveProperty("memberCount");
+    expect(d?.businessVerifiedAt).toBeNull();
+    expect(mapOrgDetail({ id: "o1", name: "A", status: "active", created_at: "2026-01-01T00:00:00Z", business_verified_at: "2026-10-17T00:00:00Z" })?.businessVerifiedAt).toBe("2026-10-17T00:00:00Z");
   });
 });
 

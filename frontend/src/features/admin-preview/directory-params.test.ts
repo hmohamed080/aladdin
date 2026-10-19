@@ -69,8 +69,13 @@ describe("parseUsersDirectoryParams", () => {
     expect(p).toMatchObject({ status: null, accountType: null, verification: null, governorate: null });
   });
 
-  it("does not accept a business classification as a persona filter", () => {
-    expect(parseUsersDirectoryParams({ type: "showroom_dealer" }).accountType).toBeNull();
+  it("accepts each of the nine account keys and none, never an internal organization type", () => {
+    for (const type of ["showroom_dealer", "supplier", "manufacturer", "importer", "contractor", "engineer", "installer_technician", "sales", "end_consumer", "none"]) {
+      expect(parseUsersDirectoryParams({ type }).accountType, type).toBe(type);
+    }
+    expect(parseUsersDirectoryParams({ type: "contractor_company" }).accountType).toBeNull();
+    expect(parseUsersDirectoryParams({ type: "design_office" }).accountType).toBeNull();
+    expect(parseUsersDirectoryParams({ type: "salesperson" }).accountType).toBeNull();
   });
 
   it("takes the first value of a repeated parameter", () => {

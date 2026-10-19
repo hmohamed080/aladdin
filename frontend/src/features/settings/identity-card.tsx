@@ -9,6 +9,7 @@ import type { CanonicalPhone } from "@/lib/contact/phone";
 import { setDisplayNameAction, setPhoneAction, type IdentityFieldState } from "@/server/actions/profile-identity";
 import type { MyIdentity } from "@/server/queries/profile-identity";
 import { AvatarField } from "./avatar-field";
+import { SecondaryPhoneSection } from "./secondary-phone";
 
 const INITIAL: IdentityFieldState = { ok: false };
 
@@ -83,6 +84,8 @@ export function IdentityCard({ identity }: { identity: MyIdentity }) {
             {!phoneState.ok && phoneState.code ? <InlineError>{t(phoneState.code)}</InlineError> : null}
           </div>
         </form>
+
+        <SecondaryPhoneSection secondary={identity.secondaryPhone ?? null} phoneLogin={identity.phoneLogin ?? false} />
       </div>
     </Card>
   );

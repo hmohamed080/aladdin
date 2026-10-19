@@ -217,9 +217,11 @@ export default {
         ],
         body: ["0.875rem", { lineHeight: "1.5", fontWeight: "300" }],
         "body-lg": ["1rem", { lineHeight: "1.5", fontWeight: "400" }],
+        /* label + caption read per-script variables (src/styles/tokens.css, "Small type steps, per
+         * script"): Latin keeps 13px/1.2/0.02em and 12px/1.35/0.01em; Arabic steps up with zero tracking. */
         label: [
-          "0.8125rem",
-          { lineHeight: "1.2", letterSpacing: "0.02em", fontWeight: "500" },
+          "var(--type-label-size)",
+          { lineHeight: "var(--type-label-leading)", letterSpacing: "var(--type-label-tracking)", fontWeight: "500" },
         ],
         /* The METADATA step, below `label`.
          *
@@ -238,8 +240,8 @@ export default {
          * small step would just be a second label.
          */
         caption: [
-          "0.75rem",
-          { lineHeight: "1.35", letterSpacing: "0.01em", fontWeight: "400" },
+          "var(--type-caption-size)",
+          { lineHeight: "var(--type-caption-leading)", letterSpacing: "var(--type-caption-tracking)", fontWeight: "400" },
         ],
         mono: [
           "0.8125rem",

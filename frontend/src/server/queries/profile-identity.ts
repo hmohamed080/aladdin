@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { AVATAR_BUCKET } from "@/lib/storage/avatar-assets";
+import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 
 /** How long a signed avatar read URL lives. Minted per render, never stored. */
 const AVATAR_READ_URL_SECONDS = 300;
@@ -16,7 +17,24 @@ export type MyIdentity = {
   phoneNational: string | null;
   phoneE164: string | null;
   avatarUrl: string | null;
+  /** A phone + password (Craftsman) account: its main phone is its login and cannot be moved here. */
+  phoneLogin: boolean;
+  /** The current unverified second phone reservation (V1, no OTP), or null. */
+  secondaryPhone: SecondaryPhone | null;
 };
+
+export type SecondaryPhone = {
+  phone: string;
+  expiresAt: string;
+  canRenew: boolean;
+};
+
+function mapSecondaryPhone(raw: unknown): SecondaryPhone | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.phone !== "string" || typeof r.expires_at !== "string" || r.status !== "active") return null;
+  return { phone: r.phone, expiresAt: r.expires_at, canRenew: r.can_renew === true };
+}
 
 /** The caller's own shared identity fields (every audience). Scoped to the session — takes no user id. */
 export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyIdentity | null> {
@@ -52,6 +70,8 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
     }
   }
 
+  const { data: secondary } = await supabase.rpc("my_secondary_phone");
+
   return {
     displayName: profile.display_name,
     displayNameConfirmed: profile.display_name_confirmed_at !== null,
@@ -60,6 +80,8 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
     phoneNational: profile.phone_national,
     phoneE164: profile.phone_e164,
     avatarUrl,
+    phoneLogin: isCraftsmanLoginAlias(user.email),
+    secondaryPhone: mapSecondaryPhone(secondary),
   };
 });
 

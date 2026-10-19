@@ -212,14 +212,15 @@ select ok(
 -- select-published), for 11 total; Own Products (20261015090004) then added the
 -- four named product_images_* policies of the private product-images bucket, for 15; Milestone C (20261015090020) added
 -- the four request_images_* policies of the private purchase-request-images bucket, for 19; the Showroom profile image (20261015090043)
--- added the four organization_images_* policies of the private organization-images bucket, for 23. Updated here rather than left stale,
+-- added the four organization_images_* policies of the private organization-images bucket, for 23; business verification
+-- (20261017160001) added the three bv_documents_* policies of the private business-verification-documents bucket, for 26. Updated here rather than left stale,
 -- since this file's own point is to name every policy explicitly so a NEW
 -- one cannot pass quietly — the avatars bucket is a reviewed addition, named.
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects'),
-  23,
-  'Twenty-three policies on storage.objects: three each for certificates/portfolio/avatars, plus two public doors, plus the four product-images policies (Own Products, 20261015090004), plus the four request-images policies (Purchase Requests, 20261015090020), plus the four organization-images policies (Showroom profile image, 20261015090043)'
+  26,
+  'Twenty-six policies on storage.objects: three each for certificates/portfolio/avatars, plus two public doors, plus the four product-images policies (Own Products, 20261015090004), plus the four request-images policies (Purchase Requests, 20261015090020), plus the four organization-images policies (Showroom profile image, 20261015090043), plus the three business-verification document policies (20261017160001)'
 );
 
 select is(
@@ -230,6 +231,9 @@ select is(
     'avatars_insert_authorized',
     'avatars_select_own',
     'avatars_select_published',
+    'bv_documents_delete_unsubmitted',
+    'bv_documents_insert_authorized',
+    'bv_documents_select_authorized',
     'organization_images_delete_manager',
     'organization_images_insert_authorized',
     'organization_images_select_manager',
