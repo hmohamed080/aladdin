@@ -1,5 +1,6 @@
 import { isUuid, parseTicketKeys, verifyTicket, VARIANTS } from "./ticket";
 import type { ByteCacheLike, Env, ExecutionContextLike, MediaAuthority, MediaGrant } from "./types";
+import { handleVideo } from "./video";
 
 // Content types the application accepts per namespace (frontend/src/lib/storage/media-policy.ts).
 const TYPES: Record<string, readonly string[]> = {
@@ -142,6 +143,7 @@ export type HandlerDeps = {
  * Routes:
  *   /m/<ns>/<variant>?t=<ticket>   private (Mode P): ticket + database authorization
  *   /c/<ns>/<id>/<variant>         conditional public (Mode C): database eligibility
+ *   /v/<videoId>/<file>[?t=]       video playlists, segments and posters (video.ts)
  * Every request reaches the database; nothing about authorization is cached here.
  */
 export function createHandler(deps: HandlerDeps) {
@@ -151,8 +153,18 @@ export function createHandler(deps: HandlerDeps) {
     return cachedKeys.keys;
   };
   return async function fetch(request: Request, env: Env, ctx: ExecutionContextLike): Promise<Response> {
-    if (request.method !== "GET" && request.method !== "HEAD") return notFound();
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/v/") && env.VIDEO_ROUTES === "on"
+      && (request.method === "GET" || request.method === "HEAD" || request.method === "OPTIONS")) {
+      try {
+        return await handleVideo(request, env, ctx, { authority: () => deps.authority(env), keys: () => keysFor(env),
+          now: deps.now, cache: deps.cache?.() ?? null });
+      } catch {
+        log("error", "v");
+        return notFound();
+      }
+    }
+    if (request.method !== "GET" && request.method !== "HEAD") return notFound();
     const parts = url.pathname.split("/");
     let authority: MediaAuthority | null = null;
     try {

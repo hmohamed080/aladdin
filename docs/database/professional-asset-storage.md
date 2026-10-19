@@ -566,3 +566,25 @@ Owner decision (ADR-0018 Revision 2): Supabase-hosted portfolio photos and avata
 - Job: `cd backend && uv run python -m app.workers.historical_media_purge --cutoff <ISO>` (dry run), then `--execute --confirm-project <ref>`. Production runs need owner approval and come after R2 writes are on.
 - Tests: `supabase/tests/100_historical_media_purge_test.sql`, `backend/tests/test_historical_media_purge.py`.
 
+
+## 16. Image originals are never refused for size; derivatives have ceilings (2026-10-19)
+
+Owner rule: no product-level file-size or dimension cap on the photo a person picks. The browser always prepares the upload before any byte is sent (`frontend/src/lib/media/resize-image.ts`), and the existing server caps stay unchanged in SQL and in `server/storage`. They are now the ceiling of the **prepared derivative**, which the browser guarantees to meet:
+
+| Namespace | Derivative ceiling (unchanged server cap) | Long edge | How the browser meets it |
+|---|---|---|---|
+| Avatar | 3 MiB | 512 px crop | `encodeCanvasWithin` (quality steps) |
+| Organization image | 3 MiB | 640 px crop | `encodeCanvasWithin` |
+| Portfolio | 5 MiB | 2560 px | `resizeImageForUpload` profile `portfolio` |
+| Product | 5 MiB | 2560 px | profile `product` |
+| Purchase-request reference | 5 MiB | 2560 px | profile `request` (no browser upload UI yet) |
+| Certificate image | 10 MiB | 3200 px | profile `certificate` |
+
+Preparation runs when the original is over the byte ceiling, over the long edge, or over 25 MP. Very large sources (over 24 MP) are decoded at the target size with `createImageBitmap(..., { resizeWidth, resizeHeight, resizeQuality: "high", imageOrientation: "from-image" })`; an engine that resizes before rotating is detected and asked again with the box swapped, and an engine that rejects the options falls back to a full decode. The result is fitted by stepping quality (0.85, 0.75, 0.65, 0.55) and then the long edge (x 0.8 per step, not below 1280 px). Transparency is kept (WebP, or PNG when the pixels really have alpha and WebP encoding is unavailable). When a device cannot decode, draw or fit the photo, the upload stops before anything is created and the person sees *"This photo could not be prepared on this device. Try a smaller copy."* The server is never asked to refuse an oversized original, so nothing large reaches Vercel or Supabase, and the server keeps reading only small, bounded files.
+
+Remaining technical limits, stated rather than imposed silently:
+
+- **Server decode limit, 25 MP** (sharp `limitInputPixels` in `content-validation.mjs` and `public-image-variants.ts`) with at most two concurrent decodes per instance. It applies to the derivative only; the largest derivative is 3200 x 3200 = 10.24 MP, and `fitWithin` also clamps to 25 MP.
+- **Browser canvas and decode limits.** Older iPhones cap canvas area (about 16.7 MP) and memory; a source the device cannot decode even at reduced size gets the message above. Derivatives stay at or under 3200 px on the long edge, inside every current canvas limit.
+- **Supabase Free global file limit, 50 MB**, on the rollback path (`R2_STORAGE_ENABLED=false`). Derivatives are at most 10 MiB, so images never reach it.
+- **Documents are not images.** Certificate PDFs and business-verification documents (PDF or image) keep their 10 MiB limit, checked before upload; they are not re-encoded.

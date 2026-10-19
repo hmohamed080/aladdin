@@ -21,9 +21,10 @@ describe("product image files", () => {
     expect(validateProductImageFile({ type, size: 1024 })).toEqual({ ok: false, code: "showroomProducts.images.errorType" });
   });
 
-  it("refuses empty and oversize files", () => {
+  it("refuses empty files, never large originals", () => {
     expect(validateProductImageFile({ type: "image/png", size: 0 })).toEqual({ ok: false, code: "showroomProducts.images.errorSize" });
-    expect(validateProductImageFile({ type: "image/png", size: PRODUCT_IMAGE_MAX_BYTES + 1 })).toEqual({ ok: false, code: "showroomProducts.images.errorSize" });
+    // The picked original is never refused for its size; the prepared upload is fitted under the ceiling.
+    expect(validateProductImageFile({ type: "image/png", size: PRODUCT_IMAGE_MAX_BYTES * 16 })).toEqual({ ok: true });
   });
 });
 

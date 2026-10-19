@@ -12,7 +12,7 @@ vi.mock("@/server/actions/portfolio", () => ({
   finishPortfolioUpload: vi.fn(),
   updatePortfolioItemAction: vi.fn(),
   setPortfolioVisibilityAction: (...a: unknown[]) => setVisibility(...a),
-  movePortfolioItemAction: (...a: unknown[]) => move(...a),
+  movePortfolioMediaAction: (...a: unknown[]) => move(...a),
   deletePortfolioItemAction: vi.fn(),
 }));
 

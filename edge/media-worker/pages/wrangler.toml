@@ -16,6 +16,8 @@ compatibility_flags = ["nodejs_compat"]
 PRIVATE_ROUTES = "on"
 PUBLIC_ROUTES = "on"
 EDGE_CACHE = "on"
+VIDEO_ROUTES = "off"
+VIDEO_ALLOWED_ORIGINS = "https://aladdindecore.com,https://www.aladdindecore.com"
 
 [[r2_buckets]]
 binding = "MEDIA_BUCKET"

@@ -13,7 +13,7 @@ import type { PortfolioItem } from "@/server/queries/portfolio";
 import {
   deletePortfolioItemAction,
   finishPortfolioUpload,
-  movePortfolioItemAction,
+  movePortfolioMediaAction,
   setPortfolioVisibilityAction,
   startPortfolioUpload,
   updatePortfolioItemAction,
@@ -22,6 +22,9 @@ import { AddPanel, AssetFileField, MediaFrame, QuickAction, VisibilityBadge } fr
 import { MediaImage } from "./media-frame";
 import type { MediaVariantUrls } from "@/lib/media/image-variants";
 import { uploadAsset } from "./upload";
+import { mergeMedia } from "@/lib/media/media-order";
+import type { ManagedVideo } from "@/server/queries/videos";
+import { VideoCard, useProcessingRefresh } from "@/features/video/video-manager";
 
 /**
  * One item plus the URL the server issued for its preview, and — optionally,
@@ -43,10 +46,17 @@ export type PortfolioCard = PortfolioItem & { previewUrl: string | null; preview
  * person comes to this page to check, so it is a badge on the image rather than a
  * line of text below the fold.
  */
-export function PortfolioManager({ items }: { items: PortfolioCard[] }) {
+export function PortfolioManager({ items, videos = [] }: {
+  items: PortfolioCard[];
+  /** Portfolio videos; they sit among the photos in one order the owner controls. */
+  videos?: ManagedVideo[];
+}) {
   const { t } = useI18n();
+  const router = useRouter();
   const usable = items.filter((i) => !i.pending);
   const unfinished = items.filter((i) => i.pending);
+  const entries = mergeMedia(usable.map((item) => ({ ...item, position: item.sortOrder })), videos);
+  useProcessingRefresh(videos);
 
   return (
     <div className="flex flex-col gap-xl" data-testid="portfolio-manager">
@@ -77,7 +87,7 @@ export function PortfolioManager({ items }: { items: PortfolioCard[] }) {
         </section>
       ) : null}
 
-      {usable.length === 0 ? (
+      {entries.length === 0 ? (
         <StatePanel
           icon={<LayersIcon size={22} />}
           title={t("portfolio.empty.title")}
@@ -85,14 +95,19 @@ export function PortfolioManager({ items }: { items: PortfolioCard[] }) {
         />
       ) : (
         <ul className="grid gap-lg tablet:grid-cols-2 desktop:grid-cols-3">
-          {usable.map((item, index) => (
-            <WorkCard
-              key={item.id}
-              item={item}
-              isFirst={index === 0}
-              isLast={index === usable.length - 1}
-            />
-          ))}
+          {entries.map((entry, index) => {
+            const isFirst = index === 0;
+            const isLast = index === entries.length - 1;
+            if (entry.kind === "image") {
+              return <WorkCard key={entry.item.id} item={entry.item} isFirst={isFirst} isLast={isLast} />;
+            }
+            return (
+              <li key={`video-${entry.item.id}`} data-testid="portfolio-video">
+                <VideoCard video={entry.item} canPublish onChange={() => router.refresh()}
+                  extra={<MoveControls kind="video" id={entry.item.id} isFirst={isFirst} isLast={isLast} />} />
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -193,28 +208,38 @@ function WorkCard({
                   uses for its arrow: logical, not physical, and a CSS rule rather
                   than the locale branch R5 forbids inside a component. */}
               <span className="ms-auto flex items-center gap-1">
-                <QuickAction
-                  action={movePortfolioItemAction}
-                  fields={{ itemId: item.id, direction: "up" }}
-                  label={<ChevronLeftIcon size={16} className="rtl:-scale-x-100" />}
-                  ariaLabel={t("portfolio.actions.moveEarlier")}
-                  variant="ghost"
-                  disabled={isFirst}
-                />
-                <QuickAction
-                  action={movePortfolioItemAction}
-                  fields={{ itemId: item.id, direction: "down" }}
-                  label={<ChevronRightIcon size={16} className="rtl:-scale-x-100" />}
-                  ariaLabel={t("portfolio.actions.moveLater")}
-                  variant="ghost"
-                  disabled={isLast}
-                />
+                <MoveControls kind="image" id={item.id} isFirst={isFirst} isLast={isLast} />
               </span>
             </div>
           </>
         )}
       </Card>
     </li>
+  );
+}
+
+/** Earlier / later within the shared photo-and-video order. */
+function MoveControls({ kind, id, isFirst, isLast }: { kind: "image" | "video"; id: string; isFirst: boolean; isLast: boolean }) {
+  const { t } = useI18n();
+  return (
+    <>
+      <QuickAction
+        action={movePortfolioMediaAction}
+        fields={{ kind, id, direction: "up" }}
+        label={<ChevronLeftIcon size={16} className="rtl:-scale-x-100" />}
+        ariaLabel={t("portfolio.actions.moveEarlier")}
+        variant="ghost"
+        disabled={isFirst}
+      />
+      <QuickAction
+        action={movePortfolioMediaAction}
+        fields={{ kind, id, direction: "down" }}
+        label={<ChevronRightIcon size={16} className="rtl:-scale-x-100" />}
+        ariaLabel={t("portfolio.actions.moveLater")}
+        variant="ghost"
+        disabled={isLast}
+      />
+    </>
   );
 }
 

@@ -17,7 +17,7 @@ export function LandingFooter() {
     <footer className={styles.footer} data-landing-preview-part="Footer">
       <div className={styles.columns}>
         <div className={styles.brand}>
-          <Image src="/preview/landing/aladdin-logo.png" alt="Aladdin" width={684} height={643} className={styles.logo} />
+          <Image src="/preview/landing/aladdin-logo.png" alt="Aladdin" width={684} height={643} sizes="80px" className={styles.logo} />
           <p>{t.footerDescription}</p>
         </div>
         {columns.map((column) => <nav key={column.title} aria-label={column.title}>

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { getMessages } from "@/lib/i18n/translate";
 import { requireAdminStaff } from "@/server/authorization/admin";
 import { AppHeader } from "@/components/layout/app-header";

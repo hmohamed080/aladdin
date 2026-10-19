@@ -3,7 +3,7 @@ import type { MediaAuthority } from "./types";
 
 /**
  * Postgres through Hyperdrive. One short-lived client per request (Hyperdrive
- * pools the real connections). The database role may EXECUTE only the two
+ * pools the real connections). The database role may EXECUTE only the
  * Worker functions; every decision is made there, never in this file.
  */
 export function postgresAuthority(connectionString: string): MediaAuthority {
@@ -18,6 +18,12 @@ export function postgresAuthority(connectionString: string): MediaAuthority {
     },
     async authorizePublic(r) {
       const rows = await sql`select public.media_edge_public(${r.namespace}, ${r.id}::uuid, ${r.variant}) as g`;
+      return rows[0]?.g ?? null;
+    },
+    async authorizeVideo(r) {
+      const rows = await sql`select public.media_edge_video(${r.video}::uuid, ${r.viewer}::uuid, ${r.session}::uuid,
+        ${r.workspace}::uuid, case when ${r.expiresAt}::double precision is null then null
+          else to_timestamp(${r.expiresAt}::double precision) end) as g`;
       return rows[0]?.g ?? null;
     },
     async close() { await sql.end({ timeout: 1 }); },

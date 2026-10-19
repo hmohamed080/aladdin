@@ -9,11 +9,39 @@ import { Toaster } from "@/components/ui/toast";
 import { createTranslator } from "@/lib/i18n/translate";
 import "./globals.css";
 
+// PRELOADING. `subsets` only decides which files next/font PRELOADS: the
+// generated CSS still declares every subset's @font-face (each with its own
+// `unicode-range`), and the browser fetches a face the moment text that needs
+// it is laid out. The preload list is the same for every request (it is fixed
+// at build time, not per locale), so it holds only what BOTH locales need early:
+// the Latin faces of the body font (Arabic pages also show Latin text and
+// digits), of Archivo (English display) and of Reem Kufi (`font-display-ar`,
+// which English headings such as Sign In's also use). Everything else loads on
+// use instead of competing with the Landing hero image (the mobile LCP element)
+// on every English page: the Arabic faces of Readex and Reem Kufi, and JetBrains
+// Mono (codes and OTP boxes). An Arabic page starts its two Arabic faces early
+// through `arabicFontWarmup` instead (see there).
+//
 // Bilingual (AR + EN) product-UI workhorse — the default body font.
-const readex = Readex_Pro({ subsets: ["arabic", "latin"], variable: "--font-readex", display: "swap" });
+const readex = Readex_Pro({ subsets: ["latin"], variable: "--font-readex", display: "swap" });
 const archivo = Archivo({ subsets: ["latin"], variable: "--font-archivo", display: "swap" });
-const reemKufi = Reem_Kufi({ subsets: ["arabic", "latin"], variable: "--font-reem-kufi", display: "swap" });
-const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono", display: "swap" });
+const reemKufi = Reem_Kufi({ subsets: ["latin"], variable: "--font-reem-kufi", display: "swap" });
+const jetbrainsMono = JetBrains_Mono({ preload: false, variable: "--font-jetbrains-mono", display: "swap" });
+
+/**
+ * Arabic pages only: ask the browser for the Arabic faces of the body and
+ * display fonts as soon as the stylesheets that declare them are parsed, so
+ * they arrive before first paint instead of swapping in after it (a measured
+ * 0.004 layout shift on the Landing page). This stands in for a per-locale
+ * `<link rel="preload">`: next/font fixes its preload list at build time and
+ * does not expose the hashed file URLs, but `document.fonts.load` resolves the
+ * right file from the @font-face rules by `unicode-range`. English pages do not
+ * run it: they fetch an Arabic face only if they render Arabic text (the "ع"
+ * of the language switch), and then late, after the first layout.
+ */
+function arabicFontWarmup(families: string[]): string {
+  return `try{${JSON.stringify(families)}.forEach(function(f){document.fonts.load("1em "+f,"\u0639")})}catch(e){}`;
+}
 
 export const metadata: Metadata = {
   title: "Aladdin",
@@ -49,6 +77,13 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         {/* Blocking by design: it must decide `.dark` before the first frame, or
             every dark-mode user sees a white flash on every navigation. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+        {locale === "ar" ? (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: arabicFontWarmup([readex.style.fontFamily, reemKufi.style.fontFamily]),
+            }}
+          />
+        ) : null}
       </head>
       <body className="min-h-dvh bg-canvas text-fg">
         <ThemeSync />

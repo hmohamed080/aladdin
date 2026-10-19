@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/controls";
 import { InlineError, InlineSuccess } from "@/components/ui/primitives";
 import { StorefrontIcon } from "@/components/ui/icons";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
-import { encodeCanvas } from "@/lib/media/resize-image";
+import { encodeCanvasWithin, ImagePrepareError } from "@/lib/media/resize-image";
 import {
   ORGANIZATION_IMAGE_ALLOWED_TYPES,
+  ORGANIZATION_IMAGE_MAX_BYTES,
   ORGANIZATION_IMAGE_OUTPUT_PX,
   ORGANIZATION_IMAGE_OUTPUT_TYPE,
   validateOrganizationImageFile,
@@ -30,14 +31,14 @@ async function cropToBlob(src: string, area: Area, sourceType: string): Promise<
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("image load failed"));
+    img.onerror = () => reject(new ImagePrepareError("decode"));
     img.src = src;
   });
   const canvas = document.createElement("canvas");
   canvas.width = ORGANIZATION_IMAGE_OUTPUT_PX;
   canvas.height = ORGANIZATION_IMAGE_OUTPUT_PX;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("canvas unavailable");
+  if (!ctx) throw new ImagePrepareError("canvas");
   const opaque = sourceType === "image/jpeg";
   if (opaque) {
     // Only a JPEG source can become a JPEG; the fill is pixel data under it, not a themed colour.
@@ -45,7 +46,7 @@ async function cropToBlob(src: string, area: Area, sourceType: string): Promise<
     ctx.fillRect(0, 0, ORGANIZATION_IMAGE_OUTPUT_PX, ORGANIZATION_IMAGE_OUTPUT_PX);
   }
   ctx.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, ORGANIZATION_IMAGE_OUTPUT_PX, ORGANIZATION_IMAGE_OUTPUT_PX);
-  return encodeCanvas(canvas, 0.9, opaque ? ORGANIZATION_IMAGE_OUTPUT_TYPE : "image/png");
+  return encodeCanvasWithin(canvas, 0.9, opaque ? ORGANIZATION_IMAGE_OUTPUT_TYPE : "image/png", ORGANIZATION_IMAGE_MAX_BYTES);
 }
 
 /**
@@ -109,8 +110,9 @@ export function OrganizationImageField({ orgId, imageUrl, canManage }: { orgId: 
       reset();
       setNotice(t("showroomSettings.image.saved"));
       router.refresh();
-    } catch {
-      setError(t("showroomSettings.image.errorUpload"));
+    } catch (e) {
+      // A photo this device could not crop or fit is named as such, not reported as a failed upload.
+      setError(t(e instanceof ImagePrepareError ? "showroomSettings.image.errorPrepare" : "showroomSettings.image.errorUpload"));
     } finally {
       setBusy(false);
     }

@@ -32,6 +32,7 @@ function fakeAuthority(): MediaAuthority {
       if (!db.published || db.deleted || db.suspended || r.id !== ITEM) return null;
       return { object: "portfolio/e9100000-0000-4000-8000-000000000001.png", contentType: "image/png", size: 4, sha256: "a".repeat(64) };
     },
+    async authorizeVideo() { return null; },
     async close() { calls.closed++; },
   };
 }

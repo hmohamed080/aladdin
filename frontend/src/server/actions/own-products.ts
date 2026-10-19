@@ -247,3 +247,23 @@ export async function reorderProductImagesAction(productId: string, imageIds: st
   revalidateProduct(productId);
   return { ok: true };
 }
+
+/**
+ * Orders a product's photos AND videos together (they share the three gallery
+ * slots). Lists every ready photo and video once; the database re-checks that,
+ * the caller's catalog.write and the product's organization.
+ */
+export async function reorderProductMediaAction(productId: string, items: { kind: "image" | "video"; id: string }[]): Promise<ImageResult> {
+  if (!UUID.test(productId) || !Array.isArray(items) || items.length > 3
+    || items.some((item) => (item.kind !== "image" && item.kind !== "video") || !UUID.test(item.id))) {
+    return { ok: false, code: "states.genericRetry" };
+  }
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.rpc("product_media_reorder", {
+    p_product_id: productId,
+    p_items: items.map(({ kind, id }) => ({ kind, id })),
+  });
+  if (error) return { ok: false, code: mapOwnProductError(error).code };
+  revalidateProduct(productId);
+  return { ok: true };
+}

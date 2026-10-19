@@ -12,4 +12,8 @@ describe("server-only R2 settings", () => {
     expect(() => storageEnvSchema.parse({ R2_PUBLIC_BUCKET: "x", R2_PRIVATE_BUCKET: "x" })).toThrow();
     expect(() => storageEnvSchema.parse({ R2_ACCOUNT_ID: "https://attacker.example" })).toThrow();
   });
+  it("allows a local S3 stand-in endpoint only in local", () => {
+    expect(storageEnvSchema.parse({ R2_LOCAL_S3_ENDPOINT: "http://127.0.0.1:8333", APP_ENV: "local" }).R2_LOCAL_S3_ENDPOINT).toBe("http://127.0.0.1:8333");
+    expect(() => storageEnvSchema.parse({ R2_LOCAL_S3_ENDPOINT: "http://127.0.0.1:8333", APP_ENV: "production" })).toThrow();
+  });
 });

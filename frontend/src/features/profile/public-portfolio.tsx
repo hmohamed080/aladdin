@@ -3,6 +3,9 @@ import type { TranslateFn } from "@/lib/i18n/translate";
 import type { PublicPortfolioItem } from "@/server/queries/portfolio";
 import { MediaFrame, MediaImage } from "@/features/portfolio/media-frame";
 import type { MediaSource } from "@/lib/media/image-variants";
+import { mergeMedia } from "@/lib/media/media-order";
+import type { VideoPlayback } from "@/server/video/playback";
+import { VideoPlayer } from "@/features/video/video-player";
 
 /**
  * A professional's published work, on their public profile.
@@ -29,12 +32,16 @@ import type { MediaSource } from "@/lib/media/image-variants";
  */
 export function PublicPortfolio({
   items,
+  videos = [],
   t,
 }: {
   items: Array<PublicPortfolioItem & { media?: MediaSource | null }>;
+  /** Published videos, placed among the photos in the owner's order. */
+  videos?: VideoPlayback[];
   t: TranslateFn;
 }) {
-  if (items.length === 0) return null;
+  if (items.length === 0 && videos.length === 0) return null;
+  const entries = mergeMedia(items.map((item) => ({ ...item, position: item.sortOrder ?? null })), videos);
 
   return (
     <section className="flex flex-col gap-md" aria-labelledby="public-portfolio">
@@ -43,7 +50,25 @@ export function PublicPortfolio({
       </h2>
 
       <ul className="grid gap-md tablet:grid-cols-2 desktop:grid-cols-3">
-        {items.map((item) => (
+        {entries.map((entry) => {
+          if (entry.kind === "video") {
+            const video = entry.item;
+            return (
+              <li key={`video-${video.id}`} data-testid="public-portfolio-video">
+                <Card pad="sm" className="flex h-full flex-col gap-3">
+                  <MediaFrame>
+                    <VideoPlayer fill source={video} title={video.title} width={video.width} height={video.height}
+                      labels={{ play: t("video.play", { title: video.title }), unavailable: t("video.unavailable") }} />
+                  </MediaFrame>
+                  <h3 className="text-label font-medium text-fg">
+                    <bdi dir="auto">{video.title}</bdi>
+                  </h3>
+                </Card>
+              </li>
+            );
+          }
+          const item = entry.item;
+          return (
           <li key={item.id}>
             <Card pad="sm" className="flex h-full flex-col gap-3">
               <MediaFrame>
@@ -70,7 +95,8 @@ export function PublicPortfolio({
               </div>
             </Card>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </section>
   );

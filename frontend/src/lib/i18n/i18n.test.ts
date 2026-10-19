@@ -35,6 +35,9 @@ const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
   "entryAuth.oauthConsentPrefix",
   "entryAuth.emailPlaceholder",
   "entryAuth.error.oauth",
+  // Video: file-format names (MP4, MOV, WebM) are what the file picker shows.
+  "video.fileHint",
+  "video.error.type",
   // Admin: a permission VOCABULARY token ("resource.action" is the literal shape
   // of every permission key, e.g. users.read) and the fixed date-entry FORMAT
   // hint (DD/MM/YYYY — the field is LTR by design, so the hint stays literal).

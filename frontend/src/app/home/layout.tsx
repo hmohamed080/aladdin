@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { getMessages, createTranslator } from "@/lib/i18n/translate";
 import { getWorkspaces } from "@/server/queries/workspace";
 import { loadMandatoryBusinessSetup } from "@/server/queries/business-setup";

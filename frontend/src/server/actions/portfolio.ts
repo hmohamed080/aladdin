@@ -192,6 +192,23 @@ export async function movePortfolioItemAction(
   return { ok: true };
 }
 
+/** Moves a photo or a video within the shared portfolio order (ADR-0020 Revision 2). */
+export async function movePortfolioMediaAction(
+  _prev: ActionState,
+  fd: FormData,
+): Promise<ActionState> {
+  const kind = String(fd.get("kind") ?? "");
+  if (kind !== "image" && kind !== "video") return { ok: false, code: "states.genericRetry" };
+  const { error } = await rpc("portfolio_media_move", {
+    p_kind: kind,
+    p_id: String(fd.get("id") ?? ""),
+    p_direction: String(fd.get("direction") ?? ""),
+  });
+  if (error) return { ok: false, code: mapPortfolioError(error) };
+  refreshOwnerSurfaces("portfolio");
+  return { ok: true };
+}
+
 /**
  * The convergent removal (S3, §8), and the ONLY place the three steps appear.
  *

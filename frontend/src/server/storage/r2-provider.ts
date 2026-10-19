@@ -6,6 +6,16 @@ import { readStorageEnv } from "@/lib/env/storage";
 import { readBoundedBody } from "./validation";
 import { MEDIA_VARIANTS, variantStorageKey, type MediaVariant } from "@/lib/media/image-variants";
 
+/** The one S3 client configuration for R2 (images here, video in r2-multipart.ts). */
+export function createR2Client(): S3Client {
+  const env = readStorageEnv();
+  if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY) throw new Error("R2 credentials are not configured");
+  return new S3Client({ region: "auto", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED", responseChecksumValidation: "WHEN_REQUIRED",
+    endpoint: env.R2_LOCAL_S3_ENDPOINT ?? `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY },
+    maxAttempts: 3, requestHandler: { requestTimeout: 30_000, connectionTimeout: 5_000 } });
+}
+
 export class CloudflareR2StorageProvider implements StorageProvider {
   private readonly client: S3Client;
   private readonly bucket: string;
@@ -25,9 +35,7 @@ export class CloudflareR2StorageProvider implements StorageProvider {
     this.uploadBucket = env.R2_PRIVATE_BUCKET;
     this.bucket = visibility === "public" ? env.R2_PUBLIC_BUCKET! : env.R2_PRIVATE_BUCKET;
     this.publicBaseUrl = env.R2_PUBLIC_BASE_URL;
-    this.client = new S3Client({ region: "auto", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED", responseChecksumValidation: "WHEN_REQUIRED", endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-      credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY },
-      maxAttempts: 3, requestHandler: { requestTimeout: 30_000, connectionTimeout: 5_000 } });
+    this.client = createR2Client();
   }
   private finalKey(key: string) { return `${this.namespace}/${key}`; }
   private pendingKey(key: string) { return `pending/${this.namespace}/${key}`; }

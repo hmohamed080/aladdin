@@ -20,7 +20,20 @@ export const storageEnvSchema = z.object({
   MEDIA_EDGE_ORIGIN: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
   MEDIA_EDGE_TICKET_KID: z.preprocess((value) => value === "" ? undefined : value, z.string().regex(/^[a-z0-9]{1,16}$/).optional()),
   MEDIA_EDGE_TICKET_SECRET: optional,
+  // Video (ADR-0020): uploads go straight to R2 and playback only through the edge
+  // Worker, so this needs both of those on. Off by default.
+  VIDEO_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  // LOCAL ONLY: an S3-compatible endpoint standing in for R2 (e.g. SeaweedFS) in
+  // isolated tests. Refused outside NEXT_PUBLIC_APP_ENV=local.
+  R2_LOCAL_S3_ENDPOINT: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
+  APP_ENV: z.enum(["local", "staging", "production"]).default("local"),
 }).superRefine((env, ctx) => {
+  if (env.VIDEO_ENABLED && (!env.R2_STORAGE_ENABLED || !env.MEDIA_EDGE_DELIVERY_ENABLED)) {
+    ctx.addIssue({ code: "custom", path: ["VIDEO_ENABLED"], message: "Video needs R2_STORAGE_ENABLED and MEDIA_EDGE_DELIVERY_ENABLED" });
+  }
+  if (env.R2_LOCAL_S3_ENDPOINT && env.APP_ENV !== "local") {
+    ctx.addIssue({ code: "custom", path: ["R2_LOCAL_S3_ENDPOINT"], message: "Only allowed in local isolated tests" });
+  }
   if (env.R2_PUBLIC_BASE_URL && !env.R2_PUBLIC_BASE_URL.startsWith("https://")) {
     ctx.addIssue({ code: "custom", path: ["R2_PUBLIC_BASE_URL"], message: "Public media must use HTTPS" });
   }
@@ -60,5 +73,8 @@ export function readStorageEnv() {
     MEDIA_EDGE_ORIGIN: process.env.MEDIA_EDGE_ORIGIN,
     MEDIA_EDGE_TICKET_KID: process.env.MEDIA_EDGE_TICKET_KID,
     MEDIA_EDGE_TICKET_SECRET: process.env.MEDIA_EDGE_TICKET_SECRET,
+    R2_LOCAL_S3_ENDPOINT: process.env.R2_LOCAL_S3_ENDPOINT,
+    VIDEO_ENABLED: process.env.VIDEO_ENABLED,
+    APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
   });
 }

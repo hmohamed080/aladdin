@@ -44,7 +44,11 @@ export function LandingHeader() {
       else if (open) { setOpen(false); menu.current?.focus(); }
     }}>
       <a className={styles.brand} href="#landing-top" aria-label="Aladdin">
-        <Image src="/preview/landing/aladdin-logo.png" alt="" width={684} height={643} priority />
+        {/* Drawn at most 80×72 CSS px (`.brand img`), so `sizes` lets the browser pick a
+            ~256 px file instead of the 1920 px one. No `priority` and no eager load
+            (React preloads an eager <img>): the hero image, not the logo, is the
+            LCP element and must not share the early bandwidth with it. */}
+        <Image src="/preview/landing/aladdin-logo.png" alt="" width={684} height={643} sizes="80px" />
       </a>
       <Button ref={menu} className={styles.menu} variant="ghost" aria-label={t.menu} aria-expanded={open} aria-controls="preview-navigation" onClick={() => setOpen(!open)}>
         {open ? <XIcon size={20} /> : <MenuIcon size={20} />}<span>{t.menu}</span>

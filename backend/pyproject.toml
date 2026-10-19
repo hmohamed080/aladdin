@@ -23,6 +23,9 @@ dev = [
     "pytest>=8.3",
     "ruff>=0.9",
 ]
+video-worker = [
+    "boto3>=1.35",
+]
 
 [tool.uv]
 # Application project (not a distributable package) — do not build it.

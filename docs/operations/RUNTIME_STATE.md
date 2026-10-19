@@ -1,5 +1,13 @@
 # Runtime State
 
+## Redis, video and palette (draft PRs #92, video PR, #93) — 2026-10-19
+
+- **Stack:** #88 → #89 → #91 → #92 (Redis) → video branch `claude/video-r2-2ibvgs`. Palette #93 is independent, based on `main`. Nothing merged or deployed.
+- **New migration (local only):** `20261019170000_media_videos` (renamed from 20261019150000 so it sorts after the revocation migration 20261019163000; permission contract `supabase/permissions/20261019170000.json`).
+- **Flags (all off):** `REDIS_CACHE_ENABLED=false`, `VIDEO_ENABLED=false`, Worker `VIDEO_ROUTES="off"`; R2 and edge flags unchanged.
+- **Decisions:** [ADR-0019](../decisions/ADR-0019-redis-cache-and-rate-limits.md), [ADR-0020](../decisions/ADR-0020-video-r2-hls.md) — both Proposed. FastAPI next phase: [plan](../architecture/fastapi-next-phase.md), not started.
+- **Hosted dependencies pending approval:** managed Redis, transcode host, R2 CORS and lifecycle rules, Worker video routes, the migration.
+
 ## Media/backend continuation (stacked on PR #89) — 2026-10-19
 
 - **Branch** `claude/media-backend-continuation-2ibvgs`, stacked on PR #89 (`claude/r2-rc2-integration-vdrldz`) with PR #88's latest commits merged in. Not merged anywhere; no hosted change.

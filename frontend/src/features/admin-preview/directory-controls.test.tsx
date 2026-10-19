@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent, cleanup, act, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { AutoFilters, SortableHeader } from "./auto-filters";
 import { TablePagination } from "./table-pagination";
 

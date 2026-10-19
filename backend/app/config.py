@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # The environments this service knows. Anything else is a configuration error.
@@ -50,6 +51,22 @@ class Settings(BaseSettings):
     redis_url: str = ""
     # Separates environments that share one Redis database.
     redis_key_env: str = ""
+
+    # --- R2 (video worker only; the private bucket holding originals and HLS) ---
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_private_bucket: str = ""
+    # S3-compatible stand-in for isolated local tests. Refused outside a local environment.
+    r2_local_s3_endpoint: str = ""
+
+    @property
+    def r2_endpoint(self) -> str:
+        if self.r2_local_s3_endpoint:
+            return self.r2_local_s3_endpoint
+        return (
+            f"https://{self.r2_account_id}.r2.cloudflarestorage.com" if self.r2_account_id else ""
+        )
 
     # --- Server ---
     # Comma-separated browser origins allowed to call the API (CORS).
@@ -104,6 +121,13 @@ class Settings(BaseSettings):
             }
             missing += [name for name, value in required.items() if not value.strip()]
         return missing
+
+    @model_validator(mode="after")
+    def _local_storage_only_locally(self) -> Settings:
+        # A deployed worker must never write video bytes to a test stand-in.
+        if self.r2_local_s3_endpoint and self.environment != "local":
+            raise ValueError("R2_LOCAL_S3_ENDPOINT is only allowed in local isolated tests")
+        return self
 
 
 @lru_cache

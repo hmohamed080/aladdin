@@ -7,9 +7,10 @@ import { useI18n } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/controls";
 import { InlineError, InlineSuccess } from "@/components/ui/primitives";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
-import { encodeCanvas } from "@/lib/media/resize-image";
+import { encodeCanvasWithin, ImagePrepareError } from "@/lib/media/resize-image";
 import {
   AVATAR_ALLOWED_TYPES,
+  AVATAR_MAX_BYTES,
   AVATAR_OUTPUT_PX,
   AVATAR_OUTPUT_TYPE,
   validateAvatarFile,
@@ -26,20 +27,20 @@ async function cropToBlob(src: string, area: Area): Promise<Blob> {
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("image load failed"));
+    img.onerror = () => reject(new ImagePrepareError("decode"));
     img.src = src;
   });
   const canvas = document.createElement("canvas");
   canvas.width = AVATAR_OUTPUT_PX;
   canvas.height = AVATAR_OUTPUT_PX;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("canvas unavailable");
+  if (!ctx) throw new ImagePrepareError("canvas");
   // A JPEG fallback has no alpha: a transparent PNG would otherwise flatten to
   // black. This is pixel data baked into the uploaded file, not a themed UI colour.
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, AVATAR_OUTPUT_PX, AVATAR_OUTPUT_PX);
   ctx.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, AVATAR_OUTPUT_PX, AVATAR_OUTPUT_PX);
-  return encodeCanvas(canvas, 0.9, AVATAR_OUTPUT_TYPE);
+  return encodeCanvasWithin(canvas, 0.9, AVATAR_OUTPUT_TYPE, AVATAR_MAX_BYTES);
 }
 
 /**
@@ -108,8 +109,9 @@ export function AvatarField({ avatarUrl, displayName }: { avatarUrl: string | nu
       reset();
       setSaved(true);
       router.refresh();
-    } catch {
-      setError(t("profileIdentity.avatar.errorUpload"));
+    } catch (e) {
+      // A photo this device could not crop or fit is named as such, not reported as a failed upload.
+      setError(t(e instanceof ImagePrepareError ? "profileIdentity.avatar.errorPrepare" : "profileIdentity.avatar.errorUpload"));
     } finally {
       setBusy(false);
     }

@@ -3,7 +3,6 @@
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
 import { resizeImageForUpload, UPLOAD_RESIZE_PROFILES } from "@/lib/media/resize-image";
 import {
-  ASSET_POLICY,
   validateAssetContent,
   type AssetNamespace,
 } from "@/lib/storage/professional-assets";
@@ -15,16 +14,18 @@ import type { UploadTicket } from "@/server/actions/portfolio";
  *
  * THREE STEPS, AND WHY THEY ARE IN THIS ORDER (§7, S3):
  *
- *   0. PREPARE. A photo is downscaled (long edge 2560 px; certificates 3200 px)
- *      and re-encoded to WebP when that makes it smaller (`resizeImageForUpload`).
- *      The prepared file is what gets validated, declared to `start` and
- *      uploaded, so its type and size are the ones the server checks. A browser
- *      that cannot resize uploads the original. PDFs are never touched.
+ *   0. PREPARE. The picked photo is never refused for its size: it is
+ *      downscaled (long edge 2560 px; certificates 3200 px) and re-encoded until
+ *      it fits the namespace's ceiling (`resizeImageForUpload`). The prepared
+ *      file is what gets validated, declared to `start` and uploaded, so its
+ *      type and size are the ones the server checks. A device that cannot
+ *      prepare a photo that needs it gets `assets.errors.prepareFailed`, before
+ *      anything is created. PDFs are never touched (10 MiB, see the policy).
  *   1. VALIDATE locally. Type, size, and the file's first bytes against the type
- *      it claims. None of this is authority — the bucket enforces type and size
- *      again from its own row, before Postgres is consulted — but it is the only
- *      way a person learns their 8 MB photo is too large without waiting for an
- *      8 MB upload to fail.
+ *      it claims. None of this is authority (the bucket enforces type and size
+ *      again from its own row, before Postgres is consulted), but it is the only
+ *      way a person learns their 12 MB PDF is too large without waiting for the
+ *      upload to fail.
  *   2. START. The server creates the metadata row and returns a single-use token
  *      bound to one bucket, one key and `upsert: false`. The row exists before any
  *      bytes do, so the object identity is decided and recorded rather than
@@ -53,9 +54,6 @@ export type UploadOutcome = { ok: true } | { ok: false; code: string };
 /** How many bytes of the head we need to recognise every accepted signature. */
 const SIGNATURE_BYTES = 16;
 
-/** A source larger than this is refused before decoding; resizing could not save it anyway. */
-const MAX_SOURCE_FACTOR = 4;
-
 export async function uploadAsset(
   namespace: AssetNamespace,
   original: File,
@@ -64,9 +62,9 @@ export async function uploadAsset(
   finish: (itemId: string) => Promise<{ ok: boolean; code?: string }>,
   onProgress?: (percent: number) => void,
 ): Promise<UploadOutcome> {
-  const file = original.size <= ASSET_POLICY[namespace].maxBytes * MAX_SOURCE_FACTOR
-    ? await resizeImageForUpload(original, UPLOAD_RESIZE_PROFILES[namespace])
-    : original;
+  const prepared = await resizeImageForUpload(original, UPLOAD_RESIZE_PROFILES[namespace]);
+  if (!prepared.ok) return { ok: false, code: "assets.errors.prepareFailed" };
+  const file = prepared.file;
   const head = new Uint8Array(await file.slice(0, SIGNATURE_BYTES).arrayBuffer());
   const valid = validateAssetContent(namespace, { type: file.type, size: file.size }, head);
   if (!valid.ok) return { ok: false, code: valid.code };

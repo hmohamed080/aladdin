@@ -1,3 +1,33 @@
+## 2026-10-19 — Landing mobile LCP under 2.5 s
+
+Branch `claude/landing-lcp-2ibvgs` (from `claude/video-r2-2ibvgs`). It fixes the one failing page in `performance-2026-10-19.md`. Header logo: `sizes="80px"`, no `priority`, lazy (it was fetched at 1920 px, 104 KB, and preloaded). Footer logo: `sizes="80px"` too. Hero image: `fetchPriority="high"` added to `priority`, and `sizes` capped at 2560 px. Mobile still selects the same 1200 w file, so it looks the same. Fonts: preload only the Latin faces of Readex, Archivo and Reem Kufi (≈ 86 KB, down from 160 KB). The Arabic faces and JetBrains Mono load on use. Arabic pages start their two Arabic faces from an inline `document.fonts.load` script in `<head>`. i18n: `context.tsx` (`useI18n`, new `I18nMessagesProvider`) no longer imports a catalog. The catalog-backed `I18nProvider` moved to `lib/i18n/provider.tsx`, and every layout import was updated. `/` and `/preview/landing` send only the `nav` namespace of the current locale. The bilingual catalog chunk (141 KB) is gone from the Landing page. `landing-messages.test.tsx` checks that the slice renders exactly like the full catalog in en and ar.
+
+Mobile median of 5, interleaved, load 1.5–2.3. Landing en: LCP 3028 → 2148 ms. Landing ar: 2824 → 2184 ms. CLS 0 on both. Transfer: 747 → 481 KB. Auth: 1312 → 1080 ms. Home: 1060 → 1076 ms (noise). Not done: AVIF (it would change encoding app-wide). The mobile hero is drawn `object-fit: cover` wider than the viewport, so a fully "correct" `sizes` would pick a much heavier file. `100vw` stays as a weight cap.
+
+## 2026-10-19 — Image uploads: no cap on originals, ceilings on derivatives
+
+Branch `claude/image-uploads-2ibvgs` (from `claude/video-r2-2ibvgs`, to be merged into it). Owner rule: a picked photo is never refused for its size. `lib/media/resize-image.ts` now always prepares the upload to the namespace's unchanged server cap (avatar/organization 3 MiB, portfolio/product/request 5 MiB, certificate image 10 MiB): header read without decoding, reduced-size decode above 24 MP with an orientation check, quality then long-edge steps, alpha kept, typed failure with a translated "could not be prepared on this device" message. Client-side source caps removed (avatar, organization, product pick, request validation, portfolio `MAX_SOURCE_FACTOR`, installer preview). Server caps, SQL and sharp's 25 MP limit unchanged. Documented in `docs/database/professional-asset-storage.md` §16, with the remaining limits (25 MP server decode on the derivative, browser canvas limits, Supabase Free 50 MB on the rollback path, documents 10 MiB).
+
+Not verified: real-browser behaviour on very large photos (unit tests mock canvas and `createImageBitmap`); purchase-request images still have no browser upload UI.
+
+## 2026-10-19 — Redis (PR #92), video on R2 + HLS (video PR), palette (PR #93)
+
+Branches: `claude/redis-cache-2ibvgs` (draft #92, base #91's branch), `claude/video-r2-2ibvgs` (stacked on #92), `claude/brand-palette-2ibvgs` (draft #93, base main). No hosted change, no paid service.
+
+Done:
+- **Redis (ADR-0019)**: optional, fail-open; reference vocabularies cached 600 s, per-user rate limits (media upload/read, video parts), Python job locks. Never authorization or bytes. Local benchmark: trades 4.48 → 0.47 ms p50, categories 3.53 → 0.39 ms.
+- **Video (ADR-0020)**: migration `20261019150000_media_videos` (pgTAP `103_*` 88 checks), browser → R2 multipart (resume, retry, progress), `backend/app/workers/video_transcode.py` (ffmpeg HLS fMP4 + poster, `--once/--loop/--purge`, `boto3` in the `video-worker` uv group), Worker `/v/` with a Postgres decision per segment, players lazy (poster only until play). Portfolio manager, public profile, product edit and catalog pages wired; all behind `VIDEO_ENABLED=false`.
+- **Isolated E2E** (`frontend/playwright.video.config.ts`, SeaweedFS as R2 stand-in, Worker handler on local HTTPS): R2 photo upload/edge retrieval/delete, rollback with R2 off, and video upload/transcode/play/seek/publish/revoke/delete/purge on desktop and mobile. It caught three bugs, fixed: origin check compared against the bind address, `video_upload_begin` needed `p_product_id` sent explicitly, and the public profile crashed because the player used the client i18n hook.
+- **Palette**: tokens remapped to #071A2D/#D8C7A6/#F2E9D8/#B96F52 with an AA contrast test; colors.json and DESIGN.md synced.
+
+Validation: Vitest 3,995 pass / 24 skipped; typecheck clean; lint 0 errors; Worker 41; backend pytest 74 (incl. real ffmpeg); pgTAP 128 files / 5,693; permission gate 626 PASS; Playwright video config 5/5 + rollback 1/1.
+
+Unfinished / needs the owner:
+- Real R2 untested from here (no network path); run `r2.live.test.ts` against the disposable acceptance buckets after approval.
+- Transcode host not chosen (paid; options in ADR-0020). R2 CORS + abort-multipart lifecycle rule, `VIDEO_ROUTES`, `VIDEO_ALLOWED_ORIGINS`, migration — all need approval.
+- Managed Redis not created (Upstash Free recommended in ADR-0019).
+- The test browser cannot decode H.264, so in-browser playback was verified with VP9 (`--test-codec`, local only); check H.264 playback in Chrome/Safari on a preview.
+
 ## 2026-10-19 — Redis: Upstash readiness, fail-safe rate limits, usage monitoring (ADR-0019 Revision 2)
 
 Branch `claude/redis-cache-2ibvgs` (draft PR #92). No hosted call: Upstash is unreachable from the sandbox; everything was tested against local Redis 7.0 and a local TLS proxy.

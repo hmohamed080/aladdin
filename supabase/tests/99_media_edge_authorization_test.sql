@@ -40,11 +40,12 @@ update public.organizations set status='active',is_verified=true where id='9d000
 -- ---------------------------------------------------------------- privileges
 select ok(not (select rolcanlogin from pg_roles where rolname='media_edge'),'media_edge is NOLOGIN by default');
 select ok(not (select rolsuper or rolbypassrls or rolcreaterole or rolcreatedb from pg_roles where rolname='media_edge'),'media_edge holds no elevated attributes');
-select is((select array_agg(p.oid::regprocedure::text order by 1) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+select is((select array_agg(p.oid::regprocedure::text order by p.oid::regprocedure::text) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
   where n.nspname in ('public','app') and has_function_privilege('media_edge',p.oid,'EXECUTE')
     and has_schema_privilege('media_edge',n.oid,'USAGE')),
-  array['media_edge_authorize(text,text,text,uuid,uuid,uuid,timestamp with time zone)','media_edge_public(text,uuid,text)'],
-  'media_edge can execute exactly the two Worker functions');
+  array['media_edge_authorize(text,text,text,uuid,uuid,uuid,timestamp with time zone)','media_edge_public(text,uuid,text)',
+        'media_edge_video(uuid,uuid,uuid,uuid,timestamp with time zone)'],
+  'media_edge can execute exactly the Worker functions (images and, since 20261019170000, video)');
 select ok(not has_schema_privilege('media_edge','app','USAGE') and not has_schema_privilege('media_edge','auth','USAGE')
   and not has_schema_privilege('media_edge','storage','USAGE'),'media_edge has no internal schema usage');
 select is((select count(*)::int from information_schema.role_table_grants where grantee='media_edge'),0,'media_edge has no table grants');

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 vi.mock("server-only", () => ({}));
 import { render, cleanup, screen } from "@testing-library/react";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { ADMIN_PERMISSIONS, type AdminAccess } from "@/lib/permissions/admin";
 import type { AdminUserDetail } from "@/features/admin-preview/directory-mappers";
 

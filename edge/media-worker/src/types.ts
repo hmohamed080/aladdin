@@ -33,6 +33,10 @@ export interface Env {
    * decided by the database on every request; only bytes are cached.
    */
   EDGE_CACHE?: string;
+  /** "on" enables /v (video). Anything else disables it. */
+  VIDEO_ROUTES?: string;
+  /** Comma-separated app origins allowed to fetch playlists and segments (hls.js uses fetch/XHR). */
+  VIDEO_ALLOWED_ORIGINS?: string;
 }
 
 /** The subset of the Workers Cache API (`caches.default`) the Worker uses. */
@@ -50,5 +54,9 @@ export interface MediaAuthority {
     viewer: string; session: string; workspace: string | null; expiresAt: number;
   }): Promise<unknown>;
   authorizePublic(request: { namespace: string; id: string; variant: string }): Promise<unknown>;
+  /** Video: viewer/session/workspace/expiresAt are null for anonymous requests. */
+  authorizeVideo(request: {
+    video: string; viewer: string | null; session: string | null; workspace: string | null; expiresAt: number | null;
+  }): Promise<unknown>;
   close(): Promise<void>;
 }

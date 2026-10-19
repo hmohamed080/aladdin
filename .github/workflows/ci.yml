@@ -79,9 +79,12 @@ jobs:
           python-version: "3.12"
       - name: Install uv (tool bootstrap; project deps stay uv-managed)
         run: pipx install uv
-      - run: uv sync --frozen --python 3.12
+      # ffmpeg for the real transcode test of the video worker (ADR-0020).
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: uv sync --frozen --python 3.12 --group video-worker
       - run: uv run ruff check .
-      - run: uv run pytest
+      - run: uv run --group video-worker pytest
 
   docs:
     name: docs

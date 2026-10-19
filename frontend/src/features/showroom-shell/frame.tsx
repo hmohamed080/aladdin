@@ -3,7 +3,7 @@ import { PendingApprovalBanner } from "./pending-banner";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { createTranslator } from "@/lib/i18n/translate";
 import { SIDEBAR_MODE_COOKIE, resolveSidebarMode } from "@/lib/ui/sidebar-mode";
 import { THEME_COOKIE, resolveTheme, resolveThemePreference } from "@/lib/theme/config";

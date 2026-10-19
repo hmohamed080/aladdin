@@ -10,12 +10,16 @@ import { confirmProductImageUploadAction, requestProductImageUploadAction } from
  * to the private bucket under that key -> confirm. Throws an i18n key on failure;
  * a failed upload leaves only an invisible pending row that expires on its own.
  *
- * The photo is first capped at 2560 px and re-encoded to WebP when that is smaller
- * (`resizeImageForUpload`); the ticket declares the prepared type and size, which
- * the server re-verifies from the stored bytes.
+ * The picked photo is never refused for its size: it is capped at 2560 px and
+ * re-encoded until it fits the bucket's 5 MiB ceiling (`resizeImageForUpload`);
+ * the ticket declares the prepared type and size, which the server re-verifies
+ * from the stored bytes. A device that cannot prepare it throws
+ * `showroomProducts.images.errorPrepare` before any ticket is requested.
  */
 export async function uploadProductImage(productId: string, picked: File): Promise<string> {
-  const file = await resizeImageForUpload(picked, UPLOAD_RESIZE_PROFILES.product);
+  const prepared = await resizeImageForUpload(picked, UPLOAD_RESIZE_PROFILES.product);
+  if (!prepared.ok) throw new Error("showroomProducts.images.errorPrepare");
+  const file = prepared.file;
   const ticket = await requestProductImageUploadAction(productId, file.type, file.size);
   if (!ticket.ok) throw new Error(ticket.code);
   try { await uploadWithGrant(ticket.grant, file); }

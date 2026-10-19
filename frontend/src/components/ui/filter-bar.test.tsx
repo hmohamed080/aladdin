@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { FilterBar } from "./filter-bar";
 import { LIVE_SEARCH_DEBOUNCE_MS, normalizeSearchInput } from "@/lib/search/normalize";
 

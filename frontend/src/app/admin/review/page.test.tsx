@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, within } from "@testing-library/react";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { PREVIEW_ORG_REQUESTS } from "@/features/admin-preview/fixtures";
 import { en } from "@/lib/i18n/messages/en";
 import { ar } from "@/lib/i18n/messages/ar";

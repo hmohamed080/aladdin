@@ -6,6 +6,9 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { readableMediaSource } from "@/server/storage/edge-ticket";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
 import { PortfolioManager, type PortfolioCard } from "@/features/portfolio/portfolio-manager";
+import { VideoManager } from "@/features/video/video-manager";
+import { listManagedVideos } from "@/server/queries/videos";
+import { videoEnabled } from "@/server/video/playback";
 
 export const dynamic = "force-dynamic";
 
@@ -45,5 +48,12 @@ export default async function PortfolioPage() {
     }),
   );
 
-  return <PortfolioManager items={cards} />;
+  // Video appears only while uploads go to R2 and playback runs at the edge.
+  const videos = videoEnabled() ? await listManagedVideos({ scope: "portfolio" }) : null;
+  return (
+    <>
+      <PortfolioManager items={cards} videos={videos ?? []} />
+      {videos && <div className="mt-xl"><VideoManager scope="portfolio" videos={videos} canPublish showList={false} /></div>}
+    </>
+  );
 }

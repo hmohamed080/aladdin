@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import { render } from "@testing-library/react";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import type { Locale } from "@/lib/i18n/locales";
 import { directionFor } from "@/lib/i18n/config";
 

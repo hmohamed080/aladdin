@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { CATALOG_VIEW_COOKIE } from "@/lib/ui/catalog-view";
 
 const actions = vi.hoisted(() => ({
@@ -13,6 +13,7 @@ const actions = vi.hoisted(() => ({
   confirm: vi.fn(),
   remove: vi.fn(async () => ({ ok: true })),
   reorder: vi.fn(async () => ({ ok: true })),
+  reorderMedia: vi.fn(async () => ({ ok: true })),
   upload: vi.fn<(grant: unknown, file: File) => Promise<{ error: { message: string } | null }>>(async () => ({ error: null })),
   refresh: vi.fn(),
 }));
@@ -25,6 +26,7 @@ vi.mock("@/server/actions/own-products", () => ({
   confirmProductImageUploadAction: actions.confirm,
   removeProductImageAction: actions.remove,
   reorderProductImagesAction: actions.reorder,
+  reorderProductMediaAction: actions.reorderMedia,
 }));
 const feed = vi.hoisted(() => ({ load: vi.fn() }));
 vi.mock("@/server/actions/own-products-feed", () => ({ loadMyProductsBatchAction: feed.load }));
@@ -37,6 +39,7 @@ vi.mock("@/lib/storage/browser-upload", () => ({ uploadWithGrant: async (grant: 
 import { OwnProductsResults, type OwnProductCard } from "./own-products-results";
 import { ProductForm } from "./product-form";
 import { ImageManager } from "./image-manager";
+import type { ManagedVideo } from "@/server/queries/videos";
 import type { ProductAudienceCode } from "./product-audiences";
 
 /** Hex literals are product DATA here, not styling — built at run time so the colour guard stays strict. */
@@ -504,6 +507,48 @@ describe("ImageManager", () => {
     manager();
     fireEvent.click(within(screen.getAllByRole("group", { name: /Photo 1/ })[0]!).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(actions.remove).toHaveBeenCalledWith("i1"));
+  });
+});
+
+describe("ImageManager with videos (one shared gallery)", () => {
+  const img = (n: number) => ({ id: `i${n}`, url: `https://signed/${n}.png`, slot: n });
+  const vid = (n: number, state: "ready" | "processing" = "ready"): ManagedVideo => {
+    const summary = { id: `v${n}`, title: `Clip ${n}`, durationSeconds: 12, width: 1280, height: 720, hasPoster: true, position: n };
+    return {
+      ...summary, createdAt: "2026-10-19T00:00:00Z", scope: "product", state, isPublic: false, failureCode: null,
+      playback: state === "ready" ? { ...summary, src: `https://media/v/v${n}/master.m3u8`, poster: null, access: "ticketed", workspace: "org-1" } : null,
+    };
+  };
+  const manager = (images: ReturnType<typeof img>[], videos: ReturnType<typeof vid>[]) =>
+    wrap(<ImageManager productId="p1" productName="Matt Emulsion" images={images} videos={videos} archived={false} />);
+
+  it("places a video in its slot, even first, and counts it toward the three items", () => {
+    manager([img(2)], [vid(1)]);
+    const tiles = screen.getByTestId("image-slots").querySelectorAll(":scope > li");
+    expect(tiles[0]!.getAttribute("data-testid")).toBe("gallery-video");
+    expect(screen.getByTestId("image-count").textContent).toBe("2 of 3 photos and videos");
+    // The main photo is the first PHOTO, not the video before it.
+    expect(within(tiles[1] as HTMLElement).getByText("Main photo")).toBeTruthy();
+  });
+
+  it("is full with two photos and one video", () => {
+    manager([img(1), img(3)], [vid(2)]);
+    expect(screen.queryByTestId("image-add")).toBeNull();
+    expect(screen.getByText("This product has 3 photos and videos. Remove one to add another.")).toBeTruthy();
+  });
+
+  it("moves a video before a photo through the shared order", async () => {
+    manager([img(1)], [vid(2)]);
+    fireEvent.click(within(screen.getByRole("group", { name: "Video 2" })).getByRole("button", { name: "Move earlier" }));
+    await waitFor(() => expect(actions.reorderMedia).toHaveBeenCalledWith("p1", [{ kind: "video", id: "v2" }, { kind: "image", id: "i1" }]));
+    expect(actions.reorder).not.toHaveBeenCalled();
+  });
+
+  it("does not move a video that is still processing", () => {
+    manager([img(1)], [vid(2, "processing")]);
+    const group = screen.getByRole("group", { name: "Video 2" });
+    expect((within(group).getByRole("button", { name: "Move earlier" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("video-state")).toBeTruthy();
   });
 });
 

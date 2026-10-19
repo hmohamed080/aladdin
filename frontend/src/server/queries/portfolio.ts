@@ -54,6 +54,8 @@ export type PublicPortfolioItem = {
   id: string;
   title: string;
   description: string | null;
+  /** Place in the owner's shared photo-and-video order. */
+  sortOrder?: number | null;
   /**
    * Where the image is fetched: `/p/media/<id>`, or the media Worker's
    * `/c/portfolio/<id>/<variant>` (with recorded variants) for an R2 item while
@@ -132,7 +134,7 @@ export async function loadPublicPortfolio(profileId: string): Promise<PublicPort
   // underlying table says. Narrowing on the two the page cannot render without is
   // cheaper than asserting non-null, and it means a row that somehow arrived
   // incomplete is skipped rather than rendered as an empty card.
-  const rows = data.flatMap((r) => (r.id && r.title ? [{ id: r.id, title: r.title, description: r.description }] : []));
+  const rows = data.flatMap((r) => (r.id && r.title ? [{ id: r.id, title: r.title, description: r.description, sortOrder: r.sort_order }] : []));
   const edge = await publicEdgeSources(supabase, "portfolio", rows.map((r) => r.id));
   return rows.map((r) => ({ ...r, media: publicPortfolioSource(r.id, edge.get(r.id)) }));
 }

@@ -25,12 +25,12 @@ const B64URL = /^[A-Za-z0-9_-]+$/;
 export function isUuid(value: unknown): value is string { return typeof value === "string" && UUID.test(value); }
 export function isObjectKey(value: unknown): value is string { return typeof value === "string" && value.length <= 256 && KEY.test(value); }
 
-function toBase64Url(bytes: Uint8Array): string {
+export function toBase64Url(bytes: Uint8Array): string {
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
-function fromBase64Url(text: string): Uint8Array<ArrayBuffer> | null {
+export function fromBase64Url(text: string): Uint8Array<ArrayBuffer> | null {
   if (!B64URL.test(text)) return null;
   try {
     const binary = atob(text.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (text.length % 4)) % 4));
@@ -53,7 +53,7 @@ export function parseTicketKeys(json: string): Map<string, Uint8Array<ArrayBuffe
 }
 
 const encoder = new TextEncoder();
-async function hmacKey(secret: Uint8Array<ArrayBuffer>, usage: "sign" | "verify") {
+export async function hmacKey(secret: Uint8Array<ArrayBuffer>, usage: "sign" | "verify") {
   return crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, [usage]);
 }
 
