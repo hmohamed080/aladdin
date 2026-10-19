@@ -59,7 +59,7 @@ export function illustrationFamily(tradeKey: string | null | undefined): Illustr
 }
 
 const INK = "text-primary";
-const ACCENT = "text-accent-solid";
+const ACCENT = "text-accent";
 const WASH = "text-fg-muted";
 
 function Ink({ children }: { children: ReactNode }) {

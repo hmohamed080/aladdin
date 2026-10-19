@@ -280,7 +280,7 @@ export function TabLinks({
                   "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-label font-medium transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-canvas",
                   active
-                    ? "border-accent-solid text-fg"
+                    ? "border-accent text-fg"
                     : "border-transparent text-fg-secondary hover:border-strong hover:text-fg",
                 )}
               >

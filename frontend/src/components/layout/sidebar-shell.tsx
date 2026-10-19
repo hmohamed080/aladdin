@@ -633,7 +633,7 @@ export function SidebarShell({
                second floating surface beside the sidebar. On the plate it is the
                shell itself lifting, which is the only thing here that is a
                surface at all. */
-            open && hoverMode && "shadow-[8px_0_28px_-8px_rgba(0,10,30,0.28)]",
+            open && hoverMode && "shadow-[8px_0_28px_-8px_color-mix(in_srgb,var(--deep-navy)_28%,transparent)]",
           )}
           style={{ width: "var(--shell-nav-w)" }}
         >
@@ -796,13 +796,13 @@ export function SidebarShell({
               href="/b2b/settings"
               aria-label={narrow ? upgradeLabel : undefined}
               className={cn(
-                "flex items-center rounded-md text-label font-medium text-accent-solid",
+                "flex items-center rounded-md text-label font-medium text-shell-accent",
                 "bg-shell-gold-soft hover:bg-shell-gold/30",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-shell",
                 navRowClass(narrow),
               )}
             >
-              <span className={cn(navIconClass(), "text-accent-solid")}>
+              <span className={cn(navIconClass(), "text-shell-accent")}>
                 <TrendingUpIcon size={NAV_ICON_SIZE} />
               </span>
               {narrow ? null : <span className="truncate">{upgradeLabel}</span>}

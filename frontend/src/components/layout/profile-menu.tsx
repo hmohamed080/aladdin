@@ -139,7 +139,7 @@ export function ProfileMenu({
         aria-label={t("account.menu")}
         data-testid="profile-menu-trigger"
         className={cn(
-          "grid h-9 w-9 place-items-center rounded-pill bg-accent-solid text-label font-semibold text-on-accent",
+          "grid h-9 w-9 place-items-center rounded-pill bg-accent-solid ring-1 ring-accent-edge text-label font-semibold text-on-accent",
           "transition-shadow hover:shadow-card",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
         )}

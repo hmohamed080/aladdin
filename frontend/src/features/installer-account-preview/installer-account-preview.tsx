@@ -124,7 +124,7 @@ function ProfileOverview({ locale }: { locale: Locale }) {
           const Icon = statIcons[stat.id];
           return (
             <div key={stat.id} className="flex min-h-24 items-center justify-center gap-sm border-b p-md [&:nth-child(odd)]:border-e [&:nth-child(n+3)]:border-b-0 tablet:border-b-0 tablet:[&:not(:last-child)]:border-e">
-              <Icon size={23} className="shrink-0 text-accent-solid" />
+              <Icon size={23} className="shrink-0 text-accent" />
               <div>
                 <strong className="block text-title tabular-nums text-fg">{stat.value}</strong>
                 <span className="text-label text-fg-secondary">{pick(locale, stat.label)}</span>

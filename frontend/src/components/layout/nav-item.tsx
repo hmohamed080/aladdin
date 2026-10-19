@@ -152,7 +152,7 @@ export function NavLink({
         <span
           aria-hidden="true"
           className={cn(
-            "absolute inset-y-1.5 start-0 w-0.5 rounded-pill bg-accent-solid transition-opacity",
+            "absolute inset-y-1.5 start-0 w-0.5 rounded-pill bg-accent-solid ring-1 ring-accent-edge transition-opacity",
             active ? "opacity-100" : "opacity-0",
           )}
         />
@@ -194,12 +194,13 @@ export function NavLink({
           // had, one element in.
           ground === "surface" && (active ? "text-accent" : "text-fg-muted group-hover:text-fg"),
           ground === "shell" && active && carved && "text-shell-active-fg",
-          // `accent-solid` (Lumen itself), never `accent`. The AA-safe `accent`
-          // is a DARK gold tuned for type on a light page — 2.1:1 on the shell,
-          // an invisible glyph. Lumen clears 9:1 on this ground. Reached only on
+          // `shell-accent`, never `accent`. The AA-safe `accent` is a DARK
+          // terracotta tuned for type on a light page — an invisible glyph on
+          // the navy shell. `shell-accent` is terracotta lifted toward cream and
+          // is measured on the shell grounds by palette-contrast.test.ts. Reached only on
           // a ground that has no carve, which on the shell is nothing and on the
           // mobile sheet is every active row.
-          ground === "shell" && active && !carved && "text-accent-solid",
+          ground === "shell" && active && !carved && "text-shell-accent",
           ground === "shell" && !active && "text-shell-fg-secondary group-hover:text-shell-fg",
         )}
       >

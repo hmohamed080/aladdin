@@ -23,7 +23,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: #0b0c0f;
+  background: var(--deep-navy);
 }
 
 .textureImg {
@@ -152,6 +152,7 @@
   height: 2.2rem;
   border-radius: 999px;
   background: var(--lumen);
+  box-shadow: 0 0 0 1px var(--accent-edge);
   color: var(--basalt);
 }
 

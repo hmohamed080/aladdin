@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Locale } from "@/lib/i18n/locales";
 import { formatCount, formatNumber } from "@/lib/ui/format";
+import { cn } from "@/lib/ui/cn";
 import { Badge, Card } from "@/components/ui/primitives";
 
 /** Compact page header for the admin console. */
@@ -70,7 +71,7 @@ export function DistList({
           <span className="w-40 shrink-0 truncate text-label text-fg-secondary">{e.label}</span>
           <div className="h-2 flex-1 overflow-hidden rounded-pill bg-surface-2">
             <div
-              className="h-full rounded-pill bg-accent-solid"
+              className={cn("h-full rounded-pill bg-accent-solid ring-1 ring-accent-edge", e.value <= 0 && "hidden")}
               style={{ width: `${(e.value / max) * 100}%` }}
             />
           </div>

@@ -34,7 +34,7 @@ export function WizardProgress({ current, total, label }: { current: number; tot
             aria-current={i === current ? "step" : undefined}
             className={cn(
               "h-1.5 flex-1 rounded-pill transition-colors",
-              i <= current ? "bg-accent-solid" : "bg-surface-2",
+              i <= current ? "bg-accent-solid ring-1 ring-accent-edge" : "bg-surface-2",
             )}
           />
         ))}

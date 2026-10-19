@@ -1,146 +1,600 @@
 {
   "$schema": "../tokens/README.md#format",
   "name": "aladdin.colors",
-  "version": "1.1.0",
-  "description": "Canonical Aladdin color tokens for 'The Aperture'. Primitives are fixed hex; semantic tokens are theme-aware and reference primitives via {primitives.<name>}. This file is the source of truth; DESIGN.md frontmatter, frontend/src/styles/tokens.css, and the Tailwind theme mirror it.",
+  "version": "2.0.0",
+  "description": "Canonical Aladdin color tokens. Every surface, ink, border, accent and focus token derives from the four approved palette roots (Deep Navy, Warm Sand, Soft Cream, Muted Terracotta) directly or via color-mix(in srgb); the only other hues are the semantic status tones. Older Aperture primitive names are kept as aliases. Semantic tokens reference primitives via {primitives.<name>}. This file is the source of truth; DESIGN.md frontmatter, frontend/src/styles/tokens.css, and the Tailwind theme mirror it.",
   "maintenance": "Manually maintained. On any color change, edit this file first, then propagate to DESIGN.md frontmatter and frontend/src/styles/tokens.css (see tokens/README.md).",
   "primitives": {
-    "basalt": { "value": "#0E1113", "description": "Dark canvas / Admin default; warm-neutral graphite-black stone." },
-    "basalt-2": { "value": "#1B2226", "description": "Raised surface on dark (cards, sidebar)." },
-    "basalt-3": { "value": "#232B30", "description": "Highest dark surface step; secondary fills on dark." },
-    "limestone": { "value": "#F4F1EA", "description": "BRAND stone. The Aperture mark, the auth Brand Panel, and the primary button label. No longer the light canvas." },
-    "plaster": { "value": "#FBF9F4", "description": "BRAND stone. No longer the raised surface on light." },
-    "sand": { "value": "#EAE5DB", "description": "BRAND stone. No longer the secondary fill on light." },
-    "quartz": { "value": "#F4F3F0", "description": "Light canvas; the brand stone with the chroma removed (channel spread 4, vs 10 for Limestone). Warm, never cream." },
-    "quartz-raised": { "value": "#FDFCFB", "description": "Raised surface on light (cards)." },
-    "quartz-sunk": { "value": "#ECEAE6", "description": "Secondary fills, tags, chips on light." },
-    "quartz-hover": { "value": "#F3F1EE", "description": "Pointer-over ground on light; one step short of quartz-sunk so a hovered row reads as armed and the current row still reads stronger." },
-    "quartz-line": { "value": "#DBD8D5", "description": "Hairline border on Quartz. Luminance-matched to line-light within 0.0003, so it keeps that border weight while dropping two-thirds of the chroma." },
-    "quartz-line-strong": { "value": "#C2BFBB", "description": "Strong border on Quartz. Luminance-matched to line-light-strong." },
-    "ink": { "value": "#17191A", "description": "Primary action fill on light; near-black." },
-    "lumen": { "value": "#F3AB3E", "description": "Brand / AI point-of-light; glows and large fills." },
-    "lumen-deep": { "value": "#C77F1C", "description": "Supporting Lumen shade for larger marks on light." },
-    "lumen-ink": { "value": "#855A15", "description": "AA-safe Lumen tone for normal-size text/strokes/focus on light." },
-    "lumen-soft": { "value": "#F7C674", "description": "Light Lumen tint for gradients and soft glow stops." },
-    "bronze": { "value": "#C79A5E", "description": "Trust/verification metal; seals and premium detailing." },
-    "bronze-deep": { "value": "#96703F", "description": "Bronze for larger marks on light surfaces." },
-    "bronze-ink": { "value": "#6E5230", "description": "AA-safe Bronze tone for normal-size trust text and small seals." },
-    "lapis": { "value": "#2F6088", "description": "Quiet data/technology blue; links, info (light)." },
-    "lapis-bright": { "value": "#6FA8D2", "description": "Lapis on the Basalt dark theme." },
-    "verdigris": { "value": "#2F7D5B", "description": "Success (patina green); larger marks/fills." },
-    "verdigris-deep": { "value": "#205A42", "description": "AA-safe success tone for normal-size text on light." },
-    "verdigris-bright": { "value": "#58C08E", "description": "Success on the Basalt dark theme." },
-    "ochre": { "value": "#B26B12", "description": "Warning (ochre); larger marks/fills." },
-    "ochre-deep": { "value": "#6E4810", "description": "AA-safe warning tone for normal-size text on light." },
-    "ochre-bright": { "value": "#E0A54A", "description": "Warning on the Basalt dark theme." },
-    "oxide": { "value": "#B23A22", "description": "Danger (oxide red); AA on light and larger marks." },
-    "oxide-bright": { "value": "#E27159", "description": "Danger on the Basalt dark theme." },
-    "stone": { "value": "#5C6066", "description": "Secondary text on light." },
-    "stone-muted": { "value": "#676B70", "description": "Quietest light text that still clears AA on the canvas/surface (not on the secondary fill)." },
-    "graphite": { "value": "#39444B", "description": "Strong border on dark." },
-    "line-dark": { "value": "#262E33", "description": "Hairline border on Basalt." },
-    "line-light": { "value": "#DED8CC", "description": "BRAND hairline, retained as a primitive. Superseded as the light semantic border by quartz-line." },
-    "line-light-strong": { "value": "#C7BEAE", "description": "BRAND strong hairline, retained as a primitive. Superseded by quartz-line-strong." },
-    "on-dark": { "value": "#F2EFE9", "description": "Primary text on dark; also dark-theme primary action fill." },
-    "on-dark-secondary": { "value": "#B8BEC2", "description": "Secondary text on dark." },
-    "on-dark-muted": { "value": "#828A90", "description": "Muted text on dark." },
-
-    "shell": { "value": "#24384D", "description": "THE WORKSPACE SHELL — the sidebar's own material. An architectural blue, deliberately NOT the enterprise navy #001537 it replaced (hue 217 at 100% saturation, sampled off a rendered concept, derived from nothing in this palette). Chrome only: never a content surface, never a card, never a page ground." },
-    "shell-lit": { "value": "#32506A", "description": "Head of the shell ramp. The active navigation row is a wash of THIS (white 14%), not of the page's ground — a near-white pill on a saturated rail reads as pasted on rather than carved out." },
-    "shell-deep": { "value": "#182636", "description": "Foot of the shell ramp." },
-    "shell-pool": { "value": "#345070", "description": "The tonal pools painted inside the shell." },
-    "shell-dark": { "value": "#0B131C", "description": "The shell in dark theme. Only MODERATELY darker than the dark workspace — light theme keeps a large gap between the two materials, dark theme deliberately does not, or the page becomes one undifferentiated near-black stack." },
-    "shell-dark-lit": { "value": "#131F2A", "description": "Head of the dark shell ramp." },
-    "shell-dark-deep": { "value": "#070D13", "description": "Foot of the dark shell ramp." },
-    "shell-dark-pool": { "value": "#16222E", "description": "Tonal pools inside the dark shell." },
-    "shell-text": { "value": "#F2F5FA", "description": "Primary text ON the shell. Tinted from the shell's hue rather than grey — a neutral grey on a saturated ground reads as dirty." },
-    "shell-text-secondary": { "value": "#CCD6E4", "description": "Secondary text on the shell." },
-    "shell-text-muted": { "value": "#7E90AB", "description": "Group headings and quietest chrome on the shell." },
-
-    "mineral": { "value": "#E6EBF2", "description": "THE WORKSPACE ATMOSPHERE base (light) — the cool-mineral field the whole B2B page is composed on. Light on purpose: the SIDEBAR carries the ink, and a large expanse of low-luminance colour was twice rejected as a workspace ground for reading as heavy." },
-    "mineral-lit": { "value": "#EEF2F8", "description": "The tone the atmosphere's pools are mixed TOWARD. Never mix toward white — that produces a spotlight, and a room is not a spotlight." },
-    "mineral-dark": { "value": "#111A24", "description": "Atmosphere base in dark theme. A soft charcoal-ink, deliberately neither pure black nor the app's own near-black carbon." },
-    "mineral-dark-lit": { "value": "#1B2836", "description": "Pool mix target in dark theme." },
-    "navy-air": { "value": "#5986CF", "description": "A TINT SOURCE, never a surface. Tinting a light ground toward a near-black blue yields grey, not blue: navy (0,21,55) mixed into a light ground at 15% gains barely 9 points of blue-minus-red. This is the same hue carried up to PAGE lightness, and it is what the atmosphere's seam pool — the sidebar's own hue diluted by the room — is actually mixed from." },
-    "navy-edge": { "value": "#153860", "description": "The second, quieter atmosphere pool's hue. Tint source only." }
+    "deep-navy": {
+      "value": "#071A2D",
+      "description": "PALETTE ROOT: Deep Navy. Approved 2026-10-19."
+    },
+    "warm-sand": {
+      "value": "#D8C7A6",
+      "description": "PALETTE ROOT: Warm Sand. Approved 2026-10-19."
+    },
+    "soft-cream": {
+      "value": "#F2E9D8",
+      "description": "PALETTE ROOT: Soft Cream. Approved 2026-10-19."
+    },
+    "muted-terracotta": {
+      "value": "#B96F52",
+      "description": "PALETTE ROOT: Muted Terracotta. Approved 2026-10-19."
+    },
+    "status-success": {
+      "value": "#205A42",
+      "description": "Semantic status tone (the only non-palette hues). Light theme."
+    },
+    "status-success-bright": {
+      "value": "#6CC79A",
+      "description": "Semantic status tone (the only non-palette hues). Dark theme."
+    },
+    "status-warning": {
+      "value": "#6E4810",
+      "description": "Semantic status tone (the only non-palette hues). Light theme."
+    },
+    "status-warning-bright": {
+      "value": "#E3AC57",
+      "description": "Semantic status tone (the only non-palette hues). Dark theme."
+    },
+    "status-danger": {
+      "value": "#A3301C",
+      "description": "Semantic status tone (the only non-palette hues). Light theme."
+    },
+    "status-danger-bright": {
+      "value": "#F08A76",
+      "description": "Semantic status tone (the only non-palette hues). Dark theme."
+    },
+    "status-info": {
+      "value": "#2A5A80",
+      "description": "Semantic status tone (the only non-palette hues). Light theme."
+    },
+    "status-info-bright": {
+      "value": "#7FB3DA",
+      "description": "Semantic status tone (the only non-palette hues). Dark theme."
+    },
+    "navy-ink-2": {
+      "value": "#313F4C",
+      "description": "Derived step: Navy 82% + Cream (color-mix in srgb)."
+    },
+    "navy-ink-3": {
+      "value": "#49545D",
+      "description": "Derived step: Navy 72% + Cream (color-mix in srgb)."
+    },
+    "navy-raised": {
+      "value": "#132436",
+      "description": "Derived step: Navy + 5% Cream (color-mix in srgb)."
+    },
+    "navy-sunk": {
+      "value": "#1C2B39",
+      "description": "Derived step: Navy + 10% Sand (color-mix in srgb)."
+    },
+    "navy-hover": {
+      "value": "#162635",
+      "description": "Derived step: Navy + 7% Sand (color-mix in srgb)."
+    },
+    "navy-lit": {
+      "value": "#24323E",
+      "description": "Derived step: Navy + 14% Sand (color-mix in srgb)."
+    },
+    "sand-muted": {
+      "value": "#A29A87",
+      "description": "Derived step: Sand 74% + Navy (color-mix in srgb)."
+    },
+    "sand-line": {
+      "value": "#74746C",
+      "description": "Derived step: Sand 52% + Navy (color-mix in srgb)."
+    },
+    "sand-line-dark": {
+      "value": "#2D3943",
+      "description": "Derived step: Navy + 18% Sand (color-mix in srgb)."
+    },
+    "sand-strong": {
+      "value": "#7C7B71",
+      "description": "Derived step: Sand 56% + Navy (color-mix in srgb)."
+    },
+    "sand-ink": {
+      "value": "#4E5556",
+      "description": "Derived step: Sand 34% + Navy (color-mix in srgb)."
+    },
+    "cream-ground": {
+      "value": "#EEE4D0",
+      "description": "Derived step: Cream 84% + Sand (color-mix in srgb)."
+    },
+    "cream-hover": {
+      "value": "#E8DCC5",
+      "description": "Derived step: Cream 62% + Sand (color-mix in srgb)."
+    },
+    "cream-sunk": {
+      "value": "#E4D6BC",
+      "description": "Derived step: Cream 45% + Sand (color-mix in srgb)."
+    },
+    "cream-strong": {
+      "value": "#74746C",
+      "description": "Derived step: Sand 52% + Navy (color-mix in srgb)."
+    },
+    "terracotta-ink": {
+      "value": "#7C5245",
+      "description": "Derived step: Terracotta 66% + Navy (color-mix in srgb)."
+    },
+    "terracotta-glow": {
+      "value": "#CF9D85",
+      "description": "Derived step: Terracotta 62% + Cream (color-mix in srgb)."
+    },
+    "basalt": {
+      "value": "#071A2D",
+      "description": "Alias of deep-navy. Brand dark: the Aperture mark, auth brand panel, scrims."
+    },
+    "basalt-2": {
+      "value": "#132436",
+      "description": "Alias of navy-raised. Raised navy step."
+    },
+    "basalt-3": {
+      "value": "#24323E",
+      "description": "Alias of navy-lit. Highest navy step."
+    },
+    "limestone": {
+      "value": "#F2E9D8",
+      "description": "Alias of soft-cream. Cream: primary button label on navy, brand stone."
+    },
+    "plaster": {
+      "value": "#F2E9D8",
+      "description": "Alias of soft-cream. Cream ground of the landing page."
+    },
+    "sand": {
+      "value": "#E4D6BC",
+      "description": "Alias of cream-sunk. Sunk cream step."
+    },
+    "quartz": {
+      "value": "#EEE4D0",
+      "description": "Alias of cream-ground. Light canvas."
+    },
+    "quartz-raised": {
+      "value": "#F2E9D8",
+      "description": "Alias of soft-cream. Raised surface on light (cards)."
+    },
+    "quartz-sunk": {
+      "value": "#E4D6BC",
+      "description": "Alias of cream-sunk. Secondary fills, tags, chips on light."
+    },
+    "quartz-hover": {
+      "value": "#E8DCC5",
+      "description": "Alias of cream-hover. Pointer-over ground on light; one step short of quartz-sunk."
+    },
+    "quartz-line": {
+      "value": "#D8C7A6",
+      "description": "Alias of warm-sand. Decorative hairline on light."
+    },
+    "quartz-line-strong": {
+      "value": "#74746C",
+      "description": "Alias of cream-strong. Strong border / field line on light; >=3:1 on every light ground."
+    },
+    "ink": {
+      "value": "#071A2D",
+      "description": "Alias of deep-navy. Primary text and primary action fill on light."
+    },
+    "lumen": {
+      "value": "#B96F52",
+      "description": "Alias of muted-terracotta. Accent fill (action, selection, progress)."
+    },
+    "lumen-deep": {
+      "value": "#B96F52",
+      "description": "Alias of muted-terracotta. Accent for larger marks."
+    },
+    "lumen-ink": {
+      "value": "#7C5245",
+      "description": "Alias of terracotta-ink. AA-safe accent tone for normal-size text, strokes and focus on light."
+    },
+    "lumen-soft": {
+      "value": "#CF9D85",
+      "description": "Alias of terracotta-glow. Accent tone for text and focus on dark."
+    },
+    "bronze": {
+      "value": "#D8C7A6",
+      "description": "Alias of warm-sand. Trust/verification on dark."
+    },
+    "bronze-deep": {
+      "value": "#74746C",
+      "description": "Alias of sand-line. Trust/verification for larger marks on light."
+    },
+    "bronze-ink": {
+      "value": "#4E5556",
+      "description": "Alias of sand-ink. AA-safe trust tone for normal-size text on light."
+    },
+    "lapis": {
+      "value": "#071A2D",
+      "description": "Alias of deep-navy. Data/information ink on light (the info status tone is status-info)."
+    },
+    "lapis-bright": {
+      "value": "#D8C7A6",
+      "description": "Alias of warm-sand. Data/information ink on dark."
+    },
+    "verdigris": {
+      "value": "#205A42",
+      "description": "Alias of status-success. Success."
+    },
+    "verdigris-deep": {
+      "value": "#205A42",
+      "description": "Alias of status-success. AA-safe success tone on light."
+    },
+    "verdigris-bright": {
+      "value": "#6CC79A",
+      "description": "Alias of status-success-bright. Success on dark."
+    },
+    "ochre": {
+      "value": "#6E4810",
+      "description": "Alias of status-warning. Warning."
+    },
+    "ochre-deep": {
+      "value": "#6E4810",
+      "description": "Alias of status-warning. AA-safe warning tone on light."
+    },
+    "ochre-bright": {
+      "value": "#E3AC57",
+      "description": "Alias of status-warning-bright. Warning on dark."
+    },
+    "oxide": {
+      "value": "#A3301C",
+      "description": "Alias of status-danger. Danger on light; a deeper brick than the terracotta accent."
+    },
+    "oxide-bright": {
+      "value": "#F08A76",
+      "description": "Alias of status-danger-bright. Danger on dark."
+    },
+    "stone": {
+      "value": "#313F4C",
+      "description": "Alias of navy-ink-2. Secondary text on light."
+    },
+    "stone-muted": {
+      "value": "#49545D",
+      "description": "Alias of navy-ink-3. Muted text on light; AA on every light ground including surface-2."
+    },
+    "graphite": {
+      "value": "#313F4C",
+      "description": "Alias of navy-ink-2. Strong navy ink."
+    },
+    "line-dark": {
+      "value": "#2D3943",
+      "description": "Alias of sand-line-dark. Hairline border on navy."
+    },
+    "line-light": {
+      "value": "#D8C7A6",
+      "description": "Alias of warm-sand. Hairline on cream."
+    },
+    "line-light-strong": {
+      "value": "#74746C",
+      "description": "Alias of cream-strong. Strong hairline on cream."
+    },
+    "on-dark": {
+      "value": "#F2E9D8",
+      "description": "Alias of soft-cream. Primary text on navy."
+    },
+    "on-dark-secondary": {
+      "value": "#D8C7A6",
+      "description": "Alias of warm-sand. Secondary text on navy."
+    },
+    "on-dark-muted": {
+      "value": "#A29A87",
+      "description": "Alias of sand-muted. Muted text on navy."
+    },
+    "shell": {
+      "value": "#071A2D",
+      "description": "Alias of deep-navy. The workspace shell (sidebar) material. Chrome only."
+    },
+    "shell-lit": {
+      "value": "#24323E",
+      "description": "Alias of navy-lit. Lit tone of the shell; the active row is a 14% cream wash of this."
+    },
+    "shell-deep": {
+      "value": "#071A2D",
+      "description": "Alias of deep-navy. Foot of the shell ramp."
+    },
+    "shell-pool": {
+      "value": "#24323E",
+      "description": "Alias of navy-lit. Tonal pools inside the shell."
+    },
+    "shell-dark": {
+      "value": "#071A2D",
+      "description": "Alias of deep-navy. The shell in dark theme; set apart from the navy workspace by its sand hairline."
+    },
+    "shell-dark-lit": {
+      "value": "#24323E",
+      "description": "Alias of navy-lit. Lit tone of the dark shell."
+    },
+    "shell-dark-deep": {
+      "value": "#071A2D",
+      "description": "Alias of deep-navy. Foot of the dark shell ramp."
+    },
+    "shell-dark-pool": {
+      "value": "#1C2B39",
+      "description": "Alias of navy-sunk. Tonal pools inside the dark shell."
+    },
+    "shell-text": {
+      "value": "#F2E9D8",
+      "description": "Alias of soft-cream. Primary text on the shell."
+    },
+    "shell-text-secondary": {
+      "value": "#D8C7A6",
+      "description": "Alias of warm-sand. Secondary text on the shell."
+    },
+    "shell-text-muted": {
+      "value": "#A29A87",
+      "description": "Alias of sand-muted. Quietest chrome on the shell; AA as body text."
+    },
+    "mineral": {
+      "value": "#EEE4D0",
+      "description": "Alias of cream-ground. Workspace atmosphere base (light)."
+    },
+    "mineral-lit": {
+      "value": "#F2E9D8",
+      "description": "Alias of soft-cream. Tone the atmosphere's pools mix toward (light)."
+    },
+    "mineral-dark": {
+      "value": "#071A2D",
+      "description": "Alias of deep-navy. Workspace atmosphere base (dark)."
+    },
+    "mineral-dark-lit": {
+      "value": "#1C2B39",
+      "description": "Alias of navy-sunk. Pool mix target (dark)."
+    },
+    "navy-air": {
+      "value": "#D8C7A6",
+      "description": "Alias of warm-sand. Tint source for the atmosphere's seam pool; never a surface."
+    },
+    "navy-edge": {
+      "value": "#24323E",
+      "description": "Alias of navy-lit. Tint source for the atmosphere's second pool."
+    }
   },
   "semantic": {
     "light": {
-      "canvas": { "value": "{primitives.quartz}" },
-      "surface": { "value": "{primitives.quartz-raised}" },
-      "surface-2": { "value": "{primitives.quartz-sunk}" },
-      "surface-hover": { "value": "{primitives.quartz-hover}" },
-      "fg": { "value": "{primitives.ink}", "contrastOnCanvas": "15.90:1" },
-      "fg-secondary": { "value": "{primitives.stone}", "contrastOnCanvas": "5.70:1" },
-      "fg-muted": { "value": "{primitives.stone-muted}", "contrastOnCanvas": "4.84:1", "contrastOnSurface": "5.24:1", "note": "AA only on canvas/surface; NOT on the secondary fill quartz-sunk (4.47:1). See the Muted-On-Sunk Rule." },
-      "border": { "value": "{primitives.quartz-line}" },
-      "border-strong": { "value": "{primitives.quartz-line-strong}" },
-      "primary": { "value": "{primitives.ink}" },
-      "primary-foreground": { "value": "{primitives.limestone}", "contrastOnPrimary": "15.64:1", "note": "Brand stone on ink. Unchanged by the Quartz move: neither token in this pair is the canvas." },
-      "accent": { "value": "{primitives.lumen-ink}", "contrastOnCanvas": "5.45:1" },
-      "accent-solid": { "value": "{primitives.lumen}", "note": "Glows/fills/large marks only; not normal-size text on light." },
-      "bronze": { "value": "{primitives.bronze-ink}", "contrastOnSurface2": "6.00:1" },
-      "lapis": { "value": "{primitives.lapis}", "contrastOnCanvas": "6.01:1" },
-      "success": { "value": "{primitives.verdigris-deep}", "contrastOnCanvas": "7.27:1" },
-      "warning": { "value": "{primitives.ochre-deep}", "contrastOnCanvas": "7.29:1" },
-      "danger": { "value": "{primitives.oxide}", "contrastOnCanvas": "5.37:1" },
-      "info": { "value": "{primitives.lapis}" },
-      "focus": { "value": "{primitives.lumen-ink}" },
-
-      "shell": { "value": "{primitives.shell}", "note": "Chrome family. Separate from surface/canvas ON PURPOSE: these are the only tokens allowed on chrome, and surface/canvas the only ones allowed on content, so the two can never be confused at a call site." },
-      "shell-lit": { "value": "{primitives.shell-lit}" },
-      "shell-deep": { "value": "{primitives.shell-deep}" },
-      "shell-pool": { "value": "{primitives.shell-pool}" },
-      "shell-fg": { "value": "{primitives.shell-text}", "contrastOnShell": "12.1:1" },
-      "shell-fg-secondary": { "value": "{primitives.shell-text-secondary}", "contrastOnShell": "8.6:1" },
-      "shell-fg-muted": { "value": "{primitives.shell-text-muted}", "contrastOnShell": "3.5:1", "note": "Group HEADINGS only — uppercase 11px, which is not body text. Never use for a readable label." },
-      "shell-active": { "value": "color-mix(white 14%, {primitives.shell-lit})", "note": "The carved active row. A wash of the shell's OWN lit tone, never the page ground, and it carries no cast shadow — a dark shadow under a light-on-dark wash is a smudge, not a depth cue." },
-      "shell-active-fg": { "value": "{primitives.shell-text}", "note": "The rail's full-strength foreground, NOT an inverted ink: an ink tuned for a near-white pill is close to invisible on a translucent wash of the shell." },
-      "workspace-mesh": { "value": "{primitives.mineral}" },
-      "workspace-mesh-lit": { "value": "{primitives.mineral-lit}" },
-      "workspace-pool-cool": { "value": "{primitives.navy-air}", "note": "The SEAM pool — the sidebar's own hue. This one token is the mechanism behind the sidebar reading as integrated with the environment rather than pasted beside it." },
-      "workspace-pool-cool-2": { "value": "{primitives.navy-edge}" },
-      "workspace-pool-warm": { "value": "{primitives.lumen}", "note": "The one warm note in a cool field. Restrained — the brand's accent, not a second temperature competing with it." },
-      "workspace": { "value": "#FBFCFE", "note": "The operational ground the cards are drawn on. Panels stay `surface`." }
+      "canvas": {
+        "value": "{primitives.quartz}"
+      },
+      "surface": {
+        "value": "{primitives.quartz-raised}"
+      },
+      "surface-2": {
+        "value": "{primitives.quartz-sunk}"
+      },
+      "surface-hover": {
+        "value": "{primitives.quartz-hover}"
+      },
+      "fg": {
+        "value": "{primitives.ink}",
+        "contrastOnCanvas": "13.93:1"
+      },
+      "fg-secondary": {
+        "value": "{primitives.stone}",
+        "contrastOnCanvas": "8.55:1"
+      },
+      "fg-muted": {
+        "value": "{primitives.stone-muted}",
+        "contrastOnSurface2": "5.40:1",
+        "note": "AA on every light ground, including surface-2. Measured by frontend/src/styles/palette-contrast.test.ts."
+      },
+      "border": {
+        "value": "{primitives.quartz-line}"
+      },
+      "border-strong": {
+        "value": "{primitives.quartz-line-strong}",
+        "contrastOnCanvas": "3.73:1"
+      },
+      "primary": {
+        "value": "{primitives.ink}"
+      },
+      "primary-foreground": {
+        "value": "{primitives.limestone}",
+        "contrastOnPrimary": "14.58:1"
+      },
+      "accent": {
+        "value": "{primitives.lumen-ink}",
+        "contrastOnSurface2": "4.65:1"
+      },
+      "accent-solid": {
+        "value": "{primitives.lumen}",
+        "contrastOnCanvas": "3.05:1",
+        "note": "Fills and large marks; about 2.7:1 on surface-2, so never a sole indicator there."
+      },
+      "on-accent": {
+        "value": "{primitives.deep-navy}",
+        "contrastOnAccentSolid": "4.57:1"
+      },
+      "bronze": {
+        "value": "{primitives.bronze-ink}",
+        "contrastOnSurface2": "5.31:1"
+      },
+      "lapis": {
+        "value": "{primitives.lapis}",
+        "contrastOnCanvas": "13.93:1"
+      },
+      "success": {
+        "value": "{primitives.verdigris-deep}",
+        "contrastOnCanvas": "6.40:1"
+      },
+      "warning": {
+        "value": "{primitives.ochre-deep}",
+        "contrastOnCanvas": "6.41:1"
+      },
+      "danger": {
+        "value": "{primitives.oxide}",
+        "contrastOnCanvas": "5.55:1"
+      },
+      "info": {
+        "value": "{primitives.status-info}",
+        "contrastOnCanvas": "5.79:1"
+      },
+      "focus": {
+        "value": "{primitives.lumen-ink}",
+        "contrastOnSurface2": "4.65:1"
+      },
+      "shell": {
+        "value": "{primitives.shell}"
+      },
+      "shell-lit": {
+        "value": "{primitives.shell-lit}"
+      },
+      "shell-deep": {
+        "value": "{primitives.shell-deep}"
+      },
+      "shell-pool": {
+        "value": "{primitives.shell-pool}"
+      },
+      "shell-fg": {
+        "value": "{primitives.shell-text}",
+        "contrastOnShell": "14.58:1"
+      },
+      "shell-fg-secondary": {
+        "value": "{primitives.shell-text-secondary}",
+        "contrastOnShell": "10.58:1"
+      },
+      "shell-fg-muted": {
+        "value": "{primitives.shell-text-muted}",
+        "contrastOnShell": "6.28:1"
+      },
+      "shell-active-fg": {
+        "value": "{primitives.shell-text}"
+      },
+      "workspace-mesh": {
+        "value": "{primitives.mineral}"
+      },
+      "workspace-mesh-lit": {
+        "value": "{primitives.mineral-lit}"
+      },
+      "workspace-pool-cool": {
+        "value": "{primitives.navy-air}"
+      },
+      "workspace-pool-cool-2": {
+        "value": "{primitives.deep-navy}"
+      },
+      "workspace-pool-warm": {
+        "value": "{primitives.lumen}"
+      },
+      "workspace": {
+        "value": "{primitives.soft-cream}"
+      },
+      "shell-active": {
+        "value": "color-mix(soft-cream 14%, {primitives.shell-lit})"
+      }
     },
     "dark": {
-      "canvas": { "value": "{primitives.basalt}" },
-      "surface": { "value": "{primitives.basalt-2}" },
-      "surface-2": { "value": "{primitives.basalt-3}" },
-      "fg": { "value": "{primitives.on-dark}", "contrastOnCanvas": "16.51:1" },
-      "fg-secondary": { "value": "{primitives.on-dark-secondary}", "contrastOnCanvas": "10.09:1" },
-      "fg-muted": { "value": "{primitives.on-dark-muted}", "contrastOnCanvas": "5.40:1" },
-      "border": { "value": "{primitives.line-dark}" },
-      "border-strong": { "value": "{primitives.graphite}" },
-      "primary": { "value": "{primitives.on-dark}" },
-      "primary-foreground": { "value": "{primitives.basalt}", "contrastOnPrimary": "16.51:1" },
-      "accent": { "value": "{primitives.lumen}", "contrastOnCanvas": "9.66:1" },
-      "accent-solid": { "value": "{primitives.lumen}" },
-      "bronze": { "value": "{primitives.bronze}" },
-      "lapis": { "value": "{primitives.lapis-bright}", "contrastOnCanvas": "7.41:1" },
-      "success": { "value": "{primitives.verdigris-bright}", "contrastOnCanvas": "8.43:1" },
-      "warning": { "value": "{primitives.ochre-bright}", "contrastOnCanvas": "8.71:1" },
-      "danger": { "value": "{primitives.oxide-bright}", "contrastOnCanvas": "6.08:1" },
-      "info": { "value": "{primitives.lapis-bright}" },
-      "focus": { "value": "{primitives.lumen}" },
-
-      "shell": { "value": "{primitives.shell-dark}" },
-      "shell-lit": { "value": "{primitives.shell-dark-lit}" },
-      "shell-deep": { "value": "{primitives.shell-dark-deep}" },
-      "shell-pool": { "value": "{primitives.shell-dark-pool}" },
-      "shell-fg": { "value": "#EDEDEC", "note": "The dark theme's own primary text. Literal rather than a {primitives.*} reference because the Carbon ramp it belongs to is not in this file yet — see knownDrift." },
-      "shell-active": { "value": "color-mix(white 14%, {primitives.shell-dark-lit})", "note": "SAME percentage as light, and that is correct rather than lazy: the token it mixes FROM already carries the theme, so re-deriving the percentage on top double-counts it. Measured at 9% and the active row visibly flattened against the rail." },
-      "shell-active-fg": { "value": "#EDEDEC", "note": "Same literal, same reason." },
-      "workspace-mesh": { "value": "{primitives.mineral-dark}" },
-      "workspace-mesh-lit": { "value": "{primitives.mineral-dark-lit}" },
-      "workspace-pool-cool": { "value": "{primitives.navy-air}", "note": "Hues are theme-independent; only the mesh they mix INTO changes, so the same percentages land as a tint rather than a glow." },
-      "workspace-pool-cool-2": { "value": "{primitives.navy-edge}" },
-      "workspace-pool-warm": { "value": "{primitives.lumen}" },
-      "workspace": { "value": "#131415", "note": "The Carbon ground. Literal for the same reason — see knownDrift." }
+      "canvas": {
+        "value": "{primitives.deep-navy}"
+      },
+      "surface": {
+        "value": "{primitives.navy-raised}"
+      },
+      "surface-2": {
+        "value": "{primitives.navy-sunk}"
+      },
+      "surface-hover": {
+        "value": "{primitives.navy-hover}"
+      },
+      "fg": {
+        "value": "{primitives.on-dark}",
+        "contrastOnCanvas": "14.58:1"
+      },
+      "fg-secondary": {
+        "value": "{primitives.on-dark-secondary}",
+        "contrastOnCanvas": "10.58:1"
+      },
+      "fg-muted": {
+        "value": "{primitives.on-dark-muted}",
+        "contrastOnSurface2": "5.16:1"
+      },
+      "border": {
+        "value": "{primitives.line-dark}"
+      },
+      "border-strong": {
+        "value": "{primitives.sand-strong}",
+        "contrastOnCanvas": "4.13:1"
+      },
+      "primary": {
+        "value": "{primitives.warm-sand}"
+      },
+      "primary-foreground": {
+        "value": "{primitives.deep-navy}",
+        "contrastOnPrimary": "10.58:1"
+      },
+      "accent": {
+        "value": "{primitives.lumen-soft}",
+        "contrastOnSurface2": "6.06:1"
+      },
+      "accent-solid": {
+        "value": "{primitives.lumen}",
+        "contrastOnCanvas": "4.57:1"
+      },
+      "bronze": {
+        "value": "{primitives.bronze}"
+      },
+      "lapis": {
+        "value": "{primitives.lapis-bright}",
+        "contrastOnCanvas": "10.58:1"
+      },
+      "success": {
+        "value": "{primitives.verdigris-bright}",
+        "contrastOnCanvas": "8.60:1"
+      },
+      "warning": {
+        "value": "{primitives.ochre-bright}",
+        "contrastOnCanvas": "8.63:1"
+      },
+      "danger": {
+        "value": "{primitives.oxide-bright}",
+        "contrastOnCanvas": "7.20:1"
+      },
+      "info": {
+        "value": "{primitives.status-info-bright}",
+        "contrastOnCanvas": "7.84:1"
+      },
+      "focus": {
+        "value": "{primitives.lumen-soft}",
+        "contrastOnSurface2": "6.06:1"
+      },
+      "shell": {
+        "value": "{primitives.shell-dark}"
+      },
+      "shell-lit": {
+        "value": "{primitives.shell-dark-lit}"
+      },
+      "shell-deep": {
+        "value": "{primitives.shell-dark-deep}"
+      },
+      "shell-pool": {
+        "value": "{primitives.shell-dark-pool}"
+      },
+      "shell-fg": {
+        "value": "{primitives.shell-text}",
+        "contrastOnShell": "14.58:1"
+      },
+      "shell-active-fg": {
+        "value": "{primitives.shell-text}"
+      },
+      "workspace-mesh": {
+        "value": "{primitives.mineral-dark}"
+      },
+      "workspace-mesh-lit": {
+        "value": "{primitives.mineral-dark-lit}"
+      },
+      "workspace-pool-cool": {
+        "value": "{primitives.navy-air}"
+      },
+      "workspace-pool-cool-2": {
+        "value": "{primitives.deep-navy}"
+      },
+      "workspace-pool-warm": {
+        "value": "{primitives.lumen}"
+      },
+      "workspace": {
+        "value": "{primitives.deep-navy}"
+      },
+      "shell-active": {
+        "value": "color-mix(soft-cream 14%, {primitives.shell-dark-lit})"
+      }
     }
   },
   "knownDrift": {
-    "note": "PRE-EXISTING, NOT INTRODUCED BY THE SHELL PASS. This file still names Basalt as the dark canvas/surface ramp; the implementation (frontend/src/styles/tokens.css) moved the dark GROUND to a neutral Carbon ramp some passes ago — Basalt was retained as a brand colour only. The Carbon primitives, the dark elevation shadows and the scrollbar tokens are therefore absent here. The shell/workspace family added on 2026-08-26 IS current. Reconciling the dark ramp is its own task; do not treat the Basalt entries above as authoritative for the dark workspace.",
-    "authority": "frontend/src/styles/tokens.css is currently ahead of this file for the dark theme."
+    "note": "None. Reconciled 2026-10-19 with the palette remap: values here equal frontend/src/styles/tokens.css (color-mix steps computed to hex, rounded per channel). Elevation shadows, scrollbar and field tokens live only in tokens.css.",
+    "authority": "This file; contrast is enforced by frontend/src/styles/palette-contrast.test.ts."
   }
 }

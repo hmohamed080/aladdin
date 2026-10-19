@@ -51,6 +51,14 @@
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    /* Native controls (checkboxes, radios, range, date pickers) follow the
+       palette and the active theme instead of painting browser white/blue. */
+    color-scheme: light;
+    accent-color: var(--accent-solid);
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 
   body {
@@ -534,10 +542,10 @@ body:has(.workspace-frame) {
    layer stacked under the real one. */
 header[data-app-header="card"] {
   background-color: color-mix(in srgb, var(--workspace) 70%, transparent) !important;
-  border-color: color-mix(in srgb, white 45%, var(--workspace-line)) !important;
+  border-color: color-mix(in srgb, var(--soft-cream) 45%, var(--workspace-line)) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 10px 24px -16px rgba(20, 32, 54, 0.16);
+    inset 0 1px 0 color-mix(in srgb, var(--soft-cream) 60%, transparent),
+    0 10px 24px -16px color-mix(in srgb, var(--deep-navy) 16%, transparent);
   /* STICKY, AND WITH BREATHING ROOM WHILE STUCK. The header stays in view while
      the dashboard scrolls under it. `top: 0` pinned the card flush to the
      viewport edge the instant the page scrolled, flattening the floating rounded
@@ -551,10 +559,10 @@ header[data-app-header="card"] {
 
 .dark header[data-app-header="card"] {
   background-color: color-mix(in srgb, var(--workspace) 68%, transparent) !important;
-  border-color: color-mix(in srgb, white 8%, var(--workspace-line)) !important;
+  border-color: color-mix(in srgb, var(--soft-cream) 8%, var(--workspace-line)) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 10px 28px -16px rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 color-mix(in srgb, var(--soft-cream) 6%, transparent),
+    0 10px 28px -16px color-mix(in srgb, var(--deep-navy) 40%, transparent);
 }
 
 /* HEADER CONTRAST. The muted/hint tokens used inside the header (utility icons,
@@ -585,7 +593,7 @@ header[data-app-header="card"] [class*="text-fg-muted"]:not([class*="select-none
    the near-black the brief rules out. */
 header[data-app-header="card"] [data-testid="global-search-trigger"] {
   background-color: color-mix(in srgb, var(--workspace) 92%, transparent) !important;
-  border-color: color-mix(in srgb, white 55%, var(--border)) !important;
+  border-color: color-mix(in srgb, var(--soft-cream) 55%, var(--border)) !important;
   color: var(--field-fg) !important;
 }
 
@@ -594,12 +602,12 @@ header[data-app-header="card"] [data-testid="global-search-trigger"]:hover {
 }
 
 .dark header[data-app-header="card"] [data-testid="global-search-trigger"] {
-  background-color: color-mix(in srgb, white 10%, var(--workspace)) !important;
-  border-color: rgba(255, 255, 255, 0.14) !important;
+  background-color: color-mix(in srgb, var(--soft-cream) 10%, var(--workspace)) !important;
+  border-color: color-mix(in srgb, var(--soft-cream) 14%, transparent) !important;
 }
 
 .dark header[data-app-header="card"] [data-testid="global-search-trigger"]:hover {
-  background-color: color-mix(in srgb, white 15%, var(--workspace)) !important;
+  background-color: color-mix(in srgb, var(--soft-cream) 15%, var(--workspace)) !important;
 }
 
 header[data-app-header="card"] [data-testid="global-search-trigger"] [class*="text-field-placeholder"] {
@@ -622,8 +630,8 @@ header[data-app-header="card"] [data-testid="global-search-trigger"] [class*="te
 .workspace-body .bg-surface {
   border-color: color-mix(in srgb, var(--workspace-pool-cool) 10%, var(--workspace-line)) !important;
   box-shadow:
-    0 1px 2px rgba(20, 32, 54, 0.05),
-    0 10px 24px -16px rgba(20, 32, 54, 0.14) !important;
+    0 1px 2px color-mix(in srgb, var(--deep-navy) 5%, transparent),
+    0 10px 24px -16px color-mix(in srgb, var(--deep-navy) 14%, transparent) !important;
 }
 
 /* Dark theme: a cast shadow barely registers against an already-dark ground, so
@@ -631,10 +639,10 @@ header[data-app-header="card"] [data-testid="global-search-trigger"] [class*="te
    the same elevation grammar light mode uses (edge + shadow), with the roles
    that actually read swapped for a dark ground. */
 .dark .workspace-body .bg-surface {
-  border-color: rgba(255, 255, 255, 0.09) !important;
+  border-color: color-mix(in srgb, var(--soft-cream) 9%, transparent) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 10px 24px -16px rgba(0, 0, 0, 0.5) !important;
+    inset 0 1px 0 color-mix(in srgb, var(--soft-cream) 5%, transparent),
+    0 10px 24px -16px color-mix(in srgb, var(--deep-navy) 50%, transparent) !important;
 }
 
 /* Installer opportunity filters preserve the native range interaction while
@@ -672,7 +680,7 @@ header[data-app-header="card"] [data-testid="global-search-trigger"] [class*="te
   border: 2px solid var(--surface);
   border-radius: 9999px;
   background: var(--accent-solid);
-  box-shadow: 0 0 0 1px var(--border-strong);
+  box-shadow: 0 0 0 1px var(--accent-edge);
 }
 
 .installer-budget-range::-moz-range-track {
@@ -685,6 +693,7 @@ header[data-app-header="card"] [data-testid="global-search-trigger"] [class*="te
   height: 0.25rem;
   border-radius: 9999px;
   background: var(--accent-solid);
+  box-shadow: 0 0 0 1px var(--accent-edge);
 }
 
 .installer-budget-range::-moz-range-thumb {
@@ -693,7 +702,7 @@ header[data-app-header="card"] [data-testid="global-search-trigger"] [class*="te
   border: 2px solid var(--surface);
   border-radius: 9999px;
   background: var(--accent-solid);
-  box-shadow: 0 0 0 1px var(--border-strong);
+  box-shadow: 0 0 0 1px var(--accent-edge);
 }
 
 /* FILTER CHIPS — flat and borderless rather than bordered buttons competing with

@@ -3,7 +3,6 @@
   border-color: var(--border) !important;
   box-shadow: none !important;
 }
-.theme :global(.text-white) { color: var(--soft-cream); }
 .theme :global(.border-danger) { border-color: var(--muted-terracotta); }
 .toggle {
   position: relative;
@@ -14,7 +13,7 @@
   border-radius: var(--radius-pill, 999px);
   background: var(--surface-2);
 }
-.toggle[aria-checked="true"] { background: var(--muted-terracotta); }
+.toggle[aria-checked="true"] { background: var(--muted-terracotta); box-shadow: 0 0 0 1px var(--accent-edge); }
 .thumb {
   position: absolute;
   inset-inline-start: 0.25rem;

@@ -54,7 +54,7 @@ export function AnalyticsRange({ current, from, to, max }: { current: RangePrese
             }}
             className={cn(
               "min-h-10 rounded-md border px-3.5 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
-              current === p.value ? "border-accent bg-accent-solid text-on-accent" : "border-strong text-fg-secondary hover:bg-surface-2",
+              current === p.value ? "border-accent-edge bg-accent-solid text-on-accent" : "border-strong text-fg-secondary hover:bg-surface-2",
             )}
           >
             {p.label}
@@ -66,7 +66,7 @@ export function AnalyticsRange({ current, from, to, max }: { current: RangePrese
           onClick={() => setShowCustom(true)}
           className={cn(
             "min-h-10 rounded-md border px-3.5 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
-            current === "custom" || showCustom ? "border-accent bg-accent-solid text-on-accent" : "border-strong text-fg-secondary hover:bg-surface-2",
+            current === "custom" || showCustom ? "border-accent-edge bg-accent-solid text-on-accent" : "border-strong text-fg-secondary hover:bg-surface-2",
           )}
         >
           {t("admin.preview.analytics.presets.custom")}

@@ -2,82 +2,103 @@
 name: Aladdin
 description: The AI operating system that brings light to a decision — for Egypt's finishing, construction & design sector.
 colors:
-  basalt: "#0E1113"
-  basalt-2: "#1B2226"
-  basalt-3: "#232B30"
-  # ---- The SHELL, i.e. the sidebar's own material ----
-  # An architectural blue, NOT an enterprise navy. `navy` (#001537) is hue 217°
-  # at 100% saturation — a colour sampled off a rendered concept, which matches
-  # an image and does not own a colour: nothing in this system can say what it
-  # is a shade of. The shell ramp below is the approved one; `navy-air` survives
-  # from the old family only as a TINT SOURCE (see below), never as a surface.
-  shell: "#24384D"
-  shell-lit: "#32506A"
-  shell-deep: "#182636"
-  shell-pool: "#345070"
-  # The carved active row is a WASH OF THE SHELL ITSELF (white 14% into
-  # shell-lit), not the page's ground. A near-white pill on this material reads
-  # as an object pasted onto it rather than a row lifted out of it.
-  shell-active: "white 14% + shell-lit"
-  navy-text: "#F2F5FA"
-  navy-text-secondary: "#CCD6E4"
-  navy-text-muted: "#7E90AB"
-  # Navy at PAGE lightness. Never paint a surface with it — it is the pigment
-  # the workspace's cool pools are mixed from, because tinting a light ground
-  # toward a near-black navy produces grey, not blue.
-  navy-air: "#5986CF"
-  # ---- The WORKSPACE, i.e. what the sidebar stands beside ----
-  # TWO MATERIALS, DELIBERATELY DIFFERENT LIGHTNESS, and the direction matters:
-  # the SIDEBAR carries the saturated dark colour and the WORKSPACE is light.
-  # Spreading the ink across the whole page was tried and rejected twice for
-  # reading as heavy — a large expanse of low-luminance colour is not what
-  # "atmospheric" means. The workspace is an ATMOSPHERE (a mesh with three
-  # restrained pools), not a flat fill; its seam pool borrows the shell's own
-  # hue, which is the entire mechanism behind the sidebar reading as integrated
-  # with the room rather than pasted beside it.
-  workspace-mesh: "#E6EBF2"
-  workspace-mesh-lit: "#EEF2F8"
-  workspace-pool-cool: "navy-air"
-  workspace-pool-cool-2: "#153860"
-  workspace-pool-warm: "lumen"
-  # The operational surface the cards are drawn on. Panels stay `surface`.
-  workspace: "#FBFCFE"
-  limestone: "#F4F1EA"
-  plaster: "#FBF9F4"
-  sand: "#EAE5DB"
-  quartz: "#F4F3F0"
-  quartz-raised: "#FDFCFB"
-  quartz-sunk: "#ECEAE6"
-  quartz-hover: "#F3F1EE"
-  quartz-line: "#DBD8D5"
-  quartz-line-strong: "#C2BFBB"
-  ink: "#17191A"
-  lumen: "#F3AB3E"
-  lumen-deep: "#C77F1C"
-  lumen-ink: "#855A15"
-  lumen-soft: "#F7C674"
-  bronze: "#C79A5E"
-  bronze-deep: "#96703F"
-  bronze-ink: "#6E5230"
-  lapis: "#2F6088"
-  lapis-bright: "#6FA8D2"
-  verdigris: "#2F7D5B"
-  verdigris-deep: "#205A42"
-  ochre: "#B26B12"
-  ochre-deep: "#6E4810"
-  oxide: "#B23A22"
-  stone: "#5C6066"
-  stone-muted: "#676B70"
-  graphite: "#39444B"
-  line-dark: "#262E33"
-  line-light: "#DED8CC"
-  line-light-strong: "#C7BEAE"
-  on-dark: "#F2EFE9"
-  on-dark-secondary: "#B8BEC2"
-  on-dark-muted: "#828A90"
-  verdigris-bright: "#58C08E"
-  ochre-bright: "#E0A54A"
-  oxide-bright: "#E27159"
+  # ---- The approved palette (owner decision 2026-10-19) ----
+  # Every surface, ink, border, accent and focus value is one of these four
+  # roots or a color-mix of them; status tones are the only other hues.
+  # Mirrors design/tokens/colors.json and frontend/src/styles/tokens.css.
+  deep-navy: "#071A2D"
+  warm-sand: "#D8C7A6"
+  soft-cream: "#F2E9D8"
+  muted-terracotta: "#B96F52"
+  # ---- Semantic status tones (-bright = dark theme) ----
+  status-success: "#205A42"
+  status-success-bright: "#6CC79A"
+  status-warning: "#6E4810"
+  status-warning-bright: "#E3AC57"
+  status-danger: "#A3301C"
+  status-danger-bright: "#F08A76"
+  status-info: "#2A5A80"
+  status-info-bright: "#7FB3DA"
+  # ---- Derived steps (color-mix in srgb of the roots) ----
+  navy-ink-2: "#313F4C"  # Navy 82% + Cream
+  navy-ink-3: "#49545D"  # Navy 72% + Cream
+  navy-raised: "#132436"  # Navy + 5% Cream
+  navy-sunk: "#1C2B39"  # Navy + 10% Sand
+  navy-hover: "#162635"  # Navy + 7% Sand
+  navy-lit: "#24323E"  # Navy + 14% Sand
+  sand-muted: "#A29A87"  # Sand 74% + Navy
+  sand-line: "#74746C"  # Sand 52% + Navy
+  sand-line-dark: "#2D3943"  # Navy + 18% Sand
+  sand-strong: "#7C7B71"  # Sand 56% + Navy
+  sand-ink: "#4E5556"  # Sand 34% + Navy
+  cream-ground: "#EEE4D0"  # Cream 84% + Sand
+  cream-hover: "#E8DCC5"  # Cream 62% + Sand
+  cream-sunk: "#E4D6BC"  # Cream 45% + Sand
+  cream-strong: "#74746C"  # Sand 52% + Navy
+  terracotta-ink: "#7C5245"  # Terracotta 66% + Navy
+  terracotta-glow: "#CF9D85"  # Terracotta 62% + Cream
+  # ---- Aperture names, kept as aliases of the palette ----
+  basalt: "#071A2D"  # = deep-navy
+  basalt-2: "#132436"  # = navy-raised
+  basalt-3: "#24323E"  # = navy-lit
+  limestone: "#F2E9D8"  # = soft-cream
+  plaster: "#F2E9D8"  # = soft-cream
+  sand: "#E4D6BC"  # = cream-sunk
+  quartz: "#EEE4D0"  # = cream-ground
+  quartz-raised: "#F2E9D8"  # = soft-cream
+  quartz-sunk: "#E4D6BC"  # = cream-sunk
+  quartz-hover: "#E8DCC5"  # = cream-hover
+  quartz-line: "#D8C7A6"  # = warm-sand
+  quartz-line-strong: "#74746C"  # = cream-strong
+  ink: "#071A2D"  # = deep-navy
+  lumen: "#B96F52"  # = muted-terracotta
+  lumen-deep: "#B96F52"  # = muted-terracotta
+  lumen-ink: "#7C5245"  # = terracotta-ink
+  lumen-soft: "#CF9D85"  # = terracotta-glow
+  bronze: "#D8C7A6"  # = warm-sand
+  bronze-deep: "#74746C"  # = sand-line
+  bronze-ink: "#4E5556"  # = sand-ink
+  lapis: "#071A2D"  # = deep-navy
+  lapis-bright: "#D8C7A6"  # = warm-sand
+  verdigris: "#205A42"  # = status-success
+  verdigris-deep: "#205A42"  # = status-success
+  verdigris-bright: "#6CC79A"  # = status-success-bright
+  ochre: "#6E4810"  # = status-warning
+  ochre-deep: "#6E4810"  # = status-warning
+  ochre-bright: "#E3AC57"  # = status-warning-bright
+  oxide: "#A3301C"  # = status-danger
+  oxide-bright: "#F08A76"  # = status-danger-bright
+  stone: "#313F4C"  # = navy-ink-2
+  stone-muted: "#49545D"  # = navy-ink-3
+  graphite: "#313F4C"  # = navy-ink-2
+  line-dark: "#2D3943"  # = sand-line-dark
+  line-light: "#D8C7A6"  # = warm-sand
+  line-light-strong: "#74746C"  # = cream-strong
+  on-dark: "#F2E9D8"  # = soft-cream
+  on-dark-secondary: "#D8C7A6"  # = warm-sand
+  on-dark-muted: "#A29A87"  # = sand-muted
+  shell: "#071A2D"  # = deep-navy
+  shell-lit: "#24323E"  # = navy-lit
+  shell-deep: "#071A2D"  # = deep-navy
+  shell-pool: "#24323E"  # = navy-lit
+  shell-dark: "#071A2D"  # = deep-navy
+  shell-dark-lit: "#24323E"  # = navy-lit
+  shell-dark-deep: "#071A2D"  # = deep-navy
+  shell-dark-pool: "#1C2B39"  # = navy-sunk
+  shell-text: "#F2E9D8"  # = soft-cream
+  shell-text-secondary: "#D8C7A6"  # = warm-sand
+  shell-text-muted: "#A29A87"  # = sand-muted
+  mineral: "#EEE4D0"  # = cream-ground
+  mineral-lit: "#F2E9D8"  # = soft-cream
+  mineral-dark: "#071A2D"  # = deep-navy
+  mineral-dark-lit: "#1C2B39"  # = navy-sunk
+  navy-air: "#D8C7A6"  # = warm-sand
+  navy-edge: "#24323E"  # = navy-lit
+  shell-active: "soft-cream 14% + shell-lit"
+  workspace: "soft-cream"
+  workspace-pool-cool: "warm-sand"
+  workspace-pool-cool-2: "deep-navy"
+  workspace-pool-warm: "muted-terracotta"
 typography:
   display:
     fontFamily: "Archivo, system-ui, sans-serif"

@@ -197,11 +197,11 @@ function HistorySummary({ locale }: { locale: Locale }) {
     <section aria-label={locale === "ar" ? "ملخص سجل النقاط" : "Points history summary"} className="grid min-w-0 gap-md desktop:grid-cols-3" dir="ltr">
       <article dir={dir} className="flex min-h-36 items-center justify-between gap-md rounded-md border border-strong bg-surface p-lg shadow-card">
         <IconBubble><GiftIcon size={27} /></IconBubble>
-        <div className="text-end"><h2 className="text-body-lg font-semibold text-fg">{c.total}</h2><strong className="mt-2 block text-[2.75rem] font-bold leading-none tabular-nums text-accent-solid">1,250</strong><span className="mt-1 block text-label font-semibold text-accent-solid">{c.point}</span></div>
+        <div className="text-end"><h2 className="text-body-lg font-semibold text-fg">{c.total}</h2><strong className="mt-2 block text-[2.75rem] font-bold leading-none tabular-nums text-accent">1,250</strong><span className="mt-1 block text-label font-semibold text-accent">{c.point}</span></div>
       </article>
       <article dir={dir} className="grid min-h-36 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-md rounded-md border border-strong bg-surface p-md shadow-card">
         <Image src={POINTS_LEVEL_BADGE_ASSET[2]} alt="" width={130} height={130} className="h-28 w-28 object-contain" />
-        <div><h2 className="text-body text-fg-secondary">{c.currentLevel}</h2><strong className="mt-1 block text-title font-bold text-fg">{c.silver}</strong><p className="mt-sm flex items-center gap-1 text-label text-fg-secondary"><ChevronLeftIcon size={15} className="text-accent-solid" />{c.reachGold}</p></div>
+        <div><h2 className="text-body text-fg-secondary">{c.currentLevel}</h2><strong className="mt-1 block text-title font-bold text-fg">{c.silver}</strong><p className="mt-sm flex items-center gap-1 text-label text-fg-secondary"><ChevronLeftIcon size={15} className="text-accent" />{c.reachGold}</p></div>
       </article>
       <article dir={dir} className="flex min-h-36 items-center justify-between gap-md rounded-md border border-strong bg-surface p-lg shadow-card">
         <IconBubble><CrownIcon size={27} /></IconBubble>
@@ -212,7 +212,7 @@ function HistorySummary({ locale }: { locale: Locale }) {
 }
 
 function IconBubble({ children }: { children: ReactNode }) {
-  return <span className="grid h-14 w-14 shrink-0 place-items-center rounded-pill bg-accent-solid/10 text-accent-solid">{children}</span>;
+  return <span className="grid h-14 w-14 shrink-0 place-items-center rounded-pill bg-accent-solid/10 text-accent">{children}</span>;
 }
 
 function FilterMenu<T extends string>({ label, value, options, onChange, icon }: { label: string; value: T; options: FilterOption<T>[]; onChange: (value: T) => void; icon?: ReactNode }) {
@@ -239,7 +239,7 @@ function FilterMenu<T extends string>({ label, value, options, onChange, icon }:
       <FloatingMenu id={listId} open={open} onClose={() => setOpen(false)} anchorRef={trigger} role="menu" aria-label={label} placement="bottom-start" matchAnchorWidth className="max-h-60">
         {options.map((option) => (
           <button key={option.value} type="button" role="menuitemradio" aria-checked={option.value === value} onClick={() => { onChange(option.value); setOpen(false); trigger.current?.focus(); }} className={cn("flex w-full items-center gap-sm px-md py-2 text-start text-label transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2", option.value === value ? "font-semibold text-fg" : "text-fg-secondary")}>
-            <span className="min-w-0 flex-1 truncate">{option.label}</span>{option.value === value ? <CheckIcon size={15} className="shrink-0 text-accent-solid" /> : null}
+            <span className="min-w-0 flex-1 truncate">{option.label}</span>{option.value === value ? <CheckIcon size={15} className="shrink-0 text-accent" /> : null}
           </button>
         ))}
       </FloatingMenu>
@@ -273,7 +273,7 @@ function HistoryTableRow({ locale, item }: { locale: Locale; item: PointsHistory
   return (
     <tr className="bg-canvas transition-colors hover:bg-surface-2/60">
       <td className="px-md py-2.5 text-label tabular-nums text-fg-secondary"><time>{localized(locale, item.date)}</time></td>
-      <td className="px-md py-2.5"><span className="flex items-center gap-sm text-label font-semibold text-fg"><Icon size={19} className="shrink-0 text-accent-solid" />{localized(locale, item.title)}</span></td>
+      <td className="px-md py-2.5"><span className="flex items-center gap-sm text-label font-semibold text-fg"><Icon size={19} className="shrink-0 text-accent" />{localized(locale, item.title)}</span></td>
       <td className="truncate px-md py-2.5 text-label text-fg-secondary" title={localized(locale, item.description)}>{localized(locale, item.description)}</td>
       <td className="px-md py-2.5 text-center"><PointsBadge points={item.points} /></td>
     </tr>
@@ -287,7 +287,7 @@ function MobileHistoryList({ locale, rows }: { locale: Locale; rows: PointsHisto
         const { Icon } = item;
         return (
           <li key={item.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-sm bg-canvas px-md py-3">
-            <span className="grid h-9 w-9 place-items-center rounded-sm bg-accent-solid/10 text-accent-solid"><Icon size={19} /></span>
+            <span className="grid h-9 w-9 place-items-center rounded-sm bg-accent-solid/10 text-accent"><Icon size={19} /></span>
             <div className="min-w-0"><h3 className="text-label font-semibold text-fg">{localized(locale, item.title)}</h3><p className="truncate text-caption text-fg-secondary">{localized(locale, item.description)}</p><time className="mt-1 block text-caption tabular-nums text-fg-secondary">{localized(locale, item.date)}</time></div>
             <PointsBadge points={item.points} />
           </li>
@@ -298,7 +298,7 @@ function MobileHistoryList({ locale, rows }: { locale: Locale; rows: PointsHisto
 }
 
 function PointsBadge({ points }: { points: number }) {
-  return <strong className="inline-flex min-w-16 justify-center rounded-sm border border-accent-solid/20 bg-accent-solid/10 px-sm py-1 text-label font-bold tabular-nums text-accent-solid">+{points}</strong>;
+  return <strong className="inline-flex min-w-16 justify-center rounded-sm border border-accent-solid/20 bg-accent-solid/10 px-sm py-1 text-label font-bold tabular-nums text-accent">+{points}</strong>;
 }
 
 function Pagination({ locale, page, onChange }: { locale: Locale; page: number; onChange: (page: number) => void }) {

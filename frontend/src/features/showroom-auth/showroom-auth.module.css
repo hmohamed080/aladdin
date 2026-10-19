@@ -26,7 +26,7 @@
 .consent a, .footer a { text-decoration: underline; text-underline-offset: 4px; font-weight: 600; }
 .error { color: var(--fg); @apply text-body; font-weight: 500; @apply ps-sm; border-inline-start: 1px solid var(--danger); }
 .hint { color: var(--fg-secondary); @apply text-label; line-height: 1.5; }
-.submit { width: 100%; min-height: 60px; @apply text-title; @apply gap-md; @apply rounded-md; background: var(--muted-terracotta); color: var(--soft-cream); font-weight: 700; box-shadow: none; }
+.submit { width: 100%; min-height: 60px; @apply text-title; @apply gap-md; @apply rounded-md; background: var(--muted-terracotta); color: var(--on-accent); font-weight: 700; box-shadow: 0 0 0 1px var(--accent-edge); }
 .footer { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; @apply gap-sm; @apply mt-lg; text-align: center; @apply text-body; }
 .footer::before, .footer::after { content: ""; height: 1px; background: var(--warm-sand); flex: 1; @apply min-w-4; }
 :global(.dark) .sheet { background: var(--deep-navy); }

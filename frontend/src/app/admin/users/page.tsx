@@ -8,6 +8,7 @@ import { whatsappShareUrl } from "@/lib/contact/whatsapp";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatAdminDate, formatCount, formatNumber } from "@/lib/ui/format";
+import { cn } from "@/lib/ui/cn";
 import { AdminHeader, StatusBadge } from "@/features/admin/parts";
 import { StatePanel, Badge, Card } from "@/components/ui/primitives";
 import { DataTable, RecordCell, Monogram, type Column } from "@/components/ui/data-table";
@@ -212,7 +213,7 @@ export default async function PreviewUsersPage({
       cell: (u) => (
         <span className="flex items-center gap-2">
           <span className="h-1.5 w-12 overflow-hidden rounded-pill bg-surface-2">
-            <span className="block h-full rounded-pill bg-accent-solid" style={{ width: `${u.completion}%` }} />
+            <span className={cn("block h-full rounded-pill bg-accent-solid ring-1 ring-accent-edge", u.completion <= 0 && "hidden")} style={{ width: `${u.completion}%` }} />
           </span>
           <span className="tabular-nums">{formatNumber(u.completion, locale)}%</span>
         </span>

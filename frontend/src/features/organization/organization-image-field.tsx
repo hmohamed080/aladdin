@@ -179,7 +179,7 @@ export function OrganizationImageField({ orgId, imageUrl, canManage }: { orgId: 
       {error && !source ? <InlineError>{error}</InlineError> : null}
 
       {source ? (
-        <div role="dialog" aria-modal="true" aria-labelledby="organization-image-crop-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-md">
+        <div role="dialog" aria-modal="true" aria-labelledby="organization-image-crop-title" className="fixed inset-0 z-50 flex items-center justify-center bg-brand-deep-navy/60 p-md">
           <div className="flex w-full max-w-md flex-col gap-md rounded-lg bg-surface p-md shadow-lg">
             <h2 id="organization-image-crop-title" className="text-title text-fg">{t("showroomSettings.image.cropTitle")}</h2>
             <div className="relative h-72 w-full overflow-hidden rounded-md bg-surface-2" data-testid="organization-image-cropper">

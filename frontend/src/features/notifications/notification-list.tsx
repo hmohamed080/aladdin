@@ -135,7 +135,7 @@ function NotificationRow({
           reader gets no signal at all from a coloured span. The dot keeps its
           gutter when the row is read, so nothing shifts sideways on marking. */}
       <span className="mt-1.5 flex w-2 shrink-0 justify-center" aria-hidden="true">
-        {read ? null : <span className="h-2 w-2 rounded-pill bg-accent-solid" />}
+        {read ? null : <span className="h-2 w-2 rounded-pill bg-accent-solid ring-1 ring-accent-edge" />}
       </span>
 
       <span className="flex min-w-0 flex-col gap-0.5">

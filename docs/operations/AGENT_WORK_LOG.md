@@ -1,3 +1,15 @@
+## 2026-10-19 — Palette contrast made strict (no exceptions)
+
+Branch `claude/brand-palette-2ibvgs`. The four palette hex values are unchanged. `palette-contrast.test.ts` now checks every text, border, focus, series, badge and status-ink pair on every ground (canvas, surface, surface-2, surface-hover, workspace, field, shell). It runs in six palettes: global light/dark, plus the `.installer-surface` scope (installer **and showroom**) and its flat variant, each light/dark. Nothing is skipped and there is no per-theme carve-out. Source scans fail any `bg-accent-solid` without the navy edge (`--accent-edge`, `ring-1 ring-accent-edge`), any `text/border/stroke-accent-solid`, and any CSS terracotta fill without the edge. New tokens: `--accent-edge`, `--on-status`, `--shell-accent`. Derived mixes were retuned and installer-scope inks were moved to derived terracotta steps. Review screenshots: `/mnt/project-files/showroom-admin/palette-screens-v2/`.
+
+Open: the WebKit range track gradient (installer budget slider) is not edge-bounded; the native checkbox `accent-color` is not measured.
+
+## 2026-10-19 — Approved palette enforced site-wide (token remap)
+
+Branch `claude/brand-palette-2ibvgs` from `main` @ `bd0de0a`. `frontend/src/styles/tokens.css` now derives every surface/ink/border/accent/focus token from Navy `#071A2D`, Sand `#D8C7A6`, Cream `#F2E9D8` and Terracotta `#B96F52` in light and dark; legacy Aperture primitive names are aliases of the palette; status tones are the only other hues (`--status-*`). Hard-coded white/black/rgba in components and CSS modules moved onto the palette. New `src/styles/palette-contrast.test.ts` measures every text/background pair (AA) in both themes. Mapping recorded in `UI-UX/UI_UX_SYSTEM_GUIDE.md` (2026-10-19). Colours only; no layout/RTL change.
+
+Follow-up commit: `design/tokens/colors.json` (v2.0.0) and the `DESIGN.md` frontmatter now mirror the mapping (derived steps computed to hex; `knownDrift` cleared). Open: the `/` landing is still light-only by design (fixed primitives); signed-in surfaces (`/b2b`, admin, home, settings, onboarding) were covered by the token remap and the contrast test but not screenshotted (no live backend).
+
 ## 2026-10-18 — Terms of Service published
 
 Branch `claude/auth-oauth-email-g90ajg` restarted from `main` @ `9d9a1b6` after PR #87 merged. `/legal/terms` renders the real bilingual Terms through `LegalDocumentView`; per-document updated dates. See [legal-pages.md](../frontend/legal-pages.md).

@@ -229,7 +229,7 @@ function ActiveWorkPanel({ work, locale, onAction }: { work: ActiveWorkVM; local
             ) : (
               <TradeIllustration tradeKey={work.tradeKey} className="absolute inset-y-4 start-1/2 h-[calc(100%-2rem)] w-auto max-w-[80%] -translate-x-1/2 rtl:translate-x-1/2" />
             )}
-            <span className="absolute start-sm top-sm flex items-center gap-1 rounded-pill bg-success px-2.5 py-1 text-label font-semibold text-white shadow-sm">
+            <span className="absolute start-sm top-sm flex items-center gap-1 rounded-pill bg-success px-2.5 py-1 text-label font-semibold text-on-status shadow-sm">
               {work.badgeLabel}
             </span>
           </div>
@@ -641,7 +641,7 @@ function WorkHistory({
             <Button size="sm" variant="outline" className="relative gap-1.5 max-tablet:order-2 max-tablet:h-11 max-tablet:w-11 max-tablet:shrink-0 max-tablet:gap-0 max-tablet:px-0" aria-expanded={filtersOpen} aria-haspopup="dialog" onClick={() => setFiltersOpen(true)}>
               <FilterIcon size={15} className="max-tablet:h-[18px] max-tablet:w-[18px]" />
               <span className="max-tablet:sr-only">{ar ? "كل الفلاتر" : "All filters"}</span>
-              {activeDrawerFilters > 0 ? <span className="rounded-pill bg-surface-2 px-1.5 tabular-nums text-fg max-tablet:absolute max-tablet:-end-1 max-tablet:-top-1 max-tablet:grid max-tablet:h-5 max-tablet:min-w-5 max-tablet:place-items-center max-tablet:bg-accent-solid max-tablet:px-1 max-tablet:text-caption max-tablet:font-bold max-tablet:text-on-accent">{formatNumber(activeDrawerFilters, locale)}</span> : null}
+              {activeDrawerFilters > 0 ? <span className="rounded-pill bg-surface-2 px-1.5 tabular-nums text-fg max-tablet:absolute max-tablet:-end-1 max-tablet:-top-1 max-tablet:grid max-tablet:h-5 max-tablet:min-w-5 max-tablet:place-items-center max-tablet:bg-accent-solid max-tablet:ring-1 max-tablet:ring-accent-edge max-tablet:px-1 max-tablet:text-caption max-tablet:font-bold max-tablet:text-on-accent">{formatNumber(activeDrawerFilters, locale)}</span> : null}
             </Button>
             {savedEnabled ? (
               <Button size="sm" variant="outline" className="gap-1.5 max-tablet:hidden" onClick={() => setSaveDialogOpen(true)}>

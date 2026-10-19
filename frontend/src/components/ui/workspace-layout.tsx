@@ -662,7 +662,7 @@ export function PanelRow({
         tone === "warning" && "bg-warning",
         tone === "success" && "bg-success",
         tone === "info" && "bg-info",
-        tone === "accent" && "bg-accent-solid",
+        tone === "accent" && "bg-accent-solid ring-1 ring-accent-edge",
         tone === "neutral" && "bg-fg-muted",
       )}
     />
@@ -696,8 +696,9 @@ export function PanelRow({
               tone === "warning" && "bg-warning",
               tone === "success" && "bg-success",
               tone === "info" && "bg-info",
-              tone === "accent" && "bg-accent-solid",
+              tone === "accent" && "bg-accent-solid ring-1 ring-accent-edge",
               (tone === "neutral" || !tone) && "bg-fg-muted",
+              share <= 0 && "hidden",
             )}
             /* A percentage width is the one thing here that cannot be a utility
                class: it is data. Floored at 2% so a present-but-tiny value still

@@ -311,7 +311,7 @@ export function KpiCustomizeDialog({
                       run(() => setPersonalKpiLayoutAction(orgId, enabled, surface), t("home.customize.savedPersonal"))
                     }
                     data-testid="kpi-customize-save-personal"
-                    className="inline-flex h-8 items-center gap-1.5 rounded-sm bg-accent-solid px-3 text-label font-medium text-on-accent transition-colors hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-sm bg-accent-solid ring-1 ring-accent-edge px-3 text-label font-medium text-on-accent transition-colors hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
                   >
                     <CheckIcon size={14} />
                     {t("home.customize.savePersonal")}

@@ -333,7 +333,7 @@ export function InstallerShowroomReferralPreview({
             <div dir="ltr" className="relative grid items-center gap-lg desktop:grid-cols-[minmax(0,2.15fr)_minmax(18rem,.85fr)] desktop:gap-xl">
               <div dir={dir} className="rounded-lg border border-strong bg-surface p-md shadow-card tablet:p-lg">
                 <header className="mb-md flex items-center gap-md">
-                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-pill bg-accent-solid/10 text-accent-solid">
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-pill bg-accent-solid/10 text-accent">
                     <StorefrontIcon size={27} />
                   </span>
                   <div>
@@ -409,7 +409,7 @@ export function InstallerShowroomReferralPreview({
                             key={option}
                             className={cn(
                               "relative flex min-h-20 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border bg-canvas px-sm py-sm text-center transition-[border-color,background-color,color] focus-within:ring-2 focus-within:ring-focus",
-                              selected ? "border-accent-solid bg-accent-solid/10 text-fg" : "border-strong text-fg-secondary hover:bg-surface-2",
+                              selected ? "border-accent bg-accent-solid/10 text-fg" : "border-strong text-fg-secondary hover:bg-surface-2",
                             )}
                           >
                             <input
@@ -423,10 +423,10 @@ export function InstallerShowroomReferralPreview({
                               }}
                               className="sr-only"
                             />
-                            <span className={cn("absolute end-2 top-2 grid h-5 w-5 place-items-center rounded-pill border", selected ? "border-accent-solid bg-accent-solid text-on-accent" : "border-strong bg-surface")}>
+                            <span className={cn("absolute end-2 top-2 grid h-5 w-5 place-items-center rounded-pill border", selected ? "border-accent-edge bg-accent-solid text-on-accent" : "border-strong bg-surface")}>
                               {selected ? <CheckIcon size={12} /> : null}
                             </span>
-                            <Icon size={25} className="text-accent-solid" />
+                            <Icon size={25} className="text-accent" />
                             <span className="text-label font-semibold leading-snug">{c.activities[option]}</span>
                           </label>
                         );

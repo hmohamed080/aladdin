@@ -81,6 +81,7 @@ export default {
           "active-fg": alpha("--shell-active-fg"),
           gold: alpha("--shell-gold"),
           "gold-soft": alpha("--shell-gold-soft"),
+          accent: alpha("--shell-accent"),
         },
         /* ---- Form fields ----
            A field's own neutrals, warm-derived so the control matches the ground
@@ -115,6 +116,9 @@ export default {
         accent: {
           DEFAULT: alpha("--accent"),
           solid: alpha("--accent-solid"),
+          // The navy hairline every `bg-accent-solid` fill carries
+          // (`ring-1 ring-accent-edge`). See tokens.css `--accent-edge`.
+          edge: alpha("--accent-edge"),
         },
         // The ONE ink for anything sitting on `accent-solid`. Not part of the
         // `accent` object because `text-accent-on` would read as a third accent
@@ -133,6 +137,8 @@ export default {
         warning: alpha("--warning"),
         danger: alpha("--danger"),
         info: alpha("--info"),
+        // The ink on a SOLID status fill (`bg-success text-on-status`).
+        "on-status": alpha("--on-status"),
         focus: alpha("--focus"),
 
         // ---- Categorical data-visualisation series (theme-aware) ----
@@ -151,6 +157,12 @@ export default {
 
         // ---- Fixed primitives (brand artwork, mark, seals) ----
         brand: {
+          // The four approved palette roots. Every other entry below is an
+          // alias of these (see tokens.css).
+          "deep-navy": alpha("--deep-navy"),
+          "warm-sand": alpha("--warm-sand"),
+          "soft-cream": alpha("--soft-cream"),
+          "muted-terracotta": alpha("--muted-terracotta"),
           basalt: alpha("--basalt"),
           "basalt-2": alpha("--basalt-2"),
           "basalt-3": alpha("--basalt-3"),

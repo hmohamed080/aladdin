@@ -100,7 +100,7 @@ export function OpportunityCard({
         <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-sm p-sm">
           {job.matchPercent !== null ? (
             preview ? (
-              <span className="flex items-center gap-1 rounded-pill bg-success px-2.5 py-1 text-label font-semibold text-white shadow-sm">
+              <span className="flex items-center gap-1 rounded-pill bg-success px-2.5 py-1 text-label font-semibold text-on-status shadow-sm">
                 <TargetIcon size={13} />
                 {ar
                   ? `${formatNumber(job.matchPercent, locale)}% مناسب لمهاراتك`
@@ -117,7 +117,7 @@ export function OpportunityCard({
               aria-label={heart.saved ? (ar ? "إزالة من الفرص المحفوظة" : "Remove from saved jobs") : ar ? "حفظ الفرصة" : "Save opportunity"}
               aria-pressed={heart.saved}
               onClick={heart.onToggle}
-              className="grid h-9 w-9 place-items-center rounded-pill bg-white/90 text-fg-secondary shadow-sm backdrop-blur transition-colors hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="grid h-9 w-9 place-items-center rounded-pill bg-brand-soft-cream/90 text-fg-secondary shadow-sm backdrop-blur transition-colors hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               {heart.saved ? <HeartFilledIcon size={19} className="text-danger" /> : <HeartIcon size={19} />}
             </button>

@@ -20,7 +20,7 @@ import showroomStyles from "@/features/showroom-auth/showroom-auth.module.css";
 
 const RESEND_COOLDOWN_SECONDS = 30;
 const INSTALLER_SUBMIT =
-  "mt-sm min-h-14 w-full rounded-lg bg-shell text-body-lg font-semibold text-shell-fg shadow-card hover:opacity-90 tablet:min-h-16 tablet:text-title dark:bg-brand-lapis";
+  "mt-sm min-h-14 w-full rounded-lg bg-shell text-body-lg font-semibold text-shell-fg shadow-card hover:opacity-90 tablet:min-h-16 tablet:text-title dark:bg-primary dark:text-primary-foreground";
 
 const MailIcon = () => (
   <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">

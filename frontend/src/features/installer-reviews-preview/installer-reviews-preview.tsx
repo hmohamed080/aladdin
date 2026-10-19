@@ -107,7 +107,7 @@ function RatingsOverview({ locale }: { locale: Locale }) {
       <div className="grid divide-y divide-strong tablet:grid-cols-[0.85fr_0.8fr_1.55fr] tablet:divide-x-0 tablet:divide-y-0 tablet:[&>*+*]:border-s">
         <div className="flex min-h-48 flex-col items-center justify-center gap-sm p-lg text-center">
           <strong className="text-display font-semibold tabular-nums text-info">{formatNumber(4.8, locale, 1)}</strong>
-          <Stars value={4.8} size={27} filledClassName="text-accent-solid" label={ar ? "4.8 من 5 نجوم" : "4.8 out of 5 stars"} />
+          <Stars value={4.8} size={27} filledClassName="text-accent" label={ar ? "4.8 من 5 نجوم" : "4.8 out of 5 stars"} />
           <span className="text-body-lg font-semibold text-success">{ar ? "ممتاز" : "Excellent"}</span>
           <span className="text-label text-fg-secondary">{ar ? "من 5" : "out of 5"}</span>
         </div>
@@ -340,7 +340,7 @@ function ReviewRow({ review, locale, avatarTone }: { review: ReviewFixture; loca
       </div>
 
       <div className="flex min-w-0 flex-wrap items-center justify-center gap-sm">
-          <Stars value={review.rating} size={18} filledClassName="text-accent-solid" label={ar ? `${review.rating} من 5 نجوم` : `${review.rating} out of 5 stars`} />
+          <Stars value={review.rating} size={18} filledClassName="text-accent" label={ar ? `${review.rating} من 5 نجوم` : `${review.rating} out of 5 stars`} />
           <span className="font-mono text-label font-semibold tabular-nums text-fg">{formatNumber(review.rating, locale, 1)}</span>
           {review.recommended ? <Badge tone="success"><CheckIcon size={12} />{ar ? "موصى به" : "Recommended"}</Badge> : null}
       </div>
@@ -369,7 +369,7 @@ function ReviewGridCard({ review, locale, avatarTone }: { review: ReviewFixture;
         <button type="button" aria-label={ar ? "المزيد من الإجراءات" : "More actions"} className="grid h-8 w-8 place-items-center rounded-sm text-fg-muted hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"><MoreHorizontalIcon size={17} className="rotate-90" /></button>
       </div>
       <div className="mt-md flex flex-wrap items-center gap-sm border-t pt-md">
-        <Stars value={review.rating} size={18} filledClassName="text-accent-solid" label={ar ? `${review.rating} من 5 نجوم` : `${review.rating} out of 5 stars`} />
+        <Stars value={review.rating} size={18} filledClassName="text-accent" label={ar ? `${review.rating} من 5 نجوم` : `${review.rating} out of 5 stars`} />
         <span className="font-mono text-label font-semibold tabular-nums text-fg">{formatNumber(review.rating, locale, 1)}</span>
         {review.recommended ? <Badge tone="success"><CheckIcon size={12} />{ar ? "موصى به" : "Recommended"}</Badge> : null}
       </div>

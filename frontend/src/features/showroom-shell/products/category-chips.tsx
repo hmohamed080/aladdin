@@ -32,7 +32,7 @@ export function CategoryChips({
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "inline-flex min-h-9 items-center rounded-sm border px-3 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
-                  active ? "border-transparent bg-accent-solid text-on-accent" : "border-strong bg-surface text-fg-secondary hover:bg-surface-2",
+                  active ? "border-accent-edge bg-accent-solid text-on-accent" : "border-strong bg-surface text-fg-secondary hover:bg-surface-2",
                 )}
               >
                 {chip.label}

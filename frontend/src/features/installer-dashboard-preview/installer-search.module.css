@@ -1,6 +1,6 @@
 .trigger {
   background-color: color-mix(in srgb, var(--workspace) 92%, transparent);
-  border-color: color-mix(in srgb, white 55%, var(--border));
+  border-color: color-mix(in srgb, var(--soft-cream) 55%, var(--border));
 }
 
 .trigger:hover {
@@ -8,12 +8,12 @@
 }
 
 :global(.dark) .trigger {
-  background-color: color-mix(in srgb, white 10%, var(--workspace));
-  border-color: rgba(255, 255, 255, 0.14);
+  background-color: color-mix(in srgb, var(--soft-cream) 10%, var(--workspace));
+  border-color: color-mix(in srgb, var(--soft-cream) 14%, transparent);
 }
 
 :global(.dark) .trigger:hover {
-  background-color: color-mix(in srgb, white 15%, var(--workspace));
+  background-color: color-mix(in srgb, var(--soft-cream) 15%, var(--workspace));
 }
 
 .placeholder {
@@ -27,5 +27,6 @@
 .shortcut {
   border-color: var(--accent-solid);
   background-color: var(--accent-solid);
+  box-shadow: 0 0 0 1px var(--accent-edge);
   color: var(--on-accent);
 }

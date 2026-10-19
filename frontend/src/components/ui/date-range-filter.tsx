@@ -116,7 +116,7 @@ function CalendarMonth({ locale, month, range, onSelect, onPrevious, onNext }: {
           const edge = iso === range.from || iso === range.to;
           const within = Boolean(range.from && range.to && iso > range.from && iso < range.to);
           return (
-            <button key={iso} type="button" aria-label={iso} aria-pressed={edge} onClick={() => onSelect(iso)} className={cn("grid aspect-square min-h-8 place-items-center rounded-sm text-label text-fg hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", within && "bg-info/10", edge && "bg-info text-white hover:bg-info")}>
+            <button key={iso} type="button" aria-label={iso} aria-pressed={edge} onClick={() => onSelect(iso)} className={cn("grid aspect-square min-h-8 place-items-center rounded-sm text-label text-fg hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", within && "bg-info/10", edge && "bg-info text-on-status hover:bg-info")}>
               {formatNumber(day, locale)}
             </button>
           );

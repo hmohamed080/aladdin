@@ -94,7 +94,7 @@ function LevelRing({ level, progressPct, label }: { level: number; progressPct: 
           cx="24"
           cy="24"
           r={radius}
-          className="stroke-accent-solid"
+          className="stroke-accent"
           strokeWidth="4"
           fill="none"
           strokeLinecap="round"

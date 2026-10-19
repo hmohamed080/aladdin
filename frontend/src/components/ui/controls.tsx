@@ -32,7 +32,7 @@ import { ListboxSelect, type ListboxOption } from "@/components/ui/listbox";
  */
 const variants = {
   primary: "bg-primary text-primary-foreground shadow-sm hover:opacity-90 active:opacity-100",
-  accent: "bg-accent-solid text-on-accent shadow-sm hover:brightness-105 active:brightness-100",
+  accent: "bg-accent-solid ring-1 ring-accent-edge text-on-accent shadow-sm hover:brightness-105 active:brightness-100",
   outline: "border border-strong bg-transparent text-fg hover:bg-surface-2",
   ghost: "bg-transparent text-fg-secondary hover:bg-surface-2 hover:text-fg",
   danger: "border border-danger/50 bg-transparent text-danger hover:bg-danger/10",
@@ -200,7 +200,7 @@ export function Checkbox({
         {...input}
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4.5 w-4.5 shrink-0 rounded-xs border border-strong text-accent-solid accent-[var(--accent-solid)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50"
+        className="mt-0.5 h-4.5 w-4.5 shrink-0 rounded-xs border border-strong text-accent accent-[var(--accent-solid)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50"
       />
       <span>{children}</span>
     </label>

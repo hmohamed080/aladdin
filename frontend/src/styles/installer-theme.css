@@ -27,6 +27,13 @@
  * frontend/src/styles/tokens.css (design 2.1.0/2.1.1, design/tokens/colors.json).
  * When the global tokens land, delete this file; nothing else needs to change.
  *
+ * CONTRAST IS MEASURED HERE TOO. `palette-contrast.test.ts` resolves this
+ * scope (light, dark, and the flat variant in both) with the same pairs it
+ * checks on the global tokens, so text that is raw terracotta, a sand hairline
+ * bounding an input, or a status ink on the sunk ground fails a test instead of
+ * shipping. Inks that sit on cream or sand therefore use the derived
+ * `--terracotta-ink` / `--terracotta-status` steps, never `--muted-terracotta`.
+ *
  * `:where()` keeps specificity at zero so a route can still override a single
  * token without a specificity contest. Settings no longer does that: it selects
  * the shared `flat` variant at the end of this file with
@@ -37,7 +44,10 @@
   --warm-sand: #d8c7a6;
   --muted-terracotta: #b96f52;
   --soft-cream: #f2e9d8;
-  --terracotta-ink: var(--muted-terracotta);
+  /* Status inks here are terracotta, and a `/15` badge tints its ground with
+     its OWN ink, so they sit one step deeper than the accent ink to clear AA
+     inside that badge on the sunk ground. */
+  --terracotta-status: color-mix(in srgb, var(--muted-terracotta) 50%, var(--deep-navy));
   --basalt: var(--deep-navy);
   --basalt-2: var(--deep-navy);
   --basalt-3: var(--deep-navy);
@@ -60,29 +70,31 @@
   --sand: var(--warm-sand);
   --quartz: var(--soft-cream);
   --quartz-raised: var(--soft-cream);
-  --quartz-sunk: var(--warm-sand);
-  --quartz-hover: var(--warm-sand);
+  /* The sunk/hover grounds are the global cream-sand steps, not pure sand:
+     terracotta ink and its /15 badges cannot clear AA on pure sand. */
+  --quartz-sunk: var(--cream-sunk);
+  --quartz-hover: var(--cream-hover);
   --quartz-line: var(--warm-sand);
-  --quartz-line-strong: var(--muted-terracotta);
+  --quartz-line-strong: var(--terracotta-ink);
   --ink: var(--deep-navy);
   --lumen: var(--muted-terracotta);
   --lumen-deep: var(--muted-terracotta);
   --lumen-ink: var(--terracotta-ink);
   --lumen-soft: var(--warm-sand);
   --bronze: var(--warm-sand);
-  --bronze-deep: var(--muted-terracotta);
+  --bronze-deep: var(--terracotta-ink);
   --bronze-ink: var(--terracotta-ink);
   --lapis: var(--deep-navy);
   --lapis-bright: var(--warm-sand);
   --iris: var(--muted-terracotta);
   --iris-deep: var(--muted-terracotta);
-  --iris-ink: var(--muted-terracotta);
+  --iris-ink: var(--terracotta-status);
   --iris-bright: var(--warm-sand);
   --verdigris: var(--deep-navy);
   --verdigris-deep: var(--deep-navy);
   --ochre: var(--warm-sand);
-  --ochre-deep: var(--muted-terracotta);
-  --oxide: var(--muted-terracotta);
+  --ochre-deep: var(--terracotta-status);
+  --oxide: var(--terracotta-status);
   --stone: var(--deep-navy);
   --stone-muted: var(--deep-navy);
   --graphite: var(--deep-navy);
@@ -118,7 +130,7 @@
   --danger: var(--oxide);
   --info: var(--lapis);
   --focus: var(--lumen-ink);
-  --series-1: var(--lumen-deep);
+  --series-1: var(--terracotta-ink);
   --series-2: var(--lapis);
   --series-3: var(--verdigris-deep);
   --series-4: var(--bronze-deep);
@@ -134,7 +146,7 @@
   --field-line: var(--warm-sand);
   --field-fg: var(--ink);
   --field-placeholder: var(--deep-navy);
-  --field-hint: var(--muted-terracotta);
+  --field-hint: var(--terracotta-ink);
   --field-focus: color-mix(in srgb, var(--muted-terracotta) 38%, transparent);
   --shell: var(--deep-navy);
   --shell-lit: var(--deep-navy);
@@ -169,7 +181,6 @@
   --warm-sand: #d8c7a6;
   --muted-terracotta: #b96f52;
   --soft-cream: #f2e9d8;
-  --terracotta-ink: var(--muted-terracotta);
   --basalt: var(--deep-navy);
   --basalt-2: var(--deep-navy);
   --basalt-3: var(--deep-navy);
@@ -195,26 +206,26 @@
   --quartz-sunk: var(--warm-sand);
   --quartz-hover: var(--warm-sand);
   --quartz-line: var(--warm-sand);
-  --quartz-line-strong: var(--muted-terracotta);
+  --quartz-line-strong: var(--terracotta-ink);
   --ink: var(--deep-navy);
   --lumen: var(--muted-terracotta);
   --lumen-deep: var(--muted-terracotta);
   --lumen-ink: var(--terracotta-ink);
   --lumen-soft: var(--warm-sand);
   --bronze: var(--warm-sand);
-  --bronze-deep: var(--muted-terracotta);
+  --bronze-deep: var(--terracotta-ink);
   --bronze-ink: var(--terracotta-ink);
   --lapis: var(--deep-navy);
   --lapis-bright: var(--warm-sand);
   --iris: var(--muted-terracotta);
   --iris-deep: var(--muted-terracotta);
-  --iris-ink: var(--muted-terracotta);
+  --iris-ink: var(--terracotta-ink);
   --iris-bright: var(--warm-sand);
   --verdigris: var(--deep-navy);
   --verdigris-deep: var(--deep-navy);
   --ochre: var(--warm-sand);
-  --ochre-deep: var(--muted-terracotta);
-  --oxide: var(--muted-terracotta);
+  --ochre-deep: var(--terracotta-ink);
+  --oxide: var(--terracotta-ink);
   --stone: var(--deep-navy);
   --stone-muted: var(--deep-navy);
   --graphite: var(--deep-navy);
@@ -226,22 +237,22 @@
   --on-dark-muted: var(--warm-sand);
   --verdigris-bright: var(--warm-sand);
   --ochre-bright: var(--warm-sand);
-  --oxide-bright: var(--muted-terracotta);
+  --oxide-bright: var(--terracotta-glow);
   --canvas: var(--deep-navy);
   --surface: color-mix(in srgb, var(--soft-cream) 3%, var(--deep-navy));
   --surface-2: color-mix(in srgb, var(--warm-sand) 10%, var(--deep-navy));
-  --surface-hover: color-mix(in srgb, var(--warm-sand) 14%, var(--deep-navy));
+  --surface-hover: var(--navy-hover);
   --fg: var(--soft-cream);
   --fg-secondary: var(--warm-sand);
-  --fg-muted: color-mix(in srgb, var(--warm-sand) 72%, var(--deep-navy));
+  --fg-muted: color-mix(in srgb, var(--warm-sand) 76%, var(--deep-navy));
   --border: color-mix(in srgb, var(--warm-sand) 20%, transparent);
-  --border-strong: color-mix(in srgb, var(--warm-sand) 48%, transparent);
+  --border-strong: color-mix(in srgb, var(--warm-sand) 56%, transparent);
   --primary: var(--muted-terracotta);
   --primary-foreground: var(--deep-navy);
-  --accent: var(--muted-terracotta);
+  --accent: var(--terracotta-glow);
   --accent-solid: var(--muted-terracotta);
   --on-accent: var(--deep-navy);
-  --bronze-sem: var(--muted-terracotta);
+  --bronze-sem: var(--terracotta-glow);
   --lapis-sem: var(--lapis-bright);
   --iris-sem: var(--iris-bright);
   --iris-solid: var(--muted-terracotta);
@@ -338,13 +349,16 @@
   --canvas: var(--soft-cream);
   --workspace: var(--soft-cream);
   --surface: var(--soft-cream);
-  --surface-2: var(--warm-sand);
+  --surface-2: var(--cream-sunk);
   --fg: var(--deep-navy);
   --fg-secondary: var(--deep-navy);
   --fg-muted: var(--deep-navy);
   --border: var(--warm-sand);
-  --border-strong: var(--warm-sand);
-  --field-line: var(--warm-sand);
+  /* Sand stays the decorative hairline; anything that BOUNDS a control (an
+     input, a toggle track, a checkbox) needs 3:1, which pure sand on cream is
+     not, so the strong line is sand deepened toward navy. */
+  --border-strong: var(--cream-strong);
+  --field-line: var(--cream-strong);
   --field: var(--canvas);
   --field-fg: var(--fg);
   --field-hint: var(--fg-secondary);
@@ -355,7 +369,7 @@
   --accent: var(--deep-navy);
   --accent-solid: var(--muted-terracotta);
   --on-accent: var(--deep-navy);
-  --focus: var(--muted-terracotta);
+  --focus: var(--terracotta-ink);
   --danger: var(--deep-navy);
   --shell: var(--deep-navy);
   --shell-2: var(--deep-navy);
@@ -387,5 +401,6 @@
   --accent: var(--warm-sand);
   --primary: var(--warm-sand);
   --primary-foreground: var(--deep-navy);
-  --danger: var(--muted-terracotta);
+  --danger: var(--terracotta-glow);
+  --focus: var(--terracotta-glow);
 }

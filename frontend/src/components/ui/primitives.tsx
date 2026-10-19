@@ -149,7 +149,7 @@ export function InlineSuccess({ children }: { children: ReactNode }) {
 
 const meterTones = {
   neutral: "bg-fg-muted",
-  accent: "bg-accent-solid",
+  accent: "bg-accent-solid ring-1 ring-accent-edge",
   iris: "bg-iris-solid",
   success: "bg-success",
   warning: "bg-warning",
@@ -205,7 +205,7 @@ export function ProgressMeter({
           share in a breakdown, "none of it is done" is a meaningful reading here
           and should not be dressed up as a sliver of progress. */}
       <div
-        className={cn("h-full rounded-pill transition-[width]", meterTones[tone])}
+        className={cn("h-full rounded-pill transition-[width]", meterTones[tone], pct <= 0 && "hidden")}
         /* Data, so it cannot be a utility class. */
         style={{ width: `${pct}%` }}
       />

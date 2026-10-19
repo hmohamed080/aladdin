@@ -131,7 +131,7 @@ export function InteractiveTrendChart({
                 className={cn(
                   "min-h-8 rounded-sm px-2.5 text-label font-medium tabular-nums transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
-                  range === r ? "bg-accent-solid text-on-accent" : "text-fg-secondary hover:bg-surface-2",
+                  range === r ? "bg-accent-solid ring-1 ring-accent-edge text-on-accent" : "text-fg-secondary hover:bg-surface-2",
                 )}
               >
                 {r === "all" ? t("admin.preview.analytics.chartRangeAll") : t("admin.preview.analytics.chartRangeDays", { count: formatNumber(r, locale) })}

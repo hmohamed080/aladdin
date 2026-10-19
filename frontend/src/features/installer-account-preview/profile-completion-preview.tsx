@@ -170,14 +170,14 @@ function ProfileHero({ locale }: { locale: Locale }) {
           <span className="relative block h-24 w-24 overflow-hidden rounded-pill border-4 border-canvas bg-surface-2 shadow-raised tablet:h-28 tablet:w-28">
             <Image src={avatarUrl} alt={ar ? "صورة أحمد محمود" : "Ahmed Mahmoud profile"} fill sizes="112px" unoptimized={avatarUrl.startsWith("blob:")} className="object-cover" />
           </span>
-          <button type="button" onClick={() => avatarInputRef.current?.click()} aria-label={ar ? "تغيير صورة الملف" : "Change profile photo"} className="absolute -bottom-1 -start-1 grid h-10 w-10 place-items-center rounded-pill border-2 border-canvas bg-accent-solid text-on-accent shadow-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"><CameraIcon size={18} /></button>
+          <button type="button" onClick={() => avatarInputRef.current?.click()} aria-label={ar ? "تغيير صورة الملف" : "Change profile photo"} className="absolute -bottom-1 -start-1 grid h-10 w-10 place-items-center rounded-pill border-2 border-canvas bg-accent-solid ring-1 ring-accent-edge text-on-accent shadow-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"><CameraIcon size={18} /></button>
           <button type="button" onClick={() => setActiveCrop({ kind: "avatar", source: avatarUrl, owned: false })} aria-label={ar ? "ضبط صورة الملف الحالية" : "Adjust current profile photo"} className="absolute -end-1 -top-1 grid h-9 w-9 place-items-center rounded-pill border-2 border-canvas bg-surface text-accent shadow-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"><PencilIcon size={16} /></button>
         </div>
       </div>
       <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp" aria-label={ar ? "رفع صورة الغلاف" : "Upload cover photo"} className="sr-only" onChange={(event) => onPickImage("cover", event)} />
       <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp" aria-label={ar ? "رفع صورة الملف" : "Upload profile photo"} className="sr-only" onChange={(event) => onPickImage("avatar", event)} />
       <div className="relative z-raised flex flex-wrap gap-sm px-md pb-md tablet:absolute tablet:bottom-md tablet:end-md tablet:p-0">
-        <button type="button" onClick={() => coverInputRef.current?.click()} className="flex min-h-11 items-center gap-xs rounded-md border border-accent bg-accent-solid px-md text-label font-bold text-on-accent shadow-raised transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+        <button type="button" onClick={() => coverInputRef.current?.click()} className="flex min-h-11 items-center gap-xs rounded-md border border-accent-edge bg-accent-solid px-md text-label font-bold text-on-accent shadow-raised transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           <CameraIcon size={17} />
           {ar ? "تغيير صورة الغلاف" : "Change cover photo"}
         </button>
@@ -387,7 +387,7 @@ function BasicInformationSection({ locale, onCompletionChange }: { locale: Local
                       onClick={() => toggleSpecialty(specialty.value)}
                       className={menuItemClass(checked, "min-h-10 rounded-sm text-label")}
                     >
-                      <span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-xs border border-strong", checked && "border-accent bg-accent-solid text-on-accent")}>{checked ? <CheckIcon size={13} /> : null}</span>
+                      <span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-xs border border-strong", checked && "border-accent-edge bg-accent-solid text-on-accent")}>{checked ? <CheckIcon size={13} /> : null}</span>
                       {pick(locale, specialty)}
                     </button>
                   );
@@ -668,7 +668,7 @@ function CoverageSection({ locale, onCompletionChange }: { locale: Locale; onCom
         <label className={cn("flex cursor-pointer items-center justify-between gap-md rounded-md border border-strong bg-canvas p-md", !otherAreas && "tablet:col-span-3")}>
           <span className="font-medium text-fg">{ar ? "أعمل في محافظات أخرى" : "I work in other governorates"}</span>
           <input type="checkbox" checked={otherAreas} onChange={(event) => { setOtherAreas(event.target.checked); setOpen(false); }} className="peer sr-only" />
-          <span className={cn("relative h-7 w-12 shrink-0 rounded-pill border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-focus", otherAreas ? "border-accent bg-accent-solid" : "border-strong bg-surface-2")}>
+          <span className={cn("relative h-7 w-12 shrink-0 rounded-pill border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-focus", otherAreas ? "border-accent-edge bg-accent-solid" : "border-strong bg-surface-2")}>
             <span className={cn("absolute top-1 h-5 w-5 rounded-pill bg-canvas shadow-raised transition-[left,right]", otherAreas ? "right-1" : "left-1")} />
           </span>
         </label>
@@ -743,7 +743,7 @@ function MobileProfileSummary({ locale, percent, completedStepIds }: { locale: L
   return (
     <section aria-label={ar ? "ملخص اكتمال الملف" : "Profile completion summary"} className="rounded-md border border-strong bg-surface p-md shadow-card tablet:hidden">
       <div className="flex items-center gap-md">
-        <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-pill border-2 border-accent-solid bg-surface-2">
+        <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-pill border-2 border-accent bg-surface-2">
           <Image src="/assets/installer-account/profile-ahmed.png" alt="" fill sizes="56px" className="object-cover" />
         </span>
         <div className="min-w-0">

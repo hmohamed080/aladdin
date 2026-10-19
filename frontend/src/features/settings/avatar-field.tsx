@@ -159,7 +159,7 @@ export function AvatarField({ avatarUrl, displayName }: { avatarUrl: string | nu
           role="dialog"
           aria-modal="true"
           aria-labelledby="avatar-crop-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-md"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-deep-navy/60 p-md"
         >
           <div className="flex w-full max-w-md flex-col gap-md rounded-lg bg-surface p-md shadow-lg">
             <h2 id="avatar-crop-title" className="text-title text-fg">
