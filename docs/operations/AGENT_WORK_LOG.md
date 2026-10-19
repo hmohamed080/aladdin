@@ -1,3 +1,11 @@
+## 2026-10-19 — React #418 hydration mismatches: dates pinned to Egypt time
+
+Branch `claude/hydration-418-2ibvgs` from `main` @ `bd0de0a`. **Cause found and fixed:** the shared format layer (`lib/ui/format.ts`) formatted dates in the RUNTIME's zone, so a Client Component rendered "13:30" on the UTC server and "16:30" in a Cairo browser (`formatDateTime`/`formatTime`/`formatAdminDate*` always; `formatDate` only for instants 21:00-24:00 UTC, hence "intermittent"). All date formatters now use `DISPLAY_TIME_ZONE = "Africa/Cairo"`; chat "same day" uses the same calendar; the job card's relative "posted" age re-renders after mount (same pattern as `AvailabilityControl`). Server-rendered dates now also show Egypt time instead of UTC.
+
+Evidence (local prod build, server `TZ=UTC`, Chromium `timezoneId=Africa/Cairo`, ar-EG + en-US, 10 seeded users, 1,046 loads, 121 routes): text-type #418 **34 -> 0** loads (RFQ/quotation/order/lead detail pages). Unit: `format.test.ts` asserts identical output under UTC, Cairo and Los Angeles.
+
+Open: a separate, rare **HTML-type** #418 (4 and 6 loads per 1,046, mostly the Admin shell at `/admin`, also `/home/profile/edit`, `/b2b/suppliers`) is NOT fixed and not root-caused. It does not reproduce in `next dev` (126 loads) or with a DOM mutation recorder attached (0/752), and the recovered DOM matches the server HTML, so it looks like a timing race rather than different markup. Also noted, not changed: `follow-up-edit-form.tsx` builds its `datetime-local` default from the runtime zone (server UTC vs browser), and several components still format numbers with a bare `ar-EG` tag (identical in Node 22 and Chromium 141 today).
+
 ## 2026-10-18 — Terms of Service published
 
 Branch `claude/auth-oauth-email-g90ajg` restarted from `main` @ `9d9a1b6` after PR #87 merged. `/legal/terms` renders the real bilingual Terms through `LegalDocumentView`; per-document updated dates. See [legal-pages.md](../frontend/legal-pages.md).

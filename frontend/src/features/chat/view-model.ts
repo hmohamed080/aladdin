@@ -1,6 +1,6 @@
 import type { Locale } from "@/lib/i18n/locales";
 import type { TranslateFn } from "@/lib/i18n/translate";
-import { formatDateTime, formatRelativeTime, formatTime } from "@/lib/ui/format";
+import { displayDayKey, formatDateTime, formatRelativeTime, formatTime } from "@/lib/ui/format";
 
 /**
  * PERSISTED CHAT ROWS -> UI-READY VIEWS. Presentation only.
@@ -235,10 +235,6 @@ export function toMessageView(
 }
 
 function sameDay(iso: string, now: Date): boolean {
-  const then = new Date(iso);
-  return (
-    then.getFullYear() === now.getFullYear() &&
-    then.getMonth() === now.getMonth() &&
-    then.getDate() === now.getDate()
-  );
+  // On the display calendar, not the runtime's: the server (UTC) and the browser (Cairo) must agree on "today".
+  return displayDayKey(new Date(iso)) === displayDayKey(now);
 }
