@@ -1,3 +1,35 @@
+## 2026-10-19 — Session revocation coverage and backend production configuration (PR #91)
+
+Branch `claude/media-backend-continuation-2ibvgs`. No hosted write, deploy or merge.
+
+- **Backend config:** `backend/app/config.py` derives the environment from `VERCEL_ENV` when `APP_ENV` is unset or `local` (Production → `production`, Preview → `staging`, unknown → `production`). Required when deployed: `SUPABASE_URL`, `SUPABASE_ANON_KEY` (the only values a deployed route reads); service-role key, `DATABASE_URL` and the legacy JWT secret are no longer required. A missing variable no longer raises at import: health answers 503 `misconfigured` with the names, `require_configured` makes every authenticated endpoint answer 503. Names per environment: [vercel-environment-variables.md](../guides/vercel-environment-variables.md). ADR-0009 revised, runbook superseded lines updated.
+- **Revocation audit:** real gaps were Storage API (bucket policies only; BV documents and request images are read, signed, uploaded and deleted with the caller's token) and Realtime postgres_changes (`leads`, `follow_up_tasks`; `realtime.apply_rls` checks RLS only). Fixed by migration `20261019163000` (restrictive `app.jwt_session_is_live()` policies; `authenticated` granted EXECUTE on the helper; permission contract `20261019163000.json`), pgTAP `103_*` (23), `47_*` and `102_*` updated. Already covered: PostgREST (hook), Server Actions and route handlers (every service-role use follows a caller-scoped RPC through the hook; admin-client calls follow network `getUser()`), media Worker (`media_edge_authorize`), FastAPI (`require_active_principal` → `my_account_status`).
+- **Cost:** helper 30–70 µs warm, evaluated once per statement (InitPlan, plan unchanged).
+
+Unfinished / needs the owner: set `SUPABASE_URL` and `SUPABASE_ANON_KEY` for Preview and Production; approve the migration with the others. Merging the video branch needs its `20261019150000.json` contract to include this grant (or this contract to include the video functions), whichever lands second.
+
+## 2026-10-19 — Media and backend continuation of PRs #88/#89 (stacked branch)
+
+Branch `claude/media-backend-continuation-2ibvgs`, stacked on PR #89 after merging PR #88's last three commits into it locally (conflicts only in this log and RUNTIME_STATE; HEAD side kept). `main` (`bd0de0a`, includes PR #90 legal pages) was audited and is untouched. No hosted write, deploy, merge, DNS or billing change.
+
+Done:
+- **Historical media purge** (owner: delete, do not migrate): migration `20261019120000`, pgTAP `100_*` (51), backend job `app/workers/historical_media_purge.py` (dry run default, `--confirm-project`), rehearsed locally against the real Storage API; certificates untouched.
+- **Backend integration**: the FastAPI service was a health-only scaffold with no caller. Added `app/auth` (JWKS verification, suspension and session guard) and made it the home of media jobs. `pyjwt[crypto]` declared (was transitive).
+- **Worker**: content-addressed edge byte cache after DB authorization; `media.aladdindecore.com` via Pages + CNAME (Option B) or a Cloudflare zone (Option A); local workerd E2E for Mode C and Mode P incl. revocation.
+- **Sessions**: migration `20261019140000` makes the PostgREST pre-request hook refuse signed-out, banned and deleted sessions on the next request (pgTAP `102_*`, real PostgREST check); middleware sends such sessions to Sign In; backend guard matches.
+- **Performance**: `vercel.json` `regions: ["cdg1"]` (functions were in iad1, database in Paris); RLS InitPlan for 20 platform-staff policies (migration `20261019130000`, pgTAP `101_*`; 212 ms to 0.75 ms locally, staging measured 260 ms mean); landing role atlas 1.46 MB PNG to 40 kB WebP (mobile LCP 12.5 s to 4.1–5.3 s, desktop 2.3 s to 0.9 s, page weight 2.1 MB to 0.72 MB).
+- **ADR-0018 Revision 2**, ARCHITECTURE_GUIDE, professional-asset-storage §15, backend/AGENTS.md.
+
+Validation: pgTAP 127 files / 5,604 pass after `supabase db reset` (177 migrations); permission gate 609 PASS; Vitest 3,942 pass / 24 skipped; typecheck clean; lint 0 errors (7 existing warnings); backend pytest 48, ruff clean; Worker 30 pass / 1 skipped; Playwright desktop `pr89-media` 2/2, `pr88-admin-showroom` 10/10, `sidebar-mode-sync` 3/3 (with `E2E_STUB_TURNSTILE=1`; Create Account specs cannot run here because Siteverify is unreachable).
+
+Tried and dropped: lazy per-locale message catalogs (first-load JS median 272 to 131 kB) broke the admin users type filter under E2E; not shipped. Both catalogs (~140 kB gzipped) still ship on every page; a per-locale route segment is the safer way.
+
+Unfinished / needs the owner:
+- Approvals: hosted migrations (PR #88 four + #89 six + three here), R2 activation, Worker/Pages + Hyperdrive, DNS CNAME, Workers Paid, Production purge run, merges, deploys.
+- Brand palette: only Showroom V2 and installer surfaces use #071A2D/#D8C7A6/#F2E9D8/#B96F52; landing, auth, `/b2b`, admin, home, settings use the older Aperture tokens (`src/styles/tokens.css`, 89 off-palette hex). A token-layer remap is a visible change on every page and needs design sign-off.
+- Backend Production `APP_ENV` is unset (reports `local`, fail-fast secret check skipped).
+- React #418 (intermittent route-sweep hydration error from 2026-10-01/18) not reproduced in 36 production loads here; still open.
+
 ## 2026-10-18 — WP0: R2 media delivery documentation (ADR-0018 proposed)
 
 Branch `local/wp-docs` from `local/r2-rc2-snapshot` (same head as draft PR #89, `26edd40`). Docs only: no code, migration, push or hosted change.

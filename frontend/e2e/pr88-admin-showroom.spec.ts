@@ -29,6 +29,9 @@ const SUPER_EMAIL = "pr88-super-admin@example.test";
 // Overrides are immutable, so each run uses its own number (Egyptian mobile, +2010 + 8 digits).
 const RUN_NATIONAL = "010" + String(Date.now()).slice(-8);
 const RUN_E164 = "+20" + RUN_NATIONAL.slice(1);
+// A second run-unique number the consumer briefly holds as its MAIN phone (the "already your main phone" check).
+const OWN_PRIMARY_NATIONAL = "011" + String(Date.now()).slice(-8);
+const OWN_PRIMARY_E164 = "+20" + OWN_PRIMARY_NATIONAL.slice(1);
 
 type Role = "admin" | "superAdmin" | "showroom" | "consumer" | "b2b";
 const EMAIL: Record<Role, string> = {
@@ -229,13 +232,18 @@ test.describe.serial("PR #88 functional (desktop · en · light)", () => {
     await expect(rp.getByText("commercial-register.pdf")).toBeVisible();
 
     await (await openDialog(rp, rp.getByRole("button", { name: "Start review" }))).getByRole("button", { name: "Start review" }).click();
-    // ConfirmDialog closes on success and refreshes the server data (its done copy is not displayed).
+    // ConfirmDialog closes on success and refreshes the server data; its done copy survives the close as a toast
+    // (the "Start review" button itself is gone once the request is under review).
     await expect(rp.getByRole("dialog")).toHaveCount(0, { timeout: 20_000 });
+    await expect(rp.getByTestId("toast").filter({ hasText: "Review started." })).toBeVisible();
+    await expect(rp.getByRole("status").filter({ has: rp.getByTestId("toast") })).toHaveAttribute("aria-live", "polite");
     await expect(rp.getByText("Under review", { exact: true }).first()).toBeVisible();
     const dialog = await openDialog(rp, rp.getByRole("button", { name: "Approve and verify" }));
     await dialog.locator("#bv-approve-reason").fill("Commercial register checked (PR88 e2e).");
     await dialog.getByRole("button", { name: "Approve and verify" }).click();
     await expect(rp.getByRole("dialog")).toHaveCount(0, { timeout: 20_000 });
+    await expect(rp.getByTestId("toast").filter({ hasText: "Business verified." })).toBeVisible();
+    await rp.screenshot({ path: path.join(SHOTS, "admin-bv-approved-toast-desktop-en-light.png"), fullPage: false });
     await expect(rp.getByText("Verified", { exact: true }).first()).toBeVisible();
     await expect(rp.getByRole("button", { name: "Approve and verify" })).toHaveCount(0);
     expect(scalar(`select business_verified_at is not null from public.organizations where id = '${HANA_ORG}'`)).toBe("t");
@@ -282,6 +290,19 @@ test.describe.serial("PR #88 functional (desktop · en · light)", () => {
     await section.locator("#secondary-phone-password").fill(E2E_PASSWORD);
     await section.getByRole("button", { name: "Add second phone" }).click();
     await expect(section.getByText(/You released this number recently/)).toBeVisible({ timeout: 20_000 });
+
+    // One number is never both the main and the second phone of one account: the database refuses it and the
+    // card says so in plain words. (The consumer has no main phone in the seed; give it one for this check only.)
+    psql(`update public.profiles set phone_e164 = '${OWN_PRIMARY_E164}' where user_id = '${CONSUMER}';`);
+    try {
+      await page.reload();
+      await section.locator("#secondary-phone-national").fill(OWN_PRIMARY_NATIONAL);
+      await section.locator("#secondary-phone-password").fill(E2E_PASSWORD);
+      await section.getByRole("button", { name: "Add second phone" }).click();
+      await expect(section.getByText("This is already your main phone.")).toBeVisible({ timeout: 20_000 });
+    } finally {
+      psql(`update public.profiles set phone_e164 = null where user_id = '${CONSUMER}';`);
+    }
     await ctx.close();
   });
 
@@ -295,10 +316,17 @@ test.describe.serial("PR #88 functional (desktop · en · light)", () => {
     await page.getByRole("button", { name: "Look up" }).click();
     const status = page.getByTestId("phone-cooldown-status");
     await expect(status).toContainText(/In cooldown until /);
-    const dialog = await openDialog(page, status.getByRole("button", { name: "Lift cooldown" }));
+    // The action keeps its intrinsic width on desktop (the status card is a flex column, which used to stretch it).
+    const lift = status.getByRole("button", { name: "Lift cooldown" });
+    const [liftBox, cardBox] = [await lift.boundingBox(), await status.boundingBox()];
+    expect(liftBox!.width).toBeLessThan(cardBox!.width / 3);
+    await page.screenshot({ path: path.join(SHOTS, "admin-phone-cooldowns-in-cooldown-desktop-en-light.png"), fullPage: true });
+    const dialog = await openDialog(page, lift);
     await dialog.locator("#cooldown-reason").fill("Customer support request (PR88 e2e)");
     await dialog.getByRole("button", { name: "Lift cooldown" }).click();
     await expect(dialog).toHaveCount(0, { timeout: 20_000 });
+    await expect(page.getByTestId("toast").filter({ hasText: "Cooldown lifted." })).toBeVisible();
+    await page.screenshot({ path: path.join(SHOTS, "admin-phone-cooldowns-lifted-toast-desktop-en-light.png"), fullPage: false });
     await expect(status).toContainText("Not in cooldown.");
     await expect(status).toContainText("Customer support request (PR88 e2e)");
 

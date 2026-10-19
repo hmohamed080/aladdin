@@ -12,6 +12,9 @@ export function PhoneCooldownOverride({ phone }: { phone: string }) {
     <ConfirmDialog
       trigger={t("phoneCooldown.override")}
       triggerVariant="danger"
+      // The status card lays out as a flex column, which stretches a child to the card's width; the action
+      // keeps its intrinsic width at every breakpoint, like every other button in an Admin card.
+      triggerClassName="self-start"
       title={t("phoneCooldown.overrideTitle")}
       body={t("phoneCooldown.overrideBody")}
       confirmLabel={t("phoneCooldown.override")}

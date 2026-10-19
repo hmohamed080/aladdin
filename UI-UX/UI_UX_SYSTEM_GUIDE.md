@@ -64,6 +64,7 @@ The design system is **finalized and versioned** (`1.0.0`, approved/hardened, pr
 - Field pattern: **label `$fs-label`**, **value `$fs-body-lg`**, leading icon `20`.
 - Product UI stays in Readex Pro so Arabic and Latin share first-class coverage and matched metrics; Archivo/Reem Kufi are reserved for brand and headline moments.
 - Never encode meaning with italics in Arabic; use weight/size/color tokens instead.
+- **Arabic small steps:** under `lang=ar`, `label` is 14px / 1.4 and `caption` 13px / 1.45, both with **zero tracking** (Latin keeps 13px/0.02em and 12px/0.01em). Readex Pro's Arabic letter bodies render smaller than its Latin x-height at the same size, and positive tracking pulls apart joined letters. Implemented as per-script CSS variables (`tokens.css`), recorded in `design/tokens/typography.json`.
 
 ## Spacing Rules
 - Spacing is a **token scale** (4-based); use tokens, never arbitrary pixel values.

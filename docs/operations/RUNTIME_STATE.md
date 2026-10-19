@@ -1,5 +1,14 @@
 # Runtime State
 
+## Media/backend continuation (stacked on PR #89) — 2026-10-19
+
+- **Branch** `claude/media-backend-continuation-2ibvgs`, stacked on PR #89 (`claude/r2-rc2-integration-vdrldz`) with PR #88's latest commits merged in. Not merged anywhere; no hosted change.
+- **New migrations (local only):** `20261019120000_historical_media_purge`, `20261019130000_rls_platform_check_initplan`, `20261019140000_data_api_session_revocation` (177 migration files on this branch, counting #88 and #89). Staging (`kkpkgjrweysgvhvkhzun`) still has 164, max `20261017134139`; its `pgrst.db_pre_request` hook is active (`pgrst_hooks.pre_request`).
+- **Revocation and backend config (2026-10-19, same branch):** migration `20261019163000_storage_realtime_session_revocation` (178 files) adds restrictive session-live policies to `storage.objects`, `leads` and `follow_up_tasks`. The backend derives its environment from `VERCEL_ENV`: once this branch deploys, Production `/api/backend/health` answers **503 `misconfigured`** until `SUPABASE_URL` and `SUPABASE_ANON_KEY` are set for the backend ([names](../guides/vercel-environment-variables.md)); the web app is unaffected.
+- **Flags unchanged:** `R2_STORAGE_ENABLED=false`, `R2_PRODUCTION_WRITES_APPROVED=false`, `MEDIA_EDGE_DELIVERY_ENABLED=false`.
+- **Infrastructure facts (audited 2026-10-19):** one Vercel project `aladdin-staging` (Hobby) serves `aladdindecore.com`; DNS on Vercel nameservers; functions ran in `iad1` (this branch sets `cdg1`). FastAPI live at `/api/backend/health` only, `APP_ENV` unset. Cloudflare account has R2 buckets (`aladdin-production-db-backups`, `aladdin-r2-acceptance-20261011-private/-public`), no Workers, no Hyperdrive. Supabase staging Storage: avatars 144 objects / 8.4 MB, portfolio 163 / 259.6 MB (to be purged), certificates 4 / 7.9 MB (kept).
+- Decision: [ADR-0018 Revision 2](../decisions/ADR-0018-r2-edge-media-delivery.md#revision-2--2026-10-19-full-media-architecture).
+
 ## R2 media storage and edge delivery (PR #89) — 2026-10-18
 
 - **Branch and PR.** The R2 work is on draft **PR #89** (`claude/r2-rc2-integration-vdrldz`, head `26edd40`), which is open and **not merged**. It includes PR #88. The local snapshot branch `local/r2-rc2-snapshot` has the same head, 29 commits ahead of the local `origin/main` ref (`9d9a1b6`). On `main`, media is still served from Supabase Storage.

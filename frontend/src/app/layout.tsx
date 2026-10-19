@@ -5,6 +5,8 @@ import { Archivo, JetBrains_Mono, Readex_Pro, Reem_Kufi } from "next/font/google
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { THEME_COOKIE, THEME_BOOTSTRAP, resolveThemePreference } from "@/lib/theme/config";
 import { ThemeSync } from "@/components/layout/theme-sync";
+import { Toaster } from "@/components/ui/toast";
+import { createTranslator } from "@/lib/i18n/translate";
 import "./globals.css";
 
 // Bilingual (AR + EN) product-UI workhorse — the default body font.
@@ -51,6 +53,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body className="min-h-dvh bg-canvas text-fg">
         <ThemeSync />
         {children}
+        {/* The one toast region (transient confirmations that outlive the dialog or control that raised them). */}
+        <Toaster dismissLabel={createTranslator(locale)("common.close")} />
       </body>
     </html>
   );

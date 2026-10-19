@@ -113,7 +113,19 @@ MEDIA_EDGE_LIVE_ADMIN_URL=postgres://postgres:postgres@127.0.0.1:54322/postgres 
    `wrangler.toml`.
 4. **R2.** A private bucket (no public access, no `r2.dev`), lifecycle rule
    expiring `pending/` after 2 days. Bind it as `MEDIA_BUCKET`.
-5. **Zone and route** for the media hostname (plan D4), Workers Paid (D5).
+5. **Hostname `media.aladdindecore.com`** (feasible; checked 2026-10-19). The
+   `aladdindecore.com` zone is served by Vercel DNS (`ns1/ns2.vercel-dns.com`),
+   and a Workers Custom Domain needs a Cloudflare zone (CNAME/partial setup is
+   Business plan and up). Two free ways:
+   - **B, recommended first:** a Cloudflare **Pages** project (`pages/`) running
+     the same bundle. Add `media.aladdindecore.com` as its custom domain, then
+     one DNS record in Vercel: `media CNAME aladdin-media.pages.dev`. Nothing
+     else in the zone changes.
+   - **A:** move the `aladdindecore.com` nameservers to a Cloudflare Free zone
+     (recreate the Vercel A/CNAME records and every MX/TXT record first) and use
+     `wrangler.toml`'s Custom Domain. Adds Cloudflare WAF and rate-limit rules,
+     but touches the whole domain, including email.
+   Workers Paid (D5, $5/month) is needed for production volume either way.
 6. **Ticket key.** Generate 32 random bytes, base64url. `wrangler secret put
    TICKET_KEYS` with `{"k1":"<secret>"}`. In Vercel set
    `MEDIA_EDGE_TICKET_KID=k1` and `MEDIA_EDGE_TICKET_SECRET=<secret>` (secret),
@@ -128,6 +140,34 @@ remove `k1`. **Rollback:** `MEDIA_EDGE_DELIVERY_ENABLED=false` returns every URL
 to the application proxy at the next render; no data changes. Setting
 `PRIVATE_ROUTES`/`PUBLIC_ROUTES` to anything but `on` disables a route family at
 the edge.
+
+## Edge byte cache
+
+With `EDGE_CACHE=on`, whole-object GETs up to 20 MB are kept in the local
+Cloudflare cache (`caches.default`, available on Workers custom domains and on
+Pages) under an internal key made of the R2 object and its verified sha256. The
+order is fixed: **database authorization first, cache second**, so a cached copy
+never outlives a revocation, and a replaced object (new sha256) never reuses an
+old entry. Browsers still receive `private, no-store` (Mode P) or `private,
+no-cache` + ETag (Mode C). Ranges, HEAD and cache failures fall back to R2.
+Effect: repeat views in the same Cloudflare location cost no R2 Class B read.
+The Cache API is per location and does not use tiered cache; Workers Caching
+(authenticated-entrypoint pattern) is the upgrade path if hit rates matter.
+
+## Local end-to-end run (2026-10-19, wrangler 4.151.1, real workerd)
+
+Against the local Supabase stack (all migrations), a `media_edge_worker` login
+role, local R2 and Hyperdrive `localConnectionString`:
+- `/c` portfolio: 200 with identical bytes, `304` on revalidation; **404 on the
+  very next request** after unpublish, delete and owner suspension (with the
+  bytes in the edge cache); 200 again after restore.
+- `/m` certificate with an app-format ticket: 200 identical bytes, `private,
+  no-store`; tampered ticket 404; unknown session 404; **404 right after
+  sign-out** (session row deleted).
+- The worker role cannot read any table (`permission denied for table users`).
+- Pages advanced mode (`_worker.js`, 99 KB bundle) loads and routes with the R2
+  binding; `wrangler pages dev` has no local Hyperdrive flag, so the database
+  half of Pages was not exercised locally.
 
 ## Residual risks and costs
 

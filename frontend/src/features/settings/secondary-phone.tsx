@@ -51,7 +51,9 @@ export function SecondaryPhoneSection({ secondary, phoneLogin }: { secondary: Se
       {secondary ? (
         <div className="flex flex-col gap-sm rounded-sm bg-surface-2/50 px-3 py-2.5" data-testid="secondary-phone-current">
           <span dir="ltr" className="text-body font-medium text-fg">{secondary.phone}</span>
-          <span className="text-label text-fg-muted">
+          {/* fg-secondary, not fg-muted: this sits on the sunk fill, where muted text falls under 4.5:1
+              (UI_UX_SYSTEM_GUIDE "Muted-On-Sunk exception"). */}
+          <span className="text-label text-fg-secondary">
             {t("profileIdentity.secondaryPhone.heldUntil", { date: formatDate(secondary.expiresAt, locale) })}
             {secondary.canRenew ? "" : ` · ${t("profileIdentity.secondaryPhone.noMoreRenewals")}`}
           </span>

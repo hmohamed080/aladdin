@@ -11,6 +11,8 @@ Extends the root `AGENTS.md`. Read that first. This file governs `backend/`.
 
 FastAPI here is a **specialized service**, not the product's CRUD backend. It exists for: AI orchestration, OCR orchestration, document processing, chunking, embeddings, RAG, AI evaluations, NLP, large-Excel processing, background workers, and future computer-vision tasks.
 
+It also owns **media jobs and integrations** that are not CRUD (ADR-0018 Revision 2): today the historical-media purge (`app/workers/historical_media_purge.py`), next the R2 variant backfill. Caller identity comes from `app/auth` (local JWKS verification of the Supabase access token; `require_active_principal` also refuses suspended accounts and ended sessions). Every endpoint that acts for a person or runs a job depends on `require_configured` (directly or through those two), so a deployment missing configuration answers 503 instead of running half-configured.
+
 **Do not recreate application CRUD routes in FastAPI.** Standard product CRUD lives in the Next.js app against Supabase. If a feature can be a Server Action / Route Handler against Supabase, it does not belong here.
 
 ## Stack (locked — see ADR-0001)

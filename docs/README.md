@@ -113,6 +113,7 @@ The five files above are **persistent project memory and part of the core archit
 
 - [`guides/frontend-setup.md`](guides/frontend-setup.md)
 - [`guides/backend-setup.md`](guides/backend-setup.md)
+- [`guides/vercel-environment-variables.md`](guides/vercel-environment-variables.md) — Vercel variable names for Preview and Production
 - [`guides/supabase-setup.md`](guides/supabase-setup.md)
 
 ## UI/UX

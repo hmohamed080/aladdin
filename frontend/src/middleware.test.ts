@@ -19,11 +19,16 @@ let claimsError: Error | null = null;
 let claimsThrows = false;
 let refreshOnRead = false;
 let networkUser: { id: string } | null = null;
-let accountStatus: { status: string; suspended: boolean } | null = null;
+let accountStatus: { status: string; suspended: boolean; session_active?: boolean } | null = null;
 let adapter: CookieAdapter | null = null;
 
 const rpc = vi.fn(async () => ({ data: accountStatus, error: null }));
 const getUser = vi.fn(async () => ({ data: { user: networkUser }, error: null }));
+const signOut = vi.fn(async () => {
+  // supabase-js clears the session through the cookie adapter.
+  adapter?.setAll([{ name: "sb-test-auth-token", value: "", options: { path: "/", maxAge: 0 } }]);
+  return { error: null };
+});
 const getClaims = vi.fn(async () => {
   if (claimsThrows) throw new Error("jwks unreachable");
   // supabase-js refreshes an expired session through the cookie adapter first.
@@ -38,7 +43,7 @@ vi.mock("@/lib/env", () => ({
 vi.mock("@supabase/ssr", () => ({
   createServerClient: (_url: string, _key: string, options: { cookies: CookieAdapter }) => {
     adapter = options.cookies;
-    return { auth: { getUser, getClaims }, rpc };
+    return { auth: { getUser, getClaims, signOut }, rpc };
   },
 }));
 
@@ -63,6 +68,7 @@ beforeEach(() => {
   rpc.mockClear();
   getUser.mockClear();
   getClaims.mockClear();
+  signOut.mockClear();
 });
 
 describe("middleware — account suspension", () => {
@@ -107,6 +113,31 @@ describe("middleware — account suspension", () => {
     const res = await at("/b2b/leads", { method: "POST", headers: { "next-action": "abc", "next-router-prefetch": "1" } });
     expect(pathOf(res)).toBe("/auth/suspended");
     expect(rpc).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("middleware — revoked session", () => {
+  it("clears the cookies of a session revoked elsewhere and sends it to sign in", async () => {
+    claims = SIGNED_IN;
+    accountStatus = { status: "active", suspended: false, session_active: false };
+    const res = await at("/b2b/leads?tab=new");
+    expect(pathOf(res)).toBe("/auth/sign-in");
+    expect(location(res)?.searchParams.get("next")).toBe("/b2b/leads?tab=new");
+    expect(signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(res.headers.get("set-cookie")).toContain("sb-test-auth-token=;");
+  });
+
+  it("treats a revoked session before suspension", async () => {
+    claims = SIGNED_IN;
+    accountStatus = { status: "suspended", suspended: true, session_active: false };
+    expect(pathOf(await at("/home"))).toBe("/auth/sign-in");
+  });
+
+  it("leaves a live session alone", async () => {
+    claims = SIGNED_IN;
+    accountStatus = { status: "active", suspended: false, session_active: true };
+    expect(pathOf(await at("/b2b/leads"))).toBeNull();
+    expect(signOut).not.toHaveBeenCalled();
   });
 });
 

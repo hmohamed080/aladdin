@@ -215,3 +215,94 @@ describe("parseRange", () => {
     expect(parseRange("bytes=0-1", null)).toBeNull();
   });
 });
+
+describe("edge byte cache", () => {
+  /** A Map-backed stand-in for caches.default that counts reads and writes. */
+  function memoryCache() {
+    const store = new Map<string, { body: Uint8Array; headers: Headers }>();
+    const stats = { match: 0, put: 0 };
+    return {
+      store, stats,
+      cache: {
+        async match(key: string) {
+          stats.match++;
+          const hit = store.get(key);
+          return hit ? new Response(hit.body.slice(), { headers: hit.headers }) : undefined;
+        },
+        async put(key: string, response: Response) {
+          stats.put++;
+          store.set(key, { body: new Uint8Array(await response.arrayBuffer()), headers: response.headers });
+        },
+      },
+    };
+  }
+  let mem: ReturnType<typeof memoryCache>;
+  let r2Gets: number;
+  let cached: ReturnType<typeof createHandler>;
+  const cget = (url: string, headers: Record<string, string> = {}) => cached(new Request(url, { headers }), env, ctx);
+
+  beforeEach(() => {
+    mem = memoryCache();
+    r2Gets = 0;
+    const inner = env.MEDIA_BUCKET;
+    env.MEDIA_BUCKET = { ...inner, get: (k, o) => { r2Gets++; return inner.get(k, o); } };
+    env.EDGE_CACHE = "on";
+    cached = createHandler({ authority: () => fakeAuthority(), now: () => NOW * 1000, cache: () => mem.cache });
+  });
+
+  it("fills on a miss and serves the next authorized request without reading R2", async () => {
+    const first = await cget(await privateUrl());
+    expect(new Uint8Array(await first.arrayBuffer())).toEqual(BYTES);
+    await Promise.all(waits);
+    expect(mem.stats.put).toBe(1);
+    const second = await cget(await privateUrl());
+    expect(new Uint8Array(await second.arrayBuffer())).toEqual(BYTES);
+    expect(r2Gets).toBe(1);
+    // The browser still gets private, no-store headers; the stored copy is internal.
+    expect(second.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+    expect([...mem.store.keys()][0]).toBe(`https://media-edge.internal/certificate/${KEY}?sha256=${SHA}`);
+  });
+
+  it("never lets a cached copy outlive revocation: the database is asked first", async () => {
+    await (await cget(await privateUrl())).arrayBuffer();
+    await Promise.all(waits);
+    db.deleted = true;
+    expect((await cget(await privateUrl())).status).toBe(404);
+    db.deleted = false; db.sessionRevoked = true;
+    expect((await cget(await privateUrl())).status).toBe(404);
+    expect(calls.private).toBe(3);
+  });
+
+  it("re-reads R2 when the cached entry does not match the verified size", async () => {
+    await (await cget(await privateUrl())).arrayBuffer();
+    await Promise.all(waits);
+    const [key] = [...mem.store.keys()];
+    mem.store.set(key!, { body: new Uint8Array([1, 2, 3]), headers: new Headers({ "content-length": "3" }) });
+    const res = await cget(await privateUrl());
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(BYTES);
+    expect(r2Gets).toBe(2);
+  });
+
+  it("bypasses the cache for ranges, when switched off, and when the cache fails", async () => {
+    await (await cget(await privateUrl(), { range: "bytes=0-3" })).arrayBuffer();
+    expect(mem.stats.match + mem.stats.put).toBe(0);
+    env.EDGE_CACHE = "off";
+    await (await cget(await privateUrl())).arrayBuffer();
+    expect(mem.stats.match + mem.stats.put).toBe(0);
+    env.EDGE_CACHE = "on";
+    mem.cache.match = async () => { throw new Error("cache down"); };
+    const res = await cget(await privateUrl());
+    expect(res.status).toBe(200);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(BYTES);
+  });
+
+  it("caches conditional public bytes too, still re-authorizing every view", async () => {
+    const url = `https://media.example.test/c/portfolio/${ITEM}/original`;
+    await (await cget(url)).arrayBuffer();
+    await Promise.all(waits);
+    expect((await cget(url)).headers.get("cache-control")).toBe("private, no-cache");
+    db.published = false;
+    expect((await cget(url)).status).toBe(404);
+    expect(r2Gets).toBe(1);
+  });
+});

@@ -5,6 +5,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: vi.fn(async () => ({ rpc })) }));
 
 const { saveSecondaryPhoneAction, makeSecondaryPhonePrimaryAction } = await import("./secondary-phone");
+const { createTranslator } = await import("@/lib/i18n/translate");
 
 const form = (o: Record<string, string>) => {
   const fd = new FormData();
@@ -51,6 +52,20 @@ describe("second phone actions", () => {
     expect((await saveSecondaryPhoneAction({ ok: false }, form({ e164: "+201012345678", password: "x" }))).code).toBe(
       "profileIdentity.secondaryPhone.errors.unavailable",
     );
+  });
+
+  it("your own main phone as the second phone (add or change) gets the friendly 'already your main phone' copy in both languages", async () => {
+    for (const mode of ["reserve", "change"] as const) {
+      rpc.mockResolvedValueOnce({ data: { ok: true, receipt: RECEIPT }, error: null }).mockResolvedValueOnce({
+        data: null,
+        error: { code: "22023", message: "this is already your primary phone" },
+      });
+      const r = await saveSecondaryPhoneAction({ ok: false }, form({ e164: "+201012345678", password: "x", mode }));
+      expect(r).toEqual({ ok: false, code: "profileIdentity.secondaryPhone.errors.alreadyPrimary" });
+    }
+    // The key resolves to real copy (a missing key would render as the raw key).
+    expect(createTranslator("en")("profileIdentity.secondaryPhone.errors.alreadyPrimary")).toBe("This is already your main phone.");
+    expect(createTranslator("ar")("profileIdentity.secondaryPhone.errors.alreadyPrimary")).toBe("هذا هو هاتفك الأساسي بالفعل.");
   });
 
   it("refuses a non-canonical number before any call", async () => {

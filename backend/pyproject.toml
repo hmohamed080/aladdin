@@ -12,6 +12,9 @@ dependencies = [
     "httpx>=0.28",
     "structlog>=24.4",
     "openai>=1.59",
+    # Local Supabase JWT verification (JWKS, ES256). Already locked as a
+    # transitive dependency of supabase-auth; declared because app.auth uses it.
+    "pyjwt[crypto]>=2.10",
 ]
 
 [dependency-groups]

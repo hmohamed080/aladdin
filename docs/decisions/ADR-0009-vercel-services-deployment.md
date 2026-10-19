@@ -70,6 +70,8 @@ Two code changes are load-bearing for this decision and ship with it:
 
 **Flip `APP_ENV=staging` and provision the four secrets in the same change that lands the first real AI/OCR/document endpoint** — not before, and not separately.
 
+> **Revision 2026-10-19 (owner request, PR #91).** Production ran with `APP_ENV` unset, reporting `local` and skipping the check. `backend/app/config.py` now derives the environment from Vercel's `VERCEL_ENV` when `APP_ENV` is unset or `local` (Production → `production`, Preview → `staging`), so a deployment can no longer skip the check. The required set is what the deployed request path uses: `SUPABASE_URL` and `SUPABASE_ANON_KEY`. The service-role key, `DATABASE_URL` and the legacy JWT secret are no longer required (no deployed route reads them), which keeps the reasoning above: no RLS-bypassing key on the function without a consumer. A missing variable no longer fails the import: the service starts, `/api/backend/health` answers 503 `misconfigured` with the missing names, and every authenticated endpoint answers 503, so merging cannot take the site down. Names per environment: [vercel-environment-variables.md](../guides/vercel-environment-variables.md).
+
 `ALLOWED_ORIGINS` (CORS) stays at its default. Same-origin routing means the browser issues no cross-origin preflight, and the service is called server-to-server regardless.
 
 ### Workers are explicitly out of scope

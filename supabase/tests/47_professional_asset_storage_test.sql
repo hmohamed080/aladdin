@@ -220,8 +220,8 @@ select ok(
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects'),
-  27,
-  'Twenty-seven policies on storage.objects: three each for certificates/portfolio/avatars, plus two public doors, plus the four product-images policies (Own Products, 20261015090004), plus the four request-images policies (Purchase Requests, 20261015090020), plus the four organization-images policies (Showroom profile image, 20261015090043), plus the three business-verification document policies (20261017160001), plus the restrictive revocable-media read boundary (R2)'
+  28,
+  'Twenty-eight policies on storage.objects: three each for certificates/portfolio/avatars, plus two public doors, plus the four product-images policies (Own Products, 20261015090004), plus the four request-images policies (Purchase Requests, 20261015090020), plus the four organization-images policies (Showroom profile image, 20261015090043), plus the three business-verification document policies (20261017160001), plus the restrictive revocable-media read boundary (R2), plus the restrictive ended-session refusal (20261019163000)'
 );
 
 select is(
@@ -254,8 +254,8 @@ select is(
     'request_images_insert_authorized',
     'request_images_select_owner',
     'request_images_select_viewer',
-    'revocable_media_backend_reads'
-
+    'revocable_media_backend_reads',
+    'storage_objects_session_live'
   ],
   'Exact policy set includes the reviewed five-bucket restrictive boundary'
 );

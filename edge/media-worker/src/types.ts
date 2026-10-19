@@ -27,6 +27,18 @@ export interface Env {
   PRIVATE_ROUTES?: string;
   /** "on" enables /c (conditional public). Anything else disables it. */
   PUBLIC_ROUTES?: string;
+  /**
+   * "on" keeps verified bytes in the local Cloudflare cache, keyed by the R2 object
+   * and its sha256 (content-addressed, so never stale). Authorization is still
+   * decided by the database on every request; only bytes are cached.
+   */
+  EDGE_CACHE?: string;
+}
+
+/** The subset of the Workers Cache API (`caches.default`) the Worker uses. */
+export interface ByteCacheLike {
+  match(key: string): Promise<Response | undefined>;
+  put(key: string, response: Response): Promise<void>;
 }
 
 /** What the database authorizes for exactly one request. */

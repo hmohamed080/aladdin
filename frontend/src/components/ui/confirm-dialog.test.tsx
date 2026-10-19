@@ -1,12 +1,20 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, screen } from "@testing-library/react";
+import { useState } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { renderWithI18n } from "@/test/render";
 import { ConfirmDialog } from "./confirm-dialog";
 import { ar } from "@/lib/i18n/messages/ar";
+import { en } from "@/lib/i18n/messages/en";
+import { Toaster, resetToasts } from "./toast";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
 
 function noop() {}
+
+afterEach(() => {
+  act(() => resetToasts());
+  vi.useRealTimers();
+});
 
 describe("ConfirmDialog (accessible destructive confirmation)", () => {
   it("is closed until the trigger is pressed, then shows a labelled modal", () => {
@@ -70,5 +78,75 @@ describe("ConfirmDialog (accessible destructive confirmation)", () => {
     // The render receives the returned state, so callers can show per-field errors
     // and keep a controlled field's value across the error.
     expect(renderedState).not.toBeNull();
+  });
+
+  it("stateful formAction success: closes, and its done message survives the close as a polite toast", async () => {
+    const formAction = vi.fn(async () => ({ ok: true, code: "phoneCooldown.done" }));
+    renderWithI18n(
+      <>
+        <ConfirmDialog trigger="رفع" title="X" confirmLabel="تأكيد" formAction={formAction}>
+          <input type="hidden" name="phone" value="+201012345678" />
+        </ConfirmDialog>
+        <Toaster dismissLabel={ar.common.close} />
+      </>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "رفع" }));
+    fireEvent.submit(screen.getByRole("button", { name: "تأكيد" }).closest("form")!);
+
+    const toast = await screen.findByTestId("toast");
+    expect(toast).toHaveTextContent(ar.phoneCooldown.done);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // Announced: the toast sits inside the always-mounted polite live region, and is not colour-only.
+    const region = toast.closest('[role="status"]')!;
+    expect(region).toHaveAttribute("aria-live", "polite");
+    // Dismissable by keyboard-reachable, labelled button.
+    fireEvent.click(within(toast).getByRole("button", { name: ar.common.close }));
+    expect(screen.queryByTestId("toast")).toBeNull();
+  });
+
+  it("the success toast outlives the dialog's own unmount (the refreshed data removed the trigger)", async () => {
+    const formAction = vi.fn(async () => ({ ok: true, code: "businessVerification.admin.done.start" }));
+    function Harness() {
+      const [show, setShow] = useState(true);
+      return (
+        <>
+          {show ? <ConfirmDialog trigger="Start" title="X" confirmLabel="Go" formAction={formAction} /> : null}
+          <button type="button" onClick={() => setShow(false)}>unmount</button>
+          <Toaster dismissLabel={en.common.close} />
+        </>
+      );
+    }
+    renderWithI18n(<Harness />, "en");
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    fireEvent.submit(screen.getByRole("button", { name: "Go" }).closest("form")!);
+    await screen.findByTestId("toast");
+    fireEvent.click(screen.getByRole("button", { name: "unmount" }));
+    expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
+    expect(screen.getByTestId("toast")).toHaveTextContent(en.businessVerification.admin.done.start);
+  });
+
+  it("a success without a code shows no toast, and a toast auto-dismisses unless hovered", async () => {
+    const formAction = vi.fn(async () => ({ ok: true }));
+    renderWithI18n(
+      <>
+        <ConfirmDialog trigger="Do" title="X" confirmLabel="Go" formAction={formAction} />
+        <Toaster dismissLabel="Close" />
+      </>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Do" }));
+    fireEvent.submit(screen.getByRole("button", { name: "Go" }).closest("form")!);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.queryByTestId("toast")).toBeNull();
+
+    vi.useFakeTimers();
+    const { showToast } = await import("./toast");
+    act(() => showToast("Saved."));
+    const toast = screen.getByTestId("toast");
+    fireEvent.mouseEnter(toast);
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.getByTestId("toast")).toBeInTheDocument(); // paused while hovered
+    fireEvent.mouseLeave(toast);
+    act(() => vi.advanceTimersByTime(6_000));
+    expect(screen.queryByTestId("toast")).toBeNull();
   });
 });

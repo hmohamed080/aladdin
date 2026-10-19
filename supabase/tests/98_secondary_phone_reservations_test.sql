@@ -8,12 +8,13 @@
 --   E. Conversion: no cooldown; phone-login accounts refused
 --   F. Support override: permission, mandatory reason, immutability, audit
 --   G. Boundaries: tables closed to clients, anon refused, never a login/contact
+--   H. One number is never both the primary and the secondary of one account, in every direction
 --
 -- Every fixture is created INSIDE this transaction; the file rolls back.
 create extension if not exists pgtap;
 
 begin;
-select plan(69);
+select plan(75);
 
 \set u1     '69000000-0000-4000-8000-000000000001'
 \set u2     '69000000-0000-4000-8000-000000000002'
@@ -247,6 +248,24 @@ select is((select count(*)::int from public.audit_log where action = 'phone_cool
              and metadata ->> 'reason' = 'Customer proved ownership by call'), 1, 'F6 the override is audited');
 select throws_ok($$ update public.phone_cooldown_overrides set reason = 'edited' $$, '42501', null, 'F7 overrides cannot be edited');
 select throws_ok($$ delete from public.phone_cooldown_overrides $$, '42501', null, 'F8 ...or deleted');
+
+-- ===========================================================================
+-- H. Same number as primary AND secondary on one account (B9 covers reserving your own primary)
+-- ===========================================================================
+-- u1: primary +201069000001, active secondary +201069100030 (F5).
+select is(pg_temp.call_as(:'u1', format('public.secondary_phone_change(%L, %L::uuid)', '+201069000001',
+          pg_temp.receipt(:'u1', 'secondary_phone.change', '+201069000001'))) ->> 'msg', 'this is already your primary phone',
+          'H1 changing your secondary to your own primary is refused (22023, "already your primary")');
+select is(pg_temp.call_as(:'u1', 'public.my_secondary_phone()') ->> 'phone', '+201069100030',
+          'H2 ...and the refused change keeps the current secondary (atomic)');
+select is(pg_temp.st(:'u1', $$public.profile_set_phone('EG', '1069100030', '+201069100030')$$), 'ok',
+          'H3 the normal primary-phone change to your own active secondary succeeds');
+select is((select status::text from public.secondary_phone_reservations where user_id = :'u1' and phone_e164 = '+201069100030'),
+          'converted', 'H4 ...as a conversion: the secondary reservation ends, it does not stay beside the primary');
+select is(pg_temp.call_as(:'u1', 'public.my_secondary_phone()'), '{"void":true}'::jsonb, 'H5 the account has no secondary left');
+select is((select count(*)::int from public.profiles p
+             join public.secondary_phone_reservations r on r.user_id = p.user_id and r.phone_e164 = p.phone_e164
+            where r.status = 'active'), 0, 'H6 no account anywhere holds one number as both primary and active secondary');
 
 -- ===========================================================================
 -- G. Boundaries

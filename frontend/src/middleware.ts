@@ -95,7 +95,21 @@ export async function middleware(request: NextRequest) {
   const productSurface = isProductSurfacePath(path);
   if (userId && !prefetch && (productSurface || path === "/auth/suspended")) {
     const { data: account } = await supabase.rpc("my_account_status");
-    const suspended = (account as { suspended?: boolean } | null)?.suspended === true;
+    const status = account as { suspended?: boolean; session_active?: boolean } | null;
+    // A session signed out elsewhere, revoked, banned or deleted: the database
+    // already refuses its token (db_pre_request), so drop the stale cookies and
+    // start a fresh sign-in instead of rendering a page whose queries all fail.
+    if (status?.session_active === false) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      const url = request.nextUrl.clone();
+      url.pathname = "/auth/sign-in";
+      url.search = "";
+      if (productSurface) url.searchParams.set("next", path + request.nextUrl.search);
+      const redirect = NextResponse.redirect(url);
+      for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
+      return redirect;
+    }
+    const suspended = status?.suspended === true;
     if (suspended && productSurface) {
       const url = request.nextUrl.clone();
       url.pathname = "/auth/suspended";

@@ -1,5 +1,5 @@
 import { isUuid, parseTicketKeys, verifyTicket, VARIANTS } from "./ticket";
-import type { Env, ExecutionContextLike, MediaAuthority, MediaGrant } from "./types";
+import type { ByteCacheLike, Env, ExecutionContextLike, MediaAuthority, MediaGrant } from "./types";
 
 // Content types the application accepts per namespace (frontend/src/lib/storage/media-policy.ts).
 const TYPES: Record<string, readonly string[]> = {
@@ -48,6 +48,19 @@ function parseGrant(value: unknown, namespace: string): MediaGrant | null {
 
 type ByteRange = { offset: number; length: number } | "unsatisfiable" | null;
 
+// Objects up to this size are kept in the edge byte cache (images and most PDFs).
+export const EDGE_CACHE_MAX_BYTES = 20 * 1024 * 1024;
+const EDGE_CACHE_CONTROL = "public, max-age=2592000, immutable";
+
+/**
+ * Content-addressed cache key: the R2 object plus the verified sha256. A replaced
+ * object gets a new sha256 and therefore a new key, so a cached entry is never
+ * stale. The key is internal to the Worker and never sent to a browser.
+ */
+export function edgeCacheKey(grant: MediaGrant): string {
+  return `https://media-edge.internal/${grant.object}?sha256=${grant.sha256}`;
+}
+
 /** A single `bytes=` range against a known size; anything else serves the whole object. */
 export function parseRange(header: string | null, size: number | null): ByteRange {
   if (!header || size === null) return null;
@@ -65,7 +78,8 @@ export function parseRange(header: string | null, size: number | null): ByteRang
   return { offset: start, length: end - start + 1 };
 }
 
-async function serve(request: Request, env: Env, grant: MediaGrant, conditional: boolean): Promise<Response> {
+async function serve(request: Request, env: Env, ctx: ExecutionContextLike, bytes: ByteCacheLike | null,
+  grant: MediaGrant, conditional: boolean): Promise<Response> {
   const etag = `"${grant.sha256}"`;
   const cache = conditional ? { ...CONDITIONAL_CACHE, etag } : PRIVATE_CACHE;
   const base = { ...SECURITY, ...cache, "content-type": grant.contentType, "accept-ranges": "bytes" };
@@ -85,6 +99,18 @@ async function serve(request: Request, env: Env, grant: MediaGrant, conditional:
     if (!head || (grant.size !== null && head.size !== grant.size)) { log("object", conditional ? "c" : "m"); return notFound(); }
     return new Response(null, { status: 200, headers: { ...base, "content-length": String(head.size) } });
   }
+  // Edge byte cache: only whole-object GETs of a known, bounded size. The response
+  // the browser receives keeps its private headers; only the stored copy is public.
+  const cacheable = bytes !== null && env.EDGE_CACHE === "on" && !range && grant.size !== null
+    && grant.size <= EDGE_CACHE_MAX_BYTES;
+  const key = edgeCacheKey(grant);
+  if (cacheable) {
+    const hit = await bytes.match(key).catch(() => undefined);
+    if (hit?.body && Number(hit.headers.get("content-length")) === grant.size) {
+      return new Response(hit.body, { status: 200, headers: { ...base, "content-length": String(grant.size) } });
+    }
+    await hit?.body?.cancel();
+  }
   const object = await env.MEDIA_BUCKET.get(grant.object, range ? { range } : undefined);
   // A size mismatch means the object is not the verified receipt: refuse it.
   if (!object || (grant.size !== null && object.size !== grant.size)) {
@@ -96,12 +122,20 @@ async function serve(request: Request, env: Env, grant: MediaGrant, conditional:
     return new Response(object.body, { status: 206, headers: { ...base, "content-length": String(range.length),
       "content-range": `bytes ${range.offset}-${range.offset + range.length - 1}/${object.size}` } });
   }
+  if (cacheable) {
+    const [toBrowser, toCache] = object.body.tee();
+    ctx.waitUntil(bytes.put(key, new Response(toCache, { headers: { "cache-control": EDGE_CACHE_CONTROL,
+      "content-type": grant.contentType, "content-length": String(object.size) } })).catch(() => undefined));
+    return new Response(toBrowser, { status: 200, headers: { ...base, "content-length": String(object.size) } });
+  }
   return new Response(object.body, { status: 200, headers: { ...base, "content-length": String(object.size) } });
 }
 
 export type HandlerDeps = {
   authority: (env: Env) => MediaAuthority;
   now: () => number;
+  /** The edge byte cache, or null where none exists (tests, previews). */
+  cache?: () => ByteCacheLike | null;
 };
 
 /**
@@ -133,7 +167,7 @@ export function createHandler(deps: HandlerDeps) {
         const grant = parseGrant(await authority.authorizePrivate({ namespace: claims.ns, key: claims.k, variant: claims.var,
           viewer: claims.sub, session: claims.sid, workspace: claims.ws, expiresAt: claims.exp }), claims.ns);
         if (!grant) { log("authz", "m"); return notFound(); }
-        return await serve(request, env, grant, false);
+        return await serve(request, env, ctx, deps.cache?.() ?? null, grant, false);
       }
       if (parts.length === 5 && parts[1] === "c" && env.PUBLIC_ROUTES === "on") {
         const [, , namespace, id, variant] = parts as [string, string, string, string, string];
@@ -142,7 +176,7 @@ export function createHandler(deps: HandlerDeps) {
         authority = deps.authority(env);
         const grant = parseGrant(await authority.authorizePublic({ namespace, id, variant }), namespace);
         if (!grant) { log("authz", "c"); return notFound(); }
-        return await serve(request, env, grant, true);
+        return await serve(request, env, ctx, deps.cache?.() ?? null, grant, true);
       }
       log("route", "-");
       return notFound();

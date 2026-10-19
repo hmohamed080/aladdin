@@ -556,3 +556,13 @@ Tests on the branch:
 - `78_verified_media_storage_test.sql`, `79_media_maintenance_test.sql`, `88_revocable_media_delivery_test.sql`, `96_rc2_private_provider_media_test.sql` and `99_media_edge_authorization_test.sql`;
 - the Worker tests in `edge/media-worker/test/`;
 - the HTTP harness `professional_asset_storage_api_test.mjs`, updated to this contract in `5b2e813`: 67 pass, 0 fail, recorded on the branch, not re-run here.
+
+## 15. Historical portfolio photos and avatars are deleted, not migrated (2026-10-19)
+
+Owner decision (ADR-0018 Revision 2): Supabase-hosted portfolio photos and avatars created before a cutoff are permanently deleted; nothing is copied to R2 and no placeholder replaces them. Users see an empty portfolio or the initials avatar and upload again (to R2 once `R2_STORAGE_ENABLED=true`).
+
+- Migration `20261019120000_historical_media_purge.sql`: journal table `media_historical_purge_journal` and four service-role-only functions (`inventory`, `retire`, `storage_removed`, `finalize`). Retire hides published items and unlinks `profiles.avatar_media_id` in one transaction; metadata rows (`portfolio_items`, `avatar_uploads`, `media_storage_locations` with provider `supabase`) are deleted only after the database confirms the object is gone from `storage.objects`.
+- Scope is closed: buckets `professional-portfolio` and `avatars` only, rows older than the cutoff, never a verified R2 object. Certificates (`professional-certificates`), business-verification documents, product and organization images are never selected.
+- Job: `cd backend && uv run python -m app.workers.historical_media_purge --cutoff <ISO>` (dry run), then `--execute --confirm-project <ref>`. Production runs need owner approval and come after R2 writes are on.
+- Tests: `supabase/tests/100_historical_media_purge_test.sql`, `backend/tests/test_historical_media_purge.py`.
+

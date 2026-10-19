@@ -52,7 +52,8 @@ Token/brand changes follow the design-system edit-order (token JSON first) and u
 - **Specialized workloads only:** AI orchestration, OCR, document processing/chunking, embeddings, RAG, AI evaluations, NLP, large-Excel processing, and background/queue handlers.
 - **Does not recreate application CRUD.** If a feature can be a Server Action / Route Handler against Supabase, it belongs in the web app, not here.
 - Talks to Supabase/Postgres via **`supabase-py`** (see [Python Data-Access Decision](#python-data-access-decision)).
-- Verifies the Supabase JWT on every request and derives identity from the token.
+- Verifies the Supabase JWT on every request and derives identity from the token (`app/auth`: local JWKS verification; `require_active_principal` also refuses suspended accounts and ended sessions).
+- Owns non-CRUD **media jobs**: the historical-media purge today, the R2 variant backfill next ([ADR-0018 Revision 2](../decisions/ADR-0018-r2-edge-media-delivery.md#revision-2--2026-10-19-full-media-architecture)).
 
 ## Supabase Platform Responsibilities
 - **PostgreSQL** — the single shared database and the system of record.
@@ -114,6 +115,8 @@ Token/brand changes follow the design-system edit-order (token JSON first) and u
 - **Delivery.** When `MEDIA_EDGE_DELIVERY_ENABLED=true`, R2 rows are served by the `media-edge` Worker (`edge/media-worker/`). Private reads need a 120 s HMAC ticket minted by the app; public reads need none. Every request calls Postgres through Hyperdrive with caching off. Otherwise, and for Supabase rows, the app proxy serves them (`/api/media/<ns>`, `/p/media/<itemId>`, `no-store`).
 - **Variants.** WebP `thumb` 320, `card` 768 and `full` 1600 px are generated from the verified original and stored at `v/<ns>/<key>/<variant>.webp`.
 - **Hosting.** The Worker is a media edge beside Supabase Storage. It is not a Vercel service and not the background-worker host; [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md) is unchanged.
+- **Historical Supabase media is deleted, not migrated** (2026-10-19): portfolio photos and avatars before a cutoff are purged by a resumable, database-confirmed backend job; certificates and verification evidence are never touched. Products and logos stay private (no guest catalog). Media hostname `media.aladdindecore.com` (Pages + CNAME, or a Cloudflare zone). Responsibilities, costs, failure handling and rollback: ADR-0018 Revision 2.
+- **Session revocation on the Data API.** The `db_pre_request` hook refuses a signed-out, banned or deleted session on its next request (migration `20261019140000`), not at JWT expiry. Storage and Realtime do not run that hook, so restrictive `app.jwt_session_is_live()` policies cover them: `storage.objects` (every command) and the two Realtime-published tables `leads` and `follow_up_tasks` (migration `20261019163000`, pgTAP `103_*`). A table added to the `supabase_realtime` publication needs the same policy; pgTAP `103_*` fails without it.
 - Runbooks: [media monitoring and migration](../operations/media-monitoring.md) · [Worker setup](../../edge/media-worker/README.md) · [professional media contract](../database/professional-asset-storage.md).
 
 ## Realtime Responsibilities
@@ -194,6 +197,9 @@ Every architecture change must, in the same session:
 6. Include **validation results** (the commands run and their outcomes).
 
 ## Architecture Change History
+
+### 2026-10-19 — ADR-0018 Revision 2: full media architecture, purge instead of migration, session revocation
+Proposed, not deployed (stacked on PR #89). Backend becomes the home of media jobs; historical Supabase portfolio photos and avatars are deleted, not copied; the Worker gains a content-addressed edge byte cache and the `media.aladdindecore.com` route; PostgREST refuses ended sessions on the next request; Vercel functions move to `cdg1` next to the database. See [Media Storage & Delivery](#media-storage--delivery).
 
 ### 2026-10-18 — R2 media store and ticketed edge delivery proposed (ADR-0018)
 Proposed, not accepted and not deployed. R2 becomes the primary media store and a Cloudflare Worker serves R2 media with a per-request Postgres authorization, behind `MEDIA_EDGE_DELIVERY_ENABLED` (default false). See [Media Storage & Delivery](#media-storage--delivery) and [ADR-0018](../decisions/ADR-0018-r2-edge-media-delivery.md).
