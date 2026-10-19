@@ -43,6 +43,8 @@ const identity = {
   phoneNational: null,
   phoneE164: null,
   avatarUrl: null,
+  phoneLogin: false,
+  secondaryPhone: null,
 };
 
 async function outcome(): Promise<string> {

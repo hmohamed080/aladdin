@@ -2035,6 +2035,107 @@ export type Database = {
         }
         Relationships: []
       }
+      media_migration_ledger: {
+        Row: {
+          namespace: string
+          object_key: string
+          owner_user_id: string
+          rolled_back_at: string | null
+          sha256: string
+          size_bytes: number
+          source_provider: string
+          switched_at: string
+        }
+        Insert: {
+          namespace: string
+          object_key: string
+          owner_user_id: string
+          rolled_back_at?: string | null
+          sha256: string
+          size_bytes: number
+          source_provider?: string
+          switched_at?: string
+        }
+        Update: {
+          namespace?: string
+          object_key?: string
+          owner_user_id?: string
+          rolled_back_at?: string | null
+          sha256?: string
+          size_bytes?: number
+          source_provider?: string
+          switched_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_migration_ledger_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media_storage_locations: {
+        Row: {
+          cleaned_at: string | null
+          content_type: string
+          created_at: string
+          namespace: string
+          object_key: string
+          organization_id: string | null
+          owner_user_id: string
+          provider: string
+          sha256: string | null
+          size_bytes: number | null
+          variants: Json
+          verified_at: string | null
+        }
+        Insert: {
+          cleaned_at?: string | null
+          content_type: string
+          created_at?: string
+          namespace: string
+          object_key: string
+          organization_id?: string | null
+          owner_user_id: string
+          provider: string
+          sha256?: string | null
+          size_bytes?: number | null
+          variants?: Json
+          verified_at?: string | null
+        }
+        Update: {
+          cleaned_at?: string | null
+          content_type?: string
+          created_at?: string
+          namespace?: string
+          object_key?: string
+          organization_id?: string | null
+          owner_user_id?: string
+          provider?: string
+          sha256?: string | null
+          size_bytes?: number | null
+          variants?: Json
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_storage_locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_storage_locations_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membership_branch_access: {
         Row: {
           branch_id: string
@@ -3279,6 +3380,8 @@ export type Database = {
       }
       organizations: {
         Row: {
+          business_verification_id: string | null
+          business_verified_at: string | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string
@@ -3303,6 +3406,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          business_verification_id?: string | null
+          business_verified_at?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -3327,6 +3432,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          business_verification_id?: string | null
+          business_verified_at?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -7348,6 +7455,24 @@ export type Database = {
         Args: { p_reason: string; p_user_id: string }
         Returns: Json
       }
+      admin_phone_cooldown_override: {
+        Args: { p_phone: string; p_reason: string }
+        Returns: string
+      }
+      admin_phone_cooldown_status: { Args: { p_phone: string }; Returns: Json }
+      admin_users_directory: {
+        Args: {
+          p_account_type?: string
+          p_governorate?: string
+          p_page?: number
+          p_page_size?: number
+          p_search?: string
+          p_sort?: string
+          p_status?: string
+          p_verification?: string
+        }
+        Returns: Json
+      }
       admin_users_list: {
         Args: {
           p_account_type?: Database["public"]["Enums"]["persona_type"]
@@ -7359,6 +7484,10 @@ export type Database = {
           p_status?: string
           p_verification?: string
         }
+        Returns: Json
+      }
+      account_password_confirm: {
+        Args: { p_operation: string; p_password: string; p_target: string }
         Returns: Json
       }
       apply_account_upgrade: {
@@ -7378,6 +7507,7 @@ export type Database = {
         Returns: number
       }
       avatar_confirm_upload: { Args: { p_object_key: string }; Returns: string }
+      avatar_delete_current: { Args: never; Returns: string }
       avatar_request_upload: {
         Args: { p_content_type: string }
         Returns: string
@@ -7489,6 +7619,58 @@ export type Database = {
         Returns: undefined
       }
       business_submit: { Args: never; Returns: string }
+      business_verification_approve: {
+        Args: { p_reason: string; p_verification_id: string }
+        Returns: undefined
+      }
+      business_verification_detail: {
+        Args: { p_verification_id: string }
+        Returns: Json
+      }
+      business_verification_document_confirm: {
+        Args: { p_object_key: string }
+        Returns: string
+      }
+      business_verification_document_remove: {
+        Args: { p_document_id: string }
+        Returns: string
+      }
+      business_verification_document_request_upload: {
+        Args: {
+          p_content_type: string
+          p_doc_type: string
+          p_file_name: string
+          p_org_id: string
+          p_size_bytes: number
+        }
+        Returns: string
+      }
+      business_verification_queue: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_org_type?: Database["public"]["Enums"]["organization_type"]
+          p_search?: string
+          p_status?: string[]
+        }
+        Returns: Json
+      }
+      business_verification_reject: {
+        Args: { p_reason: string; p_verification_id: string }
+        Returns: undefined
+      }
+      business_verification_request_info: {
+        Args: { p_reason: string; p_verification_id: string }
+        Returns: undefined
+      }
+      business_verification_start_review: {
+        Args: { p_verification_id: string }
+        Returns: undefined
+      }
+      business_verification_submit: {
+        Args: { p_note?: string; p_org_id: string }
+        Returns: string
+      }
       caller_has_service_location: { Args: never; Returns: boolean }
       cancel_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
       cancel_order: { Args: { p_order_id: string }; Returns: undefined }
@@ -7947,6 +8129,104 @@ export type Database = {
         Returns: undefined
       }
       mark_notification_read: { Args: { p_id: string }; Returns: undefined }
+      media_cleanup_candidates: {
+        Args: { p_limit?: number }
+        Returns: {
+          namespace: string
+          object_key: string
+          owner_user_id: string
+          provider: string
+        }[]
+      }
+      media_cleanup_complete: {
+        Args: { p_key: string; p_namespace: string; p_owner: string }
+        Returns: undefined
+      }
+      media_cleanup_retire: {
+        Args: { p_key: string; p_namespace: string; p_owner: string }
+        Returns: undefined
+      }
+      media_edge_authorize: {
+        Args: {
+          p_expires_at: string
+          p_key: string
+          p_namespace: string
+          p_session: string
+          p_variant: string
+          p_viewer: string
+          p_workspace: string
+        }
+        Returns: Json
+      }
+      media_edge_public: {
+        Args: { p_id: string; p_namespace: string; p_variant: string }
+        Returns: Json
+      }
+      media_migration_inventory: {
+        Args: { p_after?: string; p_limit?: number }
+        Returns: {
+          content_type: string
+          cursor_key: string
+          max_bytes: number
+          migration_tracked: boolean
+          namespace: string
+          object_key: string
+          owner_user_id: string
+          provider: string
+          source_exists: boolean
+        }[]
+      }
+      media_migration_rollback: {
+        Args: { p_key: string; p_namespace: string; p_sha256: string }
+        Returns: undefined
+      }
+      media_migration_switch: {
+        Args: {
+          p_content_type: string
+          p_key: string
+          p_namespace: string
+          p_owner: string
+          p_sha256: string
+          p_size: number
+        }
+        Returns: undefined
+      }
+      media_source_inventory_summary: { Args: never; Returns: Json }
+      media_storage_attest: {
+        Args: {
+          p_content_type: string
+          p_key: string
+          p_namespace: string
+          p_owner: string
+          p_provider: string
+          p_sha256: string
+          p_size: number
+        }
+        Returns: undefined
+      }
+      media_storage_metrics: { Args: never; Returns: Json }
+      media_storage_record_variants: {
+        Args: {
+          p_key: string
+          p_namespace: string
+          p_owner: string
+          p_variants: Json
+        }
+        Returns: undefined
+      }
+      media_storage_reserve: {
+        Args: {
+          p_key: string
+          p_namespace: string
+          p_owner?: string
+          p_provider: string
+        }
+        Returns: undefined
+      }
+      media_storage_resolve: {
+        Args: { p_key: string; p_namespace: string; p_operation: string }
+        Returns: Json
+      }
       membership_activate: {
         Args: { p_membership_id: string }
         Returns: undefined
@@ -7971,7 +8251,9 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      my_secondary_phone: { Args: never; Returns: Json }
       my_account_status: { Args: never; Returns: Json }
+      my_business_verification: { Args: { p_org_id: string }; Returns: Json }
       my_branches: {
         Args: { p_org_id: string }
         Returns: {
@@ -8362,6 +8644,23 @@ export type Database = {
         Args: { p_content_type: string; p_org_id: string }
         Returns: string
       }
+      organization_media_read_keys: {
+        Args: { p_keys: string[]; p_namespace: string; p_workspace?: string }
+        Returns: string[]
+      }
+      organization_media_read_providers: {
+        Args: { p_keys: string[]; p_namespace: string; p_workspace?: string }
+        Returns: Json
+      }
+      organization_media_resolve: {
+        Args: {
+          p_key: string
+          p_namespace: string
+          p_operation: string
+          p_workspace?: string
+        }
+        Returns: Json
+      }
       organization_update_i18n: {
         Args: {
           p_name_ar: string
@@ -8525,7 +8824,25 @@ export type Database = {
         Args: { p_country_iso2: string; p_e164: string; p_national: string }
         Returns: undefined
       }
+      secondary_phone_cancel: { Args: never; Returns: undefined }
+      secondary_phone_change: {
+        Args: { p_phone: string; p_receipt: string }
+        Returns: Json
+      }
+      secondary_phone_make_primary: {
+        Args: { p_country_iso2?: string; p_national?: string; p_receipt: string }
+        Returns: undefined
+      }
+      secondary_phone_renew: { Args: never; Returns: Json }
+      secondary_phone_reserve: {
+        Args: { p_phone: string; p_receipt: string }
+        Returns: Json
+      }
       profile_set_username: { Args: { p_username: string }; Returns: undefined }
+      public_media_edge_sources: {
+        Args: { p_ids: string[]; p_namespace: string }
+        Returns: Json
+      }
       public_portfolio_media_key: {
         Args: { p_item_id: string }
         Returns: string
@@ -9159,6 +9476,7 @@ export type Database = {
         | "co_owner"
         | "branch_location"
         | "independent_publisher"
+        | "business"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -9482,6 +9800,7 @@ export const Constants = {
         "co_owner",
         "branch_location",
         "independent_publisher",
+        "business",
       ],
     },
   },

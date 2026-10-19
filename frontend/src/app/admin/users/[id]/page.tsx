@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/server/auth/session";
 import { loadUserDetail } from "@/server/queries/admin-directory";
 import { previewUserPointsLedger, previewSubjectAudit } from "@/server/queries/admin-preview";
 import { localizedName } from "@/features/admin-preview/directory-mappers";
@@ -120,9 +121,7 @@ export default async function PreviewUserDetailPage({
   // when the caller holds that record's read permission (else a locked state).
   // Suspend / Restore is drawn only when the actor may use it on THIS user: not their own account, and not Admin
   // Staff at or above their own rank (the same rule `admin_user_suspend` enforces; the RPC stays the judge).
-  const {
-    data: { user: caller },
-  } = await supabase.auth.getUser();
+  const caller = await getCurrentUser();
   const staffRanks = await loadStaffRanks(supabase, access);
   const canSuspend = canSuspendUser(access, caller?.id ?? "", { userId: user.id, staffRank: staffRankOf(staffRanks, user.id) });
   const suspension = user.status === "suspended" ? await loadSuspension(supabase, "user", user.id) : null;
@@ -212,7 +211,7 @@ export default async function PreviewUserDetailPage({
           <Card>
             <dl className="grid gap-md tablet:grid-cols-3">
               <Field label={m.admin.users.type}>
-                {user.accountType ? (typeLabels[user.accountType] ?? user.accountType) : m.admin.users.businessOnly}
+                {user.accountType ? (typeLabels[user.accountType] ?? user.accountType) : m.admin.preview.users.accountTypeNone}
               </Field>
               <Field label={m.admin.users.status}>{statusLabels[user.status] ?? user.status}</Field>
               <Field label={m.admin.users.joined}>{formatAdminDate(user.createdAt, locale)}</Field>

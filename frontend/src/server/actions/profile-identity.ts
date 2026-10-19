@@ -1,5 +1,7 @@
 "use server";
 
+import { authorizeMediaUpload, verifyPendingMedia, removeMedia } from "@/server/storage/media";
+import type { UploadGrant } from "@/lib/storage/provider-types";
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 
@@ -70,17 +72,21 @@ export async function setPhoneAction(
 }
 
 export type AvatarUploadTicket =
-  | { ok: true; key: string }
+  | { ok: true; key: string; grant: UploadGrant }
   | { ok: false; code: string };
 
 /** Step 1 — creates the pending metadata row and returns the server-generated key the client must upload to. */
-export async function requestAvatarUploadAction(contentType: string): Promise<AvatarUploadTicket> {
+export async function requestAvatarUploadAction(contentType: string, expectedBytes?: number): Promise<AvatarUploadTicket> {
+  if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > 3 * 1024 * 1024)) {
+    return { ok: false, code: "profileIdentity.avatar.errorUpload" };
+  }
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("avatar_request_upload", { p_content_type: contentType });
   if (error || !data) {
     return { ok: false, code: "profileIdentity.avatar.errorUpload" };
   }
-  return { ok: true, key: data };
+  try { return { ok: true, key: data, grant: await authorizeMediaUpload(supabase, "avatar", data, expectedBytes) }; }
+  catch { return { ok: false, code: "profileIdentity.avatar.errorUpload" }; }
 }
 
 export type AvatarConfirmResult = { ok: true } | { ok: false; code: string };
@@ -93,6 +99,8 @@ export type AvatarConfirmResult = { ok: true } | { ok: false; code: string };
  */
 export async function confirmAvatarUploadAction(objectKey: string): Promise<AvatarConfirmResult> {
   const supabase = await getServerSupabase();
+  try { await verifyPendingMedia(supabase, "avatar", objectKey); }
+  catch { return { ok: false, code: "profileIdentity.avatar.errorUpload" }; }
   const { data: previousKey, error } = await supabase.rpc("avatar_confirm_upload", {
     p_object_key: objectKey,
   });
@@ -104,9 +112,20 @@ export async function confirmAvatarUploadAction(objectKey: string): Promise<Avat
     // Best-effort: the confirm already committed, so a cleanup failure here
     // never leaves the caller's own avatar unset — it only leaves one orphaned
     // object in a private bucket nobody but the owner could ever read anyway.
-    await supabase.storage.from("avatars").remove([previousKey]);
+    try { await removeMedia(supabase, "avatar", previousKey); } catch { /* Metadata already revoked access. */ }
   }
 
+  revalidateIdentity();
+  return { ok: true };
+}
+
+export async function deleteAvatarAction(): Promise<AvatarConfirmResult> {
+  const supabase = await getServerSupabase();
+  const { data: key, error } = await supabase.rpc("avatar_delete_current" as never);
+  if (error) return { ok: false, code: "profileIdentity.avatar.errorUpload" };
+  if (typeof key === "string") {
+    try { await removeMedia(supabase, "avatar", key); } catch { /* Retired metadata remains for retryable cleanup. */ }
+  }
   revalidateIdentity();
   return { ok: true };
 }

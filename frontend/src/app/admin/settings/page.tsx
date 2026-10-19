@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/server/auth/session";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { AdminHeader } from "@/features/admin/parts";
@@ -32,10 +33,9 @@ export default async function PreviewSettingsPage() {
   const m = getMessages(locale);
   const st = m.admin.preview.settings;
 
-  const { data: authData } = await supabase.auth.getUser();
+  const authUser = await getCurrentUser();
   const roleLabels = m.admin.roleLabel as Record<string, string>;
   const roleNames = access.roles.map((r) => (r.isSystem ? (roleLabels[r.key] ?? r.name) : r.name));
-  const authUser = authData.user;
   let displayName = "";
   let username = "";
   if (authUser) {

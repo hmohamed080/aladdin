@@ -1,5 +1,49 @@
 # Runtime State
 
+## R2 media storage and edge delivery (PR #89) — 2026-10-18
+
+- **Branch and PR.** The R2 work is on draft **PR #89** (`claude/r2-rc2-integration-vdrldz`, head `26edd40`), which is open and **not merged**. It includes PR #88. The local snapshot branch `local/r2-rc2-snapshot` has the same head, 29 commits ahead of the local `origin/main` ref (`9d9a1b6`). On `main`, media is still served from Supabase Storage.
+- **Decision.** [ADR-0018](../decisions/ADR-0018-r2-edge-media-delivery.md) is **Proposed** and needs owner approval. It refines [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md).
+- **Flags (code defaults).** `MEDIA_EDGE_DELIVERY_ENABLED=false`, so edge delivery is off and every image URL goes to the app proxy (`/api/media/<ns>`, `/p/media/<itemId>`). `R2_STORAGE_ENABLED=false` and `R2_PRODUCTION_WRITES_APPROVED=false`. `MEDIA_EDGE_PUBLIC_ENABLED` defaults to `true`; it only has an effect once edge delivery is on.
+- **In the code on PR #89:**
+  - the Worker `edge/media-worker/` (`/m` private with a ticket, `/c` conditional public);
+  - ticket issuance in `frontend/src/server/storage/edge-ticket.ts`;
+  - 320/768/1600 WebP variants and pre-upload resizing;
+  - the migration tooling `scripts/media-storage.mjs` and the usage report `scripts/usage-report.mjs`;
+  - local JWT verification for session reads ([auth-session-reads.md](../frontend/auth-session-reads.md));
+  - migrations `20261018100000`–`20261018100003` and `20261019100000_media_edge_authorization.sql`.
+  This is 173 migration files in total.
+- **Hosted steps: none done.** Each needs owner approval:
+  - the Worker login role `media_edge_worker` (member of `media_edge`);
+  - Hyperdrive with query caching disabled;
+  - the private R2 bucket and its `pending/` lifecycle rule;
+  - the Cloudflare zone and media hostname (decision D4);
+  - Workers Paid (D5);
+  - the `TICKET_KEYS` Worker secret;
+  - the Vercel env vars `MEDIA_EDGE_ORIGIN`, `MEDIA_EDGE_TICKET_KID`, `MEDIA_EDGE_TICKET_SECRET`, `MEDIA_EDGE_DELIVERY_ENABLED` and `R2_*`.
+  Steps: [`edge/media-worker/README.md`](../../edge/media-worker/README.md).
+- **Hosted database.** The media migrations have **not** run on any hosted project. Staging (`kkpkgjrweysgvhvkhzun`) had 164 migrations up to `20261017134139` when audited on 2026-10-18. PR #88, `20261018090000/1`, `20261018100000`–`100003` and `20261019100000` are all pending there. No media has been copied to R2.
+- **Supabase egress.** About **0.29 GB is left of the 5 GB** Free quota this cycle (4.71 GB used, owner-reported 2026-10-18). The full bulk copy needs about 0.273 GB, so only an avatar and certificate rehearsal (about 16 MB) fits before the cycle resets or the plan is upgraded to Pro. Going over the quota returns HTTP 402 on every API call. Runbook: [media-monitoring.md](media-monitoring.md).
+- **Security item to check.** On the local stack, `PUBLIC` has `USAGE` on schema `net` and `EXECUTE` on some pg_net functions (`net.http_delete(...)`, `net.worker_restart()` and helpers), so `anon` can call them. The hosted projects have not been checked. Check them and revoke these grants from `PUBLIC` in a separate reviewed change, before the Worker login role is created.
+- **Validation.** Not re-run in the 2026-10-18 docs session. To check: `pnpm --filter @aladdin/media-worker test` and `typecheck` for the Worker. pgTAP `99_media_edge_authorization_test.sql` tests that the next request is denied after delete, unpublish, delisting, suspension, ban and sign-out.
+
+## Showroom V2 and Admin follow-ups (PR #88) — 2026-10-18
+
+- Same branch and PR as business verification below. Adds: Admin Users "User Type" column/filter (`admin_users_directory`, migration `20261018090000`); Admin Staff search/empty copy; Offers and My Offers re-enabled; unverified secondary phone reservations with password receipts and a Support cooldown override (`20261018090001`, `/admin/phone-cooldowns`, permission `phones.cooldown_override`, Super Admin only by default).
+- None of `20261017160000`, `20261017160001`, `20261018090000`, `20261018090001` is applied to any hosted project. Owner approval required.
+- R2 RC2 worktree (device, uncommitted) was snapshotted and merged onto main + this PR in a separate local branch (not pushed). R2 migrations renamed to `20261018100000`–`100003` so they sort after main's newest; exact permission contracts added for every intervening migration.
+- Validation: real local Supabase stack (supabase/postgres 17): pgTAP 123 files / 5,447 checks pass, exact permission gate passes, concurrency scripts pass. Browser E2E not yet run.
+
+## Business verification (Verified badge) — 2026-10-17
+
+- Branch `claude/showroom-v2-admin-verification-vdrldz` (draft PR) from `main` @ `9d9a1b6`. Adds `/showroom/verification`, `/admin/business-verification` and `/admin/business-verification/[id]`, and the document stream `/business-verification/file/<org>/<file>`.
+- Migrations `20261017160000` and `20261017160001` are NOT applied to any hosted project. They must be applied in that order, after any migration already on the target, and only with the owner's approval. New private bucket `business-verification-documents`, new permission `verification.approve`.
+- `organizations.is_verified` still means "approved/active" for every gate; `organizations.business_verified_at` drives the Verified badge. No backfill: existing organizations show no badge until a business verification is approved (Decision B). `verification.approve` does not approve applications.
+- Validation: typecheck, lint, Vitest, build and pgTAP (local shim) passed; browser journeys not run here.
+## 2026-10-17 — Approved local RC2 R2 integration
+
+The owner authorized a dedicated integration branch based on exact RC2 main8bde19c4 and163 migrations. Original R2 worktree is preserved. Scope includes forward-only schema/permission reconciliation, actual-byte receipts, mixed providers and private application delivery for existing personal media plus RC2 product images and organization logos; preserve every current tenant/audience/org.manage/ordering rule. No hosted resource, cleanup, deployment, push or merge is authorized. Both R2 flagsfalse. Architecture: [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md). Integration in progress; acceptance results must be recorded before completion.
+
 ## Terms of Service published — 2026-10-18
 
 - `/legal/terms` now publishes the real Terms of Service (EN/AR, public, contact `info@aladdindecore.com`), replacing the placeholder; the `LegalPending` component is removed. All three legal pages are live content. [Details](../frontend/legal-pages.md).

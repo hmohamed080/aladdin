@@ -1,7 +1,8 @@
 import { Card } from "@/components/ui/primitives";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import type { PublicPortfolioItem } from "@/server/queries/portfolio";
-import { MediaFrame } from "@/features/portfolio/media-frame";
+import { MediaFrame, MediaImage } from "@/features/portfolio/media-frame";
+import type { MediaSource } from "@/lib/media/image-variants";
 
 /**
  * A professional's published work, on their public profile.
@@ -21,12 +22,16 @@ import { MediaFrame } from "@/features/portfolio/media-frame";
  * object before it serves a byte. So the two halves agree by construction: an item
  * that reaches this list is one the media route will serve, and an item the route
  * refuses is one the list never had.
+ *
+ * `media` is OPTIONAL and comes from the URL issuer: the same opaque item
+ * identity, plus thumb/card variant URLs once they exist. Without it the card
+ * uses `/p/media/<id>` exactly as before.
  */
 export function PublicPortfolio({
   items,
   t,
 }: {
-  items: PublicPortfolioItem[];
+  items: Array<PublicPortfolioItem & { media?: MediaSource | null }>;
   t: TranslateFn;
 }) {
   if (items.length === 0) return null;
@@ -42,16 +47,10 @@ export function PublicPortfolio({
           <li key={item.id}>
             <Card pad="sm" className="flex h-full flex-col gap-3">
               <MediaFrame>
-                {/* The media route streams bytes behind a short-lived signed
-                    URL, which next/image cannot optimise without a loader that
-                    would cache it past the moment it stops being published. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/p/media/${item.id}`}
-                  alt={item.title}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
+                {/* The media route re-proves publication per request, so
+                    next/image must never cache it past the moment it stops
+                    being published; MediaImage stays a plain <img>. */}
+                <MediaImage source={item.media ?? { src: `/p/media/${item.id}` }} alt={item.title} />
               </MediaFrame>
               <div className="flex min-w-0 flex-col gap-1">
                 {/* `<bdi>`, not `dir="auto"` on the block. Both lines are

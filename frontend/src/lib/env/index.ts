@@ -35,7 +35,7 @@ export const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   // Base URL of the FastAPI AI/document service. No runtime caller exists yet —
   // the web app reaches Postgres only through @supabase/ssr — so this stays
-  // optional and is NOT provisioned for the first staging deployment.
+  // optional. Root Vercel Services deploys the backend at /api/backend.
   AI_SERVICE_URL: z.string().url().optional(),
   // Symmetric key for canonical Forgot Password's recovery-grant cookie
   // (AES-256-GCM — see lib/supabase/recovery-grant.ts). Required wherever

@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Revocable media must never enter the optimizer cache, even through a crafted URL.
+  images: { localPatterns: ["assets", "brand", "demo", "images", "installer-auth", "landing-v2", "preview", "_next/static/media"]
+    .map((directory) => ({ pathname: `/${directory}/**`, search: "" })) },
   // App Router is the default in Next 15. No Vite, no custom SPA routing.
 
   // Compatibility for links shared while the installer phone + password pages

@@ -162,7 +162,7 @@ export function validateAssetFile(
 ): AssetValidation {
   const policy = ASSET_POLICY[namespace];
   if (!policy.types.includes(file.type)) return { ok: false, code: "assets.errors.unsupportedType" };
-  if (file.size <= 0) return { ok: false, code: "assets.errors.empty" };
+  if (!Number.isSafeInteger(file.size) || file.size <= 0) return { ok: false, code: "assets.errors.empty" };
   if (file.size > policy.maxBytes) return { ok: false, code: "assets.errors.tooLarge" };
   return { ok: true };
 }
@@ -215,7 +215,3 @@ export function validateAssetContent(
   if (!bytesMatchType(head, file.type)) return { ok: false, code: "assets.errors.contentMismatch" };
   return { ok: true };
 }
-
-/** How long a read URL lives. Long enough to render a page, short enough that a
- * copied URL is not a lasting handout. Minted per render, never stored. */
-export const ASSET_READ_URL_SECONDS = 300;

@@ -115,7 +115,7 @@ export function ProfileHub({
       <HomeSection title={t("profile.work.title")} description={t("profile.work.body")}>
         <div className="grid gap-md tablet:grid-cols-2 desktop:grid-cols-3">
           <WorkModule completedCount={completedJobsCount} t={t} />
-          <PortfolioModule summary={assets} publicItemId={assets.previewItemId} t={t} />
+          <PortfolioModule summary={assets} publicItemId={assets.previewItemId} publicItemMedia={assets.previewMedia} t={t} />
           <CertificatesModule summary={assets} t={t} />
           <ReviewsModule summary={reviews} t={t} />
           <PointsModule balance={pointsBalance} locale={locale} t={t} />

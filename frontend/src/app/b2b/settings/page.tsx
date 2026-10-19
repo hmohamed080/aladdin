@@ -14,6 +14,7 @@ import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import { formatCount } from "@/lib/ui/format";
 import { maskEmail } from "@/lib/ui/mask-email";
 import { isCraftsmanLoginAlias, userFacingEmail } from "@/lib/auth/craftsman-login-alias";
+import { getCurrentUser } from "@/server/auth/session";
 import { resolveBilingualText } from "@/lib/i18n/bilingual";
 import { OrganizationIdentityDialog } from "@/features/organization/organization-identity-dialog";
 import { BranchIdentityDialog } from "@/features/organization/branch-identity-dialog";
@@ -71,13 +72,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const store = await cookies();
   const theme = store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light";
 
-  const [{ data: record }, { data: auth }, { data: branchRows }] = await Promise.all([
+  const [{ data: record }, authUser, { data: branchRows }] = await Promise.all([
     supabase
       .from("organizations")
-      .select("name, slug, org_type, status, is_verified, primary_locale, name_ar, name_en, timezone, contact_phone, contact_email")
+      .select("name, slug, org_type, status, business_verified_at, primary_locale, name_ar, name_en, timezone, contact_phone, contact_email")
       .eq("id", org.organizationId)
       .maybeSingle(),
-    supabase.auth.getUser(),
+    getCurrentUser(),
     org.branches.length > 0
       ? supabase
           .from("branches")
@@ -93,12 +94,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const canManageOrg = org.capabilities.includes("org.manage");
   const canManageBranches = canManageOrg || org.capabilities.includes("branch.manage");
   const reachable = allowedNavKeys(org.capabilities).filter((k) => k !== "home" && k !== "settings");
-  const verified = record?.is_verified ?? false;
+  // The Verified badge is business verification, not approval of the application.
+  const verified = record?.business_verified_at != null;
   const pending = record?.status === "pending_verification";
   // An installer phone account's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
-  const visibleEmail = userFacingEmail(auth?.user?.email);
+  const visibleEmail = userFacingEmail(authUser?.email);
   const signInEmail = visibleEmail ? maskEmail(visibleEmail) : null;
-  const phonePasswordAccount = isCraftsmanLoginAlias(auth?.user?.email);
+  const phonePasswordAccount = isCraftsmanLoginAlias(authUser?.email);
   const branchDetails = new Map((branchRows ?? []).map((b) => [b.id, b]));
 
   // Organization subtypes (Showroom/Supplier/Manufacturer/Importer activities).

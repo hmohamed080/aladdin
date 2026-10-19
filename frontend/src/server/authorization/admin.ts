@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/server/auth/session";
 import {
   meets,
   NO_ADMIN_ACCESS,
@@ -23,9 +24,8 @@ import {
  */
 export const loadAdminAccess = cache(async (): Promise<AdminAccess> => {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Network-validated (Auth server), shared with the page's own getCurrentUser().
+  const user = await getCurrentUser();
   if (!user) return NO_ADMIN_ACCESS;
   const { data, error } = await supabase.rpc("admin_my_access");
   if (error) return NO_ADMIN_ACCESS;

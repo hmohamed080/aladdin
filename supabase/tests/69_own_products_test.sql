@@ -23,6 +23,7 @@
 create extension if not exists pgtap;
 
 begin;
+\ir helpers/organization_media_receipt.inc
 -- The seed keeps Egypt Marble and Nile Import PENDING on purpose (the Admin review queue). A
 -- pending organization is non-operational (20261015090028), so a suite that needs them to act
 -- as established businesses approves them here, inside its own transaction.
@@ -229,9 +230,10 @@ select ok((select qual like '%can_delete_product_image_object%' from pg_policies
             where schemaname = 'storage' and tablename = 'objects' and policyname = 'product_images_delete_writer'),
   'deleting an image object requires catalog.write on the OWNING organization (direct SQL deletes are blocked by Storage itself)');
 set local request.jwt.claims = :'hana';
-select lives_ok(format('select public.product_image_confirm_upload(%L)', (select key from _k where n = 1)), 'the owner confirms the upload');
-select is((select count(*)::int from storage.objects where bucket_id = 'product-images' and name = (select key from _k where n = 1)), 1,
-  'the owning organization reads its own image — it survived the other tenant''s delete attempt');
+select pg_temp.attest_organization_fixture('product',(select key from _k where n = 1));
+select lives_ok(format('select public.product_image_confirm_upload(%L)', (select key from _k where n = 1)), 'the owner confirms the verified upload');
+select is((select count(*)::int from storage.objects where bucket_id = 'product-images' and name = (select key from _k where n = 1)), 0,
+  'private Storage bytes are backend-only, including for the owning organization');
 
 insert into _k select 2, public.product_image_request_upload((select id from _o where name = 'a'), 'image/png');
 insert into _k select 3, public.product_image_request_upload((select id from _o where name = 'a'), 'image/webp');
@@ -261,6 +263,8 @@ select throws_ok(
 -- Upload + confirm the other two, then order and primary image.
 select lives_ok(format($q$insert into storage.objects (bucket_id, name) values ('product-images', %L), ('product-images', %L)$q$,
   (select key from _k where n = 2), (select key from _k where n = 3)), 'two more uploads');
+select pg_temp.attest_organization_fixture('product',(select key from _k where n = 2));
+select pg_temp.attest_organization_fixture('product',(select key from _k where n = 3));
 select lives_ok(format('select public.product_image_confirm_upload(%L), public.product_image_confirm_upload(%L)',
   (select key from _k where n = 2), (select key from _k where n = 3)), 'confirm both');
 select public.product_audiences_set((select id from _o where name = 'a'), array['showroom_dealer','supplier','manufacturer','importer','contractor','engineer','installer_technician','end_consumer']);

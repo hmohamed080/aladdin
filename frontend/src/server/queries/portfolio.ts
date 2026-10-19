@@ -2,6 +2,8 @@ import "server-only";
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
+import type { MediaSource } from "@/lib/media/image-variants";
+import { publicEdgeSources, publicPortfolioSource } from "@/server/storage/edge-ticket";
 
 /**
  * Reads for Portfolio and Certificates.
@@ -52,6 +54,13 @@ export type PublicPortfolioItem = {
   id: string;
   title: string;
   description: string | null;
+  /**
+   * Where the image is fetched: `/p/media/<id>`, or the media Worker's
+   * `/c/portfolio/<id>/<variant>` (with recorded variants) for an R2 item while
+   * edge delivery is on. Both carry only the item id and re-prove publication on
+   * every request.
+   */
+  media?: MediaSource;
 };
 
 export const listMyPortfolio = cache(async function listMyPortfolio(): Promise<PortfolioItem[]> {
@@ -123,9 +132,9 @@ export async function loadPublicPortfolio(profileId: string): Promise<PublicPort
   // underlying table says. Narrowing on the two the page cannot render without is
   // cheaper than asserting non-null, and it means a row that somehow arrived
   // incomplete is skipped rather than rendered as an empty card.
-  return data.flatMap((r) =>
-    r.id && r.title ? [{ id: r.id, title: r.title, description: r.description }] : [],
-  );
+  const rows = data.flatMap((r) => (r.id && r.title ? [{ id: r.id, title: r.title, description: r.description }] : []));
+  const edge = await publicEdgeSources(supabase, "portfolio", rows.map((r) => r.id));
+  return rows.map((r) => ({ ...r, media: publicPortfolioSource(r.id, edge.get(r.id)) }));
 }
 
 export type ProfessionalAssetSummary = {
@@ -155,6 +164,8 @@ export type ProfessionalAssetSummary = {
    * page quietly asking for something it is not entitled to.
    */
   previewItemId: string | null;
+  /** The preview's image (see `PublicPortfolioItem.media`), or null. */
+  previewMedia?: MediaSource | null;
 };
 
 /**
@@ -167,6 +178,7 @@ export async function loadProfessionalAssetSummary(): Promise<ProfessionalAssetS
   const usable = portfolio.filter((i) => !i.pending);
   const published = usable.filter((i) => i.isPublic);
   const today = new Date().toISOString().slice(0, 10);
+  const previewItemId = published[0]?.id ?? null;
 
   return {
     portfolioTotal: usable.length,
@@ -178,6 +190,10 @@ export async function loadProfessionalAssetSummary(): Promise<ProfessionalAssetS
       (c) => !c.pending && c.expiresOn !== null && c.expiresOn < today,
     ).length,
     certificateTitles: certificates.filter((c) => !c.pending).slice(0, 3).map((c) => c.title),
-    previewItemId: published[0]?.id ?? null,
+    previewItemId,
+    previewMedia: previewItemId
+      ? publicPortfolioSource(previewItemId,
+        (await publicEdgeSources(await getServerSupabase(), "portfolio", [previewItemId])).get(previewItemId))
+      : null,
   };
 }

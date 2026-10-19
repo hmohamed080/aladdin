@@ -250,6 +250,11 @@ set local request.jwt.claims = :'u2';
 select throws_ok(format($q$select public.product_image_request_upload(%L, 'image/png')$q$, (select id from _ids where k = 'iprod')), '42501', null,
   'I3: another professional cannot upload to it');
 reset role;
+-- R2 (20261018100000): an image becomes ready only after its stored bytes were attested; record that attestation first.
+insert into public.media_storage_locations (namespace, object_key, owner_user_id, provider, content_type, size_bytes, sha256, verified_at)
+select 'product', pi.object_key, pi.created_by, 'supabase', pi.content_type, 1, repeat('0', 64), now()
+  from public.product_images pi where pi.product_id = (select id from _ids where k = 'iprod')
+on conflict (namespace, object_key) do update set verified_at = now(), size_bytes = 1, sha256 = repeat('0', 64);
 update public.product_images set state = 'ready' where product_id = (select id from _ids where k = 'iprod');
 set local role authenticated;
 set local request.jwt.claims = :'u5';

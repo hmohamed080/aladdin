@@ -9,6 +9,14 @@
 `professional_asset_storage_api_test.mjs` (59) ·
 `public_media_exposure_test.mjs` (53)
 
+> **R2 provider (PR #89, unmerged).** On the R2 branch, §7 (read URLs), §7.1 (the anon
+> Storage policy as the public door) and §11 (no metadata table) are superseded for
+> both buckets. A provider registry now exists, reads go through the application or
+> an edge Worker, and bytes may live in Cloudflare R2. See **§14**,
+> [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md) and
+> [ADR-0018](../decisions/ADR-0018-r2-edge-media-delivery.md) (Proposed). On `main`,
+> this document is still accurate as written.
+
 > **Increment 11 superseded one thing here.** Increment 10 gave both buckets the
 > same owner-prefixed key. Portfolio needed to be readable by a signed-out
 > stranger, and that turned out to be incompatible with putting the owner's id in
@@ -510,3 +518,41 @@ is the absence that already exists.
 | `frontend/src/server/actions/error-mapping.ts` | `mapAssetError` |
 | `supabase/tests/47_professional_asset_storage_test.sql` | policies, key contract, absences, downgrade |
 | `supabase/tests/professional_asset_storage_api_test.mjs` | MIME, size, overwrite, signed URLs, delete |
+| `supabase/migrations/20261018100000_rc2_verified_media_storage.sql`–`20261018100003_*` | R2 branch: provider registry, receipts, migration ledger, restrictive caller-read policy (§14) |
+| `supabase/migrations/20261019100000_media_edge_authorization.sql` | R2 branch: edge Worker authority functions, `media_edge` role, `variants` column (§14) |
+| `frontend/src/server/storage/{media,delivery,edge-ticket,r2-provider}.ts` | R2 branch: provider-aware resolve, the `no-store` proxy, Worker tickets, R2 writes and variants |
+| `edge/media-worker/` | R2 branch: the `media-edge` Worker ([README](../../edge/media-worker/README.md)) |
+
+---
+
+## 14. R2 provider and edge delivery (PR #89, not merged)
+
+**Status:** code on draft PR #89. Edge delivery is off (`MEDIA_EDGE_DELIVERY_ENABLED=false`) and R2 writes are off (`R2_STORAGE_ENABLED=false`). No hosted migration, bucket or Worker exists yet. Decisions: [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md) (provider integration, Accepted for local implementation) and [ADR-0018](../decisions/ADR-0018-r2-edge-media-delivery.md) (R2 primary store and edge delivery, Proposed).
+
+What stays the same:
+- S1–S4 (§12.1).
+- The bucket list and limits (§1).
+- The key contracts (§2): certificates `<owner>/<uuid>.<ext>`, portfolio opaque `<uuid>.<ext>`.
+- The persona gate (§4).
+- Immutable keys (§9).
+- `/p/media/<portfolioItemId>` as the public contract, served `no-store`, with withdrawal on the next request.
+
+What changes:
+
+| Topic | On `main` (sections above) | On the R2 branch |
+|---|---|---|
+| Where bytes live | Supabase buckets `professional-portfolio`, `professional-certificates` (and `avatars`) | Per object, recorded in `media_storage_locations.provider`: `supabase` (legacy) or `r2` (a private bucket with no public access and no `r2.dev`). R2 keys are `<ns>/<key>`; uploads land in `pending/<ns>/<key>` first. |
+| Metadata registry (§11) | None | `media_storage_locations` records owner, organization, content type, size, sha256, `verified_at`, `cleaned_at` and `variants`. The provider never changes after reservation. Owners can read their own rows (RLS). |
+| Pending → ready | The caller finalizes | Needs a backend verification receipt (`media_storage_attest`, bytes checked, under 10 minutes old). A caller cannot attest for itself. |
+| Caller reads (§7) | `createAssetReadUrl` mints a 300 s Supabase signed URL for the browser | `createAssetReadUrl` returns an application URL (`/api/media/<ns>?key=…`), or a Worker URL with a ticket when edge delivery is on. The browser never receives a provider URL. The restrictive policy `revocable_media_backend_reads` refuses every caller `SELECT` on the five revocable buckets, so direct signing or download by `anon` or `authenticated` fails. |
+| Public door (§7.1) | The anon `SELECT` policy `professional_portfolio_select_published` lets the route sign as the caller | The same publication rule (`is_published_portfolio_object` via `public_portfolio_media_key`) decides, but the route reads with server-only Storage authority after `media_storage_resolve` passes. The restrictive policy overrides the anon `SELECT` for callers. |
+| Delivery | `/p/media` streams the bytes | `delivery.ts` resolves before and after the fetch, caps the stream at the namespace limit and sends `no-store`, `nosniff` and `CSP: sandbox`. With edge delivery on, R2 rows are served by the Worker instead: private `/m/<ns>/<variant>?t=<ticket>` (ticket of at most 120 s plus `media_edge_authorize`), and published portfolio and listed avatars at `/c/<ns>/<id>/<variant>` (`media_edge_public`). Both run in Postgres on every request. |
+| Image sizes | Originals only | The browser caps the long edge before upload (2560 px photos, 3200 px certificate images; PDFs untouched). Verified R2 originals get WebP `thumb` 320, `card` 768 and `full` 1600 px at `v/<ns>/<key>/<variant>.webp`. They are recorded in `variants` and deleted with the original. |
+| Delete (§8) | Caller deletes through the Storage API | The resolver decides, then a server-side delete runs through the provider. Supabase sources of migrated rows are kept for at least 30 days for rollback (`scripts/media-storage.mjs`). |
+
+**Business-verification documents are not covered here and do not change.** They keep their own Supabase bucket and policies (PR #88).
+
+Tests on the branch:
+- `78_verified_media_storage_test.sql`, `79_media_maintenance_test.sql`, `88_revocable_media_delivery_test.sql`, `96_rc2_private_provider_media_test.sql` and `99_media_edge_authorization_test.sql`;
+- the Worker tests in `edge/media-worker/test/`;
+- the HTTP harness `professional_asset_storage_api_test.mjs`, updated to this contract in `5b2e813`: 67 pass, 0 fail, recorded on the branch, not re-run here.

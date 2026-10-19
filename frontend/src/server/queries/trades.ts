@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { readSessionIdentity } from "@/server/auth/session";
 
 /**
  * The canonical trade taxonomy, from the two sides the profile reads it.
@@ -80,9 +81,7 @@ export const loadTradeCatalog = cache(async function loadTradeCatalog(): Promise
  */
 export const loadMyTrades = cache(async function loadMyTrades(): Promise<MyTrades> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return { keys: [], legacyKeys: [], primaryKey: null };
 
   const { data, error } = await supabase

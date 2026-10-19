@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { claimsFrom } from "@/test/session-claims";
 
 vi.mock("server-only", () => ({}));
 
@@ -21,7 +22,7 @@ vi.mock("@/lib/supabase/server", () => ({
         Promise.resolve({ data: state.error ? null : state.rows, error: state.error }).then(resolve),
     };
     const builder: Record<string, unknown> = {
-      auth: { getUser },
+      auth: { getUser, getClaims: claimsFrom(getUser) },
       from(t: string) {
         asked.from.push(t);
         return builder;

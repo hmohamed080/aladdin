@@ -16,16 +16,20 @@
     "e2e:install": "playwright install chromium"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1149.0",
+    "@aws-sdk/s3-request-presigner": "3.1149.0",
     "@floating-ui/react-dom": "^2.1.9",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.48.1",
     "libphonenumber-js": "^1.13.14",
     "motion": "^13.1.1",
     "next": "^15.1.6",
+    "pdf-lib": "1.17.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-easy-crop": "^6.2.3",
     "server-only": "0.0.1",
+    "sharp": "0.34.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {

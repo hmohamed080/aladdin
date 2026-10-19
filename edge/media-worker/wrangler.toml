@@ -1,0 +1,29 @@
+# TEMPLATE ONLY. Placeholders in <angle brackets> are filled by the owner during
+# the approved hosted setup (README.md). No account id, secret or connection
+# string belongs in this file; TICKET_KEYS is a Worker secret (wrangler secret put).
+name = "aladdin-media-edge"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+# postgres.js uses Node-compatible APIs over Cloudflare sockets.
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+routes = [{ pattern = "<media-hostname>/*", zone_name = "<media-zone>" }]
+
+[vars]
+# "on" enables a route family; any other value disables it (fails closed).
+PRIVATE_ROUTES = "on"
+PUBLIC_ROUTES = "on"
+
+# PRIVATE bucket. Never enable public access or r2.dev on it.
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "<private-media-bucket>"
+
+# Created with query caching DISABLED (see README): authorization results must never be cached.
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "<hyperdrive-config-id>"
+
+[observability]
+enabled = true

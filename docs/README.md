@@ -107,6 +107,7 @@ The five files above are **persistent project memory and part of the core archit
 - [`operations/staging-deployment-runbook.md`](operations/staging-deployment-runbook.md) — first cloud STAGING setup: agent/code work vs. owner manual steps
 - [`operations/staging-demo-accounts.md`](operations/staging-demo-accounts.md) — the 26 STAGING demo identities: persona, organization, landing route, visible data, and what to demo from each (generated; carries no email addresses)
 - [`operations/monitoring-and-observability.md`](operations/monitoring-and-observability.md)
+- [`operations/showroom-admin-handoff/`](operations/showroom-admin-handoff/README.md) — Showroom V2, Admin and R2 working reports (release readiness, R2 plan, Supabase audit, E2E results)
 
 ## Guides
 

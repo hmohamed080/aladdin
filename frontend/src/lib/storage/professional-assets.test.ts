@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   ASSET_NAMESPACES,
   ASSET_POLICY,
-  ASSET_READ_URL_SECONDS,
   bytesMatchType,
   isAssetKeyForCaller,
   isCertificatePathOwnedBy,
@@ -230,12 +229,5 @@ describe("declared type versus actual bytes", () => {
 
   it("knows no signature for a type it does not accept", () => {
     expect(bytesMatchType(png, "image/svg+xml")).toBe(false);
-  });
-});
-
-describe("read URL lifetime", () => {
-  it("is short, and short enough that a copied URL is not a lasting handout", () => {
-    expect(ASSET_READ_URL_SECONDS).toBe(300);
-    expect(ASSET_READ_URL_SECONDS).toBeLessThanOrEqual(600);
   });
 });

@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
+import { readSessionIdentity } from "@/server/auth/session";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadIsAdminStaff } from "@/server/queries/platform";
 import { loadWorkspaces } from "@/server/queries/workspace";
@@ -28,9 +29,7 @@ import { decideMandatoryBusinessSetup, type MandatoryBusinessSetup } from "@/lib
  * (`app.mandatory_registration_business_type`, which mirrors this rule); every read re-checks membership and RLS.
  */
 export async function computeMandatoryBusinessSetup(supabase: SupabaseClient<Database>): Promise<MandatoryBusinessSetup> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return { required: false, orgType: null };
 
   const { data: progress } = await supabase

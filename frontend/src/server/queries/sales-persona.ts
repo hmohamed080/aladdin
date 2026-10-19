@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { readSessionIdentity } from "@/server/auth/session";
 
 /**
  * "Is this account a SALESPERSON?" — the one frontend answer to the question the
@@ -50,9 +51,7 @@ export function isSalesPersona(
  */
 export const loadIsSalesPersona = cache(async function loadIsSalesPersona(): Promise<boolean> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return false;
 
   const [{ data: userRow }, { data: onboarding }] = await Promise.all([

@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { readSessionIdentity } from "@/server/auth/session";
 import { userFacingEmail } from "@/lib/auth/craftsman-login-alias";
 
 /**
@@ -45,9 +46,7 @@ export type AccountIdentity = {
 
 export const loadAccountIdentity = cache(async function loadAccountIdentity(): Promise<AccountIdentity | null> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return null;
 
   const { data: profile } = await supabase

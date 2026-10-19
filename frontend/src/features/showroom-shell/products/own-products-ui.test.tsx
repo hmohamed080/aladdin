@@ -13,7 +13,7 @@ const actions = vi.hoisted(() => ({
   confirm: vi.fn(),
   remove: vi.fn(async () => ({ ok: true })),
   reorder: vi.fn(async () => ({ ok: true })),
-  upload: vi.fn(async (): Promise<{ error: { message: string } | null }> => ({ error: null })),
+  upload: vi.fn<(grant: unknown, file: File) => Promise<{ error: { message: string } | null }>>(async () => ({ error: null })),
   refresh: vi.fn(),
 }));
 vi.mock("@/server/actions/own-products", () => ({
@@ -29,9 +29,10 @@ vi.mock("@/server/actions/own-products", () => ({
 const feed = vi.hoisted(() => ({ load: vi.fn() }));
 vi.mock("@/server/actions/own-products-feed", () => ({ loadMyProductsBatchAction: feed.load }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: actions.refresh, push: actions.push }) }));
-vi.mock("@/lib/supabase/client", () => ({
-  createBrowserSupabaseClient: () => ({ storage: { from: () => ({ upload: actions.upload }) } }),
-}));
+vi.mock("@/lib/storage/browser-upload", () => ({ uploadWithGrant: async (grant: unknown, file: File) => {
+  const result = await actions.upload(grant, file);
+  if (result.error) throw Error("controlled upload failure");
+} }));
 
 import { OwnProductsResults, type OwnProductCard } from "./own-products-results";
 import { ProductForm } from "./product-form";
@@ -459,13 +460,13 @@ describe("ImageManager", () => {
   });
 
   it("uploads through ticket -> storage -> confirm, then refreshes", async () => {
-    actions.requestUpload.mockResolvedValue({ ok: true, key: "org/p1/i9.png" });
+    actions.requestUpload.mockResolvedValue({ ok: true, key: "org/p1/i9.png", grant: { provider: "supabase", token: "test" } });
     actions.confirm.mockResolvedValue({ ok: true, id: "i9" });
     manager();
     pick(screen.getByTestId("image-input"), file("image/png"));
     await waitFor(() => expect(actions.refresh).toHaveBeenCalled());
-    expect(actions.requestUpload).toHaveBeenCalledWith("p1", "image/png");
-    expect(actions.upload).toHaveBeenCalledWith("org/p1/i9.png", expect.any(File), { contentType: "image/png", upsert: false });
+    expect(actions.requestUpload).toHaveBeenCalledWith("p1", "image/png", expect.any(Number));
+    expect(actions.upload).toHaveBeenCalledWith({ provider: "supabase", token: "test" }, expect.any(File));
     expect(actions.confirm).toHaveBeenCalledWith("org/p1/i9.png");
   });
 
@@ -565,7 +566,7 @@ describe("Create product with photos in one flow", () => {
 
   it("creates the draft, uploads the staged photos in order, then goes to the product", async () => {
     actions.draft.mockResolvedValue({ ok: true, productId: "p-new" });
-    actions.requestUpload.mockImplementation(async () => ({ ok: true, key: "org/p-new/i.png" }));
+    actions.requestUpload.mockImplementation(async () => ({ ok: true, key: "org/p-new/i.png", grant: { provider: "supabase", token: "test" } }));
     actions.confirm.mockResolvedValue({ ok: true, id: "i1" });
     const { container } = wrap(<ProductForm orgId="org-1" />);
     fill(container);

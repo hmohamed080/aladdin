@@ -1,7 +1,9 @@
 "use client";
 
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { uploadWithGrant } from "@/lib/storage/browser-upload";
+import { resizeImageForUpload, UPLOAD_RESIZE_PROFILES } from "@/lib/media/resize-image";
 import {
+  ASSET_POLICY,
   validateAssetContent,
   type AssetNamespace,
 } from "@/lib/storage/professional-assets";
@@ -13,6 +15,11 @@ import type { UploadTicket } from "@/server/actions/portfolio";
  *
  * THREE STEPS, AND WHY THEY ARE IN THIS ORDER (§7, S3):
  *
+ *   0. PREPARE. A photo is downscaled (long edge 2560 px; certificates 3200 px)
+ *      and re-encoded to WebP when that makes it smaller (`resizeImageForUpload`).
+ *      The prepared file is what gets validated, declared to `start` and
+ *      uploaded, so its type and size are the ones the server checks. A browser
+ *      that cannot resize uploads the original. PDFs are never touched.
  *   1. VALIDATE locally. Type, size, and the file's first bytes against the type
  *      it claims. None of this is authority — the bucket enforces type and size
  *      again from its own row, before Postgres is consulted — but it is the only
@@ -46,36 +53,36 @@ export type UploadOutcome = { ok: true } | { ok: false; code: string };
 /** How many bytes of the head we need to recognise every accepted signature. */
 const SIGNATURE_BYTES = 16;
 
+/** A source larger than this is refused before decoding; resizing could not save it anyway. */
+const MAX_SOURCE_FACTOR = 4;
+
 export async function uploadAsset(
   namespace: AssetNamespace,
-  file: File,
-  start: () => Promise<UploadTicket>,
+  original: File,
+  /** Receives the PREPARED file's type and size: those are what will be uploaded. */
+  start: (prepared: { type: string; size: number }) => Promise<UploadTicket>,
   finish: (itemId: string) => Promise<{ ok: boolean; code?: string }>,
+  onProgress?: (percent: number) => void,
 ): Promise<UploadOutcome> {
+  const file = original.size <= ASSET_POLICY[namespace].maxBytes * MAX_SOURCE_FACTOR
+    ? await resizeImageForUpload(original, UPLOAD_RESIZE_PROFILES[namespace])
+    : original;
   const head = new Uint8Array(await file.slice(0, SIGNATURE_BYTES).arrayBuffer());
   const valid = validateAssetContent(namespace, { type: file.type, size: file.size }, head);
   if (!valid.ok) return { ok: false, code: valid.code };
 
-  const ticket = await start();
+  let ticket: UploadTicket;
+  try { ticket = await start({ type: file.type, size: file.size }); }
+  catch { return { ok: false, code: "assets.errors.uploadFailed" }; }
   if (!ticket.ok) return { ok: false, code: ticket.code };
 
-  const supabase = createBrowserSupabaseClient();
-  const { error } = await supabase.storage
-    .from(ticket.bucket)
-    .uploadToSignedUrl(ticket.objectPath, ticket.token, file, {
-      contentType: file.type,
-      // Named explicitly even though the token already forbids it. A reader of
-      // this call should not have to know that to know the answer.
-      upsert: false,
-    });
+  try {
+    await uploadWithGrant(ticket.grant ?? { provider: "supabase", bucket: ticket.bucket,
+      key: ticket.objectPath, token: ticket.token }, file, onProgress);
+  } catch { return { ok: false, code: "assets.errors.uploadFailed" }; }
 
-  if (error) {
-    // The pending row is left where it is on purpose. It is the record that this
-    // upload was attempted, it is invisible to everyone but its owner, and the
-    // card it produces is how they finish or discard it.
-    return { ok: false, code: "assets.errors.uploadFailed" };
-  }
-
-  const finished = await finish(ticket.itemId);
-  return finished.ok ? { ok: true } : { ok: false, code: finished.code ?? "states.genericRetry" };
+  try {
+    const finished = await finish(ticket.itemId);
+    return finished.ok ? { ok: true } : { ok: false, code: finished.code ?? "states.genericRetry" };
+  } catch { return { ok: false, code: "assets.errors.uploadFailed" }; }
 }

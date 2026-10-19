@@ -8,19 +8,21 @@ import { isLifecycleAction, parseOwnProductForm } from "@/features/showroom-shel
 import { parseAudienceCodes } from "@/features/showroom-shell/products/product-audiences";
 import { mapOwnProductError } from "@/features/showroom-shell/products/error-map";
 import {
-  PRODUCT_IMAGE_BUCKET,
+  PRODUCT_IMAGE_MAX_BYTES,
   isProductImageContentType,
   isProductImageKey,
   type ProductImageErrorCode,
 } from "@/lib/storage/product-images";
 import type { Database } from "@/types/database.types";
+import { authorizeMediaUpload, verifyPendingMedia, removeMedia } from "@/server/storage/media";
+import type { UploadGrant } from "@/lib/storage/provider-types";
 
 /**
  * Server Actions for "منتجاتي". Every one forwards the CALLER's JWT to a
  * security-definer RPC that re-derives the actor from auth.uid(), checks
  * organization membership and catalog.write / catalog.publish, validates the data
- * again and audits the change. Nothing here decides authorization, and there is
- * no service-role client: a bug in this file cannot widen access.
+ * again and audits the change. Media byte verification uses a server-only client
+ * only after current caller-scoped upload/read/delete authorization.
  */
 
 export type OwnProductFormState = {
@@ -184,11 +186,14 @@ export async function ownProductLifecycleAction(_prev: OwnProductFormState, fd: 
 // ---------------------------------------------------------------------------
 // Images
 // ---------------------------------------------------------------------------
-export type ImageTicket = { ok: true; key: string } | { ok: false; code: string };
+export type ImageTicket = { ok: true; key: string; grant: UploadGrant } | { ok: false; code: string };
 export type ImageResult = { ok: true } | { ok: false; code: string };
 export type ImageConfirmResult = { ok: true; id: string } | { ok: false; code: string };
 
-export async function requestProductImageUploadAction(productId: string, contentType: string): Promise<ImageTicket> {
+export async function requestProductImageUploadAction(productId: string, contentType: string, expectedBytes?: number): Promise<ImageTicket> {
+  if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > PRODUCT_IMAGE_MAX_BYTES)) {
+    return { ok: false, code: "showroomProducts.images.errorSize" };
+  }
   if (!UUID.test(productId) || !isProductImageContentType(contentType)) {
     return { ok: false, code: "showroomProducts.images.errorType" satisfies ProductImageErrorCode };
   }
@@ -198,23 +203,19 @@ export async function requestProductImageUploadAction(productId: string, content
     const mapped = mapOwnProductError(error ?? new Error("invalid upload ticket"));
     return { ok: false, code: mapped.code === "states.genericRetry" ? "showroomProducts.images.errorUpload" : mapped.code };
   }
-  return { ok: true, key: data };
+  try { return { ok: true, key: data, grant: await authorizeMediaUpload(supabase, "product", data, expectedBytes) }; }
+  catch { return { ok: false, code: "showroomProducts.images.errorUpload" }; }
 }
 
 /**
- * Confirm only AFTER the browser has uploaded: the database never reads the byte
- * store, so the existence check lives here, through the caller's own Storage access.
+ * Caller authorization precedes trusted bounded byte verification; SQL refuses
+ * pending-to-ready without the resulting provider-bound verification receipt.
  */
 export async function confirmProductImageUploadAction(key: string): Promise<ImageConfirmResult> {
   if (!isProductImageKey(key)) return { ok: false, code: "showroomProducts.images.errorUpload" };
   const supabase = await getServerSupabase();
-  const slash = key.lastIndexOf("/");
-  const { data: listed, error: listError } = await supabase.storage
-    .from(PRODUCT_IMAGE_BUCKET)
-    .list(key.slice(0, slash), { search: key.slice(slash + 1), limit: 5 });
-  if (listError || !(listed ?? []).some((o) => o.name === key.slice(slash + 1))) {
-    return { ok: false, code: "showroomProducts.images.errorUpload" };
-  }
+  try { await verifyPendingMedia(supabase, "product", key); }
+  catch { return { ok: false, code: "showroomProducts.images.errorUpload" }; }
   const { data, error } = await supabase.rpc("product_image_confirm_upload", { p_object_key: key });
   if (error || typeof data !== "string" || !UUID.test(data)) {
     return { ok: false, code: error ? mapOwnProductError(error).code : "showroomProducts.images.errorUpload" };
@@ -229,9 +230,9 @@ export async function removeProductImageAction(imageId: string): Promise<ImageRe
   const { data: key, error } = await supabase.rpc("product_image_remove", { p_image_id: imageId });
   if (error) return { ok: false, code: mapOwnProductError(error).code };
   if (typeof key === "string" && isProductImageKey(key)) {
-    // Best-effort byte cleanup after the metadata change committed; an orphan is harmless and unreachable.
-    await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([key]);
     revalidateProduct(key.split("/")[1]);
+    try { await removeMedia(supabase, "product", key); }
+    catch { return { ok: false, code: "showroomProducts.images.errorUpload" }; }
   }
   return { ok: true };
 }

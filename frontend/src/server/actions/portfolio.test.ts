@@ -5,7 +5,9 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const rpc = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({
-  getServerSupabase: async () => ({ rpc }),
+  getServerSupabase: async () => ({ rpc, auth: { getUser: async () => ({ data: { user: { id: "70000009-0000-4000-8000-000000000009" } } }) },
+    from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { object_key: KEY, object_path: KEY }, error: null }) }) }) }) }),
+  }),
 }));
 
 const createAssetUploadTicket = vi.fn();
@@ -17,6 +19,8 @@ vi.mock("@/server/actions/professional-assets", () => ({
   createAssetReadUrl: (...args: unknown[]) => createAssetReadUrl(...args),
 }));
 
+const verifyPendingMedia = vi.fn();
+vi.mock("@/server/storage/media", () => ({ verifyPendingMedia: (...args: unknown[]) => verifyPendingMedia(...args) }));
 import {
   deleteCertificateAction,
   deletePortfolioItemAction,
@@ -41,6 +45,8 @@ const fd = (entries: Record<string, string>) => {
 const calls = () => rpc.mock.calls.map((c) => c[0] as string);
 
 beforeEach(() => {
+  verifyPendingMedia.mockReset();
+  verifyPendingMedia.mockResolvedValue(undefined);
   rpc.mockReset();
   createAssetUploadTicket.mockReset();
   deleteProfessionalAsset.mockReset();
@@ -67,7 +73,7 @@ describe("startPortfolioUpload", () => {
       size: 1000,
     });
     expect(calls()).toEqual(["portfolio_item_create"]);
-    expect(createAssetUploadTicket).toHaveBeenCalledWith("portfolio", KEY);
+    expect(createAssetUploadTicket).toHaveBeenCalledWith("portfolio", KEY, 1000);
     expect(r).toEqual({
       ok: true,
       itemId: ITEM,
@@ -253,7 +259,7 @@ describe("certificates", () => {
     const [, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
     expect(args.p_original_filename).toBe("../../etc/passwd");
     // The key it gets back is the server's, and the filename had no part in it.
-    expect(createAssetUploadTicket).toHaveBeenCalledWith("certificate", `${ITEM}/x.pdf`);
+    expect(createAssetUploadTicket).toHaveBeenCalledWith("certificate", `${ITEM}/x.pdf`, 10);
   });
 
   it("removes the certificate through the same convergent sequence", async () => {
@@ -273,4 +279,10 @@ describe("certificates", () => {
       await deleteCertificateAction({ ok: false }, fd({ itemId: ITEM, objectPath: `${ITEM}/x.pdf` })),
     ).toEqual({ ok: false, code: "certificates.errors.dateOrder" });
   });
+});
+
+it("does not finalize a missing or malformed stored object", async () => {
+  verifyPendingMedia.mockRejectedValue(new Error("missing object"));
+  expect(await finishPortfolioUpload(ITEM)).toEqual({ ok: false, code: "assets.errors.uploadFailed" });
+  expect(rpc).not.toHaveBeenCalled();
 });

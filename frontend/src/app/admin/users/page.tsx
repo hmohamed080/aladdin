@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/server/auth/session";
 import { loadUsersDirectory } from "@/server/queries/admin-directory";
-import { parseUsersDirectoryParams, pageWindow } from "@/features/admin-preview/directory-params";
+import { parseUsersDirectoryParams, pageWindow, USER_ACCOUNT_TYPES } from "@/features/admin-preview/directory-params";
 import { localizedName, type AdminDirectoryUser } from "@/features/admin-preview/directory-mappers";
 import { GOVERNORATES } from "@/lib/onboarding/persona-fields";
 import { whatsappShareUrl } from "@/lib/contact/whatsapp";
@@ -38,7 +39,7 @@ function filterHref(keep: Record<string, string | undefined>, overrides: Record<
  * Users Directory — Admin Core Phase 1B-A. The approved Phase 0D table (twelve
  * columns, shared `DataTable` + pagination footer) over REAL data only.
  *
- * Every row, total and tab count comes from `admin_users_list` (platform
+ * Every row, total and tab count comes from `admin_users_directory` (platform
  * `users.read`): search, filters, sort and pagination run in the database over
  * the full dataset — nothing is fetched and then filtered or paged here. The
  * URL is parsed by `parseUsersDirectoryParams`, which turns any invalid value
@@ -59,9 +60,7 @@ export default async function PreviewUsersPage({
   const supabase = await getServerSupabase();
   // Row-level Suspend / Restore follows the server rule (see `canSuspendUser`): never your own row, never Admin
   // Staff at or above your rank. The RPC remains the judge; this only avoids drawing an action that can never work.
-  const {
-    data: { user: caller },
-  } = await supabase.auth.getUser();
+  const caller = await getCurrentUser();
   const staffRanks = await loadStaffRanks(supabase, access);
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
@@ -115,6 +114,18 @@ export default async function PreviewUsersPage({
           </span>
         );
       },
+    },
+    {
+      key: "accountType",
+      header: cols.accountType,
+      minWidth: "9rem",
+      nowrap: true,
+      cell: (u) =>
+        u.accountType ? (
+          <Badge tone="neutral">{typeLabels[u.accountType] ?? u.accountType}</Badge>
+        ) : (
+          <span className="text-fg-muted">{t.accountTypeNone}</span>
+        ),
     },
     {
       key: "email",
@@ -298,7 +309,7 @@ export default async function PreviewUsersPage({
           kind: "select",
           name: "type",
           anyLabel: t.anyType,
-          options: Object.entries(typeLabels).map(([value, label]) => ({ value, label })),
+          options: USER_ACCOUNT_TYPES.map((value) => ({ value, label: value === "none" ? t.accountTypeNone : typeLabels[value] ?? value })),
         },
         {
           kind: "select",

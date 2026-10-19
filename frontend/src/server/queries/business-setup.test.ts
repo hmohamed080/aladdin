@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { claimsFrom } from "@/test/session-claims";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Database } from "@/types/database.types";
 
@@ -25,7 +26,7 @@ type Facts = {
 function client({ user = { id: "u1" }, progress = null, completedDrafts = 0 }: Facts = {}) {
   const reads: string[] = [];
   const supabase = {
-    auth: { getUser: async () => ({ data: { user } }) },
+    auth: { getUser: async () => ({ data: { user } }), getClaims: claimsFrom(async () => ({ data: { user } })) },
     from: (table: string) => {
       reads.push(table);
       const chain: Record<string, unknown> = {

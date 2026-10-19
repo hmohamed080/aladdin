@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/server/auth/session";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatAdminDate, formatCount } from "@/lib/ui/format";
@@ -75,9 +76,7 @@ export default async function AdminStaffPage({
   const requested = (tabParam || "staff") as TabKey;
   const tab: TabKey = allowed.includes(requested) ? requested : allowed[0]!;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   const callerId = user?.id ?? "";
 
   const [staff, roles, catalog] = await Promise.all([
@@ -399,7 +398,7 @@ function StaffTab({
   return (
     <>
       {!manages ? <p className="text-label text-fg-muted">{t.readOnlyNote}</p> : null}
-      <AutoFilters fields={[{ kind: "text", name: "q", placeholder: m.admin.preview.users.searchPlaceholder }]} />
+      <AutoFilters fields={[{ kind: "text", name: "q", placeholder: t.searchPlaceholder }]} />
       <DataTable
         columns={columns}
         rows={slice.rows}
@@ -407,7 +406,7 @@ function StaffTab({
         caption={t.title}
         minWidth="68rem"
         stackBelow="desktop"
-        empty={<StatePanel title={m.admin.preview.duplicates.none} />}
+        empty={<StatePanel title={t.empty} />}
       />
       {filtered.length > 0 ? <TablePagination {...slice} pageSize={clampPageSize(pageSizeParam)} /> : null}
     </>

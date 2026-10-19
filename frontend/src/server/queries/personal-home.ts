@@ -3,6 +3,7 @@ import { availabilityState, type AvailabilityState } from "@/lib/profile/availab
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { readSessionIdentity } from "@/server/auth/session";
 import {
   consumerCompleteness,
   professionalCompleteness,
@@ -155,9 +156,7 @@ function verificationStateFor(status: string | null | undefined): VerificationSt
  */
 export const loadPersonalHome = cache(async function loadPersonalHome(): Promise<PersonalHomeData | null> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return null;
 
   const [{ data: profile }, { data: userRow }, { data: progress }, { data: io }, { data: ver }] =

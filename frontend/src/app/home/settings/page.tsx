@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/server/auth/session";
 import { loadWorkspaces } from "@/server/queries/workspace";
 import { personalEntry } from "@/lib/workspace/model";
 import { loadPersonalHome } from "@/server/queries/personal-home";
@@ -34,22 +35,22 @@ export default async function PersonalSettingsPage() {
   const t = createTranslator(locale);
   const theme = store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light";
 
-  const [{ data: auth }, identity, completion, availabilityWindows] = await Promise.all([
-    supabase.auth.getUser(),
+  const [authUser, identity, completion, availabilityWindows] = await Promise.all([
+    getCurrentUser(),
     loadMyIdentity(),
     loadMyProfileCompletion(),
     // The caller's own availability dates (RLS: own rows only). Only a professional sees the control that uses them.
     home.variant === "professional" ? loadMyAvailabilityWindows() : Promise.resolve([]),
   ]);
   // An installer phone account's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
-  const visibleEmail = userFacingEmail(auth?.user?.email);
+  const visibleEmail = userFacingEmail(authUser?.email);
   const signInEmail = visibleEmail ? maskEmail(visibleEmail) : null;
 
   return (
     <PersonalSettings
       home={home}
       signInEmail={signInEmail}
-      signInMethod={isCraftsmanLoginAlias(auth?.user?.email) ? "phone_password" : "email_code"}
+      signInMethod={isCraftsmanLoginAlias(authUser?.email) ? "phone_password" : "email_code"}
       theme={theme}
       t={t}
       identity={identity}
