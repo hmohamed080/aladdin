@@ -15,6 +15,7 @@ dependencies = [
     # Local Supabase JWT verification (JWKS, ES256). Already locked as a
     # transitive dependency of supabase-auth; declared because app.auth uses it.
     "pyjwt[crypto]>=2.10",
+    "redis>=8.1",
 ]
 
 [dependency-groups]

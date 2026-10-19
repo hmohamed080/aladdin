@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_embedding_model: str = "text-embedding-3-small"
 
+    # --- Redis (optional; job locks and queue wake-ups, never authorization) ---
+    # redis:// or rediss://. Unset: jobs run without a cross-process lock.
+    redis_url: str = ""
+    # Separates environments that share one Redis database.
+    redis_key_env: str = ""
+
     # --- Server ---
     # Comma-separated browser origins allowed to call the API (CORS).
     allowed_origins: str = "http://localhost:3000"

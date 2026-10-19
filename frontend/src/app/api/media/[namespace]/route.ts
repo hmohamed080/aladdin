@@ -4,6 +4,7 @@ import { deliverMedia, mediaNotFound } from "@/server/storage/delivery";
 import { resolveMedia } from "@/server/storage/media";
 import { isOrganizationMedia } from "@/lib/storage/media-policy";
 import { isProductImageKey } from "@/lib/storage/product-images";
+import { consumeRateLimit } from "@/server/cache/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,6 +23,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ name
     const { data, error } = await client.auth.getUser();
     const user = error ? null : data.user;
     if (!user) return mediaNotFound();
+    const limited = await consumeRateLimit("media-read", user.id);
+    if (limited.outcome === "limited") {
+      return new Response(null, { status: 429, headers: { "Retry-After": String(limited.retryAfterSeconds ?? 60), "Cache-Control": "no-store" } });
+    }
     if (isOrganizationMedia(namespace)) {
       const workspace = new URL(request.url).searchParams.getAll("workspace");
       if (workspace.length > 1 || (workspace[0] && !/^[0-9a-f-]{36}$/.test(workspace[0]))) return mediaNotFound();

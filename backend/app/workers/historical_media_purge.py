@@ -33,11 +33,14 @@ import json
 import sys
 from collections import defaultdict
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import urlparse
+
+from app.coordination import LockUnavailable, job_lock
 
 # Closed set. Anything the database returns outside it stops the run.
 BUCKETS: dict[str, str] = {"avatar": "avatars", "portfolio": "professional-portfolio"}
@@ -197,15 +200,29 @@ def main(argv: list[str] | None = None) -> int:
     cutoff = datetime.fromisoformat(args.cutoff.replace("Z", "+00:00"))
     handle = args.journal.open("a", encoding="utf-8") if args.journal else None
     try:
-        report = run(
-            SupabasePurgeClient(create_service_client(settings)),
-            cutoff,
-            execute=args.execute,
-            batch_size=args.batch_size,
-            journal=(lambda entry: handle.write(json.dumps(entry) + "\n"))
-            if handle
-            else (lambda _: None),
-        )
+        # One executing purge at a time across machines; a dry run needs no lock.
+        with (
+            job_lock("historical-media-purge", ttl_seconds=600)
+            if args.execute
+            else nullcontext(None) as lock
+        ):
+
+            def journal(entry: dict[str, Any]) -> None:
+                if handle:
+                    handle.write(json.dumps(entry) + "\n")
+                if lock is not None:
+                    lock.extend()
+
+            report = run(
+                SupabasePurgeClient(create_service_client(settings)),
+                cutoff,
+                execute=args.execute,
+                batch_size=args.batch_size,
+                journal=journal,
+            )
+    except LockUnavailable:
+        print("stopped: another purge is running", file=sys.stderr)
+        return 3
     except PurgeError as exc:
         print(f"stopped: {exc}", file=sys.stderr)
         return 1

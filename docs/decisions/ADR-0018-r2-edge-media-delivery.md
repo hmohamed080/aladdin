@@ -49,6 +49,8 @@ After the per-request authorization, the Worker reads bytes from the Cache API k
 
 ### Redis: not now
 
+> **Refined 2026-10-19 by [ADR-0019](ADR-0019-redis-cache-and-rate-limits.md):** the owner asked for Redis now. It is implemented as an optional accelerator (reference cache, rate limits, job locks) under the same rules stated here: no authorization and no bytes in Redis.
+
 Nothing in this design needs Redis. Authorization must not be cached (revocation on the next request), bytes are cached at the edge, and session and suspension checks are single indexed lookups. Rate limiting is the one real use: if needed, Upstash Redis on its free tier for upload-authorization and sign-in rate limits, holding counters only, never binaries. Recommendation: do not add it until a measured abuse case exists.
 
 ### Video: Cloudflare Stream when video is in scope

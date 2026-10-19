@@ -1,3 +1,20 @@
+## 2026-10-19 — Redis: Upstash readiness, fail-safe rate limits, usage monitoring (ADR-0019 Revision 2)
+
+Branch `claude/redis-cache-2ibvgs` (draft PR #92). No hosted call: Upstash is unreachable from the sandbox; everything was tested against local Redis 7.0 and a local TLS proxy.
+
+Done:
+- **Upstash-ready client** (`frontend/src/server/cache/redis.ts`): RESP2 with no client-info or maintenance handshake, so a connection costs 1 command, not 4. `MONITOR` showed `HELLO 3` plus three `CLIENT` commands before. No PING interval and no auto-reconnect (lazy reopen). One retry on a connection idle for 30 s or more. The breaker opens on a connect failure or two failed commands. Backend `app.coordination` likewise: redis-py `protocol=2`, `driver_info=None`, no health-check PING, client closed after the job; `redis>=8.1`.
+- **Fail-safe limits** (`rate-limit.ts`): a per-instance memory window when Redis is off or down, and a local block after a Redis refusal (no more commands spent). The result now carries `source` and has no `skipped` outcome; any test mock returning `{ outcome: "skipped" }` should return `allowed`.
+- **Monitoring**: command/connect counters, monthly projection, `cache.redis_budget` warnings at 50%/80% of `REDIS_MONTHLY_COMMAND_BUDGET`, and `cacheMetrics` in `/api/health`, which no longer PINGs on every probe.
+- **Caching**: re-measured with `pg_stat_statements` over 252 page loads. No new cache is justified: the costly per-page reads are entitlement or authorization. Empty vocabularies are now cached for 300 s.
+- Docs: [upstash-setup.md](../guides/upstash-setup.md), ADR-0019 Revision 2, DECISION_LOG. The guide covers the existing database `alert-bedbug-148148`, Vercel over `rediss://`, REST-only read checks from the cloud environment, a command estimate and the exhaustion risks. REST transport judged not worth adding.
+- Validation: Vitest full suite 3,965 pass / 24 skipped (with `REDIS_TEST_URL`). Four timing tests in `installer-work-production` and `public-image-variants` failed under machine load and pass alone (49/49). Cache tests 24/24 against local Redis and over a local TLS proxy (an untrusted certificate is refused); typecheck clean; lint 0 errors (7 existing warnings); backend pytest 53 pass, ruff clean; production build plus an end-to-end limiter, outage and health run on port 3304.
+
+Unfinished / needs the owner:
+- Check the existing database's plan and region, then set `REDIS_URL` in Vercel Preview, then Production (guide steps 1–4). No live Upstash check run: hosted calls are out of scope for this session.
+- `my_organization_application_slot()` costs ~13 ms locally on every B2B page and evaluates `app.application_slot` twice: a SQL fix, not done here.
+- Pay-as-you-go needs approval once traffic passes about 1,500 page views a day with images still proxied.
+
 ## 2026-10-19 — Session revocation coverage and backend production configuration (PR #91)
 
 Branch `claude/media-backend-continuation-2ibvgs`. No hosted write, deploy or merge.

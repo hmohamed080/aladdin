@@ -76,14 +76,14 @@ describe("loadTradeCatalog", () => {
   });
 
   /**
-   * There is no `.eq("is_active", true)` here and there must not be: the filter
-   * is `trades_select_active`, an RLS policy. A client-side filter would look
-   * identical on screen while leaving a retired trade one forgotten `.select()`
-   * away from being offered again.
+   * `trades_select_active` (RLS) is still the gate. The loader ALSO filters,
+   * because its result is shared through the reference cache: support staff may
+   * read retired rows under their own policy, and those must never land in an
+   * entry every other caller is served.
    */
-  it("does not filter for active itself — RLS does", async () => {
+  it("asks only for active trades, so a shared cache entry is the same for every caller", async () => {
     await loadTradeCatalog();
-    expect(asked.eq).toEqual([]);
+    expect(asked.eq).toEqual([["is_active", true]]);
   });
 
   it("survives an empty vocabulary without throwing", async () => {

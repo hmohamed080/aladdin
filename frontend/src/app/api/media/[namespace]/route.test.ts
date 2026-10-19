@@ -1,7 +1,8 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { claimsFrom } from "@/test/session-claims";
 vi.mock("server-only", () => ({}));
-const mocks = vi.hoisted(() => ({ user: vi.fn(), resolve: vi.fn(), deliver: vi.fn() }));
+const mocks = vi.hoisted(() => ({ user: vi.fn(), resolve: vi.fn(), deliver: vi.fn(), limit: vi.fn() }));
+vi.mock("@/server/cache/rate-limit", () => ({ consumeRateLimit: mocks.limit }));
 vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({ auth: { getUser: mocks.user, getClaims: claimsFrom(() => mocks.user()) } }) }));
 vi.mock("@/server/storage/media", () => ({ resolveMedia: mocks.resolve }));
 vi.mock("@/server/storage/delivery", () => ({ deliverMedia: mocks.deliver,
@@ -12,6 +13,7 @@ const KEY = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa.png";
 beforeEach(() => {
   vi.clearAllMocks(); mocks.user.mockResolvedValue({ data: { user: { id: OWNER } }, error: null });
   mocks.resolve.mockResolvedValue({ owner: OWNER });
+  mocks.limit.mockResolvedValue({ outcome: "allowed", source: "memory" });
   mocks.deliver.mockImplementation(async (_client, _namespace, _key, authority) =>
     new Response(null, { status: await authority() ? 200 : 404 }));
 });
@@ -31,4 +33,17 @@ it("denies traversal, foreign certificate prefixes, duplicate keys and unknown b
   expect((await read("other")).status).toBe(404);
   expect((await GET(new Request(`https://local.test/api/media/portfolio?key=${KEY}&key=${KEY}`), { params: Promise.resolve({ namespace: "portfolio" }) })).status).toBe(404);
   expect(mocks.deliver).not.toHaveBeenCalled();
+});
+it("answers 429 once the per-user read ceiling is reached, before any lookup", async () => {
+  mocks.limit.mockResolvedValue({ outcome: "limited", retryAfterSeconds: 17 });
+  const response = await read("portfolio");
+  expect(response.status).toBe(429);
+  expect(response.headers.get("retry-after")).toBe("17");
+  expect(mocks.limit).toHaveBeenCalledWith("media-read", OWNER);
+  expect(mocks.deliver).not.toHaveBeenCalled();
+});
+it("does not consult the limiter for an anonymous caller", async () => {
+  mocks.user.mockResolvedValue({ data: { user: null }, error: null });
+  await read("portfolio");
+  expect(mocks.limit).not.toHaveBeenCalled();
 });

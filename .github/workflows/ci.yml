@@ -32,6 +32,14 @@ jobs:
   frontend:
     name: frontend
     runs-on: ubuntu-latest
+    # Real Redis for the cache-isolation, rate-limit and job-lock tests (ADR-0019).
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 2s --health-retries 15
+    env:
+      REDIS_TEST_URL: redis://127.0.0.1:6379
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -53,6 +61,14 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-latest
+    # Real Redis for the cache-isolation, rate-limit and job-lock tests (ADR-0019).
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 2s --health-retries 15
+    env:
+      REDIS_TEST_URL: redis://127.0.0.1:6379
     defaults:
       run:
         working-directory: backend
