@@ -1,0 +1,65 @@
+/* Canonical values mirrored from design/tokens/engineer.json. */
+.engineer-surface {
+  --engineer-sand: #d8c7a6;
+  --engineer-terracotta: #b96f52;
+  --engineer-cream: #f2e9d8;
+  --engineer-navy: #071a2d;
+  --canvas: var(--engineer-cream);
+  --workspace: var(--canvas);
+  --surface: color-mix(in srgb, var(--engineer-cream) 25%, white);
+  --surface-2: var(--engineer-cream);
+  --surface-hover: var(--engineer-sand);
+  --fg: var(--engineer-navy);
+  --fg-secondary: color-mix(
+    in srgb,
+    var(--engineer-navy) 80%,
+    var(--engineer-cream)
+  );
+  --fg-muted: var(--fg-secondary);
+  --border: var(--engineer-sand);
+  --border-strong: var(--engineer-terracotta);
+  --primary: var(--engineer-navy);
+  --primary-foreground: var(--engineer-cream);
+  --accent: var(--engineer-navy);
+  --accent-solid: var(--engineer-terracotta);
+  --on-accent: var(--engineer-navy);
+  --focus: var(--engineer-terracotta);
+  --shell: var(--engineer-navy);
+  --shell-lit: var(--engineer-navy);
+  --shell-deep: var(--engineer-navy);
+  --shell-pool: var(--engineer-navy);
+  --lumen: var(--engineer-sand);
+  --workspace-mesh: var(--canvas);
+  --shell-2: color-mix(in srgb, var(--engineer-navy) 85%, var(--engineer-sand));
+  --shell-fg: var(--engineer-cream);
+  --shell-fg-secondary: var(--engineer-cream);
+  --shell-active: var(--shell-2);
+  --field-fg: var(--fg);
+}
+.dark .engineer-surface {
+  --canvas: var(--engineer-navy);
+  --surface: color-mix(in srgb, var(--engineer-navy) 90%, var(--engineer-sand));
+  --surface-2: color-mix(
+    in srgb,
+    var(--engineer-navy) 80%,
+    var(--engineer-sand)
+  );
+  --surface-hover: var(--surface-2);
+  --fg: var(--engineer-cream);
+  --fg-secondary: var(--engineer-sand);
+  --fg-muted: var(--engineer-sand);
+  --primary: var(--engineer-cream);
+  --primary-foreground: var(--engineer-navy);
+  --accent: var(--engineer-sand);
+  --border: color-mix(in srgb, var(--engineer-navy) 70%, var(--engineer-sand));
+}
+.engineer-surface .workspace-atmosphere {
+  background: var(--canvas);
+}
+.engineer-surface .engineer-hero {
+  background: var(--engineer-navy);
+  color: var(--engineer-cream);
+}
+.engineer-surface .engineer-hero p {
+  color: inherit;
+}

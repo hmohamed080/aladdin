@@ -1,5 +1,19 @@
 # Architecture Guide
 
+## Engineer account composition — 2026-10-20
+
+The engineer account composes the existing personal `/home` shell, caller-JWT
+purchase requests, public directory projections, portfolio and review services.
+It does not introduce another application or preview routes. Private saved
+records and team lists are owner-scoped collections; a team list confers no
+organization membership or permissions. The branch-local migration
+`20261019084212` adds collection/context RPCs and declared-engineer audience
+eligibility without promoting verification or canonical persona.
+
+Frontend review precedes resuming full-stack verification. Production migration
+application and deployment remain deferred to review; see
+[engineer scope](../product/engineer-account.md).
+
 <!-- CANONICAL PROJECT MEMORY — the currently active architecture. Read before any code or infra change. -->
 
 | | |

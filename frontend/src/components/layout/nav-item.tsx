@@ -36,6 +36,8 @@ import {
 
 /** One navigation destination, already resolved by whichever nav owns it. */
 export type NavItem = {
+  /** Already-localized labels for account navigation built from a feature vocabulary. */
+  label?: string;
   href: string;
   /** Translation key for the label. */
   key: string;
@@ -96,7 +98,7 @@ export function NavLink({
   const { t } = useI18n();
   const reduced = useReducedMotion();
   const { href, key, Icon } = item;
-  const label = t(key);
+  const label = item.label ?? t(key);
 
   return (
     <Link

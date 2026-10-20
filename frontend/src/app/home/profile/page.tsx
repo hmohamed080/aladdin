@@ -1,3 +1,5 @@
+import { EngineerProfile } from "@/features/engineer/profile";
+import { isEngineer } from "@/features/engineer/links";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
@@ -58,6 +60,7 @@ export default async function ProfileHubPage() {
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const t = createTranslator(locale);
+  if (isEngineer(data)) return <EngineerProfile locale={locale} />;
 
   if (data.variant !== "professional") return <NoProfessionalProfile />;
 

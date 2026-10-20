@@ -1,3 +1,6 @@
+import { EngineerDashboard } from "@/features/engineer/dashboard";
+import { loadEngineerDashboard } from "@/server/queries/engineer";
+import { isEngineer } from "@/features/engineer/links";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
@@ -105,6 +108,7 @@ export default async function PersonalHomePage() {
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const t = createTranslator(locale);
+  if (isEngineer(data)) return <EngineerDashboard data={await loadEngineerDashboard()} locale={locale} />;
 
   // Only a professional has any of this to read — a consumer holds none of it
   // by construction, since every one of these descends from an assignment,

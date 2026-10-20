@@ -7065,6 +7065,19 @@ export type Database = {
       }
     }
     Functions: {
+      engineer_request_context_read: { Args: { p_request_id: string }; Returns: Json }
+      engineer_request_location: { Args: { p_request_id: string; p_org_id: string }; Returns: string }
+      purchase_request_image_abort_upload: { Args: { p_object_key: string }; Returns: string }
+      engineer_request_save: {
+        Args: { p_request_id: string; p_expected_version: number; p_title: string; p_notes: string; p_needed_by: string; p_items: Json; p_location: string; p_showroom_ids: string[] }
+        Returns: string
+      }
+      engineer_collections_read: { Args: Record<PropertyKey, never>; Returns: Json }
+      engineer_collection_change: {
+        Args: { p_action: string; p_collection_id?: string; p_name?: string; p_entity_type?: string; p_entity_id?: string }
+        Returns: string
+      }
+
       account_entry_allowed: { Args: { p_kind: string }; Returns: boolean }
       activate_project: {
         Args: { p_expected_version: number; p_project_id: string }

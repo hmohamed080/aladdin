@@ -1,3 +1,36 @@
+## 2026-10-20 — Resume engineer account audit and frontend phase
+
+**Purpose / decision:** Recover work after a session limit. The owner requested
+frontend completion and review before resuming full-stack integration. Preserve
+the existing branch, production paths, and isolated runtime.
+
+**Scope:** Dashboard, profile, quotation composer/list/detail, showroom/product/
+professional discovery, inspiration, private team lists and saved records.
+Four-colour semantic theme follows the supplied Arabic references. Current pass
+adds category/status navigation, contextual empty states, profile team summaries,
+architectural request banner and wrapping/scroll fixes.
+
+**Earlier validation recovered:** Typecheck passed; lint had zero errors and
+seven existing warnings; 45 focused unit/component tests passed; engineer pgTAP
+and the existing 188 shared purchase-request assertions passed locally. Local
+browser saved a draft successfully. No hosted database or deployment change.
+
+**Consequences / unfinished work:** Full-stack work is paused, not complete.
+Responsive/English/dark visual checks, production build, final schema replay and
+end-to-end response flow remain before a production-ready PR. Missing real
+photos/reviews are represented honestly rather than fabricated. This checkpoint
+must not be described as release-ready.
+
+**Related:** [Feature scope](../product/engineer-account.md),
+[runtime](RUNTIME_STATE.md). Subsequent validation is recorded below before commit.
+
+**Resumed validation:** `pnpm --filter @aladdin/frontend typecheck` exited 0;
+`lint` exited 0 with the same seven existing warnings. Five focused Vitest files
+passed (45 tests). Image layout warnings in the DOM-only composer test are not
+visual browser assertions. Browser inspected Arabic dashboard, profile, saved
+product filter and new request composer on port 3350. No mobile viewport or
+English/dark parity claim is made by this checkpoint.
+
 ## 2026-10-18 — Terms of Service published
 
 Branch `claude/auth-oauth-email-g90ajg` restarted from `main` @ `9d9a1b6` after PR #87 merged. `/legal/terms` renders the real bilingual Terms through `LegalDocumentView`; per-document updated dates. See [legal-pages.md](../frontend/legal-pages.md).

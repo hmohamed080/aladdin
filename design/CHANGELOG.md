@@ -9,6 +9,16 @@ Each entry uses: Added · Changed · Fixed · Deprecated · Removed · Migration
 
 ---
 
+## 1.1.0 — 2026-10-19 — Engineer account theme
+
+Added: owner-approved engineer palette in `tokens/engineer.json` and its scoped semantic CSS mapping. The colors are sand `#D8C7A6`, terracotta `#B96F52`, cream `#F2E9D8`, and navy `#071A2D`.
+
+Changed: engineer home/profile/navigation, quotation composer, discovery and personal collections compose the canonical shell, cards and controls. The existing Aladdin showroom architectural artwork supplies decorative hero imagery; real records never receive fabricated photos, ratings or reviews.
+
+Fixed: explicit hero text contrast and complete shell/canvas token mapping. Both theme variants retain the same four brand primitives.
+
+Migration notes: the theme applies only within `.engineer-surface`; other account surfaces keep their existing token values. New business response screens reuse the business theme. Browser responsive and theme checks must pass before the feature is marked ready.
+
 ## 1.0.0 — 2026-08-01 — Foundation finalized & hardened
 
 First approved, hardened Design System foundation. No product components implemented yet; the token contract is ready to build against.

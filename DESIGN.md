@@ -210,9 +210,9 @@ components:
 | | |
 |---|---|
 | **Design System** | Aladdin — "The Aperture" |
-| **Version** | `1.0.0` |
+| **Version** | `1.1.0` |
 | **Status** | Approved · foundation hardened (pre-feature). Ready to build product UI against. |
-| **Last updated** | 2026-08-01 |
+| **Last updated** | 2026-10-19 |
 | **Maintainer** | Design-system foundation (agent-maintained under founder approval) |
 | **Changelog** | [`design/CHANGELOG.md`](design/CHANGELOG.md) |
 | **Governance** | [`design/GOVERNANCE.md`](design/GOVERNANCE.md) — source-of-truth, versioning, component & AI-agent rules |

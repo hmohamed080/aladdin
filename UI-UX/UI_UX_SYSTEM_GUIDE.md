@@ -1,5 +1,16 @@
 # UI/UX System Guide
 
+## Engineer theme extension — 2026-10-20
+
+The owner supplied four Arabic engineer account references and explicitly
+requested sand `#D8C7A6`, terracotta `#B96F52`, cream `#F2E9D8` and navy
+`#071A2D`. The named engineer theme is recorded in
+[`engineer.json`](../design/tokens/engineer.json) and scoped to
+`.engineer-surface`; canonical shell geometry, components and typography remain.
+Feature components consume semantic tokens. Real project imagery, verification
+and metrics remain authoritative; missing content uses actionable empty states.
+Frontend visual review is in progress and is not release approval.
+
 <!-- CANONICAL PROJECT MEMORY — read before any UI or design change. -->
 
 | | |

@@ -1,5 +1,24 @@
 # Runtime State
 
+## Engineer account frontend review — 2026-10-20
+
+- Worktree `D:/projects/aladdin-engineer-account`, branch `feature/engineer-account`,
+  based on `bd0de0ae`. Engineer dashboard/profile/discovery/requests/teams/saved
+  use existing production routes and canonical components.
+- Owner requested frontend review before continuing full-stack work. No hosted
+  migration, deployment, merge, or release approval has occurred.
+- Local frontend: `http://localhost:3350`; isolated Supabase project
+  `aladdin_engineer` under `D:/projects/engineer-local`, API port 64321.
+  Other local projects must not be reset or stopped.
+- Prior audit fixed pending-engineer audience access, request location visibility,
+  failed-upload reservations, collection batching, and missing inspiration and
+  profile availability. Migration `20261019084212` remains branch-local.
+- Current UI pass adds saved category/status filters, profile team summaries,
+  request imagery, contextual empty states and small-screen wrapping fixes.
+- Remaining: complete responsive/English/dark visual review, production build,
+  full-stack journey and fresh migration replay after resuming that phase.
+  See [engineer account](../product/engineer-account.md).
+
 ## Terms of Service published — 2026-10-18
 
 - `/legal/terms` now publishes the real Terms of Service (EN/AR, public, contact `info@aladdindecore.com`), replacing the placeholder; the `LegalPending` component is removed. All three legal pages are live content. [Details](../frontend/legal-pages.md).

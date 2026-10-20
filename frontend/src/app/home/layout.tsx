@@ -1,3 +1,6 @@
+import "@/styles/engineer.css";
+import { EngineerNavigation } from "@/features/engineer/navigation";
+import { isEngineer } from "@/features/engineer/links";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -129,13 +132,14 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
 
   return (
     <I18nProvider locale={locale} dir={dir}>
+      <div className={isEngineer(home) ? "engineer-surface" : undefined}>
       <AppShell
         nav={
           navKeys.length > 0 ? (
             <SidebarShell
               mode={sidebarMode}
               appName={m.common.appName}
-              nav={<PersonalNavPanel keys={navKeys} />}
+              nav={isEngineer(home) ? <EngineerNavigation /> : <PersonalNavPanel keys={navKeys} />}
               /* No separate Settings/Upgrade footer block. Settings is a real
                  route now (`/home/settings`, Increment 14), but it is a normal
                  row inside `personalNavKeys`' own "account" group rather than
@@ -170,11 +174,12 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
           />
         }
         mobileNav={
-          navKeys.length > 0 ? <PersonalMobileNav keys={personalMobileNavKeys(navKeys)} /> : undefined
+          navKeys.length > 0 ? isEngineer(home) ? <EngineerNavigation mobile /> : <PersonalMobileNav keys={personalMobileNavKeys(navKeys)} /> : undefined
         }
       >
         {children}
       </AppShell>
+      </div>
     </I18nProvider>
   );
 }

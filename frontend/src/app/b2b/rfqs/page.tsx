@@ -112,6 +112,10 @@ export default async function PurchaseRequestsPage({
         }
       />
 
+      <Link href="/b2b/material-requests" className="text-body font-medium text-accent underline">
+        {locale === "ar" ? "طلبات خامات المهندسين والمشاريع" : "Engineer and project material requests"}
+      </Link>
+
       {/* The tiles describe the VIEW, not the module. On the demand side
           `submitted` means "waiting for your price" and is the only number with a
           clock on it; on the buying side the same status means "sent, waiting" and
