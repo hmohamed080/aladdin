@@ -162,7 +162,7 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
                once, at the head of the sidebar — so on a personal account with
                no navigation at all (a caller mid-redirect) the header falls back
                to carrying it itself. */
-            variant={navKeys.length > 0 ? "card" : "bar"}
+            variant={isEngineer(home) ? "engineer" : navKeys.length > 0 ? "card" : "bar"}
             /* The account menu's "Account preferences" link. Points at the
                same route the nav's own Settings row does — one destination,
                reached two ways, never two different pages for the same

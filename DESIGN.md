@@ -200,6 +200,17 @@ components:
 
 # Design System: Aladdin
 
+### Engineer homepage reference exception — owner approval, 2026-10-20
+
+For the engineer account only, the owner explicitly authorized matching the
+supplied screenshot over earlier shell geometry restrictions. Keep the four
+engineer palette primitives; use left navigation, a compact completion strip,
+a photo-led hero with inset identity card, five shortcuts and dense four-column
+discovery cards. Engineer-scoped CSS owns these adaptations and reduced bottom
+spacing. The showroom header component is reused with personal destinations.
+Local illustrative fixtures and generated imagery support design review only;
+hosted data remains authoritative. See `docs/product/engineer-account.md`.
+
 <!-- Established with the founder from the "Brand Toolkit v1" plate and approved 2026-08-01. -->
 <!-- Visual source of truth remains UI-UX/design.pen (Pencil); this file is the token/rule
      record the .pen file and the frontend Tailwind theme both extract from. Product truth

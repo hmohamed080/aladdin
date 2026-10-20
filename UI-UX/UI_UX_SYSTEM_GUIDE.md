@@ -2,6 +2,13 @@
 
 ## Engineer theme extension — 2026-10-20
 
+Subsequent explicit owner direction permits reference-driven geometry and
+component styling changes within the engineer surface, retaining the palette.
+This exception includes left navigation, compact top completion strip, photo
+cards and smaller page gutters; it does not change other account themes.
+Populated local fixtures require local environment plus loopback database and
+are labelled on screen. They must not become production business records.
+
 The owner supplied four Arabic engineer account references and explicitly
 requested sand `#D8C7A6`, terracotta `#B96F52`, cream `#F2E9D8` and navy
 `#071A2D`. The named engineer theme is recorded in

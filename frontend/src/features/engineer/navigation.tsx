@@ -1,6 +1,8 @@
 "use client";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import Image from "next/image";
+import { ButtonLink } from "@/components/ui/controls";
 import { useI18n } from "@/lib/i18n/context";
 import { useSidebarDisplay } from "@/components/layout/sidebar-shell";
 import { NavLink } from "@/components/layout/nav-item";
@@ -76,6 +78,13 @@ export function EngineerNavigation({ mobile = false }: { mobile?: boolean }) {
       >
         {links}
       </nav>
+      {!narrow && <div className="engineer-sidebar-promo">
+        <ButtonLink href="/home/profile/portfolio" variant="outline" className="w-full">{locale === "ar" ? "إضافة مشروع +" : "Add a project +"}</ButtonLink>
+        <div className="relative mt-lg overflow-hidden rounded-md border">
+          <Image src="/assets/engineer/hero-living-room.webp" alt="" width={300} height={220} className="h-40 w-full object-cover" />
+          <div className="p-md"><h2>{locale === "ar" ? "حوّل أفكارك إلى واقع" : "Bring your ideas to life"}</h2><p className="mt-2 text-label">{locale === "ar" ? "اكتشف المعارض والمتخصصين لمشروعك القادم." : "Discover showrooms and professionals for your next project."}</p><ButtonLink href="/home/engineer/requests/new" variant="accent" className="mt-md w-full">{locale === "ar" ? "ابدأ الآن" : "Start now"}</ButtonLink></div>
+        </div>
+      </div>}
     </div>
   );
 }

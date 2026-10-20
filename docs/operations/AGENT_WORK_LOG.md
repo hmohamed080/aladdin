@@ -1,3 +1,40 @@
+## 2026-10-20 — Apply owner homepage review
+
+**Second visual revision:** Owner explicitly authorized relaxing prior layout
+constraints except palette and requested populated data. Added guarded local
+sample cards (four showrooms, four projects, four professionals), two fictional
+ImageGen contact sheets, left sidebar, sidebar CTA, denser hero/cards and removal
+of stacked bottom paddings across the engineer shell. Samples are not inserted
+into any database and are not displayed with hosted Supabase. Favorite toggles
+on those samples are temporary UI state.
+
+**Independent review:** Confirmed local/loopback guard and correct personal
+header routes. Fixed its two findings: misleading missing-location header and
+unconditional LTR reversal. Original showroom defaults preserved. Full-stack
+integration remains paused; no production deployment or migration application.
+
+**Validation:** Typecheck exited 0 after fixes; lint exited 0 with seven
+pre-existing warnings. Browser confirmed populated Arabic homepage and compact
+page ending, with expanded and collapsed sidebar states. Screenshot saved
+outside the repository as `D:/projects/engineer-home-reference-review.png`.
+Mobile viewport and English/dark screenshots have not been captured; no claim
+of complete cross-device release validation.
+
+**Request:** Match the supplied Aladdin composition, put the profile completion
+strip at the top using the Wellfound reference, remove product and guidance
+sections, and use the showroom search header.
+
+**Implementation:** Reused ShowroomTopbar with optional personal destinations
+and a real personal search slot. Built a compact segmented completion strip,
+account card inside the architectural hero, five shortcuts, and reordered
+discovery sections. Removed the unused dashboard catalog fetch. Generated a
+decorative living-room hero with ImageGen; WebP is 260 KB and provenance is
+stored alongside it. No fabricated people, reviews or showroom photos.
+
+**Scope:** Frontend only; full-stack phase remains paused. Arabic desktop browser
+inspection confirmed the new hierarchy and removed sections. Shared showroom
+defaults remain unchanged. Typecheck/lint results recorded after completion.
+
 ## 2026-10-20 — Resume engineer account audit and frontend phase
 
 **Purpose / decision:** Recover work after a session limit. The owner requested

@@ -11,6 +11,24 @@ routes, fabricated customer records, or deployment before PR review.
 
 ### Review sequence (owner decision, 2026-10-20)
 
+The owner subsequently released earlier composition constraints except the
+four-colour palette and requested populated local data. Engineer-scoped CSS may
+therefore adjust shell placement, gutters, density and card geometry to match
+the supplied reference. Local illustrative cards/photos are explicitly marked
+and rendered only when both app environment is local and Supabase is loopback.
+They are presentation fixtures, not real businesses, ratings, saved records or
+project records; their favorite toggles are session-local. Hosted data behavior
+and production routes remain unchanged. Shared shell bottom padding is reduced
+only inside the engineer theme, retaining ordinary viewport fill.
+
+Homepage revision requested on 2026-10-20: place a compact, segmented profile
+completion banner above the architectural hero (Wellfound placement reference),
+embed the real account card in the hero, and use five discovery shortcuts.
+Remove the homepage product grid and editorial guidance; their separate
+destinations remain available. Reuse the showroom topbar with personal search
+and account destinations. Decorative generated imagery must not impersonate
+real showroom or portfolio records.
+
 Finish and review the frontend suite first; full-stack integration and release
 verification are paused. Keep the real application routes and the existing
 feature branch. The local app at port 3350 remains available for visual review.

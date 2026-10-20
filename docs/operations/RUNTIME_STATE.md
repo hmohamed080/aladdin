@@ -2,6 +2,18 @@
 
 ## Engineer account frontend review — 2026-10-20
 
+- Latest owner refinement permits reference-driven geometry outside earlier
+  design constraints. Homepage now has photo-filled local sample showroom,
+  project and professional cards; these require local environment + loopback DB.
+  Three generated WebP assets have recorded provenance. Engineer-only padding
+  overrides remove stacked bottom spacing. Sidebar stays left across locales.
+  Read-only frontend review found location/RTL defects; both were addressed.
+
+- Homepage review revision: completion strip moved above the generated living-room
+  hero; real identity card sits inside the hero; five shortcuts follow. Homepage
+  products and guidance removed per owner. Shared showroom topbar now accepts
+  personal search/profile/settings slots, preserving showroom defaults.
+
 - Worktree `D:/projects/aladdin-engineer-account`, branch `feature/engineer-account`,
   based on `bd0de0ae`. Engineer dashboard/profile/discovery/requests/teams/saved
   use existing production routes and canonical components.

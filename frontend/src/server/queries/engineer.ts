@@ -13,7 +13,6 @@ import {
   listOrganizations,
   listProfessionals,
 } from "@/server/queries/directory";
-import { listCatalog } from "@/server/queries/commerce";
 import { listMyRequests } from "@/server/queries/purchase-requests";
 import { listMyPortfolio } from "@/server/queries/portfolio";
 import { loadMyIdentity } from "@/server/queries/profile-identity";
@@ -37,14 +36,13 @@ export const requireEngineer = cache(async () => {
 
 export async function loadEngineerDashboard() {
   const { account, supabase } = await requireEngineer();
-  const [requests, showrooms, professionals, products, portfolio, identity] =
+  const [requests, showrooms, professionals, portfolio, identity] =
     await Promise.all([
       listMyRequests(supabase, null, 6),
       listOrganizations(supabase, { types: ["showroom_dealer"] }),
       listProfessionals(supabase, {
         personas: ["engineer", "installer_technician"],
       }),
-      listCatalog(supabase, null, { limit: 5 }),
       listMyPortfolio(),
       loadMyIdentity(),
     ]);
@@ -53,7 +51,6 @@ export async function loadEngineerDashboard() {
     requests,
     showrooms: showrooms.slice(0, 4),
     professionals: professionals.slice(0, 6),
-    products,
     portfolio: await Promise.all(
       portfolio.slice(0, 4).map(async (item) => {
         const image = item.pending

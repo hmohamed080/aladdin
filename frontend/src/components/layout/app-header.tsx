@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ShowroomTopbar } from "@/features/showroom-shell/topbar";
 import { cn } from "@/lib/ui/cn";
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -123,7 +124,7 @@ export async function AppHeader({
    * data is identical in both — this switch must never become a place where one
    * surface quietly gets a feature another does not.
    */
-  variant?: "bar" | "card";
+  variant?: "bar" | "card" | "engineer";
   /** Workspace/branch switchers, an Admin badge — whatever names the context. */
   context?: ReactNode;
   /**
@@ -194,6 +195,22 @@ export async function AppHeader({
     orgId,
   );
 
+  if (variant === "engineer") {
+    return (
+      <ShowroomTopbar
+        theme={resolveTheme(themePreference)}
+        displayName={identity?.displayName ?? undefined}
+        capabilities={capabilities}
+        workspaceSwitch={context}
+        profileHref="/home/profile"
+        settingsHref="/home/settings"
+        showLocation={false}
+        search={<GlobalSearch capabilities={capabilities} stance={stance} hasWorkspace={false} canAdmin={canAdmin} size="lead" />}
+        notifications={<NotificationsMenu items={notifications} unreadCount={unreadCount} orgId={orgId} />}
+        chat={<ChatMenu items={conversations} unreadCount={chatUnread} activeOrgId={orgId} activeOrgName={workspaceLabel} currentUserId={identity?.userId ?? null} />}
+      />
+    );
+  }
   const card = variant === "card";
 
   /* Declared once and placed twice. In the bar it follows the brand, on the
