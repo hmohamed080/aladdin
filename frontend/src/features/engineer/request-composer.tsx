@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { parseQuantity } from "@/features/purchase-requests/model";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import {
@@ -79,6 +80,12 @@ export function RequestComposer({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState("");
+  const saving = useRef(false);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  const [invalidQuantities, setInvalidQuantities] = useState<string[]>([]);
+  const quantityHelp = ar
+    ? "أدخل كمية أكبر من صفر وحتى ١٬٠٠٠٬٠٠٠، بحد أقصى ٣ أرقام عشرية."
+    : "Enter a quantity greater than zero and up to 1,000,000, with at most 3 decimal places.";
   const [title, setTitle] = useState(existing?.request.title ?? "");
   const [location, setLocation] = useState(context.location);
   const [showroomIds, setShowroomIds] = useState(context.showroomIds);
@@ -114,6 +121,14 @@ export function RequestComposer({
       old.map((l) => (l.key === key ? { ...l, ...values } : l)),
     );
   function save() {
+    if (saving.current || pending) return;
+    const invalid = lines.filter((line) => parseQuantity(line.quantity) === null);
+    setInvalidQuantities(invalid.map((line) => line.key));
+    if (invalid.length) {
+      document.getElementById(`qty-${invalid[0]!.key}`)?.focus();
+      return;
+    }
+    saving.current = true;
     setError("");
     start(async () => {
       try {
@@ -148,6 +163,9 @@ export function RequestComposer({
             ? "تعذر الحفظ. احتفظنا ببياناتك هنا، حاول مرة أخرى."
             : "Could not save. Your input is still here; please retry.",
         );
+      } finally {
+        saving.current = false;
+        requestAnimationFrame(() => errorRef.current?.focus());
       }
     });
   }
@@ -202,6 +220,7 @@ export function RequestComposer({
         save();
       }}
       className="flex flex-col gap-lg"
+      aria-busy={pending}
     >
       <header className="engineer-hero relative isolate overflow-hidden rounded-lg p-lg tablet:p-xl">
         <Image
@@ -247,12 +266,14 @@ export function RequestComposer({
       {error && (
         <p
           role="alert"
+          ref={errorRef}
+          tabIndex={-1}
           className="rounded-sm border border-danger p-md text-danger"
         >
           {error}
         </p>
       )}
-      <div className="grid items-start gap-lg desktop:grid-cols-3">
+      <fieldset disabled={pending} className="grid min-w-0 items-start gap-lg desktop:grid-cols-3 [overflow-wrap:anywhere]">
         <div className="flex flex-col gap-lg desktop:col-span-2">
           <Card className="flex flex-col gap-md">
             <h2 className="text-title">
@@ -318,11 +339,17 @@ export function RequestComposer({
                     id={`qty-${line.key}`}
                     required
                     inputMode="decimal"
+                    aria-invalid={invalidQuantities.includes(line.key) || undefined}
+                    aria-describedby={`qty-help-${line.key}`}
                     value={line.quantity}
-                    onChange={(e) =>
-                      patch(line.key, { quantity: e.target.value })
-                    }
+                    onChange={(e) => {
+                      patch(line.key, { quantity: e.target.value });
+                      setInvalidQuantities((old) => old.filter((key) => key !== line.key));
+                    }}
                   />
+                  <p id={`qty-help-${line.key}`} className={invalidQuantities.includes(line.key) ? "text-label text-danger" : "text-label text-fg-secondary"}>
+                    {quantityHelp}
+                  </p>
                 </LabeledField>
                 <LabeledField
                   label={ar ? "الوحدة" : "Unit"}
@@ -364,7 +391,7 @@ export function RequestComposer({
                   onClick={() =>
                     setLines((old) => old.filter((l) => l.key !== line.key))
                   }
-                  disabled={pending}
+                  disabled={pending || lines.length === 1}
                 >
                   <TrashIcon size={16} />
                   {ar ? "حذف المنتج" : "Remove item"}
@@ -588,7 +615,7 @@ export function RequestComposer({
             </ol>
           </Card>
         </aside>
-      </div>
+      </fieldset>
     </form>
   );
 }

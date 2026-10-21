@@ -1,5 +1,17 @@
 # Runtime State
 
+## Engineer request form hardening — 2026-10-21
+
+- Impeccable harden pass reuses the shared quantity parser for inline validation,
+  including Arabic digits. Invalid quantities focus the affected field. Pending
+  operations disable the form fields; a synchronous guard prevents repeat saves.
+  The last product cannot be removed, long summary text wraps, and save failures
+  retain input and focus the error message.
+- Five composer tests and TypeScript pass. Browser verification was blocked by
+  the browser URL security policy; mobile/RTL visual verification is outstanding.
+  Existing shell/navigation edits were present before this pass and left intact.
+  Full-stack phase remains paused; no hosted changes or publication.
+
 ## Engineer account frontend review — 2026-10-20
 
 - Latest owner refinement permits reference-driven geometry outside earlier

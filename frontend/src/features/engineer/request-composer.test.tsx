@@ -25,6 +25,30 @@ import { RequestComposer, RequestLifecycle } from "./request-composer";
 
 beforeEach(() => vi.clearAllMocks());
 describe("engineer quotation journey", () => {
+  it("rejects invalid quantities before saving and focuses the field", () => {
+    const { container } = renderWithI18n(<RequestComposer />, "en");
+    const quantity = screen.getByLabelText("Quantity");
+    for (const value of ["0", "-1", "1000001", "1.2345", "abc"]) {
+      fireEvent.change(quantity, { target: { value } });
+      fireEvent.submit(container.querySelector("form")!);
+      expect(quantity).toHaveAttribute("aria-invalid", "true");
+      expect(quantity).toHaveFocus();
+    }
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+  it("accepts Arabic quantities and prevents duplicate saves while awaiting a response", async () => {
+    let resolveSave!: (value: { ok: boolean }) => void;
+    mocks.save.mockImplementation(() => new Promise((resolve) => { resolveSave = resolve; }));
+    const { container } = renderWithI18n(<RequestComposer />, "en");
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "١٢٫٥" } });
+    fireEvent.submit(container.querySelector("form")!);
+    fireEvent.submit(container.querySelector("form")!);
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Quantity")).toBeDisabled();
+    resolveSave({ ok: false });
+    await waitFor(() => expect(screen.getByLabelText("Quantity")).not.toBeDisabled());
+    expect(screen.getByLabelText("Quantity")).toHaveValue("١٢٫٥");
+  });
   it("saves selected showrooms and location as a draft without publishing", async () => {
     mocks.save.mockResolvedValue({ ok: true, id: "request-id" });
     const { container } = renderWithI18n(

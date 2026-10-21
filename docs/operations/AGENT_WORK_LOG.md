@@ -6696,3 +6696,15 @@ Per instruction: no full E2E, no pgTAP, no Lighthouse, no persona matrix.
 Standards: CTA contrast and stale shared-module documentation corrected. Spec: quotation accepted transitions now enforce seller eligibility; RFQ remains open on denial and rejection allowed, verified by3newpgTAP assertions. Sequential taskDB119/119; focusedauth114/114. Direct business contact RPC country metadata validation remains missing, confirmed by rolled-back synthetic diagnostic; added as second merge blocker alongside native quota. No hosted writes. Reviewed build/renderedcontrast/screenshots checked before final push.
 
 Final packaging: implementation05c4eec8 and reviewfix4ae03891 pushed; [PR84](https://github.com/hmohamed080/aladdin/pull/84) verified OPEN/DRAFT targeting main. Additional journey rerun aborted due stalled Docker, not counted as pass; final non-mutating contrast/layout2/2passed and typecheckpassed. Preview3341HTTP200, localAPI63321; original14hashesunchanged. External untracked frontend/e2e/auth-captcha.spec.ts appeared and remains excluded/preserved. No merge/deployment/worktree cleanup. Native quota and direct contact metadata remain merge blockers.
+## 2026-10-21 — Harden engineer quotation composer
+
+User invoked Impeccable harden on the new-request route. Added shared-parser
+quantity validation with accessible field help and focus, guarded repeated saves,
+disabled fields during pending operations, protected the final item from removal,
+wrapped long summary content, and focused save errors without clearing input.
+Five focused composer tests pass, including invalid quantity boundaries, Arabic
+decimal input, duplicate submission, failure retention and publication confirmation.
+TypeScript passes. Browser access was refused by URL security policy, so no new
+visual/mobile verification is claimed. Existing uncommitted shell/navigation work
+was preserved. Full-stack work remains paused; no data published or deployed.
+
