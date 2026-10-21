@@ -416,3 +416,14 @@ Bronze concentric ring (one solid + one dashed) around the monochrome Aperture; 
 - **Don't** surface technical/implementation copy ("WhatsApp Business API", "reCAPTCHA verified", "canonical account", stack jargon) in the UI.
 - **Don't** hardcode raw hex in components — add or adjust a token. Don't treat Dark as an inverted Light filter.
 - **Don't** use cream/warm-white grounds with a serif-italic display — that default is explicitly not this brand; the ground is low-chroma Limestone stone.
+# Engineer profile reference extension — 2026-10-21
+
+The owner-provided profile screenshot governs `/home/profile` composition:
+wide architectural cover, overlapping portrait on the left, actions on the right,
+horizontal section links, then paired content rows (about/status and statistics,
+projects/services, showrooms/craftspeople, teams/reviews). Preserve Arabic text
+direction inside this spatial arrangement. Use the established engineer palette,
+existing icons and controls. At narrow widths stack content in source order;
+section navigation scrolls horizontally. Sample content is local-only and labelled;
+verification and actual account statistics must never be invented.
+

@@ -1,3 +1,18 @@
+## 2026-10-21 — Reference-led engineer profile page
+
+Implemented the supplied profile composition at `/home/profile`: architecture
+cover, overlapping portrait, section navigation and paired about/status,
+projects/services, showrooms/craftspeople, teams/reviews sections. Reuses the
+existing account reads and editor/collection routes. Local-only illustrative
+content fills empty sections; its notice includes fictional profile details and
+portraits. Actual name, verification and quick statistics remain factual.
+
+Validation: TypeScript and focused ESLint pass. Static independent review found
+identity direction, contradictory sample counts and incomplete sample disclosure;
+all three were addressed. Browser access was previously security-blocked; visual
+desktop/mobile matching remains unverified. No hosted data or schema changes.
+Existing unrelated shell edits preserved. Full-stack phase remains paused.
+
 ## 2026-10-20 — Apply owner homepage review
 
 **Second visual revision:** Owner explicitly authorized relaxing prior layout

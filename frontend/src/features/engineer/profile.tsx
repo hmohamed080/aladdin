@@ -1,4 +1,7 @@
 import Image from "next/image";
+import { SamplePhoto, useLocalEngineerSamples as localEngineerSamples } from "./sample-content";
+import { ProfileSampleCards, ProfileSampleServices, ProfileSampleReview } from "./profile-samples";
+import "./profile.css";
 import { Card, Badge } from "@/components/ui/primitives";
 import { ButtonLink } from "@/components/ui/controls";
 import {
@@ -8,6 +11,7 @@ import {
   StarIcon,
   BriefcaseIcon,
   UsersIcon,
+  PencilIcon,
 } from "@/components/ui/icons";
 import { VerificationBadge } from "@/features/home/parts";
 import { requireEngineer } from "@/server/queries/engineer";
@@ -39,6 +43,7 @@ import {
 export async function EngineerProfile({ locale }: { locale: Locale }) {
   const { account, supabase } = await requireEngineer();
   const ar = locale === "ar";
+  const samples = localEngineerSamples();
   const t = createTranslator(locale);
   const [identity, publication, portfolio, reviews, network, assignments] =
     await Promise.all([
@@ -84,21 +89,13 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
     ],
   ];
   return (
-    <div className="flex flex-col gap-lg">
+    <div className="engineer-profile flex flex-col gap-lg">
+      {samples && <p className="engineer-profile-sample-note">{ar ? "معاينة محلية: الصور والنبذة والتفاصيل غير المكتملة والمشاريع والخدمات وشركاء العمل والتقييم النموذجي محتوى توضيحي. اسم الحساب وحالة التوثيق والإحصائيات السريعة بيانات فعلية." : "Local review: photos, missing profile details, projects, services, collaborators and the sample review are illustrative. Account name, verification and quick statistics are real."}</p>}
       <section className="overflow-hidden rounded-lg border bg-surface">
-        <div className="relative h-48 bg-primary tablet:h-64">
-          <Image
-            src="/assets/showroom-auth/showroom-interior-2026.png"
-            alt=""
-            fill
-            className="object-cover"
-            priority
-            sizes="100vw"
-          />
-        </div>
-        <div className="relative flex flex-wrap items-start justify-between gap-md p-lg">
+        <div className="engineer-profile-cover"><SamplePhoto index={2} /></div>
+        <div className="engineer-profile-identity relative flex flex-wrap items-start justify-between gap-md p-lg">
           <div className="flex min-w-0 flex-wrap items-center gap-md">
-            <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-pill border-4 border-surface bg-surface-2">
+            <div className="engineer-profile-avatar grid shrink-0 place-items-center overflow-hidden rounded-pill border-4 border-surface bg-surface-2">
               {identity?.avatarUrl ? (
                 <Image
                   src={identity.avatarUrl}
@@ -107,7 +104,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
                   height={96}
                   unoptimized
                 />
-              ) : (
+              ) : samples ? <SamplePhoto portrait index={0} /> : (
                 <UserIcon size={40} />
               )}
             </div>
@@ -134,6 +131,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
           </div>
           <div className="flex flex-col gap-3">
             <ButtonLink href="/home/profile/edit">
+              <PencilIcon size={16} />
               {ar ? "تعديل الملف الشخصي" : "Edit profile"}
             </ButtonLink>
             <ButtonLink href="/home/settings" variant="outline">
@@ -156,12 +154,13 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
       </section>
       <nav
         aria-label={ar ? "أقسام الملف" : "Profile sections"}
-        className="flex gap-2 overflow-x-auto rounded-md border bg-surface p-2"
+        className="engineer-profile-tabs flex gap-2 overflow-x-auto rounded-md border bg-surface p-2"
       >
         {[
           ["#about", ar ? "نبذة عامة" : "Overview"],
           ["#projects", ar ? "مشاريعي" : "Projects"],
           ["#network", ar ? "المعارض" : "Showrooms"],
+          ["#craftspeople", ar ? "الصنايعية" : "Craftspeople"],
           ["#teams", ar ? "الفرق" : "Teams"],
           ["#reviews", ar ? "التقييمات" : "Reviews"],
         ].map(([href, text]) => (
@@ -175,12 +174,12 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
           </ButtonLink>
         ))}
       </nav>
-      <div className="grid items-start gap-lg desktop:grid-cols-2">
+      <div className="engineer-profile-row grid items-start gap-lg desktop:grid-cols-2">
         <div id="about">
           <Card>
-            <h2 className="mb-md text-title">{ar ? "نبذة عني" : "About me"}</h2>
+            <div className="mb-md flex items-center justify-between gap-3"><h2 className="text-title">{ar ? "نبذة عني" : "About me"}</h2><ButtonLink href="/home/profile/edit" variant="ghost" size="sm"><PencilIcon size={14} />{ar ? "تعديل" : "Edit"}</ButtonLink></div>
             <p className="whitespace-pre-wrap text-body-lg leading-relaxed text-fg-secondary">
-              {p.bio ||
+              {p.bio || (samples ? (ar ? "مهندس معماري متخصص في التصميم الداخلي والخارجي للمشاريع السكنية والتجارية والإدارية. أهتم بتصميم مساحات عملية وجمالية تعكس احتياجات العميل وتناسب أسلوب حياته." : "Architect focused on residential, commercial and workplace interiors. Thoughtful spaces combine practical planning with a personal sense of place.") : null) ||
                 (ar
                   ? "أضف نبذة عن خبراتك وأسلوب عملك."
                   : "Introduce your experience and approach to your work.")}
@@ -193,7 +192,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
                 >
                   <dt className="text-fg-secondary">{label}</dt>
                   <dd className="text-end">
-                    {value === null || value === "" ? "—" : value}
+                    {value === null || value === "" ? (samples ? (ar ? ["تصميم معماري · تصميم داخلي", "٨ سنوات", "القاهرة · التجمع الخامس · الشيخ زايد", "العربية · الإنجليزية"][fields.findIndex(f => f[0] === label)] : ["Architecture · Interior design", "8 years", "Cairo · New Cairo · Sheikh Zayed", "Arabic · English"][fields.findIndex(f => f[0] === label)]) : "—") : value}
                   </dd>
                 </div>
               ))}
@@ -258,18 +257,18 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
           </Card>
         </div>
       </div>
-      <div className="grid gap-lg desktop:grid-cols-2">
+      <div className="engineer-profile-row grid gap-lg desktop:grid-cols-2">
         <div id="projects">
           <EngineerSection
             title={
-              ar
+              !portfolio.length && samples ? (ar ? "مشاريعي — نماذج توضيحية" : "My projects — illustrative examples") : ar
                 ? `مشاريعي (${portfolio.length})`
                 : `My projects (${portfolio.length})`
             }
             href="/home/profile/portfolio"
             locale={locale}
           >
-            {!photos.length ? (
+            {!photos.length && samples ? <ProfileSampleCards locale={locale} kind="projects" /> : !photos.length ? (
               <EngineerEmpty
                 locale={locale}
                 href="/home/profile/portfolio"
@@ -307,7 +306,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
           title={ar ? "الخدمات التي أقدمها" : "Services I offer"}
           locale={locale}
         >
-          {p.services.length ? (
+          {!p.services.length && samples ? <ProfileSampleServices locale={locale} /> : p.services.length ? (
             <div className="grid grid-cols-2 gap-md">
               {p.services.map((service) => (
                 <Card key={service} pad="sm">
@@ -327,7 +326,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
           )}
         </EngineerSection>
       </div>
-      <div className="grid gap-lg desktop:grid-cols-2">
+      <div className="engineer-profile-row grid gap-lg desktop:grid-cols-2">
         <div id="network">
           <EngineerSection
             title={
@@ -338,7 +337,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
             href="/home/network"
             locale={locale}
           >
-            {!network.length ? (
+            {!network.length && samples ? <ProfileSampleCards locale={locale} kind="showrooms" /> : !network.length ? (
               <EngineerEmpty locale={locale} />
             ) : (
               network.slice(0, 6).map((org) => (
@@ -353,44 +352,18 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
             )}
           </EngineerSection>
         </div>
-        <div id="reviews">
-          <EngineerSection
-            title={
-              ar
-                ? `آراء العملاء (${summary.total})`
-                : `Client reviews (${summary.total})`
-            }
-            href="/home/reviews"
-            locale={locale}
-          >
-            {!reviews.length ? (
-              <EngineerEmpty locale={locale} />
-            ) : (
-              reviews.slice(0, 3).map((r) => (
-                <Card key={r.id} className="mb-3">
-                  <div className="flex justify-between gap-md">
-                    <h3 className="text-body font-medium">{r.orgName}</h3>
-                    <span className="text-label">{r.rating}/5</span>
-                  </div>
-                  <blockquote className="mt-3 text-body text-fg-secondary">
-                    {r.comment}
-                  </blockquote>
-                  <p className="mt-3 text-label text-fg-secondary">
-                    {r.jobTitle}
-                  </p>
-                </Card>
-              ))
-            )}
-          </EngineerSection>
-        </div>
+        <div id="craftspeople"><EngineerSection title={ar ? "الصنايعية الذين أتعامل معهم" : "Craftspeople I work with"} href="/home/engineer/professionals" locale={locale}>
+          {samples ? <ProfileSampleCards locale={locale} kind="craftspeople" /> : <EngineerEmpty locale={locale} href="/home/engineer/teams" action={ar ? "إضافة متخصصين لفريق" : "Add specialists to a team"} />}
+        </EngineerSection></div>
       </div>
+      <div className="engineer-profile-row grid gap-lg desktop:grid-cols-2">
       <div id="teams">
         <EngineerSection
           title={ar ? "فرق العمل والمتخصصون" : "Teams and collaborators"}
           href="/home/engineer/teams"
           locale={locale}
         >
-          {!teams.length ? (
+          {!teams.length && samples ? <ProfileSampleCards locale={locale} kind="team" /> : !teams.length ? (
             <EngineerEmpty
               locale={locale}
               title={
@@ -445,6 +418,37 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
             </div>
           )}
         </EngineerSection>
+      </div>
+        <div id="reviews">
+          <EngineerSection
+            title={
+              !reviews.length && samples ? (ar ? "آراء العملاء — نموذج توضيحي" : "Client reviews — illustrative example") : ar
+                ? `آراء العملاء (${summary.total})`
+                : `Client reviews (${summary.total})`
+            }
+            href="/home/reviews"
+            locale={locale}
+          >
+            {!reviews.length && samples ? <ProfileSampleReview locale={locale} /> : !reviews.length ? (
+              <EngineerEmpty locale={locale} />
+            ) : (
+              reviews.slice(0, 3).map((r) => (
+                <Card key={r.id} className="mb-3">
+                  <div className="flex justify-between gap-md">
+                    <h3 className="text-body font-medium">{r.orgName}</h3>
+                    <span className="text-label">{r.rating}/5</span>
+                  </div>
+                  <blockquote className="mt-3 text-body text-fg-secondary">
+                    {r.comment}
+                  </blockquote>
+                  <p className="mt-3 text-label text-fg-secondary">
+                    {r.jobTitle}
+                  </p>
+                </Card>
+              ))
+            )}
+          </EngineerSection>
+        </div>
       </div>
     </div>
   );

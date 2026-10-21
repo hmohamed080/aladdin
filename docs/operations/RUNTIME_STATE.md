@@ -1,5 +1,15 @@
 # Runtime State
 
+## Engineer profile reference implementation — 2026-10-21
+
+`/home/profile` now follows the supplied profile reference with a wide cover,
+overlapping portrait, section links and four paired content rows. Scoped profile
+CSS stacks rows below 900px and cards below 480px. Local empty sections use
+explicit illustrative content guarded by local environment and loopback database.
+Account identity, verification and quick statistics still use existing reads.
+TypeScript and focused lint pass; browser visual verification remains outstanding.
+Full-stack phase is still paused, with no deployment or hosted changes.
+
 ## Engineer request form hardening — 2026-10-21
 
 - Impeccable harden pass reuses the shared quantity parser for inline validation,

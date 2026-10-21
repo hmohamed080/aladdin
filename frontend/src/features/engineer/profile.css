@@ -1,0 +1,58 @@
+.engineer-profile { gap: 14px; overflow-wrap: anywhere; }
+.engineer-profile-sample-note { font-size: 12px; color: var(--fg-secondary); margin: 0; }
+.engineer-profile-cover { height: clamp(180px, 20vw, 280px); overflow: hidden; background: var(--primary); }
+.engineer-profile-cover .engineer-sample-photo { height: 100%; width: 100%; aspect-ratio: auto; background-size: 200% auto; background-position: 0 100% !important; }
+.engineer-profile-identity { min-height: 135px; padding: 18px 24px 22px; direction: ltr; }
+[dir="rtl"] .engineer-profile-identity > div { direction: rtl; }
+.engineer-profile-identity > div:first-child { flex-direction: row-reverse; }
+[dir="ltr"] .engineer-profile-identity > div:first-child { flex-direction: row; }
+.engineer-profile-identity > div:first-child { flex: 1; }
+.engineer-profile-avatar { width: 132px; height: 132px; margin-top: -76px; position: relative; }
+.engineer-profile-avatar > img { width: 100%; height: 100%; object-fit: cover; }
+.engineer-profile-avatar .engineer-sample-portrait { width: 100%; height: 100%; border-radius: 0; }
+.engineer-profile-identity h1 { font-size: clamp(24px, 2.4vw, 34px); line-height: 1.35; }
+.engineer-profile-identity > div:last-child { min-width: 200px; }
+.engineer-profile-tabs { justify-content: space-between; }
+.engineer-profile-tabs a { flex: 1; border-radius: 6px; }
+.engineer-profile-tabs a:first-child { background: var(--surface-2); box-shadow: inset 0 -2px var(--accent); }
+.engineer-profile-row { grid-template-columns: 1.12fr 1fr; gap: 16px; direction: ltr; }
+.engineer-profile-row > * { min-width: 0; direction: ltr; }
+[dir="rtl"] .engineer-profile-row > * { direction: rtl; }
+.engineer-profile-row [id] { scroll-margin-top: 100px; }
+.engineer-profile-row section { height: 100%; padding: 14px; background: var(--surface); border-radius: 12px; }
+.engineer-profile #about > div { height: 100%; }
+.engineer-profile #about p { font-size: 15px; line-height: 1.95; }
+.engineer-profile #about dl > div { padding-block: 12px; font-size: 13px; }
+.engineer-profile #about dt { flex-shrink: 0; }
+.engineer-profile-cards { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.engineer-profile-card { min-width: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; padding: 6px; }
+.engineer-profile-card > .engineer-sample-photo { border-radius: 6px; aspect-ratio: 1.4; }
+.engineer-profile-card h3 { font-size: 13px; font-weight: 700; line-height: 1.7; margin-top: 8px; }
+.engineer-profile-card p { font-size: 12px; margin-block: 5px; }
+.engineer-profile-card a { margin-top: 8px; font-size: 12px; background: var(--surface-2); }
+.engineer-profile-person { text-align: center; padding: 12px 8px; }
+.engineer-profile-person > .engineer-sample-portrait { width: 64px; height: 64px; aspect-ratio: 1; margin-inline: auto; border-radius: 50%; }
+.engineer-profile-rating { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--fg-secondary); }
+.engineer-profile-rating svg { color: #B96F52; fill: #D8C7A6; }
+.engineer-profile-person .engineer-profile-rating { justify-content: center; }
+.engineer-profile-services { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.engineer-profile-services > div { min-width: 0; min-height: 100px; border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 10px; text-align: center; font-size: 12px; }
+.engineer-profile-review { border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin: 0; }
+.engineer-profile-review .engineer-sample-portrait { width: 48px; height: 48px; }
+.engineer-profile-review figcaption { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.engineer-profile-review blockquote { margin-top: 18px; font-size: 14px; line-height: 1.9; color: var(--fg-secondary); }
+@media (max-width: 900px) {
+  .engineer-profile-row { grid-template-columns: minmax(0,1fr); }
+  .engineer-profile-identity { gap: 20px; }
+  .engineer-profile-identity > div:last-child { width: 100%; flex-direction: row; flex-wrap: wrap; }
+  .engineer-profile-identity > div:last-child a { flex: 1; }
+}
+@media (max-width: 480px) {
+  .engineer-profile-identity { padding: 16px; }
+  .engineer-profile-avatar { width: 96px; height: 96px; margin-top: -60px; }
+  .engineer-profile-cards { grid-template-columns: minmax(0,1fr); }
+  .engineer-profile-services { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .engineer-profile-card > .engineer-sample-photo:not(.engineer-sample-portrait) { aspect-ratio: 2; }
+  .engineer-profile-card h3 { font-size: 16px; }
+  .engineer-profile-card a { min-height: 44px; font-size: 14px; }
+}
