@@ -6753,3 +6753,9 @@ TypeScript passes. Browser access was refused by URL security policy, so no new
 visual/mobile verification is claimed. Existing uncommitted shell/navigation work
 was preserved. Full-stack work remains paused; no data published or deployed.
 
+
+## 2026-10-22 — Public engineer portfolio reference
+
+Public engineer profiles now use a standalone responsive portfolio with light/dark palette, architectural hero, published-work statistics, projects, specialties, services, reviews and clean-link sharing. Empty public sections are omitted. Identity placement follows language direction. No private owner fixtures, contact details, avatars or fabricated achievements are imported; direct profile chat/quotation controls await a supported destination model.
+
+Validated TypeScript, focused lint, 29 component/query/media tests and 196 rollback-based local pgTAP tests (public professional fields, portfolio/certificates, reviews). Browser verified English/light, Arabic/dark, mobile and copy-link success. Existing public projections, publication checks, media proxy and no-store boundaries retained. No hosted schema/data changes or deployment. Other concurrent settings/auth changes remain untouched.

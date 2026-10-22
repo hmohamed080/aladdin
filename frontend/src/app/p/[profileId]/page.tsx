@@ -11,6 +11,8 @@ import { PublicProfileView } from "@/features/profile/public-profile";
 import { PublicPortfolio } from "@/features/profile/public-portfolio";
 import { PublicReviews } from "@/features/profile/public-reviews";
 import { cn } from "@/lib/ui/cn";
+import { PublicEngineerPortfolio } from "@/features/profile/public-engineer-portfolio";
+import { THEME_COOKIE } from "@/lib/theme/config";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +70,10 @@ export default async function PublicProfilePage({
     // the professional's own view of what is public.
     loadPublicReviews(profileId),
   ]);
+
+  if (profile.persona === "engineer") {
+    return <PublicEngineerPortfolio profile={profile} portfolio={portfolio} reviews={reviews} locale={locale} theme={store.get(THEME_COOKIE)?.value === "dark" ? "dark" : "light"} />;
+  }
 
   return (
     <main className={cn(contentColumnClass, "flex flex-col gap-xl py-xl")} id="main">

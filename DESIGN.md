@@ -442,3 +442,5 @@ existing icons and controls. At narrow widths stack content in source order;
 section navigation scrolls horizontally. Sample content is local-only and labelled;
 verification and actual account statistics must never be invented.
 
+
+Public portfolio reference (2026-10-22): standalone navy header, architectural hero, language-aware identity alignment, actual published statistics and content sections, cream light/navy dark surfaces, compact footer and mobile stacking. Public content must come only from public projections; omit missing data instead of borrowing private owner examples. Copy links exclude query strings and fragments.
