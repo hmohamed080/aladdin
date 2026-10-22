@@ -1,5 +1,8 @@
 # Runtime State
 
+Profile revision (2026-10-22): portrait now on the right, actions on the left;
+blue filled verification seal only for actually verified accounts, per owner.
+
 ## Engineer profile reference implementation — 2026-10-21
 
 `/home/profile` now follows the supplied profile reference with a wide cover,

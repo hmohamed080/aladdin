@@ -2,10 +2,13 @@
 .engineer-profile-sample-note { font-size: 12px; color: var(--fg-secondary); margin: 0; }
 .engineer-profile-cover { height: clamp(180px, 20vw, 280px); overflow: hidden; background: var(--primary); }
 .engineer-profile-cover .engineer-sample-photo { height: 100%; width: 100%; aspect-ratio: auto; background-size: 200% auto; background-position: 0 100% !important; }
-.engineer-profile-identity { min-height: 135px; padding: 18px 24px 22px; direction: ltr; }
+.engineer-profile-identity { min-height: 135px; padding: 18px 24px 22px; direction: rtl; }
 [dir="rtl"] .engineer-profile-identity > div { direction: rtl; }
-.engineer-profile-identity > div:first-child { flex-direction: row-reverse; }
-[dir="ltr"] .engineer-profile-identity > div:first-child { flex-direction: row; }
+.engineer-profile-identity > div:first-child { flex-direction: row; }
+[dir="ltr"] .engineer-profile-identity > div { direction: ltr; }
+[dir="ltr"] .engineer-profile-identity > div:first-child { flex-direction: row-reverse; }
+.engineer-profile-verified { color: #1877f2; display: inline-flex; align-items: center; gap: 6px; }
+.engineer-profile-verified svg path:last-child { stroke: white; }
 .engineer-profile-identity > div:first-child { flex: 1; }
 .engineer-profile-avatar { width: 132px; height: 132px; margin-top: -76px; position: relative; }
 .engineer-profile-avatar > img { width: 100%; height: 100%; object-fit: cover; }

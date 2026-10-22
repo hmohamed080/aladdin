@@ -1,3 +1,11 @@
+## 2026-10-22 — Profile portrait and verification revision
+
+Moved the profile portrait/identity to the right and actions to the left across
+locales. Verified accounts now show a blue filled check seal beside the name and
+in the verification panel; other account statuses remain unchanged. Owner
+explicitly requested blue as a palette exception. Browser visual check remains
+outstanding due to the previously reported browser access restriction.
+
 ## 2026-10-21 — Reference-led engineer profile page
 
 Implemented the supplied profile composition at `/home/profile`: architecture

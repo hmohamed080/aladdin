@@ -418,6 +418,11 @@ Bronze concentric ring (one solid + one dashed) around the monochrome Aperture; 
 - **Don't** use cream/warm-white grounds with a serif-italic display — that default is explicitly not this brand; the ground is low-chroma Limestone stone.
 # Engineer profile reference extension — 2026-10-21
 
+Owner revision (2026-10-22): portrait belongs on the right with actions on the
+left. Verified accounts use a blue filled check seal with a white checkmark;
+this is an explicit owner-approved exception to the four-color palette.
+Unverified accounts retain their truthful status and do not show the blue seal.
+
 The owner-provided profile screenshot governs `/home/profile` composition:
 wide architectural cover, overlapping portrait on the left, actions on the right,
 horizontal section links, then paired content rows (about/status and statistics,

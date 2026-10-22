@@ -12,6 +12,7 @@ import {
   BriefcaseIcon,
   UsersIcon,
   PencilIcon,
+  BadgeCheckFilledIcon,
 } from "@/components/ui/icons";
 import { VerificationBadge } from "@/features/home/parts";
 import { requireEngineer } from "@/server/queries/engineer";
@@ -109,12 +110,12 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
               )}
             </div>
             <div>
-              <h1 className="text-headline">{account.displayName}</h1>
+              <h1 className="text-headline flex items-center gap-2">{account.displayName}{account.verification.state === "verified" && <span className="engineer-profile-verified" role="img" aria-label={ar ? "حساب موثّق" : "Verified account"}><BadgeCheckFilledIcon size={28} /></span>}</h1>
               <p className="mt-2 text-body-lg text-fg-secondary">
                 {p.headline || (ar ? "مهندس" : "Engineer")}
               </p>
               <div className="mt-3 flex flex-wrap gap-3">
-                <VerificationBadge state={account.verification.state} t={t} />
+                {account.verification.state !== "verified" && <VerificationBadge state={account.verification.state} t={t} />}
                 <AvailabilityBadge state={account.availability.state} t={t} />
                 <AvailabilityAge
                   updatedAt={account.availability.updatedAt}
@@ -208,7 +209,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
                   {ar ? "حالة توثيق حسابك" : "Your verification status"}
                 </h2>
                 <div className="mt-3">
-                  <VerificationBadge state={account.verification.state} t={t} />
+                  {account.verification.state === "verified" ? <span className="engineer-profile-verified"><BadgeCheckFilledIcon size={24} />{ar ? "حساب موثّق" : "Verified account"}</span> : <VerificationBadge state={account.verification.state} t={t} />}
                 </div>
               </div>
             </div>
