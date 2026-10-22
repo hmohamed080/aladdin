@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { ProfileTabs } from "./profile-tabs";
 import { SamplePhoto, useLocalEngineerSamples as localEngineerSamples } from "./sample-content";
 import { ProfileSampleCards, ProfileSampleServices, ProfileSampleReview } from "./profile-samples";
 import "./profile.css";
@@ -91,7 +92,6 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
   ];
   return (
     <div className="engineer-profile flex flex-col gap-lg">
-      {samples && <p className="engineer-profile-sample-note">{ar ? "معاينة محلية: الصور والنبذة والتفاصيل غير المكتملة والمشاريع والخدمات وشركاء العمل والتقييم النموذجي محتوى توضيحي. اسم الحساب وحالة التوثيق والإحصائيات السريعة بيانات فعلية." : "Local review: photos, missing profile details, projects, services, collaborators and the sample review are illustrative. Account name, verification and quick statistics are real."}</p>}
       <section className="overflow-hidden rounded-lg border bg-surface">
         <div className="engineer-profile-cover"><SamplePhoto index={2} /></div>
         <div className="engineer-profile-identity relative flex flex-wrap items-start justify-between gap-md p-lg">
@@ -153,29 +153,8 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
           </div>
         </div>
       </section>
-      <nav
-        aria-label={ar ? "أقسام الملف" : "Profile sections"}
-        className="engineer-profile-tabs flex gap-2 overflow-x-auto rounded-md border bg-surface p-2"
-      >
-        {[
-          ["#about", ar ? "نبذة عامة" : "Overview"],
-          ["#projects", ar ? "مشاريعي" : "Projects"],
-          ["#network", ar ? "المعارض" : "Showrooms"],
-          ["#craftspeople", ar ? "الصنايعية" : "Craftspeople"],
-          ["#teams", ar ? "الفرق" : "Teams"],
-          ["#reviews", ar ? "التقييمات" : "Reviews"],
-        ].map(([href, text]) => (
-          <ButtonLink
-            key={href}
-            href={href!}
-            variant="ghost"
-            className="shrink-0"
-          >
-            {text}
-          </ButtonLink>
-        ))}
-      </nav>
-      <div className="engineer-profile-row grid items-start gap-lg desktop:grid-cols-2">
+      <ProfileTabs locale={locale} panels={[
+{ id: "overview", label: ar ? "نبذة عامة" : "Overview", content: (<div className="flex flex-col gap-lg">      <div className="engineer-profile-row grid items-start gap-lg desktop:grid-cols-2">
         <div id="about">
           <Card>
             <div className="mb-md flex items-center justify-between gap-3"><h2 className="text-title">{ar ? "نبذة عني" : "About me"}</h2><ButtonLink href="/home/profile/edit" variant="ghost" size="sm"><PencilIcon size={14} />{ar ? "تعديل" : "Edit"}</ButtonLink></div>
@@ -258,11 +237,34 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
           </Card>
         </div>
       </div>
-      <div className="engineer-profile-row grid gap-lg desktop:grid-cols-2">
-        <div id="projects">
+        <EngineerSection
+          title={ar ? "الخدمات التي أقدمها" : "Services I offer"}
+          locale={locale}
+        >
+          {!p.services.length && samples ? <ProfileSampleServices locale={locale} /> : p.services.length ? (
+            <div className="grid grid-cols-2 gap-md">
+              {p.services.map((service) => (
+                <Card key={service} pad="sm">
+                  <BriefcaseIcon size={25} />
+                  <p className="mt-3 text-body">
+                    {t(`onboarding.professional.serviceItems.${service}`)}
+                  </p>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <EngineerEmpty
+              locale={locale}
+              href="/home/profile/edit"
+              action={ar ? "إضافة خدمات" : "Add services"}
+            />
+          )}
+        </EngineerSection>
+</div>) },
+{ id: "projects", label: ar ? "مشاريعي" : "Projects", content: (        <div id="projects">
           <EngineerSection
             title={
-              !portfolio.length && samples ? (ar ? "مشاريعي — نماذج توضيحية" : "My projects — illustrative examples") : ar
+              ar
                 ? `مشاريعي (${portfolio.length})`
                 : `My projects (${portfolio.length})`
             }
@@ -303,32 +305,8 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
             )}
           </EngineerSection>
         </div>
-        <EngineerSection
-          title={ar ? "الخدمات التي أقدمها" : "Services I offer"}
-          locale={locale}
-        >
-          {!p.services.length && samples ? <ProfileSampleServices locale={locale} /> : p.services.length ? (
-            <div className="grid grid-cols-2 gap-md">
-              {p.services.map((service) => (
-                <Card key={service} pad="sm">
-                  <BriefcaseIcon size={25} />
-                  <p className="mt-3 text-body">
-                    {t(`onboarding.professional.serviceItems.${service}`)}
-                  </p>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <EngineerEmpty
-              locale={locale}
-              href="/home/profile/edit"
-              action={ar ? "إضافة خدمات" : "Add services"}
-            />
-          )}
-        </EngineerSection>
-      </div>
-      <div className="engineer-profile-row grid gap-lg desktop:grid-cols-2">
-        <div id="network">
+) },
+{ id: "network", label: ar ? "المعارض" : "Showrooms", content: (        <div id="network">
           <EngineerSection
             title={
               ar
@@ -353,12 +331,12 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
             )}
           </EngineerSection>
         </div>
-        <div id="craftspeople"><EngineerSection title={ar ? "الصنايعية الذين أتعامل معهم" : "Craftspeople I work with"} href="/home/engineer/professionals" locale={locale}>
+) },
+{ id: "craftspeople", label: ar ? "الصنايعية" : "Craftspeople", content: (        <div id="craftspeople"><EngineerSection title={ar ? "الصنايعية الذين أتعامل معهم" : "Craftspeople I work with"} href="/home/engineer/professionals" locale={locale}>
           {samples ? <ProfileSampleCards locale={locale} kind="craftspeople" /> : <EngineerEmpty locale={locale} href="/home/engineer/teams" action={ar ? "إضافة متخصصين لفريق" : "Add specialists to a team"} />}
         </EngineerSection></div>
-      </div>
-      <div className="engineer-profile-row grid gap-lg desktop:grid-cols-2">
-      <div id="teams">
+) },
+{ id: "teams", label: ar ? "الفرق" : "Teams", content: (      <div id="teams">
         <EngineerSection
           title={ar ? "فرق العمل والمتخصصون" : "Teams and collaborators"}
           href="/home/engineer/teams"
@@ -420,10 +398,11 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
           )}
         </EngineerSection>
       </div>
-        <div id="reviews">
+) },
+{ id: "reviews", label: ar ? "التقييمات" : "Reviews", content: (        <div id="reviews">
           <EngineerSection
             title={
-              !reviews.length && samples ? (ar ? "آراء العملاء — نموذج توضيحي" : "Client reviews — illustrative example") : ar
+              ar
                 ? `آراء العملاء (${summary.total})`
                 : `Client reviews (${summary.total})`
             }
@@ -450,7 +429,8 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
             )}
           </EngineerSection>
         </div>
-      </div>
+) }
+      ]} />
     </div>
   );
 }

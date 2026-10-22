@@ -1,5 +1,9 @@
 # Runtime State
 
+Profile sections now use actual client tabs instead of in-page anchors. Only the
+selected panel is rendered; overview includes biography, verification, statistics
+and services. Arrow keys follow locale direction with Home/End support.
+
 Profile revision (2026-10-22): portrait on the right in Arabic and left in English,
 with actions on the opposite side;
 blue filled verification seal only for actually verified accounts, per owner.

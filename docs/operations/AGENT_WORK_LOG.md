@@ -1,5 +1,10 @@
 ## 2026-10-22 — Profile portrait and verification revision
 
+Follow-up: replaced profile anchor navigation with accessible tabs that render
+only the selected section. Overview retains about/status/statistics/services;
+projects, showrooms, craftspeople, teams and reviews each have their own panel.
+TypeScript and focused lint pass; added interaction and RTL keyboard tests.
+
 Owner follow-up: English now mirrors Arabic, placing the portrait on the left
 and actions on the right. Scoped LTR CSS overrides preserve Arabic placement.
 
