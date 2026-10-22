@@ -1,5 +1,8 @@
 ## 2026-10-22 — Profile portrait and verification revision
 
+Owner follow-up: English now mirrors Arabic, placing the portrait on the left
+and actions on the right. Scoped LTR CSS overrides preserve Arabic placement.
+
 Moved the profile portrait/identity to the right and actions to the left across
 locales. Verified accounts now show a blue filled check seal beside the name and
 in the verification panel; other account statuses remain unchanged. Owner

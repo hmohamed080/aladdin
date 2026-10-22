@@ -418,8 +418,8 @@ Bronze concentric ring (one solid + one dashed) around the monochrome Aperture; 
 - **Don't** use cream/warm-white grounds with a serif-italic display — that default is explicitly not this brand; the ground is low-chroma Limestone stone.
 # Engineer profile reference extension — 2026-10-21
 
-Owner revision (2026-10-22): portrait belongs on the right with actions on the
-left. Verified accounts use a blue filled check seal with a white checkmark;
+Owner revision (2026-10-22): portrait belongs on the right in Arabic and on the
+left in English, with actions on the opposite side. Verified accounts use a blue filled check seal with a white checkmark;
 this is an explicit owner-approved exception to the four-color palette.
 Unverified accounts retain their truthful status and do not show the blue seal.
 

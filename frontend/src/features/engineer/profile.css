@@ -6,7 +6,8 @@
 [dir="rtl"] .engineer-profile-identity > div { direction: rtl; }
 .engineer-profile-identity > div:first-child { flex-direction: row; }
 [dir="ltr"] .engineer-profile-identity > div { direction: ltr; }
-[dir="ltr"] .engineer-profile-identity > div:first-child { flex-direction: row-reverse; }
+[dir="ltr"] .engineer-profile-identity { direction: ltr; }
+[dir="ltr"] .engineer-profile-identity > div:first-child { flex-direction: row; }
 .engineer-profile-verified { color: #1877f2; display: inline-flex; align-items: center; gap: 6px; }
 .engineer-profile-verified svg path:last-child { stroke: white; }
 .engineer-profile-identity > div:first-child { flex: 1; }
