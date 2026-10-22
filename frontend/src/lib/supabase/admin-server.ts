@@ -33,7 +33,7 @@ export const PASSWORD_SET_FLAG = "aladdin_pw_preview_password_set";
  * so no RLS-scoped RPC call could reach `auth.uid()`). Never used for
  * anything else.
  */
-function getAdminClient(): SupabaseClient<Database> {
+function getAdminClient(timeoutMs?: number): SupabaseClient<Database> {
   const publicEnv = readPublicEnv();
   const { SUPABASE_SERVICE_ROLE_KEY } = parseServerEnv({
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -48,7 +48,30 @@ function getAdminClient(): SupabaseClient<Database> {
   }
   return createClient<Database>(publicEnv.NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
+    // An optional per-request deadline. Without one a hung GoTrue call would hang the caller; with one an aborted call
+    // is "outcome unknown" (it may still have been processed), which callers of a time-boxed client must handle.
+    ...(timeoutMs ? { global: { fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) }) } } : {}),
   });
+}
+
+/** How long one Auth Admin API call of an installer security change may take before its outcome is treated as unknown. */
+export const INSTALLER_SECURITY_ADMIN_TIMEOUT_MS = 15_000;
+
+/**
+ * The service-role client for the installer phone / password CHANGE operations (`server/auth/installer-security.ts`):
+ * the `installer_phone_change_*` and `identity_password_change_*` RPCs plus `auth.admin.updateUserById`. Time-boxed, so
+ * a hung Auth call ends as "outcome unknown" (settled later by observation) instead of hanging the request.
+ */
+export function getInstallerSecurityAdminClient(): SupabaseClient<Database> {
+  return getAdminClient(INSTALLER_SECURITY_ADMIN_TIMEOUT_MS);
+}
+
+/**
+ * The service-role client for the contact-email claim RPCs (`contact_email_*`, service_role only by design: the server
+ * mints the token and passes the session user). Use it for nothing else.
+ */
+export function getContactEmailAdminClient(): SupabaseClient<Database> {
+  return getAdminClient();
 }
 
 /**

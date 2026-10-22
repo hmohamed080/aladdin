@@ -31,8 +31,8 @@ export async function saveOrganizationContactAction(_prev: ContactState, fd: For
   const mailRaw = text(fd, "email");
   const phone = phoneRaw ? toE164(phoneRaw) : null;
   const whatsapp = waRaw ? toE164(waRaw) : null;
-  if ((phoneRaw && !phone) || (waRaw && !whatsapp)) return { ok: false, code: "states.genericRetry" };
-  if (mailRaw && !email.safeParse(mailRaw).success) return { ok: false, code: "states.genericRetry" };
+  if ((phoneRaw && !phone) || (waRaw && !whatsapp)) return { ok: false, code: "onboarding.error.showroomPhoneRequired" };
+  if (mailRaw && !email.safeParse(mailRaw).success) return { ok: false, code: "onboarding.error.contactInvalid" };
 
   const supabase = await getServerSupabase();
   const { error } = await supabase.rpc("organization_contact_set", {
@@ -44,8 +44,13 @@ export async function saveOrganizationContactAction(_prev: ContactState, fd: For
     p_show_whatsapp: flag(fd, "showWhatsapp"),
     p_show_email: flag(fd, "showEmail"),
   });
-  if (error) return { ok: false, code: mapCommerceError(error) };
-  revalidatePath(`${SHOWROOM_ROOT}/settings`);
+  if (error) {
+    // 22023 here is the database refusing the number itself (a showroom must keep a valid business phone), or the e-mail shape.
+    if (error.code === "22023") return { ok: false, code: /e-?mail/i.test(error.message ?? "") ? "onboarding.error.contactInvalid" : "onboarding.error.showroomPhoneRequired" };
+    return { ok: false, code: mapCommerceError(error) };
+  }
+  // The business phone and e-mail are the same values the Admin Dashboard and the business profile read.
+  for (const path of [`${SHOWROOM_ROOT}/settings`, "/b2b/settings"]) revalidatePath(path);
   return { ok: true };
 }
 

@@ -99,7 +99,7 @@ export const xhrPut: PutPart = (url, blob, onProgress, signal) => new Promise((r
 });
 
 export type UploadOptions = {
-  file: File; title: string; scope: VideoScope; productId?: string;
+  file: File; title: string; scope: VideoScope; productId?: string; projectId?: string;
   onProgress: (fraction: number) => void; signal: AbortSignal;
   fetcher?: Fetcher; putPart?: PutPart; sleep?: (ms: number) => Promise<void>;
 };
@@ -120,7 +120,7 @@ export async function uploadVideo(options: UploadOptions): Promise<string> {
   }
   if (!plan) {
     plan = await api<Plan>(fetcher, "/api/video/uploads", { method: "POST",
-      body: { scope: options.scope, productId: options.productId, title: options.title, contentType, bytes: file.size } });
+      body: { scope: options.scope, productId: options.productId, projectId: options.projectId, title: options.title, contentType, bytes: file.size } });
     rememberUpload(file, plan.id);
   }
   // A provider whose transport this browser code does not speak is refused, never guessed at.

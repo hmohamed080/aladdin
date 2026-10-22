@@ -9,12 +9,21 @@ import { loadProfilePublication } from "@/server/queries/professional-profile";
 import { loadProfessionalAssetSummary } from "@/server/queries/portfolio";
 import { loadMyReviewSummary } from "@/server/queries/reviews";
 import { listMyNetworkOrganizations } from "@/server/queries/network";
-import { listMyAssignments, countAssignmentsByStatus } from "@/server/queries/job-assignments";
+import { countMyAssignments } from "@/server/queries/job-assignments";
 import { getPointsBalance } from "@/server/queries/points";
 import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { ProfileHub } from "@/features/profile/profile-hub";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
+
+import { InstallerAccountHub } from "@/features/installer-account/installer-account-hub";
+import { loadMyIdentity } from "@/server/queries/profile-identity";
+import { loadMyServiceAreas, loadMyAvailabilityWindows } from "@/server/queries/service-areas";
+import { loadMyTrades } from "@/server/queries/trades";
+import { tradeLabel } from "@/lib/i18n/trade-label";
+import { describeLocation } from "@/lib/location/describe-location";
+import { derivePointsLevel } from "@/lib/network/points-level";
+import { readEnvSupportContact } from "@/features/installer-account/support-contact";
 
 export const dynamic = "force-dynamic";
 
@@ -61,15 +70,53 @@ export default async function ProfileHubPage() {
 
   if (data.variant !== "professional") return <NoProfessionalProfile />;
 
-  const [publication, assets, reviews, network, assignments, pointsBalance] = await Promise.all([
+  const [publication, assets, reviews, network, assignmentCounts, pointsBalance] = await Promise.all([
     loadProfilePublication(),
     loadProfessionalAssetSummary(),
     loadMyReviewSummary(),
     listMyNetworkOrganizations(supabase),
-    listMyAssignments(supabase),
+    // The EXACT per-status count from the database (`my_work_counts`) — never derived from a capped row list.
+    countMyAssignments(supabase),
     getPointsBalance(supabase),
   ]);
-  const completedJobsCount = countAssignmentsByStatus(assignments).completed;
+  const completedJobsCount = assignmentCounts.completed;
+
+  if (data.accountType === "installer_technician") {
+    const [identity, areas, windows, trades] = await Promise.all([loadMyIdentity(), loadMyServiceAreas(), loadMyAvailabilityWindows(), loadMyTrades()]);
+    const ar = locale === "ar";
+    const n = (v: number) => new Intl.NumberFormat(ar ? "ar-EG" : "en-EG").format(v);
+    const today = new Date().toISOString().slice(0, 10);
+    const available = windows.length === 0 ? null : windows.some((w) => w.from <= today && (w.to === null || w.to >= today));
+    const level = derivePointsLevel(pointsBalance);
+    const tradeNames = trades.keys.map((k) => tradeLabel(t, k));
+    return (
+      <InstallerAccountHub
+        data={{
+          name: identity?.displayName ?? "",
+          profession: tradeNames.length ? tradeNames.slice(0, 2).join(" · ") : (ar ? "صنايعي" : "Installer"),
+          location: describeLocation({ governorate: areas.primaryGovernorate, city: areas.primaryCities[0] ?? null, cityCustomName: null }, locale),
+          available,
+          portraitUrl: identity?.avatarUrl ?? null,
+          coverUrl: identity?.coverUrl ?? null,
+          publicProfileHref: publication.listed && publication.profileId ? `/p/${publication.profileId}` : "/home/profile/edit",
+          stats: [
+            { id: "points", value: n(pointsBalance), label: ar ? "نقطة" : "points" },
+            { id: "jobs", value: n(completedJobsCount), label: ar ? "شغل مكتمل" : "completed jobs" },
+            { id: "rating", value: reviews.average === null ? "—" : new Intl.NumberFormat(ar ? "ar-EG" : "en-EG", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(reviews.average), label: ar ? "متوسط التقييم" : "average rating" },
+            { id: "reviews", value: n(reviews.total), label: ar ? "تقييم" : "reviews" },
+          ],
+          modules: [
+            { id: "network", title: ar ? "معارفي من المعارض" : "My showroom network", description: ar ? "المعارض والشركات التي عملت معها أو دعوتها" : "Showrooms and businesses you worked with or invited", metric: n(network.length), metricLabel: ar ? "شركة في شبكتك" : "businesses in your network", image: "/assets/installer-account/showroom.png", href: "/home/network", tone: "info" },
+            { id: "skills", title: ar ? "مهاراتي وشهاداتي" : "My skills & certificates", description: ar ? "مهنك وشهاداتك الموثقة" : "Your trades and certificates", metric: n(assets.certificateTotal), metricLabel: ar ? "شهادات" : "certificates", chips: tradeNames.slice(0, 4), image: "/assets/installer-account/certificates.png", href: "/home/profile/certificates", tone: "success" },
+            { id: "settings", title: ar ? "الإعدادات" : "Settings", description: ar ? "إدارة حسابك وبياناتك الشخصية والخصوصية" : "Manage your account, personal data, and privacy", metric: "", metricLabel: "", image: "/assets/installer-account/settings.png", href: "/home/settings", tone: "neutral" },
+            { id: "reviews", title: ar ? "تقييماتي" : "My reviews", description: ar ? "تقييمات العملاء لأعمالك وجودة خدماتك" : "Client feedback on your work and service quality", metric: reviews.average === null ? "—" : `${reviews.average} / 5`, metricLabel: ar ? `${n(reviews.total)} تقييمًا من العملاء` : `${reviews.total} client reviews`, stars: reviews.average ?? undefined, image: "/assets/installer-account/reviews.png", href: "/home/reviews", tone: "danger" },
+            { id: "rewards", title: ar ? "نقاطي ومكافآتي" : "My points & rewards", description: ar ? "تابع نقاطك ومستواك" : "Track your points and level", metric: n(pointsBalance), metricLabel: level.remainingToNextLevel === null ? (ar ? "نقطة · أعلى مستوى" : "points · top level") : (ar ? `نقطة · باقي ${n(level.remainingToNextLevel)} للمستوى التالي` : `points · ${level.remainingToNextLevel} to the next level`), progress: level.progressPct, image: "/assets/installer-account/rewards.png", href: "/home/points", tone: "warning" },
+          ],
+          supportHref: readEnvSupportContact(),
+        }}
+      />
+    );
+  }
 
   return (
     <ProfileHub

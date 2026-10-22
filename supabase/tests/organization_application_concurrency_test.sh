@@ -6,11 +6,9 @@ set -euo pipefail
 # serialise them: exactly one wins and creates the pending additional organization; the other is refused with
 # `additional_pending`. The user ends with exactly ONE pending additional organization (never two).
 
-db_container="$(docker ps --filter 'name=supabase_db_aladdin' --format '{{.Names}}' | head -n 1)"
-if [[ -z "${db_container}" ]]; then
-  echo "Supabase database container not found" >&2
-  exit 1
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/db_target.sh"
+db_target_require   # explicit DB_CONTAINER only; refuses shared / ambiguous / remote targets (no auto-selection)
+db_target_mark_dirty "$(basename "$0")"   # this script changes shared/seed rows: pgTAP must not run on this database afterwards
 
 psql_run() { docker exec -i "${db_container}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -At "$@"; }
 
@@ -59,8 +57,8 @@ p2=$!
 wait "${p1}" || true
 wait "${p2}" || true
 
-o1="$(grep -o 'ORG:[0-9a-f-]*' "${t1}" | head -n 1 || true)"
-o2="$(grep -o 'ORG:[0-9a-f-]*' "${t2}" | head -n 1 || true)"
+o1="$(grep -o 'ORG:[0-9a-f-]*' "${t1}" | sed -n 1p || true)"
+o2="$(grep -o 'ORG:[0-9a-f-]*' "${t2}" | sed -n 1p || true)"
 pending="$(psql_run -c "select count(*) from public.organizations where created_by = '${uid}' and status = 'pending_verification';")"
 refused="$(cat "${t1}" "${t2}" | grep -c 'additional_pending' || true)"
 

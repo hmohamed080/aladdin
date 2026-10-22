@@ -34,6 +34,8 @@ export type PortfolioItem = {
   pending: boolean;
   sortOrder: number;
   createdAt: string;
+  /** The portfolio project it belongs to, or null for work uploaded outside a project. */
+  projectId?: string | null;
 };
 
 export type Certificate = {
@@ -69,7 +71,7 @@ export const listMyPortfolio = cache(async function listMyPortfolio(): Promise<P
   const supabase = await getServerSupabase();
   const { data } = await supabase
     .from("portfolio_items")
-    .select("id, object_key, content_type, title, description, visibility, state, sort_order, created_at")
+    .select("id, object_key, content_type, title, description, visibility, state, sort_order, created_at, project_id")
     // The same total order the public projection uses, so what the owner
     // arranges is exactly what a visitor sees. Ties break on created_at then id
     // so the order stays total even between two reorders.
@@ -87,6 +89,7 @@ export const listMyPortfolio = cache(async function listMyPortfolio(): Promise<P
     pending: r.state === "pending",
     sortOrder: r.sort_order,
     createdAt: r.created_at,
+    projectId: r.project_id,
   }));
 });
 

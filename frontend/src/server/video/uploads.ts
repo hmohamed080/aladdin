@@ -31,11 +31,14 @@ const UUID = z.string().uuid();
 export const beginSchema = z.object({
   scope: z.enum(["portfolio", "product"]),
   productId: UUID.optional(),
+  /** A portfolio project to put the video in (at most 6 photos and videos each). */
+  projectId: UUID.optional(),
   title: z.string().trim().min(1).max(VIDEO_TITLE_MAX),
   contentType: z.enum(VIDEO_TYPES),
   // No product cap: only R2's own object limit.
   bytes: z.number().int().positive().max(VIDEO_STORAGE_MAX_BYTES),
-}).refine((v) => (v.scope === "product") === (v.productId !== undefined), { message: "productId belongs to product scope" });
+}).refine((v) => (v.scope === "product") === (v.productId !== undefined), { message: "productId belongs to product scope" })
+  .refine((v) => v.projectId === undefined || v.scope === "portfolio", { message: "projectId belongs to portfolio scope" });
 export const partsSchema = z.object({ parts: z.array(z.number().int().min(1)).min(1).max(VIDEO_PARTS_PER_REQUEST) });
 
 function fromDatabase(error: { code?: string } | null): VideoUploadError {
@@ -73,6 +76,14 @@ export async function beginVideoUpload(client: SupabaseClient, input: z.infer<ty
   const { data: id, error } = await client.rpc("video_upload_begin", { p_scope: input.scope, p_product_id: input.productId ?? null,
     p_title: input.title, p_content_type: input.contentType, p_bytes: input.bytes });
   if (error || typeof id !== "string") throw fromDatabase(error);
+  if (input.projectId) {
+    // Before any R2 work: a full project refuses the video and its row goes away.
+    const attached = await client.rpc("portfolio_project_attach", { p_project_id: input.projectId, p_kind: "video", p_id: id });
+    if (attached.error) {
+      await client.rpc("video_delete", { p_id: id });
+      throw fromDatabase(attached.error);
+    }
+  }
   const admin = privilegedStorageClient();
   try {
     const uploadId = await uploads.create(id, input.contentType);

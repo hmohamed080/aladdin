@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { loadOrganizationContact, loadOrganizationDetail } from "@/server/queries/admin-directory";
+import { loadOrganizationDetail, loadOrganizationRegistration } from "@/server/queries/admin-directory";
+import { describeLocation } from "@/lib/location/describe-location";
 import { previewSubjectAudit } from "@/server/queries/admin-preview";
 import { localizedName } from "@/features/admin-preview/directory-mappers";
 import { can, meets } from "@/lib/permissions/admin";
@@ -63,7 +64,7 @@ export default async function PreviewOrgDetailPage({
 
   const t = m.admin.preview.organizations;
   const d = m.admin.preview.directory;
-  const [loaded, contact] = await Promise.all([loadOrganizationDetail(supabase, id), loadOrganizationContact(supabase, id)]);
+  const [loaded, registration] = await Promise.all([loadOrganizationDetail(supabase, id), loadOrganizationRegistration(supabase, id)]);
   if (!loaded.ok) {
     return (
       <div className="flex flex-col gap-lg">
@@ -81,6 +82,7 @@ export default async function PreviewOrgDetailPage({
   const typeLabels = m.orgType as Record<string, string>;
   const statusLabels = m.admin.status as Record<string, string>;
   const actionLabels = m.admin.actions as Record<string, string>;
+  const activityLabels = m.profileActivities.labels as Record<string, string>;
   const name = localizedName(org, locale);
   const provenance = t[PROVENANCE_LABEL_KEY[org.source ?? ""] ?? "provenanceSelfCreated"];
   const auditEntries = canAudit && tab === "audit" ? await previewSubjectAudit(supabase, "organization", org.id) : null;
@@ -157,14 +159,35 @@ export default async function PreviewOrgDetailPage({
               <Field label={m.admin.orgs.status}>{statusLabels[org.status] ?? org.status}</Field>
               <Field label={m.admin.orgs.verification}>{org.businessVerifiedAt ? m.admin.orgs.verified : m.admin.orgs.notVerified}</Field>
               <Field label={m.admin.orgs.created}>{formatAdminDate(org.createdAt, locale)}</Field>
-              <Field label={m.onboarding.business.identity.phoneLabel}><span dir="ltr">{contact.phone ?? "—"}</span></Field>
-              <Field label={m.onboarding.business.identity.emailLabel}><span dir="ltr">{contact.email ?? "—"}</span></Field>
+              <Field label={m.onboarding.business.identity.phoneLabel}><span dir="ltr">{registration.phone ?? "—"}</span></Field>
+              <Field label={m.onboarding.business.identity.emailLabel}><span dir="ltr">{registration.email ?? "—"}</span></Field>
               <Field label={m.admin.orgs.members}>{formatNumber(activeMembers, locale)}</Field>
               <Field label={t.tabs.branches}>{formatNumber(org.branches.length, locale)}</Field>
               <Field label={t.ownershipTitle}>
                 {org.owners.length > 0 ? org.owners.map((o) => o.displayName || m.admin.users.unnamed).join(", ") : t.ownershipEmpty}
               </Field>
               <Field label={t.provenanceTitle}>{provenance}</Field>
+            </dl>
+          </Card>
+
+          <Card data-testid="admin-org-registration">
+            <SectionTitle>{t.registration.title}</SectionTitle>
+            <dl className="mt-md grid gap-md tablet:grid-cols-2">
+              <Field label={t.registration.legalName}><bdi dir="auto">{registration.legalName ?? t.registration.none}</bdi></Field>
+              <Field label={t.registration.activities}>
+                {registration.activities.length > 0
+                  ? registration.activities.map((key) => activityLabels[key] ?? key).join("، ")
+                  : t.registration.none}
+              </Field>
+              <Field label={t.registration.description}><bdi dir="auto">{registration.description ?? t.registration.none}</bdi></Field>
+              {registration.branches.map((b, i) => (
+                <div key={b.id} className="flex min-w-0 flex-col gap-md tablet:col-span-2 tablet:grid tablet:grid-cols-2">
+                  <Field label={`${t.registration.location}${registration.branches.length > 1 ? ` (${i + 1})` : ""}`}>
+                    {describeLocation({ governorate: b.governorate, city: b.city, cityCustomName: b.cityCustomName }, locale) ?? t.registration.none}
+                  </Field>
+                  <Field label={t.registration.address}><bdi dir="auto">{b.address ?? t.registration.none}</bdi></Field>
+                </div>
+              ))}
             </dl>
           </Card>
 

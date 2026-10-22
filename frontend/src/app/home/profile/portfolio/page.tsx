@@ -36,7 +36,9 @@ export default async function PortfolioPage() {
   if (!data) redirect("/auth/sign-in");
   if (data.variant !== "professional") return <NoProfessionalProfile />;
 
-  const [items, supabase] = await Promise.all([listMyPortfolio(), getServerSupabase()]);
+  // Work inside a portfolio project is managed with its project (/home/profile/edit#portfolio).
+  const [all, supabase] = await Promise.all([listMyPortfolio(), getServerSupabase()]);
+  const items = all.filter((item) => !item.projectId);
   const cards: PortfolioCard[] = await Promise.all(
     items.map(async (item) => {
       // A pending item has no bytes yet, so there is nothing to sign and asking
@@ -49,7 +51,7 @@ export default async function PortfolioPage() {
   );
 
   // Video appears only while uploads go to R2 and playback runs at the edge.
-  const videos = videoEnabled() ? await listManagedVideos({ scope: "portfolio" }) : null;
+  const videos = videoEnabled() ? (await listManagedVideos({ scope: "portfolio" })).filter((v) => !v.projectId) : null;
   return (
     <>
       <PortfolioManager items={cards} videos={videos ?? []} />

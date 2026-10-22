@@ -198,7 +198,7 @@ select ok((select pg_get_constraintdef(oid) from pg_constraint where conname = '
   'account.platform_cleanup (the explicit cleanup record) is in the audit vocabulary');
 select is((select count(*)::int from public.audit_log where action = 'account.platform_cleanup'), 0,
   'the helper itself never writes a cleanup event (only the operational transaction does)');
-select is((select count(*)::int from public.admin_permissions where key not in ('verification.approve', 'phones.cooldown_override')), 25, 'the permission catalog is unchanged by account preparation (verification.approve arrives with 20261017160001, phones.cooldown_override with 20261018090001)');
+select is((select count(*)::int from public.admin_permissions where key not in ('verification.approve', 'phones.cooldown_override', 'phones.alias_exception', 'contacts.support_release')), 25, 'the permission catalog is unchanged by account preparation (verification.approve arrives with 20261017160001, phones.cooldown_override with 20261018090001, phones.alias_exception with 20261021090004, contacts.support_release with 20261021090005)');
 select is((select count(*)::int from public.admin_roles), 4, 'the admin roles are unchanged');
 
 select * from finish();

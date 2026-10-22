@@ -53,7 +53,25 @@ export const serverEnvSchema = z.object({
   // unset the request's own host is used (server/auth/turnstile.ts). Pin it in
   // staging/production.
   TURNSTILE_ALLOWED_HOSTNAMES: z.string().trim().min(1).optional(),
+  // Resend API key for transactional email (the optional contact-email verification link). Server-only. Optional:
+  // locally an unset key writes the message to `.dev-mail/` instead of sending it; in staging/production an unset key
+  // makes the send fail closed (the pending claim is cancelled, nothing is verified).
+  RESEND_API_KEY: z.string().trim().min(1).optional(),
+  // The verified Resend sender, e.g. "Aladdin <no-reply@aladdindecore.com>". Required wherever RESEND_API_KEY is set.
+  EMAIL_FROM: z.string().trim().min(3).optional(),
+  // The public origin emailed links point at (e.g. "https://aladdindecore.com"). Never taken from a request header
+  // outside local development, so a forged Host cannot redirect a verification link.
+  APP_PUBLIC_ORIGIN: z.string().url().optional(),
 });
+
+/** Server-only email configuration (contact-email verification links). */
+export function readEmailEnv(): Pick<ServerEnv, "RESEND_API_KEY" | "EMAIL_FROM" | "APP_PUBLIC_ORIGIN"> {
+  return parseServerEnv({
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    EMAIL_FROM: process.env.EMAIL_FROM,
+    APP_PUBLIC_ORIGIN: process.env.APP_PUBLIC_ORIGIN,
+  });
+}
 
 /**
  * Names that must never appear on a browser-exposed variable. `NEXT_PUBLIC_*` is

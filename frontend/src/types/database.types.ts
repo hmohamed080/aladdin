@@ -703,6 +703,7 @@ export type Database = {
           id: string
           object_key: string
           owner_user_id: string
+          purpose: string
           state: Database["public"]["Enums"]["professional_asset_state"]
           updated_at: string
         }
@@ -712,6 +713,7 @@ export type Database = {
           id?: string
           object_key: string
           owner_user_id: string
+          purpose?: string
           state?: Database["public"]["Enums"]["professional_asset_state"]
           updated_at?: string
         }
@@ -721,6 +723,7 @@ export type Database = {
           id?: string
           object_key?: string
           owner_user_id?: string
+          purpose?: string
           state?: Database["public"]["Enums"]["professional_asset_state"]
           updated_at?: string
         }
@@ -2300,6 +2303,7 @@ export type Database = {
           lease_until: string | null
           owner_user_id: string
           product_id: string | null
+          project_id: string | null
           provider: string
           provider_ref: string | null
           publisher_id: string | null
@@ -2334,6 +2338,7 @@ export type Database = {
           lease_until?: string | null
           owner_user_id: string
           product_id?: string | null
+          project_id?: string | null
           provider?: string
           provider_ref?: string | null
           publisher_id?: string | null
@@ -2368,6 +2373,7 @@ export type Database = {
           lease_until?: string | null
           owner_user_id?: string
           product_id?: string | null
+          project_id?: string | null
           provider?: string
           provider_ref?: string | null
           publisher_id?: string | null
@@ -2401,6 +2407,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_videos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "portfolio_projects"
             referencedColumns: ["id"]
           },
           {
@@ -3938,6 +3951,7 @@ export type Database = {
           id: string
           object_key: string
           owner_user_id: string
+          project_id: string | null
           sort_order: number
           state: Database["public"]["Enums"]["professional_asset_state"]
           title: string
@@ -3951,6 +3965,7 @@ export type Database = {
           id?: string
           object_key: string
           owner_user_id: string
+          project_id?: string | null
           sort_order?: number
           state?: Database["public"]["Enums"]["professional_asset_state"]
           title: string
@@ -3964,6 +3979,7 @@ export type Database = {
           id?: string
           object_key?: string
           owner_user_id?: string
+          project_id?: string | null
           sort_order?: number
           state?: Database["public"]["Enums"]["professional_asset_state"]
           title?: string
@@ -3973,6 +3989,63 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "portfolio_items_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portfolio_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "portfolio_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      portfolio_projects: {
+        Row: {
+          cover_id: string | null
+          cover_kind: string | null
+          created_at: string
+          description: string | null
+          id: string
+          location: string | null
+          owner_user_id: string
+          sort_order: number
+          title: string
+          updated_at: string
+          visibility: Database["public"]["Enums"]["portfolio_visibility"]
+        }
+        Insert: {
+          cover_id?: string | null
+          cover_kind?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          owner_user_id: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["portfolio_visibility"]
+        }
+        Update: {
+          cover_id?: string | null
+          cover_kind?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          owner_user_id?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["portfolio_visibility"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_projects_owner_user_id_fkey"
             columns: ["owner_user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -4590,6 +4663,7 @@ export type Database = {
           available_for_work: boolean
           avatar_media_id: string | null
           bio: string | null
+          cover_media_id: string | null
           created_at: string
           deleted_at: string | null
           display_name: string
@@ -4603,6 +4677,7 @@ export type Database = {
           phone_country_iso2: string | null
           phone_e164: string | null
           phone_national: string | null
+          phone_verified_at: string | null
           public_profile_status: Database["public"]["Enums"]["public_profile_status"]
           updated_at: string
           user_id: string
@@ -4614,6 +4689,7 @@ export type Database = {
           available_for_work?: boolean
           avatar_media_id?: string | null
           bio?: string | null
+          cover_media_id?: string | null
           created_at?: string
           deleted_at?: string | null
           display_name: string
@@ -4627,6 +4703,7 @@ export type Database = {
           phone_country_iso2?: string | null
           phone_e164?: string | null
           phone_national?: string | null
+          phone_verified_at?: string | null
           public_profile_status?: Database["public"]["Enums"]["public_profile_status"]
           updated_at?: string
           user_id: string
@@ -4638,6 +4715,7 @@ export type Database = {
           available_for_work?: boolean
           avatar_media_id?: string | null
           bio?: string | null
+          cover_media_id?: string | null
           created_at?: string
           deleted_at?: string | null
           display_name?: string
@@ -4651,6 +4729,7 @@ export type Database = {
           phone_country_iso2?: string | null
           phone_e164?: string | null
           phone_national?: string | null
+          phone_verified_at?: string | null
           public_profile_status?: Database["public"]["Enums"]["public_profile_status"]
           updated_at?: string
           user_id?: string
@@ -4661,6 +4740,13 @@ export type Database = {
           {
             foreignKeyName: "fk_profiles_avatar_media_id"
             columns: ["avatar_media_id"]
+            isOneToOne: false
+            referencedRelation: "avatar_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_cover_media_id_fkey"
+            columns: ["cover_media_id"]
             isOneToOne: false
             referencedRelation: "avatar_uploads"
             referencedColumns: ["id"]
@@ -7891,6 +7977,15 @@ export type Database = {
         }
         Returns: string
       }
+      branch_location_set: {
+        Args: {
+          p_branch_id: string
+          p_city: string
+          p_city_custom: string
+          p_governorate: string
+        }
+        Returns: undefined
+      }
       branch_set_active: {
         Args: { p_active: boolean; p_branch_id: string }
         Returns: undefined
@@ -8105,6 +8200,80 @@ export type Database = {
         Args: { p_expected_version: number; p_project_id: string }
         Returns: number
       }
+      contact_email_claim_confirm: {
+        Args: {
+          p_explicit_action: boolean
+          p_token_hash: string
+          p_user_id: string
+        }
+        Returns: {
+          outcome: string
+        }[]
+      }
+      contact_email_claim_start: {
+        Args: {
+          p_email: string
+          p_receipt_id: string
+          p_token_hash: string
+          p_ttl_seconds?: number
+          p_user_id: string
+        }
+        Returns: {
+          claim_id: string
+          deliver: boolean
+          expires_at: string
+          outcome: string
+        }[]
+      }
+      contact_email_release: {
+        Args: { p_receipt_id?: string; p_user_id: string }
+        Returns: {
+          outcome: string
+        }[]
+      }
+      contact_email_status: {
+        Args: { p_user_id: string }
+        Returns: {
+          email: string
+          release_reason: string
+          status: string
+          token_expires_at: string
+          verified_at: string
+          verified_via: string
+        }[]
+      }
+      contact_email_support_find: {
+        Args: { p_email: string; p_operator_id: string }
+        Returns: {
+          claim_id: string
+          owner_user_id: string
+          sign_in_owner: string
+          status: string
+        }[]
+      }
+      contact_email_support_release: {
+        Args: {
+          p_case_ref: string
+          p_claim_id: string
+          p_operator_id: string
+          p_reason: string
+        }
+        Returns: boolean
+      }
+      contact_email_token_peek: {
+        Args: { p_token_hash: string; p_user_id: string }
+        Returns: {
+          expires_at: string
+          masked_email: string
+          state: string
+        }[]
+      }
+      cover_confirm_upload: { Args: { p_object_key: string }; Returns: string }
+      cover_delete_current: { Args: never; Returns: string }
+      cover_request_upload: {
+        Args: { p_content_type: string }
+        Returns: string
+      }
       craftsman_contact: {
         Args: { p_profile_id: string; p_viewer_org_id: string }
         Returns: {
@@ -8229,6 +8398,14 @@ export type Database = {
         }
         Returns: number
       }
+      identity_password_change_audit: {
+        Args: { p_receipt_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      identity_password_change_authorize: {
+        Args: { p_receipt_id: string; p_user_id: string }
+        Returns: boolean
+      }
       independent_publisher_request: {
         Args: { p_note?: string }
         Returns: string
@@ -8264,6 +8441,65 @@ export type Database = {
         Returns: undefined
       }
       individual_submit_professional: { Args: never; Returns: string }
+      installer_alias_exception_issue: {
+        Args: {
+          p_new_alias: string
+          p_operator_id: string
+          p_reason: string
+          p_ttl_seconds?: number
+          p_user_id: string
+        }
+        Returns: string
+      }
+      installer_alias_exception_revoke: {
+        Args: { p_exception_id: string; p_operator_id: string }
+        Returns: boolean
+      }
+      installer_alias_guard_status: { Args: never; Returns: boolean }
+      installer_phone_change_begin: {
+        Args: {
+          p_country_iso2: string
+          p_e164: string
+          p_national: string
+          p_receipt_id: string
+          p_request_id: string
+          p_user_id: string
+        }
+        Returns: {
+          change_id: string
+          new_alias: string
+          old_alias: string
+          replayed: boolean
+          state: string
+        }[]
+      }
+      installer_phone_change_recoverable: {
+        Args: { p_limit?: number }
+        Returns: {
+          change_id: string
+          user_id: string
+        }[]
+      }
+      installer_phone_change_settle: {
+        Args: {
+          p_attempt_finished?: boolean
+          p_change_id: string
+          p_user_id: string
+        }
+        Returns: {
+          resolution: string
+          state: string
+        }[]
+      }
+      installer_phone_change_status: {
+        Args: { p_user_id: string }
+        Returns: {
+          change_id: string
+          lease_expired: boolean
+          resolution: string
+          state: string
+        }[]
+      }
       invitation_accept: { Args: { p_token: string }; Returns: string }
       invitation_create: {
         Args: {
@@ -8703,8 +8939,25 @@ export type Database = {
           submitted_at: string
         }[]
       }
+      my_points_overview: {
+        Args: never
+        Returns: {
+          balance: number
+          entries: number
+          month_deducted: number
+          month_earned: number
+        }[]
+      }
       my_profile_completion: { Args: never; Returns: Json }
       my_registration_state: { Args: never; Returns: string }
+      my_review_monthly: {
+        Args: { p_months?: number }
+        Returns: {
+          average: number
+          month: string
+          reviews: number
+        }[]
+      }
       my_secondary_phone: { Args: never; Returns: Json }
       my_showroom_affiliations: {
         Args: never
@@ -9036,6 +9289,10 @@ export type Database = {
         Args: { p_content_type: string; p_org_id: string }
         Returns: string
       }
+      organization_legal_name_set: {
+        Args: { p_legal_name: string; p_org_id: string }
+        Returns: string
+      }
       organization_media_read_keys: {
         Args: { p_keys: string[]; p_namespace: string; p_workspace?: string }
         Returns: string[]
@@ -9170,10 +9427,6 @@ export type Database = {
         Args: { p_direction: string; p_item_id: string }
         Returns: undefined
       }
-      portfolio_media_move: {
-        Args: { p_direction: string; p_id: string; p_kind: string }
-        Returns: undefined
-      }
       portfolio_item_purge: { Args: { p_item_id: string }; Returns: undefined }
       portfolio_item_set_visibility: {
         Args: { p_item_id: string; p_public: boolean }
@@ -9181,6 +9434,47 @@ export type Database = {
       }
       portfolio_item_update: {
         Args: { p_description: string; p_item_id: string; p_title: string }
+        Returns: undefined
+      }
+      portfolio_media_move: {
+        Args: { p_direction: string; p_id: string; p_kind: string }
+        Returns: undefined
+      }
+      portfolio_project_attach: {
+        Args: { p_id: string; p_kind: string; p_project_id: string }
+        Returns: undefined
+      }
+      portfolio_project_create: {
+        Args: { p_description: string; p_location: string; p_title: string }
+        Returns: string
+      }
+      portfolio_project_delete: {
+        Args: { p_project_id: string }
+        Returns: undefined
+      }
+      portfolio_project_reorder: {
+        Args: { p_items: Json; p_project_id: string }
+        Returns: undefined
+      }
+      portfolio_project_set_cover: {
+        Args: { p_id: string; p_kind: string; p_project_id: string }
+        Returns: undefined
+      }
+      portfolio_project_set_visibility: {
+        Args: { p_project_id: string; p_public: boolean }
+        Returns: undefined
+      }
+      portfolio_project_update: {
+        Args: {
+          p_description: string
+          p_location: string
+          p_project_id: string
+          p_title: string
+        }
+        Returns: undefined
+      }
+      portfolio_projects_reorder: {
+        Args: { p_ids: string[] }
         Returns: undefined
       }
       product_audiences_set: {
@@ -9245,6 +9539,29 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: string
       }
+      public_portfolio_project_media: {
+        Args: { p_profile_id: string }
+        Returns: {
+          id: string
+          kind: string
+          project_id: string
+          sort_order: number
+          title: string
+        }[]
+      }
+      public_portfolio_projects: {
+        Args: { p_profile_id: string }
+        Returns: {
+          cover_id: string
+          cover_kind: string
+          description: string
+          id: string
+          location: string
+          media_count: number
+          sort_order: number
+          title: string
+        }[]
+      }
       public_portfolio_videos: {
         Args: { p_profile_id: string }
         Returns: {
@@ -9257,6 +9574,10 @@ export type Database = {
           title: string
           width: number
         }[]
+      }
+      public_profile_cover_key: {
+        Args: { p_profile_id: string }
+        Returns: string
       }
       publisher_offer_save: {
         Args: {

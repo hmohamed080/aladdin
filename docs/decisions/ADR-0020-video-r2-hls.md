@@ -9,7 +9,7 @@
 Portfolio and product videos are stored in the **private R2 bucket**, transcoded to **adaptive HLS** by a separate worker, and delivered **only** by the media Worker at `/v/<videoId>/<file>`, with a database decision on **every** playlist, segment and poster request.
 
 ```
-browser ──multipart PUT (presigned parts, ≥ 8 MiB)──▶ R2  video/<id>/original
+browser ──multipart PUT (presigned parts, ≥ 100 MiB)──▶ R2  video/<id>/original
    ▲                                                   │
    │ app (Vercel): begin / sign parts / complete       │ transcode worker (ffmpeg)
    │ — decides in Postgres, never sees bytes           ▼
@@ -21,7 +21,7 @@ No video byte passes through Supabase or Vercel.
 
 ### Upload
 - **No product size or length cap (Revision 2).** Types `video/mp4`, `video/quicktime`, `video/webm`. The only size ceiling is R2's 5 TiB object limit. Count quotas are the existing ones only: a product's videos share its 3 gallery slots with its photos (owner decision 2026-10-19, "shared limit"); portfolios have no video count limit; at most 10 unfinished uploads per person, as for images.
-- Part size grows with the file so no upload exceeds R2's 10,000 parts: `max(8 MiB, ceil(bytes / 10,000) rounded up to 1 MiB)`.
+- Part size grows with the file so no upload exceeds R2's 10,000 parts: `max(100 MiB, ceil(bytes / 10,000) rounded up to 1 MiB)` (100 MiB is the approved chunk size).
 - `video_upload_begin` (caller's JWT, RLS) decides; only then is an R2 multipart upload opened. Part URLs are signed per part number **and exact length** for 10 minutes, at most 8 per request, rate-limited per user (`video-part`, ADR-0019).
 - The browser uploads 3 parts at a time with byte progress, retries each part 4 times with backoff on a freshly signed URL, and resumes after a reload: it remembers only the file fingerprint and upload id, and asks the server which parts R2 holds.
 - Completion never trusts client ETags: the server lists the parts R2 stored, completes with exactly parts 1..N at their expected lengths, checks the stored size and the container signature, then moves the row to `processing` and pushes a Redis wake-up (optional).
@@ -50,7 +50,7 @@ No video byte passes through Supabase or Vercel.
 | Limit | Value | Where |
 |---|---|---|
 | R2 object size | 5 TiB | Cloudflare R2 |
-| Multipart parts | 10,000 per upload, ≥ 5 MiB each (we use ≥ 8 MiB) | R2/S3 |
+| Multipart parts | 10,000 per upload, ≥ 5 MiB each (we use ≥ 100 MiB) | R2/S3 |
 | Unfinished upload lifetime | 24 h idle or 6 days total (R2 aborts at 7 days via lifecycle rule) | SQL + R2 lifecycle |
 | Transcode disk | ≈ 2.5 × the original free on the worker host | worker host |
 | Transcode time | roughly 0.5–2 × the video's duration on 2 vCPUs for three renditions | worker host |

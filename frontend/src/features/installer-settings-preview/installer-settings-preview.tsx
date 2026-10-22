@@ -21,7 +21,7 @@ const PhoneField = dynamic(() => import("@/features/installer-dashboard-preview/
   loading: () => <div className="h-11 rounded-md border bg-canvas" aria-busy="true" />,
 });
 
-function SettingsSection({ number, title, description, icon: Icon, compact, children }: {
+export function SettingsSection({ number, title, description, icon: Icon, compact, children }: {
   number: string; title: string; description: string; icon: Icon; compact?: boolean; children: ReactNode;
 }) {
   return (
@@ -39,7 +39,7 @@ function SettingsSection({ number, title, description, icon: Icon, compact, chil
   );
 }
 
-function SettingRow({ title, hint, icon: Icon, children }: { title: string; hint: string; icon: Icon; children: ReactNode }) {
+export function SettingRow({ title, hint, icon: Icon, children }: { title: string; hint: string; icon: Icon; children: ReactNode }) {
   return <div className="flex flex-wrap items-center justify-between gap-sm rounded-sm border p-3">
     <div className="flex min-w-0 flex-1 items-center gap-sm">
       <Icon size={23} className="shrink-0 text-fg" />

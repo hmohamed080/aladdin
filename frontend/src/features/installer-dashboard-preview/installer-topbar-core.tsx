@@ -91,10 +91,21 @@ export function InstallerTopbarCore({
       </button>
 
       {/* Location selector — the craftsman's own service area, not a filter. */}
-      <div className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm px-1.5 py-1 text-label font-medium text-fg-secondary tablet:flex">
-        <MapPinIcon size={15} className="text-fg-muted" />
-        {production ? location || (locale === "ar" ? "منطقة الخدمة غير محددة" : "Service area not set") : locale === "ar" ? "الشيخ زايد، الجيزة" : "Sheikh Zayed, Giza"}
-      </div>
+      {production ? (
+        <Link
+          href="/home/profile/edit"
+          data-testid="installer-service-area"
+          className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm px-1.5 py-1 text-label font-medium text-fg-secondary hover:bg-surface-2 hover:text-fg tablet:flex"
+        >
+          <MapPinIcon size={15} className="text-fg-muted" />
+          {location || (locale === "ar" ? "منطقة الخدمة غير محددة" : "Service area not set")}
+        </Link>
+      ) : (
+        <div className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm px-1.5 py-1 text-label font-medium text-fg-secondary tablet:flex">
+          <MapPinIcon size={15} className="text-fg-muted" />
+          {locale === "ar" ? "الشيخ زايد، الجيزة" : "Sheikh Zayed, Giza"}
+        </div>
+      )}
 
       <div className={dividerClass} aria-hidden="true" />
 

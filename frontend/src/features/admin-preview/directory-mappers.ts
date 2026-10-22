@@ -78,6 +78,8 @@ export type AdminDirectoryUser = {
   /** Canonical E.164 phone. */
   phone: string | null;
   accountType: string | null;
+  /** What the person registered as: their persona, else the business type they chose or belong to. */
+  registeredAccount?: string | null;
   status: string;
   isVerified: boolean;
   createdAt: string;
@@ -118,6 +120,7 @@ export function mapDirectoryUser(raw: unknown): AdminDirectoryUser | null {
     email: str(o.email),
     phone: str(o.phone),
     accountType: str(o.account_type),
+    registeredAccount: str(o.registered_account),
     status,
     isVerified: bool(o.is_verified),
     createdAt,
@@ -188,7 +191,7 @@ export function mapUserDetail(raw: unknown): AdminUserDetail | null {
   const completion = obj(o.completion);
   return {
     ...pick(base, [
-      "id", "displayName", "username", "email", "phone", "accountType", "status", "isVerified", "createdAt",
+      "id", "displayName", "username", "email", "phone", "accountType", "registeredAccount", "status", "isVerified", "createdAt",
       "verificationState", "governorate", "city", "profileId", "publicProfileAvailable",
     ] as const),
     headline: str(o.headline),
@@ -240,6 +243,11 @@ export type AdminDirectoryOrg = LocalizedName & {
   memberCount: number;
   branchCount: number;
   owner: AdminPersonRef | null;
+  /** The business phone and primary-branch location given at registration (and kept current in Settings). */
+  contactPhone?: string | null;
+  governorate?: string | null;
+  city?: string | null;
+  cityCustomName?: string | null;
 };
 
 export function mapDirectoryOrg(raw: unknown): AdminDirectoryOrg | null {
@@ -263,6 +271,10 @@ export function mapDirectoryOrg(raw: unknown): AdminDirectoryOrg | null {
     memberCount: num(o.member_count) ?? 0,
     branchCount: num(o.branch_count) ?? 0,
     owner: mapPersonRef(o.owner),
+    contactPhone: str(o.contact_phone),
+    governorate: str(o.governorate),
+    city: str(o.city),
+    cityCustomName: str(o.city_custom_name),
   };
 }
 

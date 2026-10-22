@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { loadPersonalHome } from "@/server/queries/personal-home";
-import { listMyReviews, loadMyReviewSummary } from "@/server/queries/reviews";
+import { listMyReviewsPage, loadMyReviewMonthly, loadMyReviewSummary } from "@/server/queries/reviews";
+import { InstallerReviews } from "@/features/installer-reviews/installer-reviews";
+import { loadInstallerReviewsAction } from "@/server/actions/review-list";
 import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
@@ -34,20 +36,39 @@ export default async function ReviewsRoute({
   if (!data) redirect("/auth/sign-in");
   if (data.variant !== "professional") return <NoProfessionalProfile />;
 
+  // An Installer gets the approved Reviews design (`/preview/installer-reviews`) on real, keyset-paged data.
+  if (data.accountType === "installer_technician") {
+    const [first, summary, monthly] = await Promise.all([listMyReviewsPage(), loadMyReviewSummary(), loadMyReviewMonthly(6)]);
+    return (
+      <InstallerReviews
+        summary={summary}
+        monthly={monthly}
+        initial={{ reviews: first.reviews, nextCursor: first.nextCursor }}
+        load={loadInstallerReviewsAction}
+      />
+    );
+  }
+
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const t = createTranslator(locale);
 
-  // Both reads are cache()d and resolve to the same rows, so the summary below
-  // is provably a summary OF the list rather than a second opinion about it.
-  const [all, summary] = await Promise.all([listMyReviews(), loadMyReviewSummary()]);
-
   const { rating } = await searchParams;
   const parsed = Number(rating);
   const filter = Number.isInteger(parsed) && parsed >= 1 && parsed <= 5 ? parsed : null;
-  const shown = filter === null ? all : all.filter((r) => r.rating === filter);
+
+  // The summary is the database's EXACT counts over the whole set (never derived from the rows on screen);
+  // the list is the FIRST keyset page, filtered in SQL, with the cursor of the next ("Show more").
+  const [page, summary] = await Promise.all([listMyReviewsPage({ rating: filter }), loadMyReviewSummary()]);
 
   return (
-    <ReviewsPage reviews={shown} summary={summary} filter={filter} t={t} locale={locale} />
+    <ReviewsPage
+      reviews={page.reviews}
+      nextCursor={page.nextCursor}
+      summary={summary}
+      filter={filter}
+      t={t}
+      locale={locale}
+    />
   );
 }

@@ -65,7 +65,7 @@ describe("beginSchema", () => {
 describe("beginVideoUpload", () => {
   it("plans larger parts for a file that would need more than 10,000", async () => {
     const c = client({ video_upload_begin: { data: ID, error: null } });
-    const bytes = 200 * 1024 ** 3;
+    const bytes = 2048 * 1024 ** 3;
     const plan = await beginVideoUpload(c, { scope: "portfolio", title: "t", contentType: "video/mp4", bytes }, uploads());
     expect(plan.partCount).toBeLessThanOrEqual(10_000);
     expect(plan.partBytes).toBeGreaterThan(VIDEO_PART_BYTES);
@@ -85,6 +85,19 @@ describe("beginVideoUpload", () => {
     const u = uploads();
     await expect(beginVideoUpload(client({ video_upload_begin: { data: null, error: { code } } }),
       { scope: "portfolio", title: "t", contentType: "video/mp4", bytes: 10 }, u)).rejects.toMatchObject({ code: expected });
+    expect((u as unknown as { create: ReturnType<typeof vi.fn> }).create).not.toHaveBeenCalled();
+  });
+  it("puts a video into a portfolio project before any R2 work, and removes it when the project is full", async () => {
+    const PROJECT = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
+    expect(beginSchema.safeParse({ scope: "product", productId: ID, projectId: PROJECT, title: "t", contentType: "video/mp4", bytes: 10 }).success).toBe(false);
+    const ok = client({ video_upload_begin: { data: ID, error: null } });
+    await beginVideoUpload(ok, { scope: "portfolio", projectId: PROJECT, title: "t", contentType: "video/mp4", bytes: 10 }, uploads());
+    expect(ok.rpc).toHaveBeenCalledWith("portfolio_project_attach", { p_project_id: PROJECT, p_kind: "video", p_id: ID });
+    const u = uploads();
+    const full = client({ video_upload_begin: { data: ID, error: null }, portfolio_project_attach: { data: null, error: { code: "23514" } } });
+    await expect(beginVideoUpload(full, { scope: "portfolio", projectId: PROJECT, title: "t", contentType: "video/mp4", bytes: 10 }, u))
+      .rejects.toMatchObject({ code: "limit" });
+    expect(full.rpc).toHaveBeenCalledWith("video_delete", { p_id: ID });
     expect((u as unknown as { create: ReturnType<typeof vi.fn> }).create).not.toHaveBeenCalled();
   });
   it("releases the slot when R2 fails", async () => {

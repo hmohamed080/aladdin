@@ -6,6 +6,7 @@ import type { MediaSource } from "@/lib/media/image-variants";
 import { mergeMedia } from "@/lib/media/media-order";
 import type { VideoPlayback } from "@/server/video/playback";
 import { VideoPlayer } from "@/features/video/video-player";
+import type { PublicPortfolioProject } from "@/server/queries/portfolio-projects";
 
 /**
  * A professional's published work, on their public profile.
@@ -98,6 +99,59 @@ export function PublicPortfolio({
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+/**
+ * Published portfolio PROJECTS (20261021090009): each one titled, with its
+ * optional location and description, its cover first and then its other photos
+ * and videos in the owner's order. Like the flat list it renders nothing when
+ * there is nothing, and every photo still comes through the publication-checking
+ * media route.
+ */
+export function PublicPortfolioProjects({ projects, t }: { projects: PublicPortfolioProject[]; t: TranslateFn }) {
+  if (projects.length === 0) return null;
+  return (
+    <section className="flex flex-col gap-md" aria-labelledby="public-portfolio-projects" data-testid="public-portfolio-projects">
+      <h2 id="public-portfolio-projects" className="text-title text-fg">{t("profile.publicPage.portfolio")}</h2>
+      {projects.map((project) => {
+        const order = project.cover
+          ? [project.cover, ...project.order.filter((m) => !(m.kind === project.cover!.kind && m.id === project.cover!.id))]
+          : project.order;
+        return (
+          <article key={project.id} className="flex flex-col gap-sm" data-testid="public-portfolio-project">
+            <div className="flex min-w-0 flex-col gap-1">
+              <h3 className="text-body-lg font-semibold text-fg"><bdi dir="auto">{project.title}</bdi></h3>
+              {project.location ? <p className="text-label text-fg-secondary"><bdi dir="auto">{project.location}</bdi></p> : null}
+              {project.description ? <p className="max-w-prose text-label text-fg-secondary"><bdi dir="auto">{project.description}</bdi></p> : null}
+            </div>
+            <ul className="grid gap-sm tablet:grid-cols-2 desktop:grid-cols-3">
+              {order.map((entry) => {
+                if (entry.kind === "video") {
+                  const video = project.videos.find((v) => v.id === entry.id);
+                  return video ? (
+                    <li key={`video-${video.id}`}>
+                      <MediaFrame>
+                        <VideoPlayer fill source={video} title={video.title} width={video.width} height={video.height}
+                          labels={{ play: t("video.play", { title: video.title }), unavailable: t("video.unavailable") }} />
+                      </MediaFrame>
+                    </li>
+                  ) : null;
+                }
+                const photo = project.photos.find((p) => p.id === entry.id);
+                return photo ? (
+                  <li key={photo.id}>
+                    <MediaFrame>
+                      <MediaImage source={photo.media ?? { src: `/p/media/${photo.id}` }} alt={photo.title} />
+                    </MediaFrame>
+                  </li>
+                ) : null;
+              })}
+            </ul>
+          </article>
+        );
+      })}
     </section>
   );
 }

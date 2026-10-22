@@ -14,7 +14,7 @@ import { ProfessionalHome } from "@/features/home/professional-home";
 import {
   listMyAssignments,
   featuredAssignment,
-  countAssignmentsByStatus,
+  countMyAssignments,
 } from "@/server/queries/job-assignments";
 import {
   OPPORTUNITY_LIST_LIMIT,
@@ -124,9 +124,12 @@ export default async function PersonalHomePage() {
   // generic card is not drawn a second time above it.
   const isInstaller = data.accountType === "installer_technician";
 
-  const [assignments, opportunities, pointsBalance, recentPointsEntries, reviews, network, availableOpportunitiesCount, installerStrip] =
+  const [assignments, assignmentCounts, opportunities, pointsBalance, recentPointsEntries, reviews, network, availableOpportunitiesCount, installerStrip] =
     await Promise.all([
     listMyAssignments(supabase),
+    // The EXACT per-status count from the database (`my_work_counts`): the row list above is a bounded read for the
+    // needs-action module and the featured card, so a count must never be derived from it.
+    countMyAssignments(supabase),
     // An installer reads the whole (capped) board so openings in their own city
     // and governorate can lead and be counted; everyone else keeps the small
     // bounded preview.
@@ -142,7 +145,7 @@ export default async function PersonalHomePage() {
       ? listDashboardOpportunities(supabase, dashboardModeFor(DEFAULT_DASHBOARD_SORT, DEFAULT_DASHBOARD_DATE_ORDER), DASHBOARD_OPPORTUNITY_COUNT)
       : Promise.resolve([]),
   ]);
-  const completedJobsCount = countAssignmentsByStatus(assignments).completed;
+  const completedJobsCount = assignmentCounts.completed;
 
   // The welcome sentence's "nearby" count (below) still reads the whole board; the CARDS of the strip do not — they come
   // from the database's own orderings (`installerStrip`).

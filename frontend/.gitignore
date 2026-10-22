@@ -7,3 +7,4 @@
 # Screenshots written by e2e specs for visual-review handoffs — reproducible
 # output, not source; regenerate by re-running the spec.
 /e2e/screenshots/
+.dev-mail/

@@ -16,8 +16,11 @@ export type VideoContentType = (typeof VIDEO_TYPES)[number];
 export const VIDEO_TITLE_MAX = 120;
 
 const MIB = 1024 * 1024;
-/** Smallest part size; R2 needs at least 5 MiB for every part but the last. */
-export const VIDEO_MIN_PART_BYTES = 8 * MIB;
+/**
+ * Smallest part size: the approved 100 MB chunk (R2 itself needs at least 5 MiB
+ * for every part but the last). Fewer, larger parts mean fewer signing requests.
+ */
+export const VIDEO_MIN_PART_BYTES = 100 * MIB;
 /** R2/S3 limit on parts per multipart upload. */
 export const VIDEO_MAX_PARTS = 10_000;
 /** How many part URLs one signing request may ask for. */
@@ -33,8 +36,8 @@ export function isVideoType(value: unknown): value is VideoContentType {
 }
 
 /**
- * Part size for an upload of `bytes`: 8 MiB, or the whole MiB that keeps the
- * upload within 10,000 parts (about 78 GiB and above). A pure function of the
+ * Part size for an upload of `bytes`: 100 MiB, or the whole MiB that keeps the
+ * upload within 10,000 parts (about 977 GiB and above). A pure function of the
  * size, so the browser, the signer and the resume check always agree.
  */
 export function videoPartBytes(bytes: number): number {
