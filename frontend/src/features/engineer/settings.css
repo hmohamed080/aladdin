@@ -1,0 +1,246 @@
+/* Engineer settings: quiet two-column layout — title and text tabs on the left, open sections divided by hairlines. */
+.engineer-settings { color: var(--fg); overflow-wrap: anywhere; }
+.engineer-settings-layout { display: grid; grid-template-columns: 250px minmax(0,1fr); gap: 0; align-items: stretch; padding-block: 8px 32px; }
+.engineer-settings-side { display: flex; flex-direction: column; gap: 28px; padding-inline-end: 28px; border-inline-end: 1px solid var(--border); min-height: 420px; }
+.engineer-settings h1 { font-size: 32px; line-height: 1.25; font-weight: 750; }
+.engineer-settings-heading p { margin-top: 8px; font-size: 13px; line-height: 1.7; color: var(--fg-secondary); }
+.engineer-settings-nav { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.engineer-settings-nav button { cursor: pointer; font: inherit; font-size: 15px; color: var(--fg-secondary); background: transparent; border: 1px solid transparent; border-radius: 999px; padding: 9px 16px; min-height: 44px; text-align: start; transition: background-color .15s, color .15s, border-color .15s; }
+.engineer-settings-nav button:hover { color: var(--fg); background: var(--surface-2); }
+.engineer-settings-nav button[aria-selected="true"] { color: var(--fg); background: var(--surface); border-color: var(--border); font-weight: 650; }
+.engineer-settings-nav button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.engineer-settings-content { min-width: 0; padding-inline-start: 40px; }
+.engineer-settings-panel { max-width: 560px; }
+.engineer-settings-panel > header { margin-bottom: 28px; }
+.engineer-settings h2 { font-size: 24px; line-height: 1.3; font-weight: 750; }
+.engineer-settings-panel > header p { margin-top: 8px; font-size: 14px; line-height: 1.7; color: var(--fg-secondary); }
+/* The identity forms save from the page-end button below; their own buttons stay out of the way. */
+.engineer-settings #identity form button[type="submit"] { display: none; }
+.engineer-settings .engineer-settings-panel > .engineer-settings-savebar { position: sticky; bottom: 16px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 32px; padding: 12px 16px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); box-shadow: 0 8px 24px color-mix(in srgb, var(--engineer-navy) 14%, transparent); }
+.engineer-settings-savebar span { font-size: 14px; color: var(--fg-secondary); }
+
+.engineer-settings h3 { font-size: 18px; line-height: 1.4; font-weight: 700; margin-bottom: 20px; }
+.engineer-settings-group { display: flex; flex-direction: column; }
+.engineer-settings-group > * + * { margin-top: 28px; }
+.engineer-settings-group > h3 + * { margin-top: 0; }
+
+/* Sections inside a panel read as one column divided by hairlines, not as stacked cards. */
+.engineer-settings-panel > * + * { margin-top: 24px; }
+.engineer-settings-panel > * + *:not(.engineer-settings-hint) { padding-top: 24px; border-top: 1px solid var(--border); }
+.engineer-settings .engineer-settings-group > div:has(> #identity) { padding: 0 !important; border: 0 !important; box-shadow: none !important; background: transparent !important; margin-top: 0; }
+.engineer-settings #identity { display: grid; grid-template-columns: minmax(0,1fr); gap: 28px; }
+.engineer-settings #identity p { font-size: 13px; font-weight: 400; line-height: 1.7; color: var(--fg-secondary); }
+.engineer-settings #identity form { border: 0; padding: 0; min-width: 0; }
+.engineer-settings input { min-width: 0; background: transparent; }
+.engineer-settings-contact { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
+.engineer-settings-hint { display: block; font-size: 13px; line-height: 1.7; color: var(--fg-secondary); }
+.engineer-security-rows > * + * { border-top: 1px solid var(--border); }
+.engineer-security-rows summary { display: flex; align-items: center; gap: 12px; padding: 16px 0; cursor: pointer; list-style: none; min-height: 44px; }
+.engineer-security-rows summary::-webkit-details-marker { display: none; }
+.engineer-security-rows summary > svg:first-child { display: none; }
+.engineer-security-rows summary > span { flex: 1; min-width: 0; }
+.engineer-security-rows strong, .engineer-settings-unavailable strong { display: block; font-size: 16px; font-weight: 650; }
+.engineer-security-rows small, .engineer-settings-unavailable small { display: block; margin-top: 2px; font-size: 13px; line-height: 1.7; color: var(--fg-secondary); }
+.engineer-security-rows summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.engineer-security-rows details[open] summary > svg:last-child { transform: rotate(-90deg); }
+[dir="ltr"] .engineer-security-rows details:not([open]) summary > svg:last-child { transform: rotate(180deg); }
+.engineer-security-detail { padding: 0 0 18px; font-size: 14px; line-height: 1.8; }
+.engineer-settings-unavailable { display: flex; align-items: center; gap: 12px; padding: 16px 0; border-top: 1px solid var(--border); }
+.engineer-settings-unavailable > div { flex: 1; }
+.engineer-settings-unavailable > span { font-size: 13px; color: var(--fg-secondary); }
+.engineer-settings .engineer-settings-danger { display: flex; flex-direction: column; margin-block: 0; padding-top: 8px; border-top: 1px solid var(--border); }
+.engineer-settings-danger > div { display: grid; grid-template-columns: 1fr; padding: 16px 0; }
+.engineer-settings-danger > div + div { border-top: 1px solid var(--border); }
+.engineer-settings-danger strong { font-size: 16px; font-weight: 650; }
+.engineer-settings-danger small { color: var(--fg-secondary); font-size: 13px; margin-top: 2px; }
+.engineer-settings-danger > div:last-child strong { color: var(--danger); }
+@media (max-width: 800px) {
+  .engineer-settings-layout { grid-template-columns: minmax(0,1fr); }
+  .engineer-settings-side { padding-inline-end: 0; border-inline-end: 0; min-height: 0; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .engineer-settings-nav { flex-direction: row; overflow-x: auto; gap: 6px; width: 100%; scrollbar-width: none; }
+  .engineer-settings-nav button { flex: 0 0 auto; white-space: nowrap; }
+  .engineer-settings-content { padding-inline-start: 0; padding-top: 24px; }
+  .engineer-settings h1 { font-size: 26px; }
+}
+@media (max-width: 560px) {
+  .engineer-settings #identity, .engineer-settings-contact { grid-template-columns: minmax(0,1fr); }
+  .engineer-settings input { font-size: 16px; }
+  .engineer-settings-unavailable { flex-wrap: wrap; }
+  .engineer-settings button, .engineer-settings a { min-height: 44px; }
+}
+
+/* Basic info / Account info: a quiet list — label on one side, value on the other, a hairline between rows. */
+.engineer-settings h3 { font-size: 22px; font-weight: 500; margin-bottom: 4px; }
+.engineer-settings-group > * + * { margin-top: 0; }
+.engineer-settings .engineer-settings-group #identity { gap: 0; display: flex; flex-direction: column; }
+.engineer-settings .engineer-settings-group form { display: contents; }
+.engineer-settings-group :is(div:has(> label[for]), .engineer-gender, .engineer-phone-row, .engineer-password-row) { display: grid; grid-template-columns: 150px minmax(0,1fr); align-items: center; column-gap: 16px; min-height: 54px; padding-block: 2px; border-bottom: 1px solid var(--border); }
+.engineer-settings-group #phone { display: grid; grid-template-columns: 150px minmax(0,1fr); align-items: center; column-gap: 16px; min-height: 54px; padding-block: 2px; border-bottom: 1px solid var(--border); }
+.engineer-settings-group label[for], .engineer-gender > span, .engineer-password-row > span:first-child, #phone > span:first-child { font-size: 12px; font-weight: 500; color: var(--fg-secondary); }
+.engineer-settings-group label[for] { grid-column: 1; }
+.engineer-settings-group div:has(> label[for]) > :not(label) { grid-column: 2; }
+.engineer-settings-group div:has(> label[for]) > p, #phone > p, [data-testid="display-name-status"] { grid-column: 2; margin: 0 0 6px; font-size: 12px; font-weight: 400; color: var(--fg-secondary); }
+.engineer-settings .engineer-settings-group input:not([type="radio"]):not([type="hidden"]) { min-height: 44px; border-color: transparent; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; font-size: 14px; font-weight: 500; color: var(--fg); text-align: start; }
+
+.engineer-settings-group #phone [role="combobox"], .engineer-settings-group #phone button { min-height: 44px; }
+.engineer-gender > div { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+.engineer-gender label { position: relative; cursor: pointer; display: inline-flex; }
+.engineer-gender input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.engineer-gender label > span { display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; color: var(--fg-secondary); border-bottom: 2px solid transparent; }
+.engineer-gender input:checked + span { color: var(--fg); font-weight: 600; border-bottom-color: var(--accent-solid); }
+.engineer-gender input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+.engineer-personal-details { display: contents; }
+.engineer-password-row { color: var(--fg); text-decoration: none; }
+.engineer-settings .engineer-settings-group a.engineer-password-row { grid-template-columns: 150px minmax(0,1fr) auto; cursor: pointer; }
+a.engineer-password-row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.engineer-password-dots { letter-spacing: 3px; font-size: 15px; font-weight: 500; }
+.engineer-password-row > svg { flex-shrink: 0; }
+[dir="ltr"] .engineer-password-row > svg { transform: rotate(180deg); }
+.engineer-password-row small { grid-column: 2; font-size: 12px; color: var(--fg-secondary); }
+.engineer-password-row[aria-disabled="true"] { opacity: .8; }
+.engineer-settings-group + .engineer-settings-group { margin-top: 36px; padding-top: 0; border-top: 0; }
+@media (max-width: 560px) {
+  .engineer-settings-group :is(div:has(> label[for]), .engineer-gender, .engineer-phone-row, .engineer-password-row), .engineer-settings-group #phone { grid-template-columns: 104px minmax(0,1fr); column-gap: 12px; }
+  .engineer-settings .engineer-settings-group a.engineer-password-row { grid-template-columns: 104px minmax(0,1fr) auto; }
+}
+/* The quiet list drops helper text; errors and the saved confirmation stay. */
+.engineer-settings-group p.text-fg-muted, .engineer-settings-group [data-testid="display-name-status"] { display: none; }
+.engineer-settings-group .engineer-password-row small { display: none; }
+@media (max-width: 560px) { .engineer-settings-group #phone .relative { width: 6.25rem; } }
+
+.engineer-settings .engineer-settings-group a.engineer-password-row { grid-template-columns: 150px minmax(0,1fr); }
+.engineer-password-dots { font-size: 14px; }
+.engineer-gender label > span { font-size: 14px; }
+.engineer-settings-group input[type="date"] { width: 100%; direction: inherit; }
+@media (max-width: 560px) { .engineer-settings .engineer-settings-group a.engineer-password-row { grid-template-columns: 104px minmax(0,1fr); } }
+
+/* Editing: no box. The value sizes to its text and a terracotta underline matches its length while typing. */
+.engineer-settings .engineer-settings-group input:not([type="radio"]):not([type="hidden"]) { field-sizing: content; width: auto; min-width: 4ch; max-width: 100%; justify-self: start; border-bottom: 2px solid transparent; transition: border-color .15s; }
+.engineer-settings .engineer-settings-group input:not([type="radio"]):not([type="hidden"]):hover { border-bottom-color: var(--border); }
+.engineer-settings .engineer-settings-group input:not([type="radio"]):not([type="hidden"]):focus,
+.engineer-settings .engineer-settings-group input:not([type="radio"]):not([type="hidden"]):focus-visible { outline: none; box-shadow: none; border-bottom-color: var(--accent-solid); }
+.engineer-settings-group div:has(> label[for]) > :not(label):not(p) { grid-column: 2; }
+.engineer-username-form, .engineer-personal-details { display: contents; }
+
+/* Rows that open another page end in a chevron pointing toward the row's end. */
+.engineer-link-row { display: grid; grid-template-columns: 150px minmax(0,1fr); align-items: center; column-gap: 16px; min-height: 54px; padding: 2px 28px 2px 0; border-bottom: 1px solid var(--border); position: relative; color: var(--fg); text-decoration: none; }
+[dir="rtl"] .engineer-link-row { padding: 2px 0 2px 28px; }
+.engineer-link-row > span:first-child { font-size: 12px; font-weight: 500; color: var(--fg-secondary); }
+.engineer-link-row > span:nth-child(2) { font-size: 14px; font-weight: 500; text-align: start; }
+.engineer-link-row:hover { background: var(--surface-2); }
+.engineer-link-row:focus-visible, .engineer-password-row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+a.engineer-link-row::after, a.engineer-password-row::after { content: ""; position: absolute; inset-inline-end: 6px; top: 50%; width: 7px; height: 7px; margin-top: -4px; border-inline-end: 2px solid var(--fg); border-block-end: 2px solid var(--fg); transform: rotate(-45deg); pointer-events: none; }
+[dir="rtl"] a.engineer-link-row::after, [dir="rtl"] a.engineer-password-row::after { transform: rotate(45deg); }
+a.engineer-password-row { position: relative; }
+@media (max-width: 560px) { .engineer-link-row { grid-template-columns: 104px minmax(0,1fr); column-gap: 12px; } }
+
+/* Date picker */
+.dp { position: relative; grid-column: 2; min-width: 0; }
+.dp-trigger { cursor: pointer; font: inherit; font-size: 14px; font-weight: 500; color: var(--fg); background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 0; min-height: 44px; text-align: start; }
+.dp-trigger:hover { border-bottom-color: var(--border); }
+.dp-trigger[aria-expanded="true"], .dp-trigger:focus-visible { outline: none; border-bottom-color: var(--accent-solid); }
+.dp-placeholder { color: var(--fg-secondary); font-weight: 400; }
+.dp-pop { position: absolute; z-index: 30; inset-inline-start: 0; top: calc(100% + 6px); width: 300px; max-width: calc(100vw - 32px); padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 16px 40px color-mix(in srgb, var(--engineer-navy) 18%, transparent); }
+.dp-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.dp-head select { flex: 1; min-width: 0; min-height: 40px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--fg); font: inherit; font-size: 14px; }
+.dp-nav { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 8px; background: transparent; color: var(--fg); cursor: pointer; flex-shrink: 0; }
+.dp-nav:hover { background: var(--surface-2); }
+[dir="ltr"] .dp-next svg, [dir="rtl"] .dp-prev svg { transform: rotate(180deg); }
+.dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.dp-dow { font-size: 11px; color: var(--fg-secondary); padding-block: 6px; }
+.dp-day { aspect-ratio: 1; min-height: 38px; border: 0; border-radius: 999px; background: transparent; color: var(--fg); font: inherit; font-size: 14px; cursor: pointer; }
+.dp-day:hover:not(:disabled) { background: var(--surface-2); }
+.dp-day[data-today] { border: 1px solid var(--border-strong); }
+.dp-day[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
+.dp-day:disabled { opacity: .3; cursor: not-allowed; }
+.dp-foot { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.dp-foot button { min-height: 40px; padding: 0 10px; border: 0; background: transparent; color: var(--fg); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.dp button:focus-visible, .dp select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Email / Phone sub-pages */
+.engineer-contact-back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: 14px; color: var(--fg-secondary); text-decoration: none; }
+[dir="rtl"] .engineer-contact-back svg { transform: rotate(180deg); }
+.engineer-contact-value { font-size: 16px; font-weight: 600; padding-block: 8px 16px; text-align: start; }
+.engineer-contact-form { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.engineer-contact-form > label { font-size: 12px; font-weight: 500; color: var(--fg-secondary); }
+.engineer-contact-form input[type="email"] { width: 100%; max-width: 420px; min-height: 48px; }
+.engineer-contact-list { list-style: none; margin: 0 0 16px; padding: 0; }
+.engineer-contact-list li { display: flex; align-items: center; gap: 12px; min-height: 54px; border-bottom: 1px solid var(--border); }
+.engineer-contact-list li > span { flex: 1; font-size: 14px; font-weight: 500; text-align: start; }
+.engineer-contact-list small { font-size: 12px; color: var(--fg-secondary); }
+.engineer-contact-list button { min-height: 44px; padding: 0 8px; border: 0; background: transparent; color: var(--danger); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.engineer-contact-empty { font-size: 14px; color: var(--fg-secondary); margin: 0 0 16px; }
+.engineer-settings .engineer-settings-group .engineer-contact-form input:not([type="hidden"]):not([type="radio"]) { field-sizing: fixed; width: 100%; max-width: 420px; border-bottom: 2px solid var(--border); }
+.engineer-settings .engineer-settings-group .engineer-contact-form input:not([type="hidden"]):not([type="radio"]):focus { border-bottom-color: var(--accent-solid); }
+.engineer-contact-form button[type="submit"] { width: auto; min-width: 140px; align-self: flex-start; }
+.engineer-contact-form { margin-top: 4px; }
+
+/* Privacy & security and Notifications use the same quiet rows. */
+.engineer-security-rows { border: 0; }
+.engineer-security-rows summary { min-height: 54px; padding: 2px 0; gap: 12px; }
+.engineer-security-rows strong, .engineer-settings-unavailable strong { font-size: 14px; font-weight: 500; }
+.engineer-security-rows small, .engineer-settings-unavailable small { font-size: 12px; margin-top: 0; }
+.engineer-security-detail { font-size: 13px; padding-bottom: 14px; color: var(--fg-secondary); }
+.engineer-security-rows > * + *, .engineer-settings-unavailable { border-top: 0; }
+.engineer-security-rows > *, .engineer-settings-unavailable { border-bottom: 1px solid var(--border); }
+.engineer-settings-unavailable { min-height: 54px; padding: 2px 0; }
+.engineer-settings-unavailable > svg, .engineer-security-rows summary > svg:first-child { display: none; }
+.engineer-settings-notifications .engineer-settings-hint { display: block; padding-block: 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.engineer-settings .engineer-settings-group form.engineer-contact-form { display: flex; }
+
+/* Sign-in methods: provider rows and notices */
+.engineer-method-row button { min-height: 44px; padding: 0 8px; border: 0; background: transparent; color: var(--fg); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.engineer-method-row button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.engineer-method-row > p { grid-column: 1 / -1; font-size: 13px; padding-bottom: 8px; }
+.engineer-row-note { grid-column: 2; font-size: 12px; color: var(--fg-secondary); padding-bottom: 8px; }
+.engineer-link-notice { font-size: 13px; padding: 10px 14px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.engineer-link-notice-error { border-color: var(--danger); color: var(--danger); }
+
+/* Sub-pages (Email, Password) share the tabbed page's frame; the tabs are links there. */
+.engineer-settings-nav a { cursor: pointer; font: inherit; font-size: 15px; color: var(--fg-secondary); background: transparent; border: 1px solid transparent; border-radius: 999px; padding: 9px 16px; min-height: 44px; display: inline-flex; align-items: center; text-decoration: none; }
+.engineer-settings-nav a:hover { color: var(--fg); background: var(--surface-2); }
+.engineer-settings-nav a[aria-current="page"] { color: var(--fg); background: var(--surface); border-color: var(--border); font-weight: 650; }
+.engineer-settings-nav a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.engineer-settings-panel > .engineer-contact-back { margin-bottom: 8px; }
+.engineer-password-embed { max-width: 420px; }
+@media (max-width: 800px) { .engineer-settings-nav a { flex: 0 0 auto; white-space: nowrap; } }
+
+/* Consistency pass: sub-pages and the security tab use one rhythm — no stacked hairlines, no empty strips. */
+.engineer-subpage .engineer-settings-panel > * + * { margin-top: 0; padding-top: 0; border-top: 0; }
+.engineer-subpage .engineer-settings-panel > header { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.engineer-subpage .engineer-settings-panel > .engineer-contact-back { margin-bottom: 4px; }
+.engineer-subpage .engineer-settings-group { padding-block: 0; }
+.engineer-contact-current { display: flex; flex-direction: column; gap: 2px; padding-bottom: 20px; }
+.engineer-contact-current > span { font-size: 12px; font-weight: 500; color: var(--fg-secondary); }
+.engineer-contact-current > strong { font-size: 16px; font-weight: 600; text-align: start; }
+.engineer-settings .engineer-settings-panel > .engineer-security-rows { margin-top: 0; padding-top: 0; border-top: 0; }
+.engineer-settings .engineer-settings-group + .engineer-security-rows { margin-top: 28px; }
+.engineer-settings .engineer-settings-group > .engineer-link-notice { margin-bottom: 12px; }
+.engineer-settings input:-webkit-autofill, .engineer-settings input:-webkit-autofill:focus { -webkit-box-shadow: 0 0 0 1000px var(--canvas) inset; -webkit-text-fill-color: var(--fg); transition: background-color 9999s; }
+/* Change password inside the frame: the same underline fields as the rest of Settings. */
+.engineer-settings .engineer-password-embed input { border: 0; border-bottom: 2px solid var(--border); border-radius: 0; background: transparent; box-shadow: none; padding-inline-start: 0; }
+.engineer-settings .engineer-password-embed input:focus, .engineer-settings .engineer-password-embed input:focus-visible { outline: none; box-shadow: none; border-bottom-color: var(--accent-solid); }
+.engineer-password-embed label { font-size: 12px; font-weight: 500; color: var(--fg-secondary); }
+
+/* Sign-in methods use the same row as Active sessions / Trusted devices: a 14px title over a 12px description, action at the end. */
+.engineer-method-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; min-height: 54px; padding: 2px 0; border-bottom: 1px solid var(--border); position: relative; color: var(--fg); text-decoration: none; }
+.engineer-method-row > span { flex: 1; min-width: 0; }
+.engineer-method-row strong { display: block; font-size: 14px; font-weight: 500; }
+.engineer-method-row small { display: block; margin-top: 0; font-size: 12px; line-height: 1.7; color: var(--fg-secondary); }
+.engineer-method-row > p { flex-basis: 100%; }
+a.engineer-method-link { padding-inline-end: 28px; cursor: pointer; }
+a.engineer-method-link:hover { background: var(--surface-2); }
+a.engineer-method-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+a.engineer-method-link::after { content: ""; position: absolute; inset-inline-end: 6px; top: 50%; width: 7px; height: 7px; margin-top: -4px; border-inline-end: 2px solid var(--fg); border-block-end: 2px solid var(--fg); transform: rotate(-45deg); pointer-events: none; }
+[dir="rtl"] a.engineer-method-link::after { transform: rotate(45deg); }
+
+/* Sign-in methods now lives inside the first accordion row; its rows keep the shared method-row look but drop the outer detail padding and the last divider. */
+.engineer-security-detail .engineer-method-row:last-child { border-bottom: 0; }
+.engineer-security-detail .engineer-link-notice { margin-bottom: 8px; }
+.engineer-security-detail .engineer-method-row { color: var(--fg); }
+
+/* Active sessions / Trusted devices lists inside the accordion. */
+.engineer-badge { display: inline-block; margin-inline-start: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--fg-secondary); font-size: 11px; font-style: normal; font-weight: 500; vertical-align: 1px; }
+.engineer-devices-all { padding: 12px 0 2px; }
+.engineer-devices-all button { min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--fg); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.engineer-devices-all button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

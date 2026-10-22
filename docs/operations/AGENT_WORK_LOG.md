@@ -1,5 +1,19 @@
 ## 2026-10-22 — Profile portrait and verification revision
 
+Engineer settings reference composition added at `/home/settings`, scoped to
+engineers. Reuses identity save actions, availability, language/theme and sign-out.
+Unsupported security/preferences/destructive operations are labelled unavailable.
+Browser checked light/dark and 390px; restored light/default viewport. TypeScript,
+focused lint and 14 existing personal settings tests passed. Static reviewer
+findings on sign-out scope copy and phone recovery links corrected.
+
+Runtime recovery: reproduced the public profile's worker exception in the
+browser, confirmed a reload still failed, and restarted only this project's
+port-3350 Next.js process. Direct load and navigation via "View public profile"
+then both rendered successfully. No code/data changes. Screenshot evidence:
+`D:/projects/engineer-public-profile-recovered.png`. Worker exit root cause was
+not established; recovery verified in the live browser.
+
 Follow-up: replaced profile anchor navigation with accessible tabs that render
 only the selected section. Overview retains about/status/statistics/services;
 projects, showrooms, craftspeople, teams and reviews each have their own panel.

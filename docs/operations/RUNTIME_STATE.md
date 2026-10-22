@@ -1,5 +1,16 @@
 # Runtime State
 
+Engineer settings now uses reference-led identity/security/notifications/account
+panels and four navigation tiles. Existing identity and preference functionality
+is reused; unsupported operations remain explicitly unavailable. Checked light,
+dark and mobile; 14 settings tests and typecheck/lint passed.
+
+Local server recovery (2026-10-22): public profile failed with "Jest worker
+encountered 2 child process exceptions". Restarted only the verified engineer
+Next.js server on port 3350 (current exec session 95836). Public profile now
+renders, including navigation from the profile's public-view link. No application
+code or database change was necessary; underlying worker exit cause is unknown.
+
 Profile sections now use actual client tabs instead of in-page anchors. Only the
 selected panel is rendered; overview includes biography, verification, statistics
 and services. Arrow keys follow locale direction with Home/End support.

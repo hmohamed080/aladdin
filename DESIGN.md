@@ -418,6 +418,12 @@ Bronze concentric ring (one solid + one dashed) around the monochrome Aperture; 
 - **Don't** use cream/warm-white grounds with a serif-italic display — that default is explicitly not this brand; the ground is low-chroma Limestone stone.
 # Engineer profile reference extension — 2026-10-21
 
+Engineer settings reference extension: four sand navigation tiles alongside
+compact identity/security/notifications/account panels. Dark mode uses navy
+surfaces and cream text. Mobile navigation becomes a horizontal strip. Reuse
+existing identity actions; unavailable security operations must be stated rather
+than represented by working-looking toggles. Avatar editing is a disclosure.
+
 Owner interaction revision: section navigation is a tablist, not page anchors.
 Render one panel at a time, with the selected tab visibly marked. Overview owns
 about, status, statistics and services; other tabs isolate their named sections.

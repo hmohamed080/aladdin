@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { Card, InlineError, InlineSuccess } from "@/components/ui/primitives";
 import { Input, LabeledField, SubmitButton } from "@/components/ui/controls";
@@ -22,7 +22,7 @@ const INITIAL: IdentityFieldState = { ok: false };
  * account-creation trigger filled in automatically is shown, but flagged as
  * not yet confirmed.
  */
-export function IdentityCard({ identity }: { identity: MyIdentity }) {
+export function IdentityCard({ identity, compact = false, afterName }: { identity: MyIdentity; compact?: boolean; /** Rendered between the display-name and phone forms (compact layouts). */ afterName?: ReactNode }) {
   const { t } = useI18n();
   const [nameState, submitName] = useActionState(setDisplayNameAction, INITIAL);
   const [phoneState, submitPhone] = useActionState(setPhoneAction, INITIAL);
@@ -32,13 +32,13 @@ export function IdentityCard({ identity }: { identity: MyIdentity }) {
     <Card className="flex flex-col gap-lg">
       {/* id/test hook on a real element — Card forwards neither. */}
       <div id="identity" data-testid="identity-card" className="flex flex-col gap-lg">
-        <AvatarField avatarUrl={identity.avatarUrl} displayName={identity.displayName} />
+        {compact ? null : <AvatarField avatarUrl={identity.avatarUrl} displayName={identity.displayName} />}
 
         <form action={submitName} className="flex flex-col gap-sm border-t pt-md" id="display-name">
           <LabeledField
             label={t("profileIdentity.displayName.label")}
             htmlFor="displayName"
-            hint={t("profileIdentity.displayName.hint")}
+            hint={compact ? undefined : t("profileIdentity.displayName.hint")}
             error={!nameState.ok && nameState.code ? t(nameState.code) : undefined}
           >
             <Input
@@ -50,11 +50,13 @@ export function IdentityCard({ identity }: { identity: MyIdentity }) {
               autoComplete="name"
             />
           </LabeledField>
-          <p className="text-label text-fg-muted" data-testid="display-name-status">
+          {compact ? null : (
+            <p className="text-label text-fg-muted" data-testid="display-name-status">
             {identity.displayNameConfirmed || nameState.ok
               ? t("profileIdentity.displayName.confirmedHint")
               : t("profileIdentity.displayName.unconfirmedHint")}
           </p>
+          )}
           <div className="flex flex-wrap items-center gap-sm">
             <SubmitButton size="sm" pendingLabel={t("profileIdentity.displayName.saving")}>
               {t("profileIdentity.displayName.confirm")}
@@ -63,6 +65,9 @@ export function IdentityCard({ identity }: { identity: MyIdentity }) {
           </div>
         </form>
 
+        {afterName}
+
+        {compact ? null : (
         <form action={submitPhone} className="flex flex-col gap-sm border-t pt-md" id="phone">
           <span className="text-label font-medium text-fg-secondary">{t("profileIdentity.phone.label")}</span>
           <PhoneField
@@ -83,6 +88,7 @@ export function IdentityCard({ identity }: { identity: MyIdentity }) {
             {!phoneState.ok && phoneState.code ? <InlineError>{t(phoneState.code)}</InlineError> : null}
           </div>
         </form>
+        )}
       </div>
     </Card>
   );
