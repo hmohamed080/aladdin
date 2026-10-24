@@ -71,7 +71,7 @@ export const AUDIT_ACTIONS = [
   "project.created",
   "project.activated",
   "project.completed",
-  // 20261017160001: business verification (the Verified badge), separate from organization approval.
+  // 20261021090002: business verification (the Verified badge), separate from organization approval.
   "business_verification.document_added",
   "business_verification.document_removed",
   "business_verification.submitted",
@@ -79,7 +79,7 @@ export const AUDIT_ACTIONS = [
   "business_verification.info_requested",
   "business_verification.approved",
   "business_verification.rejected",
-  // 20261018090001: current-password confirmation and unverified secondary phone reservations.
+  // 20261021090004: current-password confirmation and unverified secondary phone reservations.
   "account.password_confirmed",
   "account.password_confirm_locked",
   "secondary_phone.reserved",

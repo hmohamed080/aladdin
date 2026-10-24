@@ -1,9 +1,38 @@
 # Runtime State
 
+## Consolidated database baseline (draft PR) — 2026-10-22
+
+- Branch `claude/project-thread-lz98jd` (from the Workers branch, PR #97 head): 180 migrations = main's `20261020090001_registration_data_sync` (byte-identical) plus the PR stack, with the 15 PR-only migrations renamed to `20261021090001`..`15` so they run after main's. Mapping, verification and the Production plan: [database-baseline-2026-10-22.md](database-baseline-2026-10-22.md).
+- Hosted: unchanged. Acceptance `nxossqhdfltcqdwvbewi` has 105 migrations (drifted, rebuild pending approval); Production `kkpkgjrweysgvhvkhzun` must be rehearsed with `scripts/hosted-db/production-rehearsal.sh` before any push.
+- Backups must use `scripts/hosted-db/` (`db dump` alone loses storage policies, the auth trigger and exact grants).
+
+## Cloudflare migration, PR #97 — 2026-10-22 (later)
+
+- Branch `claude/cloudflare-workers-2ibvgs`: Next.js 16.4.2; R2/DNS/cutover, cost, security, Redis and video audits merged in. Status report and GO/NO-GO: [cloudflare-migration-status-2026-10-22.md](cloudflare-migration-status-2026-10-22.md). **Production NO-GO.**
+- 2026-10-24: preview Worker `aladdin-frontend-preview` is reachable and serves pages (smoke run 40077176318). Runtime secrets (Supabase acceptance, R2, Upstash REST, Turnstile) are not set yet. GitHub Actions is the only preview deploy path; the dashboard Workers Builds connection is to be disconnected by the owner. #97 contains #100's 180-migration baseline. Vercel still serves everything; DNS unchanged.
+
+## Cloudflare R2, credentials, DNS and 15-stage cutover (read-only audit) — 2026-10-22
+
+- Branch `claude/cf-r2-cutover-2ibvgs` (local, from PR #97 `claude/cloudflare-workers-2ibvgs`), docs only. Nothing hosted was changed.
+- Cloudflare account, read 2026-10-22:
+  - **Worker:** one, `aladdin-frontend-preview`, deployed on `bstalent9.workers.dev`.
+  - **R2 buckets:** `aladdin-r2-acceptance-20261011-private`, `aladdin-r2-acceptance-20261011-public` and `aladdin-production-db-backups`. All are WEUR, Standard class. Their CORS, lifecycle and public-access settings are not readable through the MCP tools.
+  - **Not present:** Hyperdrive, the media Worker, and a production media bucket.
+- DNS for `aladdindecore.com` is still on Vercel: 11 records, Zoho MX, SPF and DKIM, **no DMARC**, wildcard to Vercel. Export: [dns-records-aladdindecore-2026-10-22.md](dns-records-aladdindecore-2026-10-22.md).
+- New docs:
+  - [R2 audit and prepared rules](r2/README.md), not applied;
+  - [credentials checklist](cloudflare-credentials-checklist.md);
+  - [cutover plan](cloudflare-frontend-cutover-plan.md), now 15 stages.
+
+## Cloudflare Workers frontend (draft PR, ADR-0021) — 2026-10-20
+
+- Branch `claude/cloudflare-workers-2ibvgs` (stacked on the video branch): the frontend also builds for Cloudflare Workers with OpenNext (`pnpm cf:build`), runs in workerd locally, and CI builds both. **Nothing is deployed to Cloudflare**; Vercel still serves `aladdindecore.com` and FastAPI; DNS is still on Vercel nameservers.
+- Pending owner approval: workers.dev preview on the isolated acceptance project, Workers Paid ($5/month), DNS move, traffic switch ([cutover plan](cloudflare-frontend-cutover-plan.md)).
+
 ## Redis, video and palette (draft PRs #92, video PR, #93) — 2026-10-19
 
 - **Stack:** #88 → #89 → #91 → #92 (Redis) → video branch `claude/video-r2-2ibvgs`. Palette #93 is independent, based on `main`. Nothing merged or deployed.
-- **New migration (local only):** `20261019170000_media_videos` (renamed from 20261019150000 so it sorts after the revocation migration 20261019163000; permission contract `supabase/permissions/20261019170000.json`).
+- **New migration (local only):** `20261021090015_media_videos` (renamed from 20261019150000 so it sorts after the revocation migration 20261021090014; permission contract `supabase/permissions/20261021090015.json`).
 - **Flags (all off):** `REDIS_CACHE_ENABLED=false`, `VIDEO_ENABLED=false`, Worker `VIDEO_ROUTES="off"`; R2 and edge flags unchanged.
 - **Decisions:** [ADR-0019](../decisions/ADR-0019-redis-cache-and-rate-limits.md), [ADR-0020](../decisions/ADR-0020-video-r2-hls.md) — both Proposed. FastAPI next phase: [plan](../architecture/fastapi-next-phase.md), not started.
 - **Hosted dependencies pending approval:** managed Redis, transcode host, R2 CORS and lifecycle rules, Worker video routes, the migration.
@@ -11,8 +40,8 @@
 ## Media/backend continuation (stacked on PR #89) — 2026-10-19
 
 - **Branch** `claude/media-backend-continuation-2ibvgs`, stacked on PR #89 (`claude/r2-rc2-integration-vdrldz`) with PR #88's latest commits merged in. Not merged anywhere; no hosted change.
-- **New migrations (local only):** `20261019120000_historical_media_purge`, `20261019130000_rls_platform_check_initplan`, `20261019140000_data_api_session_revocation` (177 migration files on this branch, counting #88 and #89). Staging (`kkpkgjrweysgvhvkhzun`) still has 164, max `20261017134139`; its `pgrst.db_pre_request` hook is active (`pgrst_hooks.pre_request`).
-- **Revocation and backend config (2026-10-19, same branch):** migration `20261019163000_storage_realtime_session_revocation` (178 files) adds restrictive session-live policies to `storage.objects`, `leads` and `follow_up_tasks`. The backend derives its environment from `VERCEL_ENV`: once this branch deploys, Production `/api/backend/health` answers **503 `misconfigured`** until `SUPABASE_URL` and `SUPABASE_ANON_KEY` are set for the backend ([names](../guides/vercel-environment-variables.md)); the web app is unaffected.
+- **New migrations (local only):** `20261021090011_historical_media_purge`, `20261021090012_rls_platform_check_initplan`, `20261021090013_data_api_session_revocation` (177 migration files on this branch, counting #88 and #89). Staging (`kkpkgjrweysgvhvkhzun`) still has 164, max `20261017134139`; its `pgrst.db_pre_request` hook is active (`pgrst_hooks.pre_request`).
+- **Revocation and backend config (2026-10-19, same branch):** migration `20261021090014_storage_realtime_session_revocation` (178 files) adds restrictive session-live policies to `storage.objects`, `leads` and `follow_up_tasks`. The backend derives its environment from `VERCEL_ENV`: once this branch deploys, Production `/api/backend/health` answers **503 `misconfigured`** until `SUPABASE_URL` and `SUPABASE_ANON_KEY` are set for the backend ([names](../guides/vercel-environment-variables.md)); the web app is unaffected.
 - **Flags unchanged:** `R2_STORAGE_ENABLED=false`, `R2_PRODUCTION_WRITES_APPROVED=false`, `MEDIA_EDGE_DELIVERY_ENABLED=false`.
 - **Infrastructure facts (audited 2026-10-19):** one Vercel project `aladdin-staging` (Hobby) serves `aladdindecore.com`; DNS on Vercel nameservers; functions ran in `iad1` (this branch sets `cdg1`). FastAPI live at `/api/backend/health` only, `APP_ENV` unset. Cloudflare account has R2 buckets (`aladdin-production-db-backups`, `aladdin-r2-acceptance-20261011-private/-public`), no Workers, no Hyperdrive. Supabase staging Storage: avatars 144 objects / 8.4 MB, portfolio 163 / 259.6 MB (to be purged), certificates 4 / 7.9 MB (kept).
 - Decision: [ADR-0018 Revision 2](../decisions/ADR-0018-r2-edge-media-delivery.md#revision-2--2026-10-19-full-media-architecture).
@@ -28,7 +57,7 @@
   - 320/768/1600 WebP variants and pre-upload resizing;
   - the migration tooling `scripts/media-storage.mjs` and the usage report `scripts/usage-report.mjs`;
   - local JWT verification for session reads ([auth-session-reads.md](../frontend/auth-session-reads.md));
-  - migrations `20261018100000`–`20261018100003` and `20261019100000_media_edge_authorization.sql`.
+  - migrations `20261021090005`–`20261021090008` and `20261021090009_media_edge_authorization.sql`.
   This is 173 migration files in total.
 - **Hosted steps: none done.** Each needs owner approval:
   - the Worker login role `media_edge_worker` (member of `media_edge`);
@@ -39,22 +68,22 @@
   - the `TICKET_KEYS` Worker secret;
   - the Vercel env vars `MEDIA_EDGE_ORIGIN`, `MEDIA_EDGE_TICKET_KID`, `MEDIA_EDGE_TICKET_SECRET`, `MEDIA_EDGE_DELIVERY_ENABLED` and `R2_*`.
   Steps: [`edge/media-worker/README.md`](../../edge/media-worker/README.md).
-- **Hosted database.** The media migrations have **not** run on any hosted project. Staging (`kkpkgjrweysgvhvkhzun`) had 164 migrations up to `20261017134139` when audited on 2026-10-18. PR #88, `20261018090000/1`, `20261018100000`–`100003` and `20261019100000` are all pending there. No media has been copied to R2.
+- **Hosted database.** The media migrations have **not** run on any hosted project. Staging (`kkpkgjrweysgvhvkhzun`) had 164 migrations up to `20261017134139` when audited on 2026-10-18. PR #88, `20261021090003`–`20261021090004`, `20261021090005`–`20261021090008` and `20261021090009` are all pending there. No media has been copied to R2.
 - **Supabase egress.** About **0.29 GB is left of the 5 GB** Free quota this cycle (4.71 GB used, owner-reported 2026-10-18). The full bulk copy needs about 0.273 GB, so only an avatar and certificate rehearsal (about 16 MB) fits before the cycle resets or the plan is upgraded to Pro. Going over the quota returns HTTP 402 on every API call. Runbook: [media-monitoring.md](media-monitoring.md).
 - **Security item to check.** On the local stack, `PUBLIC` has `USAGE` on schema `net` and `EXECUTE` on some pg_net functions (`net.http_delete(...)`, `net.worker_restart()` and helpers), so `anon` can call them. The hosted projects have not been checked. Check them and revoke these grants from `PUBLIC` in a separate reviewed change, before the Worker login role is created.
 - **Validation.** Not re-run in the 2026-10-18 docs session. To check: `pnpm --filter @aladdin/media-worker test` and `typecheck` for the Worker. pgTAP `99_media_edge_authorization_test.sql` tests that the next request is denied after delete, unpublish, delisting, suspension, ban and sign-out.
 
 ## Showroom V2 and Admin follow-ups (PR #88) — 2026-10-18
 
-- Same branch and PR as business verification below. Adds: Admin Users "User Type" column/filter (`admin_users_directory`, migration `20261018090000`); Admin Staff search/empty copy; Offers and My Offers re-enabled; unverified secondary phone reservations with password receipts and a Support cooldown override (`20261018090001`, `/admin/phone-cooldowns`, permission `phones.cooldown_override`, Super Admin only by default).
-- None of `20261017160000`, `20261017160001`, `20261018090000`, `20261018090001` is applied to any hosted project. Owner approval required.
-- R2 RC2 worktree (device, uncommitted) was snapshotted and merged onto main + this PR in a separate local branch (not pushed). R2 migrations renamed to `20261018100000`–`100003` so they sort after main's newest; exact permission contracts added for every intervening migration.
+- Same branch and PR as business verification below. Adds: Admin Users "User Type" column/filter (`admin_users_directory`, migration `20261021090003`); Admin Staff search/empty copy; Offers and My Offers re-enabled; unverified secondary phone reservations with password receipts and a Support cooldown override (`20261021090004`, `/admin/phone-cooldowns`, permission `phones.cooldown_override`, Super Admin only by default).
+- None of `20261021090001`, `20261021090002`, `20261021090003`, `20261021090004` is applied to any hosted project. Owner approval required.
+- R2 RC2 worktree (device, uncommitted) was snapshotted and merged onto main + this PR in a separate local branch (not pushed). R2 migrations renamed to `20261021090005`–`20261021090008` so they sort after main's newest; exact permission contracts added for every intervening migration.
 - Validation: real local Supabase stack (supabase/postgres 17): pgTAP 123 files / 5,447 checks pass, exact permission gate passes, concurrency scripts pass. Browser E2E not yet run.
 
 ## Business verification (Verified badge) — 2026-10-17
 
 - Branch `claude/showroom-v2-admin-verification-vdrldz` (draft PR) from `main` @ `9d9a1b6`. Adds `/showroom/verification`, `/admin/business-verification` and `/admin/business-verification/[id]`, and the document stream `/business-verification/file/<org>/<file>`.
-- Migrations `20261017160000` and `20261017160001` are NOT applied to any hosted project. They must be applied in that order, after any migration already on the target, and only with the owner's approval. New private bucket `business-verification-documents`, new permission `verification.approve`.
+- Migrations `20261021090001` and `20261021090002` are NOT applied to any hosted project. They must be applied in that order, after any migration already on the target, and only with the owner's approval. New private bucket `business-verification-documents`, new permission `verification.approve`.
 - `organizations.is_verified` still means "approved/active" for every gate; `organizations.business_verified_at` drives the Verified badge. No backfill: existing organizations show no badge until a business verification is approved (Decision B). `verification.approve` does not approve applications.
 - Validation: typecheck, lint, Vitest, build and pgTAP (local shim) passed; browser journeys not run here.
 ## 2026-10-17 — Approved local RC2 R2 integration

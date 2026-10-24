@@ -1,5 +1,5 @@
 -- The Data API refuses a signed-out, expired (not_after), banned or deleted session
--- on its next request (migration 20261019140000), while my_account_status stays
+-- on its next request (migration 20261021090013), while my_account_status stays
 -- reachable and reports `session_active`.
 create extension if not exists pgtap;
 begin;
@@ -13,7 +13,7 @@ insert into auth.sessions(id, user_id, created_at, aal, not_after) values
   (:'live',  :'u', now(), 'aal1', null),
   (:'ended', :'u', now(), 'aal1', now() - interval '1 minute');
 
--- authenticated may execute it since 20261019163000 (Storage/Realtime policies run as the caller).
+-- authenticated may execute it since 20261021090014 (Storage/Realtime policies run as the caller).
 select ok(not has_function_privilege(r, 'app.jwt_session_is_live()', 'EXECUTE'), format('%s cannot call the helper directly', r))
   from unnest(array['anon', 'service_role']) r;
 

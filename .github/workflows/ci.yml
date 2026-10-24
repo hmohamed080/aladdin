@@ -58,6 +58,42 @@ jobs:
       - run: pnpm --filter @aladdin/media-worker typecheck
       - run: pnpm --filter @aladdin/media-worker test
 
+  # The same app built for Cloudflare Workers (OpenNext, ADR-0021). Builds and bundles only:
+  # no Cloudflare account, no deploy. Catches anything that breaks the Workers runtime build.
+  frontend-cloudflare:
+    name: frontend-cloudflare
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_APP_ENV: staging
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22" # wrangler 4 requires Node 22
+      - name: Enable pnpm (corepack, pinned to packageManager)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter frontend cf:build
+      - name: Bundle the Worker (dry run, no upload) and keep it under the 64 MiB limit
+        working-directory: frontend
+        run: pnpm exec wrangler deploy --env preview --dry-run --outdir "$RUNNER_TEMP/worker"
+      # next.config.ts swaps server/storage/image-processing/runtime.ts for runtime.workers.ts
+      # (Cloudflare Images binding) when ALADDIN_BUILD_TARGET=workers, set by open-next.config.ts.
+      - name: The Worker bundle must not contain sharp, and must use the Images engine
+        working-directory: frontend
+        run: |
+          # Bundled code only (worker.js and OpenNext's handler); copied package sources may mention sharp in messages.
+          if grep -lE "sharp-linux|@img/sharp|node_modules/sharp/" "$RUNNER_TEMP/worker/worker.js" .open-next/server-functions/default/frontend/handler.mjs; then
+            echo "sharp leaked into the Worker bundle"; exit 1
+          fi
+          if ! grep -q 'cloudflare-images' "$RUNNER_TEMP/worker/worker.js"; then
+            echo "the Worker bundle does not carry the Cloudflare Images engine (image-processing/runtime.workers.ts)"; exit 1
+          fi
+
   backend:
     name: backend
     runs-on: ubuntu-latest

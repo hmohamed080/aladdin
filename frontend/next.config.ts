@@ -1,4 +1,12 @@
+import path from "node:path";
 import type { NextConfig } from "next";
+import { SECURITY_HEADERS } from "./src/lib/security/response-headers";
+
+// Set by open-next.config.ts `buildCommand` for the Cloudflare Workers build only.
+// That build swaps the image engine (sharp cannot load in workerd) so the Worker
+// bundle never contains sharp; Vercel and `next build` keep the Node module.
+const WORKERS_BUILD = process.env.ALADDIN_BUILD_TARGET === "workers";
+const IMAGE_RUNTIME = /[\\/]server[\\/]storage[\\/]image-processing[\\/]runtime\.ts$/;
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -6,6 +14,25 @@ const nextConfig: NextConfig = {
   images: { localPatterns: ["assets", "brand", "demo", "images", "installer-auth", "landing-v2", "preview", "_next/static/media"]
     .map((directory) => ({ pathname: `/${directory}/**`, search: "" })) },
   // App Router is the default in Next 15. No Vite, no custom SPA routing.
+  webpack(config, { webpack, isServer }) {
+    if (WORKERS_BUILD && config.cache && typeof config.cache === "object") {
+      // A separate persistent cache: otherwise a later Node build on the same
+      // machine reuses the swapped module graph (and would ship without sharp).
+      config.cache.name = `${config.cache.name ?? `${config.name}-${config.mode}`}-workers`;
+    }
+    if (WORKERS_BUILD && isServer) {
+      const workersRuntime = path.join(__dirname, "src/server/storage/image-processing/runtime.workers.ts");
+      config.plugins.push(new webpack.NormalModuleReplacementPlugin(IMAGE_RUNTIME, (resource: { createData?: { resource?: string } }) => {
+        if (resource.createData?.resource) resource.createData.resource = workersRuntime;
+      }));
+    }
+    return config;
+  },
+
+  // Baseline security headers on every response, on Vercel and on Workers (security audit 2026-10-22).
+  async headers() {
+    return [{ source: "/:path*", headers: [...SECURITY_HEADERS] }];
+  },
 
   // Compatibility for links shared while the installer phone + password pages
   // were a temporary preview: permanent (308) redirects to the promoted routes.

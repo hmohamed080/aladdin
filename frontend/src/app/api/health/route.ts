@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cacheMetrics, lastRedisSuccessAt, redisEnabled, withRedis } from "@/server/cache/redis";
+import { imageProcessingMetrics } from "@/server/storage/image-processing/metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,8 @@ export async function GET() {
     // One warm instance's counters (no keys, values or URLs). With Redis off,
     // `rl.fallback` and `rl.limited` still show the memory limiter at work.
     cacheMetrics: cacheMetrics(),
+    // Cloudflare Images calls of this instance (Workers build; all zero on Node).
+    imageMetrics: imageProcessingMetrics(),
     timestamp: new Date().toISOString(),
   }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
@@ -139,12 +140,22 @@ export async function loadShowroomOrderCounts(
       .eq("status", "completed")
       .gte("completed_at", window.start)
       .lt("completed_at", window.end),
-    supabase.from("order_list").select("id", { count: "exact", head: true }).eq("requester_org_id", orgId).eq("status", "confirmed"),
+    countAwaitingExecution(supabase, orgId),
   ]);
   if (done.error) throw done.error;
-  if (waiting.error) throw waiting.error;
-  return { completedOrders: done.count ?? 0, awaitingExecution: waiting.count ?? 0 };
+  return { completedOrders: done.count ?? 0, awaitingExecution: waiting };
 }
+
+/**
+ * "Confirmed, not started" does not depend on the window, and the home page asks for
+ * the current and the previous window in the same render: count it once per render.
+ * (Node's fetch memoization happened to merge the two; the Workers build does not.)
+ */
+const countAwaitingExecution = cache(async function countAwaitingExecution(supabase: DB, orgId: string): Promise<number> {
+  const { count, error } = await supabase.from("order_list").select("id", { count: "exact", head: true }).eq("requester_org_id", orgId).eq("status", "confirmed");
+  if (error) throw error;
+  return count ?? 0;
+});
 
 export type IncomingQuotation = {
   id: string;

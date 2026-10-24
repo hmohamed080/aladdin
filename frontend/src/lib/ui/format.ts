@@ -153,13 +153,21 @@ export function formatCompactMoney(
 ): string {
   const n = toNumber(value);
   if (n === null) return EMPTY;
+  // Runtimes disagree on two details, which breaks hydration when the server and the browser differ:
+  // Node pads small figures ("EGP 7.0") unless the minimum is explicit, and Cloudflare Workers starts
+  // Arabic thousands with an invisible right-to-left mark that Node and Chromium leave out. The mark
+  // has no visible effect in right-to-left text, so it is never emitted.
   return numberFormat(locale, {
     style: "currency",
     currency: "EGP",
     notation: "compact",
+    minimumFractionDigits: 0,
     maximumFractionDigits: 1,
-  }).format(n);
+  }).format(n).replace(LEADING_DIRECTION_MARKS, "$1");
 }
+
+/** Left-to-right or right-to-left marks at the start, after an optional Arabic letter mark and sign. */
+const LEADING_DIRECTION_MARKS = /^(\u061c?[-+]?)[\u200e\u200f]+/;
 
 /**
  * Like `formatCompactMoney`, but Arabic keeps one decimal ("148.7 thousand"), because CLDR's Arabic compact

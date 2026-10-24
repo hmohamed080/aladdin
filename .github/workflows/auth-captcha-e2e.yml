@@ -1,0 +1,160 @@
+# Aladdin - CAPTCHA-dependent desktop E2E on a GitHub runner.
+#
+# Why this exists: the cloud sandbox cannot reach challenges.cloudflare.com, so the real Turnstile widget never
+# mints a token there and the Create Account / Forgot Password / installer sign-up specs fail before they submit
+# (docs/operations/e2e-shared-failures-triage-2026-10-22.md, "Turnstile token empty"). A GitHub runner can reach
+# Cloudflare, so the same specs run here unchanged against the Node build (`next build` + `next start`, owned by
+# frontend/playwright.config.ts) and a local Supabase stack on this ephemeral runner.
+#
+# Keys: Cloudflare's PUBLIC, documented Turnstile test keys (always-pass site key + always-pass secret), see
+# https://developers.cloudflare.com/turnstile/troubleshooting/testing/ . They are not secrets; no repository or
+# environment secret is read. The app accepts a test-key result ONLY when NEXT_PUBLIC_APP_ENV=local
+# (frontend/src/server/auth/turnstile.ts, `result_with_testing_key`); nothing in app code is relaxed for this job.
+#
+# The E2E Turnstile stubs (E2E_STUB_TURNSTILE / E2E_TURNSTILE_STUB) are forced OFF so the real widget script and
+# the real Siteverify call run.
+#
+# Not run here (known, non-CAPTCHA, tracked in the triage doc): the Sign In "renders no Turnstile widget" check
+# (owner decision pending) and the profile-completion "seeded account" block (Showroom RC2 product review).
+
+name: Auth CAPTCHA E2E (Turnstile test keys)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/cloudflare-workers-2ibvgs]
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/src/server/auth/**"
+      - "frontend/src/server/actions/auth*.ts"
+      - "frontend/src/features/auth/**"
+      - "frontend/src/features/auth-password-preview/**"
+      - "frontend/src/features/entry-auth/**"
+      - "frontend/src/features/installer-phone-auth/**"
+      - "frontend/src/lib/env/**"
+      - "frontend/src/middleware.ts"
+      - "frontend/e2e/auth-password-preview.spec.ts"
+      - "frontend/e2e/profile-completion.spec.ts"
+      - "frontend/e2e/installer-phone-auth.spec.ts"
+      - "frontend/e2e/recovery-replay.spec.ts"
+      - "frontend/e2e/helpers/**"
+      - "frontend/e2e/global-setup.ts"
+      - "frontend/playwright.config.ts"
+      - "supabase/config.toml"
+      - ".github/workflows/auth-captcha-e2e.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-captcha-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  captcha-e2e:
+    name: auth-captcha-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      PLAYWRIGHT_HTML_OPEN: never
+      NEXT_PUBLIC_APP_ENV: local
+      # Cloudflare's published always-pass TEST keys (public by design).
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
+      # Only consulted for a non-test result. A test-key Siteverify answer is accepted before the hostname check,
+      # and only because NEXT_PUBLIC_APP_ENV=local. Pinned to the local origin so the request host is never trusted.
+      TURNSTILE_ALLOWED_HOSTNAMES: 127.0.0.1,localhost
+      # Real widget + real Siteverify: both E2E stubs off.
+      E2E_STUB_TURNSTILE: "0"
+      E2E_TURNSTILE_STUB: "0"
+      E2E_DB_CONTAINER: supabase_db_aladdin
+      MAILPIT_URL: http://127.0.0.1:54324
+      ARTIFACTS: ${{ github.workspace }}/.artifacts/auth-captcha
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+          pnpm install --frozen-lockfile
+          pnpm --filter frontend exec playwright install --with-deps chromium
+          mkdir -p "$ARTIFACTS"
+      - name: Preflight - Cloudflare Siteverify answers the test keys from this runner
+        # Records Cloudflare's actual answer for the dummy token (hostname, action, metadata) as evidence.
+        run: |
+          curl -sS --max-time 15 -X POST https://challenges.cloudflare.com/turnstile/v0/siteverify \
+            --data-urlencode "secret=$TURNSTILE_SECRET_KEY" \
+            --data-urlencode "response=XXXX.DUMMY.TOKEN.XXXX" > "$ARTIFACTS/siteverify-test-key.json"
+          cat "$ARTIFACTS/siteverify-test-key.json"; echo
+          jq -e '.success == true' "$ARTIFACTS/siteverify-test-key.json" > /dev/null
+      - name: Start local Supabase and replay migrations + seeds
+        run: |
+          set -o pipefail
+          pnpm exec supabase start --exclude studio,postgres-meta,edge-runtime,logflare,vector,supavisor > "$RUNNER_TEMP/stack.log" 2>&1
+          pnpm exec supabase db reset >> "$RUNNER_TEMP/stack.log" 2>&1
+          pnpm exec supabase status -o json > "$RUNNER_TEMP/status.json"
+      - name: Point the app at the runner-local stack
+        run: |
+          status=$(jq 'if type == "array" then .[0] else . end' "$RUNNER_TEMP/status.json")
+          api_url=$(jq -r '.API_URL // empty' <<<"$status")
+          anon=$(jq -r '.ANON_KEY // empty' <<<"$status")
+          service=$(jq -r '.SERVICE_ROLE_KEY // empty' <<<"$status")
+          test "$api_url" = "http://127.0.0.1:54321" || { echo "Unexpected local API URL"; exit 1; }
+          test -n "$anon" && test -n "$service" || { echo "Local stack keys missing from supabase status"; exit 1; }
+          grant=$(openssl rand -hex 32)
+          for value in "$anon" "$service" "$grant"; do echo "::add-mask::$value"; done
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$api_url"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$service"
+            echo "AUTH_PASSWORD_PREVIEW_GRANT_SECRET=$grant"
+          } >> "$GITHUB_ENV"
+      - name: CAPTCHA-dependent desktop suites (real widget, real Siteverify)
+        working-directory: frontend
+        run: |
+          set -o pipefail
+          pnpm exec playwright test --project=chromium-desktop --reporter=list,html \
+            e2e/auth-password-preview.spec.ts \
+            e2e/profile-completion.spec.ts \
+            e2e/installer-phone-auth.spec.ts \
+            e2e/recovery-replay.spec.ts \
+            --grep-invert "renders no Turnstile widget|Complete your profile — seeded account" \
+            2>&1 | tee "$ARTIFACTS/playwright.log"
+      - name: Show what the page rendered for each failure
+        # First attempts only; the ARIA snapshot names the on-screen error the assertion missed.
+        if: failure()
+        working-directory: frontend
+        run: |
+          find test-results -path '*-chromium-desktop/error-context.md' | sort | while read -r f; do
+            echo "::group::$f"; head -c 8000 "$f"; echo; echo "::endgroup::"
+          done
+      - name: Collect redacted stack log
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/stack.log" ]; then
+            sed -E -e 's/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/[redacted-jwt]/g' \
+                   -e 's/sb_(secret|publishable)_[A-Za-z0-9_-]+/[redacted-local-key]/g' \
+                   -e 's#postgres(ql)?://[^[:space:]]+#[redacted-local-db-url]#g' \
+                   "$RUNNER_TEMP/stack.log" > "$ARTIFACTS/stack.log"
+          fi
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-captcha-e2e-${{ github.sha }}
+          path: |
+            .artifacts/auth-captcha/
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Stop the runner-local stack
+        if: always()
+        run: timeout 90s pnpm exec supabase stop --no-backup || true

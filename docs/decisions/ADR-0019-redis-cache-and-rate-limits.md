@@ -25,7 +25,7 @@ Redis is an **accelerator and counter store**, never an authority.
 
 ### Why only reference vocabularies are cached
 
-The audit (2026-10-19) found no other cross-user hot reads. Every other page reads data that RLS filters per caller, and caching it would mean caching a permission decision. The measured staging bottleneck (a 260 ms per-row role check) was fixed in SQL instead (`20261019130000_rls_platform_check_initplan.sql`).
+The audit (2026-10-19) found no other cross-user hot reads. Every other page reads data that RLS filters per caller, and caching it would mean caching a permission decision. The measured staging bottleneck (a 260 ms per-row role check) was fixed in SQL instead (`20261021090012_rls_platform_check_initplan.sql`).
 
 Each cached loader filters explicitly (`is_active = true`), so a support user, whose policy also returns retired rows, can never fill an entry other callers are served. A caller without a verified session never touches the cache. An empty result is kept for 300 s only.
 
@@ -115,3 +115,50 @@ Step by step in [upstash-setup.md](../guides/upstash-setup.md). In short:
 **Transport.** On Vercel the app and the backend use TCP + TLS (`REDIS_URL=rediss://…:6379`). The cloud coding environment reaches the database only over Upstash's HTTPS REST endpoint (proxy-injected token; 6379 blocked), so it can run read-only `curl` checks but not the TCP test suite. A REST transport in the app is not worth it today. It would add one HTTPS request per command for no gain where TCP works. If ever needed (Edge runtime, or a host that blocks 6379), it is about 30 lines of `fetch` behind `withRedis`, with no new dependency.
 
 Not verified from the build sandbox: a live connection to Upstash (unreachable from it). TLS (`rediss://`) was tested against a local TLS proxy, including refusal of an untrusted certificate.
+
+## Revision 2026-10-20: Workers runtime
+
+**Context.** The web app is being moved to Cloudflare Workers (OpenNext). Measured in `workerd` (`wrangler dev` 4.151.2, compat date 2026-10-01, `nodejs_compat`) against a local Redis:
+- `@redis/client` 6.3.0 over TCP (`node:net` via `nodejs_compat`) connects and runs GET, SET EX, EVAL, LPUSH, DEL and PING **within one request**.
+- A connection opened in one request and reused in a later one **does not work**. `@redis/client` raises nothing, keeps `isReady: true`, and waits for a reply that never comes (the command times out). A raw `node:net` socket shows the cause: `Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. … (I/O type: Writable)`. The TCP design above (one connection per warm instance) would therefore time out and trip the breaker on every Worker isolate, forever.
+- Opening a connection per request works, but each one sends an extra `AUTH`: 200 requests produced 201 `AUTH` and 200 `GET` (`INFO commandstats`), doubling the Upstash bill. In production it would also add TCP + TLS + AUTH round trips before each command.
+
+**Decision.**
+1. The application talks to Redis through a small command interface (`get`, `setEx`, `del`, `eval`, `lPush`, `ping`: only what callers use) with two transports: TCP (`@redis/client`, unchanged, for Vercel/Node) and **Upstash REST** over plain `fetch` (no new dependency). `frontend/src/server/cache/redis-commands.ts`.
+2. REST is used when `REDIS_REST_URL` + `REDIS_REST_TOKEN` are set (both or neither; `https://` outside local; no credentials in the URL; the token is a secret). It wins over `REDIS_URL`.
+3. On Workers with only `REDIS_URL`, the app **refuses TCP**: Redis is treated as unavailable (caches read Postgres, rate limits use the memory window), and `cache.redis_tcp_unsupported` is logged once per isolate. It is not a per-request connection. That would double commands and add round trips, and a silent wrong configuration should show up as `"cache": "unavailable"` on `/api/health`, not as a quietly doubled bill. `cacheMetrics.transport` reports `rest`, `tcp` or `none`.
+4. Unchanged guarantees: never an authorization input; silent fail-safe with the breaker (a `401`/`403` from REST opens it at once, like a refused connection; timeouts count like failed commands); the memory fallback limiter; the key scheme; the health counters; the command budget (REST has no handshake, so `connects` stays 0). Each REST command is bounded by `AbortSignal.timeout(500 ms)`. TCP's 150 ms applies to an open connection; REST includes a possible TLS handshake to the database's region.
+5. The Python backend keeps TCP (`REDIS_URL`); both transports reach the same database and key scheme, so the video job list written over REST is read by the worker over TCP.
+
+**Evidence (local; loopback, so the round trip is near zero).** The real `redis.ts` and `rate-limit.ts` ran in `workerd` against a scratch Upstash-REST-to-Redis shim:
+- `withRedis` GET: p50 2 ms, p95 3 ms. Rate-limit `EVAL`: p50 2 ms, p95 4 ms. 300 requests each, all served by Redis.
+- With the shim frozen: two 500 ms timeouts, then the breaker opened (`rest:timeout`, one log line), and the memory limiter answered in about 1 ms.
+- With only `REDIS_URL` on Workers: no connection, `source: "memory"`, one `cache.redis_tcp_unsupported` line.
+- Real Upstash latency from Cloudflare's edge was **not** measured; it depends on the database's region.
+
+Also found: on Workers the clock reads 0 while a module initialises, so the budget counter's start time is now set on first use.
+
+**Owner decisions.** Store `REDIS_REST_URL`/`REDIS_REST_TOKEN` (from the existing database's REST tab; no new account) as Worker variables/secrets when Redis is enabled on Workers; consider whether the database's region suits Cloudflare's edge; the 500 ms REST timeout is a code constant.
+
+## Audit 2026-10-22 (owner brief, section 6)
+
+The existing implementation was checked against the brief. Status: **Met** means it already held. **Fixed** means this audit closed a gap (with tests). Line numbers are as of this revision.
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Workers config: `REDIS_REST_URL`, `REDIS_REST_TOKEN`, `REDIS_KEY_ENV`, `REDIS_CACHE_ENABLED` | Met | `frontend/src/lib/env/cache.ts:14-29`, `frontend/src/server/cache/redis.ts:255`, `redis-commands.ts:56` |
+| FastAPI uses `REDIS_URL` over TLS | **Fixed**: the backend accepted any URL; it now refuses non-`rediss://` outside local (loopback excepted) | `backend/app/config.py:166`; test `backend/tests/test_coordination.py:75` |
+| Reference-data caching works | Met | `frontend/src/server/cache/reference.ts:37`; real-Redis tests in `redis.test.ts` |
+| Rate limiting works | Met | `frontend/src/server/cache/rate-limit.ts:85` |
+| Background-job coordination works | Met (locks, video wake-up list) | `backend/app/coordination/__init__.py:100`, `frontend/src/server/video/uploads.ts:133`, `backend/app/workers/video_transcode.py:602` |
+| Each environment has its own key namespace | **Fixed**: the namespace fell back to `APP_ENV`, so two deployments that are both `staging` and share a database could share keys. `REDIS_KEY_ENV` is now required outside local while Redis is on, in both services | `frontend/src/lib/env/cache.ts:34`, `backend/app/config.py:157`, `redis.ts:367`, `coordination/__init__.py:41` |
+| Cache hit/miss metrics | Met (per-instance counters on `/api/health`, structured `cache.*` log events) | `reference.ts:46,51`, `redis.ts:111` |
+| No new paid service | Met | Existing Upstash Free database; no new dependency |
+| Degrades safely when Redis is unavailable (web app) | Met | `redis.ts:213` (breaker), `rate-limit.ts:101` (memory window), `redis.ts:263` (TCP on Workers refused) |
+| Degrades safely when Redis is unavailable (backend) | **Fixed**: an unreachable Redis made `job_lock` raise and fail the job, contrary to the table above. The lock now degrades to unlocked, and `extend()` mid-job returns False instead of raising | `coordination/__init__.py:125,85`; tests `test_coordination.py:45,61` |
+| No permission or authorization decision cached | Met; **guard added**: a static test lists the only Redis callers, namespaces and writes, and fails if authorization/session code imports the cache | `reference.ts:39`; `frontend/src/server/cache/redis-guards.test.ts:34,42,50` |
+| No private media bytes in Redis | Met; **guard added** (the only writes are `setEx` of vocabularies, `eval` counters, `lPush` of job ids) | `redis-guards.test.ts:55` |
+| Usage monitoring and monthly budget controls | Met for the web app (`redis.ts:228`, `/api/health`); **fixed** in the docs: the command estimate lacked the backend (idle video worker ~86,400 commands a month), and a concrete Upstash budget setting is now documented. The worker's own Redis client also sent `CLIENT SETINFO` and health-check PINGs; it now uses the budget-tuned `connect()` | `docs/guides/upstash-setup.md:114,120-137`; `video_transcode.py:650` |
+| Disabled in Production until acceptance (flag default off) | Met for the web app; **fixed** for the backend, which used Redis whenever `REDIS_URL` was set. It now honours the same `REDIS_CACHE_ENABLED` switch (default false); a guard test checks `.env.example` and every `wrangler.jsonc` environment | `backend/app/config.py:56`, `cache.ts:14`; tests `test_coordination.py:32`, `redis-guards.test.ts:67` |
+
+**Live check.** `curl -s https://alert-bedbug-148148.upstash.io/ping` from the coding sandbox on 2026-10-22: **not reachable**. The agent proxy refused the CONNECT tunnel (`403`, `connect_rejected`), so no PING reached Upstash and the database's state was not verified from here.

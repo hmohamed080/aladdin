@@ -107,6 +107,9 @@ The five files above are **persistent project memory and part of the core archit
 - [`operations/staging-deployment-runbook.md`](operations/staging-deployment-runbook.md) — first cloud STAGING setup: agent/code work vs. owner manual steps
 - [`operations/staging-demo-accounts.md`](operations/staging-demo-accounts.md) — the 26 STAGING demo identities: persona, organization, landing route, visible data, and what to demo from each (generated; carries no email addresses)
 - [`operations/monitoring-and-observability.md`](operations/monitoring-and-observability.md)
+- [`operations/cloudflare-cost-scalability-2026-10-22.md`](operations/cloudflare-cost-scalability-2026-10-22.md) — estimated monthly cost at 1k / 10k / 100k DAU for the Cloudflare target architecture vs Vercel
+- [`operations/e2e-shared-failures-triage-2026-10-22.md`](operations/e2e-shared-failures-triage-2026-10-22.md) — the 51 E2E failures shared by the Node and Workers runs, by cause and owner
+- [`operations/cloudflare-migration-status-2026-10-22.md`](operations/cloudflare-migration-status-2026-10-22.md) — Cloudflare migration status, blockers and GO/NO-GO (PR #97)
 - [`operations/showroom-admin-handoff/`](operations/showroom-admin-handoff/README.md) — Showroom V2, Admin and R2 working reports (release readiness, R2 plan, Supabase audit, E2E results)
 
 ## Guides

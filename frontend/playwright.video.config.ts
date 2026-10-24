@@ -57,7 +57,7 @@ export default defineConfig({
     { name: "chromium-mobile", use: { ...devices["Pixel 5"], launchOptions } },
   ],
   webServer: {
-    command: `pnpm exec next build && pnpm exec next start --port ${PORT}`,
+    command: `pnpm build && pnpm exec next start --port ${PORT}`,
     url: `http://127.0.0.1:${PORT}/api/health`,
     // E2E_REUSE_SERVER=1 reuses a server already started with the same env (faster reruns).
     reuseExistingServer: process.env.E2E_REUSE_SERVER === "1",

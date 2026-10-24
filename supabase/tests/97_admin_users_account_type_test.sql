@@ -1,5 +1,5 @@
 -- pgTAP: Admin Users directory — the derived account type and the filters that use it
--- (20261018090000_admin_users_account_type.sql).
+-- (20261021090003_admin_users_account_type.sql).
 --
 --   A. app.user_account_type: persona, owned organization, onboarding choice, none
 --   B. admin_users_list type filter over the full table (incl. a Craftsman not yet activated)

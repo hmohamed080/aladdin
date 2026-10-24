@@ -1,6 +1,5 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript";
 import {
   HEX,
   ARBITRARY_COLOR,
@@ -9,21 +8,30 @@ import {
   FOUNDATION_FILES,
 } from "./eslint/ui-foundation-guard.mjs";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({ baseDirectory: __dirname });
-
 // The guard's regexes and allow-lists live in ./eslint/ui-foundation-guard.mjs
 // — a dependency-free module so `src/lint/foundation-guard.test.ts` can
-// import it directly without also triggering this file's `compat.extends(...)`,
-// which resolves Next's real ESLint config chain as a side effect of module
-// load and has no place running inside a Vitest process.
+// import it directly without also loading Next's real ESLint config chain,
+// which has no place running inside a Vitest process.
 
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...nextVitals,
+  ...nextTypescript,
   {
-    ignores: [".next/**", "node_modules/**", "next-env.d.ts"],
+    // eslint-config-next 16 ships the React Compiler rules of eslint-plugin-react-hooks 7.
+    // They flag patterns this code base used before the Next 16 upgrade, so they warn
+    // until a separate cleanup fixes them; they do not change how anything runs.
+    name: "aladdin/react-compiler-rules-pending",
+    rules: {
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/error-boundaries": "warn",
+      "react-hooks/immutability": "warn",
+      "react-hooks/static-components": "warn",
+      "react-hooks/purity": "warn",
+    },
+  },
+  {
+    ignores: [".next/**", "node_modules/**", "next-env.d.ts", ".open-next/**", ".wrangler/**", "cloudflare/worker.ts"],
   },
   {
     name: "aladdin/ui-foundation",

@@ -76,6 +76,18 @@ async function register(page: Page, request: APIRequestContext, tag: string): Pr
 }
 
 /** A small real PNG, drawn by the browser itself (no binary fixture on disk). */
+/** The primary phone's country picker; the secondary phone section has its own. */
+function primaryCountry(page: Page) {
+  return page.locator("#phone").getByRole("button", { name: "Country" });
+}
+
+async function chooseCountry(page: Page, name: string, { expectMany = false } = {}): Promise<void> {
+  await primaryCountry(page).click();
+  const list = page.getByRole("listbox", { name: "Country" });
+  if (expectMany) expect(await list.getByRole("option").count()).toBeGreaterThan(200);
+  await list.getByRole("option", { name: new RegExp(`^${name}`) }).click();
+}
+
 async function pngBytes(page: Page, colour: string): Promise<Buffer> {
   const b64 = await page.evaluate((fill) => {
     const c = document.createElement("canvas");
@@ -214,9 +226,9 @@ test.describe("Complete your profile", () => {
     await expect(percent).toHaveText("25% complete");
 
     // Phone: Egypt is the default, not the only choice.
-    const country = page.getByLabel("Country");
-    await expect(country).toHaveValue("EG");
-    expect(await country.locator("option").count()).toBeGreaterThan(200);
+    const country = primaryCountry(page);
+    await expect(country).toContainText("+20");
+    await chooseCountry(page, "Egypt", { expectMany: true });
     const national = uniqueEgMobile();
     await page.locator("#phone-national").fill("123");
     await expect(page.getByText(/valid phone number/i)).toBeVisible();
@@ -225,7 +237,7 @@ test.describe("Complete your profile", () => {
     await expect(page.getByText("Phone saved")).toBeVisible();
     await page.reload();
     await expect(page.locator("#phone-national")).toHaveValue(national);
-    await expect(country).toHaveValue("EG");
+    await expect(primaryCountry(page)).toContainText("+20");
     await expect(percent).toHaveText("38% complete");
 
     // Avatar: cancel uploads nothing.
@@ -267,7 +279,8 @@ test.describe("Complete your profile", () => {
     await expect(page.getByText("Photo updated")).toBeVisible({ timeout: 20000 });
     await page.reload();
     const secondSrc = await page.getByTestId("avatar-current").getAttribute("src");
-    expect(secondSrc?.split("?")[0]).not.toBe(firstSrc?.split("?")[0]);
+    // R2 media serves every avatar from /api/media/avatar; the query names the object, so it is what changes.
+    expect(secondSrc).not.toBe(firstSrc);
   });
 
   test("a phone number already held by another account gets a neutral 'unavailable' message", async ({ browser, request }) => {
@@ -333,10 +346,8 @@ test.describe("Complete your profile — seeded account", () => {
     await page.reload();
     await expect(page.getByTestId("display-name-status")).toHaveText("Confirmed");
 
-    const country = page.getByLabel("Country");
-    await expect(country).toHaveValue(/^[A-Z]{2}$/);
-    expect(await country.locator("option").count()).toBeGreaterThan(200);
-    await country.selectOption("EG");
+    await expect(primaryCountry(page)).toContainText(/\+\d+/);
+    await chooseCountry(page, "Egypt", { expectMany: true });
     const national = uniqueEgMobile();
     await page.locator("#phone-national").fill("123");
     await expect(page.getByText(/valid phone number/i)).toBeVisible();
@@ -345,7 +356,7 @@ test.describe("Complete your profile — seeded account", () => {
     await expect(page.getByText("Phone saved")).toBeVisible();
     await page.reload();
     await expect(page.locator("#phone-national")).toHaveValue(national);
-    await expect(country).toHaveValue("EG");
+    await expect(primaryCountry(page)).toContainText("+20");
 
     const red = await pngBytes(page, "red");
     await page.getByTestId("avatar-input").setInputFiles({ name: "a.png", mimeType: "image/png", buffer: red });
@@ -376,7 +387,8 @@ test.describe("Complete your profile — seeded account", () => {
     await expect(page.getByText("Photo updated")).toBeVisible({ timeout: 20000 });
     await page.reload();
     const secondSrc = await page.getByTestId("avatar-current").getAttribute("src");
-    expect(secondSrc?.split("?")[0]).not.toBe(firstSrc?.split("?")[0]);
+    // R2 media serves every avatar from /api/media/avatar; the query names the object, so it is what changes.
+    expect(secondSrc).not.toBe(firstSrc);
 
     const after = (await page.getByTestId("complete-profile-card").count()) > 0 ? await percentOf(page) : 100;
     expect(after).toBeGreaterThanOrEqual(before);
@@ -391,7 +403,7 @@ test.describe("Complete your profile — seeded account", () => {
     const pageA = await a.newPage();
     await signIn(pageA, request, IDENTITIES.consumer, /\/home(\/|$|\?)/);
     await pageA.goto("/home/settings");
-    await pageA.getByLabel("Country").selectOption("EG");
+    await chooseCountry(pageA, "Egypt");
     await pageA.locator("#phone-national").fill(national);
     await pageA.getByRole("button", { name: "Save phone" }).click();
     await expect(pageA.getByText("Phone saved")).toBeVisible();
@@ -403,7 +415,7 @@ test.describe("Complete your profile — seeded account", () => {
     await signIn(pageB, request, IDENTITIES.showroom);
     await pageB.goto("/b2b/settings");
     await expect(pageB.getByTestId("identity-card")).toBeVisible();
-    await pageB.getByLabel("Country").selectOption("EG");
+    await chooseCountry(pageB, "Egypt");
     await pageB.locator("#phone-national").fill(national);
     await pageB.getByRole("button", { name: "Save phone" }).click();
     await expect(pageB.getByText("That phone number is unavailable. Please use a different one.")).toBeVisible();

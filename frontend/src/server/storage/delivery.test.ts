@@ -20,7 +20,7 @@ it.each(["supabase", "r2"])("streams authorized %s bytes without credentials or 
   expect(response.status).toBe(200); expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([1, 2, 3]);
   expect(response.headers.get("cache-control")).toContain("no-store"); expect(response.headers.get("cdn-cache-control")).toBe("no-store");
   for (const name of ["etag", "location", "cf-cache-status"]) expect(response.headers.has(name)).toBe(false);
-  expect(fetcher).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ cache: "no-store", redirect: "error" }));
+  expect(fetcher).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ cache: "no-store", redirect: "manual" }));
   expect(mocks.admin).toHaveBeenCalledTimes(provider === "supabase" ? 1 : 0);
 });
 it.each(["wrong-user", "wrong-tenant", "deleted", "purged"])("denies %s before consulting cached upstream", async () => {
@@ -28,6 +28,11 @@ it.each(["wrong-user", "wrong-tenant", "deleted", "purged"])("denies %s before c
   const response = await deliverMedia(client, "certificate", "owner/file.pdf");
   expect(response.status).toBe(404); expect(response.headers.get("cache-control")).toContain("no-store");
   expect(fetcher).not.toHaveBeenCalled(); expect(mocks.admin).not.toHaveBeenCalled();
+});
+it("never follows or serves an upstream redirect", async () => {
+  fetcher.mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: "https://elsewhere.invalid/" } }));
+  const response = await deliverMedia(client, "portfolio", "image.png");
+  expect(response.status).toBe(404); expect(response.headers.has("location")).toBe(false); expect(fetcher).toHaveBeenCalledTimes(1);
 });
 it("refuses pending display", async () => {
   mocks.resolve.mockResolvedValue({ ...ready, state: "pending" });

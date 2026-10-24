@@ -213,7 +213,7 @@ select ok(
 -- four named product_images_* policies of the private product-images bucket, for 15; Milestone C (20261015090020) added
 -- the four request_images_* policies of the private purchase-request-images bucket, for 19; the Showroom profile image (20261015090043)
 -- added the four organization_images_* policies of the private organization-images bucket, for 23; business verification
--- (20261017160001) added the three bv_documents_* policies of the private business-verification-documents bucket, for 26. Updated here rather than left stale,
+-- (20261021090002) added the three bv_documents_* policies of the private business-verification-documents bucket, for 26. Updated here rather than left stale,
 -- One additional restrictive application-read boundary (R2, 20261018..._rc2_private_media_application_delivery) covers the five revocable media buckets, for 27.
 -- since this file's own point is to name every policy explicitly so a NEW
 -- one cannot pass quietly — the avatars bucket is a reviewed addition, named.
@@ -221,7 +221,7 @@ select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects'),
   28,
-  'Twenty-eight policies on storage.objects: three each for certificates/portfolio/avatars, plus two public doors, plus the four product-images policies (Own Products, 20261015090004), plus the four request-images policies (Purchase Requests, 20261015090020), plus the four organization-images policies (Showroom profile image, 20261015090043), plus the three business-verification document policies (20261017160001), plus the restrictive revocable-media read boundary (R2), plus the restrictive ended-session refusal (20261019163000)'
+  'Twenty-eight policies on storage.objects: three each for certificates/portfolio/avatars, plus two public doors, plus the four product-images policies (Own Products, 20261015090004), plus the four request-images policies (Purchase Requests, 20261015090020), plus the four organization-images policies (Showroom profile image, 20261015090043), plus the three business-verification document policies (20261021090002), plus the restrictive revocable-media read boundary (R2), plus the restrictive ended-session refusal (20261021090014)'
 );
 
 select is(

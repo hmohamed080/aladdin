@@ -1,5 +1,5 @@
 -- pgTAP: secondary phone reservations + current-password confirmation
--- (20261018090001_secondary_phone_reservations.sql).
+-- (20261021090004_secondary_phone_reservations.sql).
 --
 --   A. Password confirmation: receipt binding, single use, 60 s, 5-in-15 lockout, no-password accounts
 --   B. Reserve: one per account, canonical E.164, cross-account and primary conflicts, cooldown

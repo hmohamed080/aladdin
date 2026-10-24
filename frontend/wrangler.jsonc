@@ -1,0 +1,50 @@
+{
+  // Cloudflare Workers host for the Next.js frontend (ADR-0021). Built with
+  // `pnpm cf:build` (OpenNext); Vercel stays the live host until cutover.
+  // Secrets are never written here: set them with `wrangler secret put` per
+  // environment (see docs/guides/cloudflare-frontend.md).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aladdin-frontend",
+  "main": "cloudflare/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend" }],
+  "images": { "binding": "IMAGES" },
+  "observability": { "enabled": true },
+  // The deployed version id keys the edge cache of optimized images (cloudflare/worker.ts).
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  // Local (`wrangler dev`) reads its variables from .dev.vars (never committed).
+  "workers_dev": false,
+
+  "env": {
+    // Isolated acceptance preview on workers.dev: aladdin-r2-acceptance Supabase
+    // project and the acceptance R2 buckets only. No custom domain.
+    "preview": {
+      "name": "aladdin-frontend-preview",
+      "workers_dev": true,
+      "preview_urls": true,
+      "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend-preview" }],
+      "images": { "binding": "IMAGES" },
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
+      "vars": {
+        "NEXT_PUBLIC_APP_ENV": "staging",
+        "REDIS_KEY_ENV": "cf-preview",
+        // Siteverify must report this hostname, or the CAPTCHA check fails closed.
+        "TURNSTILE_ALLOWED_HOSTNAMES": "aladdin-frontend-preview.bstalent9.workers.dev"
+      }
+    },
+    // Production: deployed only after the owner approves the cutover. Routes
+    // (aladdindecore.com) are added at cutover, not before.
+    "production": {
+      "name": "aladdin-frontend-production",
+      "workers_dev": false,
+      "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend-production" }],
+      "images": { "binding": "IMAGES" },
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
+      "vars": {
+        "NEXT_PUBLIC_APP_ENV": "production"
+      }
+    }
+  }
+}

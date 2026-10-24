@@ -47,6 +47,15 @@ export async function middleware(request: NextRequest) {
     },
   );
 
+  // Every redirect below carries the cookies the Supabase client wrote on
+  // `response` (a refreshed session, or a cleared one): the browser must not
+  // keep a refresh token the Auth server has already rotated.
+  const redirectWithSession = (url: URL) => {
+    const redirect = NextResponse.redirect(url);
+    for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
+    return redirect;
+  };
+
   const path = request.nextUrl.pathname;
   const prefetch = isPrefetchRequest(request.method, request.headers);
 
@@ -82,7 +91,7 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/sign-in";
     url.searchParams.set("next", path + request.nextUrl.search);
-    return NextResponse.redirect(url);
+    return redirectWithSession(url);
   }
 
   // A suspended account (PD-010) is refused by the database on every data
@@ -105,22 +114,20 @@ export async function middleware(request: NextRequest) {
       url.pathname = "/auth/sign-in";
       url.search = "";
       if (productSurface) url.searchParams.set("next", path + request.nextUrl.search);
-      const redirect = NextResponse.redirect(url);
-      for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
-      return redirect;
+      return redirectWithSession(url);
     }
     const suspended = status?.suspended === true;
     if (suspended && productSurface) {
       const url = request.nextUrl.clone();
       url.pathname = "/auth/suspended";
       url.search = "";
-      return NextResponse.redirect(url);
+      return redirectWithSession(url);
     }
     if (!suspended && path === "/auth/suspended") {
       const url = request.nextUrl.clone();
       url.pathname = "/onboarding";
       url.search = "";
-      return NextResponse.redirect(url);
+      return redirectWithSession(url);
     }
   }
 
@@ -132,7 +139,7 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/onboarding";
     url.search = "";
-    return NextResponse.redirect(url);
+    return redirectWithSession(url);
   }
 
   return response;
@@ -142,7 +149,9 @@ export async function middleware(request: NextRequest) {
 // need for the Edge runtime: it verifies a JWT with WebCrypto, makes at most a
 // token refresh / admin getUser() / status RPC round trip to Supabase, and
 // reads/writes cookies — all of which the Node runtime supports.
-// Node.js middleware is stable as of Next.js 15.5 (installed: 15.5.22).
+// Node.js middleware is stable as of Next.js 15.5. Next 16 deprecates the file name in
+// favour of `proxy.ts`, which is Node-only; the Workers build needs this file on the Edge
+// runtime (scripts/build-cloudflare.mjs), so it stays `middleware.ts` for now.
 export const runtime = "nodejs";
 
 export const config = {

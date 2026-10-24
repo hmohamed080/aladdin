@@ -30,7 +30,7 @@ custom listbox replacing <select>, tabbed installer entry), sign-up blocked by S
 ## Bugs found on PR89 (fixed, committed locally on local/r2-rc2-snapshot, not pushed)
 - 63bc661: product photo upload always failed — public.organization_media_resolve was STABLE, PostgREST ran it
   read-only, its upload branch reaches app.can_write_publisher's FOR SHARE (25006). New migration
-  20261019100001 marks it VOLATILE; pgTAP 96 asserts it.
+  20261021090010 marks it VOLATILE; pgTAP 96 asserts it.
 - 30ca9d9: next.config localPatterns omitted /images/** -> My Products hero 400 from /_next/image.
 
 ## Left

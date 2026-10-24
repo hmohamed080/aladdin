@@ -45,7 +45,7 @@ select is((select array_agg(p.oid::regprocedure::text order by p.oid::regprocedu
     and has_schema_privilege('media_edge',n.oid,'USAGE')),
   array['media_edge_authorize(text,text,text,uuid,uuid,uuid,timestamp with time zone)','media_edge_public(text,uuid,text)',
         'media_edge_video(uuid,uuid,uuid,uuid,timestamp with time zone)'],
-  'media_edge can execute exactly the Worker functions (images and, since 20261019170000, video)');
+  'media_edge can execute exactly the Worker functions (images and, since 20261021090015, video)');
 select ok(not has_schema_privilege('media_edge','app','USAGE') and not has_schema_privilege('media_edge','auth','USAGE')
   and not has_schema_privilege('media_edge','storage','USAGE'),'media_edge has no internal schema usage');
 select is((select count(*)::int from information_schema.role_table_grants where grantee='media_edge'),0,'media_edge has no table grants');

@@ -196,6 +196,19 @@ describe("middleware — session read (getClaims, no Auth request)", () => {
     claims = null;
     expect(pathOf(await at("/auth/sign-in"))).toBeNull();
   });
+
+  it("carries a session refreshed during the read onto every redirect", async () => {
+    claims = SIGNED_IN;
+    refreshOnRead = true;
+    const bounced = await at("/auth/sign-in");
+    expect(pathOf(bounced)).toBe("/onboarding");
+    expect(bounced.cookies.get("sb-test-auth-token")?.value).toBe("refreshed");
+
+    accountStatus = { status: "suspended", suspended: true };
+    const suspended = await at("/home");
+    expect(pathOf(suspended)).toBe("/auth/suspended");
+    expect(suspended.cookies.get("sb-test-auth-token")?.value).toBe("refreshed");
+  });
 });
 
 describe("middleware — admin routes stay network-validated", () => {

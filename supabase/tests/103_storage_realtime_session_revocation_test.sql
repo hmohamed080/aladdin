@@ -1,5 +1,5 @@
 -- Storage API and Realtime refuse a signed-out, expired, banned or deleted session
--- (migration 20261019163000). Neither service runs the PostgREST pre-request hook, so
+-- (migration 20261021090014). Neither service runs the PostgREST pre-request hook, so
 -- the check lives in restrictive RLS policies, evaluated exactly as each service runs
 -- them: Storage sets role + request.jwt.claims per request; Realtime's
 -- realtime.apply_rls sets them per subscription before a SELECT by primary key.

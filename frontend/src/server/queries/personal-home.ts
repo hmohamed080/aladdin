@@ -4,6 +4,7 @@ import { availabilityState, type AvailabilityState } from "@/lib/profile/availab
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { readSessionIdentity } from "@/server/auth/session";
+import { loadOwnPrimaryAccountType } from "./own-account-type";
 import {
   consumerCompleteness,
   professionalCompleteness,
@@ -159,14 +160,14 @@ export const loadPersonalHome = cache(async function loadPersonalHome(): Promise
   const user = await readSessionIdentity(supabase);
   if (!user) return null;
 
-  const [{ data: profile }, { data: userRow }, { data: progress }, { data: io }, { data: ver }] =
+  const [{ data: profile }, primaryAccountType, { data: progress }, { data: io }, { data: ver }] =
     await Promise.all([
       supabase
         .from("profiles")
         .select("display_name, headline, bio, languages, available_for_work, availability_updated_at")
         .eq("user_id", user.id)
         .maybeSingle(),
-      supabase.from("users").select("primary_account_type").eq("id", user.id).maybeSingle(),
+      loadOwnPrimaryAccountType(user.id),
       supabase.from("onboarding_progress").select("phone, selected_track").eq("user_id", user.id).maybeSingle(),
       supabase.from("individual_onboarding").select("*").eq("user_id", user.id).maybeSingle(),
       supabase
@@ -179,7 +180,7 @@ export const loadPersonalHome = cache(async function loadPersonalHome(): Promise
     ]);
 
   const track: OnboardingTrack | null = progress?.selected_track ?? null;
-  const canonicalType: PersonaType | null = userRow?.primary_account_type ?? null;
+  const canonicalType: PersonaType | null = primaryAccountType;
   const declaredType = io?.prof_concrete_type ?? null;
 
   const input: CompletenessInput = {

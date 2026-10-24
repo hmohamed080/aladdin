@@ -8,7 +8,7 @@ Until then nothing here is used. Business-verification documents are out of
 scope: they stay in their Supabase bucket (PR #88 contract).
 
 Plan: `r2-delivery-architecture.md` WP3. Database side:
-`supabase/migrations/20261019100000_media_edge_authorization.sql` (WP1).
+`supabase/migrations/20261021090009_media_edge_authorization.sql` (WP1).
 App side: `frontend/src/server/storage/edge-ticket.ts` (WP4).
 
 ## Routes
@@ -89,7 +89,7 @@ MEDIA_EDGE_LIVE_ADMIN_URL=postgres://postgres:postgres@127.0.0.1:54322/postgres 
 
 ## Hosted steps (owner approval required; none have been done)
 
-1. **Migration.** Apply `20261019100000_media_edge_authorization.sql` through the
+1. **Migration.** Apply `20261021090009_media_edge_authorization.sql` through the
    permission gate with the other pending migrations. It creates the NOLOGIN
    `media_edge` role.
 2. **Worker login role** (SQL editor or `psql`, as `postgres`; type the password

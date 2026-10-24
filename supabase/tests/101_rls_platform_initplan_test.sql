@@ -1,5 +1,5 @@
 -- The platform-staff read policies evaluate `app.is_platform('support')` once per
--- statement (InitPlan), not per row (migration 20261019130000). Same access:
+-- statement (InitPlan), not per row (migration 20261021090012). Same access:
 -- support staff still read across tenants; nobody else gains anything.
 create extension if not exists pgtap;
 begin;

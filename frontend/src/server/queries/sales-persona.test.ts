@@ -135,10 +135,11 @@ describe("loadIsSalesPersona", () => {
   it("asks only about the CALLER, never a supplied id", async () => {
     given("sales", null);
     await loadIsSalesPersona();
-    expect(asked.from).toEqual(["users", "individual_onboarding"]);
-    expect(asked.select).toEqual(["primary_account_type", "prof_concrete_type"]);
+    // Both reads run in parallel; the order they reach the client is not part of the contract.
+    expect([...asked.from].sort()).toEqual(["individual_onboarding", "users"]);
+    expect([...asked.select].sort()).toEqual(["primary_account_type", "prof_concrete_type"]);
     // Both reads are pinned to auth.getUser()'s id and nothing else.
-    expect(asked.eq).toEqual([
+    expect([...asked.eq].sort()).toEqual([
       ["id", "u-1"],
       ["user_id", "u-1"],
     ]);

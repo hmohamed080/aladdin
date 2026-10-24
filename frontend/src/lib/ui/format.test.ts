@@ -101,6 +101,15 @@ describe("currency", () => {
     expect(formatMoney("not-a-number", "en")).toBe(EMPTY);
     expect(formatCompactMoney(undefined, "ar")).toBe(EMPTY);
   });
+
+  it("formats compact money identically in every runtime (no leading direction mark, no padded zeros)", () => {
+    // Cloudflare Workers' ICU adds U+200F before Arabic thousands; Node pads "7.0" without an explicit minimum.
+    expect(formatCompactMoney(565_500, "ar")).toBe("٥٦٥٫٥\u00a0ألف\u00a0ج.م.\u200f");
+    expect(formatCompactMoney(7, "ar")).toBe("٧\u00a0ج.م.\u200f");
+    expect(formatCompactMoney(-2_500, "ar")).toBe("\u061c-٢٫٥\u00a0ألف\u00a0ج.م.\u200f");
+    expect(formatCompactMoney(7, "en")).toBe("EGP\u00a07");
+    expect(formatCompactMoney(1_100_000, "en")).toBe("EGP\u00a01.1M");
+  });
 });
 
 describe("percentages", () => {

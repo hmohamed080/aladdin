@@ -6,7 +6,7 @@ import type { IdentityFieldState } from "@/server/actions/profile-identity";
 
 /**
  * The unverified second phone (V1, no OTP). Every rule lives in the database
- * (20261018090001_secondary_phone_reservations.sql): one reservation per
+ * (20261021090004_secondary_phone_reservations.sql): one reservation per
  * account, 7 days plus one 7-day renewal, global uniqueness against every
  * primary and secondary claim, the 30-day cooldown, and the current-password
  * receipt (single-use, 60 seconds, bound to user + operation + number, 5 wrong

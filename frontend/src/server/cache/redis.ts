@@ -1,11 +1,22 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { ConnectionTimeoutError, createClient } from "@redis/client";
-import { readCacheEnv } from "@/lib/env/cache";
+import { readCacheEnv, type CacheEnv } from "@/lib/env/cache";
+import { RestCommandError, restCommands, tcpCommands, type RedisCommands } from "./redis-commands";
+
+export type { RedisCommands } from "./redis-commands";
 
 /**
  * The one Redis connection for this server instance, and the key scheme every
  * cache and limiter uses.
+ *
+ * TRANSPORT. With REDIS_REST_URL + REDIS_REST_TOKEN set, every command is one
+ * HTTPS request to Upstash's REST API (redis-commands.ts). Otherwise REDIS_URL
+ * is used over TCP, as below. On Cloudflare Workers TCP is refused (Redis is
+ * treated as unavailable, so the fallbacks apply): a socket opened in one
+ * request cannot be used by a later one there, and @redis/client does not
+ * notice; it just waits for a reply that never comes (ADR-0019, "Workers
+ * runtime").
  *
  * WHAT REDIS IS HERE. An accelerator for data that is the same for every caller
  * who may read it (reference vocabularies), and a counter store for rate limits.
@@ -26,11 +37,16 @@ import { readCacheEnv } from "@/lib/env/cache";
  *     Redis, so an idle instance spends nothing. TCP keep-alive (not a Redis
  *     command) stays on.
  *   * One multiplexed connection per warm instance, reused across invocations.
+ *   * REST has no connection and so no handshake: each command is billed once.
  */
 
 type Client = ReturnType<typeof createClient>;
 
 const COMMAND_TIMEOUT_MS = 150;
+// One HTTPS round trip from the edge to the database's region, including a TLS
+// handshake when the pooled connection has lapsed; TCP's 150 ms is for a
+// command on a connection that is already open.
+const REST_TIMEOUT_MS = 500;
 const CONNECT_TIMEOUT_MS = 1_000;
 // Outer bound on connect + AUTH. Longer than the socket's own timeout because
 // a cold instance's event loop can be busy loading code when the socket timer
@@ -46,7 +62,9 @@ const PROJECTION_MIN_MS = 15 * 60_000;
 
 type Counters = { hits: number; misses: number; sets: number; errors: number; invalidations: number; limited: number; fallback: number };
 const counters = new Map<string, Counters>();
-const usage = { commands: 0, connects: 0, since: Date.now(), warned: 0 };
+// `since` starts on first use, not at module load: on Workers the clock reads
+// 0 (the epoch) while a module initialises.
+const usage = { commands: 0, connects: 0, since: 0, warned: 0 };
 let latencyTotalMs = 0;
 let latencyCount = 0;
 let breakerUntil = 0;
@@ -55,6 +73,7 @@ let lastUsedAt = 0;
 let lastOkAt = 0;
 // Set when an outage is logged, cleared by the next success: one line per outage.
 let outageLogged = false;
+let tcpRefusedLogged = false;
 
 const state = globalThis as typeof globalThis & { __aladdinRedis?: Promise<Client> | null };
 
@@ -82,6 +101,7 @@ class ConnectFailed extends Error {
  */
 export function commandUsage() {
   const { REDIS_MONTHLY_COMMAND_BUDGET: budget } = readCacheEnv();
+  if (usage.since === 0) usage.since = Date.now();
   const elapsed = Date.now() - usage.since;
   const projected = elapsed >= PROJECTION_MIN_MS ? Math.round((usage.commands / elapsed) * 30 * DAY_MS) : null;
   return { commands: usage.commands, connects: usage.connects, sinceMs: elapsed, projectedMonthly: projected, monthlyBudget: budget };
@@ -93,6 +113,7 @@ export function cacheMetrics() {
     namespaces: Object.fromEntries(counters),
     usage: commandUsage(),
     commandLatencyAvgMs: latencyCount ? Number((latencyTotalMs / latencyCount).toFixed(2)) : null,
+    transport: redisTransport(),
     breakerOpen: Date.now() < breakerUntil,
     lastOkAgoMs: lastOkAt ? Date.now() - lastOkAt : null,
   };
@@ -117,6 +138,7 @@ export async function resetRedisForTests() {
   lastUsedAt = 0;
   lastOkAt = 0;
   outageLogged = false;
+  tcpRefusedLogged = false;
   if (pending) await pending.then((client) => client.destroy()).catch(() => undefined);
 }
 
@@ -126,6 +148,11 @@ export function setUsageForTests(values: { since?: number; commands?: number; la
   if (values.commands !== undefined) usage.commands = values.commands;
   if (values.lastUsed !== undefined) lastUsedAt = values.lastUsed;
   usage.warned = 0;
+}
+
+/** Test seam: the open TCP client, if any, for tests that act on the connection itself. */
+export function tcpClientForTests(): Promise<Client> | null {
+  return state.__aladdinRedis ?? null;
 }
 
 /** Test seam: end the breaker's pause early, as the 5 s would. */
@@ -173,6 +200,7 @@ function connect(url: string): Promise<Client> {
 }
 
 function errorCode(error: unknown): string {
+  if (error instanceof RestCommandError) return error.code;
   if (error instanceof ConnectFailed) return error.timedOut ? "connect:timeout" : `connect:${errorCode(error.cause)}`;
   if (error && typeof error === "object") {
     const { code, name } = error as { code?: unknown; name?: unknown };
@@ -187,7 +215,7 @@ function recordFailure(namespace: string, error: unknown) {
   consecutiveFailures += 1;
   // One failed command or connect timeout may be a single dropped connection or
   // a busy cold start; two in a row, or a refused connection, is an outage.
-  const immediate = error instanceof ConnectFailed && !error.timedOut;
+  const immediate = (error instanceof ConnectFailed && !error.timedOut) || (error instanceof RestCommandError && error.rejectedCredentials);
   if (consecutiveFailures < 2 && !immediate) return;
   breakerUntil = Date.now() + BREAKER_MS;
   // Logged once per outage, however often the breaker re-opens, never per request.
@@ -217,16 +245,66 @@ export function lastRedisSuccessAt(): number {
   return lastOkAt;
 }
 
+/** The Cloudflare Workers runtime (workerd), where no I/O object may outlive its request. */
+function onWorkers(): boolean {
+  return typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers";
+}
+
+type Transport = { kind: "rest"; url: string; token: string } | { kind: "tcp"; url: string } | { kind: "none" };
+
+function transportFor(env: CacheEnv): Transport {
+  if (!env.REDIS_CACHE_ENABLED) return { kind: "none" };
+  if (env.REDIS_REST_URL && env.REDIS_REST_TOKEN) return { kind: "rest", url: env.REDIS_REST_URL, token: env.REDIS_REST_TOKEN };
+  if (!env.REDIS_URL) return { kind: "none" };
+  if (onWorkers()) {
+    // Not an outage, a configuration that cannot work here: say so once.
+    if (!tcpRefusedLogged) {
+      tcpRefusedLogged = true;
+      console.warn(JSON.stringify({ event: "cache.redis_tcp_unsupported", runtime: "workers", fix: "set REDIS_REST_URL and REDIS_REST_TOKEN" }));
+    }
+    return { kind: "none" };
+  }
+  return { kind: "tcp", url: env.REDIS_URL };
+}
+
+/** Which transport this instance would use now (`none`: Redis off, or TCP on Workers). */
+export function redisTransport(): Transport["kind"] {
+  return transportFor(readCacheEnv()).kind;
+}
+
+function succeeded(started: number) {
+  latencyTotalMs += performance.now() - started;
+  latencyCount += 1;
+  consecutiveFailures = 0;
+  outageLogged = false;
+  lastOkAt = Date.now();
+  checkBudget();
+}
+
 /**
  * Runs `command` against Redis, or returns `undefined` when Redis is off,
  * unreachable, slow or failing. Never throws. `commands` is how many Redis
  * commands the callback sends, for the budget counter.
  */
-export async function withRedis<T>(namespace: string, command: (client: Client) => Promise<T>, commands = 1): Promise<T | undefined> {
-  const env = readCacheEnv();
-  if (!env.REDIS_CACHE_ENABLED || !env.REDIS_URL) return undefined;
+export async function withRedis<T>(namespace: string, command: (redis: RedisCommands) => Promise<T>, commands = 1): Promise<T | undefined> {
+  const transport = transportFor(readCacheEnv());
+  if (transport.kind === "none") return undefined;
+  if (usage.since === 0) usage.since = Date.now();
   if (Date.now() < breakerUntil) return undefined;
-  const url = env.REDIS_URL;
+  if (transport.kind === "rest") {
+    const started = performance.now();
+    lastUsedAt = Date.now();
+    try {
+      usage.commands += commands;
+      const result = await command(restCommands({ url: transport.url, token: transport.token, timeoutMs: REST_TIMEOUT_MS }));
+      succeeded(started);
+      return result;
+    } catch (error) {
+      recordFailure(namespace, error);
+      return undefined;
+    }
+  }
+  const { url } = transport;
   const attempt = async (): Promise<T> => {
     state.__aladdinRedis ??= connect(url).catch((error: unknown) => {
       state.__aladdinRedis = null;
@@ -240,7 +318,7 @@ export async function withRedis<T>(namespace: string, command: (client: Client) 
       return attempt();
     }
     usage.commands += commands;
-    return command(client);
+    return command(tcpCommands(client));
   };
   const started = performance.now();
   const stale = lastUsedAt > 0 && Date.now() - lastUsedAt > STALE_AFTER_MS;
@@ -257,12 +335,7 @@ export async function withRedis<T>(namespace: string, command: (client: Client) 
       if (old) void old.then((client) => client.destroy()).catch(() => undefined);
       result = await attempt();
     }
-    latencyTotalMs += performance.now() - started;
-    latencyCount += 1;
-    consecutiveFailures = 0;
-    outageLogged = false;
-    lastOkAt = Date.now();
-    checkBudget();
+    succeeded(started);
     return result;
   } catch (error) {
     recordFailure(namespace, error);

@@ -3,7 +3,9 @@
 **Purpose:** connect the existing Upstash account to Aladdin's optional Redis accelerator ([ADR-0019](../decisions/ADR-0019-redis-cache-and-rate-limits.md)) safely, starting on the Free plan.
 **Current decision:** one Free database, used by Preview first and Production second. The owner's database `alert-bedbug-148148.upstash.io` already exists, so use it rather than creating another. The code ships with `REDIS_CACHE_ENABLED=false`.
 
-**Transport:** the app on Vercel (web app and backend) connects over TCP with TLS, using `REDIS_URL` (`rediss://…:6379`). Vercel can reach port 6379. The REST endpoint (`UPSTASH_REDIS_REST_URL` / `_TOKEN`) is not used by the app; see [REST transport](#rest-transport-not-used-by-the-app).
+**Transport:** two, chosen by configuration ([ADR-0019, Workers runtime](../decisions/ADR-0019-redis-cache-and-rate-limits.md#revision-2026-10-20-workers-runtime)):
+- **TCP + TLS** with `REDIS_URL` (`rediss://…:6379`): the web app on Vercel/Node, and the backend (job locks, video job queue).
+- **HTTPS REST** with `REDIS_REST_URL` + `REDIS_REST_TOKEN`: the web app on **Cloudflare Workers**, where a TCP connection cannot be kept between requests. When both are set, REST wins. On Workers with only `REDIS_URL`, the app does not use Redis at all (logs `cache.redis_tcp_unsupported` once; caches read Postgres, limits count in memory). See [REST transport](#rest-transport-cloudflare-workers).
 **Scope:** the web app (`frontend/`) and, optionally, the backend job lock. It does not cover Upstash QStash, Vector or the REST SDK, none of which the app uses.
 
 ## What Redis does here, and what it never does
@@ -42,8 +44,20 @@ rediss://default:<password>@alert-bedbug-148148.upstash.io:6379
 
 - Use `rediss://` (two s, TLS). The app refuses a plain `redis://` URL outside local development.
 - Do **not** append a database number (`/1`): Upstash only has database 0.
-- Do **not** use `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`. The app talks Redis protocol over TCP with `@redis/client`, not the REST API.
+- This is the URL for Vercel and the backend. For Cloudflare Workers, copy the REST pair instead ([step 2b](#2b-rest-url-and-token-cloudflare-workers-only)).
 - The URL contains the password. Treat it as a secret: never paste it in chat, an issue, a PR, or a `NEXT_PUBLIC_` variable.
+
+## 2b. REST URL and token (Cloudflare Workers only)
+
+Same database, same account: REST is another door into `alert-bedbug-148148`, not a new database. Nothing to create.
+
+1. On the database page, open the **REST** tab (or "Connect" → "REST API").
+2. Copy **`UPSTASH_REDIS_REST_URL`** (`https://alert-bedbug-148148.upstash.io`) into the app's **`REDIS_REST_URL`**.
+3. Copy **`UPSTASH_REDIS_REST_TOKEN`** into **`REDIS_REST_TOKEN`**. Use the normal token, **not** the *read-only* token: the app writes cache entries and limiter counters.
+4. The names differ on purpose (`REDIS_REST_*` in the app); do not add the `UPSTASH_*` names.
+5. The token is a secret, like the password. On Workers store it with `wrangler secret put REDIS_REST_TOKEN` (or Dashboard → Worker → Settings → Variables → *Secret*); `REDIS_REST_URL`, `REDIS_KEY_ENV` and `REDIS_CACHE_ENABLED` can be plain variables. **Reset Password** on the database also rotates the REST token.
+
+The app refuses an `http://` REST URL outside local development, and a URL with a token or credentials in it.
 
 ## 3. Add the secrets, Preview first
 
@@ -62,7 +76,9 @@ Redeploy a Preview deployment so it picks up the variables.
 
 After Preview has run cleanly for a few days (step 5), add the same names for **Production**, with `REDIS_KEY_ENV=production`. Preview and Production then share the one Free database, kept apart by the key prefix (`aladdin:preview:…` and `aladdin:production:…`), and share its 500,000 commands.
 
-The backend reads the same `REDIS_URL` and `REDIS_KEY_ENV` for job locks. With `REDIS_URL` unset, background jobs simply run without a cross-process lock.
+The backend reads the same `REDIS_CACHE_ENABLED`, `REDIS_URL` and `REDIS_KEY_ENV` for job locks and the video queue wake-up. With the switch off, `REDIS_URL` unset, or Redis unreachable, background jobs run without a cross-process lock (one `job_lock.redis_unavailable` log line) and the video worker polls.
+
+`REDIS_KEY_ENV` is **required** in every deployed environment while Redis is on (the web app's and the backend's settings both refuse the configuration without it), so two deployments that both count as `staging` (Vercel Preview and the Workers preview, `cf-preview`) never share keys.
 
 ### This cloud coding environment
 
@@ -95,6 +111,7 @@ Never put the URL or token in `.env.local` files that could be committed, and ne
 Two sources, and the Upstash one is authoritative:
 
 - **Upstash console → database → Usage / Metrics.** Shows monthly commands against the plan limit, daily commands, storage, bandwidth and connections. Under **Account → Billing** (paid plans) set a **budget**; at the cap Upstash rate-limits the database instead of billing more.
+- **Monthly budget control (owner setting).** On Free nothing is billed: at 500,000 commands Upstash refuses commands and the app falls back as in an outage. If the database ever moves to pay-as-you-go, set the database's **monthly budget to $5** first (about 2.5M commands at $0.20 per 100K, enough for 5,000 page views a day with edge delivery off), and set `REDIS_MONTHLY_COMMAND_BUDGET` to the same command count so the app's 50% / 80% warnings measure against it. Raising either needs owner approval.
 - **App logs (Vercel → Logs), per server instance:**
   - `cache.redis_budget` with `thresholdPercent` 50 or 80: this one instance, extrapolated from at least 15 minutes of traffic, would use that share of `REDIS_MONTHLY_COMMAND_BUDGET` on its own. Several instances run at once, so the real total is higher: open the Upstash dashboard when you see it.
   - `cache.redis_unavailable`: Redis failed twice in a row, or a connection could not be opened. The app falls back for 5 seconds and tries again. One line per outage, not per request.
@@ -113,6 +130,11 @@ What one event costs:
 | New connection (cold server instance) | 1 (AUTH) |
 | `/api/health` | 0 if Redis was used in the last minute on that instance, else 1 (PING) |
 | Repeated requests from a user already refused | 0 (refused in memory until the window ends) |
+| Video upload completed (wake the transcode worker) | 1 (`LPUSH`) |
+| Backend job lock (historical purge, one run) | 1 AUTH + 1 `SET NX` + 1 per batch (extend) + 1 release |
+| Video transcode worker, idle (`--loop`) | 1 `BLPOP` per 30 s wait: ~86,400 a month per running worker (17% of Free), plus 1 AUTH per reconnect |
+
+The worker's idle cost is the largest fixed item: run `--loop` only where Redis is on, and count each extra worker as another ~86,000 a month.
 
 Monthly estimates (30 days). Assumptions: 10 private images per page view through the proxy; 10% of page views show a vocabulary (1.5 on average) and most of those refill it; uploads 20 / 50 / 250 a day; 3,000 / 4,000 / 6,000 cold starts. Not included: an uptime monitor on `/api/health` (up to ~43,000 more, see risk 3).
 
@@ -129,17 +151,14 @@ Monthly estimates (30 days). Assumptions: 10 private images per page view throug
 3. **A frequent uptime monitor on `/api/health`.** At most one PING per instance per minute, about 43,000 a month for a monitor polling every minute. Poll every 5 minutes, or point the monitor at a page instead.
 4. **Preview and Production share one database.** Heavy preview testing spends Production's allowance. Use a second Free database for Preview if that happens; the plan page lists how many free databases an account may have.
 
-## REST transport (not used by the app)
+## REST transport (Cloudflare Workers)
 
-Upstash also serves every command over HTTPS (`POST` a JSON array with `Authorization: Bearer <token>`). Should the app support it as a second transport? **Not now.**
+Upstash serves every command over HTTPS: `POST` the command as a JSON array to the REST URL with `Authorization: Bearer <token>`, reply `{"result": …}` or `{"error": …}`. The app implements this with plain `fetch` (`frontend/src/server/cache/redis-commands.ts`, no `@upstash/redis` dependency) behind the same `withRedis` seam, bounded at 500 ms per command.
 
-- **No gain on Vercel.**
-  - TCP works there and needs no dependency beyond `@redis/client`.
-  - TCP keeps one multiplexed connection per warm instance: about one network round trip per command, and one `AUTH` per connection.
-  - REST is one HTTPS request per command, with the same command count and billing, and a TLS handshake whenever the HTTP keep-alive connection lapses.
-- **Atomic limiter.** The limiter runs as one `EVAL`; REST runs `EVAL` too, so both transports would have to stay correct.
-- **Only the cloud coding environment needs REST,** and only for read-only checks. The `curl` commands in step 4 cover that.
-- **No dependency if ever needed.** `@upstash/redis` is not justified: a REST transport is about 30 lines of `fetch` behind the existing `withRedis` seam. Reasons to write it would be an Edge-runtime caller, or a host that blocks 6379. Neither applies today.
+- **Why on Workers.** A socket opened in one request cannot be used by a later request there, and `@redis/client` does not notice: it waits for a reply that never comes. Opening a TCP connection per request does work, but each one costs an extra billed `AUTH` and several round trips (TCP, TLS, AUTH) before the command. REST has neither: no connection, no `AUTH`.
+- **Billing.** One REST request = one command, the same as over TCP; the app's command counter and budget warnings are unchanged. `connects` stays 0 on REST.
+- **On Vercel** either transport works; TCP stays the default there (one warm connection, about one round trip per command). If both are set, REST is used.
+- **Verify on Workers:** `/api/health` → `"cache": "ok"` and `cacheMetrics.transport: "rest"`. `cache.redis_unavailable` with `error: "rest:401"` means a wrong or read-only token; `rest:timeout` means slow or unreachable.
 
 ## 6. Roll back
 
@@ -154,7 +173,8 @@ To drop cached vocabularies immediately (for example right after a migration cha
 ## Related files
 
 - [ADR-0019](../decisions/ADR-0019-redis-cache-and-rate-limits.md): what Redis may and may not hold, and measurements.
-- `frontend/src/server/cache/redis.ts`: connection, budget counter, breaker, key scheme.
+- `frontend/src/server/cache/redis.ts`: transport choice, TCP connection, budget counter, breaker, key scheme.
+- `frontend/src/server/cache/redis-commands.ts`: the command interface, and the REST transport.
 - `frontend/src/server/cache/rate-limit.ts`: limits and the memory fallback.
 - `frontend/src/server/cache/reference.ts`: vocabulary cache.
 - `frontend/src/lib/env/cache.ts`: settings; `frontend/.env.example`.

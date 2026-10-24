@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 import type { SidebarMode } from "@/lib/ui/sidebar-mode";
 import { INSTALLER_CONTENT_FRAME_CLASS, INSTALLER_SHELL_GUTTER_CLASS } from "@/features/installer-dashboard-preview/installer-layout";
 import { ShowroomSidebar } from "./sidebar";
@@ -27,7 +27,9 @@ export function ShowroomShell({ children, theme, sidebarMode, displayName, locat
       <ShowroomSidebar initialMode={sidebarMode} mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} capabilities={capabilities} />
       <div className={`${INSTALLER_SHELL_GUTTER_CLASS} flex min-w-0 flex-1 flex-col tablet:gap-6 tablet:pb-10 tablet:pt-6 desktop:pt-8`}>
         <ShowroomTopbar theme={theme} onMenuClick={() => setMobileNavOpen(true)} displayName={displayName} location={location} capabilities={capabilities} workspaceSwitch={workspaceSwitch} notifications={notifications} chat={chat} branchSwitch={branchSwitch} />
-        <main id="top" className={`${INSTALLER_CONTENT_FRAME_CLASS} flex flex-1 flex-col py-4 tablet:py-6 desktop:py-7`}>{banner}{children}</main>
+        {/* The boundary lets the page suspend during hydration (its code still loading) without React replaying
+            <main> itself, which can throw a hydration mismatch (#418) when the code arrives in a different order. */}
+        <main id="top" className={`${INSTALLER_CONTENT_FRAME_CLASS} flex flex-1 flex-col py-4 tablet:py-6 desktop:py-7`}><Suspense>{banner}{children}</Suspense></main>
       </div>
     </div>
   );

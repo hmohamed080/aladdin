@@ -256,7 +256,7 @@ select is(
   (select array_agg(k order by k) from jsonb_object_keys(pg_temp.ul($$'Zeta Probe 01', null, null, null, null, 'registered:desc', 1, 10$$) -> 'rows' -> 0) k),
   array['account_type','city','completion','created_at','display_name','display_name_ar','display_name_en','email',
         'flags','governorate','id','is_verified','latest_verification_status','organization','organization_count',
-        'phone','profile_id','public_profile_available','status','username','verification_state'],
+        'phone','profile_id','public_profile_available','registered_account','status','username','verification_state'],
   'a directory row carries exactly the approved fields — no auth metadata');
 select is((pg_temp.ul($$'Zeta Probe 01', null, null, null, null, 'registered:desc', 1, 10$$) -> 'rows' -> 0 ->> 'profile_id')::uuid,
   (select id from public.profiles where user_id = '67000000-0000-4000-8000-000000000001'),

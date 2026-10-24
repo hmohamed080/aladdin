@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { randomInt } from "node:crypto";
 import { test, expect, type Page } from "@playwright/test";
 import { IDENTITIES, signIn } from "./helpers/auth";
 
@@ -49,7 +50,7 @@ async function expectNoAlias(page: Page): Promise<void> {
 
 async function fillSignUp(page: Page, { name, phone, password = PASSWORD }: { name: string; phone: string; password?: string }) {
   await page.getByLabel("الاسم الكامل").fill(name);
-  await page.getByLabel("رقم الهاتف").fill(phone);
+  await page.getByRole("textbox", { name: "رقم الهاتف" }).fill(phone);
   await page.getByLabel("كلمة المرور", { exact: true }).fill(password);
   await page.getByRole("checkbox").check();
 }
@@ -70,7 +71,7 @@ async function register(page: Page, name: string, phone: string): Promise<void> 
 
 /** Submit sign-in and wait for THAT attempt's server action to settle (the form resets after each one). */
 async function attemptSignIn(page: Page, phone: string, password: string): Promise<void> {
-  await page.getByLabel("رقم الهاتف").fill(phone);
+  await page.getByRole("textbox", { name: "رقم الهاتف" }).fill(phone);
   await page.getByLabel("كلمة المرور", { exact: true }).fill(password);
   const settled = page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/installer/sign-in"));
   await page.getByRole("button", { name: "تسجيل الدخول" }).click();
@@ -78,6 +79,16 @@ async function attemptSignIn(page: Page, phone: string, password: string): Promi
 }
 
 test.describe("installer phone + password auth", () => {
+  // phone_auth_consume_limit allows 10 sign-ups per IP per 15 minutes, and this file alone registers more than
+  // that. Under NEXT_PUBLIC_APP_ENV=local the app takes the client IP from X-Forwarded-For, so each test sends its
+  // own address and counts against its own bucket. The per-phone limit is unaffected.
+  test.beforeEach(async ({ page, baseURL }) => {
+    const ip = `10.${randomInt(256)}.${randomInt(256)}.${randomInt(1, 255)}`;
+    await page.route(`${baseURL}/**`, (route) =>
+      route.continue({ headers: { ...route.request().headers(), "x-forwarded-for": ip } }),
+    );
+  });
+
   test("sign-up creates a normal installer/technician account and lands on /home", async ({ page }) => {
     const phone = uniquePhone();
     const name = `صنايعي اختبار ${phone.slice(-4)}`;
@@ -140,7 +151,7 @@ test.describe("installer phone + password auth", () => {
     await expect(page.getByText("يجب أن تتكون كلمة المرور من 10 أحرف على الأقل")).toBeVisible();
 
     // Duplicate (same number typed in international form) — server-side check.
-    await page.getByLabel("رقم الهاتف").fill(`+20${phone.slice(1)}`);
+    await page.getByRole("textbox", { name: "رقم الهاتف" }).fill(`+20${phone.slice(1)}`);
     await page.getByLabel("كلمة المرور", { exact: true }).fill(PASSWORD);
     await submitSignUp(page);
     await expect(page.getByText("يوجد حساب مسجل بالفعل بهذا الرقم")).toBeVisible();
@@ -166,7 +177,7 @@ test.describe("installer phone + password auth", () => {
     await attemptSignIn(page, uniquePhone(), PASSWORD);
     await expect(page.getByText(generic)).toBeVisible();
 
-    await page.getByLabel("رقم الهاتف").fill(phone);
+    await page.getByRole("textbox", { name: "رقم الهاتف" }).fill(phone);
     await page.getByLabel("كلمة المرور", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "تسجيل الدخول" }).click();
     await page.waitForURL(/\/home$/, { waitUntil: "commit" });

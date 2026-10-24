@@ -4,15 +4,19 @@ Uploaded originals sit in the PRIVATE R2 bucket at ``video/<id>/original``. For
 each video the database hands out (``video_job_claim``, leased, SKIP LOCKED, at
 most three attempts) the worker:
 
-  1. downloads the original and checks its size against the database;
+  1. checks the original's size against the database and reads it from a local
+     copy when the disk holds it, or else straight from R2 over a presigned
+     HTTPS URL for that one object, so no size depends on the host's disk;
   2. probes it with ffprobe, forcing the demuxer the declared type allows and
-     reading local files only, so a crafted container cannot make ffmpeg open a
-     URL or another file;
-  3. refuses media with no video stream or longer than the limit;
+     whitelisting only that demuxer and the input's own protocol (``file``, or
+     ``https,tls,tcp`` for the URL), so a crafted container cannot make ffmpeg
+     open another URL or file;
+  3. refuses media with no video stream;
   4. writes adaptive HLS (fMP4, 360p/720p/1080p, never above the source) and a
-     poster frame;
-  5. uploads the outputs to ``video/<id>/<revision>/`` with a fresh revision, and
-  6. calls ``video_job_finish``. A video deleted meanwhile stays deleted; the
+     poster frame, uploading each finished segment to ``video/<id>/<revision>/``
+     (a fresh revision) and deleting it locally while ffmpeg runs, so outputs
+     never pile up on disk; playlists go last, and
+  5. calls ``video_job_finish``. A video deleted meanwhile stays deleted; the
      purge removes what was written.
 
 The purge (``--purge``) removes deleted and expired videos: it aborts any
@@ -26,6 +30,12 @@ database decides which job runs.
     uv run --group video-worker python -m app.workers.video_transcode --once
     uv run --group video-worker python -m app.workers.video_transcode --loop
     uv run --group video-worker python -m app.workers.video_transcode --purge
+    uv run --group video-worker python -m app.workers.video_transcode --drain
+
+``--drain`` is for hosts that start the worker on demand and bill while it runs
+(Cloudflare Containers, docs/architecture/video-transcode-cloudflare-containers.md):
+it processes every claimable video, purges, and exits. On SIGTERM it stops ffmpeg,
+releases the job for a retry and exits.
 """
 
 from __future__ import annotations
@@ -35,6 +45,7 @@ import hashlib
 import json
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -51,16 +62,25 @@ import structlog
 log = structlog.get_logger(__name__)
 
 # No product limit on length or size (ADR-0020 Revision 2). What remains is
-# technical: ffmpeg's time budget grows with the video, the lease is renewed while
-# it runs, and the host needs disk for the original plus its outputs.
+# technical: ffmpeg's time budget grows with the video and the lease is renewed
+# while it runs. Disk no longer bounds the size: segments leave the disk as they
+# are written, and an original the disk cannot hold is read from R2 over HTTPS.
 LEASE_SECONDS = 900
 LEASE_RENEW_SECONDS = 300
 FFMPEG_MIN_TIMEOUT_SECONDS = 1500
 # Three renditions on a small CPU run at about one to three times real time.
 FFMPEG_SECONDS_PER_MEDIA_SECOND = 8
 PROBE_TIMEOUT_SECONDS = 60
-# Original + renditions (at most about its own size again) + headroom.
-DISK_FACTOR = 2.5
+# Room for what stays on disk while ffmpeg runs: the newest segment of each
+# rendition, init segments, playlists, the poster and ffmpeg's error log. A few
+# MB in practice; generous so a slow upload never fills the disk.
+OUTPUT_HEADROOM_BYTES = 1024**3
+# How often finished segments are uploaded while ffmpeg works.
+UPLOAD_EVERY_SECONDS = 2.0
+# A presigned URL outlives the ffmpeg run that uses it by this much. SigV4 (and
+# R2) refuse more than 7 days.
+URL_SLACK_SECONDS = 300
+URL_MAX_SECONDS = 7 * 24 * 3600
 SEGMENT_SECONDS = 4
 
 # Closed set, mirrored by the media Worker's file pattern (edge/media-worker/src/video.ts).
@@ -81,6 +101,30 @@ CONTENT_TYPES = {
 }
 # The demuxer each accepted upload type may use. Never auto-detected.
 DEMUXERS = {"video/mp4": "mov", "video/quicktime": "mov", "video/webm": "matroska"}
+# The protocols an input URL may use, by scheme. http only reaches the local S3
+# stand-in (S3VideoStore refuses it otherwise). Never file, crypto or hls.
+URL_PROTOCOLS = {"https": "https,tls,tcp", "http": "http,tcp"}
+# ffmpeg 5.1 (Debian bookworm, the image) knows all of these. A dropped connection
+# or a 5xx resumes at the same byte with a Range request; a 403 (such as an expired
+# URL) fails at once; a read stalled for 60 s counts as a dropped connection.
+# What ffmpeg prints when the HTTP layer, not the media, fails.
+NETWORK_ERROR = re.compile(
+    r"Server returned|HTTP error|Connection (?:refused|reset|timed out)|"
+    r"Input/output error|Network is unreachable|Failed to resolve|timed out",
+    re.IGNORECASE,
+)
+RECONNECT = [
+    "-reconnect",
+    "1",
+    "-reconnect_on_network_error",
+    "1",
+    "-reconnect_on_http_error",
+    "5xx",
+    "-reconnect_delay_max",
+    "30",
+    "-rw_timeout",
+    "60000000",
+]
 UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
@@ -98,6 +142,8 @@ class JobClient(Protocol):
 
 class VideoStore(Protocol):
     def download(self, key: str, target: Path) -> int: ...
+    def size(self, key: str) -> int: ...
+    def presign_get(self, key: str, seconds: int) -> str: ...
     def upload(self, source: Path, key: str, content_type: str) -> None: ...
     def delete_prefix(self, prefix: str) -> int: ...
     def abort_multipart(self, key: str, upload_id: str) -> None: ...
@@ -114,9 +160,10 @@ class SupabaseJobClient:
 class S3VideoStore:
     """The private R2 bucket (or the local S3 stand-in) through boto3."""
 
-    def __init__(self, client: Any, bucket: str) -> None:
+    def __init__(self, client: Any, bucket: str, allow_http: bool = False) -> None:
         self._client = client
         self._bucket = bucket
+        self._allow_http = allow_http
 
     @classmethod
     def from_settings(cls, settings: Any) -> S3VideoStore:
@@ -137,14 +184,36 @@ class S3VideoStore:
             aws_secret_access_key=settings.r2_secret_access_key,
             region_name="auto",
             config=Config(
-                retries={"max_attempts": 4, "mode": "standard"}, s3={"addressing_style": "path"}
+                retries={"max_attempts": 4, "mode": "standard"},
+                s3={"addressing_style": "path"},
+                signature_version="s3v4",
             ),
         )
-        return cls(client, settings.r2_private_bucket)
+        # Only the local S3 stand-in speaks plain HTTP; config refuses it outside local.
+        return cls(
+            client, settings.r2_private_bucket, allow_http=bool(settings.r2_local_s3_endpoint)
+        )
 
     def download(self, key: str, target: Path) -> int:
         self._client.download_file(self._bucket, key, str(target))
         return target.stat().st_size
+
+    def size(self, key: str) -> int:
+        return int(self._client.head_object(Bucket=self._bucket, Key=key)["ContentLength"])
+
+    def presign_get(self, key: str, seconds: int) -> str:
+        """A GET for this one object only (SigV4 signs the key), valid for `seconds`.
+        It is a credential: hand it to ffmpeg, never log it."""
+        url = str(
+            self._client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self._bucket, "Key": key},
+                ExpiresIn=max(1, min(seconds, URL_MAX_SECONDS)),
+            )
+        )
+        if not (url.startswith("https://") or (self._allow_http and url.startswith("http://"))):
+            raise RuntimeError("refusing a storage URL that is not HTTPS")
+        return url
 
     def upload(self, source: Path, key: str, content_type: str) -> None:
         self._client.upload_file(
@@ -187,20 +256,96 @@ class Probe:
 
 
 Runner = Callable[[Sequence[str], int], subprocess.CompletedProcess[bytes]]
+# Like Runner, calling the third argument every few seconds while the process runs.
+Transcoder = Callable[[Sequence[str], int, Callable[[], None]], subprocess.CompletedProcess[bytes]]
+# A local copy of the original, or a presigned URL to it in R2.
+Source = Path | str
 
 
 def run(args: Sequence[str], timeout: int) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(list(args), capture_output=True, timeout=timeout, check=False)
 
 
-def _input_args(content_type: str, source: Path) -> list[str]:
+class FfmpegTimeout(RuntimeError):
+    """ffmpeg exceeded its budget. Unlike subprocess.TimeoutExpired, the message does
+    not carry the command line, which may hold a presigned URL."""
+
+
+STDERR_KEEP_BYTES = 64 * 1024
+
+
+def run_ticking(
+    args: Sequence[str],
+    timeout: int,
+    tick: Callable[[], None],
+    every: float = UPLOAD_EVERY_SECONDS,
+) -> subprocess.CompletedProcess[bytes]:
+    """Runs ffmpeg, calling tick() (the segment upload) every few seconds from this
+    thread. Any exception, from tick(), the timeout or Terminated, kills ffmpeg first.
+    stderr goes to a file, so a long run can never block on a full pipe."""
+    deadline = time.monotonic() + timeout
+    with tempfile.TemporaryFile() as err:
+        process = subprocess.Popen(
+            list(args), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err
+        )
+        try:
+            while True:
+                try:
+                    code = process.wait(timeout=every)
+                    break
+                except subprocess.TimeoutExpired:
+                    pass
+                if time.monotonic() > deadline:
+                    raise FfmpegTimeout(f"ffmpeg ran longer than {timeout} s")
+                tick()
+        except BaseException:
+            process.kill()
+            process.wait()
+            raise
+        length = err.seek(0, 2)
+        err.seek(max(0, length - STDERR_KEEP_BYTES))
+        tail = err.read()
+        if length > STDERR_KEEP_BYTES:
+            tail = tail.partition(b"\n")[2]  # never start inside a line, or a URL
+        return subprocess.CompletedProcess(list(args), code, b"", tail)
+
+
+_SECRET = re.compile(r"[a-z][a-z0-9+.-]*://\S+|X-Amz-[A-Za-z-]+=[^&\s'\"]*", re.IGNORECASE)
+
+
+def redact(text: str) -> str:
+    """Removes URLs and SigV4 query parameters: ffmpeg echoes a failing input URL,
+    signature included. Redact before truncating, or a cut may keep part of one."""
+    return _SECRET.sub("<redacted>", text)
+
+
+def _input_args(content_type: str, source: Source) -> list[str]:
     demuxer = DEMUXERS.get(content_type)
     if demuxer is None:
         raise MediaRejected("invalid_media")
-    return ["-protocol_whitelist", "file", "-f", demuxer, "-i", f"file:{source}"]
+    # Both whitelists also bind anything the demuxer opens in turn, so a crafted
+    # file cannot reach HLS, concat or another URL or file.
+    if isinstance(source, Path):
+        protocols, target, network = "file", f"file:{source}", []
+    else:
+        protocols = URL_PROTOCOLS.get(source.partition("://")[0])
+        if protocols is None:
+            raise ValueError("an input URL must be http(s)")
+        target, network = source, RECONNECT
+    return [
+        "-protocol_whitelist",
+        protocols,
+        "-format_whitelist",
+        demuxer,
+        *network,
+        "-f",
+        demuxer,
+        "-i",
+        target,
+    ]
 
 
-def probe(source: Path, content_type: str, runner: Runner = run) -> Probe:
+def probe(source: Source, content_type: str, runner: Runner = run) -> Probe:
     done = runner(
         [
             "ffprobe",
@@ -215,6 +360,10 @@ def probe(source: Path, content_type: str, runner: Runner = run) -> Probe:
         PROBE_TIMEOUT_SECONDS,
     )
     if done.returncode != 0:
+        if isinstance(source, str) and NETWORK_ERROR.search(done.stderr.decode(errors="replace")):
+            # R2 unreachable, a 5xx after the reconnects, or an expired URL: the
+            # storage failed, not the media, so the job is retried.
+            raise RuntimeError("could not read the original from storage")
         raise MediaRejected("invalid_media")
     try:
         data = json.loads(done.stdout)
@@ -277,7 +426,7 @@ def _scale(target: tuple[str, int, str, str], info: Probe) -> str:
 
 
 def transcode_command(
-    source: Path,
+    source: Source,
     content_type: str,
     out: Path,
     info: Probe,
@@ -372,7 +521,7 @@ def transcode_command(
     return args
 
 
-def poster_command(source: Path, content_type: str, target: Path, info: Probe) -> list[str]:
+def poster_command(source: Source, content_type: str, target: Path, info: Probe) -> list[str]:
     at = min(1.0, info.duration / 2)
     return [
         "ffmpeg",
@@ -415,6 +564,54 @@ def output_files(out: Path) -> list[str]:
     if stray:
         raise RuntimeError(f"unexpected output files: {stray[:3]}")
     return files
+
+
+class SegmentUploader:
+    """Moves finished media segments to R2 while ffmpeg runs, so the disk holds only
+    a segment or two per rendition at any time, however long the video.
+
+    A rendition's newest segment may still be being written; every older one is
+    complete (ffmpeg writes a rendition's segments one after another). After ffmpeg
+    exits, flush(final=True) takes the rest. Playlists, init segments and the poster
+    stay on disk for the caller to upload last."""
+
+    def __init__(self, store: VideoStore, out: Path, prefix: str, names: list[str]) -> None:
+        self._store, self._out, self._prefix, self._names = store, out, prefix, names
+        self.uploaded: set[str] = set()
+
+    def flush(self, final: bool = False) -> None:
+        for name in self._names:
+            segments = sorted((self._out / name).glob("seg_*.m4s"))
+            for segment in segments if final else segments[:-1]:
+                relative = f"{name}/{segment.name}"
+                if not OUTPUT_FILE.match(relative):
+                    raise RuntimeError("unexpected output file")
+                self._store.upload(segment, self._prefix + relative, CONTENT_TYPES[".m4s"])
+                segment.unlink()
+                self.uploaded.add(relative)
+
+    def check_playlists(self) -> None:
+        """Every segment a playlist names was uploaded (they are no longer on disk)."""
+        for name in self._names:
+            text = (self._out / name / "index.m3u8").read_text()
+            uris = [line for line in text.splitlines() if line and not line.startswith("#")]
+            missing = [u for u in uris if f"{name}/{u}" not in self.uploaded]
+            if not uris or missing:
+                raise RuntimeError(f"playlist {name} names segments that were not uploaded")
+
+
+def read_locally(size: int, free: int) -> bool:
+    """True: download the original and read it from disk (the common case, and ffmpeg
+    stays on file: only). False: read it from R2 over HTTPS, so its size never
+    depends on this host's disk. Raises when even the outputs' headroom is missing."""
+    if free < OUTPUT_HEADROOM_BYTES:
+        raise InsufficientDisk(f"needs {OUTPUT_HEADROOM_BYTES} bytes free, has {free}")
+    return free >= size + OUTPUT_HEADROOM_BYTES
+
+
+def url_seconds(timeout: int) -> int:
+    """A presigned URL lives as long as the ffmpeg run that reads it, plus slack."""
+    return min(URL_MAX_SECONDS, timeout + URL_SLACK_SECONDS)
 
 
 @dataclass
@@ -468,6 +665,7 @@ def process_one(
     runner: Runner = run,
     workdir: Path | None = None,
     codec: str = "h264",
+    transcoder: Transcoder = run_ticking,
 ) -> JobResult | None:
     jobs.rpc("video_job_expire", {})
     claimed = jobs.rpc("video_job_claim", {"p_lease_seconds": LEASE_SECONDS}) or []
@@ -484,39 +682,51 @@ def process_one(
         root = Path(tmp)
         source, out = root / "original", root / "out"
         try:
-            free = shutil.disk_usage(root).free
-            if free < size * DISK_FACTOR:
-                # The host is too small for this file, not the file too big: retry later.
-                raise InsufficientDisk(f"needs {size * DISK_FACTOR:.0f} bytes, has {free}")
-            if store.download(f"video/{video_id}/original", source) != size:
+            key = f"video/{video_id}/original"
+            # A host short of disk is too small for the job, not the file too big:
+            # InsufficientDisk retries later.
+            local = read_locally(size, shutil.disk_usage(root).free)
+            if (store.download(key, source) if local else store.size(key)) != size:
                 raise MediaRejected("upload_incomplete")
-            info = probe(source, content_type, runner)
+
+            def input_for(timeout: int) -> Source:
+                # A fresh URL per ffmpeg run, living as long as that run may.
+                return source if local else store.presign_get(key, url_seconds(timeout))
+
+            info = probe(input_for(PROBE_TIMEOUT_SECONDS), content_type, runner)
             renditions = plan_renditions(info.width, info.height)
             names = [r[0] for r in renditions]
             for name in names:
                 (out / name).mkdir(parents=True)
-            done = runner(
-                transcode_command(source, content_type, out, info, renditions, codec),
-                ffmpeg_timeout(info.duration),
+            revision = str(uuid.uuid4())
+            prefix = f"video/{video_id}/{revision}/"
+            segments = SegmentUploader(store, out, prefix, names)
+            timeout = ffmpeg_timeout(info.duration)
+            done = transcoder(
+                transcode_command(input_for(timeout), content_type, out, info, renditions, codec),
+                timeout,
+                segments.flush,
             )
             if done.returncode != 0:
-                raise RuntimeError(f"ffmpeg failed: {done.stderr[-400:].decode(errors='replace')}")
+                stderr = redact(done.stderr.decode(errors="replace"))
+                raise RuntimeError(f"ffmpeg failed: {stderr[-400:]}")
+            segments.flush(final=True)
             normalize_outputs(out, names)
+            segments.check_playlists()
             poster = runner(
-                poster_command(source, content_type, out / "poster.jpg", info),
+                poster_command(
+                    input_for(PROBE_TIMEOUT_SECONDS), content_type, out / "poster.jpg", info
+                ),
                 PROBE_TIMEOUT_SECONDS,
             )
             has_poster = poster.returncode == 0 and (out / "poster.jpg").is_file()
             if not has_poster:
                 (out / "poster.jpg").unlink(missing_ok=True)
             files = output_files(out)
-            revision = str(uuid.uuid4())
             # Playlists last: nothing references a segment that is not stored yet.
             for name in sorted(files, key=lambda f: f.endswith(".m3u8")):
                 suffix = name[name.rfind(".") :]
-                store.upload(
-                    out / name, f"video/{video_id}/{revision}/{name}", CONTENT_TYPES[suffix]
-                )
+                store.upload(out / name, prefix + name, CONTENT_TYPES[suffix])
             jobs.rpc(
                 "video_job_finish",
                 {
@@ -533,6 +743,7 @@ def process_one(
                 "video.ready",
                 video=_ref(video_id),
                 renditions=names,
+                source="local" if local else "r2",
                 seconds=round(time.monotonic() - started, 1),
             )
             return JobResult(video_id, "ready")
@@ -550,7 +761,8 @@ def process_one(
                 "video.retry",
                 video=_ref(video_id),
                 error=type(error).__name__,
-                detail=str(error)[:200],
+                # A TimeoutExpired or ffmpeg message can carry the presigned URL.
+                detail=redact(str(error))[:200],
             )
             return JobResult(video_id, "retry", type(error).__name__)
 
@@ -606,6 +818,44 @@ def loop(
         time.sleep(idle_seconds)
 
 
+class Terminated(Exception):
+    """The host asked the worker to stop (SIGTERM). Raised inside the running job, so
+    ffmpeg is killed, the job is released for a retry and the temp files are removed."""
+
+
+def stop_on_sigterm() -> Callable[[], bool]:
+    """Turns the first SIGTERM into Terminated in the main thread. As PID 1 in a
+    container, Python would otherwise ignore SIGTERM until the platform's SIGKILL."""
+    stopping = threading.Event()
+
+    def handler(_signum: int, _frame: object) -> None:
+        if not stopping.is_set():
+            stopping.set()
+            raise Terminated()
+
+    signal.signal(signal.SIGTERM, handler)
+    return stopping.is_set
+
+
+def drain(
+    jobs: JobClient,
+    store: VideoStore,
+    codec: str = "h264",
+    stop: Callable[[], bool] = lambda: False,
+) -> dict[str, int]:
+    """Every claimable video, then the purge, then return: the container exits and
+    stops billing. The database still decides which job runs (SKIP LOCKED leases)."""
+    counts = {"ready": 0, "rejected": 0, "retry": 0, "purged": 0}
+    while not stop():
+        result = process_one(jobs, store, codec=codec)
+        if result is None:
+            break
+        counts[result.outcome] += 1
+    if not stop():
+        counts["purged"] = purge(jobs, store, limit=500)
+    return counts
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -614,6 +864,9 @@ def main(argv: list[str] | None = None) -> int:
         "--loop", action="store_true", help="keep processing; wake on the Redis queue"
     )
     mode.add_argument("--purge", action="store_true", help="remove deleted and expired videos")
+    mode.add_argument(
+        "--drain", action="store_true", help="process every waiting video, purge, then exit"
+    )
     parser.add_argument(
         "--test-codec",
         choices=["vp9"],
@@ -641,18 +894,24 @@ def main(argv: list[str] | None = None) -> int:
     if args.purge:
         print(json.dumps({"purged": purge(jobs, store, limit=500)}))
         return 0
+    if args.drain:
+        stopping = stop_on_sigterm()
+        try:
+            counts = drain(jobs, store, codec=codec, stop=stopping)
+        except Terminated:
+            # Between jobs: nothing is held that the lease would not release.
+            counts = {}
+        log.info("video.drained", **counts, terminated=stopping())
+        print(json.dumps({**counts, "terminated": stopping()}))
+        return 1 if counts.get("retry") else 0
     redis_client = None
-    if settings.redis_url:
-        import redis
+    if settings.redis_active_url:
+        from app.coordination import connect
 
-        # A blocking pop needs a socket timeout longer than its own wait.
-        redis_client = redis.Redis.from_url(
-            settings.redis_url,
-            socket_connect_timeout=2,
-            socket_timeout=45,
-            health_check_interval=30,
-        )
-    loop(jobs, store, redis_client, queue_key(settings.redis_key_env or settings.app_env))
+        # The budget-tuned handshake (no CLIENT SETINFO, no health-check PING):
+        # idle, the worker costs one BLPOP per wait (ADR-0019 command estimate).
+        redis_client = connect(settings.redis_active_url, socket_timeout=45)
+    loop(jobs, store, redis_client, queue_key(settings.redis_namespace))
     return 0
 
 

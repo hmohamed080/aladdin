@@ -1,7 +1,7 @@
 /**
  * The business verification contract the browser can check before anything uploads. It is NOT the
  * authority: the private bucket's `allowed_mime_types` / `file_size_limit`, the document metadata rows
- * and the business_verification_* RPCs (20261017160001) decide. Pure on purpose: no Supabase client.
+ * and the business_verification_* RPCs (20261021090002) decide. Pure on purpose: no Supabase client.
  */
 export const BV_BUCKET = "business-verification-documents";
 export const BV_MAX_BYTES = 10 * 1024 * 1024;

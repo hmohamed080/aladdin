@@ -94,7 +94,7 @@ export async function consumeRateLimit(rule: RateLimitRule, userId: string): Pro
   }
   const key = cacheKey("rl", { user: userId }, rule, String(window));
   const reply = await withRedis("rl", (redis) =>
-    redis.eval(WINDOW_SCRIPT, { keys: [key], arguments: [String(windowSeconds)] }));
+    redis.eval(WINDOW_SCRIPT, [key], [String(windowSeconds)]));
   let used = typeof reply === "number" ? reply : Number.NaN;
   let source: RateLimitResult["source"] = "redis";
   if (!Number.isFinite(used)) {

@@ -1,6 +1,6 @@
 /**
  * Video upload rules shared by the browser, the server (signing) and, as CHECK
- * constraints, the database (20261019170000_media_videos.sql).
+ * constraints, the database (20261021090015_media_videos.sql).
  *
  * There is NO product cap on size or length (ADR-0020 Revision 2). What remains
  * are storage-provider limits, stated rather than hidden:

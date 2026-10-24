@@ -76,4 +76,4 @@ Migration runs are slower than a blind copy, because of the metadata pass and th
 
 ## Related files
 
-[`scripts/media-storage.mjs`](../../scripts/media-storage.mjs) · [`scripts/usage-report.mjs`](../../scripts/usage-report.mjs) · [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md) · [monitoring and observability](monitoring-and-observability.md) · [professional media](../database/professional-asset-storage.md) · migration `supabase/migrations/20261018100000_rc2_verified_media_storage.sql`
+[`scripts/media-storage.mjs`](../../scripts/media-storage.mjs) · [`scripts/usage-report.mjs`](../../scripts/usage-report.mjs) · [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md) · [monitoring and observability](monitoring-and-observability.md) · [professional media](../database/professional-asset-storage.md) · migration `supabase/migrations/20261021090005_rc2_verified_media_storage.sql`

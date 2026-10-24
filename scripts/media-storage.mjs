@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { readMaintenanceEnv } from "../frontend/src/lib/env/media-maintenance.mjs";
 import { readBoundedBody, verifyMediaBytes } from "../frontend/src/server/storage/content-validation.mjs";
+import { verifyImageWithSharp } from "../frontend/src/server/storage/image-processing/sharp-verify.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -269,7 +270,7 @@ const reasonOf = (error) => (statusOf(error) ? `http_${statusOf(error)}` : "erro
 
 /** Copies, verifies and switches the selected rows. Never overwrites R2, never deletes Supabase. */
 export async function migrateRows(selected, io, journal, { maxBytes, batchSize, egressAllowance = null }) {
-  const verify = io.verify ?? verifyMediaBytes;
+  const verify = io.verify ?? ((bytes, contentType, max) => verifyMediaBytes(bytes, contentType, max, verifyImageWithSharp));
   const state = foldJournal(journal.entries);
   const result = { batches: 0, switched: 0, copied: 0, resumedWithoutDownload: 0, mismatches: 0, conflicts: 0,
     failed: 0, downloadedBytes: 0, budgetStop: false };

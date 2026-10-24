@@ -518,8 +518,8 @@ is the absence that already exists.
 | `frontend/src/server/actions/error-mapping.ts` | `mapAssetError` |
 | `supabase/tests/47_professional_asset_storage_test.sql` | policies, key contract, absences, downgrade |
 | `supabase/tests/professional_asset_storage_api_test.mjs` | MIME, size, overwrite, signed URLs, delete |
-| `supabase/migrations/20261018100000_rc2_verified_media_storage.sql`–`20261018100003_*` | R2 branch: provider registry, receipts, migration ledger, restrictive caller-read policy (§14) |
-| `supabase/migrations/20261019100000_media_edge_authorization.sql` | R2 branch: edge Worker authority functions, `media_edge` role, `variants` column (§14) |
+| `supabase/migrations/20261021090005_rc2_verified_media_storage.sql`–`20261021090008_*` | R2 branch: provider registry, receipts, migration ledger, restrictive caller-read policy (§14) |
+| `supabase/migrations/20261021090009_media_edge_authorization.sql` | R2 branch: edge Worker authority functions, `media_edge` role, `variants` column (§14) |
 | `frontend/src/server/storage/{media,delivery,edge-ticket,r2-provider}.ts` | R2 branch: provider-aware resolve, the `no-store` proxy, Worker tickets, R2 writes and variants |
 | `edge/media-worker/` | R2 branch: the `media-edge` Worker ([README](../../edge/media-worker/README.md)) |
 
@@ -561,7 +561,7 @@ Tests on the branch:
 
 Owner decision (ADR-0018 Revision 2): Supabase-hosted portfolio photos and avatars created before a cutoff are permanently deleted; nothing is copied to R2 and no placeholder replaces them. Users see an empty portfolio or the initials avatar and upload again (to R2 once `R2_STORAGE_ENABLED=true`).
 
-- Migration `20261019120000_historical_media_purge.sql`: journal table `media_historical_purge_journal` and four service-role-only functions (`inventory`, `retire`, `storage_removed`, `finalize`). Retire hides published items and unlinks `profiles.avatar_media_id` in one transaction; metadata rows (`portfolio_items`, `avatar_uploads`, `media_storage_locations` with provider `supabase`) are deleted only after the database confirms the object is gone from `storage.objects`.
+- Migration `20261021090011_historical_media_purge.sql`: journal table `media_historical_purge_journal` and four service-role-only functions (`inventory`, `retire`, `storage_removed`, `finalize`). Retire hides published items and unlinks `profiles.avatar_media_id` in one transaction; metadata rows (`portfolio_items`, `avatar_uploads`, `media_storage_locations` with provider `supabase`) are deleted only after the database confirms the object is gone from `storage.objects`.
 - Scope is closed: buckets `professional-portfolio` and `avatars` only, rows older than the cutoff, never a verified R2 object. Certificates (`professional-certificates`), business-verification documents, product and organization images are never selected.
 - Job: `cd backend && uv run python -m app.workers.historical_media_purge --cutoff <ISO>` (dry run), then `--execute --confirm-project <ref>`. Production runs need owner approval and come after R2 writes are on.
 - Tests: `supabase/tests/100_historical_media_purge_test.sql`, `backend/tests/test_historical_media_purge.py`.
@@ -584,7 +584,7 @@ Preparation runs when the original is over the byte ceiling, over the long edge,
 
 Remaining technical limits, stated rather than imposed silently:
 
-- **Server decode limit, 25 MP** (sharp `limitInputPixels` in `content-validation.mjs` and `public-image-variants.ts`) with at most two concurrent decodes per instance. It applies to the derivative only; the largest derivative is 3200 x 3200 = 10.24 MP, and `fitWithin` also clamps to 25 MP.
+- **Server decode limit, 25 MP** (sharp `limitInputPixels` in `image-processing/sharp-verify.mjs` and `sharp-processor.ts`; on Cloudflare Workers the same bound is checked with the Images binding, see [cloudflare-workers-runtime-notes.md](../architecture/cloudflare-workers-runtime-notes.md)) with at most two concurrent decodes per instance. It applies to the derivative only; the largest derivative is 3200 x 3200 = 10.24 MP, and `fitWithin` also clamps to 25 MP.
 - **Browser canvas and decode limits.** Older iPhones cap canvas area (about 16.7 MP) and memory; a source the device cannot decode even at reduced size gets the message above. Derivatives stay at or under 3200 px on the long edge, inside every current canvas limit.
 - **Supabase Free global file limit, 50 MB**, on the rollback path (`R2_STORAGE_ENABLED=false`). Derivatives are at most 10 MiB, so images never reach it.
 - **Documents are not images.** Certificate PDFs and business-verification documents (PDF or image) keep their 10 MiB limit, checked before upload; they are not re-encoded.

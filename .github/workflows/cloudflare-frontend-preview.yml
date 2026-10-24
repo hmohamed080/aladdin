@@ -1,0 +1,150 @@
+# Aladdin - Cloudflare Workers frontend PREVIEW (workers.dev), ADR-0021.
+#
+# Manual only. Builds the app with OpenNext for the `preview` environment in frontend/wrangler.jsonc
+# (Worker `aladdin-frontend-preview`, workers.dev, no custom domain) and uploads it. It never touches
+# Vercel, DNS, aladdindecore.com, the live Supabase project or any Production resource.
+#
+# SAFE BY DEFAULT: nothing is uploaded unless the GitHub Environment `cloudflare-preview` has the variable
+# CLOUDFLARE_PREVIEW_ENABLED set to exactly "true". Without it the run builds and bundles only.
+#
+# GitHub Environment `cloudflare-preview` (restrict it to the branches you allow):
+#   secrets:   CLOUDFLARE_API_TOKEN   (Workers Scripts:Edit on this account only; see docs/guides/cloudflare-frontend.md)
+#   variables: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_PREVIEW_ENABLED,
+#              NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY (the ISOLATED acceptance project only),
+#              NEXT_PUBLIC_TURNSTILE_SITE_KEY (optional)
+# Runtime secrets (service-role key, R2 keys, ticket secret, Redis REST token, ...) are NOT in GitHub: an operator
+# sets them once on the Worker with `wrangler secret put --env preview` (the guide lists them).
+
+# The Supabase URL and anon key default to the isolated acceptance project (both are public values).
+#
+# Runs on pushes to the migration branch as well as manually: GitHub only offers the manual button for
+# workflows on the default branch, and this one stays off `main` until the migration is accepted.
+
+name: Cloudflare frontend preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/cloudflare-workers-2ibvgs]
+    paths: ["frontend/**", ".github/workflows/cloudflare-frontend-preview.yml"]
+
+concurrency:
+  group: cloudflare-frontend-preview
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    name: cloudflare-frontend-preview
+    runs-on: ubuntu-latest
+    environment: cloudflare-preview
+    env:
+      NEXT_PUBLIC_APP_ENV: staging
+      # aladdin-r2-acceptance (nxossqhdfltcqdwvbewi) unless the environment overrides it.
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://nxossqhdfltcqdwvbewi.supabase.co' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54b3NzcWhkZmx0Y3Fkd3ZiZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MjYxMjMsImV4cCI6MjEwNzMwMjEyM30.bhRRGiQK3astY9HTAUKlQBtPKuqKvPGbOycoVo9QT64' }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Enable pnpm (corepack, pinned to packageManager)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+      - name: Refuse the live Supabase project
+        run: |
+          case "$NEXT_PUBLIC_SUPABASE_URL" in
+            *kkpkgjrweysgvhvkhzun*) echo "The preview must use the isolated acceptance project, never the live one"; exit 1 ;;
+            "") echo "NEXT_PUBLIC_SUPABASE_URL is not set on the cloudflare-preview environment"; exit 1 ;;
+          esac
+      - run: pnpm install --frozen-lockfile
+      - name: Build for Workers
+        # An unset repository variable arrives as an empty string, which the env
+        # schema rejects (an optional key must be absent or non-empty) and Next.js
+        # inlines into the bundle, so every page would 500. Drop empty ones.
+        run: |
+          [ -n "$NEXT_PUBLIC_TURNSTILE_SITE_KEY" ] || unset NEXT_PUBLIC_TURNSTILE_SITE_KEY
+          pnpm --filter frontend cf:build
+      - name: Bundle (dry run)
+        working-directory: frontend
+        run: pnpm exec wrangler deploy --env preview --dry-run --outdir "$RUNNER_TEMP/worker"
+      - name: Upload to workers.dev
+        if: vars.CLOUDFLARE_PREVIEW_ENABLED == 'true'
+        working-directory: frontend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        # Server code reads the public Supabase values at runtime too.
+        run: |
+          set -o pipefail
+          pnpm exec wrangler deploy --env preview \
+            --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$NEXT_PUBLIC_SUPABASE_ANON_KEY" | tee "$RUNNER_TEMP/deploy.log"
+          grep -oE 'https://[a-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/deploy.log" | head -1 > "$RUNNER_TEMP/preview-url"
+      - name: Smoke check the preview
+        if: vars.CLOUDFLARE_PREVIEW_ENABLED == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          url=$(cat "$RUNNER_TEMP/preview-url")
+          if [ -z "$url" ]; then echo "The deploy printed no workers.dev URL"; exit 1; fi
+          echo "Preview: $url" | tee -a "$GITHUB_STEP_SUMMARY"
+          # A new workers.dev name can take a minute or two to resolve.
+          for attempt in $(seq 1 18); do
+            health=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url/api/health" || true)
+            [ "$health" = "200" ] && break
+            sleep 10
+          done
+          # Stream the Worker's own logs while the pages are requested, so a 5xx
+          # comes with its exception instead of Next.js's generic error page.
+          tail_log="$RUNNER_TEMP/tail.jsonl"
+          (cd frontend && exec timeout 120 pnpm exec wrangler tail --env preview --format json > "$tail_log" 2> "$RUNNER_TEMP/tail.err") &
+          tail_pid=$!
+          sleep 10
+          server_errors=0
+          for path in /api/health / /auth/sign-in /legal/terms /showroom; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$url$path" || true)
+            echo "$path -> $code" | tee -a "$GITHUB_STEP_SUMMARY"
+            case "$code" in 5*|000) server_errors=$((server_errors + 1)) ;; esac
+          done
+          sleep 5
+          kill "$tail_pid" 2>/dev/null || true
+          wait "$tail_pid" 2>/dev/null || true
+          if [ "$server_errors" -gt 0 ]; then
+            echo "Worker exceptions and error logs during the smoke check:"
+            jq -r '(.exceptions // [])[] | "exception \(.name): \(.message)"' "$tail_log" 2>/dev/null | sort | uniq -c | head -20 || true
+            jq -r '(.logs // [])[] | select(.level == "error") | .message | map(tostring) | join(" ")' "$tail_log" 2>/dev/null \
+              | cut -c1-400 | sort | uniq -c | head -20 || true
+            [ -s "$tail_log" ] || { echo "wrangler tail captured nothing:"; tail -5 "$RUNNER_TEMP/tail.err"; }
+          fi
+          if [ "$health" != "200" ]; then
+            echo "/api/health never returned 200 (last: $health)"
+            host="${url#https://}"
+            account_host="${host#*.}"
+            # Evidence for a Cloudflare support ticket: DNS from two resolvers, the
+            # TLS handshake per protocol for the Worker and the bare account name,
+            # and which Cloudflare colo the runner reached.
+            getent hosts "$host" || echo "the workers.dev name does not resolve"
+            for resolver in 1.1.1.1 8.8.8.8; do
+              echo "DNS via $resolver: $(dig +short "$host" @"$resolver" | tr '\n' ' ')"
+            done
+            for name in "$host" "$account_host"; do
+              for proto in -tls1_2 -tls1_3; do
+                echo "--- openssl $proto $name"
+                echo | timeout 20 openssl s_client -connect "$name:443" -servername "$name" "$proto" 2>&1 \
+                  | grep -E "alert|subject=|issuer=|Verify return|Protocol|Cipher is|no peer certificate" || true
+              done
+            done
+            curl -sS --max-time 20 https://www.cloudflare.com/cdn-cgi/trace | grep -E "^(colo|loc|tls|http)=" || true
+            curl -sS -o /dev/null --max-time 20 "$url/api/health" || true
+            exit 1
+          fi
+          if [ "$server_errors" -gt 0 ]; then
+            echo "$server_errors page(s) returned a server error"
+            exit 1
+          fi

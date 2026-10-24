@@ -1,5 +1,6 @@
 import { createServer, type AddressInfo } from "node:net";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createClient } from "@redis/client";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const identity = vi.hoisted(() => ({ current: { id: "11111111-1111-4111-8111-111111111111" } as { id: string } | null }));
@@ -7,7 +8,7 @@ vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({}) })
 vi.mock("@/server/auth/session", () => ({ readSessionIdentity: async () => identity.current }));
 
 import { cacheEnvSchema } from "@/lib/env/cache";
-import { cacheKey, cacheMetrics, closeBreakerForTests, resetRedisForTests, setUsageForTests, withRedis } from "./redis";
+import { cacheKey, cacheMetrics, closeBreakerForTests, resetRedisForTests, setUsageForTests, tcpClientForTests, withRedis } from "./redis";
 import { cachedReference, invalidateReference } from "./reference";
 import { consumeRateLimit, RATE_LIMITS, resetMemoryLimiterForTests } from "./rate-limit";
 
@@ -28,10 +29,19 @@ describe("cache settings", () => {
     expect(() => cacheEnvSchema.parse({ REDIS_CACHE_ENABLED: "true" })).toThrow();
   });
   it("requires TLS for hosted Redis but allows loopback", () => {
-    expect(() => cacheEnvSchema.parse({ REDIS_CACHE_ENABLED: "true", REDIS_URL: "redis://cache.example.com:6379", APP_ENV: "production" })).toThrow();
-    expect(cacheEnvSchema.parse({ REDIS_CACHE_ENABLED: "true", REDIS_URL: "rediss://default:x@cache.example.com:6379", APP_ENV: "production" }).REDIS_URL).toContain("rediss://");
-    expect(cacheEnvSchema.parse({ REDIS_CACHE_ENABLED: "true", REDIS_URL: "redis://127.0.0.1:6379", APP_ENV: "staging" }).REDIS_CACHE_ENABLED).toBe(true);
+    const keyEnv = { REDIS_KEY_ENV: "production" };
+    expect(() => cacheEnvSchema.parse({ REDIS_CACHE_ENABLED: "true", REDIS_URL: "redis://cache.example.com:6379", APP_ENV: "production", ...keyEnv })).toThrow(/TLS/);
+    expect(cacheEnvSchema.parse({ REDIS_CACHE_ENABLED: "true", REDIS_URL: "rediss://default:x@cache.example.com:6379", APP_ENV: "production", ...keyEnv }).REDIS_URL).toContain("rediss://");
+    expect(cacheEnvSchema.parse({ REDIS_CACHE_ENABLED: "true", REDIS_URL: "redis://127.0.0.1:6379", APP_ENV: "staging", ...keyEnv }).REDIS_CACHE_ENABLED).toBe(true);
     expect(() => cacheEnvSchema.parse({ REDIS_CACHE_ENABLED: "true", REDIS_URL: "http://127.0.0.1:6379" })).toThrow();
+  });
+  it("requires each deployed environment to name its own key namespace", () => {
+    const on = { REDIS_CACHE_ENABLED: "true", REDIS_URL: "rediss://default:x@cache.example.com:6379" };
+    expect(() => cacheEnvSchema.parse({ ...on, APP_ENV: "staging" })).toThrow(/REDIS_KEY_ENV is required/);
+    expect(() => cacheEnvSchema.parse({ ...on, APP_ENV: "production", REDIS_KEY_ENV: "Prod:1" })).toThrow();
+    expect(cacheEnvSchema.parse({ ...on, APP_ENV: "local" }).REDIS_KEY_ENV).toBeUndefined();
+    // Off, nothing is required: the shipped default stays valid everywhere.
+    expect(cacheEnvSchema.parse({ APP_ENV: "production" }).REDIS_CACHE_ENABLED).toBe(false);
   });
 });
 
@@ -124,14 +134,28 @@ describe("with Redis off or unreachable", () => {
 const REDIS_TEST_URL = process.env.REDIS_TEST_URL;
 
 describe.skipIf(!REDIS_TEST_URL)("against a real Redis (REDIS_TEST_URL)", () => {
+  // The app's interface carries only the commands the app sends; inspection
+  // (SCAN, TTL, CLIENT KILL) goes through a separate connection.
+  const admin = createClient({ url: REDIS_TEST_URL, RESP: 2 });
+  const testKeys = async (pattern: string) => {
+    const out: string[] = [];
+    for await (const keys of admin.scanIterator({ MATCH: pattern })) out.push(...keys);
+    return out;
+  };
+  const killAppConnection = async () => {
+    const id = await (await tcpClientForTests())?.clientId();
+    expect(typeof id).toBe("number");
+    await admin.sendCommand(["CLIENT", "KILL", "ID", String(id)]);
+  };
+  beforeAll(async () => { await admin.connect(); });
+  afterAll(async () => { await admin.destroy(); });
   beforeEach(async () => {
     await resetRedisForTests();
     resetMemoryLimiterForTests();
     setEnv({ REDIS_CACHE_ENABLED: "true", REDIS_URL: REDIS_TEST_URL, REDIS_KEY_ENV: `test-${process.pid}`, NEXT_PUBLIC_APP_ENV: "local" });
     identity.current = { id: USER_A };
-    await withRedis("t", async (redis) => {
-      for await (const keys of redis.scanIterator({ MATCH: `aladdin:test-${process.pid}:*` })) if (keys.length) await redis.del(keys);
-    });
+    const keys = await testKeys(`aladdin:test-${process.pid}:*`);
+    if (keys.length) await admin.del(keys);
   });
   afterEach(async () => { await resetRedisForTests(); });
 
@@ -140,7 +164,7 @@ describe.skipIf(!REDIS_TEST_URL)("against a real Redis (REDIS_TEST_URL)", () => 
     expect(await cachedReference("trades", load)).toEqual([{ id: "t1", key: "trade.tiling" }]);
     expect(await cachedReference("trades", load)).toEqual([{ id: "t1", key: "trade.tiling" }]);
     expect(load).toHaveBeenCalledTimes(1);
-    const ttl = await withRedis("t", (redis) => redis.ttl(cacheKey("ref", "global", "trades")));
+    const ttl = await admin.ttl(cacheKey("ref", "global", "trades"));
     expect(ttl).toBeGreaterThan(500);
     expect(ttl).toBeLessThanOrEqual(600);
     expect(cacheMetrics().namespaces.ref).toMatchObject({ hits: 1, misses: 1, sets: 1 });
@@ -168,7 +192,7 @@ describe.skipIf(!REDIS_TEST_URL)("against a real Redis (REDIS_TEST_URL)", () => 
     expect(await cachedReference("trade-specialties", empty)).toEqual([]);
     expect(await cachedReference("trade-specialties", empty)).toEqual([]);
     expect(empty).toHaveBeenCalledTimes(1);
-    const ttl = await withRedis("t", (redis) => redis.ttl(cacheKey("ref", "global", "trade-specialties")));
+    const ttl = await admin.ttl(cacheKey("ref", "global", "trade-specialties"));
     expect(ttl).toBeGreaterThan(0);
     expect(ttl).toBeLessThanOrEqual(300);
   });
@@ -206,13 +230,10 @@ describe.skipIf(!REDIS_TEST_URL)("against a real Redis (REDIS_TEST_URL)", () => 
 
   it("sets a TTL on every limiter key", async () => {
     await consumeRateLimit("media-read", USER_A);
-    const ttls = await withRedis("t", async (redis) => {
-      const out: number[] = [];
-      for await (const keys of redis.scanIterator({ MATCH: `aladdin:test-${process.pid}:v1:rl:*` })) for (const key of keys) out.push(await redis.ttl(key));
-      return out;
-    });
-    expect(ttls?.length).toBe(1);
-    expect(ttls?.every((ttl) => ttl > 0 && ttl <= 60)).toBe(true);
+    const keys = await testKeys(`aladdin:test-${process.pid}:v1:rl:*`);
+    const ttls = await Promise.all(keys.map((key) => admin.ttl(key)));
+    expect(ttls.length).toBe(1);
+    expect(ttls.every((ttl) => ttl > 0 && ttl <= 60)).toBe(true);
   });
 
   it("counts commands and the handshake, and opens one connection for many commands", async () => {
@@ -220,8 +241,9 @@ describe.skipIf(!REDIS_TEST_URL)("against a real Redis (REDIS_TEST_URL)", () => 
     await withRedis("t", (redis) => redis.get("aladdin:none"));
     const { usage } = cacheMetrics();
     expect(usage.connects).toBe(1);
-    // beforeEach's cleanup + two GETs (+ SELECT when REDIS_TEST_URL names a database).
-    expect(usage.commands).toBeGreaterThanOrEqual(3);
+    // Two GETs (+ AUTH / SELECT when REDIS_TEST_URL has a password or names a database).
+    expect(usage.commands).toBeGreaterThanOrEqual(2);
+    expect(usage.commands).toBeLessThanOrEqual(4);
     expect(usage.projectedMonthly).toBeNull();
   });
 
@@ -229,6 +251,8 @@ describe.skipIf(!REDIS_TEST_URL)("against a real Redis (REDIS_TEST_URL)", () => 
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     setEnv({ REDIS_MONTHLY_COMMAND_BUDGET: "1000" });
     const hour = 3_600_000;
+    // Connect first, so the handshake (AUTH/SELECT) is not counted below.
+    await withRedis("t", (redis) => redis.ping(), 0);
     // 1 h of uptime: 0.8 commands/h projects to ~576/month (57%).
     setUsageForTests({ since: Date.now() - hour, commands: 0.8 });
     await withRedis("t", (redis) => redis.get("aladdin:none"), 0);
@@ -255,12 +279,9 @@ describe.skipIf(!REDIS_TEST_URL)("against a real Redis (REDIS_TEST_URL)", () => 
   });
 
   it("reopens a connection the server closed while idle, without an error reaching the caller", async () => {
-    const id = await withRedis("t", (redis) => redis.clientId());
-    expect(typeof id).toBe("number");
+    expect(await withRedis("t", (redis) => redis.ping())).toBe("PONG");
     // The server drops the connection (as an idle timeout or a frozen instance would).
-    const killer = await withRedis("t", (redis) => redis.duplicate().connect());
-    await killer?.sendCommand(["CLIENT", "KILL", "ID", String(id)]);
-    await killer?.destroy();
+    await killAppConnection();
     setUsageForTests({ lastUsed: Date.now() - 60_000 });
     expect(await withRedis("t", (redis) => redis.ping())).toBe("PONG");
     expect(cacheMetrics().usage.connects).toBe(2);
@@ -268,10 +289,8 @@ describe.skipIf(!REDIS_TEST_URL)("against a real Redis (REDIS_TEST_URL)", () => 
   });
 
   it("replaces a connection the server closed, even when it was used moments ago", async () => {
-    const id = await withRedis("t", (redis) => redis.clientId());
-    const killer = await withRedis("t", (redis) => redis.duplicate().connect());
-    await killer?.sendCommand(["CLIENT", "KILL", "ID", String(id)]);
-    await killer?.destroy();
+    expect(await withRedis("t", (redis) => redis.ping())).toBe("PONG");
+    await killAppConnection();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(await withRedis("t", (redis) => redis.ping())).toBe("PONG");
     expect(cacheMetrics().usage.connects).toBe(2);
@@ -282,11 +301,8 @@ describe.skipIf(!REDIS_TEST_URL)("against a real Redis (REDIS_TEST_URL)", () => 
     expect(await consumeRateLimit("video-part", USER_A)).toMatchObject({ outcome: "allowed", source: "redis" });
     resetMemoryLimiterForTests();
     expect(await consumeRateLimit("video-part", USER_A)).toMatchObject({ outcome: "allowed", source: "redis" });
-    const used = await withRedis("t", async (redis) => {
-      const keys: string[] = [];
-      for await (const batch of redis.scanIterator({ MATCH: `aladdin:test-${process.pid}:v1:rl:u-${USER_A}:*` })) keys.push(...batch);
-      return keys.length === 1 ? redis.get(keys[0]!) : null;
-    });
-    expect(used).toBe("2");
+    const keys = await testKeys(`aladdin:test-${process.pid}:v1:rl:u-${USER_A}:*`);
+    expect(keys.length).toBe(1);
+    expect(await admin.get(keys[0]!)).toBe("2");
   });
 });

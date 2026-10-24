@@ -1,3 +1,93 @@
+## 2026-10-24 — Video transcode: originals larger than the Container disk
+
+Branch `claude/cf-video-large-2ibvgs` (local, from `claude/cloudflare-workers-2ibvgs`). This is code and docs only, with nothing deployed. Details: [video-transcode-cloudflare-containers.md](../architecture/video-transcode-cloudflare-containers.md#does-a-long-video-fit).
+
+**Changes in `backend/app/workers/video_transcode.py`:**
+- Finished HLS segments are uploaded to the revision prefix while ffmpeg runs, then deleted locally. Playlists are still uploaded last.
+- An original larger than the free disk minus 1 GiB is read from R2 through a presigned GET URL for that one object. The URL lives as long as the run's own timeout plus 5 min, at most 7 days. The input allows only `https,tls,tcp` and the forced demuxer, with reconnect flags, and the URL is redacted from logs.
+- An original that fits is still read from local disk only.
+- The ceiling moves from ≈ 7.5 GB to R2's 5 TiB object limit and a 7-day wall time per job.
+- **Bug found and fixed** while testing against SeaweedFS: an expired URL or network error during ffprobe was rejected as `invalid_media`. It is now a retry.
+
+**Validation:**
+- `uv run pytest`: 118 passed, 3 skipped (Redis).
+- `ruff check` and `ruff format --check` are clean.
+- A real ffmpeg transcode over local HTTP Range passed, and so did a real S3 API run on SeaweedFS.
+
+**Unfinished:** real R2 and Container tests, the bookworm image (ffmpeg 5.1), a multi-GB original, and a mid-transcode connection drop.
+
+## 2026-10-22 — Consolidated database baseline, tested backup/restore, Production rehearsal
+
+Branch `claude/project-thread-lz98jd` (from `claude/cloudflare-workers-2ibvgs`, PR #97 head). Details: [database-baseline-2026-10-22.md](database-baseline-2026-10-22.md).
+
+- Main's `20261020090001_registration_data_sync` failed on the PR stack, because `admin_users_account_type` had already rewritten `admin_users_list`. The 15 PR-only migrations moved to `20261021090001`..`15` (order kept) so a fresh replay matches `db push` onto main. Main's file is untouched. `admin_users_account_type` keeps `registered_account`.
+- Contracts for main's 3 new functions. The permission gate accepts `CASE ... END`.
+- Local: 5,791/5,791 pgTAP (two resets); upgrade gate 17/17 atomic; lint 0 errors; phone parity 0 mismatches; 3 concurrency proofs; fresh and upgrade fingerprints equal.
+- Found that a `db dump` restore drops the `storage.objects` policies, the auth trigger and the `media_edge` membership, and widens anon/authenticated grants. Added `scripts/hosted-db/security-tail.sql`. With it, the restore is exact (fingerprint, 145 tables of row counts, 5,791 pgTAP on the restored copy).
+- `production-rehearsal.sh` was tested in its local test mode on a Production-like copy. Restore exact, 15 applied, schema equal to the baseline, rows only added where expected.
+
+Unfinished / needs the owner: approval and an owner-run backup for the Acceptance rebuild; the Production rehearsal run (read-only); Hyperdrive and real Cloudflare tests (token and allowed domains still missing). Not touched: any hosted database.
+
+## 2026-10-22 — R2 audit, credentials checklist, DNS export, 15-stage cutover plan
+
+Branch `claude/cf-r2-cutover-2ibvgs` (local, from PR #97). Docs only. Every hosted call was read-only:
+- Cloudflare MCP: `r2_buckets_list`, `r2_bucket_get`, `workers_list`, `workers_get_worker`, `hyperdrive_configs_list`;
+- Vercel MCP: `get_domain` and `get_records` for team `aladdin8`.
+
+There were no Supabase calls, and no change to Cloudflare, Vercel, GitHub or DNS.
+
+- `docs/operations/r2/`:
+  - the bucket audit;
+  - CORS (PUT only, private bucket, ETag exposed) for acceptance and production;
+  - lifecycle rules: `pending/` deleted after 2 days, multipart aborted after 7 days;
+  - the requirement map to code and tests, with what still needs real R2.
+- `docs/operations/cloudflare-credentials-checklist.md`: every name per environment, token scopes, setup locations, and what already exists.
+- `docs/operations/dns-records-aladdindecore-2026-10-22.md`: 11 records, a BIND snippet, proxying flags.
+- `docs/operations/cloudflare-frontend-cutover-plan.md`: rewritten to the owner's 15 stages, each with entry and exit criteria, rollback and approval gate.
+
+Findings:
+- **No DMARC record.**
+- **CAA lacks `ssl.com`.**
+- **The registrar is not Vercel** and was not identified.
+- **No Hyperdrive and no media Worker exist.**
+- **The public acceptance bucket is unused by code.**
+- **FastAPI off Vercel needs an explicit `APP_ENV`**: unset means `local`.
+- **R2 bucket settings are not readable through the MCP tools.**
+
+Validation: `python3 scripts/check_doc_links.py`; the JSON files parse.
+
+Unfinished: everything in the plan; it needs the owner's approval stage by stage.
+
+## 2026-10-20 — Cloudflare Workers frontend (ADR-0021), lead
+
+Branch `claude/cloudflare-workers-2ibvgs` (from the video branch, PR #94 head). OpenNext 1.20.12 + wrangler 4.151.2, Next 15.5.28. `pnpm cf:build` (Edge middleware for Workers only), `cloudflare/worker.ts` (`/api/backend` proxy to `BACKEND_ORIGIN`, `/_next/image` cache, HSTS), `wrangler.jsonc` local/preview/production envs, `playwright.workers.config.ts`, CI job `frontend-cloudflare`, manual preview workflow. Merged: Redis REST (`claude/cf-redis-2ibvgs`), image engine seam (`claude/cf-media-runtime-2ibvgs`), perf report (`claude/cf-perf-2ibvgs`, sharp-lazy commit dropped). Fixed: middleware redirects now carry refreshed session cookies; duplicate reads on `/home` and `/showroom/home`. vinext 1.2.1 trialled and rejected for production (beta, Vite).
+
+Unfinished: workers.dev preview and its E2E (needs a Cloudflare token and the migrated acceptance project); Workers Paid approval; DNS move and cutover.
+
+## 2026-10-20 — Workers media runtime: image engine seam (sharp on Node, Images binding on Workers)
+
+Branch `claude/cf-media-runtime-2ibvgs` (from `claude/cloudflare-workers-2ibvgs`). No hosted call. Findings and design: [cloudflare-workers-runtime-notes.md](../architecture/cloudflare-workers-runtime-notes.md).
+
+- Before: in the Workers build, 38 of 163 routes returned 500 at module load because `media.ts` imported sharp statically. Upload finalize was unreachable.
+- `server/storage/image-processing/`: one `ImageProcessor` interface. Node uses sharp. Workers uses `env.IMAGES`: container check, `info()`, then one thumb transform as the full decode, reused as the thumb variant (3 transforms per R2 upload). Error 9422 fails the upload, logs `media.images_quota_exceeded` and is counted in `/api/health` `imageMetrics`. The engine is swapped at build time (`ALADDIN_BUILD_TARGET=workers` from `open-next.config.ts`, `next.config.ts` module replacement, separate webpack cache). The CI sharp check now looks at the bundled code only and requires the Images engine.
+- Verified: Vitest 4,063 pass / 38 skipped; typecheck clean; lint 0 errors; `scripts/media-storage.test.mjs` 15/15; Node → Workers → Node build sequence (sharp in Node, absent from the Worker); `wrangler deploy --dry-run` bundle clean. On base `82d23c7`, `playwright.workers-media.config.ts` passed 3/3 under `wrangler dev`: large JPEG, EXIF JPEG, video multipart.
+
+Unfinished / needs the owner: E2E not re-run after rebasing onto `bdfab08`, because the local Docker daemon (Supabase, S3 stand-in) went down mid-session. Images plan (Free 5,000/month) and a quota alert. Behaviour only checkable on real Cloudflare (quality, 9422, decoder leniency) is listed in the notes.
+
+## 2026-10-20 — Redis on Cloudflare Workers: Upstash REST transport (ADR-0019 revision)
+
+Branch `claude/cf-redis-2ibvgs` (from `claude/cloudflare-workers-2ibvgs`). `withRedis` callers now use a small command interface with two transports: TCP (`@redis/client`, unchanged for Vercel/Node) and Upstash REST over `fetch` (`REDIS_REST_URL`/`REDIS_REST_TOKEN`; it wins when set). On Workers with only `REDIS_URL`, TCP is refused and Redis counts as unavailable, because in `workerd` a connection reused across requests hangs (`Cannot perform I/O on behalf of a different request`). Evidence and reasoning: ADR-0019 "Workers runtime". The usage clock now starts on first use, because the Workers clock reads 0 during module init.
+
+Validation: `vitest run src/server/cache` 38 pass (24 without `REDIS_TEST_URL`); with `REDIS_TEST_URL` against local Redis (db 0, db 5, and a password-protected instance) all pass; typecheck clean; eslint clean on the touched paths. Real `redis.ts`/`rate-limit.ts` ran in `wrangler dev` against a scratch REST shim.
+
+Not verified: real Upstash from Cloudflare's edge; the full OpenNext app build with Redis enabled.
+
+## 2026-10-20 — Workers (OpenNext) vs Node performance
+
+Branch `claude/cf-perf-2ibvgs` (from `claude/cloudflare-workers-2ibvgs`). Report: `docs/operations/performance-cloudflare-2026-10-20.md`. Same routes, workloads and local Supabase on `wrangler dev` (workerd) and `next start`. Precondition fix `51bf389`: the top-level `sharp` import made every route that imports `server/storage/media.ts` return 500 in workerd. sharp now loads on use. The lead may drop this commit in favour of the Images-binding branch. Results: lab CWV passes on both (Landing LCP regresses on Workers because `/_next/image` is uncached). Server CPU is about the same on both runtimes, and every page, the Server Action, sign-in and refresh use 15–77 ms CPU (over the Workers Free 10 ms limit). The bundle is 5.9 MB gzip (over the Free 3 MB limit), so Workers Paid is required. The isolate live heap is about 96 MB of 128 MB. Workers makes one extra PostgREST request on `/home` and `/showroom/home` (fetch memoization). Hashed `_next/static` is served with `max-age=0`. A middleware redirect drops refreshed cookies (on both runtimes). Vercel is unreachable from the sandbox. Harness: `server-latency.mjs` gained `--cpu-pids`, `--catalog-action`, and the sign-in replay and refresh targets; `run-ab.sh`/`summarize.mjs` gained `A_LABEL`/`B_LABEL`.
+
+Unfinished: none of the fixes listed in the report are implemented. The isolate memory and CPU figures must be confirmed on a real Workers preview.
+
 ## 2026-10-19 — Landing mobile LCP under 2.5 s
 
 Branch `claude/landing-lcp-2ibvgs` (from `claude/video-r2-2ibvgs`). It fixes the one failing page in `performance-2026-10-19.md`. Header logo: `sizes="80px"`, no `priority`, lazy (it was fetched at 1920 px, 104 KB, and preloaded). Footer logo: `sizes="80px"` too. Hero image: `fetchPriority="high"` added to `priority`, and `sizes` capped at 2560 px. Mobile still selects the same 1200 w file, so it looks the same. Fonts: preload only the Latin faces of Readex, Archivo and Reem Kufi (≈ 86 KB, down from 160 KB). The Arabic faces and JetBrains Mono load on use. Arabic pages start their two Arabic faces from an inline `document.fonts.load` script in `<head>`. i18n: `context.tsx` (`useI18n`, new `I18nMessagesProvider`) no longer imports a catalog. The catalog-backed `I18nProvider` moved to `lib/i18n/provider.tsx`, and every layout import was updated. `/` and `/preview/landing` send only the `nav` namespace of the current locale. The bilingual catalog chunk (141 KB) is gone from the Landing page. `landing-messages.test.tsx` checks that the slice renders exactly like the full catalog in en and ar.
@@ -6776,3 +6866,9 @@ Per instruction: no full E2E, no pgTAP, no Lighthouse, no persona matrix.
 Standards: CTA contrast and stale shared-module documentation corrected. Spec: quotation accepted transitions now enforce seller eligibility; RFQ remains open on denial and rejection allowed, verified by3newpgTAP assertions. Sequential taskDB119/119; focusedauth114/114. Direct business contact RPC country metadata validation remains missing, confirmed by rolled-back synthetic diagnostic; added as second merge blocker alongside native quota. No hosted writes. Reviewed build/renderedcontrast/screenshots checked before final push.
 
 Final packaging: implementation05c4eec8 and reviewfix4ae03891 pushed; [PR84](https://github.com/hmohamed080/aladdin/pull/84) verified OPEN/DRAFT targeting main. Additional journey rerun aborted due stalled Docker, not counted as pass; final non-mutating contrast/layout2/2passed and typecheckpassed. Preview3341HTTP200, localAPI63321; original14hashesunchanged. External untracked frontend/e2e/auth-captcha.spec.ts appeared and remains excluded/preserved. No merge/deployment/worktree cleanup. Native quota and direct contact metadata remain merge blockers.
+
+### Cloudflare migration, PR #97 — 2026-10-22
+Merged five audit branches (cost, R2/DNS/credentials/cutover, video on Containers, security, Redis) into `claude/cloudflare-workers-2ibvgs`, fixed stale E2E specs and classified the 51 shared Node/Workers failures. Validated: frontend typecheck, lint (0 errors), targeted unit suites, `cf:build` + `wrangler deploy --dry-run`; backend pytest and ruff. Unfinished: everything hosted (preview unreachable on a workers.dev certificate), Sign In CAPTCHA decision, 17 Showroom RC2 spec drifts for product review. See [status report](cloudflare-migration-status-2026-10-22.md).
+
+### Cloudflare migration, PR #97 — 2026-10-24
+Preview became reachable (certificate issued). Fixed its 500s (empty `NEXT_PUBLIC_TURNSTILE_SITE_KEY` inlined as `""`), made the smoke check fail on 5xx with `wrangler tail` evidence, pinned `TURNSTILE_ALLOWED_HOSTNAMES`, fast-forwarded to #100's 180-migration baseline, ported pyjwt 2.15.1, added `auth-captcha-e2e.yml` (CAPTCHA suites on a GitHub runner with Cloudflare's public test keys). Unfinished: Worker secrets (owner), Workers Builds disconnect (owner), Sign In CAPTCHA decision, 17 Showroom RC2 spec drifts, transcoding originals over 7.5 GB (in progress).

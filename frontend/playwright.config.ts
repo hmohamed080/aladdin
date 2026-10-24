@@ -84,7 +84,7 @@ export default defineConfig({
     // window.__salesRealtime adapter the scoped-realtime E2E relies on). The
     // `env` below applies to this whole command — both `build` and `start` — so the
     // flag is present at build time without any cross-platform env-prefix shim.
-    command: `pnpm exec next build && pnpm exec next start --port ${PORT}`,
+    command: `pnpm build && pnpm exec next start --port ${PORT}`,
     url: BASE_URL,
     // Never silently reuse a stray dev server — the gate must always run against a
     // fresh production build.

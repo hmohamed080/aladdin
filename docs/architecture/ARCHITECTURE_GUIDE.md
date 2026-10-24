@@ -117,7 +117,7 @@ Token/brand changes follow the design-system edit-order (token JSON first) and u
 - **Hosting.** The Worker is a media edge beside Supabase Storage. It is not a Vercel service and not the background-worker host; [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md) is unchanged.
 - **Historical Supabase media is deleted, not migrated** (2026-10-19): portfolio photos and avatars before a cutoff are purged by a resumable, database-confirmed backend job; certificates and verification evidence are never touched. Products and logos stay private (no guest catalog). Media hostname `media.aladdindecore.com` (Pages + CNAME, or a Cloudflare zone). Responsibilities, costs, failure handling and rollback: ADR-0018 Revision 2.
 - **Video (proposed, [ADR-0020](../decisions/ADR-0020-video-r2-hls.md), behind `VIDEO_ENABLED=false`).** Browsers upload originals straight to the private R2 bucket in presigned multipart parts; a separate ffmpeg worker (`backend/app/workers/video_transcode.py`) writes adaptive HLS and a poster to R2; the media Worker serves `/v/` with a Postgres decision (`media_edge_video`) on every playlist and segment. No video byte passes through Supabase or Vercel. The transcode host is a deployment dependency still to be approved.
-- **Session revocation on the Data API.** The `db_pre_request` hook refuses a signed-out, banned or deleted session on its next request (migration `20261019140000`), not at JWT expiry. Storage and Realtime do not run that hook, so restrictive `app.jwt_session_is_live()` policies cover them: `storage.objects` (every command) and the two Realtime-published tables `leads` and `follow_up_tasks` (migration `20261019163000`, pgTAP `103_*`). A table added to the `supabase_realtime` publication needs the same policy; pgTAP `103_*` fails without it.
+- **Session revocation on the Data API.** The `db_pre_request` hook refuses a signed-out, banned or deleted session on its next request (migration `20261021090013`), not at JWT expiry. Storage and Realtime do not run that hook, so restrictive `app.jwt_session_is_live()` policies cover them: `storage.objects` (every command) and the two Realtime-published tables `leads` and `follow_up_tasks` (migration `20261021090014`, pgTAP `103_*`). A table added to the `supabase_realtime` publication needs the same policy; pgTAP `103_*` fails without it.
 - Runbooks: [media monitoring and migration](../operations/media-monitoring.md) · [Worker setup](../../edge/media-worker/README.md) · [professional media contract](../database/professional-asset-storage.md).
 
 ## Realtime Responsibilities
@@ -187,6 +187,7 @@ No Kubernetes, Kafka, RabbitMQ, Redis, Elasticsearch/OpenSearch, event sourcing,
 - [ADR-0005 — Python Data Access (supabase-py; SQLAlchemy deferred)](../decisions/ADR-0005-python-data-access.md)
 - [ADR-0018 — Media delivery: R2 primary store, ticketed edge Worker (Proposed)](../decisions/ADR-0018-r2-edge-media-delivery.md)
 - [ADR-0020 — Video: R2 originals, HLS transcoding worker, per-request edge authorization (Proposed)](../decisions/ADR-0020-video-r2-hls.md)
+- [ADR-0021 — Next.js frontend on Cloudflare Workers (OpenNext), Vercel kept as rollback (Proposed)](../decisions/ADR-0021-cloudflare-workers-frontend.md)
 - Full index: [DECISION_LOG.md](../decisions/DECISION_LOG.md)
 
 ## Architecture-Change Process

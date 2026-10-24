@@ -58,6 +58,6 @@ This is not a production release yet, for these reasons:
 
 ## Migration and deployment plan
 
-1. Apply `20261017160000` and then `20261017160001` to staging, in that order and only after your approval.
+1. Apply `20261021090001` and then `20261021090002` to staging, in that order and only after your approval.
 2. Regenerate the types and run the browser journeys on staging.
 3. Production: only after R2 is cleared, the staging journeys pass and you approve.

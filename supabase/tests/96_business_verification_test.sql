@@ -1,4 +1,4 @@
--- pgTAP: business verification (20261017160000 / 20261017160001).
+-- pgTAP: business verification (20261021090001 / 20261021090002).
 --   A. activation does NOT grant the Verified badge; business verification is a separate request
 --   B. documents: validation, owner-only upload into the private bucket, confirm, removal rules
 --   C. tenant isolation: an outsider can neither read the state nor touch the documents

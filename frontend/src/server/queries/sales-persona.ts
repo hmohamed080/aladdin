@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { readSessionIdentity } from "@/server/auth/session";
+import { loadOwnPrimaryAccountType } from "./own-account-type";
 
 /**
  * "Is this account a SALESPERSON?" — the one frontend answer to the question the
@@ -54,8 +55,8 @@ export const loadIsSalesPersona = cache(async function loadIsSalesPersona(): Pro
   const user = await readSessionIdentity(supabase);
   if (!user) return false;
 
-  const [{ data: userRow }, { data: onboarding }] = await Promise.all([
-    supabase.from("users").select("primary_account_type").eq("id", user.id).maybeSingle(),
+  const [primaryAccountType, { data: onboarding }] = await Promise.all([
+    loadOwnPrimaryAccountType(user.id),
     supabase
       .from("individual_onboarding")
       .select("prof_concrete_type")
@@ -63,5 +64,5 @@ export const loadIsSalesPersona = cache(async function loadIsSalesPersona(): Pro
       .maybeSingle(),
   ]);
 
-  return isSalesPersona(userRow?.primary_account_type, onboarding?.prof_concrete_type);
+  return isSalesPersona(primaryAccountType, onboarding?.prof_concrete_type);
 });

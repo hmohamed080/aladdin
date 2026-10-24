@@ -58,7 +58,7 @@ export async function cachedReference<T>(name: ReferenceName, load: () => Promis
   const rows = await pending;
   const ttl = rows.length > 0 ? REFERENCE_TTL_SECONDS : EMPTY_REFERENCE_TTL_SECONDS;
   const stored = await withRedis("ref", (redis) =>
-    redis.set(key, JSON.stringify(rows), { expiration: { type: "EX", value: ttl } }));
+    redis.setEx(key, JSON.stringify(rows), ttl));
   if (stored !== undefined) count("ref", "sets");
   return rows;
 }

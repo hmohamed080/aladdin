@@ -6,13 +6,17 @@ Application modules import `get_settings()` — they never call `os.getenv` or
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
+from urllib.parse import urlsplit
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # The environments this service knows. Anything else is a configuration error.
 ENVIRONMENTS = ("local", "staging", "production")
+# Same rule as the web app's REDIS_KEY_ENV (frontend/src/lib/env/cache.ts).
+_REDIS_KEY_ENV = re.compile(r"[a-z0-9-]{1,24}")
 # Vercel sets VERCEL_ENV on every deployment. A Preview deployment is staging.
 _FROM_VERCEL = {"production": "production", "preview": "staging", "development": "local"}
 
@@ -47,10 +51,24 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
 
     # --- Redis (optional; job locks and queue wake-ups, never authorization) ---
-    # redis:// or rediss://. Unset: jobs run without a cross-process lock.
+    # The same switch as the web app's (ADR-0019). Off by default, so Redis stays
+    # unused in every environment until the owner accepts it there.
+    redis_cache_enabled: bool = False
+    # rediss:// (TLS) outside local; holds the password, so a secret. Unset or the
+    # switch off: jobs run without a cross-process lock and the video worker polls.
     redis_url: str = ""
-    # Separates environments that share one Redis database.
+    # Key namespace (`aladdin:{env}:v1:...`). Required outside local while Redis is
+    # on, so two deployments sharing one database never share keys.
     redis_key_env: str = ""
+
+    @property
+    def redis_active_url(self) -> str:
+        """REDIS_URL while Redis is switched on, else empty (callers then skip Redis)."""
+        return self.redis_url.strip() if self.redis_cache_enabled else ""
+
+    @property
+    def redis_namespace(self) -> str:
+        return self.redis_key_env or self.environment
 
     # --- R2 (video worker only; the private bucket holding originals and HLS) ---
     r2_account_id: str = ""
@@ -127,6 +145,25 @@ class Settings(BaseSettings):
         # A deployed worker must never write video bytes to a test stand-in.
         if self.r2_local_s3_endpoint and self.environment != "local":
             raise ValueError("R2_LOCAL_S3_ENDPOINT is only allowed in local isolated tests")
+        return self
+
+    @model_validator(mode="after")
+    def _redis_tls_and_namespace(self) -> Settings:
+        if not self.redis_cache_enabled:
+            return self
+        if self.redis_key_env and not _REDIS_KEY_ENV.fullmatch(self.redis_key_env):
+            raise ValueError("REDIS_KEY_ENV must match [a-z0-9-]{1,24}")
+        if self.environment != "local" and not self.redis_key_env:
+            raise ValueError("REDIS_KEY_ENV is required outside local when Redis is enabled")
+        if not self.redis_url.strip():
+            return self
+        url = urlsplit(self.redis_url.strip())
+        if url.scheme not in {"redis", "rediss"}:
+            raise ValueError("REDIS_URL must be a redis:// or rediss:// URL")
+        loopback = url.hostname in {"127.0.0.1", "localhost", "::1"}
+        if self.environment != "local" and url.scheme != "rediss" and not loopback:
+            # The URL carries the password: never send it in clear text.
+            raise ValueError("Hosted Redis must use TLS (rediss://)")
         return self
 
 

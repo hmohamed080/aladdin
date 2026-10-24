@@ -2,7 +2,7 @@
 
 Owner decision 2026-10-19: these images are not migrated to R2. People see an
 empty portfolio or avatar and upload new images (R2 only). The database decides
-what is historical (migration 20261019120000): portfolio and avatar rows created
+what is historical (migration 20261021090011): portfolio and avatar rows created
 before `--cutoff` whose object is not already a verified R2 object, plus orphan
 objects in the same two buckets. Certificates, business-verification documents,
 products, organization images, accounts and profiles are never selected.
