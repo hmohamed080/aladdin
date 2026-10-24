@@ -16,14 +16,13 @@ import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { ProfileHub } from "@/features/profile/profile-hub";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
 
-import { InstallerAccountHub } from "@/features/installer-account/installer-account-hub";
-import { loadMyIdentity } from "@/server/queries/profile-identity";
-import { loadMyServiceAreas, loadMyAvailabilityWindows } from "@/server/queries/service-areas";
+import { InstallerProfilePage } from "@/features/installer-account/installer-profile-page";
+import { getIndividualOnboardingData } from "@/server/queries/onboarding";
+import { loadMyPortfolioProjects, PORTFOLIO_MAX_PROJECT_MEDIA, PORTFOLIO_MAX_PROJECTS } from "@/server/queries/portfolio-projects";
+import { videoEnabled } from "@/server/video/playback";
+import { loadMyIdentity, loadMyProfileCompletion } from "@/server/queries/profile-identity";
+import { loadMyServiceAreas } from "@/server/queries/service-areas";
 import { loadMyTrades } from "@/server/queries/trades";
-import { tradeLabel } from "@/lib/i18n/trade-label";
-import { describeLocation } from "@/lib/location/describe-location";
-import { derivePointsLevel } from "@/lib/network/points-level";
-import { readEnvSupportContact } from "@/features/installer-account/support-contact";
 
 export const dynamic = "force-dynamic";
 
@@ -82,37 +81,34 @@ export default async function ProfileHubPage() {
   const completedJobsCount = assignmentCounts.completed;
 
   if (data.accountType === "installer_technician") {
-    const [identity, areas, windows, trades] = await Promise.all([loadMyIdentity(), loadMyServiceAreas(), loadMyAvailabilityWindows(), loadMyTrades()]);
-    const ar = locale === "ar";
-    const n = (v: number) => new Intl.NumberFormat(ar ? "ar-EG" : "en-EG").format(v);
-    const today = new Date().toISOString().slice(0, 10);
-    const available = windows.length === 0 ? null : windows.some((w) => w.from <= today && (w.to === null || w.to >= today));
-    const level = derivePointsLevel(pointsBalance);
-    const tradeNames = trades.keys.map((k) => tradeLabel(t, k));
+    const [identity, areas, trades, individual, projects, completion] = await Promise.all([
+      loadMyIdentity(),
+      loadMyServiceAreas(),
+      loadMyTrades(),
+      getIndividualOnboardingData(),
+      loadMyPortfolioProjects(),
+      loadMyProfileCompletion(),
+    ]);
+    const answers = individual?.professional;
     return (
-      <InstallerAccountHub
+      <InstallerProfilePage
         data={{
-          name: identity?.displayName ?? "",
-          profession: tradeNames.length ? tradeNames.slice(0, 2).join(" · ") : (ar ? "صنايعي" : "Installer"),
-          location: describeLocation({ governorate: areas.primaryGovernorate, city: areas.primaryCities[0] ?? null, cityCustomName: null }, locale),
-          available,
-          portraitUrl: identity?.avatarUrl ?? null,
+          displayName: identity?.displayName ?? "",
+          avatarUrl: identity?.avatarUrl ?? null,
           coverUrl: identity?.coverUrl ?? null,
-          publicProfileHref: publication.listed && publication.profileId ? `/p/${publication.profileId}` : "/home/profile/edit",
-          stats: [
-            { id: "points", value: n(pointsBalance), label: ar ? "نقطة" : "points" },
-            { id: "jobs", value: n(completedJobsCount), label: ar ? "شغل مكتمل" : "completed jobs" },
-            { id: "rating", value: reviews.average === null ? "—" : new Intl.NumberFormat(ar ? "ar-EG" : "en-EG", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(reviews.average), label: ar ? "متوسط التقييم" : "average rating" },
-            { id: "reviews", value: n(reviews.total), label: ar ? "تقييم" : "reviews" },
-          ],
-          modules: [
-            { id: "network", title: ar ? "معارفي من المعارض" : "My showroom network", description: ar ? "المعارض والشركات التي عملت معها أو دعوتها" : "Showrooms and businesses you worked with or invited", metric: n(network.length), metricLabel: ar ? "شركة في شبكتك" : "businesses in your network", image: "/assets/installer-account/showroom.png", href: "/home/network", tone: "info" },
-            { id: "skills", title: ar ? "مهاراتي وشهاداتي" : "My skills & certificates", description: ar ? "مهنك وشهاداتك الموثقة" : "Your trades and certificates", metric: n(assets.certificateTotal), metricLabel: ar ? "شهادات" : "certificates", chips: tradeNames.slice(0, 4), image: "/assets/installer-account/certificates.png", href: "/home/profile/certificates", tone: "success" },
-            { id: "settings", title: ar ? "الإعدادات" : "Settings", description: ar ? "إدارة حسابك وبياناتك الشخصية والخصوصية" : "Manage your account, personal data, and privacy", metric: "", metricLabel: "", image: "/assets/installer-account/settings.png", href: "/home/settings", tone: "neutral" },
-            { id: "reviews", title: ar ? "تقييماتي" : "My reviews", description: ar ? "تقييمات العملاء لأعمالك وجودة خدماتك" : "Client feedback on your work and service quality", metric: reviews.average === null ? "—" : `${reviews.average} / 5`, metricLabel: ar ? `${n(reviews.total)} تقييمًا من العملاء` : `${reviews.total} client reviews`, stars: reviews.average ?? undefined, image: "/assets/installer-account/reviews.png", href: "/home/reviews", tone: "danger" },
-            { id: "rewards", title: ar ? "نقاطي ومكافآتي" : "My points & rewards", description: ar ? "تابع نقاطك ومستواك" : "Track your points and level", metric: n(pointsBalance), metricLabel: level.remainingToNextLevel === null ? (ar ? "نقطة · أعلى مستوى" : "points · top level") : (ar ? `نقطة · باقي ${n(level.remainingToNextLevel)} للمستوى التالي` : `points · ${level.remainingToNextLevel} to the next level`), progress: level.progressPct, image: "/assets/installer-account/rewards.png", href: "/home/points", tone: "warning" },
-          ],
-          supportHref: readEnvSupportContact(),
+          yearsExperience: answers?.yearsExperience ?? 0,
+          tradeKeys: trades.keys,
+          bio: answers?.bio ?? "",
+          availability: answers?.availability ?? null,
+          governorate: areas.primaryGovernorate ?? answers?.governorate ?? null,
+          city: areas.primaryCities[0] ?? answers?.city ?? null,
+          otherGovernorates: [...new Set(areas.others.map((o) => o.governorateKey))],
+          projects,
+          maxProjects: PORTFOLIO_MAX_PROJECTS,
+          maxMedia: PORTFOLIO_MAX_PROJECT_MEDIA,
+          videoEnabled: videoEnabled(),
+          completion: completion ?? { percent: 0, missing: [] },
+          publicProfileHref: publication.listed && publication.profileId ? `/p/${publication.profileId}` : null,
         }}
       />
     );

@@ -137,7 +137,7 @@ export function InstallerNetwork({
                 </Link>
               </div>
               <div className="hidden justify-center tablet:flex" aria-hidden="true">
-                <Image src="/assets/installer-network/showroom-invite.png" alt="" width={224} height={150} className="h-36 w-56 scale-125 object-contain" priority />
+                <Image src="/assets/installer-network/showroom-invite.png" alt="" width={224} height={144} className="h-36 w-56 scale-125 object-contain" priority />
               </div>
             </div>
           </section>

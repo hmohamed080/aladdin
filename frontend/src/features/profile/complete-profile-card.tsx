@@ -31,12 +31,15 @@ export const ITEM_HREF: Record<ProfileCompletionItem, string> = {
   display_name: "/settings/profile#display-name",
   locality: "/settings/profile",
   headline: "/home/profile/edit",
-  years_experience: "/home/profile/edit",
-  activities: "/home/profile/edit",
+  years_experience: "/home/profile#basic",
+  activities: "/home/profile#basic",
   bio: "/home/profile/edit",
   organization_address: "/b2b/settings",
   organization_activities: "/b2b/settings",
   organization_setup: "/business/new",
+  availability: "/home/profile#availability",
+  location: "/home/profile#basic",
+  portfolio: "/home/profile#portfolio",
 };
 
 /**

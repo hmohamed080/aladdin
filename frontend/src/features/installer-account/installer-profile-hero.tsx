@@ -1,10 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Area } from "react-easy-crop";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
-import { CameraIcon, PencilIcon, TrashIcon } from "@/components/ui/icons";
+import Link from "next/link";
+import { CameraIcon, PencilIcon, TrashIcon, UserIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
 import { cropImageToBlob } from "@/lib/media/crop-image";
 import { uploadWithGrant } from "@/lib/storage/browser-upload";
@@ -32,12 +34,15 @@ export function InstallerProfileHero({
   coverUrl,
   title,
   subtitle,
+  publicProfileHref = null,
 }: {
   displayName: string;
   avatarUrl: string | null;
   coverUrl: string | null;
   title: string;
   subtitle: string;
+  /** `/p/<profile id>` once the profile is public; the button is shown only then. */
+  publicProfileHref?: string | null;
 }) {
   const { locale } = useI18n();
   const ar = locale === "ar";
@@ -116,8 +121,8 @@ export function InstallerProfileHero({
           // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not a static asset
           <img src={coverUrl} alt="" className="h-full w-full object-cover object-center" data-testid="profile-cover" />
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element -- approved default artwork
-          <img src="/assets/installer-account/profile-completion-hero-2026.png" alt="" className="h-full w-full object-cover object-center" />
+          // Optimised by next/image: the source PNG is 1.7 MB, the delivered WebP/AVIF a fraction of that.
+          <Image src="/assets/installer-account/profile-completion-hero-2026.png" alt="" fill priority sizes="(min-width: 1024px) 80vw, 100vw" className="object-cover object-center" />
         )}
         <div className="absolute inset-0 hidden bg-gradient-to-l from-canvas/45 via-canvas/10 to-transparent tablet:block ltr:tablet:bg-gradient-to-r" />
       </div>
@@ -144,6 +149,11 @@ export function InstallerProfileHero({
       <input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp" aria-label={ar ? "رفع صورة الغلاف" : "Upload cover photo"} className="sr-only" onChange={(e) => pick("cover", e)} data-testid="profile-cover-input" />
       <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" aria-label={ar ? "رفع صورة الملف" : "Upload profile photo"} className="sr-only" onChange={(e) => pick("avatar", e)} data-testid="profile-avatar-input" />
       <div className="relative z-raised flex flex-wrap gap-sm px-md pb-md tablet:absolute tablet:bottom-md tablet:end-md tablet:p-0">
+        {publicProfileHref ? (
+          <Link href={publicProfileHref} className="flex min-h-11 items-center gap-xs rounded-md border border-strong bg-surface px-md text-label font-bold text-fg shadow-raised transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" data-testid="profile-public-link">
+            <UserIcon size={16} />{ar ? "عرض ملفي العام" : "View public profile"}
+          </Link>
+        ) : null}
         <button type="button" onClick={() => coverInput.current?.click()} disabled={busy} className="flex min-h-11 items-center gap-xs rounded-md border border-accent bg-accent-solid px-md text-label font-bold text-on-accent shadow-raised transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-60" data-testid="profile-cover-change">
           <CameraIcon size={17} />{ar ? "تغيير صورة الغلاف" : "Change cover photo"}
         </button>

@@ -25,16 +25,16 @@ export function SettingsSection({ number, title, description, icon: Icon, compac
   number: string; title: string; description: string; icon: Icon; compact?: boolean; children: ReactNode;
 }) {
   return (
-    <section aria-labelledby={`settings-${number}`} className="grid min-w-0 gap-md rounded-lg border bg-surface p-sm desktop:grid-cols-4">
-      <div className={`relative flex gap-md rounded-md bg-surface-2 p-md desktop:col-span-1 ${compact ? "items-center" : "items-center desktop:flex-col desktop:justify-center desktop:py-xl desktop:text-center"}`}>
+    <section aria-labelledby={`settings-${number}`} data-settings-section className="grid min-w-0 gap-md rounded-lg border bg-surface p-sm desktop:grid-cols-4">
+      <div data-settings-summary className={`relative flex gap-md rounded-md bg-surface-2 p-md desktop:col-span-1 ${compact ? "items-center" : "items-center desktop:flex-col desktop:justify-center desktop:py-xl desktop:text-center"}`}>
         <span className="absolute end-3 top-3 text-label font-semibold tabular-nums text-fg" aria-hidden="true">{number}</span>
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-pill bg-canvas text-fg"><Icon size={28} /></span>
+        <span data-settings-summary-icon className="grid h-12 w-12 shrink-0 place-items-center rounded-pill bg-canvas text-fg"><Icon size={28} /></span>
         <div className="min-w-0 pe-lg">
           <h2 id={`settings-${number}`} className="text-title font-semibold text-fg">{title}</h2>
           <p className="mt-2 text-body leading-relaxed text-fg-secondary">{description}</p>
         </div>
       </div>
-      <div className="min-w-0 p-sm desktop:col-span-3 desktop:p-md">{children}</div>
+      <div data-settings-body className="min-w-0 p-sm desktop:col-span-3 desktop:p-md">{children}</div>
     </section>
   );
 }

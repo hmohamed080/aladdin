@@ -84,7 +84,6 @@ export default async function PersonalPointsPage({
           locale={locale}
           overview={overview}
           recent={toPointsEntryViews(entries, t, locale, names)}
-          earn={{ title: m.points.earn.title, ruleTitle: m.points.earn.ruleTitle, ruleBody: m.points.earn.ruleBody, ruleNote: m.points.earn.ruleNote, more: m.points.earn.more }}
         />
       );
     } catch {

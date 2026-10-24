@@ -39,6 +39,8 @@ function refresh() {
   revalidatePath("/home/profile/edit");
   revalidatePath("/home/profile/portfolio");
   revalidatePath("/home/profile");
+  // The dashboard banner's completion counts a portfolio project.
+  revalidatePath("/home");
 }
 
 type Details = { title: string; location: string | null; description: string | null };

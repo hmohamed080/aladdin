@@ -1,3 +1,32 @@
+## 2026-10-24 — Installer profile completion: one rule on three surfaces, E2E, local checkpoint
+
+Branch `integration/approved-features-20261019`: HEAD `9cc8eb87` plus one local checkpoint commit. Base `origin/main` is `a9723a01` (fetched 2026-10-24); the branch is 89 commits ahead, 0 behind. **Nothing pushed, no hosted write, no deploy.** The branch's configured upstream is `origin/claude/media-backend-continuation-2ibvgs` (PR #91): never run a bare `git push` from it.
+
+- **Approved Installer profile.** `/home/profile` is the approved "Complete your profile" page on real data (`installer-profile-page.tsx`, `saveInstallerProfileAction`). Migration `20261024090000_installer_profile_completion` redefines `app.profile_completion` so an Installer counts the four shared items (username, photo, phone, confirmed name) plus the five the page asks for: experience, specialties, availability, a primary governorate/city and at least one portfolio project (9 items). Every other persona is unchanged. The dashboard banner, `/home/profile` and `/settings/profile` read the same figure. An Installer's `/home/settings` is the installer settings page and does not show completion.
+- **Polish in the same checkpoint.** Sidebar highlight, mobile top bar with bell and avatar, points page rewards, dark-mode Settings, service-area names on the public profile (`/p/<profiles.id>`; the user id deliberately 404s), `showroom-invite.png` height now matches its CSS size, test ids on the banner and the page percent, `.next-perf/` and `.next-review/` ignored by git and ESLint.
+- **Removed as temporary:** the `NEXT_LOCAL_DIST_DIR` block in `next.config.ts` and the build-generated edits to `next-env.d.ts` and `tsconfig.json`.
+
+### Verification (all on this working tree)
+
+- typecheck pass; `pnpm lint` 0 errors, 8 warnings; Vitest 336 files, 4,297 passed, 38 skipped, 0 failed. The one timing-sensitive Cloudflare Images test ("steps quality down…", 2.8 s alone, 5 s limit) can time out when the suite runs under heavy load; it passes alone and is unrelated.
+- pgTAP: all 140 files, 6,284 tests, on a fresh isolated stack (`supabase start` from a copied `supabase/` with other ports, deleted afterwards). On the long-lived local dev DB 32 files fail only because it holds dev data (74 users), so never use it as the pgTAP result.
+- Migration policy (as CI runs it) passes; guard unit tests 29/29; the permission gate's own functions, run read-only against a DB with the new migration, report the 163 reviewed migrations unchanged, atomic form OK and all 688 function contracts exact. No new `supabase/permissions/*.json` is needed.
+- E2E, isolated stack, production build of the working tree, desktop: new `installer-profile-completion.spec.ts` passes on desktop and mobile; `profile-completion.spec.ts` 10/12.
+
+### E2E changes (derived, not re-numbered)
+
+- New spec registers a fresh installer by phone, fills `/home/profile` through its real controls, adds a portfolio project and a photo, and after every step compares the banner, the page and the Settings card with a per-item count taken from the raw tables (not from `my_profile_completion()`), including the card's missing list. At 100% the banner and the card are correctly absent.
+- `profile-completion.spec.ts`: the generic-card tests now register a **Sales Team** member (card still drawn for non-installers). The 25% / 38% / 50% figures stay because the rule gives Sales 4 shared + headline, years, about and an activity = 8 items (migration `20260924090003` seeds `sales_rep` and `sales_manager`). The two Tradespeople tests now check the approved Installer page. Fixed stale locators: the phone country control is a listbox button (not a `<select>`), and an avatar replacement is a different `?key=` URL on the same `/api/media/avatar` path.
+- Still red and untouched by this diff: the two showroom-owner tests (`/b2b/settings` redirects to `/showroom/settings`, which has no `identity-card` or `activity-selector` there).
+
+### Not done / owner decisions
+
+- Hosted DB: this migration and the stack's ~26 unapplied migrations are not applied anywhere hosted. Push, PR and deploy wait for the owner.
+- Port to `origin/main` (assessed, not attempted): `main` lacks PR #96's three commits that the stack also lacks, so merging the stack conflicts in four files; migration `20261020090001` differs between `main` and this branch and one copy must win (edits a merged migration). Details in RUNTIME_STATE.md.
+- Favicon: none exists (`/favicon.ico` 404 on every page); needs a brand asset, separate change.
+- Concurrency, Storage-API and media-exposure scripts were not run: none touches an RPC or table this diff changes.
+- Node on this machine was upgraded to 24.22.1 (nvm); the dev server on :3210 still runs on the old process (about 6.7 GB RAM), restart it.
+
 ## 2026-10-20 — Cloudflare Workers frontend (ADR-0021), lead
 
 Branch `claude/cloudflare-workers-2ibvgs` (from the video branch, PR #94 head). OpenNext 1.20.12 + wrangler 4.151.2, Next 15.5.28. `pnpm cf:build` (Edge middleware for Workers only), `cloudflare/worker.ts` (`/api/backend` proxy to `BACKEND_ORIGIN`, `/_next/image` cache, HSTS), `wrangler.jsonc` local/preview/production envs, `playwright.workers.config.ts`, CI job `frontend-cloudflare`, manual preview workflow. Merged: Redis REST (`claude/cf-redis-2ibvgs`), image engine seam (`claude/cf-media-runtime-2ibvgs`), perf report (`claude/cf-perf-2ibvgs`, sharp-lazy commit dropped). Fixed: middleware redirects now carry refreshed session cookies; duplicate reads on `/home` and `/showroom/home`. vinext 1.2.1 trialled and rejected for production (beta, Vite).

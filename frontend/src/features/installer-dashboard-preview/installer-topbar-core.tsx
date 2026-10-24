@@ -53,6 +53,7 @@ export function InstallerTopbarCore({
   theme,
   onMenuClick,
   displayName,
+  avatarUrl = null,
   location,
   production = false,
   searchJobs,
@@ -60,6 +61,7 @@ export function InstallerTopbarCore({
   theme: "light" | "dark";
   onMenuClick: () => void;
   displayName?: string;
+  avatarUrl?: string | null;
   location?: string | null;
   production?: boolean;
   /** Real, bounded opportunities for the shared search overlay — required in
@@ -93,7 +95,7 @@ export function InstallerTopbarCore({
       {/* Location selector — the craftsman's own service area, not a filter. */}
       {production ? (
         <Link
-          href="/home/profile/edit"
+          href="/home/profile#coverage"
           data-testid="installer-service-area"
           className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm px-1.5 py-1 text-label font-medium text-fg-secondary hover:bg-surface-2 hover:text-fg tablet:flex"
         >
@@ -114,7 +116,9 @@ export function InstallerTopbarCore({
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5">
-        {production ? null : (
+        {production ? (
+          <NotificationsButton locale={locale} />
+        ) : (
           <button
             type="button"
             aria-label={locale === "ar" ? "الإشعارات" : "Notifications"}
@@ -144,8 +148,13 @@ export function InstallerTopbarCore({
           data-testid="profile-menu-trigger"
           className="flex items-center gap-1.5 rounded-sm py-1 pe-1 ps-1 hover:bg-surface-2"
         >
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-pill bg-accent-solid text-label font-semibold text-on-accent">
-            {initial}
+          <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-pill bg-accent-solid text-label font-semibold text-on-accent">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not a static asset
+              <img src={avatarUrl} alt="" className="h-full w-full object-cover" data-testid="topbar-avatar" />
+            ) : (
+              initial
+            )}
           </span>
           <span className="hidden min-w-0 max-w-32 flex-col items-start desktop:flex">
             <span className="w-full truncate text-label font-medium leading-tight text-fg">{resolvedName}</span>
@@ -227,4 +236,34 @@ function MenuRow({
 
 function MenuLink({ href, icon: Icon, label }: { href: string; icon: typeof UserIcon; label: string }) {
   return <Link role="menuitem" href={href} className="flex w-full items-center gap-2.5 px-3 py-2 text-label font-medium text-fg-secondary transition-colors hover:bg-surface-2 hover:text-fg"><Icon size={16} />{label}</Link>;
+}
+
+/**
+ * The approved header's bell. Installers have no notification feed yet, so it opens an honest empty state and never
+ * shows an unread dot it cannot back.
+ */
+function NotificationsButton({ locale }: { locale: string }) {
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const ar = locale === "ar";
+  return (
+    <>
+      <button
+        ref={button}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={ar ? "الإشعارات" : "Notifications"}
+        data-testid="installer-notifications"
+        className="relative grid h-10 w-10 shrink-0 place-items-center rounded-sm text-fg-secondary hover:bg-surface-2 hover:text-fg tablet:h-8 tablet:w-8"
+      >
+        <BellIcon size={18} />
+      </button>
+      <FloatingMenu open={open} onClose={() => setOpen(false)} anchorRef={button} role="dialog" aria-label={ar ? "الإشعارات" : "Notifications"} placement="bottom-end" className="w-64 p-md">
+        <p className="text-label font-semibold text-fg">{ar ? "الإشعارات" : "Notifications"}</p>
+        <p className="mt-1 text-label text-fg-secondary">{ar ? "لا توجد إشعارات جديدة." : "No new notifications."}</p>
+      </FloatingMenu>
+    </>
+  );
 }

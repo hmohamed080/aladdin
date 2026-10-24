@@ -115,6 +115,10 @@ export const PROFILE_COMPLETION_ITEMS = [
   "organization_address",
   "organization_activities",
   "organization_setup",
+  // Installer items (20261024090000_installer_profile_completion.sql).
+  "availability",
+  "location",
+  "portfolio",
 ] as const;
 export type ProfileCompletionItem = (typeof PROFILE_COMPLETION_ITEMS)[number];
 

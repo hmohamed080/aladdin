@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BarChartIcon, ClockIcon, CrownIcon, GiftIcon, StorefrontIcon } from "@/components/ui/icons";
+import { BarChartIcon, ClockIcon, CrownIcon, GiftIcon } from "@/components/ui/icons";
+import { POINT_SOURCES, PREVIEW_REWARDS } from "@/features/installer-points-preview/preview-data";
 import type { Locale } from "@/lib/i18n/locales";
 import { derivePointsLevel } from "@/lib/network/points-level";
 import { POINTS_LEVEL_BADGE_ASSET } from "@/lib/network/points-level-assets";
@@ -14,20 +15,21 @@ import type { PointsOverview } from "@/server/queries/points";
  *   * Balance and this month's totals are the database's exact figures (`my_points_overview`).
  *   * The level card and the progress card use the approved PRESENTATION-ONLY bands (`derivePointsLevel`, "Level N"):
  *     derived from the balance, stored nowhere, gating nothing.
- *   * "Ways to earn" shows only the earning rule the ledger actually implements (an approved business referral).
+ *   * "Ways to earn" and "My rewards" follow the approved design. The ledger awards an approved showroom referral
+ *     (REFERRAL_POINTS, migration 20260830090002); redemption is not live yet and the card says so.
  *   * Recent history is the latest ledger rows; "View all" opens `/home/points/history`.
- *   * There is no rewards catalog or redemption backend, so "My rewards" says so instead of showing example rewards.
  */
+/** The ledger's award for an approved business referral (product decision D1). */
+const REFERRAL_POINTS = 100;
+
 export function InstallerPoints({
   locale,
   overview,
   recent,
-  earn,
 }: {
   locale: Locale;
   overview: PointsOverview;
   recent: readonly PointsEntryView[];
-  earn: { title: string; ruleTitle: string; ruleBody: string; ruleNote: string; more: string };
 }) {
   const ar = locale === "ar";
   return (
@@ -38,26 +40,30 @@ export function InstallerPoints({
         <PointsTotalCard locale={locale} overview={overview} />
         <ProgressCard locale={locale} balance={overview.balance} />
       </section>
-      <section dir={ar ? "rtl" : "ltr"} aria-labelledby="sources-title" className="rounded-md border border-strong bg-surface p-lg shadow-card">
-        <header className="mb-md"><h2 id="sources-title" className="flex items-center gap-sm text-title text-fg"><IconBubble><GiftIcon size={22} /></IconBubble>{earn.title}</h2></header>
-        <div className="grid gap-sm min-[430px]:grid-cols-2 desktop:grid-cols-3">
-          <article className="flex min-h-48 flex-col rounded-md border border-strong bg-canvas p-md" data-testid="points-rule">
-            <div className="flex items-center justify-between gap-sm"><IconBubble large><StorefrontIcon size={26} /></IconBubble><h3 className="text-body-lg font-bold text-fg">{earn.ruleTitle}</h3></div>
-            <p className="mt-sm text-title font-bold text-accent-solid">+100 <span className="text-label">{ar ? "نقطة" : "points"}</span></p>
-            <p className="mt-sm text-body leading-relaxed text-fg-secondary">{earn.ruleBody}</p>
-            <p className="mt-sm text-caption leading-relaxed text-fg-muted">{earn.ruleNote}</p>
-          </article>
+      <section dir={ar ? "rtl" : "ltr"} aria-labelledby="sources-title" className="rounded-md border border-strong bg-surface p-lg shadow-card" data-testid="points-sources">
+        <header className="mb-md"><h2 id="sources-title" className="flex items-center gap-sm text-title text-fg"><IconBubble><GiftIcon size={22} /></IconBubble>{ar ? "مصادر النقاط" : "Ways to earn points"}</h2><p className="mt-1 text-body text-fg-secondary">{ar ? "اكسب النقاط من هذه الأنشطة على المنصة." : "Earn points from these activities on the platform."}</p></header>
+        <div className="grid gap-sm min-[430px]:grid-cols-2 desktop:grid-cols-3 wide:grid-cols-5">
+          {POINT_SOURCES.map(({ id, title, points, description, Icon }) => (
+            <article key={id} className="flex min-h-48 flex-col rounded-md border border-strong bg-canvas p-md" data-testid="points-source">
+              <div className="flex items-center justify-between gap-sm"><IconBubble large><Icon size={26} /></IconBubble><h3 className="text-body-lg font-bold text-fg">{title[locale]}</h3></div>
+              <p className="mt-sm text-title font-bold text-accent-solid">+{id === "showroom-added" ? REFERRAL_POINTS : points} <span className="text-label">{ar ? "نقطة" : "points"}</span></p>
+              <p className="mt-sm text-body leading-relaxed text-fg-secondary">{id === "showroom-added" ? (ar ? `احصل على ${REFERRAL_POINTS} نقطة عند اعتماد معرض رشحته للمنصة.` : `Earn ${REFERRAL_POINTS} points when a showroom you referred is approved.`) : description[locale]}</p>
+            </article>
+          ))}
         </div>
-        <p className="mt-sm text-caption text-fg-secondary">{earn.more}</p>
       </section>
       <div className="grid min-w-0 gap-md wide:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]" dir="ltr">
         <section dir={ar ? "rtl" : "ltr"} aria-labelledby="rewards-title" className="rounded-md border border-strong bg-surface p-lg shadow-card">
           <header><h2 id="rewards-title" className="flex items-center gap-sm text-title text-fg"><IconBubble><GiftIcon size={22} /></IconBubble>{ar ? "مكافآتي" : "My rewards"}</h2></header>
-          <div className="mt-md flex min-h-40 flex-col items-center justify-center gap-sm rounded-md border border-dashed border-strong bg-canvas p-md text-center" data-testid="points-rewards-empty">
-            <IconBubble large><CrownIcon size={28} /></IconBubble>
-            <p className="text-body font-semibold text-fg">{ar ? "لا توجد مكافآت متاحة للاستبدال حاليًا" : "No rewards are available to redeem yet"}</p>
-            <p className="text-label text-fg-secondary">{ar ? "رصيدك محفوظ، وسنعلن هنا عن المكافآت عند إطلاقها." : "Your balance is kept; rewards will be announced here when they launch."}</p>
+          <p className="mt-1 text-body text-fg-secondary">{ar ? "استبدل نقاطك بمكافآت مميزة." : "Redeem your points for standout rewards."}</p>
+          <div className="mt-md grid gap-sm tablet:grid-cols-3 wide:grid-cols-3" data-testid="points-rewards">
+            {PREVIEW_REWARDS.map(({ id, title, description, cost, Icon }) => (
+              <article key={id} className="flex min-h-56 flex-col items-center rounded-md border border-strong bg-canvas p-md text-center">
+                <IconBubble large><Icon size={30} /></IconBubble><h3 className="mt-sm text-body-lg font-bold text-fg">{title[locale]}</h3><p className="mt-sm text-body leading-relaxed text-fg-secondary">{description[locale]}</p><span className="mt-auto block w-full rounded-md bg-accent-solid/10 px-sm py-sm text-label font-bold tabular-nums text-accent-solid">{cost} {ar ? "نقطة" : "points"}</span>
+              </article>
+            ))}
           </div>
+          <p className="mt-sm flex items-center gap-sm text-caption text-fg-secondary"><CrownIcon size={16} className="text-accent-solid" />{ar ? "الاستبدال سيتاح قريبًا، ورصيدك محفوظ حتى ذلك الحين." : "Redemption opens soon; your balance is kept until then."}</p>
         </section>
         <section dir={ar ? "rtl" : "ltr"} aria-labelledby="history-title" className="rounded-md border border-strong bg-surface p-lg shadow-card">
           <header className="flex items-start justify-between gap-md">
