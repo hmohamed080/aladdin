@@ -1,5 +1,10 @@
 # Runtime State
 
+## FastAPI on Cloudflare Containers (draft PR, ADR-0022) — 2026-10-22
+
+- Branch `claude/project-thread-ea9qxg`, stacked on the frontend Workers branch `claude/cloudflare-workers-2ibvgs` (#97), which now contains the #100 database baseline (180 migrations). #98 adds no migrations. New Worker `edge/backend-worker` (`aladdin-backend`, environments `preview`/`production`) runs `backend/Dockerfile` in a Cloudflare Container; the frontend Worker prefers a `BACKEND` service binding over `BACKEND_ORIGIN`. **Nothing is deployed**; the frontend `wrangler.jsonc` does not bind `BACKEND` yet, so behaviour is unchanged; Vercel still serves FastAPI.
+- 2026-10-24: owner chose to hold the preview until the frontend preview's HTTPS works (Option B). Gates and the two separate approvals (Workers Paid, then the Acceptance-only preview): [fastapi-preview-prerequisites.md](fastapi-preview-prerequisites.md). pyjwt upgraded to 2.15.1 (audit). Costs and measurements in ADR-0022.
+
 ## Consolidated database baseline (draft PR) — 2026-10-22
 
 - Branch `claude/project-thread-lz98jd` (from the Workers branch, PR #97 head): 180 migrations = main's `20261020090001_registration_data_sync` (byte-identical) plus the PR stack, with the 15 PR-only migrations renamed to `20261021090001`..`15` so they run after main's. Mapping, verification and the Production plan: [database-baseline-2026-10-22.md](database-baseline-2026-10-22.md).

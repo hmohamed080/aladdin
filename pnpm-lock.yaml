@@ -12,6 +12,22 @@ importers:
         specifier: 2.110.0
         version: 2.110.0
 
+  edge/backend-worker:
+    dependencies:
+      '@cloudflare/containers':
+        specifier: 0.3.7
+        version: 0.3.7
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)(happy-dom@20.11.1)(terser@5.36.0)
+      wrangler:
+        specifier: 4.151.2
+        version: 4.151.2(@types/node@22.20.1)
+
   edge/media-worker:
     dependencies:
       postgres:
@@ -467,6 +483,9 @@ packages:
   '@babel/types@7.29.8':
     resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
     engines: {node: '>=6.9.0'}
+
+  '@cloudflare/containers@0.3.7':
+    resolution: {integrity: sha512-DM9dm3FnIBSyiSJ1FLavKwl/lk3oAmTaynCzZQ9pZR0ncRPquSxkxd8Nu2MFILxmDDsPkxKsSNEh9mHHMty4Fw==}
 
   '@cloudflare/kv-asset-handler@0.5.0':
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
@@ -4932,6 +4951,8 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
+
+  '@cloudflare/containers@0.3.7': {}
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 

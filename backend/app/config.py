@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     app_env: str = ""
     # Set by Vercel itself (production | preview | development); never set by hand.
     vercel_env: str = ""
+    # Set by the Cloudflare Containers runtime in every container (ADR-0022); never
+    # set by hand. Its presence alone means "deployed on Cloudflare".
+    cloudflare_application_id: str = ""
 
     # --- Supabase ---
     supabase_url: str = ""
@@ -100,11 +103,16 @@ class Settings(BaseSettings):
 
         On a Vercel deployment VERCEL_ENV decides whenever APP_ENV is unset or says
         `local`: a deployed service must never skip the secret check below. An
-        unknown VERCEL_ENV counts as production (fail closed).
+        unknown VERCEL_ENV counts as production (fail closed). A Cloudflare
+        container says nothing about its environment, so one without an explicit
+        staging/production APP_ENV is production (the backend Worker also refuses
+        to start a container without APP_ENV; this is the second lock).
         """
         explicit = self.app_env.strip().lower()
         vercel = self.vercel_env.strip().lower()
         deployed = _FROM_VERCEL.get(vercel, "production") if vercel else None
+        if deployed is None and self.cloudflare_application_id.strip():
+            deployed = "production"
         if deployed in {"staging", "production"} and explicit in {"", "local"}:
             return deployed
         return explicit or deployed or "local"

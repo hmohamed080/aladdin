@@ -6851,3 +6851,18 @@ Final packaging: implementation05c4eec8 and reviewfix4ae03891 pushed; [PR84](htt
 
 ### Cloudflare migration, PR #97 — 2026-10-22
 Merged five audit branches (cost, R2/DNS/credentials/cutover, video on Containers, security, Redis) into `claude/cloudflare-workers-2ibvgs`, fixed stale E2E specs and classified the 51 shared Node/Workers failures. Validated: frontend typecheck, lint (0 errors), targeted unit suites, `cf:build` + `wrangler deploy --dry-run`; backend pytest and ruff. Unfinished: everything hosted (preview unreachable on a workers.dev certificate), Sign In CAPTCHA decision, 17 Showroom RC2 spec drifts for product review. See [status report](cloudflare-migration-status-2026-10-22.md).
+
+## 2026-10-22 — FastAPI on Cloudflare Containers (ADR-0022, draft PR)
+
+- Built `edge/backend-worker` (Worker + `BackendContainer`, `@cloudflare/containers` 0.3.7) on top of #97; optional `BACKEND` service binding in the frontend proxy (agreed with the #97 thread); backend fails closed on Cloudflare without `APP_ENV`; Dockerfile compiles bytecode, pins uv, fixes the health-check path.
+- Measured locally: 59 MB RSS; ready in 26.5 s on 1/16 vCPU and 4.5 s on 1/4 vCPU (41.1 s / 8.2 s before bytecode); binding → container 200 through `wrangler dev`.
+- **Unfinished:** preview deploy and real cold-start/latency numbers (owner approval, Workers Paid); bind `BACKEND` in `frontend/wrangler.jsonc` after the backend preview exists; production at cutover.
+- Sandbox notes: Docker Hub rate-limits (use `mirror.gcr.io/library/...`), ghcr blobs are blocked, builds need a local base image that trusts the proxy CA (never shipped); `wrangler dev` with containers works with `dockerd` started by hand.
+
+
+## 2026-10-24 — FastAPI preview prep on hold (Option B), PR #98
+
+- Merged #100 (180-migration baseline, retired-version gate) into #98 and retargeted #98 onto #100; #98 adds no migrations and none of the 15 old versions remain.
+- `pip-audit`: upgraded pyjwt 2.13.0 → 2.15.1 (15 advisories, auth path), cryptography, h2, multidict, certifi; 0 known after; backend 106 passed.
+- Dry runs for `preview`/`production` pass; image 396 MB, non-root, no secrets; cold start median 5.2 s at 1/4 vCPU; prices unchanged.
+- **Unfinished:** gates in [fastapi-preview-prerequisites.md](fastapi-preview-prerequisites.md): frontend preview HTTPS, Acceptance rebuild, then separate approvals for Workers Paid and the preview.
