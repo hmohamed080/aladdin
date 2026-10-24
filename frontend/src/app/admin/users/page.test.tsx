@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+vi.mock("server-only", () => ({}));
 import { render, cleanup, screen, within } from "@testing-library/react";
 import { ADMIN_PERMISSIONS, type AdminAccess } from "@/lib/permissions/admin";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import type { AdminDirectoryUser } from "@/features/admin-preview/directory-mappers";
 
 /**
@@ -99,6 +100,23 @@ describe("Users directory page", () => {
       page: 1,
       pageSize: 10,
     });
+  });
+
+  it("forwards a business account type filter instead of dropping it", async () => {
+    loadUsersDirectory.mockResolvedValue(okPage([]));
+    await renderPage({ type: "showroom_dealer" });
+    expect(loadUsersDirectory.mock.calls[0]?.[1]).toMatchObject({ accountType: "showroom_dealer" });
+  });
+
+  it("shows each row's account type from the database, and says when none was chosen", async () => {
+    loadUsersDirectory.mockResolvedValue(
+      okPage([user({ accountType: "installer_technician" }), user({ id: "70000001-0000-4000-8000-000000000002", accountType: null })]),
+    );
+    await renderPage({});
+    expect(screen.getAllByText("User type").length).toBeGreaterThan(0);
+    const cells = (text: string) => screen.getAllByText(text).filter((el) => el.tagName !== "OPTION");
+    expect(cells("Craftsmen").length).toBeGreaterThan(0);
+    expect(cells("Not selected yet").length).toBeGreaterThan(0);
   });
 
   it("links View on Platform to the profile id, never the user id", async () => {

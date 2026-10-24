@@ -286,6 +286,8 @@ export type AdminOrgMember = AdminPersonRef & { membershipId: string; status: st
 export type AdminOrgBranch = LocalizedName & { id: string; isActive: boolean };
 
 export type AdminOrgDetail = Omit<AdminDirectoryOrg, "memberCount" | "branchCount" | "owner"> & {
+  /** When the Verified badge was granted (business verification); approval alone leaves it null. */
+  businessVerifiedAt: string | null;
   referredBy: AdminPersonRef | null;
   owners: AdminPersonRef[];
   members: AdminOrgMember[];
@@ -299,6 +301,7 @@ export function mapOrgDetail(raw: unknown): AdminOrgDetail | null {
   if (!base || !o) return null;
   return {
     ...pick(base, ["id", "name", "nameAr", "nameEn", "orgType", "status", "isVerified", "verificationState", "createdAt", "source"] as const),
+    businessVerifiedAt: str(o.business_verified_at),
     referredBy: mapPersonRef(o.referred_by),
     owners: mapAll(o.owners, mapPersonRef),
     members: mapAll(o.members, (r) => {

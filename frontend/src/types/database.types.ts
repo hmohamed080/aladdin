@@ -956,6 +956,122 @@ export type Database = {
           },
         ]
       }
+      business_verification_documents: {
+        Row: {
+          content_type: string
+          created_at: string
+          created_by: string
+          doc_type: string
+          file_name: string
+          id: string
+          object_key: string
+          organization_id: string
+          size_bytes: number
+          state: string
+          submission_id: string | null
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          created_by: string
+          doc_type: string
+          file_name: string
+          id?: string
+          object_key: string
+          organization_id: string
+          size_bytes: number
+          state?: string
+          submission_id?: string | null
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          created_by?: string
+          doc_type?: string
+          file_name?: string
+          id?: string
+          object_key?: string
+          organization_id?: string
+          size_bytes?: number
+          state?: string
+          submission_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_verification_documents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_verification_documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_verification_documents_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "business_verification_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_verification_submissions: {
+        Row: {
+          id: string
+          note: string | null
+          organization_id: string
+          round: number
+          submitted_at: string
+          submitted_by: string
+          verification_id: string
+        }
+        Insert: {
+          id?: string
+          note?: string | null
+          organization_id: string
+          round: number
+          submitted_at?: string
+          submitted_by: string
+          verification_id: string
+        }
+        Update: {
+          id?: string
+          note?: string | null
+          organization_id?: string
+          round?: number
+          submitted_at?: string
+          submitted_by?: string
+          verification_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_verification_submissions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_verification_submissions_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_verification_submissions_verification_id_fkey"
+            columns: ["verification_id"]
+            isOneToOne: false
+            referencedRelation: "verifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consent_receipts: {
         Row: {
           accepted_at: string
@@ -2014,6 +2130,1415 @@ export type Database = {
           },
         ]
       }
+      marketplace_attribute_definitions: {
+        Row: {
+          created_at: string
+          data_type: string
+          display_unit_ar: string | null
+          display_unit_en: string | null
+          id: string
+          is_active: boolean
+          key: string
+          name_ar: string
+          name_en: string
+          unit_kind: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_type: string
+          display_unit_ar?: string | null
+          display_unit_en?: string | null
+          id?: string
+          is_active?: boolean
+          key: string
+          name_ar: string
+          name_en: string
+          unit_kind?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_type?: string
+          display_unit_ar?: string | null
+          display_unit_en?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          name_ar?: string
+          name_en?: string
+          unit_kind?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketplace_attribute_options: {
+        Row: {
+          attribute_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          name_ar: string
+          name_en: string
+          sort_order: number
+          swatch_hex: string | null
+          updated_at: string
+        }
+        Insert: {
+          attribute_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          name_ar: string
+          name_en: string
+          sort_order?: number
+          swatch_hex?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attribute_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          name_ar?: string
+          name_en?: string
+          sort_order?: number
+          swatch_hex?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_attribute_options_attribute_id_fkey"
+            columns: ["attribute_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_attribute_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_categories: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          name_ar: string
+          name_en: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          name_ar: string
+          name_en: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          name_ar?: string
+          name_en?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketplace_delivery_rates: {
+        Row: {
+          area_key: string | null
+          created_at: string
+          fee_egp: number | null
+          governorate_key: string
+          id: string
+          seller_organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          area_key?: string | null
+          created_at?: string
+          fee_egp?: number | null
+          governorate_key: string
+          id?: string
+          seller_organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          area_key?: string | null
+          created_at?: string
+          fee_egp?: number | null
+          governorate_key?: string
+          id?: string
+          seller_organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_delivery_rates_seller_organization_id_fkey"
+            columns: ["seller_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_image_moderation_events: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          detail: Json
+          id: string
+          image_id: string
+          organization_id: string
+          product_id: string
+          sequence: number
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          image_id: string
+          organization_id: string
+          product_id: string
+          sequence?: never
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          image_id?: string
+          organization_id?: string
+          product_id?: string
+          sequence?: never
+        }
+        Relationships: []
+      }
+      marketplace_import_assets: {
+        Row: {
+          byte_size: number | null
+          checksum_sha256: string | null
+          created_at: string
+          file_name: string
+          id: string
+          image_id: string | null
+          job_id: string
+          matched_by: string | null
+          matched_row_id: string | null
+          mime_type: string | null
+          object_key: string
+          organization_id: string
+          sequence: number | null
+          sku_key: string | null
+          status: string
+          storage_bucket: string
+          storage_provider: string
+        }
+        Insert: {
+          byte_size?: number | null
+          checksum_sha256?: string | null
+          created_at?: string
+          file_name: string
+          id?: string
+          image_id?: string | null
+          job_id: string
+          matched_by?: string | null
+          matched_row_id?: string | null
+          mime_type?: string | null
+          object_key: string
+          organization_id: string
+          sequence?: number | null
+          sku_key?: string | null
+          status?: string
+          storage_bucket: string
+          storage_provider?: string
+        }
+        Update: {
+          byte_size?: number | null
+          checksum_sha256?: string | null
+          created_at?: string
+          file_name?: string
+          id?: string
+          image_id?: string | null
+          job_id?: string
+          matched_by?: string | null
+          matched_row_id?: string | null
+          mime_type?: string | null
+          object_key?: string
+          organization_id?: string
+          sequence?: number | null
+          sku_key?: string | null
+          status?: string
+          storage_bucket?: string
+          storage_provider?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_marketplace_import_assets_job"
+            columns: ["job_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_import_jobs"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "fk_marketplace_import_assets_row"
+            columns: ["matched_row_id", "job_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_import_rows"
+            referencedColumns: ["id", "job_id"]
+          },
+          {
+            foreignKeyName: "marketplace_import_assets_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_product_images"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_import_errors: {
+        Row: {
+          asset_id: string | null
+          code: string
+          created_at: string
+          field: string | null
+          id: string
+          job_id: string
+          message: string
+          organization_id: string
+          row_id: string | null
+          row_number: number | null
+          sequence: number
+          severity: string
+        }
+        Insert: {
+          asset_id?: string | null
+          code: string
+          created_at?: string
+          field?: string | null
+          id?: string
+          job_id: string
+          message: string
+          organization_id: string
+          row_id?: string | null
+          row_number?: number | null
+          sequence?: never
+          severity: string
+        }
+        Update: {
+          asset_id?: string | null
+          code?: string
+          created_at?: string
+          field?: string | null
+          id?: string
+          job_id?: string
+          message?: string
+          organization_id?: string
+          row_id?: string | null
+          row_number?: number | null
+          sequence?: never
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_marketplace_import_errors_asset"
+            columns: ["asset_id", "job_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_import_assets"
+            referencedColumns: ["id", "job_id"]
+          },
+          {
+            foreignKeyName: "fk_marketplace_import_errors_job"
+            columns: ["job_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_import_jobs"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "fk_marketplace_import_errors_row"
+            columns: ["row_id", "job_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_import_rows"
+            referencedColumns: ["id", "job_id"]
+          },
+        ]
+      }
+      marketplace_import_job_events: {
+        Row: {
+          actor: string | null
+          created_at: string
+          from_status: string | null
+          id: string
+          job_id: string
+          note: string | null
+          sequence: number
+          to_status: string
+        }
+        Insert: {
+          actor?: string | null
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          job_id: string
+          note?: string | null
+          sequence?: never
+          to_status: string
+        }
+        Update: {
+          actor?: string | null
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          job_id?: string
+          note?: string | null
+          sequence?: never
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_import_job_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_import_jobs: {
+        Row: {
+          applied_rows: number
+          cancelled_at: string | null
+          chunk_size: number
+          created_at: string
+          created_by: string
+          errors_dropped: number
+          errors_recorded: number
+          failed_rows: number
+          failure_reason: string | null
+          finished_at: string | null
+          id: string
+          idempotency_key: string
+          invalid_rows: number
+          lease_expires_at: string | null
+          locked_by: string | null
+          metadata: Json
+          mode: string
+          organization_id: string
+          source_checksum_sha256: string
+          source_file_name: string
+          source_format: string
+          started_at: string | null
+          status: string
+          status_changed_at: string
+          total_assets: number
+          total_rows: number
+          updated_at: string
+          valid_rows: number
+        }
+        Insert: {
+          applied_rows?: number
+          cancelled_at?: string | null
+          chunk_size?: number
+          created_at?: string
+          created_by: string
+          errors_dropped?: number
+          errors_recorded?: number
+          failed_rows?: number
+          failure_reason?: string | null
+          finished_at?: string | null
+          id?: string
+          idempotency_key: string
+          invalid_rows?: number
+          lease_expires_at?: string | null
+          locked_by?: string | null
+          metadata?: Json
+          mode: string
+          organization_id: string
+          source_checksum_sha256: string
+          source_file_name: string
+          source_format: string
+          started_at?: string | null
+          status?: string
+          status_changed_at?: string
+          total_assets?: number
+          total_rows?: number
+          updated_at?: string
+          valid_rows?: number
+        }
+        Update: {
+          applied_rows?: number
+          cancelled_at?: string | null
+          chunk_size?: number
+          created_at?: string
+          created_by?: string
+          errors_dropped?: number
+          errors_recorded?: number
+          failed_rows?: number
+          failure_reason?: string | null
+          finished_at?: string | null
+          id?: string
+          idempotency_key?: string
+          invalid_rows?: number
+          lease_expires_at?: string | null
+          locked_by?: string | null
+          metadata?: Json
+          mode?: string
+          organization_id?: string
+          source_checksum_sha256?: string
+          source_file_name?: string
+          source_format?: string
+          started_at?: string | null
+          status?: string
+          status_changed_at?: string
+          total_assets?: number
+          total_rows?: number
+          updated_at?: string
+          valid_rows?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_import_jobs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_import_rows: {
+        Row: {
+          action: string | null
+          attempt_count: number
+          attributes: Json
+          brand: string | null
+          created_at: string
+          description_ar: string | null
+          description_en: string | null
+          external_ref: string | null
+          id: string
+          job_id: string
+          name_ar: string | null
+          name_en: string | null
+          organization_id: string
+          price_egp: number | null
+          processed_at: string | null
+          product_id: string | null
+          product_type_key: string | null
+          raw: Json
+          row_hash: string
+          row_number: number
+          selling_unit: string | null
+          sku: string | null
+          status: string
+          variant_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          attempt_count?: number
+          attributes?: Json
+          brand?: string | null
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          external_ref?: string | null
+          id?: string
+          job_id: string
+          name_ar?: string | null
+          name_en?: string | null
+          organization_id: string
+          price_egp?: number | null
+          processed_at?: string | null
+          product_id?: string | null
+          product_type_key?: string | null
+          raw: Json
+          row_hash: string
+          row_number: number
+          selling_unit?: string | null
+          sku?: string | null
+          status?: string
+          variant_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          attempt_count?: number
+          attributes?: Json
+          brand?: string | null
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          external_ref?: string | null
+          id?: string
+          job_id?: string
+          name_ar?: string | null
+          name_en?: string | null
+          organization_id?: string
+          price_egp?: number | null
+          processed_at?: string | null
+          product_id?: string | null
+          product_type_key?: string | null
+          raw?: Json
+          row_hash?: string
+          row_number?: number
+          selling_unit?: string | null
+          sku?: string | null
+          status?: string
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_marketplace_import_rows_job"
+            columns: ["job_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_import_jobs"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "fk_marketplace_import_rows_product"
+            columns: ["product_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_products"
+            referencedColumns: ["id", "seller_organization_id"]
+          },
+          {
+            foreignKeyName: "fk_marketplace_import_rows_variant"
+            columns: ["variant_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_product_variants"
+            referencedColumns: ["id", "seller_organization_id"]
+          },
+        ]
+      }
+      marketplace_inventory_levels: {
+        Row: {
+          available: number | null
+          created_at: string
+          location_id: string
+          on_hand: number
+          reserved: number
+          seller_organization_id: string
+          updated_at: string
+          variant_id: string
+        }
+        Insert: {
+          available?: number | null
+          created_at?: string
+          location_id: string
+          on_hand?: number
+          reserved?: number
+          seller_organization_id: string
+          updated_at?: string
+          variant_id: string
+        }
+        Update: {
+          available?: number | null
+          created_at?: string
+          location_id?: string
+          on_hand?: number
+          reserved?: number
+          seller_organization_id?: string
+          updated_at?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_marketplace_levels_location_seller"
+            columns: ["location_id", "seller_organization_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_stock_locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "fk_marketplace_levels_variant_seller"
+            columns: ["variant_id", "seller_organization_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_product_variants"
+            referencedColumns: ["id", "seller_organization_id"]
+          },
+        ]
+      }
+      marketplace_platform_events: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          detail: Json
+          id: string
+          sequence: number
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          sequence?: never
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          sequence?: never
+        }
+        Relationships: []
+      }
+      marketplace_platform_settings: {
+        Row: {
+          media_verification_ready: boolean
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          media_verification_ready?: boolean
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          media_verification_ready?: boolean
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketplace_product_attribute_values: {
+        Row: {
+          attribute_id: string
+          created_at: string
+          data_type: string
+          id: string
+          option_id: string | null
+          product_id: string
+          updated_at: string
+          value_boolean: boolean | null
+          value_number: number | null
+          value_text: string | null
+        }
+        Insert: {
+          attribute_id: string
+          created_at?: string
+          data_type: string
+          id?: string
+          option_id?: string | null
+          product_id: string
+          updated_at?: string
+          value_boolean?: boolean | null
+          value_number?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          attribute_id?: string
+          created_at?: string
+          data_type?: string
+          id?: string
+          option_id?: string | null
+          product_id?: string
+          updated_at?: string
+          value_boolean?: boolean | null
+          value_number?: number | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_marketplace_pav_option"
+            columns: ["option_id", "attribute_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_attribute_options"
+            referencedColumns: ["id", "attribute_id"]
+          },
+          {
+            foreignKeyName: "marketplace_product_attribute_values_attribute_id_fkey"
+            columns: ["attribute_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_attribute_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_product_attribute_values_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_product_images: {
+        Row: {
+          alt_text_ar: string | null
+          alt_text_en: string | null
+          byte_size: number | null
+          checksum_sha256: string | null
+          content_checked_at: string | null
+          content_format: string | null
+          content_valid: boolean | null
+          created_at: string
+          height_px: number | null
+          id: string
+          is_primary: boolean
+          mime_type: string | null
+          moderated_at: string | null
+          moderated_by: string | null
+          moderation_reason: string | null
+          object_key: string
+          product_id: string
+          sort_order: number
+          status: string
+          storage_bucket: string
+          storage_provider: string
+          updated_at: string
+          upload_state: string
+          variant_id: string | null
+          width_px: number | null
+        }
+        Insert: {
+          alt_text_ar?: string | null
+          alt_text_en?: string | null
+          byte_size?: number | null
+          checksum_sha256?: string | null
+          content_checked_at?: string | null
+          content_format?: string | null
+          content_valid?: boolean | null
+          created_at?: string
+          height_px?: number | null
+          id?: string
+          is_primary?: boolean
+          mime_type?: string | null
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_reason?: string | null
+          object_key: string
+          product_id: string
+          sort_order?: number
+          status?: string
+          storage_bucket: string
+          storage_provider: string
+          updated_at?: string
+          upload_state?: string
+          variant_id?: string | null
+          width_px?: number | null
+        }
+        Update: {
+          alt_text_ar?: string | null
+          alt_text_en?: string | null
+          byte_size?: number | null
+          checksum_sha256?: string | null
+          content_checked_at?: string | null
+          content_format?: string | null
+          content_valid?: boolean | null
+          created_at?: string
+          height_px?: number | null
+          id?: string
+          is_primary?: boolean
+          mime_type?: string | null
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_reason?: string | null
+          object_key?: string
+          product_id?: string
+          sort_order?: number
+          status?: string
+          storage_bucket?: string
+          storage_provider?: string
+          updated_at?: string
+          upload_state?: string
+          variant_id?: string | null
+          width_px?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_marketplace_images_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_marketplace_images_variant_product"
+            columns: ["variant_id", "product_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_product_variants"
+            referencedColumns: ["id", "product_id"]
+          },
+        ]
+      }
+      marketplace_product_status_events: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          from_status: string
+          id: string
+          organization_id: string
+          product_id: string
+          sequence: number
+          to_status: string
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          from_status: string
+          id?: string
+          organization_id: string
+          product_id: string
+          sequence?: never
+          to_status: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          from_status?: string
+          id?: string
+          organization_id?: string
+          product_id?: string
+          sequence?: never
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_product_status_events_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_product_type_attributes: {
+        Row: {
+          attribute_id: string
+          created_at: string
+          is_active: boolean
+          is_filterable: boolean
+          is_required: boolean
+          is_variant_axis: boolean
+          level: string
+          name_ar_override: string | null
+          name_en_override: string | null
+          product_type_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          attribute_id: string
+          created_at?: string
+          is_active?: boolean
+          is_filterable?: boolean
+          is_required?: boolean
+          is_variant_axis?: boolean
+          level: string
+          name_ar_override?: string | null
+          name_en_override?: string | null
+          product_type_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          attribute_id?: string
+          created_at?: string
+          is_active?: boolean
+          is_filterable?: boolean
+          is_required?: boolean
+          is_variant_axis?: boolean
+          level?: string
+          name_ar_override?: string | null
+          name_en_override?: string | null
+          product_type_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_product_type_attributes_attribute_id_fkey"
+            columns: ["attribute_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_attribute_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_product_type_attributes_product_type_id_fkey"
+            columns: ["product_type_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_product_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_product_types: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          name_ar: string
+          name_en: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          name_ar: string
+          name_en: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          name_ar?: string
+          name_en?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_product_types_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_product_variants: {
+        Row: {
+          created_at: string
+          id: string
+          option_signature: string | null
+          price_egp: number
+          product_id: string
+          seller_organization_id: string
+          selling_unit: string
+          sku: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          option_signature?: string | null
+          price_egp: number
+          product_id: string
+          seller_organization_id: string
+          selling_unit: string
+          sku: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          option_signature?: string | null
+          price_egp?: number
+          product_id?: string
+          seller_organization_id?: string
+          selling_unit?: string
+          sku?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_marketplace_variants_product_seller"
+            columns: ["product_id", "seller_organization_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_products"
+            referencedColumns: ["id", "seller_organization_id"]
+          },
+        ]
+      }
+      marketplace_products: {
+        Row: {
+          brand: string | null
+          created_at: string
+          description_ar: string | null
+          description_en: string | null
+          external_ref: string | null
+          id: string
+          name_ar: string
+          name_en: string
+          product_type_id: string
+          published_at: string | null
+          seller_organization_id: string
+          slug: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          external_ref?: string | null
+          id?: string
+          name_ar: string
+          name_en: string
+          product_type_id: string
+          published_at?: string | null
+          seller_organization_id: string
+          slug: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          external_ref?: string | null
+          id?: string
+          name_ar?: string
+          name_en?: string
+          product_type_id?: string
+          published_at?: string | null
+          seller_organization_id?: string
+          slug?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_products_product_type_id_fkey"
+            columns: ["product_type_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_product_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_products_seller_organization_id_fkey"
+            columns: ["seller_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_seller_account_events: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          from_status: string | null
+          id: string
+          org_status_at_event: string | null
+          org_type_at_event: string | null
+          organization_id: string
+          reason: string
+          sequence: number
+          to_status: string
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          org_status_at_event?: string | null
+          org_type_at_event?: string | null
+          organization_id: string
+          reason: string
+          sequence?: never
+          to_status: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          org_status_at_event?: string | null
+          org_type_at_event?: string | null
+          organization_id?: string
+          reason?: string
+          sequence?: never
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_seller_account_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_seller_accounts"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      marketplace_seller_accounts: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          organization_id: string
+          requested_at: string
+          revoked_at: string | null
+          revoked_by: string | null
+          status: string
+          status_changed_at: string
+          status_reason: string | null
+          suspended_at: string | null
+          suspended_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          organization_id: string
+          requested_at?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          status_changed_at?: string
+          status_reason?: string | null
+          suspended_at?: string | null
+          suspended_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          organization_id?: string
+          requested_at?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          status_changed_at?: string
+          status_reason?: string | null
+          suspended_at?: string | null
+          suspended_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_seller_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_stock_locations: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          kind: string
+          name_ar: string
+          name_en: string
+          organization_id: string
+          supports_delivery: boolean
+          supports_pickup: boolean
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          kind?: string
+          name_ar: string
+          name_en: string
+          organization_id: string
+          supports_delivery?: boolean
+          supports_pickup?: boolean
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          kind?: string
+          name_ar?: string
+          name_en?: string
+          organization_id?: string
+          supports_delivery?: boolean
+          supports_pickup?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_stock_locations_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_stock_locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_stock_movements: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          delta_on_hand: number
+          delta_reserved: number
+          id: string
+          idempotency_key: string
+          location_id: string
+          movement_type: string
+          on_hand_after: number
+          reason: string
+          reference_id: string | null
+          reference_type: string | null
+          request_quantity: number
+          reserved_after: number
+          seller_organization_id: string
+          sequence: number
+          source: string
+          variant_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          delta_on_hand: number
+          delta_reserved: number
+          id?: string
+          idempotency_key: string
+          location_id: string
+          movement_type: string
+          on_hand_after: number
+          reason: string
+          reference_id?: string | null
+          reference_type?: string | null
+          request_quantity: number
+          reserved_after: number
+          seller_organization_id: string
+          sequence?: never
+          source: string
+          variant_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          delta_on_hand?: number
+          delta_reserved?: number
+          id?: string
+          idempotency_key?: string
+          location_id?: string
+          movement_type?: string
+          on_hand_after?: number
+          reason?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          request_quantity?: number
+          reserved_after?: number
+          seller_organization_id?: string
+          sequence?: never
+          source?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_marketplace_movements_location_seller"
+            columns: ["location_id", "seller_organization_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_stock_locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "fk_marketplace_movements_variant_seller"
+            columns: ["variant_id", "seller_organization_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_product_variants"
+            referencedColumns: ["id", "seller_organization_id"]
+          },
+        ]
+      }
+      marketplace_variant_attribute_values: {
+        Row: {
+          attribute_id: string
+          created_at: string
+          data_type: string
+          id: string
+          option_id: string | null
+          updated_at: string
+          value_boolean: boolean | null
+          value_number: number | null
+          value_text: string | null
+          variant_id: string
+        }
+        Insert: {
+          attribute_id: string
+          created_at?: string
+          data_type: string
+          id?: string
+          option_id?: string | null
+          updated_at?: string
+          value_boolean?: boolean | null
+          value_number?: number | null
+          value_text?: string | null
+          variant_id: string
+        }
+        Update: {
+          attribute_id?: string
+          created_at?: string
+          data_type?: string
+          id?: string
+          option_id?: string | null
+          updated_at?: string
+          value_boolean?: boolean | null
+          value_number?: number | null
+          value_text?: string | null
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_marketplace_vav_option"
+            columns: ["option_id", "attribute_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_attribute_options"
+            referencedColumns: ["id", "attribute_id"]
+          },
+          {
+            foreignKeyName: "marketplace_variant_attribute_values_attribute_id_fkey"
+            columns: ["attribute_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_attribute_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_variant_attribute_values_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_units: {
         Row: {
           code: Database["public"]["Enums"]["product_unit"]
@@ -2034,6 +3559,267 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      media_historical_purge_journal: {
+        Row: {
+          bucket: string
+          namespace: string
+          object_key: string
+          owner_user_id: string | null
+          purged_at: string | null
+          retired_at: string
+          size_bytes: number | null
+          storage_removed_at: string | null
+        }
+        Insert: {
+          bucket: string
+          namespace: string
+          object_key: string
+          owner_user_id?: string | null
+          purged_at?: string | null
+          retired_at?: string
+          size_bytes?: number | null
+          storage_removed_at?: string | null
+        }
+        Update: {
+          bucket?: string
+          namespace?: string
+          object_key?: string
+          owner_user_id?: string | null
+          purged_at?: string | null
+          retired_at?: string
+          size_bytes?: number | null
+          storage_removed_at?: string | null
+        }
+        Relationships: []
+      }
+      media_migration_ledger: {
+        Row: {
+          namespace: string
+          object_key: string
+          owner_user_id: string
+          rolled_back_at: string | null
+          sha256: string
+          size_bytes: number
+          source_provider: string
+          switched_at: string
+        }
+        Insert: {
+          namespace: string
+          object_key: string
+          owner_user_id: string
+          rolled_back_at?: string | null
+          sha256: string
+          size_bytes: number
+          source_provider?: string
+          switched_at?: string
+        }
+        Update: {
+          namespace?: string
+          object_key?: string
+          owner_user_id?: string
+          rolled_back_at?: string | null
+          sha256?: string
+          size_bytes?: number
+          source_provider?: string
+          switched_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_migration_ledger_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media_storage_locations: {
+        Row: {
+          cleaned_at: string | null
+          content_type: string
+          created_at: string
+          namespace: string
+          object_key: string
+          organization_id: string | null
+          owner_user_id: string
+          provider: string
+          sha256: string | null
+          size_bytes: number | null
+          variants: Json
+          verified_at: string | null
+        }
+        Insert: {
+          cleaned_at?: string | null
+          content_type: string
+          created_at?: string
+          namespace: string
+          object_key: string
+          organization_id?: string | null
+          owner_user_id: string
+          provider: string
+          sha256?: string | null
+          size_bytes?: number | null
+          variants?: Json
+          verified_at?: string | null
+        }
+        Update: {
+          cleaned_at?: string | null
+          content_type?: string
+          created_at?: string
+          namespace?: string
+          object_key?: string
+          organization_id?: string | null
+          owner_user_id?: string
+          provider?: string
+          sha256?: string | null
+          size_bytes?: number | null
+          variants?: Json
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_storage_locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_storage_locations_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media_videos: {
+        Row: {
+          attempts: number
+          content_type: string
+          created_at: string
+          declared_bytes: number
+          deleted_at: string | null
+          duration_seconds: number | null
+          failure_code: string | null
+          has_poster: boolean
+          height: number | null
+          id: string
+          lease_until: string | null
+          owner_user_id: string
+          product_id: string | null
+          provider: string
+          provider_ref: string | null
+          publisher_id: string | null
+          purged_at: string | null
+          ready_at: string | null
+          renditions: string[]
+          revision: string | null
+          scope: Database["public"]["Enums"]["media_video_scope"]
+          size_bytes: number | null
+          slot: number | null
+          sort_order: number | null
+          state: Database["public"]["Enums"]["media_video_state"]
+          title: string
+          updated_at: string
+          upload_id: string | null
+          upload_touched_at: string
+          uploaded_at: string | null
+          visibility: Database["public"]["Enums"]["portfolio_visibility"]
+          width: number | null
+        }
+        Insert: {
+          attempts?: number
+          content_type: string
+          created_at?: string
+          declared_bytes: number
+          deleted_at?: string | null
+          duration_seconds?: number | null
+          failure_code?: string | null
+          has_poster?: boolean
+          height?: number | null
+          id?: string
+          lease_until?: string | null
+          owner_user_id: string
+          product_id?: string | null
+          provider?: string
+          provider_ref?: string | null
+          publisher_id?: string | null
+          purged_at?: string | null
+          ready_at?: string | null
+          renditions?: string[]
+          revision?: string | null
+          scope: Database["public"]["Enums"]["media_video_scope"]
+          size_bytes?: number | null
+          slot?: number | null
+          sort_order?: number | null
+          state?: Database["public"]["Enums"]["media_video_state"]
+          title: string
+          updated_at?: string
+          upload_id?: string | null
+          upload_touched_at?: string
+          uploaded_at?: string | null
+          visibility?: Database["public"]["Enums"]["portfolio_visibility"]
+          width?: number | null
+        }
+        Update: {
+          attempts?: number
+          content_type?: string
+          created_at?: string
+          declared_bytes?: number
+          deleted_at?: string | null
+          duration_seconds?: number | null
+          failure_code?: string | null
+          has_poster?: boolean
+          height?: number | null
+          id?: string
+          lease_until?: string | null
+          owner_user_id?: string
+          product_id?: string | null
+          provider?: string
+          provider_ref?: string | null
+          publisher_id?: string | null
+          purged_at?: string | null
+          ready_at?: string | null
+          renditions?: string[]
+          revision?: string | null
+          scope?: Database["public"]["Enums"]["media_video_scope"]
+          size_bytes?: number | null
+          slot?: number | null
+          sort_order?: number | null
+          state?: Database["public"]["Enums"]["media_video_state"]
+          title?: string
+          updated_at?: string
+          upload_id?: string | null
+          upload_touched_at?: string
+          uploaded_at?: string | null
+          visibility?: Database["public"]["Enums"]["portfolio_visibility"]
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_videos_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_videos_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_videos_publisher_id_fkey"
+            columns: ["publisher_id"]
+            isOneToOne: false
+            referencedRelation: "publishers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       membership_branch_access: {
         Row: {
@@ -2990,6 +4776,7 @@ export type Database = {
           id: string
           object_key: string
           organization_id: string
+          retired_at: string | null
           state: Database["public"]["Enums"]["professional_asset_state"]
           updated_at: string
         }
@@ -3000,6 +4787,7 @@ export type Database = {
           id?: string
           object_key: string
           organization_id: string
+          retired_at?: string | null
           state?: Database["public"]["Enums"]["professional_asset_state"]
           updated_at?: string
         }
@@ -3010,6 +4798,7 @@ export type Database = {
           id?: string
           object_key?: string
           organization_id?: string
+          retired_at?: string | null
           state?: Database["public"]["Enums"]["professional_asset_state"]
           updated_at?: string
         }
@@ -3279,6 +5068,8 @@ export type Database = {
       }
       organizations: {
         Row: {
+          business_verification_id: string | null
+          business_verified_at: string | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string
@@ -3303,6 +5094,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          business_verification_id?: string | null
+          business_verified_at?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -3327,6 +5120,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          business_verification_id?: string | null
+          business_verified_at?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -3359,6 +5154,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "organizations_business_verification_id_fkey"
+            columns: ["business_verification_id"]
+            isOneToOne: false
+            referencedRelation: "verifications"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "organizations_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -3368,6 +5170,38 @@ export type Database = {
           {
             foreignKeyName: "organizations_referred_by_user_id_fkey"
             columns: ["referred_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phone_cooldown_overrides: {
+        Row: {
+          created_at: string
+          id: string
+          overridden_by: string
+          phone_e164: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          overridden_by: string
+          phone_e164: string
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          overridden_by?: string
+          phone_e164?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_cooldown_overrides_overridden_by_fkey"
+            columns: ["overridden_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -5389,6 +7223,50 @@ export type Database = {
           },
         ]
       }
+      secondary_phone_reservations: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          expires_at: string
+          id: string
+          phone_e164: string
+          renewal_count: number
+          renewed_at: string | null
+          status: Database["public"]["Enums"]["secondary_phone_status"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          expires_at: string
+          id?: string
+          phone_e164: string
+          renewal_count?: number
+          renewed_at?: string | null
+          status?: Database["public"]["Enums"]["secondary_phone_status"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          phone_e164?: string
+          renewal_count?: number
+          renewed_at?: string | null
+          status?: Database["public"]["Enums"]["secondary_phone_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "secondary_phone_reservations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trade_specialties: {
         Row: {
           created_at: string
@@ -7066,6 +8944,10 @@ export type Database = {
     }
     Functions: {
       account_entry_allowed: { Args: { p_kind: string }; Returns: boolean }
+      account_password_confirm: {
+        Args: { p_operation: string; p_password: string; p_target: string }
+        Returns: Json
+      }
       activate_project: {
         Args: { p_expected_version: number; p_project_id: string }
         Returns: number
@@ -7144,6 +9026,103 @@ export type Database = {
         Args: { p_subject_id: string; p_subject_type: string }
         Returns: Json
       }
+      admin_marketplace_media_approve: {
+        Args: { p_image_ids: string[] }
+        Returns: Json
+      }
+      admin_marketplace_media_queue: {
+        Args: { p_limit?: number; p_offset?: number; p_status?: string }
+        Returns: Json
+      }
+      admin_marketplace_media_record_validation: {
+        Args: {
+          p_byte_size: number
+          p_format: string
+          p_height: number
+          p_image_id: string
+          p_note?: string
+          p_sha256: string
+          p_valid: boolean
+          p_width: number
+        }
+        Returns: Json
+      }
+      admin_marketplace_media_reject: {
+        Args: { p_image_ids: string[]; p_reason: string }
+        Returns: Json
+      }
+      admin_marketplace_media_settings: { Args: never; Returns: Json }
+      admin_marketplace_seller_approve: {
+        Args: { p_organization_id: string; p_reason: string }
+        Returns: string
+      }
+      admin_marketplace_seller_history: {
+        Args: { p_organization_id: string }
+        Returns: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          from_status: string
+          org_status_at_event: string
+          org_type_at_event: string
+          reason: string
+          sequence: number
+          to_status: string
+        }[]
+      }
+      admin_marketplace_seller_overview: {
+        Args: never
+        Returns: {
+          approved_at: string
+          approved_by_name: string
+          eligible: boolean
+          org_status: string
+          organization_id: string
+          organization_name: string
+          products_draft: number
+          products_published: number
+          products_total: number
+          seller_status: string
+          status_changed_at: string
+          status_reason: string
+        }[]
+      }
+      admin_marketplace_seller_reinstate: {
+        Args: { p_organization_id: string; p_reason: string }
+        Returns: string
+      }
+      admin_marketplace_seller_revoke: {
+        Args: { p_organization_id: string; p_reason: string }
+        Returns: string
+      }
+      admin_marketplace_seller_suspend: {
+        Args: { p_organization_id: string; p_reason: string }
+        Returns: string
+      }
+      admin_marketplace_sellers: {
+        Args: never
+        Returns: {
+          approved_at: string
+          approved_by: string
+          eligible: boolean
+          org_status: string
+          org_type: string
+          organization_deleted: boolean
+          organization_id: string
+          organization_name: string
+          requested_at: string
+          revoked_at: string
+          revoked_by: string
+          status: string
+          status_reason: string
+          suspended_at: string
+          suspended_by: string
+        }[]
+      }
+      admin_marketplace_set_media_verification_ready: {
+        Args: { p_ready: boolean; p_reason: string }
+        Returns: boolean
+      }
       admin_my_access: { Args: never; Returns: Json }
       admin_network_referrals_list: {
         Args: { p_pending_only?: boolean }
@@ -7220,6 +9199,11 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_phone_cooldown_override: {
+        Args: { p_phone: string; p_reason: string }
+        Returns: string
+      }
+      admin_phone_cooldown_status: { Args: { p_phone: string }; Returns: Json }
       admin_rbac_permissions: {
         Args: never
         Returns: {
@@ -7348,6 +9332,19 @@ export type Database = {
         Args: { p_reason: string; p_user_id: string }
         Returns: Json
       }
+      admin_users_directory: {
+        Args: {
+          p_account_type?: string
+          p_governorate?: string
+          p_page?: number
+          p_page_size?: number
+          p_search?: string
+          p_sort?: string
+          p_status?: string
+          p_verification?: string
+        }
+        Returns: Json
+      }
       admin_users_list: {
         Args: {
           p_account_type?: Database["public"]["Enums"]["persona_type"]
@@ -7378,6 +9375,7 @@ export type Database = {
         Returns: number
       }
       avatar_confirm_upload: { Args: { p_object_key: string }; Returns: string }
+      avatar_delete_current: { Args: never; Returns: string }
       avatar_request_upload: {
         Args: { p_content_type: string }
         Returns: string
@@ -7498,6 +9496,58 @@ export type Database = {
         Returns: undefined
       }
       business_submit: { Args: never; Returns: string }
+      business_verification_approve: {
+        Args: { p_reason: string; p_verification_id: string }
+        Returns: undefined
+      }
+      business_verification_detail: {
+        Args: { p_verification_id: string }
+        Returns: Json
+      }
+      business_verification_document_confirm: {
+        Args: { p_object_key: string }
+        Returns: string
+      }
+      business_verification_document_remove: {
+        Args: { p_document_id: string }
+        Returns: string
+      }
+      business_verification_document_request_upload: {
+        Args: {
+          p_content_type: string
+          p_doc_type: string
+          p_file_name: string
+          p_org_id: string
+          p_size_bytes: number
+        }
+        Returns: string
+      }
+      business_verification_queue: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_org_type?: Database["public"]["Enums"]["organization_type"]
+          p_search?: string
+          p_status?: string[]
+        }
+        Returns: Json
+      }
+      business_verification_reject: {
+        Args: { p_reason: string; p_verification_id: string }
+        Returns: undefined
+      }
+      business_verification_request_info: {
+        Args: { p_reason: string; p_verification_id: string }
+        Returns: undefined
+      }
+      business_verification_start_review: {
+        Args: { p_verification_id: string }
+        Returns: undefined
+      }
+      business_verification_submit: {
+        Args: { p_note?: string; p_org_id: string }
+        Returns: string
+      }
       caller_has_service_location: { Args: never; Returns: boolean }
       cancel_follow_up: { Args: { p_follow_up_id: string }; Returns: undefined }
       cancel_order: { Args: { p_order_id: string }; Returns: undefined }
@@ -7956,6 +10006,398 @@ export type Database = {
         Returns: undefined
       }
       mark_notification_read: { Args: { p_id: string }; Returns: undefined }
+      marketplace_import_apply_next: {
+        Args: { p_job: string; p_worker: string }
+        Returns: {
+          job_status: string
+          processed: number
+          remaining: number
+        }[]
+      }
+      marketplace_import_cancel: {
+        Args: { p_actor: string; p_job: string }
+        Returns: string
+      }
+      marketplace_import_claim: {
+        Args: { p_job: string; p_lease_seconds?: number; p_worker: string }
+        Returns: boolean
+      }
+      marketplace_import_complete_dry_run: {
+        Args: { p_job: string }
+        Returns: string
+      }
+      marketplace_import_create: {
+        Args: {
+          p_actor: string
+          p_checksum: string
+          p_chunk_size?: number
+          p_file_name: string
+          p_format: string
+          p_idempotency_key?: string
+          p_mode?: string
+          p_organization_id: string
+        }
+        Returns: string
+      }
+      marketplace_import_job_cancel: {
+        Args: { p_job: string }
+        Returns: string
+      }
+      marketplace_import_job_create: {
+        Args: {
+          p_checksum: string
+          p_chunk_size?: number
+          p_file_name: string
+          p_format: string
+          p_idempotency_key?: string
+          p_mode?: string
+          p_organization_id: string
+        }
+        Returns: string
+      }
+      marketplace_import_job_report: {
+        Args: { p_job: string }
+        Returns: {
+          code: string
+          external_ref: string
+          field: string
+          file_name: string
+          message: string
+          row_number: number
+          severity: string
+          sku: string
+        }[]
+      }
+      marketplace_import_purge_staging: {
+        Args: { p_job: string }
+        Returns: number
+      }
+      marketplace_import_release: {
+        Args: { p_job: string; p_worker: string }
+        Returns: undefined
+      }
+      marketplace_import_retry_failed: {
+        Args: { p_job: string }
+        Returns: number
+      }
+      marketplace_import_seal: { Args: { p_job: string }; Returns: Json }
+      marketplace_import_stage_assets: {
+        Args: { p_assets: Json; p_job: string }
+        Returns: number
+      }
+      marketplace_import_stage_rows: {
+        Args: { p_job: string; p_rows: Json }
+        Returns: number
+      }
+      marketplace_import_validate_next: {
+        Args: { p_job: string; p_worker: string }
+        Returns: {
+          job_status: string
+          processed: number
+          remaining: number
+        }[]
+      }
+      marketplace_product_publish: {
+        Args: { p_product_id: string }
+        Returns: string
+      }
+      marketplace_product_unpublish: {
+        Args: { p_archive?: boolean; p_product_id: string }
+        Returns: string
+      }
+      marketplace_public_cart: {
+        Args: { p_area?: string; p_governorate?: string; p_lines: Json }
+        Returns: Json
+      }
+      marketplace_public_catalog: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_query?: string
+          p_type_key?: string
+        }
+        Returns: {
+          brand: string
+          category_key: string
+          description_ar: string
+          description_en: string
+          from_price_egp: number
+          in_stock: boolean
+          name_ar: string
+          name_en: string
+          primary_image_id: string
+          product_type_key: string
+          published_at: string
+          slug: string
+        }[]
+      }
+      marketplace_public_catalog_page: {
+        Args: {
+          p_attrs?: Json
+          p_category?: string
+          p_in_stock?: boolean
+          p_limit?: number
+          p_offset?: number
+          p_price_max?: number
+          p_price_min?: number
+          p_query?: string
+          p_sort?: string
+          p_type?: string
+        }
+        Returns: Json
+      }
+      marketplace_public_facets: { Args: { p_type?: string }; Returns: Json }
+      marketplace_public_image_ref: {
+        Args: { p_image_id: string }
+        Returns: {
+          checksum_sha256: string
+          mime_type: string
+          object_key: string
+          storage_bucket: string
+        }[]
+      }
+      marketplace_public_product: { Args: { p_slug: string }; Returns: Json }
+      marketplace_seller_default_location: {
+        Args: { p_organization_id: string }
+        Returns: string
+      }
+      marketplace_seller_delivery_areas_save: {
+        Args: { p_areas: Json; p_organization_id: string }
+        Returns: Json
+      }
+      marketplace_seller_delivery_get: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      marketplace_seller_delivery_prices_save: {
+        Args: { p_organization_id: string; p_prices: Json }
+        Returns: Json
+      }
+      marketplace_seller_image_confirm_upload: {
+        Args: { p_image_id: string }
+        Returns: Json
+      }
+      marketplace_seller_image_remove: {
+        Args: { p_image_id: string }
+        Returns: string
+      }
+      marketplace_seller_image_remove_finalize: {
+        Args: { p_image_id: string }
+        Returns: Json
+      }
+      marketplace_seller_image_request_upload: {
+        Args: {
+          p_content_type: string
+          p_product_id: string
+          p_variant_id?: string
+        }
+        Returns: Json
+      }
+      marketplace_seller_images_pending_removal: {
+        Args: { p_product_id: string }
+        Returns: Json
+      }
+      marketplace_seller_images_update: {
+        Args: { p_images: Json; p_product_id: string }
+        Returns: undefined
+      }
+      marketplace_seller_import_step: {
+        Args: { p_job: string; p_payload?: Json; p_step: string }
+        Returns: Json
+      }
+      marketplace_seller_pickup_set: {
+        Args: { p_enabled: boolean; p_organization_id: string }
+        Returns: Json
+      }
+      marketplace_seller_product_get: {
+        Args: { p_product_id: string }
+        Returns: Json
+      }
+      marketplace_seller_product_readiness: {
+        Args: { p_product_id: string }
+        Returns: string[]
+      }
+      marketplace_seller_product_save: {
+        Args: { p_payload: Json }
+        Returns: Json
+      }
+      marketplace_seller_products_page: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_organization_id: string
+          p_query?: string
+          p_status?: string
+          p_stock?: string
+          p_type?: string
+        }
+        Returns: Json
+      }
+      marketplace_seller_publish_ready: {
+        Args: { p_limit?: number; p_organization_id: string }
+        Returns: Json
+      }
+      marketplace_seller_stock_adjust: {
+        Args: {
+          p_delta: number
+          p_expected_on_hand?: number
+          p_idempotency_key: string
+          p_location_id: string
+          p_reason?: string
+          p_variant_id: string
+        }
+        Returns: Json
+      }
+      marketplace_stock_apply: {
+        Args: {
+          p_actor_user_id?: string
+          p_idempotency_key: string
+          p_location_id: string
+          p_movement_type: string
+          p_quantity: number
+          p_reason: string
+          p_reference_id?: string
+          p_reference_type?: string
+          p_seller_organization_id: string
+          p_source?: string
+          p_variant_id: string
+        }
+        Returns: {
+          applied: boolean
+          available: number
+          movement_id: string
+          on_hand: number
+          reserved: number
+        }[]
+      }
+      media_cleanup_candidates: {
+        Args: { p_limit?: number }
+        Returns: {
+          namespace: string
+          object_key: string
+          owner_user_id: string
+          provider: string
+        }[]
+      }
+      media_cleanup_complete: {
+        Args: { p_key: string; p_namespace: string; p_owner: string }
+        Returns: undefined
+      }
+      media_cleanup_retire: {
+        Args: { p_key: string; p_namespace: string; p_owner: string }
+        Returns: undefined
+      }
+      media_edge_authorize: {
+        Args: {
+          p_expires_at: string
+          p_key: string
+          p_namespace: string
+          p_session: string
+          p_variant: string
+          p_viewer: string
+          p_workspace: string
+        }
+        Returns: Json
+      }
+      media_edge_public: {
+        Args: { p_id: string; p_namespace: string; p_variant: string }
+        Returns: Json
+      }
+      media_edge_video: {
+        Args: {
+          p_expires_at: string
+          p_session: string
+          p_video: string
+          p_viewer: string
+          p_workspace: string
+        }
+        Returns: Json
+      }
+      media_historical_purge_finalize: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
+      media_historical_purge_inventory: {
+        Args: { p_cutoff: string }
+        Returns: Json
+      }
+      media_historical_purge_retire: {
+        Args: { p_cutoff: string; p_limit?: number }
+        Returns: {
+          bucket: string
+          namespace: string
+          object_key: string
+        }[]
+      }
+      media_historical_purge_storage_removed: {
+        Args: { p_key: string; p_namespace: string }
+        Returns: boolean
+      }
+      media_migration_inventory: {
+        Args: { p_after?: string; p_limit?: number }
+        Returns: {
+          content_type: string
+          cursor_key: string
+          max_bytes: number
+          migration_tracked: boolean
+          namespace: string
+          object_key: string
+          owner_user_id: string
+          provider: string
+          source_exists: boolean
+        }[]
+      }
+      media_migration_rollback: {
+        Args: { p_key: string; p_namespace: string; p_sha256: string }
+        Returns: undefined
+      }
+      media_migration_switch: {
+        Args: {
+          p_content_type: string
+          p_key: string
+          p_namespace: string
+          p_owner: string
+          p_sha256: string
+          p_size: number
+        }
+        Returns: undefined
+      }
+      media_source_inventory_summary: { Args: never; Returns: Json }
+      media_storage_attest: {
+        Args: {
+          p_content_type: string
+          p_key: string
+          p_namespace: string
+          p_owner: string
+          p_provider: string
+          p_sha256: string
+          p_size: number
+        }
+        Returns: undefined
+      }
+      media_storage_metrics: { Args: never; Returns: Json }
+      media_storage_record_variants: {
+        Args: {
+          p_key: string
+          p_namespace: string
+          p_owner: string
+          p_variants: Json
+        }
+        Returns: undefined
+      }
+      media_storage_reserve: {
+        Args: {
+          p_key: string
+          p_namespace: string
+          p_owner?: string
+          p_provider: string
+        }
+        Returns: undefined
+      }
+      media_storage_resolve: {
+        Args: { p_key: string; p_namespace: string; p_operation: string }
+        Returns: Json
+      }
       membership_activate: {
         Args: { p_membership_id: string }
         Returns: undefined
@@ -8000,6 +10442,7 @@ export type Database = {
           verified_at: string
         }[]
       }
+      my_business_verification: { Args: { p_org_id: string }; Returns: Json }
       my_co_owner_state: {
         Args: never
         Returns: {
@@ -8041,6 +10484,7 @@ export type Database = {
       }
       my_profile_completion: { Args: never; Returns: Json }
       my_registration_state: { Args: never; Returns: string }
+      my_secondary_phone: { Args: never; Returns: Json }
       my_showroom_affiliations: {
         Args: never
         Returns: {
@@ -8375,6 +10819,23 @@ export type Database = {
         Args: { p_content_type: string; p_org_id: string }
         Returns: string
       }
+      organization_media_read_keys: {
+        Args: { p_keys: string[]; p_namespace: string; p_workspace?: string }
+        Returns: string[]
+      }
+      organization_media_read_providers: {
+        Args: { p_keys: string[]; p_namespace: string; p_workspace?: string }
+        Returns: Json
+      }
+      organization_media_resolve: {
+        Args: {
+          p_key: string
+          p_namespace: string
+          p_operation: string
+          p_workspace?: string
+        }
+        Returns: Json
+      }
       organization_update_i18n: {
         Args: {
           p_name_ar: string
@@ -8492,6 +10953,10 @@ export type Database = {
         Args: { p_direction: string; p_item_id: string }
         Returns: undefined
       }
+      portfolio_media_move: {
+        Args: { p_direction: string; p_id: string; p_kind: string }
+        Returns: undefined
+      }
       portfolio_item_purge: { Args: { p_item_id: string }; Returns: undefined }
       portfolio_item_set_visibility: {
         Args: { p_item_id: string; p_public: boolean }
@@ -8522,6 +10987,22 @@ export type Database = {
         Args: { p_content_type: string; p_product_id: string }
         Returns: string
       }
+      product_media_reorder: {
+        Args: { p_items: Json; p_product_id: string }
+        Returns: undefined
+      }
+      product_videos: {
+        Args: { p_product_id: string; p_workspace?: string }
+        Returns: {
+          duration_seconds: number
+          has_poster: boolean
+          height: number
+          id: string
+          slot: number
+          title: string
+          width: number
+        }[]
+      }
       profile_contact_visibility_set: {
         Args: {
           p_show_email: boolean
@@ -8539,9 +11020,26 @@ export type Database = {
         Returns: undefined
       }
       profile_set_username: { Args: { p_username: string }; Returns: undefined }
+      public_media_edge_sources: {
+        Args: { p_ids: string[]; p_namespace: string }
+        Returns: Json
+      }
       public_portfolio_media_key: {
         Args: { p_item_id: string }
         Returns: string
+      }
+      public_portfolio_videos: {
+        Args: { p_profile_id: string }
+        Returns: {
+          created_at: string
+          duration_seconds: number
+          has_poster: boolean
+          height: number
+          id: string
+          sort_order: number
+          title: string
+          width: number
+        }[]
       }
       publisher_offer_save: {
         Args: {
@@ -8757,6 +11255,24 @@ export type Database = {
       saved_search_update: {
         Args: { p_filters?: Json; p_id: string; p_name?: string }
         Returns: undefined
+      }
+      secondary_phone_cancel: { Args: never; Returns: undefined }
+      secondary_phone_change: {
+        Args: { p_phone: string; p_receipt: string }
+        Returns: Json
+      }
+      secondary_phone_make_primary: {
+        Args: {
+          p_country_iso2?: string
+          p_national?: string
+          p_receipt: string
+        }
+        Returns: undefined
+      }
+      secondary_phone_renew: { Args: never; Returns: Json }
+      secondary_phone_reserve: {
+        Args: { p_phone: string; p_receipt: string }
+        Returns: Json
       }
       send_message: {
         Args: { p_body: string; p_conversation_id: string }
@@ -8996,6 +11512,73 @@ export type Database = {
         Returns: undefined
       }
       username_available: { Args: { p_username: string }; Returns: boolean }
+      video_delete: { Args: { p_id: string }; Returns: string }
+      video_job_claim: {
+        Args: { p_lease_seconds?: number }
+        Returns: {
+          attempts: number
+          content_type: string
+          id: string
+          size_bytes: number
+        }[]
+      }
+      video_job_expire: { Args: never; Returns: number }
+      video_job_fail: {
+        Args: { p_code: string; p_id: string; p_retry: boolean }
+        Returns: undefined
+      }
+      video_job_finish: {
+        Args: {
+          p_duration: number
+          p_has_poster: boolean
+          p_height: number
+          p_id: string
+          p_renditions: string[]
+          p_revision: string
+          p_width: number
+        }
+        Returns: undefined
+      }
+      video_job_renew: {
+        Args: { p_id: string; p_lease_seconds?: number }
+        Returns: boolean
+      }
+      video_mark_purged: { Args: { p_id: string }; Returns: undefined }
+      video_purge_candidates: {
+        Args: { p_limit?: number }
+        Returns: {
+          id: string
+          revision: string
+          upload_id: string
+        }[]
+      }
+      video_set_visibility: {
+        Args: { p_id: string; p_public: boolean }
+        Returns: undefined
+      }
+      video_update: {
+        Args: { p_id: string; p_title: string }
+        Returns: undefined
+      }
+      video_upload_attach: {
+        Args: { p_id: string; p_upload_id: string }
+        Returns: undefined
+      }
+      video_upload_begin: {
+        Args: {
+          p_bytes: number
+          p_content_type: string
+          p_product_id: string
+          p_scope: string
+          p_title: string
+        }
+        Returns: string
+      }
+      video_upload_complete: {
+        Args: { p_id: string; p_size: number }
+        Returns: undefined
+      }
+      video_upload_resolve: { Args: { p_id: string }; Returns: Json }
     }
     Enums: {
       activity_audience_kind: "organization_type" | "persona_type"
@@ -9068,6 +11651,13 @@ export type Database = {
         | "proposal_pending"
         | "decision_pending"
       lead_status: "active" | "won" | "lost" | "archived"
+      media_video_scope: "portfolio" | "product"
+      media_video_state:
+        | "uploading"
+        | "processing"
+        | "ready"
+        | "failed"
+        | "deleted"
       membership_status: "invited" | "active" | "suspended" | "revoked"
       network_referral_origin: "known_organization" | "new_showroom"
       network_referral_status: "pending" | "joined" | "cancelled"
@@ -9149,6 +11739,7 @@ export type Database = {
         | "website"
         | "campaign"
         | "other"
+      secondary_phone_status: "active" | "expired" | "cancelled" | "converted"
       user_status:
         | "pending_verification"
         | "active"
@@ -9172,6 +11763,7 @@ export type Database = {
         | "co_owner"
         | "branch_location"
         | "independent_publisher"
+        | "business"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -9381,6 +11973,14 @@ export const Constants = {
         "decision_pending",
       ],
       lead_status: ["active", "won", "lost", "archived"],
+      media_video_scope: ["portfolio", "product"],
+      media_video_state: [
+        "uploading",
+        "processing",
+        "ready",
+        "failed",
+        "deleted",
+      ],
       membership_status: ["invited", "active", "suspended", "revoked"],
       network_referral_origin: ["known_organization", "new_showroom"],
       network_referral_status: ["pending", "joined", "cancelled"],
@@ -9470,6 +12070,7 @@ export const Constants = {
         "campaign",
         "other",
       ],
+      secondary_phone_status: ["active", "expired", "cancelled", "converted"],
       user_status: [
         "pending_verification",
         "active",
@@ -9495,8 +12096,8 @@ export const Constants = {
         "co_owner",
         "branch_location",
         "independent_publisher",
+        "business",
       ],
     },
   },
 } as const
-

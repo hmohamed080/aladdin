@@ -71,6 +71,23 @@ export const AUDIT_ACTIONS = [
   "project.created",
   "project.activated",
   "project.completed",
+  // 20261017160001: business verification (the Verified badge), separate from organization approval.
+  "business_verification.document_added",
+  "business_verification.document_removed",
+  "business_verification.submitted",
+  "business_verification.review_started",
+  "business_verification.info_requested",
+  "business_verification.approved",
+  "business_verification.rejected",
+  // 20261018090001: current-password confirmation and unverified secondary phone reservations.
+  "account.password_confirmed",
+  "account.password_confirm_locked",
+  "secondary_phone.reserved",
+  "secondary_phone.renewed",
+  "secondary_phone.cancelled",
+  "secondary_phone.changed",
+  "secondary_phone.converted",
+  "phone_cooldown.overridden",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

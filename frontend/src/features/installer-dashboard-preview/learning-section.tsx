@@ -50,23 +50,23 @@ export function LearningSection({
             sizes="(min-width: 1280px) 24vw, (min-width: 768px) 48vw, 100vw"
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-base ease-out-expo group-hover:scale-[1.025]"
           />
-          <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/10" aria-hidden="true" />
+          <span className="absolute inset-0 bg-gradient-to-t from-brand-deep-navy/90 via-brand-deep-navy/35 to-brand-deep-navy/10" aria-hidden="true" />
 
-          <span className="absolute start-2 top-2 inline-flex h-6 items-center gap-1.5 rounded-sm border border-white/30 bg-black/60 px-2 text-caption font-medium text-white">
+          <span className="absolute start-2 top-2 inline-flex h-6 items-center gap-1.5 rounded-sm border border-brand-soft-cream/30 bg-brand-deep-navy/60 px-2 text-caption font-medium text-brand-soft-cream">
             <VideoIcon size={16} />
             {locale === "ar" ? "فيديو تعليمي" : "Video lesson"}
           </span>
 
-          <span className="absolute inset-x-2 bottom-2 flex items-end justify-between gap-2 text-white">
+          <span className="absolute inset-x-2 bottom-2 flex items-end justify-between gap-2 text-brand-soft-cream">
             <span className="min-w-0">
               <span className="block text-body font-semibold leading-snug">{pick(locale, featured.title)}</span>
-              <span className="mt-1 flex items-center gap-2 text-caption text-white/80">
+              <span className="mt-1 flex items-center gap-2 text-caption text-brand-soft-cream/80">
                 <span>{pick(locale, featured.duration)}</span>
                 <span aria-hidden="true">·</span>
                 <span className="truncate">{pick(locale, featured.source)}</span>
               </span>
             </span>
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-pill border border-white/40 bg-white text-primary shadow-card transition-transform group-hover:scale-105 desktop:h-8 desktop:w-8">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-pill border border-brand-soft-cream/40 bg-brand-soft-cream text-primary shadow-card transition-transform group-hover:scale-105 desktop:h-8 desktop:w-8">
               <PlayIcon size={20} />
             </span>
           </span>

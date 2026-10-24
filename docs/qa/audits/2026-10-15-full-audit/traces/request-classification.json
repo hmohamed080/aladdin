@@ -1,0 +1,525 @@
+[
+  {
+    "page": "Homepage",
+    "failed": [],
+    "heaviestImages": [
+      {
+        "url": "/preview/landing/roles/role-atlas-transparent.png",
+        "kb": 1312
+      },
+      {
+        "url": "/marketplace/media/cb24bf4d-7912-42a7-b2c0-1550be7d4cb3",
+        "kb": 956
+      },
+      {
+        "url": "/_next/image?url=%2Fpreview%2Flanding%2Fhero%2Fbackground-2-new-trimmed.png&w=1920&q=75",
+        "kb": 115
+      },
+      {
+        "url": "/_next/image?url=%2Fpreview%2Flanding%2Faladdin-logo-2026.png&w=750&q=75",
+        "kb": 96
+      },
+      {
+        "url": "/_next/image?url=%2Fpreview%2Flanding%2Fsections%2Fproducts-scene.png&w=640&q=75",
+        "kb": 23
+      },
+      {
+        "url": "/_next/image?url=%2Fpreview%2Flanding%2Fvideos%2F2.jpg&w=384&q=75",
+        "kb": 17
+      },
+      {
+        "url": "/_next/image?url=%2Fpreview%2Flanding%2Fvideos%2F1.jpg&w=384&q=75",
+        "kb": 15
+      },
+      {
+        "url": "/_next/image?url=%2Fpreview%2Flanding%2Fvideos%2F4.jpg&w=384&q=75",
+        "kb": 15
+      }
+    ],
+    "renderedImages": [
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Faladdin-logo-2026.png&w=750&q=75",
+        "natural": "720x773",
+        "shown": "67x72"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fhero%2Fbackground-2-new-trimmed.png&w=1920&q=75",
+        "natural": "1296x551",
+        "shown": "1430x608"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fvideos%2F1.jpg&w=384&q=75",
+        "natural": "288x511",
+        "shown": "259x162"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fvideos%2F2.jpg&w=384&q=75",
+        "natural": "288x512",
+        "shown": "259x162"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fvideos%2F3.jpg&w=384&q=75",
+        "natural": "288x512",
+        "shown": "259x162"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fvideos%2F4.jpg&w=384&q=75",
+        "natural": "288x512",
+        "shown": "259x162"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fvideos%2F5.jpg&w=384&q=75",
+        "natural": "288x512",
+        "shown": "259x162"
+      },
+      {
+        "src": "/marketplace/media/cb24bf4d-7912-42a7-b2c0-1550be7d4cb3",
+        "natural": "1890x1890",
+        "shown": "224x168"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fpartners%2Fvenecia.png&w=256&q=75",
+        "natural": "144x109",
+        "shown": "121x62"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fpartners%2Fshbab.png&w=256&q=75",
+        "natural": "144x144",
+        "shown": "181x93"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fpartners%2Fahmed-el-sallab.png&w=256&q=75",
+        "natural": "144x144",
+        "shown": "205x105"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fpartners%2Felsalam.png&w=256&q=75",
+        "natural": "144x144",
+        "shown": "169x87"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fpartners%2Fkonouz.png&w=256&q=75",
+        "natural": "144x144",
+        "shown": "217x112"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fpartners%2Fjazeerah.png&w=256&q=75",
+        "natural": "112x112",
+        "shown": "121x62"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fpartners%2Fglc.png&w=256&q=75",
+        "natural": "144x144",
+        "shown": "217x112"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fpartners%2Fjotun.png&w=256&q=75",
+        "natural": "144x144",
+        "shown": "217x112"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fpartners%2Fscib.png&w=256&q=75",
+        "natural": "144x144",
+        "shown": "205x105"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Fsections%2Fproducts-scene.png&w=640&q=75",
+        "natural": "432x216",
+        "shown": "385x144"
+      },
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Faladdin-logo-2026.png&w=750&q=75",
+        "natural": "720x773",
+        "shown": "89x96"
+      }
+    ]
+  },
+  {
+    "page": "Marketplace listing",
+    "failed": [],
+    "heaviestImages": [
+      {
+        "url": "/marketplace/media/cb24bf4d-7912-42a7-b2c0-1550be7d4cb3",
+        "kb": 956
+      },
+      {
+        "url": "/preview/landing/marketplace/wallpaper-1.png",
+        "kb": 861
+      },
+      {
+        "url": "/preview/landing/marketplace/sheeboard-1.png",
+        "kb": 858
+      },
+      {
+        "url": "/preview/landing/marketplace/corner_trim-1.png",
+        "kb": 755
+      },
+      {
+        "url": "/preview/landing/marketplace/marble_alternative-1.png",
+        "kb": 657
+      },
+      {
+        "url": "/preview/landing/marketplace/cornice-1.png",
+        "kb": 550
+      },
+      {
+        "url": "/preview/landing/marketplace/wood_alternative-1.png",
+        "kb": 497
+      },
+      {
+        "url": "/preview/landing/marketplace/type-vinyl-flooring.webp",
+        "kb": 113
+      }
+    ],
+    "renderedImages": [
+      {
+        "src": "/_next/image?url=%2Fpreview%2Flanding%2Faladdin-logo-2026.png&w=750&q=75",
+        "natural": "720x773",
+        "shown": "67x72"
+      },
+      {
+        "src": "/preview/landing/marketplace/wood_alternative-1.png",
+        "natural": "1200x900",
+        "shown": "128x244"
+      },
+      {
+        "src": "/preview/landing/marketplace/marble_alternative-1.png",
+        "natural": "1200x900",
+        "shown": "128x244"
+      },
+      {
+        "src": "/preview/landing/marketplace/cornice-1.png",
+        "natural": "1200x900",
+        "shown": "128x244"
+      },
+      {
+        "src": "/preview/landing/marketplace/wallpaper-1.png",
+        "natural": "1200x900",
+        "shown": "49x37"
+      },
+      {
+        "src": "/preview/landing/marketplace/marble_alternative-1.png",
+        "natural": "1200x900",
+        "shown": "49x37"
+      },
+      {
+        "src": "/preview/landing/marketplace/type-panels.webp",
+        "natural": "900x900",
+        "shown": "49x37"
+      },
+      {
+        "src": "/preview/landing/marketplace/type-curtains.webp",
+        "natural": "900x900",
+        "shown": "49x37"
+      },
+      {
+        "src": "/preview/landing/marketplace/wallpaper-1.png",
+        "natural": "1200x900",
+        "shown": "100x75"
+      },
+      {
+        "src": "/preview/landing/marketplace/wood_alternative-1.png",
+        "natural": "1200x900",
+        "shown": "100x75"
+      },
+      {
+        "src": "/preview/landing/marketplace/marble_alternative-1.png",
+        "natural": "1200x900",
+        "shown": "100x75"
+      },
+      {
+        "src": "/preview/landing/marketplace/sheeboard-1.png",
+        "natural": "1200x900",
+        "shown": "100x75"
+      },
+      {
+        "src": "/preview/landing/marketplace/type-panels.webp",
+        "natural": "900x900",
+        "shown": "100x75"
+      },
+      {
+        "src": "/preview/landing/marketplace/type-posters.webp",
+        "natural": "900x900",
+        "shown": "100x75"
+      },
+      {
+        "src": "/preview/landing/marketplace/cornice-1.png",
+        "natural": "1200x900",
+        "shown": "100x75"
+      },
+      {
+        "src": "/preview/landing/marketplace/type-skirting.webp",
+        "natural": "900x900",
+        "shown": "100x75"
+      },
+      {
+        "src": "/preview/landing/marketplace/corner_trim-1.png",
+        "natural": "1200x900",
+        "shown": "100x75"
+      },
+      {
+        "src": "/preview/landing/marketplace/type-interior-doors.webp",
+        "natural": "900x900",
+        "shown": "100x75"
+      },
+      {
+        "src": "/preview/landing/marketplace/type-armored-doors.webp",
+        "natural": "900x900",
+        "shown": "100x75"
+      },
+      {
+        "src": "/preview/landing/marketplace/type-vinyl-flooring.webp",
+        "natural": "900x900",
+        "shown": "100x75"
+      }
+    ]
+  },
+  {
+    "page": "Sign In",
+    "failed": [
+      {
+        "url": "/installer/sign-in?_rsc=kB0VybKRfOFOOi_f",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/auth/forgot-password?_rsc=kB0VybKRfOFOOi_f",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      }
+    ],
+    "heaviestImages": [
+      {
+        "url": "/_next/image?url=%2Fbrand%2Faladdin-mark.png&w=384&q=75",
+        "kb": 50
+      }
+    ],
+    "renderedImages": [
+      {
+        "src": "/_next/image?url=%2Fbrand%2Faladdin-mark.png&w=384&q=75",
+        "natural": "261x384",
+        "shown": "26x38"
+      },
+      {
+        "src": "/_next/image?url=%2Fbrand%2Faladdin-mark.png&w=384&q=75",
+        "natural": "261x384",
+        "shown": "0x0"
+      },
+      {
+        "src": "/_next/image?url=%2Fbrand%2Faladdin-mark.png&w=384&q=75",
+        "natural": "261x384",
+        "shown": "18x26"
+      }
+    ]
+  },
+  {
+    "page": "Showroom registration",
+    "failed": [
+      {
+        "url": "/legal/terms?_rsc=d12_Vby-UB_bSTgG",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/legal/privacy?_rsc=d12_Vby-UB_bSTgG",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      }
+    ],
+    "heaviestImages": [
+      {
+        "url": "/_next/image?url=%2Fassets%2Fshowroom-auth%2Fshowroom-interior-2026.png&w=1080&q=75",
+        "kb": 103
+      },
+      {
+        "url": "/_next/image?url=%2Fassets%2Fshowroom-auth%2Faladdin-logo-2026.png&w=1920&q=75",
+        "kb": 81
+      },
+      {
+        "url": "/assets/country-flags/eg.svg",
+        "kb": 3
+      }
+    ],
+    "renderedImages": [
+      {
+        "src": "/_next/image?url=%2Fassets%2Fshowroom-auth%2Faladdin-logo-2026.png&w=1920&q=75",
+        "natural": "1536x1024",
+        "shown": "180x120"
+      },
+      {
+        "src": "/assets/country-flags/eg.svg",
+        "natural": "200x150",
+        "shown": "24x18"
+      },
+      {
+        "src": "/_next/image?url=%2Fassets%2Fshowroom-auth%2Fshowroom-interior-2026.png&w=1080&q=75",
+        "natural": "892x892",
+        "shown": "897x1076"
+      }
+    ]
+  },
+  {
+    "page": "B2B dashboard",
+    "failed": [
+      {
+        "url": "/b2b/saved?_rsc=0ZNiuhh43N94A74o",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2b/quotations?_rsc=0ZNiuhh43N94A74o",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2b/orders?_rsc=0ZNiuhh43N94A74o",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2b/catalog?_rsc=0ZNiuhh43N94A74o",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/auth/support?_rsc=0ZNiuhh43N94A74o",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2b/follow-ups?_rsc=0ZNiuhh43N94A74o",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      }
+    ],
+    "heaviestImages": [
+      {
+        "url": "/_next/image?url=%2Fbrand%2Faladdin-logo-2026.png&w=750&q=75",
+        "kb": 96
+      },
+      {
+        "url": "/storage/v1/object/sign/avatars/54d34564-5bb4-498d-b75e-bc6281017a28.jpg?token=REDACTED",
+        "kb": 0
+      }
+    ],
+    "renderedImages": [
+      {
+        "src": "/_next/image?url=%2Fbrand%2Faladdin-logo-2026.png&w=750&q=75",
+        "natural": "720x773",
+        "shown": "75x80"
+      },
+      {
+        "src": "/_next/image?url=%2Fbrand%2Faladdin-logo-2026.png&w=750&q=75",
+        "natural": "720x773",
+        "shown": "0x0"
+      },
+      {
+        "src": "/storage/v1/object/sign/avatars/54d34564-5bb4-498d-b75e-bc6281017a28.jpg?token=REDACTED",
+        "natural": "512x512",
+        "shown": "36x36"
+      }
+    ]
+  },
+  {
+    "page": "Seller product list",
+    "failed": [
+      {
+        "url": "/b2b/rfqs?_rsc=sItLDRBO5al0X3O1",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2b/orders?_rsc=sItLDRBO5al0X3O1",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2b/catalog?_rsc=sItLDRBO5al0X3O1",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2c/seller/products/025991d6-b6d6-41b3-b8d5-bdd184db2234/edit?_rsc=sItLDRBO5al0X3O1",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2c/seller/products/00ac21b3-2585-42bc-87b1-ac6d83c9c046/edit?_rsc=sItLDRBO5al0X3O1",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2c/seller/products/063d6fe0-89c5-4c05-88dd-e92af8c95ff8/edit?_rsc=sItLDRBO5al0X3O1",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2c/seller/products/07ef664d-76db-43e9-a4ac-fae78323a0a7/edit?_rsc=sItLDRBO5al0X3O1",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2c/seller/products/076262d4-410a-4ced-ae78-f018b41cb7e7/edit?_rsc=sItLDRBO5al0X3O1",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2c/seller/products/0888abaf-c1f9-4fa8-b445-b7b97a94636b/edit?_rsc=sItLDRBO5al0X3O1",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      },
+      {
+        "url": "/b2b/settings?_rsc=sItLDRBO5al0X3O1",
+        "why": "net::ERR_ABORTED",
+        "type": "fetch",
+        "prefetch": true
+      }
+    ],
+    "heaviestImages": [
+      {
+        "url": "/_next/image?url=%2Fbrand%2Faladdin-logo-2026.png&w=750&q=75",
+        "kb": 96
+      },
+      {
+        "url": "/storage/v1/object/sign/avatars/54d34564-5bb4-498d-b75e-bc6281017a28.jpg?token=REDACTED",
+        "kb": 0
+      }
+    ],
+    "renderedImages": [
+      {
+        "src": "/_next/image?url=%2Fbrand%2Faladdin-logo-2026.png&w=750&q=75",
+        "natural": "720x773",
+        "shown": "75x80"
+      },
+      {
+        "src": "/_next/image?url=%2Fbrand%2Faladdin-logo-2026.png&w=750&q=75",
+        "natural": "720x773",
+        "shown": "0x0"
+      },
+      {
+        "src": "/storage/v1/object/sign/avatars/54d34564-5bb4-498d-b75e-bc6281017a28.jpg?token=REDACTED",
+        "natural": "512x512",
+        "shown": "36x36"
+      }
+    ]
+  }
+]

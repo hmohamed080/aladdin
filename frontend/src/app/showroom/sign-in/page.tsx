@@ -8,7 +8,7 @@ import { ShowroomAuthForm } from "@/features/showroom-auth/form";
 import { EntryAuthPanel } from "@/features/entry-auth/entry-auth-panel";
 import { EntryEmailSignInForm } from "@/features/entry-auth/email-forms";
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "تسجيل الدخول إلى حساب المعرض — علاء الدين" };
+export const metadata: Metadata = { title: "تسجيل الدخول — علاء الدين" };
 export default async function ShowroomPage({ searchParams }: {
     searchParams: Promise<{
         next?: string;

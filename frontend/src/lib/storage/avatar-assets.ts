@@ -11,15 +11,13 @@
  */
 
 export const AVATAR_BUCKET = "avatars";
-/** The bucket's own file_size_limit — applies to the CROPPED object actually uploaded. */
-export const AVATAR_MAX_BYTES = 3 * 1024 * 1024;
 /**
- * The limit on the photo a person SELECTS. Larger than the bucket limit on
- * purpose: the crop step re-encodes to a small square JPEG (see
- * AVATAR_OUTPUT_PX), so a normal 12 MP phone photo is accepted and shrunk
- * rather than refused before it can be cropped.
+ * The bucket's own file_size_limit. It applies to the CROPPED 512 px object the
+ * crop step uploads (`encodeCanvasWithin` guarantees it), never to the photo a
+ * person SELECTS: that original is not refused for its size (owner rule,
+ * 2026-10-19; docs/database/professional-asset-storage.md §16).
  */
-export const AVATAR_SOURCE_MAX_BYTES = 10 * 1024 * 1024;
+export const AVATAR_MAX_BYTES = 3 * 1024 * 1024;
 /** Edge length of the square the crop step outputs. */
 export const AVATAR_OUTPUT_PX = 512;
 /** The content type the crop step always outputs, whatever the source format. */
@@ -38,11 +36,9 @@ export function isAvatarContentType(type: string): type is AvatarContentType {
   return (AVATAR_ALLOWED_TYPES as readonly string[]).includes(type);
 }
 
-/** Type + size of the SELECTED source photo, checked before the crop step opens. */
+/** Type of the SELECTED source photo, and that it is not empty. Its size is never a reason to refuse it. */
 export function validateAvatarFile(file: { type: string; size: number }): AvatarValidation {
   if (!isAvatarContentType(file.type)) return { ok: false, code: "profileIdentity.avatar.errorType" };
-  if (file.size <= 0 || file.size > AVATAR_SOURCE_MAX_BYTES) {
-    return { ok: false, code: "profileIdentity.avatar.errorSize" };
-  }
+  if (file.size <= 0) return { ok: false, code: "profileIdentity.avatar.errorSize" };
   return { ok: true };
 }

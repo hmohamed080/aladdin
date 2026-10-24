@@ -12,12 +12,19 @@
 import { clampPageSize, type PageSize } from "@/features/admin-preview/table-state";
 import { GOVERNORATES } from "@/lib/onboarding/persona-fields";
 import { Constants, type Database } from "@/types/database.types";
+import { PUBLIC_ACCOUNTS } from "@/lib/taxonomy/accounts";
 
 type Enums = Database["public"]["Enums"];
 type Raw = string | string[] | undefined;
 
 export const USER_STATUS_TABS = ["pending", "verified", "suspended", "rejected"] as const;
 export const USER_VERIFICATION_STATES = ["unverified", "pending", "verified", "rejected"] as const;
+/**
+ * The account-type filter: the nine public accounts by the key `app.user_account_type` returns (the persona for a
+ * personal account, the organization type for a business), plus `none` for people who have not chosen yet.
+ */
+export const USER_ACCOUNT_TYPES = [...PUBLIC_ACCOUNTS.map((a) => (a.persona ?? a.orgType) as string), "none"] as const;
+export type UserAccountTypeFilter = string;
 export const USER_SORTS = ["registered:desc", "registered:asc", "completeness:desc", "completeness:asc"] as const;
 export const ORG_STATUS_TABS = ["pending", "verified", "suspended"] as const;
 export const ORG_SORTS = ["registered:desc", "registered:asc"] as const;
@@ -34,7 +41,7 @@ export const SEARCH_MAX_LENGTH = 100;
 export type UsersDirectoryParams = {
   search: string | null;
   status: UserStatusTab | null;
-  accountType: Enums["persona_type"] | null;
+  accountType: UserAccountTypeFilter | null;
   verification: UserVerificationState | null;
   governorate: string | null;
   sort: UserSort;
@@ -78,7 +85,7 @@ export function parseUsersDirectoryParams(sp: Record<string, Raw>): UsersDirecto
   return {
     search: parseSearch(sp.q),
     status: oneOf(sp.status, USER_STATUS_TABS),
-    accountType: oneOf(sp.type, Constants.public.Enums.persona_type),
+    accountType: oneOf(sp.type, USER_ACCOUNT_TYPES),
     verification: oneOf(sp.verification, USER_VERIFICATION_STATES),
     governorate: oneOf(sp.governorate, GOVERNORATES),
     sort: oneOf(sp.sort, USER_SORTS) ?? "registered:desc",

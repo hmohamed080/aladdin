@@ -8,6 +8,11 @@ import type { CatalogRow } from "@/server/queries/commerce";
 import { effectiveColors } from "@/features/showroom-shell/products/color-items";
 import { Swatch } from "@/features/showroom-shell/products/color-swatches";
 import type { getMessages } from "@/lib/i18n/translate";
+import type { VideoPlayback } from "@/server/video/playback";
+import { VideoPlayer } from "@/features/video/video-player";
+
+/** One item of the product gallery, in the publisher's order (photos and videos share slots). */
+export type GalleryEntry = { kind: "image"; url: string } | { kind: "video"; video: VideoPlayback };
 
 type Messages = ReturnType<typeof getMessages>;
 
@@ -27,9 +32,12 @@ export function CatalogProductDetail({
   back,
   extra,
   imageUrls = [],
+  media,
 }: {
   /** Signed URLs of the product's uploaded photos, main first. Empty -> the legacy `image_ref`. */
   imageUrls?: string[];
+  /** The whole gallery in order, videos included. Takes precedence over `imageUrls`. */
+  media?: GalleryEntry[];
   product: CatalogRow & {
     id: string;
     category: NonNullable<CatalogRow["category"]>;
@@ -62,16 +70,34 @@ export function CatalogProductDetail({
             card grid's thumbnail is for scanning, this is for deciding. */}
         <div className="grid gap-md tablet:grid-cols-[minmax(0,15rem)_1fr] tablet:items-start">
           <div className="flex min-w-0 flex-col gap-2">
-            <ProductMedia src={imageUrls[0] ?? product.image_ref} alt={product.name ?? ""} />
-            {imageUrls.length > 1 ? (
-              <ul className="grid grid-cols-3 gap-2" data-testid="product-detail-thumbnails">
-                {imageUrls.slice(1).map((url) => (
-                  <li key={url}>
-                    <ProductMedia src={url} alt={product.name ?? ""} aspect="aspect-square" />
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+            {(() => {
+              const entries: GalleryEntry[] = media ?? imageUrls.map((url) => ({ kind: "image" as const, url }));
+              const [first, ...rest] = entries;
+              const show = (entry: GalleryEntry | undefined, aspect: string) => {
+                if (entry?.kind === "video") {
+                  const v = entry.video;
+                  return (
+                    <div className={`relative w-full overflow-hidden rounded-md bg-black ${aspect}`} data-testid="product-detail-video">
+                      <VideoPlayer fill source={v} title={v.title} width={v.width} height={v.height}
+                        labels={{ play: m.video.play.replace("{title}", v.title), unavailable: m.video.unavailable }} />
+                    </div>
+                  );
+                }
+                return <ProductMedia src={entry?.url ?? product.image_ref} alt={product.name ?? ""} aspect={aspect === "aspect-square" ? "aspect-square" : undefined} />;
+              };
+              return (
+                <>
+                  {show(first, "aspect-[4/3]")}
+                  {rest.length > 0 ? (
+                    <ul className="grid grid-cols-3 gap-2" data-testid="product-detail-thumbnails">
+                      {rest.map((entry) => (
+                        <li key={entry.kind === "video" ? `video-${entry.video.id}` : entry.url}>{show(entry, "aspect-square")}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </>
+              );
+            })()}
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">

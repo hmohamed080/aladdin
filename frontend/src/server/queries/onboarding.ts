@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getServerSupabase } from "@/lib/supabase/server";
+import { readSessionIdentity } from "@/server/auth/session";
 import { userFacingEmail } from "@/lib/auth/craftsman-login-alias";
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
@@ -40,9 +41,7 @@ export type OnboardingData = {
 
 export async function getOnboardingData(): Promise<OnboardingData | null> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return null;
 
   const [{ data: profile }, { data: userRow }, { data: progress }] = await Promise.all([
@@ -155,9 +154,7 @@ export type BusinessOnboardingData = {
  */
 export async function getBusinessOnboardingData(): Promise<BusinessOnboardingData | null> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return null;
 
   const [{ data: progress }, { data: draft }] = await Promise.all([
@@ -204,9 +201,7 @@ export async function getBusinessOnboardingData(): Promise<BusinessOnboardingDat
 
 export async function getIndividualOnboardingData(): Promise<IndividualOnboardingData | null> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return null;
 
   const [{ data: progress }, { data: profile }, { data: io }] = await Promise.all([

@@ -12,12 +12,19 @@ dependencies = [
     "httpx>=0.28",
     "structlog>=24.4",
     "openai>=1.59",
+    # Local Supabase JWT verification (JWKS, ES256). Already locked as a
+    # transitive dependency of supabase-auth; declared because app.auth uses it.
+    "pyjwt[crypto]>=2.10",
+    "redis>=8.1",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
     "ruff>=0.9",
+]
+video-worker = [
+    "boto3>=1.35",
 ]
 
 [tool.uv]

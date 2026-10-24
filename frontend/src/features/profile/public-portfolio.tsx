@@ -1,7 +1,11 @@
 import { Card } from "@/components/ui/primitives";
 import type { TranslateFn } from "@/lib/i18n/translate";
 import type { PublicPortfolioItem } from "@/server/queries/portfolio";
-import { MediaFrame } from "@/features/portfolio/media-frame";
+import { MediaFrame, MediaImage } from "@/features/portfolio/media-frame";
+import type { MediaSource } from "@/lib/media/image-variants";
+import { mergeMedia } from "@/lib/media/media-order";
+import type { VideoPlayback } from "@/server/video/playback";
+import { VideoPlayer } from "@/features/video/video-player";
 
 /**
  * A professional's published work, on their public profile.
@@ -21,15 +25,23 @@ import { MediaFrame } from "@/features/portfolio/media-frame";
  * object before it serves a byte. So the two halves agree by construction: an item
  * that reaches this list is one the media route will serve, and an item the route
  * refuses is one the list never had.
+ *
+ * `media` is OPTIONAL and comes from the URL issuer: the same opaque item
+ * identity, plus thumb/card variant URLs once they exist. Without it the card
+ * uses `/p/media/<id>` exactly as before.
  */
 export function PublicPortfolio({
   items,
+  videos = [],
   t,
 }: {
-  items: PublicPortfolioItem[];
+  items: Array<PublicPortfolioItem & { media?: MediaSource | null }>;
+  /** Published videos, placed among the photos in the owner's order. */
+  videos?: VideoPlayback[];
   t: TranslateFn;
 }) {
-  if (items.length === 0) return null;
+  if (items.length === 0 && videos.length === 0) return null;
+  const entries = mergeMedia(items.map((item) => ({ ...item, position: item.sortOrder ?? null })), videos);
 
   return (
     <section className="flex flex-col gap-md" aria-labelledby="public-portfolio">
@@ -38,20 +50,32 @@ export function PublicPortfolio({
       </h2>
 
       <ul className="grid gap-md tablet:grid-cols-2 desktop:grid-cols-3">
-        {items.map((item) => (
+        {entries.map((entry) => {
+          if (entry.kind === "video") {
+            const video = entry.item;
+            return (
+              <li key={`video-${video.id}`} data-testid="public-portfolio-video">
+                <Card pad="sm" className="flex h-full flex-col gap-3">
+                  <MediaFrame>
+                    <VideoPlayer fill source={video} title={video.title} width={video.width} height={video.height}
+                      labels={{ play: t("video.play", { title: video.title }), unavailable: t("video.unavailable") }} />
+                  </MediaFrame>
+                  <h3 className="text-label font-medium text-fg">
+                    <bdi dir="auto">{video.title}</bdi>
+                  </h3>
+                </Card>
+              </li>
+            );
+          }
+          const item = entry.item;
+          return (
           <li key={item.id}>
             <Card pad="sm" className="flex h-full flex-col gap-3">
               <MediaFrame>
-                {/* The media route streams bytes behind a short-lived signed
-                    URL, which next/image cannot optimise without a loader that
-                    would cache it past the moment it stops being published. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/p/media/${item.id}`}
-                  alt={item.title}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
+                {/* The media route re-proves publication per request, so
+                    next/image must never cache it past the moment it stops
+                    being published; MediaImage stays a plain <img>. */}
+                <MediaImage source={item.media ?? { src: `/p/media/${item.id}` }} alt={item.title} />
               </MediaFrame>
               <div className="flex min-w-0 flex-col gap-1">
                 {/* `<bdi>`, not `dir="auto"` on the block. Both lines are
@@ -71,7 +95,8 @@ export function PublicPortfolio({
               </div>
             </Card>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </section>
   );

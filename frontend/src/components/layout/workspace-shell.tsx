@@ -15,6 +15,12 @@ import { AppShell } from "@/components/layout/app-shell";
 import { SalesRealtime } from "@/features/sales/sales-realtime";
 import { SIDEBAR_MODE_COOKIE, resolveSidebarMode } from "@/lib/ui/sidebar-mode";
 import { commerceStance } from "@/lib/workspace/supply-side";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { loadMarketplaceSellerStatus } from "@/server/queries/marketplace-seller";
+import { MARKETPLACE_SELL_ENTITLEMENT } from "@/lib/nav/modules";
+import { isMarketplacePreviewEnabled } from "@/lib/env";
+import { Brand2026BodyScope } from "@/components/layout/brand-2026-scope";
+import { BRAND_2026_SCOPE_CLASS } from "@/lib/brand/surface";
 
 /**
  * The B2B WORKSPACE assembly — what fills the shared shell for an organization.
@@ -59,8 +65,21 @@ export async function WorkspaceShell({
   // classification on the server, so the first paint is already correct — it is a
   // navigation ORDER, and rewriting the rail after hydration is a visible jump.
   const stance = commerceStance(active.orgType);
+  // Marketplace selling is an ADMIN-GRANTED entitlement of the organization, not a
+  // membership capability: the module is drawn only for an approved seller. The
+  // membership capabilities themselves are passed on untouched everywhere else.
+  const sellerStatus = await loadMarketplaceSellerStatus(await getServerSupabase(), active.organizationId);
+  const navCapabilities =
+    sellerStatus === "approved" ? [...active.capabilities, MARKETPLACE_SELL_ENTITLEMENT] : active.capabilities;
 
-  return (
+  // THE 2026 BRAND DIRECTION, PREVIEWED ON THE WHOLE WORKSPACE. Behind the same
+  // flag as the Marketplace preview, so a closed environment keeps the current
+  // design system untouched. It is presentation only: the palette scope and the
+  // 2026 lockup. Navigation, access and data are identical either way.
+  const brand2026 = isMarketplacePreviewEnabled();
+  const brandEdition = brand2026 ? ("2026" as const) : ("classic" as const);
+
+  const shell = (
     <AppShell
       nav={
         /* The panel supplies the material, the gutter, the display modes and the
@@ -70,13 +89,15 @@ export async function WorkspaceShell({
         <SidebarShell
           mode={sidebarMode}
           appName={m.common.appName}
-          nav={<WorkspaceNavPanel allowed={active.capabilities} stance={stance} />}
+          brandEdition={brandEdition}
+          nav={<WorkspaceNavPanel allowed={navCapabilities} stance={stance} />}
         />
       }
       header={
         <AppHeader
           appName={m.common.appName}
-          capabilities={active.capabilities}
+          brandEdition={brandEdition}
+          capabilities={navCapabilities}
           stance={stance}
           hasWorkspace
           workspaceLabel={orgDisplayName ?? active.organizationName}
@@ -136,9 +157,18 @@ export async function WorkspaceShell({
           actions={<SalesRealtime orgId={active.organizationId} branchId={active.activeBranchId} />}
         />
       }
-      mobileNav={<MobileNav allowed={active.capabilities} stance={stance} />}
+      mobileNav={<MobileNav allowed={navCapabilities} stance={stance} />}
     >
       {children}
     </AppShell>
+  );
+
+  if (!brand2026) return shell;
+  return (
+    // `contents` keeps the wrapper out of layout; the palette tokens still inherit through it.
+    <div className={`${BRAND_2026_SCOPE_CLASS} contents`}>
+      <Brand2026BodyScope />
+      {shell}
+    </div>
   );
 }

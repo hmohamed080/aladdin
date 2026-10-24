@@ -32,6 +32,14 @@ jobs:
   frontend:
     name: frontend
     runs-on: ubuntu-latest
+    # Real Redis for the cache-isolation, rate-limit and job-lock tests (ADR-0019).
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 2s --health-retries 15
+    env:
+      REDIS_TEST_URL: redis://127.0.0.1:6379
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -46,10 +54,21 @@ jobs:
       - run: pnpm --filter frontend lint
       - run: pnpm --filter frontend test
       - run: pnpm --filter frontend build
+      # Media Worker (edge/media-worker): unit tests with fake R2/database bindings, no Cloudflare account.
+      - run: pnpm --filter @aladdin/media-worker typecheck
+      - run: pnpm --filter @aladdin/media-worker test
 
   backend:
     name: backend
     runs-on: ubuntu-latest
+    # Real Redis for the cache-isolation, rate-limit and job-lock tests (ADR-0019).
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 2s --health-retries 15
+    env:
+      REDIS_TEST_URL: redis://127.0.0.1:6379
     defaults:
       run:
         working-directory: backend
@@ -60,9 +79,12 @@ jobs:
           python-version: "3.12"
       - name: Install uv (tool bootstrap; project deps stay uv-managed)
         run: pipx install uv
-      - run: uv sync --frozen --python 3.12
+      # ffmpeg for the real transcode test of the video worker (ADR-0020).
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: uv sync --frozen --python 3.12 --group video-worker
       - run: uv run ruff check .
-      - run: uv run pytest
+      - run: uv run --group video-worker pytest
 
   docs:
     name: docs
@@ -111,7 +133,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Unit tests (migration-history guard, migration policy, deployment selector)
+      # The media-storage script tests load sharp from the frontend workspace.
+      - name: Enable pnpm (corepack, pinned to packageManager)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - name: Unit tests (migration-history guard, migration policy, deployment selector, media storage)
         run: node --test scripts/*.test.mjs
       - name: Review the migrations changed by this PR
         run: |

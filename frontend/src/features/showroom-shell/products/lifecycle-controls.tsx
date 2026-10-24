@@ -105,7 +105,7 @@ export function ActiveSwitch({ productId, version, active, labelled = false }: {
         data-testid="active-switch"
         className={cn(
           "relative inline-flex h-6 w-11 shrink-0 items-center rounded-pill border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-          active ? "border-transparent bg-accent-solid" : "border-strong bg-surface-2",
+          active ? "border-accent-edge bg-accent-solid" : "border-strong bg-surface-2",
         )}
       >
         <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow-sm transition-all", active ? "end-0.5" : "start-0.5")} />

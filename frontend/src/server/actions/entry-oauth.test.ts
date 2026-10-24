@@ -44,7 +44,7 @@ describe("startEntryOAuth", () => {
   });
 
   it("refuses an unknown provider or page", async () => {
-    expect(await run(() => startEntryOAuth(form({ kind: "showroom", provider: "github" })))).toBe("REDIRECT:/showroom/sign-in?error=oauth");
+    expect(await run(() => startEntryOAuth(form({ kind: "showroom", provider: "github" })))).toBe("REDIRECT:/sign-in?error=oauth");
     expect(await run(() => startEntryOAuth(form({ kind: "admin", provider: "google" })))).toBe("REDIRECT:/auth/sign-in");
     expect(mocks.oauth).not.toHaveBeenCalled();
   });

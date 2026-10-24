@@ -20,10 +20,10 @@ import { formatNumber } from "@/lib/ui/format";
 import { cn } from "@/lib/ui/cn";
 
 const LEVEL_TONE: Record<MatchLevel, string> = {
-  excellent: "bg-success text-white",
-  strong: "bg-success text-white",
-  good: "bg-info text-white",
-  partial: "bg-warning text-fg",
+  excellent: "bg-success text-on-status",
+  strong: "bg-success text-on-status",
+  good: "bg-info text-on-status",
+  partial: "bg-warning text-on-status",
   low: "bg-surface text-fg-secondary",
 };
 

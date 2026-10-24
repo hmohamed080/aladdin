@@ -1,12 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({ storage: { from: storageFrom } }) }));
+vi.mock("@/lib/env/storage", () => ({ readStorageEnv: () => ({ SUPABASE_SERVICE_ROLE_KEY: "local-test" }) }));
+vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_SUPABASE_URL: "https://test.invalid" }) }));
 
 const getUser = vi.fn();
 const createSignedUploadUrl = vi.fn();
 const createSignedUrl = vi.fn();
 const remove = vi.fn();
-const storageFrom = vi.fn(() => ({ createSignedUploadUrl, createSignedUrl, remove }));
+const list = vi.fn();
+const storageFrom = vi.fn(() => ({ createSignedUploadUrl, createSignedUrl, remove, list }));
 const from = vi.fn();
 const rpc = vi.fn();
 
@@ -35,11 +39,13 @@ beforeEach(() => {
   for (const m of [getUser, createSignedUploadUrl, createSignedUrl, remove, storageFrom, from, rpc]) {
     m.mockReset();
   }
-  storageFrom.mockImplementation(() => ({ createSignedUploadUrl, createSignedUrl, remove }));
+  storageFrom.mockImplementation(() => ({ createSignedUploadUrl, createSignedUrl, remove, list }));
+  list.mockResolvedValue({ data: [], error: null });
   getUser.mockResolvedValue({ data: { user: { id: OWNER } } });
   createSignedUploadUrl.mockResolvedValue({ data: { token: "t0k3n" }, error: null });
   createSignedUrl.mockResolvedValue({ data: { signedUrl: "/object/sign/x?token=y" }, error: null });
-  remove.mockResolvedValue({ data: [{ name: "x" }], error: null });
+  remove.mockResolvedValue({ data: [{ name: PORTFOLIO_KEY }], error: null });
+  rpc.mockResolvedValue({ data: { provider: "supabase", reserved: true, contentType: "image/png", state: "pending", owner: OWNER }, error: null });
 });
 
 /**
@@ -54,7 +60,7 @@ beforeEach(() => {
 describe("createAssetUploadTicket", () => {
   it("mints a ticket for the exact key the database handed back", async () => {
     const r = await createAssetUploadTicket("portfolio", PORTFOLIO_KEY);
-    expect(r).toEqual({ ok: true, token: "t0k3n" });
+    expect(r).toMatchObject({ ok: true, token: "t0k3n", grant: { provider: "supabase" } });
     expect(storageFrom).toHaveBeenCalledWith("professional-portfolio");
     expect(createSignedUploadUrl).toHaveBeenCalledWith(PORTFOLIO_KEY);
   });
@@ -62,7 +68,7 @@ describe("createAssetUploadTicket", () => {
   it("resolves the bucket from the namespace and never takes one as an argument", async () => {
     await createAssetUploadTicket("certificate", CERTIFICATE_PATH);
     expect(storageFrom).toHaveBeenCalledWith("professional-certificates");
-    expect(createAssetUploadTicket.length).toBe(2);
+    expect(createAssetUploadTicket.length).toBe(3);
   });
 
   it("refuses an unknown namespace without asking Storage anything", async () => {
@@ -118,15 +124,22 @@ describe("createAssetUploadTicket", () => {
   it("never touches a table: this seam knows nothing about product records", async () => {
     await createAssetUploadTicket("portfolio", PORTFOLIO_KEY);
     expect(from).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith("media_storage_resolve", expect.objectContaining({ p_operation: "upload" }));
   });
 });
 
 describe("createAssetReadUrl", () => {
-  it("mints a short-lived URL for a portfolio object", async () => {
+  it("returns an application identifier, never a provider read credential", async () => {
+    rpc.mockResolvedValue({ data: { provider: "supabase", reserved: true, contentType: "image/png", state: "ready", owner: OWNER }, error: null });
     const r = await createAssetReadUrl("portfolio", PORTFOLIO_KEY);
-    expect(r).toEqual({ ok: true, url: "/object/sign/x?token=y", expiresIn: 300 });
-    expect(createSignedUrl).toHaveBeenCalledWith(PORTFOLIO_KEY, 300);
+    expect(r).toEqual({ ok: true, url: `/api/media/portfolio?key=${PORTFOLIO_KEY}` });
+    expect(createSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("does not treat public publication as owner-private authorization", async () => {
+    rpc.mockResolvedValue({ data: { provider: "supabase", reserved: true, contentType: "image/png", state: "ready", owner: null }, error: null });
+    expect(await createAssetReadUrl("portfolio", PORTFOLIO_KEY)).toEqual({ ok: false, code: "assets.errors.gone" });
+    expect(createSignedUrl).not.toHaveBeenCalled();
   });
 
   it("refuses another owner's certificate without asking Storage — no existence probe", async () => {
@@ -151,7 +164,7 @@ describe("createAssetReadUrl", () => {
    * whose metadata row belongs to somebody else, and Storage answers NoSuchKey.
    */
   it("passes a well-formed portfolio key through and lets the policy decide", async () => {
-    createSignedUrl.mockResolvedValue({
+    rpc.mockResolvedValue({
       data: null,
       error: { code: "NoSuchKey", message: "Object not found" },
     });
@@ -159,7 +172,7 @@ describe("createAssetReadUrl", () => {
       ok: false,
       code: "assets.errors.gone",
     });
-    expect(createSignedUrl).toHaveBeenCalled();
+    expect(createSignedUrl).not.toHaveBeenCalled();
   });
 });
 

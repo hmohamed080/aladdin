@@ -75,7 +75,7 @@ export function JobOpportunityCard({
         {job.image ? (
           <>
             <Image src={job.image} alt="" fill sizes="(min-width: 1024px) 33vw, 100vw" className="object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/0 to-black/0" aria-hidden="true" />
+            <div className="absolute inset-0 bg-gradient-to-t from-brand-deep-navy/35 via-brand-deep-navy/0 to-brand-deep-navy/0" aria-hidden="true" />
           </>
         ) : (
           <TradeIllustration tradeKey={job.tradeKey} className="absolute inset-y-2 end-3 h-[calc(100%-1rem)] w-auto max-w-[70%]" />
@@ -91,7 +91,7 @@ export function JobOpportunityCard({
             </div>
           ) : null
         ) : job.matchPercent !== null ? (
-          <span className="absolute start-2.5 top-2.5 flex items-center gap-1 rounded-pill bg-success px-2.5 py-1 text-label font-semibold text-white shadow-sm">
+          <span className="absolute start-2.5 top-2.5 flex items-center gap-1 rounded-pill bg-success px-2.5 py-1 text-label font-semibold text-on-status shadow-sm">
             <TargetIcon size={13} />
             {locale === "ar"
               ? `${formatNumber(job.matchPercent, locale)}% مناسب لمهاراتك`
@@ -107,7 +107,7 @@ export function JobOpportunityCard({
               aria-pressed={save.saved}
               aria-label={save.saved ? (locale === "ar" ? "إزالة من الفرص المحفوظة" : "Remove from saved jobs") : locale === "ar" ? "حفظ الفرصة" : "Save opportunity"}
               data-testid="dashboard-save"
-              className="absolute end-2.5 top-2.5 grid h-8 w-8 place-items-center rounded-pill bg-white/90 text-fg-secondary shadow-sm backdrop-blur transition-colors hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="absolute end-2.5 top-2.5 grid h-8 w-8 place-items-center rounded-pill bg-brand-soft-cream/90 text-fg-secondary shadow-sm backdrop-blur transition-colors hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               {save.saved ? <HeartFilledIcon size={17} className="text-danger" /> : <HeartIcon size={17} />}
             </button>
@@ -118,14 +118,14 @@ export function JobOpportunityCard({
             onClick={() => setSaved((v) => !v)}
             aria-pressed={saved}
             aria-label={locale === "ar" ? "حفظ الفرصة" : "Save opportunity"}
-            className="absolute end-2.5 top-2.5 grid h-8 w-8 place-items-center rounded-pill bg-white/90 text-fg-secondary shadow-sm backdrop-blur transition-colors hover:text-danger"
+            className="absolute end-2.5 top-2.5 grid h-8 w-8 place-items-center rounded-pill bg-brand-soft-cream/90 text-fg-secondary shadow-sm backdrop-blur transition-colors hover:text-danger"
           >
             {saved ? <HeartFilledIcon size={17} className="text-danger" /> : <HeartIcon size={17} />}
           </button>
         )}
 
         {job.tradeLabel ? (
-          <span className={cn("absolute bottom-2.5 start-2.5 rounded-sm px-2 py-0.5 text-caption font-medium backdrop-blur", job.image ? "bg-black/55 text-white" : "bg-primary text-primary-foreground")}>
+          <span className={cn("absolute bottom-2.5 start-2.5 rounded-sm px-2 py-0.5 text-caption font-medium backdrop-blur", job.image ? "bg-brand-deep-navy/55 text-brand-soft-cream" : "bg-primary text-primary-foreground")}>
             {pick(locale, job.tradeLabel)}
           </span>
         ) : null}

@@ -2,11 +2,9 @@ import "server-only";
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { AVATAR_BUCKET } from "@/lib/storage/avatar-assets";
+import { readableMediaUrl } from "@/server/storage/edge-ticket";
 import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
-
-/** How long a signed avatar read URL lives. Minted per render, never stored. */
-const AVATAR_READ_URL_SECONDS = 300;
+import { getCurrentUser } from "@/server/auth/session";
 
 export type MyIdentity = {
   displayName: string;
@@ -19,14 +17,29 @@ export type MyIdentity = {
   /** The phone is also this account's sign-in key (phone + password accounts): changing it needs the current password. */
   phoneIsLoginKey: boolean;
   avatarUrl: string | null;
+  /** A phone + password (Craftsman) account: its main phone is its login and cannot be moved here. */
+  phoneLogin: boolean;
+  /** The current unverified second phone reservation (V1, no OTP), or null. */
+  secondaryPhone: SecondaryPhone | null;
 };
+
+export type SecondaryPhone = {
+  phone: string;
+  expiresAt: string;
+  canRenew: boolean;
+};
+
+function mapSecondaryPhone(raw: unknown): SecondaryPhone | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.phone !== "string" || typeof r.expires_at !== "string" || r.status !== "active") return null;
+  return { phone: r.phone, expiresAt: r.expires_at, canRenew: r.can_renew === true };
+}
 
 /** The caller's own shared identity fields (every audience). Scoped to the session — takes no user id. */
 export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyIdentity | null> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) return null;
 
   const { data: profile, error } = await supabase
@@ -48,12 +61,12 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
       .eq("state", "ready")
       .maybeSingle();
     if (upload?.object_key) {
-      const { data: signed } = await supabase.storage
-        .from(AVATAR_BUCKET)
-        .createSignedUrl(upload.object_key, AVATAR_READ_URL_SECONDS);
-      avatarUrl = signed?.signedUrl ?? null;
+      try { avatarUrl = await readableMediaUrl(supabase, "avatar", upload.object_key); }
+      catch { avatarUrl = null; }
     }
   }
+
+  const { data: secondary } = await supabase.rpc("my_secondary_phone");
 
   return {
     displayName: profile.display_name,
@@ -64,6 +77,8 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
     phoneE164: profile.phone_e164,
     phoneIsLoginKey: isCraftsmanLoginAlias(user.email),
     avatarUrl,
+    phoneLogin: isCraftsmanLoginAlias(user.email),
+    secondaryPhone: mapSecondaryPhone(secondary),
   };
 });
 

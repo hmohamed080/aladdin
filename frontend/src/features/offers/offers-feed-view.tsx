@@ -199,7 +199,7 @@ export function OffersFeedView({
                 data-testid="offers-saved-toggle"
                 className={cn(
                   "inline-flex min-h-9 items-center gap-1.5 rounded-sm border px-3 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
-                  params.savedOnly ? "border-transparent bg-accent-solid text-on-accent" : "border-strong bg-surface text-fg-secondary hover:bg-surface-2",
+                  params.savedOnly ? "border-accent-edge bg-accent-solid text-on-accent" : "border-strong bg-surface text-fg-secondary hover:bg-surface-2",
                 )}
               >
                 <BookmarkIcon size={14} />
@@ -214,7 +214,7 @@ export function OffersFeedView({
                   onClick={() => update({ category: chip.value })}
                   className={cn(
                     "inline-flex min-h-9 items-center rounded-sm border px-3 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
-                    chip.value === params.category ? "border-transparent bg-accent-solid text-on-accent" : "border-strong bg-surface text-fg-secondary hover:bg-surface-2",
+                    chip.value === params.category ? "border-accent-edge bg-accent-solid text-on-accent" : "border-strong bg-surface text-fg-secondary hover:bg-surface-2",
                   )}
                 >
                   {chip.label}
@@ -293,7 +293,7 @@ function OfferCard({ offer, imageUrls, locale, detailBase, orgId, onSaved }: Car
       <ul className="flex min-h-[3.25rem] flex-col gap-0.5 text-label text-fg-secondary" data-testid="offer-lines">
         {lines.map((i) => (
           <li key={i.productId} className="flex min-w-0 items-center gap-1.5">
-            <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-solid" />
+            <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-solid ring-1 ring-accent-edge" />
             <span className="shrink-0" dir="ltr">{t("showroomOffers.quantityTimes", { count: String(i.quantity) })}</span>
             <span className="truncate" dir="auto">{i.name}</span>
           </li>
@@ -307,7 +307,7 @@ function OfferCard({ offer, imageUrls, locale, detailBase, orgId, onSaved }: Car
           <SaveOfferButton offerId={offer.id} orgId={orgId} saved={offer.saved} onChange={(s) => onSaved(offer.id, s)} className="h-10 w-10" />
           <Link
             href={`${detailBase}/${offer.id}`}
-            className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center rounded-sm bg-accent-solid px-2 text-label font-semibold text-on-accent hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center rounded-sm bg-accent-solid ring-1 ring-accent-edge px-2 text-label font-semibold text-on-accent hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             data-testid="offer-view-details"
           >
             {t("showroomOffers.viewDetails")}
@@ -336,7 +336,7 @@ function OfferRow({ offer, imageUrls, locale, detailBase, orgId, onSaved }: Card
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <SaveOfferButton offerId={offer.id} orgId={orgId} saved={offer.saved} onChange={(s) => onSaved(offer.id, s)} className="h-10 w-10" />
-        <Link href={`${detailBase}/${offer.id}`} className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-sm bg-accent-solid px-md text-label font-semibold text-on-accent hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+        <Link href={`${detailBase}/${offer.id}`} className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-sm bg-accent-solid ring-1 ring-accent-edge px-md text-label font-semibold text-on-accent hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           {t("showroomOffers.viewDetails")}
         </Link>
       </div>

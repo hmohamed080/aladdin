@@ -48,6 +48,8 @@ export function ProfileMenu({
   /** Localized name of the active work context — shown, never switched here. */
   workspaceLabel,
   initials,
+  /** The person's own profile photo (signed URL). Null falls back to the initials. */
+  avatarUrl = null,
   /** Where "My profile" goes for this surface (personal vs. business shell). */
   profileHref,
   /** Where "Account preferences" goes; omitted when the surface has no settings. */
@@ -59,6 +61,7 @@ export function ProfileMenu({
   contact: string | null;
   workspaceLabel?: string | null;
   initials: string;
+  avatarUrl?: string | null;
   profileHref?: string;
   preferencesHref?: string;
   themePreference: ThemePreference;
@@ -139,12 +142,19 @@ export function ProfileMenu({
         aria-label={t("account.menu")}
         data-testid="profile-menu-trigger"
         className={cn(
-          "grid h-9 w-9 place-items-center rounded-pill bg-accent-solid text-label font-semibold text-on-accent",
+          "grid h-9 w-9 place-items-center rounded-pill bg-accent-solid ring-1 ring-accent-edge text-label font-semibold text-on-accent",
           "transition-shadow hover:shadow-card",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
         )}
       >
-        <span aria-hidden="true">{initials}</span>
+        {avatarUrl ? (
+          // A plain <img>: the source is a short-lived signed storage URL, which the
+          // image optimizer would cache past its expiry.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatarUrl} alt="" aria-hidden="true" className="h-full w-full rounded-pill object-cover" />
+        ) : (
+          <span aria-hidden="true">{initials}</span>
+        )}
       </button>
 
       <FloatingMenu

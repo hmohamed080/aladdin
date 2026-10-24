@@ -49,6 +49,15 @@ jobs:
       # Installs the repo-pinned Supabase CLI (devDependency) into the workspace.
       - run: pnpm install --frozen-lockfile
 
+      - name: Verify exact RC2 upgrade and atomic function permissions
+        run: |
+          node scripts/prepare-media-integration-replay.mjs upgrade
+          pnpm exec supabase start --workdir logs/rc2-media-upgrade
+          node scripts/migration-permission-gate.mjs supabase_db_aladdin_r2_rc2_upgrade postgres upgrade
+          PERMISSION_TEST_CONTAINER=supabase_db_aladdin_r2_rc2_upgrade node --test scripts/migration-permission-gate.test.mjs
+          node --test scripts/media-storage.test.mjs
+          pnpm exec supabase stop --workdir logs/rc2-media-upgrade --no-backup
+
       - name: Start local Supabase stack
         run: pnpm exec supabase start
 
@@ -57,6 +66,9 @@ jobs:
 
       - name: Lint public/app schemas
         run: pnpm exec supabase db lint --schema public,app
+
+      - name: Verify fresh effective function permissions
+        run: node scripts/migration-permission-gate.mjs supabase_db_aladdin postgres check
 
       - name: Run pgTAP tenant-isolation / RLS tests
         run: pnpm exec supabase test db
@@ -76,9 +88,12 @@ jobs:
       - name: Prove repeatability (second clean reset + tests)
         run: |
           pnpm exec supabase db reset
+          node scripts/migration-permission-gate.mjs supabase_db_aladdin postgres check
           pnpm exec supabase test db
 
       # Always stop the stack, even if an earlier step failed.
       - name: Stop local Supabase stack
         if: always()
-        run: pnpm exec supabase stop --no-backup || true
+        run: |
+          pnpm exec supabase stop --workdir logs/rc2-media-upgrade --no-backup || true
+          pnpm exec supabase stop --no-backup || true

@@ -7,6 +7,12 @@ vi.mock("@/lib/supabase/client", () => ({
   }),
 }));
 
+const resize = vi.hoisted(() => vi.fn(async (file: File): Promise<{ ok: true; file: File } | { ok: false; reason: string }> => ({ ok: true, file })));
+vi.mock("@/lib/media/resize-image", async (original) => ({
+  ...(await original<typeof import("@/lib/media/resize-image")>()),
+  resizeImageForUpload: resize,
+}));
+
 import { uploadAsset } from "./upload";
 
 /** A real PNG signature followed by filler, so the byte check has something true to find. */
@@ -51,7 +57,7 @@ describe("uploadAsset", () => {
     expect(finish).toHaveBeenCalledWith("i1");
   });
 
-  it("refuses an oversized file before anything is created", async () => {
+  it("refuses a prepared file still over the ceiling before anything is created", async () => {
     const start = vi.fn();
     const big = new File([new Uint8Array(9_000_000)], "big.png", { type: "image/png" });
     expect(await uploadAsset("portfolio", big, start, vi.fn())).toEqual({
@@ -111,6 +117,39 @@ describe("uploadAsset", () => {
       code: "states.genericRetry",
     });
     expect(uploadToSignedUrl).toHaveBeenCalled();
+  });
+
+  /**
+   * The resized file is the one that is declared, validated and uploaded, so the
+   * server's size/type checks run against exactly the bytes that arrive.
+   */
+  it("declares and uploads the PREPARED file, not the picked one", async () => {
+    const webp = new Uint8Array(64);
+    webp.set([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]);
+    const prepared = new File([webp], "photo.webp", { type: "image/webp" });
+    resize.mockResolvedValueOnce({ ok: true, file: prepared });
+    const start = vi.fn(async () => ticket);
+    await uploadAsset("portfolio", pngFile(4_000_000), start, async () => ({ ok: true }));
+    expect(resize).toHaveBeenCalledWith(expect.any(File), expect.objectContaining({ maxEdge: 2560 }));
+    expect(start).toHaveBeenCalledWith({ type: "image/webp", size: 64 });
+    expect(uploadToSignedUrl.mock.calls[0]![2]).toBe(prepared);
+    expect(uploadToSignedUrl.mock.calls[0]![3]).toEqual({ contentType: "image/webp", upsert: false });
+  });
+
+  it("never refuses the picked original for its size: any source is prepared first", async () => {
+    const png = new Uint8Array(1000);
+    png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    resize.mockResolvedValueOnce({ ok: true, file: new File([png], "photo.png", { type: "image/png" }) });
+    expect(await uploadAsset("portfolio", pngFile(30_000_000), async () => ticket, async () => ({ ok: true }))).toEqual({ ok: true });
+    expect(resize).toHaveBeenCalledWith(expect.objectContaining({ size: 30_000_000 }), expect.objectContaining({ maxBytes: 5 * 1024 * 1024 }));
+  });
+
+  it("names a photo this device could not prepare, and creates nothing", async () => {
+    const start = vi.fn();
+    resize.mockResolvedValueOnce({ ok: false, reason: "canvas" });
+    expect(await uploadAsset("portfolio", pngFile(60_000_000), start, vi.fn())).toEqual({ ok: false, code: "assets.errors.prepareFailed" });
+    expect(start).not.toHaveBeenCalled();
+    expect(uploadToSignedUrl).not.toHaveBeenCalled();
   });
 
   it("never passes upsert, so a second attempt cannot overwrite an existing object", async () => {

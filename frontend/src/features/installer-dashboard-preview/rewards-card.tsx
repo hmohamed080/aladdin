@@ -121,7 +121,7 @@ export function RewardsCard({ data, viewAllHref }: { data: InstallerRewardsVM; v
       {data.showReputation && (data.rating !== null || data.completedJobs > 0) ? (
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-strong pt-2 text-body text-fg-secondary">
           <span className="flex items-center gap-1.5">
-            <StarIcon size={18} className="text-accent-solid" />
+            <StarIcon size={18} className="text-accent" />
             <span className="font-mono font-semibold text-fg">
               {data.rating === null
                 ? "—"

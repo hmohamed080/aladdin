@@ -7,10 +7,11 @@ import { useI18n } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/controls";
 import { InlineError, InlineSuccess } from "@/components/ui/primitives";
 import { StorefrontIcon } from "@/components/ui/icons";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { uploadWithGrant } from "@/lib/storage/browser-upload";
+import { encodeCanvasWithin, ImagePrepareError } from "@/lib/media/resize-image";
 import {
   ORGANIZATION_IMAGE_ALLOWED_TYPES,
-  ORGANIZATION_IMAGE_BUCKET,
+  ORGANIZATION_IMAGE_MAX_BYTES,
   ORGANIZATION_IMAGE_OUTPUT_PX,
   ORGANIZATION_IMAGE_OUTPUT_TYPE,
   validateOrganizationImageFile,
@@ -21,26 +22,31 @@ import {
   requestOrganizationImageUploadAction,
 } from "@/server/actions/organization-image";
 
-/** Renders the chosen square of the source image into a fixed-size JPEG. */
-async function cropToBlob(src: string, area: Area): Promise<Blob> {
+/**
+ * Renders the chosen square of the source image into a fixed 640 px asset. WebP
+ * where the browser can encode it — which keeps a logo's transparency — else PNG
+ * for alpha-capable sources and JPEG (on white) for opaque ones.
+ */
+async function cropToBlob(src: string, area: Area, sourceType: string): Promise<Blob> {
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("image load failed"));
+    img.onerror = () => reject(new ImagePrepareError("decode"));
     img.src = src;
   });
   const canvas = document.createElement("canvas");
   canvas.width = ORGANIZATION_IMAGE_OUTPUT_PX;
   canvas.height = ORGANIZATION_IMAGE_OUTPUT_PX;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("canvas unavailable");
-  // JPEG has no alpha: a transparent PNG would otherwise flatten to black (pixel data, not a themed colour).
-  ctx.fillStyle = "white";
-  ctx.fillRect(0, 0, ORGANIZATION_IMAGE_OUTPUT_PX, ORGANIZATION_IMAGE_OUTPUT_PX);
+  if (!ctx) throw new ImagePrepareError("canvas");
+  const opaque = sourceType === "image/jpeg";
+  if (opaque) {
+    // Only a JPEG source can become a JPEG; the fill is pixel data under it, not a themed colour.
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, ORGANIZATION_IMAGE_OUTPUT_PX, ORGANIZATION_IMAGE_OUTPUT_PX);
+  }
   ctx.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, ORGANIZATION_IMAGE_OUTPUT_PX, ORGANIZATION_IMAGE_OUTPUT_PX);
-  return new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), ORGANIZATION_IMAGE_OUTPUT_TYPE, 0.9),
-  );
+  return encodeCanvasWithin(canvas, 0.9, opaque ? ORGANIZATION_IMAGE_OUTPUT_TYPE : "image/png", ORGANIZATION_IMAGE_MAX_BYTES);
 }
 
 /**
@@ -54,6 +60,7 @@ export function OrganizationImageField({ orgId, imageUrl, canManage }: { orgId: 
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [source, setSource] = useState<string | null>(null);
+  const [sourceType, setSourceType] = useState("image/jpeg");
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [area, setArea] = useState<Area | null>(null);
@@ -85,6 +92,7 @@ export function OrganizationImageField({ orgId, imageUrl, canManage }: { orgId: 
       if (inputRef.current) inputRef.current.value = "";
       return;
     }
+    setSourceType(file.type);
     setSource(URL.createObjectURL(file));
   };
 
@@ -93,21 +101,18 @@ export function OrganizationImageField({ orgId, imageUrl, canManage }: { orgId: 
     setBusy(true);
     setError(null);
     try {
-      const blob = await cropToBlob(source, area);
-      const ticket = await requestOrganizationImageUploadAction(orgId, ORGANIZATION_IMAGE_OUTPUT_TYPE);
+      const blob = await cropToBlob(source, area, sourceType);
+      const ticket = await requestOrganizationImageUploadAction(orgId, blob.type, blob.size);
       if (!ticket.ok) throw new Error(ticket.code);
-      const supabase = createBrowserSupabaseClient();
-      const { error: uploadError } = await supabase.storage
-        .from(ORGANIZATION_IMAGE_BUCKET)
-        .upload(ticket.key, blob, { contentType: ORGANIZATION_IMAGE_OUTPUT_TYPE, upsert: false });
-      if (uploadError) throw uploadError;
+      await uploadWithGrant(ticket.grant, blob);
       const confirmed = await confirmOrganizationImageUploadAction(ticket.key);
       if (!confirmed.ok) throw new Error(confirmed.code);
       reset();
       setNotice(t("showroomSettings.image.saved"));
       router.refresh();
-    } catch {
-      setError(t("showroomSettings.image.errorUpload"));
+    } catch (e) {
+      // A photo this device could not crop or fit is named as such, not reported as a failed upload.
+      setError(t(e instanceof ImagePrepareError ? "showroomSettings.image.errorPrepare" : "showroomSettings.image.errorUpload"));
     } finally {
       setBusy(false);
     }
@@ -133,7 +138,7 @@ export function OrganizationImageField({ orgId, imageUrl, canManage }: { orgId: 
       <div className="flex flex-wrap items-center gap-md">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not a static asset
-          <img src={imageUrl} alt={t("showroomSettings.image.label")} className="h-24 w-24 rounded-md border object-cover" data-testid="organization-image-current" />
+          <img src={imageUrl} alt={t("showroomSettings.image.label")} width={96} height={96} decoding="async" className="h-24 w-24 rounded-md border object-cover" data-testid="organization-image-current" />
         ) : (
           <span aria-hidden="true" className="grid h-24 w-24 place-items-center rounded-md bg-surface-2 text-fg-muted" data-testid="organization-image-empty">
             <StorefrontIcon size={32} />
@@ -179,7 +184,7 @@ export function OrganizationImageField({ orgId, imageUrl, canManage }: { orgId: 
       {error && !source ? <InlineError>{error}</InlineError> : null}
 
       {source ? (
-        <div role="dialog" aria-modal="true" aria-labelledby="organization-image-crop-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-md">
+        <div role="dialog" aria-modal="true" aria-labelledby="organization-image-crop-title" className="fixed inset-0 z-50 flex items-center justify-center bg-brand-deep-navy/60 p-md">
           <div className="flex w-full max-w-md flex-col gap-md rounded-lg bg-surface p-md shadow-lg">
             <h2 id="organization-image-crop-title" className="text-title text-fg">{t("showroomSettings.image.cropTitle")}</h2>
             <div className="relative h-72 w-full overflow-hidden rounded-md bg-surface-2" data-testid="organization-image-cropper">

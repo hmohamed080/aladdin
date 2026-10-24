@@ -326,7 +326,7 @@ export type FlowStage = {
 
 const flowBar: Record<KpiTone, string> = {
   neutral: "bg-fg-muted",
-  accent: "bg-accent-solid",
+  accent: "bg-accent-solid ring-1 ring-accent-edge",
   iris: "bg-iris-solid",
   success: "bg-success",
   warning: "bg-warning",

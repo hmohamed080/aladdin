@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { claimsFrom } from "@/test/session-claims";
 
 vi.mock("server-only", () => ({}));
 
@@ -9,7 +10,7 @@ const asked = { from: [] as string[], select: [] as string[], eq: [] as [string,
 vi.mock("@/lib/supabase/server", () => ({
   getServerSupabase: vi.fn(async () => {
     const builder: Record<string, unknown> = {
-      auth: { getUser },
+      auth: { getUser, getClaims: claimsFrom(getUser) },
       from(t: string) {
         asked.from.push(t);
         return builder;

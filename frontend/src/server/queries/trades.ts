@@ -2,6 +2,8 @@ import "server-only";
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { readSessionIdentity } from "@/server/auth/session";
+import { cachedReference } from "@/server/cache/reference";
 
 /**
  * The canonical trade taxonomy, from the two sides the profile reads it.
@@ -58,15 +60,20 @@ export type MyTrades = {
  * summary counts against it.
  */
 export const loadTradeCatalog = cache(async function loadTradeCatalog(): Promise<Trade[]> {
-  const supabase = await getServerSupabase();
-  const { data, error } = await supabase
-    .from("trades")
-    .select("id, key")
-    .order("sort_order", { ascending: true })
-    .order("key", { ascending: true });
-  if (error) throw error;
+  return cachedReference("trades", async () => {
+    const supabase = await getServerSupabase();
+    // The explicit filter keeps the result identical for every caller (support
+    // staff may also read retired rows), which is what makes it shareable.
+    const { data, error } = await supabase
+      .from("trades")
+      .select("id, key")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("key", { ascending: true });
+    if (error) throw error;
 
-  return (data ?? []).map((t) => ({ id: t.id, key: t.key }));
+    return (data ?? []).map((t) => ({ id: t.id, key: t.key }));
+  });
 });
 
 /**
@@ -80,9 +87,7 @@ export const loadTradeCatalog = cache(async function loadTradeCatalog(): Promise
  */
 export const loadMyTrades = cache(async function loadMyTrades(): Promise<MyTrades> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return { keys: [], legacyKeys: [], primaryKey: null };
 
   const { data, error } = await supabase
@@ -118,14 +123,18 @@ export type Specialty = { id: string; key: string; tradeKey: string };
  * catalogue renders nothing (never an empty, meaningless selector).
  */
 export const loadSpecialtyCatalog = cache(async function loadSpecialtyCatalog(): Promise<Specialty[]> {
-  const supabase = await getServerSupabase();
-  const { data, error } = await supabase
-    .from("trade_specialties")
-    .select("id, key, sort_order, trades!inner(key)")
-    .order("sort_order", { ascending: true })
-    .order("key", { ascending: true });
-  if (error) throw error;
-  return (data ?? []).flatMap((row) => (row.trades ? [{ id: row.id, key: row.key, tradeKey: row.trades.key }] : []));
+  return cachedReference("trade-specialties", async () => {
+    const supabase = await getServerSupabase();
+    const { data, error } = await supabase
+      .from("trade_specialties")
+      .select("id, key, sort_order, trades!inner(key)")
+      .eq("is_active", true)
+      .eq("trades.is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("key", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).flatMap((row) => (row.trades ? [{ id: row.id, key: row.key, tradeKey: row.trades.key }] : []));
+  });
 });
 
 /** The caller's own specialties (RLS restricts the rows to `auth.uid()`). */

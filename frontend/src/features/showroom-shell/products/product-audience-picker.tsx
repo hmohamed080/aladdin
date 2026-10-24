@@ -50,7 +50,7 @@ export function ProductAudiencePicker({
                   on ? "border-accent bg-accent-solid/10 text-accent" : "border-strong bg-surface text-fg hover:bg-surface-2",
                 )}
               >
-                <span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-sm border", on ? "border-transparent bg-accent-solid text-on-accent" : "border-strong bg-surface")}>
+                <span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-sm border", on ? "border-accent-edge bg-accent-solid text-on-accent" : "border-strong bg-surface")}>
                   {on ? <CheckIcon size={12} /> : null}
                 </span>
                 <span className="min-w-0 truncate">{t(`showroomOffers.audienceGroup.${id}`)}</span>

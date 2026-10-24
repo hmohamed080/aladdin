@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { THEME_COOKIE } from "@/lib/theme/config";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadWorkspaceContext } from "@/server/queries/context";

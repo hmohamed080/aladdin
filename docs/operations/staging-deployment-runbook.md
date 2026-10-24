@@ -27,7 +27,7 @@ Per [ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md), staging is 
 
 Two consequences follow from having *only* a health route, and they matter for how you configure it:
 
-- **Leave `APP_ENV` unset on the backend service.** `backend/app/config.py` fails fast at import time when `APP_ENV` is `staging`/`production` and any of `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `DATABASE_URL` is missing. Setting it today would force provisioning a **service-role key that bypasses RLS** just to serve a health check — a breach surface with no feature behind it. Flip `APP_ENV=staging` and provision the four secrets in the **same change** that lands the first real endpoint.
+- **Superseded 2026-10-19:** `APP_ENV` is now derived from `VERCEL_ENV` when unset, so a deployment always runs the secret check. The backend needs `SUPABASE_URL` and `SUPABASE_ANON_KEY` on Preview and Production, and never the service-role key; until they are set, `/api/backend/health` answers 503 `misconfigured` and authenticated endpoints refuse, without a crash. Exact names: [vercel-environment-variables.md](../guides/vercel-environment-variables.md). (Earlier text: leave `APP_ENV` unset so the old import-time check never ran.)
 - **Leave `ALLOWED_ORIGINS` at its default.** `vercel.json` routes the backend same-origin under `/api/backend`, so the browser issues no cross-origin preflight — and per [ADR-0001](../decisions/ADR-0001-approved-architecture.md) the service is called from the server side of the web app, never from the browser.
 
 ### Backend route mounting
@@ -82,7 +82,7 @@ Exact variable names as they exist in the repository. `frontend/src/lib/env/inde
 | `SUPABASE_SERVICE_ROLE_KEY` | Optional | **SECRET** | `pnpm supabase status` → `SERVICE_ROLE_KEY` | **Do not set on Vercel.** Owner keeps it in a password manager for the admin tasks below | nowhere (Vercel) | **Never** |
 | `AI_SERVICE_URL` | Optional | **SECRET** | `http://localhost:8000` | **Do not set.** FastAPI *is* deployed, but `vercel.json` routes it same-origin at `/api/backend`, so no absolute base URL is needed — and nothing calls it yet | nowhere | **Never** |
 
-The **backend service** reads its own config through `backend/app/config.py`. For first staging it needs **no environment variables at all**: leave `APP_ENV` unset (defaults `local`) so the fail-fast validator does not demand `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_JWT_SECRET` / `DATABASE_URL` for a deployment whose only route is `GET /health`. See [What the backend actually serves today](#what-the-backend-actually-serves-today).
+The **backend service** reads its own config through `backend/app/config.py`. Since 2026-10-19 it needs `SUPABASE_URL` and `SUPABASE_ANON_KEY` on every deployment (its environment comes from `VERCEL_ENV`); see [vercel-environment-variables.md](../guides/vercel-environment-variables.md).
 
 Rules that hold regardless of environment:
 
@@ -408,7 +408,7 @@ Optional: `NEXT_PUBLIC_SUPPORT_CONTACT=<support email or help-desk URL>` — lea
 
 **Do not add** `SUPABASE_SERVICE_ROLE_KEY` or `AI_SERVICE_URL`. Nothing reads them, and the first is a full RLS bypass.
 
-**Do not add `APP_ENV` for the backend service either.** Leaving it unset keeps `backend/app/config.py`'s fail-fast validator satisfied without provisioning four secrets for a deployment whose only route is `GET /health`. See [What the backend actually serves today](#what-the-backend-actually-serves-today).
+**Backend service:** leave `APP_ENV` unset (derived from `VERCEL_ENV`) and add `SUPABASE_URL` and `SUPABASE_ANON_KEY`; see [vercel-environment-variables.md](../guides/vercel-environment-variables.md).
 
 Then **Deploy**, and copy the resulting URL back into Supabase **Site URL** ([step 3](#3-configure-supabase-auth)).
 

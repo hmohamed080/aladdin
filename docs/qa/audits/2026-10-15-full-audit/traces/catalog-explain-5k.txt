@@ -1,0 +1,186 @@
+                                                                                                                                QUERY PLAN                                                                                                                                
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Result (actual time=2228.036..2228.099 rows=1 loops=1)
+   Buffers: shared hit=770045
+   CTE params
+     ->  Result (actual time=0.144..0.144 rows=1 loops=1)
+           Buffers: shared hit=62
+   CTE base
+     ->  Nested Loop (actual time=0.763..1729.206 rows=5000 loops=1)
+           Join Filter: (o.id = p.seller_organization_id)
+           Rows Removed by Join Filter: 20000
+           Buffers: shared hit=45390
+           ->  Nested Loop Semi Join (actual time=0.725..1665.673 rows=5000 loops=1)
+                 Join Filter: (p.id = v_3.product_id)
+                 Rows Removed by Join Filter: 12497500
+                 Buffers: shared hit=25389
+                 ->  Nested Loop (actual time=0.712..495.043 rows=5000 loops=1)
+                       Join Filter: (((pr.q IS NULL) OR (POSITION((pr.q) IN (lower(p.name_en))) > 0) OR (POSITION((pr.q) IN (lower(p.name_ar))) > 0) OR (POSITION((pr.q) IN (lower(COALESCE(p.brand, ''::text)))) > 0) OR EXISTS(SubPlan 3)) AND (NOT EXISTS(SubPlan 6)))
+                       Buffers: shared hit=25304
+                       ->  Nested Loop (actual time=0.560..464.252 rows=5000 loops=1)
+                             Buffers: shared hit=25242
+                             ->  Nested Loop (actual time=0.556..447.334 rows=5000 loops=1)
+                                   Buffers: shared hit=15242
+                                   ->  Index Scan using ix_marketplace_products_seller_status on marketplace_products p (actual time=0.548..438.529 rows=5000 loops=1)
+                                         Index Cond: (status = 'published'::text)
+                                         Filter: app.marketplace_seller_is_enabled(seller_organization_id)
+                                         Buffers: shared hit=15240
+                                   ->  Memoize (actual time=0.001..0.001 rows=1 loops=5000)
+                                         Cache Key: p.product_type_id
+                                         Cache Mode: logical
+                                         Hits: 4999  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                                         Buffers: shared hit=2
+                                         ->  Index Scan using marketplace_product_types_pkey on marketplace_product_types t (actual time=0.004..0.005 rows=1 loops=1)
+                                               Index Cond: (id = p.product_type_id)
+                                               Filter: is_active
+                                               Buffers: shared hit=2
+                             ->  Index Scan using marketplace_categories_pkey on marketplace_categories c (actual time=0.003..0.003 rows=1 loops=5000)
+                                   Index Cond: (id = t.category_id)
+                                   Filter: is_active
+                                   Buffers: shared hit=10000
+                       ->  CTE Scan on params pr (actual time=0.000..0.000 rows=1 loops=5000)
+                             Buffers: shared hit=62
+                       SubPlan 3
+                         ->  Bitmap Heap Scan on marketplace_product_variants v_1 (never executed)
+                               Recheck Cond: ((product_id = p.id) AND (status = 'active'::text))
+                               Filter: (POSITION((pr.q) IN (lower(sku))) > 0)
+                               ->  Bitmap Index Scan on ix_marketplace_variants_product_status (never executed)
+                                     Index Cond: ((product_id = p.id) AND (status = 'active'::text))
+                       SubPlan 6
+                         ->  Function Scan on jsonb_each f (actual time=0.004..0.004 rows=0 loops=5000)
+                               Filter: ((jsonb_array_length(value) > 0) AND (jsonb_typeof(value) = 'array'::text) AND (NOT EXISTS(SubPlan 4)) AND (NOT EXISTS(SubPlan 5)))
+                               SubPlan 4
+                                 ->  Nested Loop (never executed)
+                                       Join Filter: (op.id = av.option_id)
+                                       ->  Nested Loop (never executed)
+                                             ->  Seq Scan on marketplace_attribute_definitions d (never executed)
+                                                   Filter: (key = f.key)
+                                             ->  Index Only Scan using ix_marketplace_pav_option on marketplace_product_attribute_values av (never executed)
+                                                   Index Cond: ((attribute_id = d.id) AND (product_id = p.id))
+                                                   Heap Fetches: 0
+                                       ->  Seq Scan on marketplace_attribute_options op (never executed)
+                                             Filter: (f.value ? key)
+                               SubPlan 5
+                                 ->  Nested Loop (never executed)
+                                       ->  Seq Scan on marketplace_attribute_definitions d_1 (never executed)
+                                             Filter: (key = f.key)
+                                       ->  Nested Loop (never executed)
+                                             ->  Bitmap Heap Scan on marketplace_product_variants v_2 (never executed)
+                                                   Recheck Cond: ((product_id = p.id) AND (status = 'active'::text))
+                                                   ->  Bitmap Index Scan on ix_marketplace_variants_product_status (never executed)
+                                                         Index Cond: ((product_id = p.id) AND (status = 'active'::text))
+                                             ->  Nested Loop (never executed)
+                                                   ->  Seq Scan on marketplace_attribute_options op_1 (never executed)
+                                                         Filter: (f.value ? key)
+                                                   ->  Index Only Scan using ix_marketplace_vav_option on marketplace_variant_attribute_values vv (never executed)
+                                                         Index Cond: ((attribute_id = d_1.id) AND (option_id = op_1.id) AND (variant_id = v_2.id))
+                                                         Heap Fetches: 0
+                 ->  Materialize (actual time=0.000..0.107 rows=2500 loops=5000)
+                       Buffers: shared hit=85
+                       ->  Seq Scan on marketplace_product_variants v_3 (actual time=0.011..4.445 rows=5000 loops=1)
+                             Filter: (status = 'active'::text)
+                             Buffers: shared hit=85
+           ->  Materialize (actual time=0.000..0.000 rows=5 loops=5000)
+                 Buffers: shared hit=1
+                 ->  Seq Scan on organizations o (actual time=0.001..0.002 rows=5 loops=1)
+                       Buffers: shared hit=1
+           SubPlan 2
+             ->  Aggregate (actual time=0.011..0.011 rows=1 loops=5000)
+                   Buffers: shared hit=20000
+                   ->  Bitmap Heap Scan on marketplace_product_variants v (actual time=0.006..0.007 rows=2 loops=5000)
+                         Recheck Cond: ((product_id = p.id) AND (status = 'active'::text))
+                         Heap Blocks: exact=10000
+                         Buffers: shared hit=20000
+                         ->  Bitmap Index Scan on ix_marketplace_variants_product_status (actual time=0.005..0.005 rows=2 loops=5000)
+                               Index Cond: ((product_id = p.id) AND (status = 'active'::text))
+                               Buffers: shared hit=10000
+   InitPlan 8
+     ->  Aggregate (actual time=1737.468..1737.468 rows=1 loops=1)
+           Buffers: shared hit=45390
+           ->  CTE Scan on base (actual time=0.766..1736.334 rows=5000 loops=1)
+                 Buffers: shared hit=45390
+   InitPlan 9
+     ->  CTE Scan on params (actual time=0.000..0.001 rows=1 loops=1)
+   InitPlan 10
+     ->  CTE Scan on params params_1 (actual time=0.000..0.001 rows=1 loops=1)
+   InitPlan 18
+     ->  Aggregate (actual time=490.405..490.414 rows=1 loops=1)
+           Buffers: shared hit=724655
+           InitPlan 15
+             ->  CTE Scan on params params_2 (actual time=0.002..0.002 rows=1 loops=1)
+           ->  Limit (actual time=6.926..6.957 rows=24 loops=1)
+                 Buffers: shared hit=9
+                 InitPlan 16
+                   ->  CTE Scan on params params_3 (actual time=0.000..0.001 rows=1 loops=1)
+                 InitPlan 17
+                   ->  CTE Scan on params params_4 (actual time=0.000..0.000 rows=1 loops=1)
+                 ->  Sort (actual time=6.923..6.941 rows=24 loops=1)
+                       Sort Key: (row_number() OVER (?))
+                       Sort Method: top-N heapsort  Memory: 37kB
+                       Buffers: shared hit=9
+                       ->  WindowAgg (actual time=3.341..4.976 rows=5000 loops=1)
+                             Buffers: shared hit=6
+                             ->  Sort (actual time=3.328..3.528 rows=5000 loops=1)
+                                   Sort Key: b.published_at DESC, b.slug
+                                   Sort Method: quicksort  Memory: 1638kB
+                                   Buffers: shared hit=6
+                                   ->  CTE Scan on base b (actual time=0.001..1.224 rows=5000 loops=1)
+           SubPlan 11
+             ->  Bitmap Heap Scan on marketplace_product_variants v_4 (actual time=0.085..0.085 rows=1 loops=24)
+                   Recheck Cond: ((product_id = b.id) AND (status = 'active'::text))
+                   Filter: (app.marketplace_variant_available(id) > 0)
+                   Heap Blocks: exact=24
+                   Buffers: shared hit=447
+                   ->  Bitmap Index Scan on ix_marketplace_variants_product_status (actual time=0.007..0.007 rows=2 loops=24)
+                         Index Cond: ((product_id = b.id) AND (status = 'active'::text))
+                         Buffers: shared hit=48
+           SubPlan 13
+             ->  Aggregate (actual time=0.006..0.006 rows=1 loops=24)
+                   Buffers: shared hit=64
+                   ->  Index Only Scan using ix_marketplace_variants_product_status on marketplace_product_variants v_5 (actual time=0.003..0.004 rows=2 loops=24)
+                         Index Cond: ((product_id = b.id) AND (status = 'active'::text))
+                         Heap Fetches: 15
+                         Buffers: shared hit=64
+           SubPlan 14
+             ->  Aggregate (actual time=19.866..19.866 rows=1 loops=24)
+                   Buffers: shared hit=723748
+                   ->  Sort (actual time=19.844..19.845 rows=2 loops=24)
+                         Sort Key: op_2.swatch_hex
+                         Sort Method: quicksort  Memory: 25kB
+                         Buffers: shared hit=723748
+                         ->  Nested Loop (actual time=0.034..19.826 rows=2 loops=24)
+                               Buffers: shared hit=723748
+                               ->  Nested Loop (actual time=0.009..5.925 rows=10000 loops=24)
+                                     Buffers: shared hit=3748
+                                     ->  Hash Join (actual time=0.007..2.765 rows=10000 loops=24)
+                                           Hash Cond: (vv_1.attribute_id = d_2.id)
+                                           Buffers: shared hit=3746
+                                           ->  Seq Scan on marketplace_variant_attribute_values vv_1 (actual time=0.005..0.653 rows=10000 loops=24)
+                                                 Buffers: shared hit=3744
+                                           ->  Hash (actual time=0.014..0.015 rows=1 loops=1)
+                                                 Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                                 Buffers: shared hit=2
+                                                 ->  Seq Scan on marketplace_attribute_definitions d_2 (actual time=0.009..0.012 rows=1 loops=1)
+                                                       Filter: (key = 'color'::text)
+                                                       Rows Removed by Filter: 60
+                                                       Buffers: shared hit=2
+                                     ->  Memoize (actual time=0.000..0.000 rows=1 loops=240000)
+                                           Cache Key: vv_1.option_id
+                                           Cache Mode: logical
+                                           Hits: 239999  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                                           Buffers: shared hit=2
+                                           ->  Index Scan using marketplace_attribute_options_pkey on marketplace_attribute_options op_2 (actual time=0.016..0.017 rows=1 loops=1)
+                                                 Index Cond: (id = vv_1.option_id)
+                                                 Filter: (swatch_hex IS NOT NULL)
+                                                 Buffers: shared hit=2
+                               ->  Index Scan using marketplace_product_variants_pkey on marketplace_product_variants v_6 (actual time=0.001..0.001 rows=0 loops=240000)
+                                     Index Cond: (id = vv_1.variant_id)
+                                     Filter: ((product_id = b.id) AND (status = 'active'::text))
+                                     Rows Removed by Filter: 1
+                                     Buffers: shared hit=720000
+ Planning:
+   Buffers: shared hit=1256
+ Planning Time: 4.131 ms
+ Execution Time: 2229.361 ms
+(182 rows)
+

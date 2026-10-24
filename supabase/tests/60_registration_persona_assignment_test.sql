@@ -7,7 +7,21 @@
 create extension if not exists pgtap;
 
 begin;
+
+-- Synthetic verifier evidence for existing metadata/lifecycle tests only.
+-- The missing-object and forged-receipt security regression is covered by 78.
+create function pg_temp.attest_owned_fixture() returns void language sql security definer set search_path='' as $$
+  insert into public.media_storage_locations(namespace,object_key,owner_user_id,provider,content_type,size_bytes,sha256,verified_at)
+  select ns,key,owner,'supabase',mime,100,repeat('a',64),now() from (
+    select 'portfolio' ns,object_key key,owner_user_id owner,content_type mime from public.portfolio_items where state='pending'
+    union all select 'certificate',object_path,owner_user_id,content_type from public.professional_certificates where state='pending'
+    union all select 'avatar',object_key,owner_user_id,content_type from public.avatar_uploads where state='pending'
+  ) f where owner=(select auth.uid())
+  on conflict(namespace,object_key) do nothing;
+$$;
+
 select plan(147);
+
 
 insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data,
                         email_confirmed_at, created_at, updated_at)
@@ -50,6 +64,7 @@ select is((public.my_profile_completion() ->> 'percent')::int, 13, 'trade: only 
 select lives_ok($$ select public.profile_set_display_name('P60 trade') $$, 'trade: confirms display name');
 select lives_ok($$ select public.profile_set_phone('EG', '1000000601', '+201000000601') $$, 'trade: saves phone');
 select set_config('test.key_trade', public.avatar_request_upload('image/jpeg'), true);
+select pg_temp.attest_owned_fixture();
 select lives_ok(format($$ select public.avatar_confirm_upload(%L) $$, current_setting('test.key_trade')), 'trade: avatar ready');
 select is((select array_agg(x order by x) from jsonb_array_elements_text(public.my_profile_completion() -> 'missing') x), array['activities','bio','headline','years_experience'], 'trade: only professional items remain');
 select lives_ok($$ select public.individual_save_professional('installer_technician'::public.persona_type, 'P60 headline', 4::smallint, null, 'P60 bio') $$, 'trade: professional profile editor save is admitted');
@@ -82,6 +97,7 @@ select is((public.my_profile_completion() ->> 'percent')::int, 13, 'sales: only 
 select lives_ok($$ select public.profile_set_display_name('P60 sales') $$, 'sales: confirms display name');
 select lives_ok($$ select public.profile_set_phone('EG', '1000000602', '+201000000602') $$, 'sales: saves phone');
 select set_config('test.key_sales', public.avatar_request_upload('image/jpeg'), true);
+select pg_temp.attest_owned_fixture();
 select lives_ok(format($$ select public.avatar_confirm_upload(%L) $$, current_setting('test.key_sales')), 'sales: avatar ready');
 select is((select array_agg(x order by x) from jsonb_array_elements_text(public.my_profile_completion() -> 'missing') x), array['activities','bio','headline','years_experience'], 'sales: only professional items remain');
 select lives_ok($$ select public.individual_save_professional('sales'::public.persona_type, 'P60 headline', 4::smallint, null, 'P60 bio') $$, 'sales: professional profile editor save is admitted');
@@ -117,6 +133,7 @@ select is((public.my_profile_completion() ->> 'percent')::int, 20, 'showroom: on
 select lives_ok($$ select public.profile_set_display_name('P60 showroom') $$, 'showroom: confirms display name');
 select lives_ok($$ select public.profile_set_phone('EG', '1000000603', '+201000000603') $$, 'showroom: saves phone');
 select set_config('test.key_showroom', public.avatar_request_upload('image/jpeg'), true);
+select pg_temp.attest_owned_fixture();
 select lives_ok(format($$ select public.avatar_confirm_upload(%L) $$, current_setting('test.key_showroom')), 'showroom: avatar ready');
 select is((select array_agg(x order by x) from jsonb_array_elements_text(public.my_profile_completion() -> 'missing') x), array['organization_setup'], 'showroom: only organization setup remains (reachable at /business/new)');
 select is((public.my_profile_completion() ->> 'percent')::int, 80, 'showroom: 4 of 5 = 80% with zero organizations');
@@ -156,6 +173,7 @@ select is((public.my_profile_completion() ->> 'percent')::int, 20, 'supplier: on
 select lives_ok($$ select public.profile_set_display_name('P60 supplier') $$, 'supplier: confirms display name');
 select lives_ok($$ select public.profile_set_phone('EG', '1000000604', '+201000000604') $$, 'supplier: saves phone');
 select set_config('test.key_supplier', public.avatar_request_upload('image/jpeg'), true);
+select pg_temp.attest_owned_fixture();
 select lives_ok(format($$ select public.avatar_confirm_upload(%L) $$, current_setting('test.key_supplier')), 'supplier: avatar ready');
 select is((select array_agg(x order by x) from jsonb_array_elements_text(public.my_profile_completion() -> 'missing') x), array['organization_setup'], 'supplier: only organization setup remains (reachable at /business/new)');
 select is((public.my_profile_completion() ->> 'percent')::int, 80, 'supplier: 4 of 5 = 80% with zero organizations');
@@ -193,6 +211,7 @@ select is((public.my_profile_completion() ->> 'percent')::int, 20, 'manufacturer
 select lives_ok($$ select public.profile_set_display_name('P60 manufacturer') $$, 'manufacturer: confirms display name');
 select lives_ok($$ select public.profile_set_phone('EG', '1000000605', '+201000000605') $$, 'manufacturer: saves phone');
 select set_config('test.key_manufacturer', public.avatar_request_upload('image/jpeg'), true);
+select pg_temp.attest_owned_fixture();
 select lives_ok(format($$ select public.avatar_confirm_upload(%L) $$, current_setting('test.key_manufacturer')), 'manufacturer: avatar ready');
 select is((select array_agg(x order by x) from jsonb_array_elements_text(public.my_profile_completion() -> 'missing') x), array['organization_setup'], 'manufacturer: only organization setup remains (reachable at /business/new)');
 select is((public.my_profile_completion() ->> 'percent')::int, 80, 'manufacturer: 4 of 5 = 80% with zero organizations');
@@ -230,6 +249,7 @@ select is((public.my_profile_completion() ->> 'percent')::int, 20, 'importer: on
 select lives_ok($$ select public.profile_set_display_name('P60 importer') $$, 'importer: confirms display name');
 select lives_ok($$ select public.profile_set_phone('EG', '1000000606', '+201000000606') $$, 'importer: saves phone');
 select set_config('test.key_importer', public.avatar_request_upload('image/jpeg'), true);
+select pg_temp.attest_owned_fixture();
 select lives_ok(format($$ select public.avatar_confirm_upload(%L) $$, current_setting('test.key_importer')), 'importer: avatar ready');
 select is((select array_agg(x order by x) from jsonb_array_elements_text(public.my_profile_completion() -> 'missing') x), array['organization_setup'], 'importer: only organization setup remains (reachable at /business/new)');
 select is((public.my_profile_completion() ->> 'percent')::int, 80, 'importer: 4 of 5 = 80% with zero organizations');

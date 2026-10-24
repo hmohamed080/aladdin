@@ -1,0 +1,12 @@
+-- organization_media_resolve was declared STABLE, so PostgREST runs a direct RPC call to it in a
+-- READ ONLY transaction. Its 'upload' branch reaches app.can_upload_product_image_object ->
+-- app.can_write_publisher, which takes `select ... for share` on the publisher row, and Postgres
+-- refuses row locks in a read-only transaction (25006). Every product photo upload therefore failed
+-- at authorizeMediaUpload with the generic "could not be uploaded" message, leaving a pending
+-- product_images row that still counts toward the 3-photo limit. pgTAP did not see it because its
+-- transaction is read-write.
+--
+-- The function is a gate whose callees may lock, so it is VOLATILE. Its body, signature, owner and
+-- grants are unchanged; STABLE callers (organization_media_read_keys, the edge resolvers) only use
+-- the 'read' branch, which takes no locks.
+alter function public.organization_media_resolve(text, text, text, uuid) volatile;

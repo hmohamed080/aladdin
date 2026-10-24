@@ -1,0 +1,17 @@
+{
+  "showroomPhone": "01064045120",
+  "showroomName": "Audit Showroom 20261015113405",
+  "run": "20261015113405",
+  "showroomUserId": "12ee0b13-e269-4bb2-96bf-f8830187b006",
+  "fixtureOrgId": "29eb0224-8a9a-41db-b0e1-a53599a23c67",
+  "fixtureOrgName": "Audit Showroom Fixture",
+  "probeAccountPhone": "0201234567 (created by the landline probe)",
+  "salesUserId": "b8ef6149-e22d-4d66-a9a2-0cc4ef4e5e13",
+  "salesEmail": "audit-sales-20261015115250@audit.test",
+  "salesMembershipId": "24f20180-bb90-40c9-8510-3015fa3917c4",
+  "fixtureProductId": "99796045-235c-4c5e-aa97-134c52dc18c1",
+  "skuA": "AUD-115850-A",
+  "skuB": "AUD-115850-B",
+  "spoofImageId": "ef806984-0bfb-431b-b46e-5d243981c6a3",
+  "fixturePublished": true
+}

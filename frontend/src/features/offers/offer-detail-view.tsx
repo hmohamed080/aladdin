@@ -207,7 +207,7 @@ export function OfferDetailView({
               {rfqAllowed && canRfq ? (
                 <Link
                   href={rfqHref}
-                  className="inline-flex min-h-11 min-w-0 flex-1 items-center justify-center rounded-sm bg-accent-solid px-md text-label font-semibold text-on-accent hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  className="inline-flex min-h-11 min-w-0 flex-1 items-center justify-center rounded-sm bg-accent-solid ring-1 ring-accent-edge px-md text-label font-semibold text-on-accent hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                   data-testid="offer-request-quote"
                 >
                   {t("showroomOffers.detail.requestQuote")}
@@ -224,7 +224,7 @@ export function OfferDetailView({
             <ul className="flex flex-col gap-1.5 text-label text-fg-secondary">
               {["terms1", "terms2", "terms3", "terms4"].map((k) => (
                 <li key={k} className="flex items-start gap-2">
-                  <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-solid" />
+                  <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-solid ring-1 ring-accent-edge" />
                   {t(`showroomOffers.detail.${k}`)}
                 </li>
               ))}

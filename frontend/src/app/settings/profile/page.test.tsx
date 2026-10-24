@@ -44,6 +44,8 @@ const identity = {
   phoneE164: null,
   phoneIsLoginKey: false,
   avatarUrl: null,
+  phoneLogin: false,
+  secondaryPhone: null,
 };
 
 async function outcome(): Promise<string> {

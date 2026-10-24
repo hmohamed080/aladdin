@@ -1,0 +1,17 @@
+{
+  "consoleErrors": [],
+  "failed": [
+    "GET /legal/terms net::ERR_ABORTED",
+    "GET /legal/privacy net::ERR_ABORTED",
+    "GET /showroom/sign-in net::ERR_ABORTED",
+    "GET /legal/privacy net::ERR_ABORTED",
+    "GET /legal/terms net::ERR_ABORTED",
+    "GET /legal/terms net::ERR_ABORTED",
+    "GET /legal/privacy net::ERR_ABORTED",
+    "GET /showroom/sign-in net::ERR_ABORTED",
+    "GET /legal/privacy net::ERR_ABORTED",
+    "GET /legal/terms net::ERR_ABORTED",
+    "GET /legal/terms net::ERR_ABORTED",
+    "GET /legal/privacy net::ERR_ABORTED"
+  ]
+}

@@ -1,0 +1,28 @@
+# TEMPLATE ONLY (Option B: media.aladdindecore.com while DNS stays on Vercel).
+# A Cloudflare Pages project in advanced mode runs the SAME Worker bundle, and a
+# Pages custom domain works with a plain CNAME at an external DNS provider,
+# which Workers custom domains do not (they need a Cloudflare zone).
+# Build: from edge/media-worker, `wrangler deploy --dry-run --outdir pages/dist`
+#        then `mv pages/dist/index.js pages/dist/_worker.js`.
+# Deploy: from edge/media-worker/pages, `wrangler pages deploy`.
+# Bindings below must match ../wrangler.toml. TICKET_KEYS is a Pages secret
+# (`wrangler pages secret put TICKET_KEYS`), never committed.
+name = "aladdin-media"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+PRIVATE_ROUTES = "on"
+PUBLIC_ROUTES = "on"
+EDGE_CACHE = "on"
+VIDEO_ROUTES = "off"
+VIDEO_ALLOWED_ORIGINS = "https://aladdindecore.com,https://www.aladdindecore.com"
+
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "<private-media-bucket>"
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "<hyperdrive-config-id>"

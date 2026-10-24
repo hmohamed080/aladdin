@@ -18,7 +18,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(46);
+select plan(60);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (seeded users that hold no membership), driven to a known state.
@@ -198,8 +198,90 @@ select ok((select pg_get_constraintdef(oid) from pg_constraint where conname = '
   'account.platform_cleanup (the explicit cleanup record) is in the audit vocabulary');
 select is((select count(*)::int from public.audit_log where action = 'account.platform_cleanup'), 0,
   'the helper itself never writes a cleanup event (only the operational transaction does)');
-select is((select count(*)::int from public.admin_permissions), 25, 'the permission catalog is unchanged');
+-- 25 original permissions; later migrations add: verification.approve (20261017160001), phones.cooldown_override (20261018090001),
+-- and the three Marketplace permissions (marketplace_sellers.read / .manage, Migration 04; marketplace_media.moderate, Migration 09)
+select is((select count(*)::int from public.admin_permissions where key not in ('verification.approve', 'phones.cooldown_override', 'marketplace_sellers.read', 'marketplace_sellers.manage', 'marketplace_media.moderate')), 25, 'the permission catalog is unchanged by account preparation (later migrations add only the five named permissions)');
+select is(
+  (select array_agg(r.key || ':' || rp.is_locked::text order by r.key)
+   from public.admin_role_permissions rp join public.admin_roles r on r.id = rp.role_id
+   where rp.permission_key = 'marketplace_media.moderate'),
+  array['administrator:false', 'super_admin:true'],
+  'RBAC-14. media moderation (Migration 09) is held by Super Admin (locked) and Administrator only');
 select is((select count(*)::int from public.admin_roles), 4, 'the admin roles are unchanged');
+
+-- ---------------------------------------------------------------------------
+-- Marketplace seller permissions (Migration 04) — verified structurally, not
+-- merely by a total count. The 25 pre-existing permissions and every existing
+-- role mapping are pinned by content hash (computed from the pre-Marketplace
+-- catalogue: key|resource|action|description|sort_order|is_active per key, and
+-- per role the sorted permission_key:is_locked list).
+-- ---------------------------------------------------------------------------
+select is(
+  (select md5(string_agg(key || '|' || resource || '|' || action || '|' || description || '|' || sort_order::text || '|' || is_active::text,
+                         E'\n' order by key))
+   from public.admin_permissions where key not like 'marketplace\_%'
+     and key not in ('verification.approve', 'phones.cooldown_override')),
+  '0742c9851ca7b55f8874396fde2234f4',
+  'RBAC-1. the 25 pre-existing permissions are present and byte-for-byte unchanged');
+select is(
+  (select count(*)::int from public.admin_permissions where key not like 'marketplace\_%'
+     and key not in ('verification.approve', 'phones.cooldown_override')), 25,
+  'RBAC-2. ...and there are exactly 25 of them');
+select is(
+  (select array_agg(key || ':' || action || ':' || is_active::text || ':' || is_system::text order by key)
+   from public.admin_permissions where key like 'marketplace\_sellers.%'),
+  array['marketplace_sellers.manage:manage:true:true', 'marketplace_sellers.read:read:true:true'],
+  'RBAC-3. the two Marketplace seller permissions exist, active and system-owned');
+select is(
+  (select array_agg(x order by x) from (
+     select r.key || ':' || count(*)::text || ':' || md5(string_agg(rp.permission_key || ':' || rp.is_locked::text, ',' order by rp.permission_key)) as x
+     from public.admin_role_permissions rp join public.admin_roles r on r.id = rp.role_id
+     where rp.permission_key not like 'marketplace\_%'
+       and rp.permission_key not in ('verification.approve', 'phones.cooldown_override')
+     group by r.key) q),
+  array['administrator:24:9e8dcc59cf3f3e5b1bc63338d75e4895', 'moderator:16:829c7432b215b59760ac28145a50abc5',
+        'super_admin:25:0139b1bbe0b1f22811be9f1b8691c2b1', 'support:7:a102b27eac08be9dbae163eeb0ed6002'],
+  'RBAC-4. no pre-existing role -> permission mapping (nor its lock flag) was changed');
+select is(
+  (select array_agg(r.key || ':' || rp.is_locked::text order by r.key)
+   from public.admin_role_permissions rp join public.admin_roles r on r.id = rp.role_id
+   where rp.permission_key = 'marketplace_sellers.manage'),
+  array['administrator:false', 'super_admin:true'],
+  'RBAC-5. manage is held by Super Admin (locked) and Administrator only');
+select is(
+  (select array_agg(r.key order by r.key)
+   from public.admin_role_permissions rp join public.admin_roles r on r.id = rp.role_id
+   where rp.permission_key = 'marketplace_sellers.read'),
+  array['administrator', 'moderator', 'super_admin'],
+  'RBAC-6. read adds Moderator; Support has neither permission');
+
+insert into public.admin_role_assignments (user_id, role_id, scope_type, assigned_by)
+select '11111111-1111-4111-8111-111111111111', r.id, 'platform', '55555555-5555-4555-8555-555555555555'
+from public.admin_roles r where r.key = 'moderator';
+insert into public.admin_role_assignments (user_id, role_id, scope_type, assigned_by)
+select '70000009-0000-4000-8000-000000000009', r.id, 'platform', '55555555-5555-4555-8555-555555555555'
+from public.admin_roles r where r.key = 'support';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
+select is(app.has_admin_permission('marketplace_sellers.manage'), true, 'RBAC-7. an Administrator can manage Marketplace sellers');
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
+select is(app.has_admin_permission('marketplace_sellers.manage'), false, 'RBAC-8. a Moderator cannot manage Marketplace sellers');
+select is(app.has_admin_permission('marketplace_sellers.read'), true, 'RBAC-9. ...but can read them');
+set local request.jwt.claims = '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
+select is(array[app.has_admin_permission('marketplace_sellers.manage'), app.has_admin_permission('marketplace_sellers.read')],
+  array[false, false], 'RBAC-10. Support can neither manage nor read Marketplace sellers');
+set local request.jwt.claims = '{"sub":"70000001-0000-4000-8000-000000000001","role":"authenticated"}';
+select is(array[app.has_admin_permission('marketplace_sellers.manage'), app.has_admin_permission('marketplace_sellers.read')],
+  array[false, false], 'RBAC-11. an ordinary user (a showroom member) has no Marketplace seller permission');
+reset role;
+select is(
+  (select count(*)::int from public.admin_role_assignments a join public.admin_roles r on r.id = a.role_id
+   where a.is_active and r.key = 'super_admin'), 1,
+  'RBAC-12. exactly one Super Admin remains (the new fixtures grant no extra top role)');
+select is(
+  (select count(*)::int from public.admin_role_permissions rp where rp.permission_key like 'marketplace\_sellers.%'), 5,
+  'RBAC-13. exactly five mappings carry the new permissions (2 manage + 3 read)');
 
 select * from finish();
 rollback;

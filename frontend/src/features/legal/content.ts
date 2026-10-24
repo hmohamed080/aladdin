@@ -1,23 +1,39 @@
 import type { Locale } from "@/lib/i18n/locales";
 
 /**
- * Published Terms of Service, Privacy Policy and Data Deletion Instructions
+ * Published Privacy Policy and Data Deletion Instructions
  * (docs/frontend/legal-pages.md). Every statement here describes what the
  * product actually does today — the data the registration, profile, business,
  * catalogue, jobs, chat and sign-in flows store, the providers that process it
  * (Supabase, Vercel, Cloudflare Turnstile, Google, Meta), the cookies the app
  * sets, and the request-based deletion process. Change the copy when the
- * behaviour changes, and bump that document's date in LEGAL_UPDATED_AT.
+ * behaviour changes, and bump LEGAL_UPDATED_AT.
  */
 
 /** The inbox privacy and deletion requests go to. Must be a real, monitored mailbox. */
 export const PRIVACY_CONTACT_EMAIL = "info@aladdindecore.com";
 export const SITE_URL = "https://aladdindecore.com";
-
+export const LEGAL_UPDATED_AT = "2026-10-17";
 
 export type LegalBlock = { kind: "p"; text: string } | { kind: "list"; items: string[] } | { kind: "steps"; items: string[] };
 export type LegalSection = { id: string; heading: string; blocks: LegalBlock[] };
-export type LegalDocument = { title: string; intro: string; updatedLabel: string; contentsLabel: string; sections: LegalSection[] };
+export type LegalDocument = {
+  title: string;
+  intro: string;
+  updatedLabel: string;
+  contentsLabel: string;
+  /** "Email us at" / "راسلنا على" — label above the contact address in the closing band. */
+  writeToUs: string;
+  /** Label of the closing band's contact button. */
+  contactLabel: string;
+  /** ISO date of this document's last update; defaults to LEGAL_UPDATED_AT. */
+  updatedAt?: string;
+  /** Shown as a pill under the intro (a draft that is not final legal text). */
+  notice?: string;
+  /** A short line shown over the photo card beside the contents. */
+  aside?: string;
+  sections: LegalSection[];
+};
 
 const p = (text: string): LegalBlock => ({ kind: "p", text });
 const list = (...items: string[]): LegalBlock => ({ kind: "list", items });
@@ -27,6 +43,8 @@ const privacyEn: LegalDocument = {
   title: "Privacy Policy",
   updatedLabel: "Last updated",
   contentsLabel: "On this page",
+  writeToUs: "Email us at",
+  contactLabel: "Contact us",
   intro:
     "Aladdin (aladdindecore.com) is a platform that connects showrooms, suppliers, manufacturers, importers, contractors, engineers, installers and their customers in Egypt's finishing, construction and interior-design sector. This policy explains what personal data we collect, why, who processes it for us, how long we keep it and the choices you have.",
   sections: [
@@ -169,6 +187,8 @@ const privacyAr: LegalDocument = {
   title: "سياسة الخصوصية",
   updatedLabel: "آخر تحديث",
   contentsLabel: "محتويات الصفحة",
+  writeToUs: "راسلنا على",
+  contactLabel: "تواصل معنا",
   intro:
     "علاء الدين (aladdindecore.com) منصة تربط المعارض والموردين والمصنّعين والمستوردين والمقاولين والمهندسين والصنايعية وعملاءهم في قطاع التشطيبات والبناء والتصميم الداخلي في مصر. توضح هذه السياسة البيانات الشخصية التي نجمعها، ولماذا، ومن يعالجها لصالحنا، ومدة الاحتفاظ بها، والخيارات المتاحة لك.",
   sections: [
@@ -303,6 +323,8 @@ const deletionEn: LegalDocument = {
   title: "Data Deletion Instructions",
   updatedLabel: "Last updated",
   contentsLabel: "On this page",
+  writeToUs: "Email us at",
+  contactLabel: "Contact us",
   intro:
     "You can ask us to delete your Aladdin account and the personal data linked to it at any time, whether you signed up with email, phone number, Google or Facebook. This page explains how, what is deleted and how long it takes.",
   sections: [
@@ -379,6 +401,8 @@ const deletionAr: LegalDocument = {
   title: "تعليمات حذف البيانات",
   updatedLabel: "آخر تحديث",
   contentsLabel: "محتويات الصفحة",
+  writeToUs: "راسلنا على",
+  contactLabel: "تواصل معنا",
   intro:
     "يمكنك أن تطلب منا حذف حسابك في علاء الدين والبيانات الشخصية المرتبطة به في أي وقت، سواء سجّلت بالبريد الإلكتروني أو رقم الهاتف أو Google أو Facebook. توضح هذه الصفحة الطريقة، وما يتم حذفه، والمدة المطلوبة.",
   sections: [
@@ -449,10 +473,18 @@ const deletionAr: LegalDocument = {
   ],
 };
 
+/**
+ * Terms of Service: the published text (PR #90). The page layout fields (aside photo line, closing contact band) follow the
+ * approved layout in D:projectsLayoutpages.
+ */
 const termsEn: LegalDocument = {
   title: "Terms of Service",
   updatedLabel: "Last updated",
   contentsLabel: "On this page",
+  writeToUs: "Email us at",
+  contactLabel: "Contact us",
+  updatedAt: "2026-10-18",
+  aside: "We are building a more trusted, more professional environment for interior design and décor.",
   intro:
     "These Terms govern your use of Aladdin, the website and web application at aladdindecore.com that connects showrooms, suppliers, manufacturers, importers, contractors, engineers, installers and their customers in Egypt's finishing, construction and interior-design sector. By creating an account or using Aladdin you agree to these Terms and to our Privacy Policy.",
   sections: [
@@ -584,6 +616,10 @@ const termsAr: LegalDocument = {
   title: "شروط الخدمة",
   updatedLabel: "آخر تحديث",
   contentsLabel: "محتويات الصفحة",
+  writeToUs: "راسلنا على",
+  contactLabel: "تواصل معنا",
+  updatedAt: "2026-10-18",
+  aside: "نبني بيئة أكثر موثوقية واحترافية لقطاع التصميم الداخلي والديكور.",
   intro:
     "تنظّم هذه الشروط استخدامك لعلاء الدين، الموقع والتطبيق على aladdindecore.com الذي يربط المعارض والموردين والمصنّعين والمستوردين والمقاولين والمهندسين والصنايعية وعملاءهم في قطاع التشطيبات والبناء والتصميم الداخلي في مصر. بإنشاء حساب أو استخدام علاء الدين فإنك توافق على هذه الشروط وعلى سياسة الخصوصية.",
   sections: [
@@ -710,21 +746,13 @@ const termsAr: LegalDocument = {
     },
   ],
 };
-
 const DOCUMENTS = {
-  terms: { en: termsEn, ar: termsAr },
   privacy: { en: privacyEn, ar: privacyAr },
   dataDeletion: { en: deletionEn, ar: deletionAr },
+  terms: { en: termsEn, ar: termsAr },
 } as const;
 
 export type LegalDocumentKey = keyof typeof DOCUMENTS;
-
-/** When each document last changed (ISO date). */
-export const LEGAL_UPDATED_AT: Record<LegalDocumentKey, string> = {
-  terms: "2026-10-18",
-  privacy: "2026-10-17",
-  dataDeletion: "2026-10-17",
-};
 
 export function legalDocument(key: LegalDocumentKey, locale: Locale): LegalDocument {
   return DOCUMENTS[key][locale === "en" ? "en" : "ar"];

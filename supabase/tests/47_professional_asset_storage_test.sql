@@ -212,14 +212,23 @@ select ok(
 -- select-published), for 11 total; Own Products (20261015090004) then added the
 -- four named product_images_* policies of the private product-images bucket, for 15; Milestone C (20261015090020) added
 -- the four request_images_* policies of the private purchase-request-images bucket, for 19; the Showroom profile image (20261015090043)
--- added the four organization_images_* policies of the private organization-images bucket, for 23. Updated here rather than left stale,
+-- added the four organization_images_* policies of the private organization-images bucket, for 23; business verification
+-- (20261017160001) added the three bv_documents_* policies of the private business-verification-documents bucket, for 26. Updated here rather than left stale,
+-- One additional restrictive application-read boundary (R2, 20261018..._rc2_private_media_application_delivery) covers the five revocable media buckets, for 27.
 -- since this file's own point is to name every policy explicitly so a NEW
 -- one cannot pass quietly — the avatars bucket is a reviewed addition, named.
+-- Marketplace Migration 06 (20261014090001) adds the private
+-- marketplace-product-images bucket with the same pending-row shape and NO
+-- public door: insert (needs a server-issued pending row) / select (members of
+-- the owning organization) / delete (only once no confirmed row references the
+-- object): 3 more (14 when only the Marketplace was added); Migration 09 adds the moderator
+-- select and the import-assets insert. Merged with Own Products / Purchase Requests /
+-- Showroom image policies the exact set is 28. Reviewed additions, named below.
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects'),
-  23,
-  'Twenty-three policies on storage.objects: three each for certificates/portfolio/avatars, plus two public doors, plus the four product-images policies (Own Products, 20261015090004), plus the four request-images policies (Purchase Requests, 20261015090020), plus the four organization-images policies (Showroom profile image, 20261015090043)'
+  33,
+  'Thirty-three policies on storage.objects: three each for certificates/portfolio/avatars, plus two public doors, plus the four product-images policies (Own Products, 20261015090004), the four request-images policies (Purchase Requests, 20261015090020), the four organization-images policies (Showroom profile image, 20261015090043), the business-verification document policies (bv_documents_*, PR #88/#89) and the Marketplace policies (marketplace-product-images: three from Migration 06, the moderator select of Migration 09, and the import-assets insert) plus the restrictive session-liveness policy (storage_objects_session_live, 20261019163000)'
 );
 
 select is(
@@ -230,6 +239,14 @@ select is(
     'avatars_insert_authorized',
     'avatars_select_own',
     'avatars_select_published',
+    'bv_documents_delete_unsubmitted',
+    'bv_documents_insert_authorized',
+    'bv_documents_select_authorized',
+    'marketplace_images_delete_unreferenced',
+    'marketplace_images_insert_authorized',
+    'marketplace_images_select_member',
+    'marketplace_images_select_moderator',
+    'marketplace_import_assets_insert',
     'organization_images_delete_manager',
     'organization_images_insert_authorized',
     'organization_images_select_manager',
@@ -248,9 +265,11 @@ select is(
     'request_images_delete_manager',
     'request_images_insert_authorized',
     'request_images_select_owner',
-    'request_images_select_viewer'
+    'request_images_select_viewer',
+    'revocable_media_backend_reads',
+    'storage_objects_session_live'
   ],
-  'Each policy still names ONE bucket in its own name, so widening one bucket''s reads cannot silently widen another''s'
+  'Exact policy set includes the reviewed five-bucket restrictive boundary'
 );
 
 select is(
@@ -267,14 +286,15 @@ select is(
   (select array_agg(policyname::text order by policyname::text collate "C")
      from pg_policies where schemaname = 'storage' and tablename = 'objects'
       and ('anon' = any(roles) or 'public' = any(roles))),
-  array['avatars_select_published', 'professional_portfolio_select_published'],
-  'EXACTLY TWO policies admit anon, both SELECT sign-only public doors — portfolio and avatars, certificates has none'
+  array['avatars_select_published', 'professional_portfolio_select_published', 'revocable_media_backend_reads'],
+  'Two permissive public policies and the restrictive backend-read boundary are the exact anon policy set'
 );
 
 select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects'
       and ('anon' = any(roles) or 'public' = any(roles))
+      and permissive = 'PERMISSIVE'
       and coalesce(qual, '') like '%professional-certificates%'),
   0,
   'No anon policy mentions the certificates bucket -- a certificate has no public read path of any kind (S2)'
@@ -350,7 +370,7 @@ select is(
                          'professional_certificates_select_own', 'professional_certificates_delete_own')
       and coalesce(qual, '') like '%allow_only_operation%'),
   0,
-  'No OWNER policy is operation-restricted -- an owner still lists and reads their own objects, private ones included'
+  'Owner predicates remain unchanged; separate restrictive SELECT requires backend delivery'
 );
 
 -- The persona gate belongs to creation and to creation only. If it ever appears
@@ -388,8 +408,8 @@ select is(
   (select count(*)::int from pg_policies
     where schemaname = 'storage' and tablename = 'objects'
       and coalesce(qual, with_check) like '%is_professional_asset_key%'),
-  3,
-  'The key contract now governs the three CERTIFICATE policies; portfolio ownership moved to metadata, where it can be asked without disclosing an owner'
+  2,
+  'Certificate read/delete retain the key contract; insertion now additionally requires owned pending metadata'
 );
 
 -- The property the whole redesign exists for.
@@ -407,6 +427,9 @@ select ok(
 -- ===========================================================================
 -- E. Write authority, exercised through the policies themselves
 -- ===========================================================================
+insert into public.professional_certificates(owner_user_id,object_path,content_type,title)
+values('70000009-0000-4000-8000-000000000009','70000009-0000-4000-8000-000000000009/aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa.pdf','application/pdf','Storage fixture');
+
 set local role authenticated;
 set local request.jwt.claims to '{"sub":"70000009-0000-4000-8000-000000000009","role":"authenticated"}';
 
@@ -521,8 +544,8 @@ select is(
 select is(
   (select count(*)::int from storage.objects
     where name = '70000009-0000-4000-8000-000000000009/aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa.pdf'),
-  1,
-  'And their own certificate'
+  0,
+  'Owner direct certificate SELECT is denied; application delivery uses backend Storage'
 );
 
 reset role;
@@ -634,8 +657,8 @@ select throws_ok(
 select is(
   (select count(*)::int from storage.objects
     where name = '70000009-0000-4000-8000-000000000009/aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa.pdf'),
-  1,
-  'DOWNGRADE: but the certificate they already uploaded is still readable — personal data is not held hostage to a persona value'
+  0,
+  'DOWNGRADE: direct Storage remains denied; application metadata retains owner read authority'
 );
 
 -- The delete half of the downgrade contract is structural rather than observed,
@@ -680,8 +703,8 @@ select ok(
 select is(
   (select count(*)::int from storage.objects
     where name = '44444444-4444-4444-8444-444444444444/cccccccc-9999-4999-8999-cccccccccccc.pdf'),
-  1,
-  'though they can read and remove what is under their own id, which is the same rule everyone else gets'
+  0,
+  'A prefixed object alone gives no client Storage read authority'
 );
 
 reset role;
@@ -705,12 +728,23 @@ select is(
 -- the traffic runs the other way, with storage policies consulting the metadata.
 -- So the product still cannot ask a question of the byte store, and a file still
 -- cannot be an input to any authorization decision.
+-- TWO NAMED EXCEPTIONS (Marketplace Migrations 06 and 07):
+--   * marketplace_seller_image_confirm_upload reads storage.objects to prove the bytes
+--     really exist before an upload is recorded as confirmed (and to take the real
+--     size / type);
+--   * marketplace_seller_image_remove_finalize reads storage.objects to prove the bytes
+--     are really GONE before the image row is forgotten (a failed delete is retried,
+--     never reported as done).
+-- Neither is an authorization input — the storage policies still consult only
+-- metadata — and neither trusts the client's word about what happened in storage.
 select is(
-  (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('app', 'public')
-      and p.prosrc like '%storage.objects%'),
-  0,
-  'No app/public function reads storage.objects: metadata points AT objects, and nothing in the product reads back from them'
+      and p.prosrc like '%storage.objects%'
+      and (has_function_privilege('anon',p.oid,'EXECUTE') or has_function_privilege('authenticated',p.oid,'EXECUTE'))),
+  array['admin_marketplace_media_record_validation', 'marketplace_seller_image_confirm_upload',
+        'marketplace_seller_image_remove_finalize'],
+  'Only three named Marketplace functions are caller-accessible AND read storage.objects (upload confirmation: the bytes exist; removal finalize: the bytes are gone; the admin media validation record); every other reader (incl. the app.* import helper and the R2 inventories) is not callable by a client role and metadata still points AT objects everywhere else'
 );
 
 select * from finish();

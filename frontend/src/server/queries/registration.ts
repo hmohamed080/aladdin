@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getServerSupabase } from "@/lib/supabase/server";
+import { readSessionIdentity } from "@/server/auth/session";
 
 /**
  * The registration / access state, derived server-side (never client state) —
@@ -58,9 +59,7 @@ export function hasAppAccess(state: RegistrationState): boolean {
 
 export async function getRegistrationState(): Promise<RegistrationState> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await readSessionIdentity(supabase);
   if (!user) return "unverified";
 
   const { data, error } = await supabase.rpc("my_registration_state");

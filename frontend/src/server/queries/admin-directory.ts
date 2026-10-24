@@ -36,7 +36,7 @@ function fail(scope: string, error: unknown): { ok: false } {
 }
 
 export async function loadUsersDirectory(supabase: Client, p: UsersDirectoryParams) {
-  const { data, error } = await supabase.rpc("admin_users_list", {
+  const { data, error } = await supabase.rpc("admin_users_directory", {
     p_search: p.search ?? undefined,
     p_status: p.status ?? undefined,
     p_account_type: p.accountType ?? undefined,
@@ -46,9 +46,9 @@ export async function loadUsersDirectory(supabase: Client, p: UsersDirectoryPara
     p_page: p.page,
     p_page_size: p.pageSize,
   });
-  if (error) return fail("admin_users_list", error);
+  if (error) return fail("admin_users_directory", error);
   const page = mapUsersPage(data);
-  return page ? ({ ok: true, data: page } as const) : fail("admin_users_list (shape)", data);
+  return page ? ({ ok: true, data: page } as const) : fail("admin_users_directory (shape)", data);
 }
 
 export async function loadOrganizationsDirectory(supabase: Client, p: OrgsDirectoryParams) {

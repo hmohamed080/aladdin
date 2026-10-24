@@ -1,0 +1,51 @@
+{"kind":"action","action":"seller list open (warm, signed in)","ms":564,"at":"2026-10-15T11:58:53.861Z"}
+{"kind":"action","action":"seller list deep page (page 40)","ms":397,"at":"2026-10-15T11:58:55.736Z"}
+{"kind":"action","action":"seller edit page open (7 variants, 9 images)","ms":984,"at":"2026-10-15T11:58:56.753Z"}
+{"kind":"action","action":"save draft (2 variants + stock + 3 image uploads)","ms":1640,"at":"2026-10-15T11:59:00.159Z"}
+{"kind":"rpc","action":"marketplace_seller_product_save (edit, 2 variants)","ms":23,"at":"2026-10-15T11:59:01.238Z"}
+{"kind":"rpc","action":"marketplace_seller_stock_adjust","ms":13,"at":"2026-10-15T11:59:01.309Z"}
+{"kind":"rpc","action":"marketplace_seller_product_readiness","ms":13,"at":"2026-10-15T11:59:01.363Z"}
+{"kind":"page-action","action":"admin media queue open","ms":310,"at":"2026-10-15T12:02:52.786Z"}
+{"kind":"action","action":"admin byte-validate 3 images (UI)","ms":268,"at":"2026-10-15T12:02:53.345Z"}
+{"kind":"action","action":"admin approve 2 images (re-validates bytes first)","ms":258,"at":"2026-10-15T12:02:54.104Z"}
+{"kind":"rpc","action":"marketplace_product_publish","ms":15,"at":"2026-10-15T12:02:54.558Z"}
+{"kind":"action","action":"import dry run (6 rows) end-to-end UI","ms":343,"at":"2026-10-15T12:05:33.355Z"}
+{"kind":"action","action":"import dry run (6 rows) end-to-end UI","ms":169,"at":"2026-10-15T12:09:39.595Z"}
+{"kind":"action","action":"import apply (6 rows + 6 images) end-to-end UI","ms":485,"at":"2026-10-15T12:09:40.518Z"}
+{"kind":"user-action","action":"Import dry run, 50 rows (UI end-to-end)","ms":477,"at":"2026-10-15T13:02:18.739Z"}
+{"kind":"user-action","action":"Import apply, 50 rows → drafts (UI end-to-end)","ms":1134,"at":"2026-10-15T13:02:20.282Z"}
+{"kind":"user-action","action":"Change product type (strip → wallpaper)","ms":87,"at":"2026-10-15T13:02:42.720Z"}
+{"kind":"user-action","action":"Apply colour filter","ms":61,"at":"2026-10-15T13:02:42.781Z"}
+{"kind":"user-action","action":"Apply price filter (max 1000, Enter)","ms":75,"at":"2026-10-15T13:02:42.872Z"}
+{"kind":"user-action","action":"Clear all filters","ms":53,"at":"2026-10-15T13:02:42.925Z"}
+{"kind":"user-action","action":"Change sorting (price high→low)","ms":99,"at":"2026-10-15T13:02:43.024Z"}
+{"kind":"user-action","action":"Open product details from card","ms":95,"at":"2026-10-15T13:02:43.119Z"}
+{"kind":"user-action","action":"Switch variant","ms":291,"at":"2026-10-15T13:02:43.410Z"}
+{"kind":"user-action","action":"Change product type (strip → wallpaper)","ms":190,"at":"2026-10-15T13:02:43.762Z"}
+{"kind":"user-action","action":"Apply colour filter","ms":84,"at":"2026-10-15T13:02:43.846Z"}
+{"kind":"user-action","action":"Apply price filter (max 1000, Enter)","ms":57,"at":"2026-10-15T13:02:43.918Z"}
+{"kind":"user-action","action":"Clear all filters","ms":84,"at":"2026-10-15T13:02:44.002Z"}
+{"kind":"user-action","action":"Change sorting (price high→low)","ms":99,"at":"2026-10-15T13:02:44.102Z"}
+{"kind":"user-action","action":"Open product details from card","ms":89,"at":"2026-10-15T13:02:44.191Z"}
+{"kind":"user-action","action":"Switch variant","ms":252,"at":"2026-10-15T13:02:44.443Z"}
+{"kind":"user-action","action":"Change product type (strip → wallpaper)","ms":71,"at":"2026-10-15T13:02:44.826Z"}
+{"kind":"user-action","action":"Apply colour filter","ms":63,"at":"2026-10-15T13:02:44.889Z"}
+{"kind":"user-action","action":"Apply price filter (max 1000, Enter)","ms":55,"at":"2026-10-15T13:02:44.962Z"}
+{"kind":"user-action","action":"Clear all filters","ms":59,"at":"2026-10-15T13:02:45.021Z"}
+{"kind":"user-action","action":"Change sorting (price high→low)","ms":98,"at":"2026-10-15T13:02:45.120Z"}
+{"kind":"user-action","action":"Open product details from card","ms":89,"at":"2026-10-15T13:02:45.209Z"}
+{"kind":"user-action","action":"Switch variant","ms":282,"at":"2026-10-15T13:02:45.491Z"}
+{"kind":"user-action","action":"Change product type (strip → wallpaper)","ms":82,"at":"2026-10-15T13:02:45.894Z"}
+{"kind":"user-action","action":"Apply colour filter","ms":71,"at":"2026-10-15T13:02:45.965Z"}
+{"kind":"user-action","action":"Apply price filter (max 1000, Enter)","ms":55,"at":"2026-10-15T13:02:46.036Z"}
+{"kind":"user-action","action":"Clear all filters","ms":69,"at":"2026-10-15T13:02:46.105Z"}
+{"kind":"user-action","action":"Change sorting (price high→low)","ms":99,"at":"2026-10-15T13:02:46.204Z"}
+{"kind":"user-action","action":"Open product details from card","ms":84,"at":"2026-10-15T13:02:46.288Z"}
+{"kind":"user-action","action":"Switch variant","ms":126,"at":"2026-10-15T13:02:46.414Z"}
+{"kind":"user-action","action":"Change product type (strip → wallpaper)","ms":205,"at":"2026-10-15T13:02:46.855Z"}
+{"kind":"user-action","action":"Apply colour filter","ms":95,"at":"2026-10-15T13:02:46.950Z"}
+{"kind":"user-action","action":"Apply price filter (max 1000, Enter)","ms":51,"at":"2026-10-15T13:02:47.016Z"}
+{"kind":"user-action","action":"Clear all filters","ms":100,"at":"2026-10-15T13:02:47.116Z"}
+{"kind":"user-action","action":"Change sorting (price high→low)","ms":87,"at":"2026-10-15T13:02:47.203Z"}
+{"kind":"user-action","action":"Open product details from card","ms":92,"at":"2026-10-15T13:02:47.295Z"}
+{"kind":"user-action","action":"Switch variant","ms":79,"at":"2026-10-15T13:02:47.374Z"}

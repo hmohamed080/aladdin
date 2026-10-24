@@ -75,7 +75,7 @@ function token(sub) {
 
 function sql(statement) {
   return execFileSync("docker",
-    ["exec", "-i", "supabase_db_aladdin", "psql", "-U", "postgres", "-d", "postgres",
+    ["exec", "-i", process.env.DB_CONTAINER ?? "supabase_db_aladdin", "psql", "-U", "postgres", "-d", "postgres",
      "-tAX", "-v", "ON_ERROR_STOP=1", "-c", statement], { encoding: "utf8" }).trim();
 }
 

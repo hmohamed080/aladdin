@@ -50,7 +50,9 @@ export const ASSET_POLICY: Readonly<Record<AssetNamespace, NamespacePolicy>> = {
   /**
    * Work samples. Images only: there is no video pipeline, no transcoding and no
    * player in this product, and adding the type here would be storing something
-   * nothing can play. 5 MiB is one 12 MP phone photo with room to spare.
+   * nothing can play. 5 MiB is the ceiling of the PREPARED upload: the browser
+   * fits every photo under it (`lib/media/resize-image.ts`), so a picked photo is
+   * never refused for its own size.
    */
   portfolio: {
     bucket: "professional-portfolio",
@@ -59,8 +61,9 @@ export const ASSET_POLICY: Readonly<Record<AssetNamespace, NamespacePolicy>> = {
   },
   /**
    * Evidence. PDF is what a certificate actually arrives as, and 10 MiB covers a
-   * scan of several pages. Images are kept because plenty of people photograph
-   * the certificate rather than scan it.
+   * scan of several pages: for a PDF it is a real limit (documents are not
+   * re-encoded). Images are kept because plenty of people photograph the
+   * certificate rather than scan it; for them 10 MiB is the prepared ceiling.
    */
   certificate: {
     bucket: "professional-certificates",
@@ -84,6 +87,7 @@ export type AssetErrorCode =
   | "assets.errors.invalidPath"
   | "assets.errors.notAllowed"
   | "assets.errors.uploadFailed"
+  | "assets.errors.prepareFailed"
   | "assets.errors.gone";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -162,7 +166,7 @@ export function validateAssetFile(
 ): AssetValidation {
   const policy = ASSET_POLICY[namespace];
   if (!policy.types.includes(file.type)) return { ok: false, code: "assets.errors.unsupportedType" };
-  if (file.size <= 0) return { ok: false, code: "assets.errors.empty" };
+  if (!Number.isSafeInteger(file.size) || file.size <= 0) return { ok: false, code: "assets.errors.empty" };
   if (file.size > policy.maxBytes) return { ok: false, code: "assets.errors.tooLarge" };
   return { ok: true };
 }
@@ -215,7 +219,3 @@ export function validateAssetContent(
   if (!bytesMatchType(head, file.type)) return { ok: false, code: "assets.errors.contentMismatch" };
   return { ok: true };
 }
-
-/** How long a read URL lives. Long enough to render a page, short enough that a
- * copied URL is not a lasting handout. Minted per render, never stored. */
-export const ASSET_READ_URL_SECONDS = 300;

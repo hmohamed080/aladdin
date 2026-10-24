@@ -62,7 +62,7 @@ const BG: Record<Series, string> = {
  * chain because the next tone added should cost one line, not another branch.
  */
 const BAR_BG = {
-  accent: "bg-accent-solid",
+  accent: "bg-accent-solid ring-1 ring-accent-edge",
   iris: "bg-iris-solid",
   lapis: "bg-lapis",
 } as const;

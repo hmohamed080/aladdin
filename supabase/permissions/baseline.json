@@ -1,0 +1,654 @@
+[
+  {
+    "file": "20260729000000_extensions.sql",
+    "sha256": "ebaf0dea67b623aeec68fc1d4b379a3e23946c0bcea41faec4220d8a3b407b66"
+  },
+  {
+    "file": "20260802090001_identity_core.sql",
+    "sha256": "b860efcc0c13b18c30176f534e3fd4cb21fcd8244ed23f75af3e26d74de0fb27"
+  },
+  {
+    "file": "20260802090002_organizations_tenancy.sql",
+    "sha256": "02dbe7fe6a527297ff8b12ca17c0791b47464464cdef2253e2c33f860cdf5c2a"
+  },
+  {
+    "file": "20260802090003_audit_foundation.sql",
+    "sha256": "f03d2d2ce94009d55fca9907e81a164a10475260f7d798adaaab2d285089625d"
+  },
+  {
+    "file": "20260803090001_verification_and_upgrade.sql",
+    "sha256": "6ecba1794875bee3502ad7dc7bd062b23ebb01ead346eb54dc4439e7c1dc8adf"
+  },
+  {
+    "file": "20260803090002_membership_branch_write_paths.sql",
+    "sha256": "60cdc7e93c8d28f03d0d5d76b6ed193bc5f8868227291b15dbe788261250445e"
+  },
+  {
+    "file": "20260804090001_write_path_security_hardening.sql",
+    "sha256": "59074d1d20485942c278342218c15d106b7d3eeee765f87a11be86e85c03fe99"
+  },
+  {
+    "file": "20260805090001_sales_customers_leads.sql",
+    "sha256": "13ff75c19998c5249c57e2447508cbad51ffbc37dfbb6d4186cd6c8f2b2661ed"
+  },
+  {
+    "file": "20260805090002_sales_activities_followups.sql",
+    "sha256": "bb8f5d1dfc792ad348e3b5ce3ed0a0c39bbf5dccd31a2b5a08cf2f278e4f679d"
+  },
+  {
+    "file": "20260805090003_sales_write_paths.sql",
+    "sha256": "585cb1ac11ffb772e70574be65bc80f461d77df8f3fd8a89fc398021a5c641d6"
+  },
+  {
+    "file": "20260805100000_public_directory_invoker_hardening.sql",
+    "sha256": "d1117e29f4ed8153d348d678ae5e104b870f8a2c8bb58719ad05768ed3e1a856"
+  },
+  {
+    "file": "20260805110000_sales_edit_concurrency.sql",
+    "sha256": "42abdfcbd081589e29d78299878c924dca23ec768cbde94a1862077309068882"
+  },
+  {
+    "file": "20260806090001_sales_ownership_and_realtime.sql",
+    "sha256": "7060becf88cbc6e90d89fc1bf7cefecb5da2a33460aeeee60490cf67c49a2216"
+  },
+  {
+    "file": "20260806100000_account_registration.sql",
+    "sha256": "f8c5ce45cacd317e810d0476a668697f950ed9154766157595b7d054588c104f"
+  },
+  {
+    "file": "20260808090001_shared_onboarding.sql",
+    "sha256": "bfe7285a33ac7098acb032fce91293082e1e2658707c43812ee664623d85b80f"
+  },
+  {
+    "file": "20260808100000_individual_persona_onboarding.sql",
+    "sha256": "56a3d8feb224590e2e003097c27ba2279beb1f1a2a8939b14967d6e4238bb397"
+  },
+  {
+    "file": "20260809100000_business_onboarding.sql",
+    "sha256": "110d54831a04f03f0ff2f9f08cc95ca0d3b5321abed198c8d2e231188b397c46"
+  },
+  {
+    "file": "20260810090001_catalog_rfq_quotation.sql",
+    "sha256": "aae20a850747892fe6c1adeb5b6022f7d584030e1385124e3f7b83e03788fd7b"
+  },
+  {
+    "file": "20260811090001_orders_projects.sql",
+    "sha256": "92b24a939da67f44747fed735986a8ed606ca8b916b53129c1fc5c3182d1e229"
+  },
+  {
+    "file": "20260812090001_pilot_people_ops.sql",
+    "sha256": "4c6963afc5dcf9d829f95442745390b5d23298509f895da6da4ef3c906272989"
+  },
+  {
+    "file": "20260813090001_pilot_personal_account_activation.sql",
+    "sha256": "0fe49c2fe2ed79a2d6aeb4b3a657906bcaab2829620a10f2cc986e2b2264e428"
+  },
+  {
+    "file": "20260813090002_organization_verification_apply.sql",
+    "sha256": "f2f3ae1db47631bed443bfb5fc5e06fe532cb13fcef5fe1103d6e36f26e26d7d"
+  },
+  {
+    "file": "20260814090001_account_persona_decoupling.sql",
+    "sha256": "854e6fc61ff7f5e296f93a62612913a7964e7178a8c7bad6dfd1c2a097f4e7ad"
+  },
+  {
+    "file": "20260814090002_business_creation_drafts.sql",
+    "sha256": "f117a5a55e1e376831084bf120b6bfbc2b78a1f7d5d5569e1af67c8b5c61c88c"
+  },
+  {
+    "file": "20260815090001_persona_organization_type_separation.sql",
+    "sha256": "9e9d28818639ce93f3befb51c30b955ce18f7b3abc8616c2c5c349aaac851659"
+  },
+  {
+    "file": "20260815090002_showroom_affiliation.sql",
+    "sha256": "4e8f44c5da789f185c0ac32eb8b3ab0bc50feae82cde32afd80c70cacbca4ed2"
+  },
+  {
+    "file": "20260816090001_showroom_saved_products.sql",
+    "sha256": "b8d77f34c55982e3e8282c64945a4796eae4b72eda2e701e3d8f735b85199154"
+  },
+  {
+    "file": "20260817090001_showroom_purchase_analytics.sql",
+    "sha256": "c924363641e9b808a255661f8834cf6036b24fcca05e5b2080fbbb70c958ca06"
+  },
+  {
+    "file": "20260817100000_catalog_view_invoker_hardening.sql",
+    "sha256": "4549eebf0bd6d8675a47285931318a8a5d4bd34e25166f57cb5d9ea04f2f2af4"
+  },
+  {
+    "file": "20260819090001_invitation_contact_channel.sql",
+    "sha256": "556ca01f507944f92f61288aa3b9e4b125e4bd12927559da7a6fbe092f400174"
+  },
+  {
+    "file": "20260822090001_notifications_core.sql",
+    "sha256": "3b240314eba6db952e365b95ef2f718445dfa30fdc4a81477543af0e0339d1b7"
+  },
+  {
+    "file": "20260822090002_notifications_event_wiring.sql",
+    "sha256": "f4933f144fba98705f67f63b16fa8f259172b4d2f0a18682eed36902167271f0"
+  },
+  {
+    "file": "20260823090001_chat_core.sql",
+    "sha256": "4660cca9aaad0f82ff6a7a231c6d175b7a6a4f88dfd0460844ba28ee52fa1ab4"
+  },
+  {
+    "file": "20260823090002_chat_message_notifications.sql",
+    "sha256": "9dc774722f1813f58a6ba30499ef270badfbe0ac69c3f481221e73b3eda2caec"
+  },
+  {
+    "file": "20260823090003_message_sent_no_owner_fallback.sql",
+    "sha256": "d6993dd00b2d6da2a8aa48b285179d35d4e658cd5f414023b80508f5da980798"
+  },
+  {
+    "file": "20260830090001_points_core.sql",
+    "sha256": "af51af82ba8f9f9cbed5dc1fc4fd1171a600d9bf862d4e34864f9a9e8e5b1eaa"
+  },
+  {
+    "file": "20260830090002_referral_points_wiring.sql",
+    "sha256": "b7375fbe1460394fa28cb6b91dadd25788b91a01e5b3ebc6d909da997651ec9c"
+  },
+  {
+    "file": "20260831090001_sales_affiliation_persona_hardening.sql",
+    "sha256": "45b6d4040bcfa0ce1f4c446f2e915393ad2315f0c3caf527a93d8cd2806b4738"
+  },
+  {
+    "file": "20260831090002_public_profile_professional_fields.sql",
+    "sha256": "df53c25af4f91960c66f3c211526e925bd9b610c12964ed71181b358bb2204b4"
+  },
+  {
+    "file": "20260831090003_professional_profile_edit_authority.sql",
+    "sha256": "bfd2a7e9d5adeec2f2ae9a07ddc06691fe75ea1f20fb40114b06528ab4f82d28"
+  },
+  {
+    "file": "20260831090004_professional_availability.sql",
+    "sha256": "42423a2a73fed0c96016efa1d1daf66bdacb3d78eb71bf6984b4e72d157072c8"
+  },
+  {
+    "file": "20260901090001_trade_taxonomy.sql",
+    "sha256": "cfeb69bddd31ed2892a7a756026e7d406aa4eb2226b907983e75a45319b5e80a"
+  },
+  {
+    "file": "20260902090001_jobs_domain.sql",
+    "sha256": "e6c219b85d3cc6e345ec27a6e26ba8779814bb0f70f976b1e72b29d0869d2c9f"
+  },
+  {
+    "file": "20260903090001_job_applicants_projection.sql",
+    "sha256": "7db436abb97886bde9513a4a957d9a8b3ab495d34ff240bb36ce4b9a0d8bf367"
+  },
+  {
+    "file": "20260903090002_job_trade_labels.sql",
+    "sha256": "0516a44778dc27ca3653765328cca2aba61e019e1225937bec1ed6364ec20620"
+  },
+  {
+    "file": "20260903090003_job_update_historical_trade.sql",
+    "sha256": "a5ee2393dac605632c32e62ce8baab7fa10436228390dd129e6133c5353a04bc"
+  },
+  {
+    "file": "20260904090001_my_job_applications_detail.sql",
+    "sha256": "0b807bff7ed77e5c3d60df3192746d1aef61c6902cf2f446574ad480d4aa2044"
+  },
+  {
+    "file": "20260904090002_job_application_decision_notifications.sql",
+    "sha256": "90c99f12c7b7a9fa7af39780fe732f9a351a4504ff7b57873c6a58e040a2ea02"
+  },
+  {
+    "file": "20260905090001_my_job_assignments.sql",
+    "sha256": "f70dc01ef07fc3f236e1f3e23f165274fb4e9508ecc7dc50403a2c3384aa0fa5"
+  },
+  {
+    "file": "20260905090002_job_assignment_lifecycle_notifications.sql",
+    "sha256": "63a76fb90bf61a4fb8db20bf5c39fbedba57f3b2dec61de78ee16ed56bd78126"
+  },
+  {
+    "file": "20260906090001_professional_asset_storage.sql",
+    "sha256": "61e1cea6486db04712cd68ae75f089df825fe427fadd858efde47b2cde293737"
+  },
+  {
+    "file": "20260907090001_portfolio_and_certificates.sql",
+    "sha256": "f76c5ef515bf028d523cd82bb709ca77c1d2a96cf83064550afe2128b4582f6c"
+  },
+  {
+    "file": "20260908090001_portfolio_public_read_sign_only.sql",
+    "sha256": "e7415ed3b15cdc31fba8acc461320cdb8f0ae967f9002709ad92b07752415f75"
+  },
+  {
+    "file": "20260909090001_job_reviews.sql",
+    "sha256": "372e9486091dad6f2adfe41ce3f67db4b6f2edbb8bf08457255a33e8dcae82dc"
+  },
+  {
+    "file": "20260910090001_installer_network.sql",
+    "sha256": "57703518f19f2cfc19f51ffbaf424451d0c05cf245526b0b6d23fd0087195d72"
+  },
+  {
+    "file": "20260911090001_network_referrals.sql",
+    "sha256": "74ba5d05f6daab9ab2225b74e7919aea6682af085035bbed33e92b5d9ff00223"
+  },
+  {
+    "file": "20260912090001_sales_assignable_members.sql",
+    "sha256": "420b4c2b4e9359e5fe35e2809f784dcb9606bf57675dbdf7b30f236da6003bb9"
+  },
+  {
+    "file": "20260913090001_bilingual_org_branch_names.sql",
+    "sha256": "2dc91587b7c97227b998003dc5baaa99c231c6cda98483346e97254e9857dbf9"
+  },
+  {
+    "file": "20260914090001_org_branch_i18n_write_paths.sql",
+    "sha256": "ab6b8e8a93f8bd628670bb7ebf1d67d2ee8a09e4fd7256849f1ae2821cc6c976"
+  },
+  {
+    "file": "20260915090001_dashboard_kpi_layout.sql",
+    "sha256": "572c5de48be29638d379a316980f707056d3788f6ef57aea2417a4c2c5c3efdf"
+  },
+  {
+    "file": "20260916090001_profile_localized_display_name.sql",
+    "sha256": "f6bf89b62d2930fb44404612c5efbb1dcbb93cecc02bed6edbf6e236a9096691"
+  },
+  {
+    "file": "20260917090001_organization_activity_log.sql",
+    "sha256": "15dd3afcf3b64588aef6c0ba63eb052a1385e77bcf35a4da9d146b198f29da2e"
+  },
+  {
+    "file": "20260924090001_username_identity.sql",
+    "sha256": "436f0ceb74c70c11585f42afdce3417ac09bb08e6b7fcbe49c0f629be77e1926"
+  },
+  {
+    "file": "20260924090002_canonical_phone.sql",
+    "sha256": "067cf01539c6200f2d10873e3eca02e453ddbe5d0e0c02445b650e623406731b"
+  },
+  {
+    "file": "20260924090003_audience_activities.sql",
+    "sha256": "bea2b7bf33fd2e15e1461981572d9d2a1727ddfeb3a6dcd6a523a1b9a4b39b89"
+  },
+  {
+    "file": "20260924090004_wholesaler_supplier_remap.sql",
+    "sha256": "3d54dc9d4c6b2aa9ceb9f0be2842569ea05da7198b06c744fbbb2c2ae3ce40cb"
+  },
+  {
+    "file": "20260924090005_avatars_storage.sql",
+    "sha256": "255d4c15681e98f5ec6353f521209bc5507f688ed5d526a43c7d99599a3a592e"
+  },
+  {
+    "file": "20260924090006_pending_registrations.sql",
+    "sha256": "ff00eef7368b445ff14a09d211328c17639b8439771e8c5d40a19a63c39cd85c"
+  },
+  {
+    "file": "20260924090007_registration_state_access_ready.sql",
+    "sha256": "b1ca414ec6d59bf6ded14d1dc4c37d9dc6cc85e1cbb96279b3463776cb47cb9f"
+  },
+  {
+    "file": "20260924090008_profile_completion.sql",
+    "sha256": "303825cbe89fe12c3b3ebb2a01e640e3f866758d05e4353138d2e7fa213c643a"
+  },
+  {
+    "file": "20260924090009_audit_action_allowlist.sql",
+    "sha256": "d74ab6e7885575e30f8750489db33e546be93041ba14167efcaa303b2236a60c"
+  },
+  {
+    "file": "20260924090010_profile_completion_array_append_fix.sql",
+    "sha256": "178e89c56ad3eb78480d47085aa75afec555e8262e44f56a512a185691a8559a"
+  },
+  {
+    "file": "20260924090011_registration_persona_assignment.sql",
+    "sha256": "805ea7eaa00e0b0cf0b5b5a92b54842e54333c08c9fc2483ec206d3e8bac3ef5"
+  },
+  {
+    "file": "20260924090012_lock_declared_persona.sql",
+    "sha256": "f4f4e86cda3afb908c216909ad8ba21b5076d58994192e898106ebce9c1f5f71"
+  },
+  {
+    "file": "20260924090013_coming_soon_account_types.sql",
+    "sha256": "a26060387b1d3b208d20581eecf087c03c81f198488b37ca3aca3148bff28e0f"
+  },
+  {
+    "file": "20260927090001_mask_craftsman_login_alias.sql",
+    "sha256": "ba67c30f1ca5ed75e5c0cc019d6bd256a5223f8a360e652e58a41f98d7418d65"
+  },
+  {
+    "file": "20260928090001_business_creation_entitlement.sql",
+    "sha256": "b8847562e0dde0b216743c6319f07fee21c8258ccc14fea8aad768e5ccdfbbda"
+  },
+  {
+    "file": "20260929090001_admin_network_referral_review.sql",
+    "sha256": "b2f46e3a55945bfbdc13f21bb8f59949e5e6909d36f05aedf261a396c831ef95"
+  },
+  {
+    "file": "20260929100001_admin_rbac_foundation.sql",
+    "sha256": "a976cccf5f69c4c3cc3b9e1c0313d009bafdbfd2577aff902afc4f3dafddaafb"
+  },
+  {
+    "file": "20260930090001_profile_completion_shared.sql",
+    "sha256": "59d49665164d1c7262aba6a64cdccf099c16db17fcc3b3f69e5db680a8a184d4"
+  },
+  {
+    "file": "20260930090002_admin_users_organizations_read.sql",
+    "sha256": "1781214a5e074f4072e746851429bcfb87b1cca8d30a4d3dfccf8bb74b03e039"
+  },
+  {
+    "file": "20260930100001_admin_operations_permissions.sql",
+    "sha256": "9b4784fae9d7c324797fd0efe6ab8ab90727be1e8c69c39801fed7f7c3312fc2"
+  },
+  {
+    "file": "20260930100002_account_organization_suspension.sql",
+    "sha256": "90c9fa0b7dda98982dd1abafd574551faf7a7290554cbfcfeaac47e47603d0f0"
+  },
+  {
+    "file": "20260930100003_admin_notes_follow_ups_cases.sql",
+    "sha256": "e481f6dc39d9c8f1f44a868595731c87766772e1606819612a44ea7f4ed1a69c"
+  },
+  {
+    "file": "20260930100004_organization_duplicates_entity_timeline.sql",
+    "sha256": "d2cb001362e3b5929af34ee832f25f54a748d0119088ca56bdb3bcff43dc07d1"
+  },
+  {
+    "file": "20260930100005_postgrest_hook_service_role_compatibility.sql",
+    "sha256": "cbc3d9164ce3f1e9a253074d61a4b5df16a1e18dbc4b8c58a7b0a8df7186d5e2"
+  },
+  {
+    "file": "20260930100006_admin_platform_account_preparation.sql",
+    "sha256": "2b2bc53a2a160353d020af0dba625d5292d2215e1dd65fc4a194cfd8196774a4"
+  },
+  {
+    "file": "20261006090001_saved_jobs.sql",
+    "sha256": "6b4b17cb02cb90163fd83fbc45d6a21e14fc6406277edba089c473f68e79c9e4"
+  },
+  {
+    "file": "20261006090002_saved_searches.sql",
+    "sha256": "19bef2bd9b943a0ced9bcff3fc52536a164fbf0a2bcd50c878e46318c415d6b4"
+  },
+  {
+    "file": "20261006090003_place_catalogue.sql",
+    "sha256": "1b8b25a0d183dc132dd6b9618a573e7801cefebfdd0d02072ba697d72f1a3695"
+  },
+  {
+    "file": "20261006090004_assignment_contacts.sql",
+    "sha256": "f10b6f45ce8fea7c0c2f2e763fcdf1cdb358cf166e8c96d2d7c8fb6899d34576"
+  },
+  {
+    "file": "20261006090005_job_work_contacts.sql",
+    "sha256": "b85ac5f4994acca9624398744141d08e7121b93418f75f24b644726c74709e1f"
+  },
+  {
+    "file": "20261006090006_my_work_paging.sql",
+    "sha256": "21a7ebca747c07fbd38186c41712f00fcbe89dc0f0e9f02cfa06fcc857f486f8"
+  },
+  {
+    "file": "20261007090001_trade_specialties.sql",
+    "sha256": "d8721dc791a8a9de4b742b8709c0a488346f3e6b4c37af66036bd460e0284618"
+  },
+  {
+    "file": "20261007090002_user_service_areas.sql",
+    "sha256": "a12eeb611c1ce51a38d92284ac29269d697b8d6e2a5de45754854336d89e5799"
+  },
+  {
+    "file": "20261007090003_user_availability_windows.sql",
+    "sha256": "1e9a0f7d89ac399c5053ad9d1bca4c57e01f568e2400c08ca6ae93f1ba0e3d9b"
+  },
+  {
+    "file": "20261007090004_job_canonical_location_and_specialty.sql",
+    "sha256": "664a61166a74cacfff4e3c614a1622af7cb374758c00119510e3e032677e2e12"
+  },
+  {
+    "file": "20261007090005_overall_match.sql",
+    "sha256": "b1eddea8646abd8fb6149ccecf5e1b9793d5623f6a5a1f8d459c8c3b5f5e3232"
+  },
+  {
+    "file": "20261007090006_job_opportunities_page.sql",
+    "sha256": "16a4809eca52ca3518c539daea0df253c9bb18148be7d3f1dd8ddc243e6d83bc"
+  },
+  {
+    "file": "20261007090007_jobs_published_at_integrity.sql",
+    "sha256": "e14803c892896ecf2601ffb0bdb9404a7c964a9bf44fa405c9627174295b65ac"
+  },
+  {
+    "file": "20261010090001_business_registration_type_lock.sql",
+    "sha256": "856b83f01bab67017cf302c6dc031fe457bdb76bbf30ce961bd5085cdd467fa8"
+  },
+  {
+    "file": "20261011090001_expand_egypt_place_catalogue.sql",
+    "sha256": "9ec911c281152a8ff14e2c2bd8aa0dd835398e6d919eefa572f75e8c4eebbc3d"
+  },
+  {
+    "file": "20261011090002_business_legal_name_primary_branch_location.sql",
+    "sha256": "d8df3dfebb697efb676d574bb94abbc68c15f1134779ef4db574e159a71b9b53"
+  },
+  {
+    "file": "20261011090003_referral_organization_legal_name_and_branch_location.sql",
+    "sha256": "8b1e9bb30d3eac149192337937aa0bb0474bdb542f2f8f4e07ea1e5cebaca059"
+  },
+  {
+    "file": "20261014085731_showroom_phone_password_security.sql",
+    "sha256": "bfc9661ce2414cf4a3c9300cb447b3cdf57d82c903333543969b2f1365ba510e"
+  },
+  {
+    "file": "20261014123000_showroom_business_onboarding_details.sql",
+    "sha256": "51d6a4a75144aa9a75bfb5b6564c2d6ca9ba3d06f1839f1c5956f3177ca95fc3"
+  },
+  {
+    "file": "20261014133000_showroom_optional_address_completion.sql",
+    "sha256": "cf30abd3b0b04b8be7084e743c54c61006ae2148cedbbbebb4d79d4138e67557"
+  },
+  {
+    "file": "20261014160000_showroom_activation_and_selling_address.sql",
+    "sha256": "a05e234af8531d3cea0fa87e57047d418d0ebf9ae705149952217acf8a661ca4"
+  },
+  {
+    "file": "20261014163431_showroom_business_phone_numbering_metadata.sql",
+    "sha256": "16c4ba01304ca9a9d975d0d0818d93cd3484260ac3ac6bcf60fc251f016b808e"
+  },
+  {
+    "file": "20261014163435_showroom_legacy_current_approval.sql",
+    "sha256": "259b4b4bad3d177808e4ad29ef4fb884413bf20d6a3fc113d324dfbef6116df1"
+  },
+  {
+    "file": "20261015090001_showroom_suite_kpi_layouts.sql",
+    "sha256": "2962fdb2d22b10b403b3691e3877756e2978739a29ed9199819262a23095a841"
+  },
+  {
+    "file": "20261015090002_showroom_home_metrics.sql",
+    "sha256": "4ce6d7966a2f10292f8bae96d450c397611977e88a6a0e83ef99eaf7b2209771"
+  },
+  {
+    "file": "20261015090003_showroom_home_metrics_no_purchase_requests.sql",
+    "sha256": "59b941c34c5d88938eec2504b69ece7dbf70772a36a0fcf7a8178d30e7195b73"
+  },
+  {
+    "file": "20261015090004_own_products_taxonomy_images.sql",
+    "sha256": "3f7bd5ca080bc0d502de3ae82a00b0de3956e77429334d48df8b0edc1cb96c8d"
+  },
+  {
+    "file": "20261015090005_own_products_price_colors_description.sql",
+    "sha256": "d66347971b3a18a98ca2e0d0d642716004ea371234b4b178c1cb6884d5e8c2af"
+  },
+  {
+    "file": "20261015090006_product_prices_private.sql",
+    "sha256": "43b0c198c99b3a544e40b195b653a8b7e6574b79cbcb94f61c598d74bd17769b"
+  },
+  {
+    "file": "20261015090007_catalog_view_color_items.sql",
+    "sha256": "041659eb3226e3376b880c31ccca0a6595af19312eed02624d52745fa4d432d7"
+  },
+  {
+    "file": "20261015090008_product_offers.sql",
+    "sha256": "b466ed13ce678da6d151bca873d9d6ac66443e1a09e68699699becfa68eebc35"
+  },
+  {
+    "file": "20261015090009_product_offers_details.sql",
+    "sha256": "7a8366057171815b3d54c3ee687591c5c455768e3d89d1b0dc244a0ca4b02d60"
+  },
+  {
+    "file": "20261015090010_offer_helpers_least_privilege.sql",
+    "sha256": "e98df52de2c83e72c98cc07ee736578a40d1e6e5cbd8842c3acd88314f21607c"
+  },
+  {
+    "file": "20261015090011_offers_closeout.sql",
+    "sha256": "5b4dc90a2c6ebec410b2b5247d8ec6b863947baf995c837ec8e296ad22ad201a"
+  },
+  {
+    "file": "20261015090012_my_offers_paging.sql",
+    "sha256": "191fa213e6ef47a3a95677188a0f128859ad36f793e139f67c00eabfa3687607"
+  },
+  {
+    "file": "20261015090013_product_color_codes.sql",
+    "sha256": "f189b6db83f3ae92d9cd1f31e676f4ad6eb539946cadd719b7aca5f4adc3b8ee"
+  },
+  {
+    "file": "20261015090014_saved_products_category_code.sql",
+    "sha256": "4a394aacba314c1581da27dda93e8e9c088a78abc3f9b462f514f0717bdba166"
+  },
+  {
+    "file": "20261015090015_description_250_characters.sql",
+    "sha256": "101a650c0fa953cdac54b3699d8ec610f3d46bd232649d389a0befcfd296bf8b"
+  },
+  {
+    "file": "20261015090016_contact_visibility.sql",
+    "sha256": "30894c93daf51a20546624c10db81b5841315fafab313b9f01e4ff1fb8844cb8"
+  },
+  {
+    "file": "20261015090017_network_refer_candidates.sql",
+    "sha256": "0f2d620ca6f72ba8a8e005c5d0e79492b67a647904afd6390607463f73516abc"
+  },
+  {
+    "file": "20261015090018_product_audiences_exact_only.sql",
+    "sha256": "b99e6b0e2ddb204fc7fcab9d09318da0506aa79212dc237419809674e589df0f"
+  },
+  {
+    "file": "20261015090019_product_image_grant_revalidation.sql",
+    "sha256": "6c68bde7a45b43c19fb7621fae6efc59efd155e64c3be518bdefe70c50fe8c1e"
+  },
+  {
+    "file": "20261015090020_shared_purchase_requests.sql",
+    "sha256": "ac7700af7ec921a1bb574977e3e2c2119e51590e2255a720c12d9972b30d0fcd"
+  },
+  {
+    "file": "20261015090021_purchase_request_state_hardening.sql",
+    "sha256": "df351eeddab444659ff93717ef494443fcc53d0d1b9521d6724c0e5e1178a59a"
+  },
+  {
+    "file": "20261015090022_account_taxonomy_canonical.sql",
+    "sha256": "3a5f44b69218523c9d86e60364d0fa78e5b2b10c34194fdf8c1479bb744aede0"
+  },
+  {
+    "file": "20261015090023_offer_audience_canonical.sql",
+    "sha256": "5d98fd807929c6b37b27782333c1c02c7e512522802857961876cb7115423467"
+  },
+  {
+    "file": "20261015090024_contractor_workspace_audience.sql",
+    "sha256": "50bc4d52f11d163fb18ec0b0f3fe1090b8299ef5d43b78f8cebd4affc5d1f4f4"
+  },
+  {
+    "file": "20261015090025_shared_units_of_measure.sql",
+    "sha256": "4882fd7eba336cf9f31a6d518eb9ddf432635bde648656810d7845a8184a26fd"
+  },
+  {
+    "file": "20261015090026_contractor_company_not_self_service.sql",
+    "sha256": "2e3154a47290fdbbbd6703ebada418ee0907142401e66f9ef5af06a7f0a702fc"
+  },
+  {
+    "file": "20261015090027_registerable_org_type_everywhere.sql",
+    "sha256": "fc829d2d7366bb79424f115fa8c610d4f206d8b264dd04b20eaf182e356c406e"
+  },
+  {
+    "file": "20261015090028_organization_governance.sql",
+    "sha256": "fcf9238e7ac98e44b4df5b4e99df572114254cacf4125a6f7987cf46db833d58"
+  },
+  {
+    "file": "20261015090029_verification_status_cancelled.sql",
+    "sha256": "9fe4d5f33bf7d1604fb34c5ea6d78146cf645b69d9a95920b8e43f1b623ce107"
+  },
+  {
+    "file": "20261015090030_application_lifecycle.sql",
+    "sha256": "066c1ff7055c066fda422efcea030ddfce4a832c4cca92441f2511127c408d3c"
+  },
+  {
+    "file": "20261015090031_org_soft_delete_not_client_writable.sql",
+    "sha256": "28d351884bd3a1f396c974664ad794a0e7876387204fe9c2927c44228be51b2f"
+  },
+  {
+    "file": "20261015090032_verification_types_governance.sql",
+    "sha256": "9955bc7af419f577a5df72f7c67f7e08beb376da3e1b991755f452068e3722d6"
+  },
+  {
+    "file": "20261015090033_identity_coowner_branch_governance.sql",
+    "sha256": "77525404771e9d7d422582abf91a8e52c409d51a12fcefc90e4f490da4196930"
+  },
+  {
+    "file": "20261015090034_business_creation_requires_ownership.sql",
+    "sha256": "4882f8ee375a58fee9e1e933d1b8deb16c5c0042fa1a0441eb6e3652cd536d0e"
+  },
+  {
+    "file": "20261015090035_m3_corrections.sql",
+    "sha256": "5a3a5fcb8697354bca5846ccb6b3c911fb72cd1cac02af9f2b09c717db410bb1"
+  },
+  {
+    "file": "20261015090036_publisher_verification_type.sql",
+    "sha256": "aa594cd99b4fa9b553253740550374d22980a2cc0c0605efdb6db4b467063ae5"
+  },
+  {
+    "file": "20261015090037_publisher_identity.sql",
+    "sha256": "520ab9716c75ad2006e7d762cf9f87a2d903781015f8332ad9c141114ddd3fab"
+  },
+  {
+    "file": "20261015090038_publisher_ownership.sql",
+    "sha256": "3610ed1cd32965a8a2b6acbddb1e5866e32fb2196ea0fa37fdc97da3ead5e22e"
+  },
+  {
+    "file": "20261015090039_publisher_write_paths.sql",
+    "sha256": "cedde6fa52a94b2337fd8defd19ae537e51f5134caadbd06851076bbc1bdd024"
+  },
+  {
+    "file": "20261015090040_publisher_read_paths.sql",
+    "sha256": "72c789ce5efcf04c396ad0afa3419b2690fccaf29e2f33af4ab4f9e15575d04f"
+  },
+  {
+    "file": "20261015090041_identity_state_latest_outcome.sql",
+    "sha256": "577e41bcb99f0f424582a719f11e67fbaae8f903e19aeff8b66d806ffb03e1d4"
+  },
+  {
+    "file": "20261015090042_showroom_kpi_reference_cards.sql",
+    "sha256": "c6efe44c1ef82ab8eac66c9acf423cfd82f6edc177029172a6ea842e93e1c00f"
+  },
+  {
+    "file": "20261015090043_organization_profile_image.sql",
+    "sha256": "b40fba3553fa30f11776f986d1865c337ac9db74cd2e9fdf0504ad462f040045"
+  },
+  {
+    "file": "20261015090044_organization_description_250.sql",
+    "sha256": "19fc8a69ed38794e7ac0178cf4787ac20a18ed26e5bed24b55b2adb020939134"
+  },
+  {
+    "file": "20261015090045_commerce_version_conflict_sqlstate.sql",
+    "sha256": "15fd931fbf3a26456e9c24eb27f84548de69d98674be9dec31cb6524fe2e4d7d"
+  },
+  {
+    "file": "20261015090046_description_limit_trigger_definer.sql",
+    "sha256": "3fcd3e7a2c1c8b65b1a8461c441493737070207f837f72c5b959e48aa7e715d1"
+  },
+  {
+    "file": "20261015090047_application_resubmit_keeps_submission.sql",
+    "sha256": "2e129f7243cd9ea6e37817cdcbce623822c80ce2f4405e63ec0449b12a8d81f6"
+  },
+  {
+    "file": "20261015090048_version_conflict_sqlstate_remaining.sql",
+    "sha256": "cb83d81941206c575cb53b0310ea2c0c6a0eec27bfc6214b1636db3f3cba77a2"
+  },
+  {
+    "file": "20261015090049_restore_admin_rbac_tier_on_org_verification_apply.sql",
+    "sha256": "8ea7b52550a5bc2fff263ddf09b01a2ed6a6076267d908ddad29b5576a39ce8b"
+  },
+  {
+    "file": "20261015090050_audit_actions_restore_admin_vocabulary.sql",
+    "sha256": "a89bacfb7f6f134879be8bc5a112e9da01e646339717466e7d6155e20965ef00"
+  },
+  {
+    "file": "20261015090051_registration_reconcile_main_and_application_model.sql",
+    "sha256": "cba3d9b80fc6fc25df3a9efdd283998459ad90e0816c190fafc0c599444d4af2"
+  },
+  {
+    "file": "20261015090052_org_review_administrator_only.sql",
+    "sha256": "8a8e3ddd6950bd02788852ed07f94d8396767be9e9d1fb1806343911e55bc20e"
+  },
+  {
+    "file": "20261015090053_rc2_catalog_seller_readiness_and_v2_registration.sql",
+    "sha256": "34343f7469c6eb62e7b428c7ea5fa39b71c71ca77d040d12b6d882083d64bce4"
+  }
+]

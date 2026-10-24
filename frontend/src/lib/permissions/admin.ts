@@ -39,6 +39,10 @@ export const ADMIN_PERMISSIONS = [
   "cases.read",
   "cases.create",
   "duplicates.resolve",
+  // Business verification: decides the Verified badge (Administrator by default, delegable).
+  "verification.approve",
+  // Secondary phones: lift a number's 30-day cooldown (Super Admin; granted to authorized Support through a role).
+  "phones.cooldown_override",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
@@ -102,6 +106,8 @@ export const ADMIN_ROUTE_RULES: Readonly<Record<string, AdminRequirement>> = {
   "/admin/organizations": "organizations.read",
   "/admin/review": ["users.read", "organizations.read", "referrals.read"],
   "/admin/verifications": ["users.read", "organizations.read"],
+  "/admin/business-verification": ["organizations.read", "organizations.verify", "verification.approve"],
+  "/admin/phone-cooldowns": "phones.cooldown_override",
   "/admin/points": "points.read",
   "/admin/analytics": "analytics.read",
   "/admin/audit": "audit.read",

@@ -22,7 +22,7 @@ cp backend/.env.example backend/.env
 # fill in Supabase + OpenAI values; never commit backend/.env
 ```
 
-Config is read only through `app/config.py` (Pydantic Settings). The app fails fast if a required variable is missing.
+Config is read only through `app/config.py` (Pydantic Settings). Locally nothing is required. Deployed (staging/production, derived from `VERCEL_ENV` when `APP_ENV` is unset), a missing required variable keeps the process up but closed: `/api/backend/health` answers 503 `misconfigured` with the missing names and every authenticated endpoint answers 503. Vercel variable names: [vercel-environment-variables.md](vercel-environment-variables.md).
 
 ## Run
 

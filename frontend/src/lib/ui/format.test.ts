@@ -1,12 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   EMPTY,
+  displayDayKey,
   formatCompactMoney,
   formatCompactMoneyFine,
   formatAdminDate,
   formatAdminDateTime,
   formatCount,
   formatDate,
+  formatDateShort,
   formatDateTime,
   formatIdentifier,
   formatMoney,
@@ -211,17 +213,18 @@ describe("formatCompactMoneyFine", () => {
 });
 
 describe("formatAdminDate / formatAdminDateTime (Admin date standard)", () => {
-  // Built from LOCAL fields so the assertion does not depend on the machine's timezone.
-  const iso = new Date(2026, 8, 9, 14, 5, 7).toISOString();
+  // 14:05:07 on 9 Sep 2026 in Cairo (UTC+3 under Egyptian summer time) — the display zone, whatever the machine's.
+  const iso = "2026-09-09T11:05:07Z";
 
   it("is day/month/year in English, never month-first", () => {
     expect(formatAdminDate(iso, "en")).toBe("09/09/2026");
-    expect(formatAdminDate(new Date(2026, 8, 19).toISOString(), "en")).toBe("19/09/2026");
+    expect(formatAdminDate("2026-09-18T22:00:00Z", "en")).toBe("19/09/2026");
   });
 
   it("adds a 24-hour clock with seconds: DD/MM/YYYY HH:mm:ss", () => {
     expect(formatAdminDateTime(iso, "en")).toBe("09/09/2026 14:05:07");
-    expect(formatAdminDateTime(new Date(2026, 0, 2, 3, 4, 5).toISOString(), "en")).toBe("02/01/2026 03:04:05");
+    // Winter time (UTC+2).
+    expect(formatAdminDateTime("2026-01-02T01:04:05Z", "en")).toBe("02/01/2026 03:04:05");
   });
 
   it("uses Arabic-Indic digits in Arabic and keeps the same field order", () => {
@@ -231,5 +234,45 @@ describe("formatAdminDate / formatAdminDateTime (Admin date standard)", () => {
   it("renders the empty marker for a missing or invalid date", () => {
     expect(formatAdminDateTime(null, "en")).toBe(formatAdminDate(null, "en"));
     expect(formatAdminDateTime("not a date", "en")).toBe(formatAdminDate("not a date", "en"));
+  });
+});
+
+describe("dates do not depend on the runtime's own time zone (hydration error 418)", () => {
+  // The server renders in UTC and the browser hydrates in Africa/Cairo. Any formatter that read the runtime zone
+  // printed different text on the two renders, which React reports as a hydration mismatch.
+  const original = process.env.TZ;
+  afterEach(() => {
+    process.env.TZ = original;
+  });
+
+  function render(): string[] {
+    // 22:30 UTC is already the NEXT day in Cairo — the instant that made date-only values drift too.
+    const instant = "2026-09-19T22:30:00Z";
+    return (["en", "ar"] as const).flatMap((locale) => [
+      formatDate(instant, locale),
+      formatDateShort(instant, locale),
+      formatDateTime(instant, locale),
+      formatTime(instant, locale),
+      formatAdminDate(instant, locale),
+      formatAdminDateTime(instant, locale),
+    ]);
+  }
+
+  it("prints the same text under a UTC server and a Cairo browser", () => {
+    process.env.TZ = "UTC";
+    const server = render();
+    process.env.TZ = "Africa/Cairo";
+    const browser = render();
+    process.env.TZ = "America/Los_Angeles";
+    expect(browser).toEqual(server);
+    expect(render()).toEqual(server);
+  });
+
+  it("shows Egypt wall-clock time", () => {
+    process.env.TZ = "UTC";
+    expect(formatTime("2026-09-19T22:30:00Z", "en")).toMatch(/^01:30/);
+    expect(formatDate("2026-09-19T22:30:00Z", "en")).toContain("20");
+    expect(displayDayKey(new Date("2026-09-19T22:30:00Z"))).toBe("2026-09-20");
+    expect(displayDayKey(new Date("2026-09-19T20:30:00Z"))).toBe("2026-09-19");
   });
 });

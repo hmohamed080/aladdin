@@ -1,0 +1,2 @@
+select public.media_edge_video('0e7fa000-0000-4000-8000-000000000003'::uuid, '44444444-4444-4444-8444-444444444444'::uuid,
+  '0e7fa000-0000-4000-8000-00000000005e'::uuid, null, now() + interval '1 hour');

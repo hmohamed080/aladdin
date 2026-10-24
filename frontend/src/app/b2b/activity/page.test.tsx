@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("server-only", () => ({}));
 import { render, screen } from "@testing-library/react";
 
 vi.mock("@/server/queries/page-context", () => ({ getPageContext: vi.fn() }));
@@ -17,6 +18,7 @@ function pageContext(capabilities: string[]) {
     supabase: {
       auth: {
         getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+        getClaims: vi.fn().mockResolvedValue({ data: null, error: null }),
       },
     } as never,
     org: {

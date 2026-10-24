@@ -1,5 +1,84 @@
 # Runtime State
 
+## Current continuation — 2026-10-14: Marketplace catalog launch (local only)
+
+- Branch `feat/public-marketplace-20261011` (worktree `D:/projects/aladdin-wt-public-marketplace-20261011`), local stack `aladdin-marketplace` (API 54421). Migrations through **09** applied locally only; nothing pushed/deployed.
+- Live: `/admin/marketplace`, `/admin/marketplace/media`, `/b2c/seller/imports`, server-paged `/b2c/seller/products`, real-data `/marketplace` + product page, `/marketplace/media/[imageId]` (no-store proxy).
+- Local data: Decore Store holds 795 draft products (786 from the real file + 9 QA), 0 published; `media_verification_ready=false`.
+- Details and acceptance numbers: `docs/marketplace/catalog-launch.md`.
+
+## Sync with all uploaded work — 2026-10-20 (local only)
+
+- Branch `feat/public-marketplace-20261011` contains origin/main `bd0de0a` the tips of PRs #88, #89, #91, #92, #93, #94, #95 and branches `claude/cloudflare-workers-2ibvgs` and `claude/cf-redis-2ibvgs`; base checkout is at origin/main. Local QA stack: 191 migrations applied (through `20261019170000`), Marketplace data intact. Nothing pushed.
+
+## Marketplace cart and delivery prices — 2026-10-19 (local only)
+
+- Same branch/worktree. Migration **12** `20261019090002_marketplace_delivery_and_cart.sql` applied to the local QA stack (184 migrations); clean-from-zero build + full pgTAP verified (134 files / 6,327 tests).
+- Live: `/marketplace/cart` (guest cart, quotes via the read-only `marketplace_public_cart`, checkout disabled "Coming soon"), Add to cart on `/marketplace/products/[slug]`, `/b2c/seller/areas` + `/b2c/seller/delivery` (showroom chooses where it delivers, then prices each place; pickup switch), reached from the **الماركت / Marketplace** sidebar group. Flag `NEXT_PUBLIC_MARKETPLACE_PREVIEW=true` still gates all of it.
+- Local QA data: Decore Store has 3 delivery-rate rows (test values). Not pushed, not applied to any hosted project. Details: `docs/marketplace/cart-and-delivery.md`.
+
+## Redis, video and palette (draft PRs #92, video PR, #93) — 2026-10-19
+
+- **Stack:** #88 → #89 → #91 → #92 (Redis) → video branch `claude/video-r2-2ibvgs`. Palette #93 is independent, based on `main`. Nothing merged or deployed.
+- **New migration (local only):** `20261019170000_media_videos` (renamed from 20261019150000 so it sorts after the revocation migration 20261019163000; permission contract `supabase/permissions/20261019170000.json`).
+- **Flags (all off):** `REDIS_CACHE_ENABLED=false`, `VIDEO_ENABLED=false`, Worker `VIDEO_ROUTES="off"`; R2 and edge flags unchanged.
+- **Decisions:** [ADR-0019](../decisions/ADR-0019-redis-cache-and-rate-limits.md), [ADR-0020](../decisions/ADR-0020-video-r2-hls.md) — both Proposed. FastAPI next phase: [plan](../architecture/fastapi-next-phase.md), not started.
+- **Hosted dependencies pending approval:** managed Redis, transcode host, R2 CORS and lifecycle rules, Worker video routes, the migration.
+
+## Media/backend continuation (stacked on PR #89) — 2026-10-19
+
+- **Branch** `claude/media-backend-continuation-2ibvgs`, stacked on PR #89 (`claude/r2-rc2-integration-vdrldz`) with PR #88's latest commits merged in. Not merged anywhere; no hosted change.
+- **New migrations (local only):** `20261019120000_historical_media_purge`, `20261019130000_rls_platform_check_initplan`, `20261019140000_data_api_session_revocation` (177 migration files on this branch, counting #88 and #89). Staging (`kkpkgjrweysgvhvkhzun`) still has 164, max `20261017134139`; its `pgrst.db_pre_request` hook is active (`pgrst_hooks.pre_request`).
+- **Revocation and backend config (2026-10-19, same branch):** migration `20261019163000_storage_realtime_session_revocation` (178 files) adds restrictive session-live policies to `storage.objects`, `leads` and `follow_up_tasks`. The backend derives its environment from `VERCEL_ENV`: once this branch deploys, Production `/api/backend/health` answers **503 `misconfigured`** until `SUPABASE_URL` and `SUPABASE_ANON_KEY` are set for the backend ([names](../guides/vercel-environment-variables.md)); the web app is unaffected.
+- **Flags unchanged:** `R2_STORAGE_ENABLED=false`, `R2_PRODUCTION_WRITES_APPROVED=false`, `MEDIA_EDGE_DELIVERY_ENABLED=false`.
+- **Infrastructure facts (audited 2026-10-19):** one Vercel project `aladdin-staging` (Hobby) serves `aladdindecore.com`; DNS on Vercel nameservers; functions ran in `iad1` (this branch sets `cdg1`). FastAPI live at `/api/backend/health` only, `APP_ENV` unset. Cloudflare account has R2 buckets (`aladdin-production-db-backups`, `aladdin-r2-acceptance-20261011-private/-public`), no Workers, no Hyperdrive. Supabase staging Storage: avatars 144 objects / 8.4 MB, portfolio 163 / 259.6 MB (to be purged), certificates 4 / 7.9 MB (kept).
+- Decision: [ADR-0018 Revision 2](../decisions/ADR-0018-r2-edge-media-delivery.md#revision-2--2026-10-19-full-media-architecture).
+
+## R2 media storage and edge delivery (PR #89) — 2026-10-18
+
+- **Branch and PR.** The R2 work is on draft **PR #89** (`claude/r2-rc2-integration-vdrldz`, head `26edd40`), which is open and **not merged**. It includes PR #88. The local snapshot branch `local/r2-rc2-snapshot` has the same head, 29 commits ahead of the local `origin/main` ref (`9d9a1b6`). On `main`, media is still served from Supabase Storage.
+- **Decision.** [ADR-0018](../decisions/ADR-0018-r2-edge-media-delivery.md) is **Proposed** and needs owner approval. It refines [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md).
+- **Flags (code defaults).** `MEDIA_EDGE_DELIVERY_ENABLED=false`, so edge delivery is off and every image URL goes to the app proxy (`/api/media/<ns>`, `/p/media/<itemId>`). `R2_STORAGE_ENABLED=false` and `R2_PRODUCTION_WRITES_APPROVED=false`. `MEDIA_EDGE_PUBLIC_ENABLED` defaults to `true`; it only has an effect once edge delivery is on.
+- **In the code on PR #89:**
+  - the Worker `edge/media-worker/` (`/m` private with a ticket, `/c` conditional public);
+  - ticket issuance in `frontend/src/server/storage/edge-ticket.ts`;
+  - 320/768/1600 WebP variants and pre-upload resizing;
+  - the migration tooling `scripts/media-storage.mjs` and the usage report `scripts/usage-report.mjs`;
+  - local JWT verification for session reads ([auth-session-reads.md](../frontend/auth-session-reads.md));
+  - migrations `20261018100000`–`20261018100003` and `20261019100000_media_edge_authorization.sql`.
+  This is 173 migration files in total.
+- **Hosted steps: none done.** Each needs owner approval:
+  - the Worker login role `media_edge_worker` (member of `media_edge`);
+  - Hyperdrive with query caching disabled;
+  - the private R2 bucket and its `pending/` lifecycle rule;
+  - the Cloudflare zone and media hostname (decision D4);
+  - Workers Paid (D5);
+  - the `TICKET_KEYS` Worker secret;
+  - the Vercel env vars `MEDIA_EDGE_ORIGIN`, `MEDIA_EDGE_TICKET_KID`, `MEDIA_EDGE_TICKET_SECRET`, `MEDIA_EDGE_DELIVERY_ENABLED` and `R2_*`.
+  Steps: [`edge/media-worker/README.md`](../../edge/media-worker/README.md).
+- **Hosted database.** The media migrations have **not** run on any hosted project. Staging (`kkpkgjrweysgvhvkhzun`) had 164 migrations up to `20261017134139` when audited on 2026-10-18. PR #88, `20261018090000/1`, `20261018100000`–`100003` and `20261019100000` are all pending there. No media has been copied to R2.
+- **Supabase egress.** About **0.29 GB is left of the 5 GB** Free quota this cycle (4.71 GB used, owner-reported 2026-10-18). The full bulk copy needs about 0.273 GB, so only an avatar and certificate rehearsal (about 16 MB) fits before the cycle resets or the plan is upgraded to Pro. Going over the quota returns HTTP 402 on every API call. Runbook: [media-monitoring.md](media-monitoring.md).
+- **Security item to check.** On the local stack, `PUBLIC` has `USAGE` on schema `net` and `EXECUTE` on some pg_net functions (`net.http_delete(...)`, `net.worker_restart()` and helpers), so `anon` can call them. The hosted projects have not been checked. Check them and revoke these grants from `PUBLIC` in a separate reviewed change, before the Worker login role is created.
+- **Validation.** Not re-run in the 2026-10-18 docs session. To check: `pnpm --filter @aladdin/media-worker test` and `typecheck` for the Worker. pgTAP `99_media_edge_authorization_test.sql` tests that the next request is denied after delete, unpublish, delisting, suspension, ban and sign-out.
+
+## Showroom V2 and Admin follow-ups (PR #88) — 2026-10-18
+
+- Same branch and PR as business verification below. Adds: Admin Users "User Type" column/filter (`admin_users_directory`, migration `20261018090000`); Admin Staff search/empty copy; Offers and My Offers re-enabled; unverified secondary phone reservations with password receipts and a Support cooldown override (`20261018090001`, `/admin/phone-cooldowns`, permission `phones.cooldown_override`, Super Admin only by default).
+- None of `20261017160000`, `20261017160001`, `20261018090000`, `20261018090001` is applied to any hosted project. Owner approval required.
+- R2 RC2 worktree (device, uncommitted) was snapshotted and merged onto main + this PR in a separate local branch (not pushed). R2 migrations renamed to `20261018100000`–`100003` so they sort after main's newest; exact permission contracts added for every intervening migration.
+- Validation: real local Supabase stack (supabase/postgres 17): pgTAP 123 files / 5,447 checks pass, exact permission gate passes, concurrency scripts pass. Browser E2E not yet run.
+
+## Business verification (Verified badge) — 2026-10-17
+
+- Branch `claude/showroom-v2-admin-verification-vdrldz` (draft PR) from `main` @ `9d9a1b6`. Adds `/showroom/verification`, `/admin/business-verification` and `/admin/business-verification/[id]`, and the document stream `/business-verification/file/<org>/<file>`.
+- Migrations `20261017160000` and `20261017160001` are NOT applied to any hosted project. They must be applied in that order, after any migration already on the target, and only with the owner's approval. New private bucket `business-verification-documents`, new permission `verification.approve`.
+- `organizations.is_verified` still means "approved/active" for every gate; `organizations.business_verified_at` drives the Verified badge. No backfill: existing organizations show no badge until a business verification is approved (Decision B). `verification.approve` does not approve applications.
+- Validation: typecheck, lint, Vitest, build and pgTAP (local shim) passed; browser journeys not run here.
+## 2026-10-17 — Approved local RC2 R2 integration
+
+The owner authorized a dedicated integration branch based on exact RC2 main8bde19c4 and163 migrations. Original R2 worktree is preserved. Scope includes forward-only schema/permission reconciliation, actual-byte receipts, mixed providers and private application delivery for existing personal media plus RC2 product images and organization logos; preserve every current tenant/audience/org.manage/ordering rule. No hosted resource, cleanup, deployment, push or merge is authorized. Both R2 flagsfalse. Architecture: [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md). Integration in progress; acceptance results must be recorded before completion.
+
+
 ## Terms of Service published — 2026-10-18
 
 - `/legal/terms` now publishes the real Terms of Service (EN/AR, public, contact `info@aladdindecore.com`), replacing the placeholder; the `LegalPending` component is removed. All three legal pages are live content. [Details](../frontend/legal-pages.md).
@@ -359,7 +438,7 @@ Always reflects the current live engineering state of the project. Overwrite eac
 - **Frontend implementation:** `frontend/src/styles/tokens.css` (primitives + light/dark semantics + motion + z-index), `frontend/tailwind.config.ts` (semantic/brand colors, type roles, spacing, radii, shadows, motion, z-index, canonical `tablet`/`desktop`/`wide` screens), `frontend/src/app/globals.css` (base + `prefers-reduced-motion`), `frontend/src/app/layout.tsx` (four self-hosted fonts).
 - **The workspace shell is canonical as of 2026-08-26.** `--shell` (#24384D, an architectural blue) is the sidebar's material; `--workspace-mesh*` + `--workspace-pool-*` are the light cool-mineral atmosphere the page is composed on. Two materials, deliberately different lightness, with the atmosphere's seam pool carrying the SIDEBAR's own hue — that one token is what makes the two read as one transition. `UI-UX/UI_UX_SYSTEM_GUIDE.md` § *Workspace Shell & Surface Language* is the policy record.
 - **Removed as superseded:** the `--frame*` family and the `--body-veil*` alpha ramp (nothing paints that plane any more), the `frame` Tailwind colour group, the three dead `--navy` *surface* entries (`--navy-air`/`--navy-edge` survive as tint sources only, never surfaces), and the `data-shell-palette="ink"` A/B proposal — **the shell palette is settled and neither candidate won.**
-- **`design/tokens/colors.json` has KNOWN PRE-EXISTING DRIFT** (older than this session, now recorded in a `knownDrift` block in the file): it still names Basalt as the dark canvas/surface ramp, while the implementation moved the dark ground to the neutral Carbon ramp several passes ago. The shell/workspace family added on 2026-08-26 IS current; the dark ramp entries are not. For the dark theme, `frontend/src/styles/tokens.css` is ahead of the canonical file. Reconciling it is its own task.
+- **`design/tokens/colors.json` is reconciled (2026-10-19, v2.0.0)**: it, the `DESIGN.md` frontmatter and `frontend/src/styles/tokens.css` all carry the approved four-colour palette mapping (Navy/Sand/Cream/Terracotta roots, status tones, derived steps, Aperture names as aliases). The earlier Basalt/Carbon dark-ramp drift no longer applies.
 - **Defect fixed in an earlier session:** dark-theme `--primary` referenced an undefined `--lime` → corrected to `--on-dark`.
 - **Components implemented:** none yet — inventory entries are `Proposed`/`Draft`. Icon library (Lucide) decided but not installed. PDF/Arabic font strategy is an open item.
 

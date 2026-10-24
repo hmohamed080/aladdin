@@ -257,7 +257,7 @@ export function OfferBuilder({
                         data-testid="offer-picker-item"
                         className={cn("flex w-full min-w-0 items-center gap-3 rounded-sm p-2 text-start transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", on && "bg-accent-solid/10")}
                       >
-                        <span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-sm border", on ? "border-transparent bg-accent-solid text-on-accent" : "border-strong bg-surface")}>{on ? <CheckIcon size={12} /> : null}</span>
+                        <span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-sm border", on ? "border-accent-edge bg-accent-solid text-on-accent" : "border-strong bg-surface")}>{on ? <CheckIcon size={12} /> : null}</span>
                         <span className="w-10 shrink-0"><ProductMedia src={p.imageUrl} alt="" aspect="aspect-square" /></span>
                         <span className="flex min-w-0 flex-1 flex-col">
                           <span className="truncate text-body font-medium text-fg" dir="auto">{p.name}</span>
@@ -355,7 +355,7 @@ export function OfferBuilder({
                       on ? "border-accent bg-accent-solid/10 text-accent" : "border-strong bg-surface text-fg hover:bg-surface-2",
                     )}
                   >
-                    <span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-sm border", on ? "border-transparent bg-accent-solid text-on-accent" : "border-strong bg-surface")}>{on ? <CheckIcon size={12} /> : null}</span>
+                    <span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-sm border", on ? "border-accent-edge bg-accent-solid text-on-accent" : "border-strong bg-surface")}>{on ? <CheckIcon size={12} /> : null}</span>
                     <span className="min-w-0 truncate">{t(`showroomOffers.audienceGroup.${id}`)}</span>
                   </button>
                 </li>
@@ -437,7 +437,7 @@ export function OfferBuilder({
               { key: "audience", done: groups.length > 0 },
             ].map(({ key, done }) => (
               <li key={key} className={cn("flex items-center gap-2", done ? "text-fg" : "text-fg-muted")} data-done={done ? "true" : "false"}>
-                <span aria-hidden="true" className={cn("grid h-4 w-4 shrink-0 place-items-center rounded-full border", done ? "border-transparent bg-accent-solid text-on-accent" : "border-strong")}>{done ? <CheckIcon size={10} /> : null}</span>
+                <span aria-hidden="true" className={cn("grid h-4 w-4 shrink-0 place-items-center rounded-full border", done ? "border-accent-edge bg-accent-solid text-on-accent" : "border-strong")}>{done ? <CheckIcon size={10} /> : null}</span>
                 {t(`showroomOffers.builder.complete.${key}`)}
               </li>
             ))}
@@ -452,7 +452,7 @@ export function OfferBuilder({
           <ul className="flex flex-col gap-1.5 text-label text-fg-secondary">
             {["tip1", "tip2", "tip3", "tip4"].map((k) => (
               <li key={k} className="flex items-start gap-2">
-                <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-solid" />
+                <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-solid ring-1 ring-accent-edge" />
                 {t(`showroomOffers.builder.${k}`)}
               </li>
             ))}

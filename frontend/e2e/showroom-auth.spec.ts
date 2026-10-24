@@ -187,7 +187,7 @@ test("real per-account throttle stops repeated credential attempts", async ({ pa
     await page.locator('#password').fill("wrong-password");
     for (let i = 0; i < 11; i++) {
         await page.locator('#password').fill("wrong-password");
-        const completed = page.waitForResponse(response => response.url().endsWith("/showroom/sign-in") && response.request().method() === "POST");
+        const completed = page.waitForResponse(response => response.url().endsWith("/sign-in") && response.request().method() === "POST");
         await page.getByRole("button", { name: "تسجيل الدخول", exact: false }).click();
         // RSC can keep a response stream open after the action result is applied.
         // Assert the HTTP response, settled form and cleared password instead.
@@ -204,7 +204,7 @@ test("real per-account throttle stops repeated credential attempts", async ({ pa
     expect(attempts).toBe("11");
 });
 test("transport cap rejects direct oversized requests", async ({ request }) => {
-    const oversized = await request.post("/showroom/sign-in", { data: "x".repeat(70000), headers: { "content-type": "application/x-www-form-urlencoded" } });
+    const oversized = await request.post("/sign-in", { data: "x".repeat(70000), headers: { "content-type": "application/x-www-form-urlencoded" } });
     expect(oversized.status()).toBe(413);
 });
 

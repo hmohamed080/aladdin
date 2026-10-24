@@ -227,6 +227,6 @@ export async function signOut(): Promise<void> {
   } = await supabase.auth.getUser();
   await supabase.auth.signOut();
   // Registration source selects an entry page only; it never grants authority.
-  const phoneEntry = user?.app_metadata?.registration_source === "temporary_showroom_password_flow" ? "/showroom/sign-in" : "/installer/sign-in";
+  const phoneEntry = user?.app_metadata?.registration_source === "temporary_showroom_password_flow" ? "/sign-in" : "/installer/sign-in";
   redirect(isCraftsmanLoginAlias(user?.email) ? phoneEntry : "/auth/sign-in");
 }

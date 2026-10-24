@@ -27,6 +27,27 @@ export const IDENTITIES = {
 
 const MAILPIT = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
 
+/**
+ * Offline sandboxes only (E2E_STUB_TURNSTILE=1): challenges.cloudflare.com is unreachable there, so the
+ * REAL widget never loads and never mints a token. This serves a stand-in `window.turnstile` that hands
+ * the widget a dummy token, the same stub pr88-admin-showroom and installer-phone-auth use. Sign In
+ * forwards the token to the local GoTrue, which has [auth.captcha] OFF; flows the APP verifies with
+ * Siteverify (Create Account, Forgot Password) still need the real network and still fail closed.
+ * Unset (the default), nothing is stubbed.
+ */
+const TURNSTILE_STUB =
+  'window.turnstile={render:function(el,o){setTimeout(function(){o.callback("XXXX.DUMMY.TOKEN.XXXX")},0);return "local-test"},remove:function(){},reset:function(){}};';
+const stubbedContexts = new WeakSet<object>();
+export async function stubTurnstileWhenOffline(page: Page): Promise<void> {
+  if (process.env.E2E_STUB_TURNSTILE !== "1") return;
+  const context = page.context();
+  if (stubbedContexts.has(context)) return;
+  stubbedContexts.add(context);
+  await context.route("https://challenges.cloudflare.com/turnstile/v0/api.js*", (route) =>
+    route.fulfill({ contentType: "application/javascript", body: TURNSTILE_STUB }),
+  );
+}
+
 type MailpitMessage = { ID: string; To: Array<{ Address: string }> };
 
 async function messagesFor(request: APIRequestContext, email: string): Promise<MailpitMessage[]> {
@@ -97,6 +118,7 @@ export async function signIn(
   expectedLanding: RegExp = /\/b2b(\/|$)/,
   password: string = E2E_PASSWORD,
 ): Promise<void> {
+  await stubTurnstileWhenOffline(page);
   await page.goto("/auth/sign-in");
   await page.getByLabel(/^email address$|^البريد الإلكتروني$/i).fill(email);
   // Anchored: the "Show password" toggle is labelled too.
@@ -181,6 +203,7 @@ export async function registerWithPassword(
     landing = /\/(home|b2b)(\/|$|\?)/,
   }: { email: string; username: string; displayName?: string; accountType?: RegExp; landing?: RegExp },
 ): Promise<void> {
+  await stubTurnstileWhenOffline(page);
   await page.goto("/auth/sign-up");
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill(displayName);
   await page.getByLabel(/^email address$|^البريد الإلكتروني$/i).fill(email);

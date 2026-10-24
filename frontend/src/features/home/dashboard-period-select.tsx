@@ -243,7 +243,7 @@ export function DashboardPeriodSelect({
                 disabled={!isValidCustomRange(customFrom, customTo)}
                 data-testid="dashboard-period-custom-apply"
                 className={cn(
-                  "mt-1.5 w-full rounded-sm bg-accent-solid px-2.5 py-1.5 text-label font-medium text-on-accent",
+                  "mt-1.5 w-full rounded-sm bg-accent-solid ring-1 ring-accent-edge px-2.5 py-1.5 text-label font-medium text-on-accent",
                   "transition-colors hover:opacity-90 disabled:pointer-events-none disabled:opacity-50",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface",
                 )}

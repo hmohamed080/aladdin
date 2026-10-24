@@ -9,6 +9,14 @@
 `professional_asset_storage_api_test.mjs` (59) ·
 `public_media_exposure_test.mjs` (53)
 
+> **R2 provider (PR #89, unmerged).** On the R2 branch, §7 (read URLs), §7.1 (the anon
+> Storage policy as the public door) and §11 (no metadata table) are superseded for
+> both buckets. A provider registry now exists, reads go through the application or
+> an edge Worker, and bytes may live in Cloudflare R2. See **§14**,
+> [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md) and
+> [ADR-0018](../decisions/ADR-0018-r2-edge-media-delivery.md) (Proposed). On `main`,
+> this document is still accurate as written.
+
 > **Increment 11 superseded one thing here.** Increment 10 gave both buckets the
 > same owner-prefixed key. Portfolio needed to be readable by a signed-out
 > stranger, and that turned out to be incompatible with putting the owner's id in
@@ -510,3 +518,73 @@ is the absence that already exists.
 | `frontend/src/server/actions/error-mapping.ts` | `mapAssetError` |
 | `supabase/tests/47_professional_asset_storage_test.sql` | policies, key contract, absences, downgrade |
 | `supabase/tests/professional_asset_storage_api_test.mjs` | MIME, size, overwrite, signed URLs, delete |
+| `supabase/migrations/20261018100000_rc2_verified_media_storage.sql`–`20261018100003_*` | R2 branch: provider registry, receipts, migration ledger, restrictive caller-read policy (§14) |
+| `supabase/migrations/20261019100000_media_edge_authorization.sql` | R2 branch: edge Worker authority functions, `media_edge` role, `variants` column (§14) |
+| `frontend/src/server/storage/{media,delivery,edge-ticket,r2-provider}.ts` | R2 branch: provider-aware resolve, the `no-store` proxy, Worker tickets, R2 writes and variants |
+| `edge/media-worker/` | R2 branch: the `media-edge` Worker ([README](../../edge/media-worker/README.md)) |
+
+---
+
+## 14. R2 provider and edge delivery (PR #89, not merged)
+
+**Status:** code on draft PR #89. Edge delivery is off (`MEDIA_EDGE_DELIVERY_ENABLED=false`) and R2 writes are off (`R2_STORAGE_ENABLED=false`). No hosted migration, bucket or Worker exists yet. Decisions: [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md) (provider integration, Accepted for local implementation) and [ADR-0018](../decisions/ADR-0018-r2-edge-media-delivery.md) (R2 primary store and edge delivery, Proposed).
+
+What stays the same:
+- S1–S4 (§12.1).
+- The bucket list and limits (§1).
+- The key contracts (§2): certificates `<owner>/<uuid>.<ext>`, portfolio opaque `<uuid>.<ext>`.
+- The persona gate (§4).
+- Immutable keys (§9).
+- `/p/media/<portfolioItemId>` as the public contract, served `no-store`, with withdrawal on the next request.
+
+What changes:
+
+| Topic | On `main` (sections above) | On the R2 branch |
+|---|---|---|
+| Where bytes live | Supabase buckets `professional-portfolio`, `professional-certificates` (and `avatars`) | Per object, recorded in `media_storage_locations.provider`: `supabase` (legacy) or `r2` (a private bucket with no public access and no `r2.dev`). R2 keys are `<ns>/<key>`; uploads land in `pending/<ns>/<key>` first. |
+| Metadata registry (§11) | None | `media_storage_locations` records owner, organization, content type, size, sha256, `verified_at`, `cleaned_at` and `variants`. The provider never changes after reservation. Owners can read their own rows (RLS). |
+| Pending → ready | The caller finalizes | Needs a backend verification receipt (`media_storage_attest`, bytes checked, under 10 minutes old). A caller cannot attest for itself. |
+| Caller reads (§7) | `createAssetReadUrl` mints a 300 s Supabase signed URL for the browser | `createAssetReadUrl` returns an application URL (`/api/media/<ns>?key=…`), or a Worker URL with a ticket when edge delivery is on. The browser never receives a provider URL. The restrictive policy `revocable_media_backend_reads` refuses every caller `SELECT` on the five revocable buckets, so direct signing or download by `anon` or `authenticated` fails. |
+| Public door (§7.1) | The anon `SELECT` policy `professional_portfolio_select_published` lets the route sign as the caller | The same publication rule (`is_published_portfolio_object` via `public_portfolio_media_key`) decides, but the route reads with server-only Storage authority after `media_storage_resolve` passes. The restrictive policy overrides the anon `SELECT` for callers. |
+| Delivery | `/p/media` streams the bytes | `delivery.ts` resolves before and after the fetch, caps the stream at the namespace limit and sends `no-store`, `nosniff` and `CSP: sandbox`. With edge delivery on, R2 rows are served by the Worker instead: private `/m/<ns>/<variant>?t=<ticket>` (ticket of at most 120 s plus `media_edge_authorize`), and published portfolio and listed avatars at `/c/<ns>/<id>/<variant>` (`media_edge_public`). Both run in Postgres on every request. |
+| Image sizes | Originals only | The browser caps the long edge before upload (2560 px photos, 3200 px certificate images; PDFs untouched). Verified R2 originals get WebP `thumb` 320, `card` 768 and `full` 1600 px at `v/<ns>/<key>/<variant>.webp`. They are recorded in `variants` and deleted with the original. |
+| Delete (§8) | Caller deletes through the Storage API | The resolver decides, then a server-side delete runs through the provider. Supabase sources of migrated rows are kept for at least 30 days for rollback (`scripts/media-storage.mjs`). |
+
+**Business-verification documents are not covered here and do not change.** They keep their own Supabase bucket and policies (PR #88).
+
+Tests on the branch:
+- `78_verified_media_storage_test.sql`, `79_media_maintenance_test.sql`, `88_revocable_media_delivery_test.sql`, `96_rc2_private_provider_media_test.sql` and `99_media_edge_authorization_test.sql`;
+- the Worker tests in `edge/media-worker/test/`;
+- the HTTP harness `professional_asset_storage_api_test.mjs`, updated to this contract in `5b2e813`: 67 pass, 0 fail, recorded on the branch, not re-run here.
+
+## 15. Historical portfolio photos and avatars are deleted, not migrated (2026-10-19)
+
+Owner decision (ADR-0018 Revision 2): Supabase-hosted portfolio photos and avatars created before a cutoff are permanently deleted; nothing is copied to R2 and no placeholder replaces them. Users see an empty portfolio or the initials avatar and upload again (to R2 once `R2_STORAGE_ENABLED=true`).
+
+- Migration `20261019120000_historical_media_purge.sql`: journal table `media_historical_purge_journal` and four service-role-only functions (`inventory`, `retire`, `storage_removed`, `finalize`). Retire hides published items and unlinks `profiles.avatar_media_id` in one transaction; metadata rows (`portfolio_items`, `avatar_uploads`, `media_storage_locations` with provider `supabase`) are deleted only after the database confirms the object is gone from `storage.objects`.
+- Scope is closed: buckets `professional-portfolio` and `avatars` only, rows older than the cutoff, never a verified R2 object. Certificates (`professional-certificates`), business-verification documents, product and organization images are never selected.
+- Job: `cd backend && uv run python -m app.workers.historical_media_purge --cutoff <ISO>` (dry run), then `--execute --confirm-project <ref>`. Production runs need owner approval and come after R2 writes are on.
+- Tests: `supabase/tests/100_historical_media_purge_test.sql`, `backend/tests/test_historical_media_purge.py`.
+
+
+## 16. Image originals are never refused for size; derivatives have ceilings (2026-10-19)
+
+Owner rule: no product-level file-size or dimension cap on the photo a person picks. The browser always prepares the upload before any byte is sent (`frontend/src/lib/media/resize-image.ts`), and the existing server caps stay unchanged in SQL and in `server/storage`. They are now the ceiling of the **prepared derivative**, which the browser guarantees to meet:
+
+| Namespace | Derivative ceiling (unchanged server cap) | Long edge | How the browser meets it |
+|---|---|---|---|
+| Avatar | 3 MiB | 512 px crop | `encodeCanvasWithin` (quality steps) |
+| Organization image | 3 MiB | 640 px crop | `encodeCanvasWithin` |
+| Portfolio | 5 MiB | 2560 px | `resizeImageForUpload` profile `portfolio` |
+| Product | 5 MiB | 2560 px | profile `product` |
+| Purchase-request reference | 5 MiB | 2560 px | profile `request` (no browser upload UI yet) |
+| Certificate image | 10 MiB | 3200 px | profile `certificate` |
+
+Preparation runs when the original is over the byte ceiling, over the long edge, or over 25 MP. Very large sources (over 24 MP) are decoded at the target size with `createImageBitmap(..., { resizeWidth, resizeHeight, resizeQuality: "high", imageOrientation: "from-image" })`; an engine that resizes before rotating is detected and asked again with the box swapped, and an engine that rejects the options falls back to a full decode. The result is fitted by stepping quality (0.85, 0.75, 0.65, 0.55) and then the long edge (x 0.8 per step, not below 1280 px). Transparency is kept (WebP, or PNG when the pixels really have alpha and WebP encoding is unavailable). When a device cannot decode, draw or fit the photo, the upload stops before anything is created and the person sees *"This photo could not be prepared on this device. Try a smaller copy."* The server is never asked to refuse an oversized original, so nothing large reaches Vercel or Supabase, and the server keeps reading only small, bounded files.
+
+Remaining technical limits, stated rather than imposed silently:
+
+- **Server decode limit, 25 MP** (sharp `limitInputPixels` in `content-validation.mjs` and `public-image-variants.ts`) with at most two concurrent decodes per instance. It applies to the derivative only; the largest derivative is 3200 x 3200 = 10.24 MP, and `fitWithin` also clamps to 25 MP.
+- **Browser canvas and decode limits.** Older iPhones cap canvas area (about 16.7 MP) and memory; a source the device cannot decode even at reduced size gets the message above. Derivatives stay at or under 3200 px on the long edge, inside every current canvas limit.
+- **Supabase Free global file limit, 50 MB**, on the rollback path (`R2_STORAGE_ENABLED=false`). Derivatives are at most 10 MiB, so images never reach it.
+- **Documents are not images.** Certificate PDFs and business-verification documents (PDF or image) keep their 10 MiB limit, checked before upload; they are not re-encoded.

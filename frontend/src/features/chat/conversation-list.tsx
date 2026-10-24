@@ -59,7 +59,7 @@ export function ConversationList({
                   nothing (WCAG 1.4.1). The gutter keeps its width when read so
                   rows never shift sideways. */}
               <span className="mt-1.5 flex w-2 shrink-0 justify-center" aria-hidden="true">
-                {item.unread ? <span className="h-2 w-2 rounded-pill bg-accent-solid" /> : null}
+                {item.unread ? <span className="h-2 w-2 rounded-pill bg-accent-solid ring-1 ring-accent-edge" /> : null}
               </span>
 
               <span className="flex min-w-0 flex-col gap-0.5">

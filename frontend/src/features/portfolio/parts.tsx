@@ -119,7 +119,8 @@ export function AssetFileField({
         className="block w-full rounded-md border bg-surface px-3 py-2 text-body text-fg file:me-3 file:rounded-sm file:border-0 file:bg-surface-2 file:px-3 file:py-1 file:text-label file:text-fg-secondary"
       />
       <p className="text-label text-fg-muted">
-        {t("assets.form.limits", {
+        {/* Photos are never refused for size (they are prepared to fit); only a certificate PDF has a ceiling to state. */}
+        {t(policy.types.includes("application/pdf") ? "assets.form.limitsDocuments" : "assets.form.limitsPhotos", {
           types: policy.types.map((m) => (m.split("/")[1] ?? m).toUpperCase()).join(" · "),
           mb: megabytes,
         })}

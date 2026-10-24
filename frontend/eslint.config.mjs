@@ -1,6 +1,5 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript";
 import {
   HEX,
   ARBITRARY_COLOR,
@@ -9,21 +8,34 @@ import {
   FOUNDATION_FILES,
 } from "./eslint/ui-foundation-guard.mjs";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({ baseDirectory: __dirname });
-
 // The guard's regexes and allow-lists live in ./eslint/ui-foundation-guard.mjs
 // — a dependency-free module so `src/lint/foundation-guard.test.ts` can
-// import it directly without also triggering this file's `compat.extends(...)`,
-// which resolves Next's real ESLint config chain as a side effect of module
-// load and has no place running inside a Vitest process.
+// import it directly without also loading this file's Next.js ESLint configs,
+// which resolve Next's real ESLint plugin chain as a side effect of module
+// load and have no place running inside a Vitest process.
 
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  // eslint-config-next 16 ships native flat configs (the FlatCompat bridge no longer loads them).
+  ...nextCoreWebVitals,
+  ...nextTypescript,
   {
-    ignores: [".next/**", "node_modules/**", "next-env.d.ts"],
+    ignores: [".next/**", "node_modules/**", "next-env.d.ts", ".open-next/**", ".wrangler/**", "cloudflare/worker.ts"],
+  },
+  {
+    // Next.js 16 upgrade: eslint-config-next 16 turns on eslint-plugin-react-hooks v7's
+    // React Compiler rules as errors. They did not exist before the upgrade and flag ~50
+    // existing call sites (mostly setState inside an effect). They stay visible as
+    // warnings until those components are refactored one by one; do not add new hits.
+    name: "aladdin/next16-react-compiler-rules",
+    rules: {
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/purity": "warn",
+      "react-hooks/immutability": "warn",
+      "react-hooks/error-boundaries": "warn",
+      "react-hooks/static-components": "warn",
+      "react-hooks/globals": "warn",
+    },
   },
   {
     name: "aladdin/ui-foundation",

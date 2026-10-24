@@ -7,6 +7,19 @@
 create extension if not exists pgtap;
 
 begin;
+
+-- Synthetic verifier evidence for existing metadata/lifecycle tests only.
+-- The missing-object and forged-receipt security regression is covered by 78.
+create function pg_temp.attest_owned_fixture() returns void language sql security definer set search_path='' as $$
+  insert into public.media_storage_locations(namespace,object_key,owner_user_id,provider,content_type,size_bytes,sha256,verified_at)
+  select ns,key,owner,'supabase',mime,100,repeat('a',64),now() from (
+    select 'portfolio' ns,object_key key,owner_user_id owner,content_type mime from public.portfolio_items where state='pending'
+    union all select 'certificate',object_path,owner_user_id,content_type from public.professional_certificates where state='pending'
+    union all select 'avatar',object_key,owner_user_id,content_type from public.avatar_uploads where state='pending'
+  ) f where owner=(select auth.uid())
+  on conflict(namespace,object_key) do nothing;
+$$;
+
 select plan(51);
 
 -- ---------------------------------------------------------------------------
@@ -102,10 +115,11 @@ select ok(app.can_upload_avatar_object(current_setting('test.key1')), 'the owner
 
 set local request.jwt.claims = '{"sub":"59000000-0000-4000-8000-00000000000b","role":"authenticated"}';
 select ok(not app.can_upload_avatar_object(current_setting('test.key1')), 'another account may NOT upload to it');
-select throws_ok(format($$ select public.avatar_confirm_upload(%L) $$, current_setting('test.key1')), 'P0002', null,
+select throws_ok(format($$ select public.avatar_confirm_upload(%L) $$, current_setting('test.key1')), '42501', null,
   'nor confirm it');
 
 set local request.jwt.claims = '{"sub":"59000000-0000-4000-8000-00000000000a","role":"authenticated"}';
+select pg_temp.attest_owned_fixture();
 select is(public.avatar_confirm_upload(current_setting('test.key1')), null, 'the first confirm has no previous avatar to clean up');
 select ok(not app.can_upload_avatar_object(current_setting('test.key1')), 'once ready, the key can no longer be uploaded over');
 select ok(app.is_current_avatar_object(current_setting('test.key1')), 'and it is the current avatar');
@@ -113,6 +127,7 @@ select is((public.my_profile_completion() ->> 'percent')::int, 100, 'consumer wi
 select is(jsonb_array_length(public.my_profile_completion() -> 'missing'), 0, 'with nothing missing');
 
 select set_config('test.key2', public.avatar_request_upload('image/png'), true);
+select pg_temp.attest_owned_fixture();
 select is(public.avatar_confirm_upload(current_setting('test.key2')), current_setting('test.key1'),
   'a replacement returns the previous key for cleanup');
 reset role;

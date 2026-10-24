@@ -1,0 +1,10 @@
+﻿الكود,اسم المنتج,name,السعر,الكمية,attr:color
+AUD-IMP-1-1,ورق اختبار استيراد ١,Audit import 1,٦٥٠,5,beige
+AUD-IMP-1-2,ورق اختبار استيراد ١,Audit import 1,650,3,white
+AUD IMP:2,ورق اختبار استيراد ٢,Audit import 2,"1,250",2,pink
+AUD-IMP-3,ورق اختبار سعر صفر,Audit zero price,0,1,green
+AUD-IMP-4,ورق اختبار سعر خطأ,Audit bad price,abc,1,green
+AUD-IMP-5,ورق اختبار كمية خطأ,Audit bad qty,400,x,green
+AUD-IMP-6,ورق اختبار ٦,Audit import 6,500,4,cream
+AUD-IMP-6,ورق اختبار ٦ مكرر,Audit import 6 dup,500,4,cream
+AUD-IMP-7,ورق اختبار ٧,Audit import 7,٨٠٠,٧,dark_brown

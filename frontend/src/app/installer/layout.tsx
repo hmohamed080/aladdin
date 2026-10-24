@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 
 /**
  * Installer/technician phone + password entry points — the approved,

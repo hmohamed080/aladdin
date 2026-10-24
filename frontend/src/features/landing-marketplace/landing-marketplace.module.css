@@ -1,0 +1,83 @@
+/* Aladdin Marketplace landing section. Scoped to this module; uses only the
+   landing's own palette tokens (--lumen = the brand gold already used by the
+   landing CTA, --shell-deep = brand navy). No new colours, fonts or shadows. */
+.section { padding-block: 16px 40px; }
+.srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+.header { display: grid; justify-items: center; gap: 8px; text-align: center; margin-block-end: 18px; }
+.eyebrow { margin: 0; font-size: .8125rem; line-height: 1.4; letter-spacing: .06em; color: var(--stone); }
+.heading { margin: 0; font-family: var(--font-archivo), var(--font-readex), sans-serif; font-size: 2rem; font-weight: 700; line-height: 1.25; color: var(--shell-deep); text-wrap: balance; }
+.section[dir="rtl"] .heading { font-family: var(--font-reem-kufi), var(--font-readex), sans-serif; }
+.accent { color: var(--lumen-deep); }
+.description { max-width: 640px; margin: 0; font-size: 1rem; line-height: 1.6; color: var(--stone); }
+.previewChip { margin: 0; padding: 2px 12px; border: 1px dashed var(--quartz-line-strong); border-radius: 999px; font-size: .75rem; line-height: 1.6; color: var(--stone); background: var(--quartz-raised); }
+
+.tabs { display: flex; gap: 12px; justify-content: safe center; overflow-x: auto; padding-block: 4px 8px; margin-block-end: 16px; scrollbar-width: thin; scroll-snap-type: x proximity; }
+.tab { display: inline-flex; flex: none; align-items: center; gap: 8px; min-height: 44px; padding: 6px 16px; border: 1px solid var(--quartz-line); border-radius: 10px; background: var(--quartz-raised); color: var(--ink); font-size: .9375rem; font-weight: 600; line-height: 1.3; cursor: pointer; scroll-snap-align: center; transition: background-color .15s ease, border-color .15s ease; }
+.tab svg { flex: none; color: var(--stone); }
+.tab:hover { border-color: var(--lumen); }
+.tab:focus-visible, .addToCart:focus-visible, .more:focus-visible { outline: 2px solid var(--shell-deep); outline-offset: 3px; }
+.tabActive { background: var(--lumen); border-color: var(--lumen); color: var(--on-accent); box-shadow: 0 0 0 1px var(--accent-edge); }
+.tabActive svg { color: inherit; }
+
+.grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; padding: 0; margin: 0; list-style: none; }
+.gridItem { display: flex; min-width: 0; }
+
+.card { display: flex; flex-direction: column; width: 100%; border: 1px solid var(--quartz-line); border-radius: 12px; background: var(--quartz-raised); overflow: hidden; transition: border-color .15s ease; }
+.card:hover, .card:focus-within { border-color: var(--lumen); }
+.media { position: relative; aspect-ratio: 4 / 3; background: var(--sand); overflow: hidden; }
+.image { object-fit: cover; transform: scale(1.04); } /* trims the supplied photos' baked-in white rounded corners */
+.flashStack { position: absolute; inset-block-start: 10px; inset-inline-start: 10px; display: grid; gap: 6px; justify-items: start; }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; line-height: 1.5; }
+.badgeFlash { background: var(--shell-deep); color: var(--limestone); }
+.badgeSpecial { position: absolute; inset-block-start: 10px; inset-inline-start: 10px; background: var(--lumen); color: var(--on-accent); box-shadow: 0 0 0 1px var(--accent-edge); }
+.timer { display: flex; gap: 6px; }
+.timerCell { display: grid; justify-items: center; min-width: 38px; padding: 2px 4px 3px; border-radius: 6px; background: var(--lumen); color: var(--on-accent); box-shadow: 0 0 0 1px var(--accent-edge); }
+.timerCell strong { font-size: .9375rem; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.timerCell small { font-size: .625rem; line-height: 1.2; }
+
+.body { display: flex; flex: 1; flex-direction: column; gap: 4px; padding: 10px 12px 12px; }
+.title { margin: 0; font-size: .9375rem; font-weight: 700; line-height: 1.35; color: var(--ink); }
+.desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; margin: 0; font-size: .75rem; line-height: 1.4; color: var(--stone); }
+.priceRow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-block-start: 4px; }
+.price { font-size: 1.125rem; font-weight: 700; line-height: 1.3; color: var(--lumen-deep); }
+.was { font-size: .875rem; color: var(--stone); text-decoration: line-through; }
+.unitNote { margin: 0; font-size: .75rem; line-height: 1.4; color: var(--stone); }
+.addToCart { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 40px; margin-block-start: auto; padding: 6px 10px; border: 1px solid var(--lumen); border-radius: 8px; background: transparent; color: var(--lumen-ink); font-size: .875rem; font-weight: 600; cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+.card:hover .addToCart, .card:focus-within .addToCart, .addToCart:hover { background: var(--lumen); color: var(--on-accent); box-shadow: 0 0 0 1px var(--accent-edge); }
+.notice { margin: 0; font-size: .75rem; line-height: 1.4; color: var(--stone); text-align: center; }
+.empty { margin: 0; padding-block: 32px; text-align: center; color: var(--stone); }
+
+.moreWrap { display: grid; justify-items: center; gap: 8px; margin-block-start: 24px; }
+.more { display: inline-flex; align-items: center; gap: 14px; min-height: 48px; padding: 8px 12px 8px 24px; border: 0; border-radius: 999px; background: var(--shell-deep); color: var(--limestone); font-size: 1rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: transform .15s ease; }
+.section[dir="rtl"] .more { padding: 8px 24px 8px 12px; }
+.more:hover { transform: translateY(-1px); }
+.moreIcon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 999px; background: var(--lumen); color: var(--on-accent); box-shadow: 0 0 0 1px var(--accent-edge); }
+.section[dir="rtl"] .moreIcon svg { transform: scaleX(-1); }
+.previewNote { margin: 16px 0 0; text-align: center; font-size: .75rem; line-height: 1.5; color: var(--stone); }
+
+@media (max-width: 1279px) {
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 1023px) {
+  .heading { font-size: 1.75rem; }
+  .tabs { justify-content: flex-start; }
+}
+@media (max-width: 767px) {
+  .section { padding-block: 8px 32px; }
+  .heading { font-size: 1.375rem; }
+  .description { font-size: .875rem; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .body { padding: 10px; }
+  .title { font-size: .875rem; }
+  .desc { font-size: .75rem; }
+  .price { font-size: 1.0625rem; }
+  .tab { min-height: 44px; padding: 6px 14px; font-size: .875rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab, .card, .addToCart, .more { transition: none; }
+  .more:hover { transform: none; }
+}
+
+.addToCartOn { background: var(--shell-deep); border-color: var(--shell-deep); color: var(--limestone); }
+.addToCartOn:hover { background: color-mix(in srgb, var(--shell-deep) 88%, var(--lumen)); }

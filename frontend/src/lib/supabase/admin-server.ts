@@ -212,6 +212,32 @@ export async function deleteCraftsmanPasswordUser(userId: string): Promise<boole
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// Public Marketplace image delivery (Migration 09,
+// docs/marketplace/catalog-launch.md §Public media delivery). One more narrowly
+// scoped service-role call site: the public product pages need image bytes for
+// an ANONYMOUS visitor, and Marketplace images live in a private bucket with no
+// anonymous read policy. `marketplace_public_image_ref` is granted to
+// service_role ONLY and returns a reference only while EVERY publication
+// condition holds (media flag on, image verified + byte-validated, product
+// published, seller enabled, type/category active, variant active). The bytes
+// are proxied by `/marketplace/media/[imageId]`; the browser never sees a
+// bucket, key, signed URL or this key.
+// ---------------------------------------------------------------------------
+
+export type PublicMarketplaceImage = { bytes: ArrayBuffer; mimeType: string; sha256: string | null };
+
+/** Returns the bytes of a currently publishable Marketplace image, or null for every other case (one answer for all refusals). */
+export async function loadPublicMarketplaceImage(imageId: string): Promise<PublicMarketplaceImage | null> {
+  const admin = getAdminClient();
+  const { data, error } = await admin.rpc("marketplace_public_image_ref", { p_image_id: imageId });
+  const ref = Array.isArray(data) ? data[0] : null;
+  if (error || !ref?.object_key || !ref.storage_bucket) return null;
+  const { data: blob, error: dlError } = await admin.storage.from(ref.storage_bucket).download(ref.object_key);
+  if (dlError || !blob) return null;
+  return { bytes: await blob.arrayBuffer(), mimeType: ref.mime_type || "application/octet-stream", sha256: ref.checksum_sha256 };
+}
+
 /** Durable shared phone-auth limiter. Only service_role can consume buckets. */
 export async function consumePhoneAuthLimit(action: "sign-in" | "sign-up", ipKey: string, phoneKey: string): Promise<boolean> {
   const { data, error } = await getAdminClient().rpc("phone_auth_consume_limit", {

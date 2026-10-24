@@ -1,0 +1,38 @@
+# TEMPLATE ONLY. Placeholders in <angle brackets> are filled by the owner during
+# the approved hosted setup (README.md). No account id, secret or connection
+# string belongs in this file; TICKET_KEYS is a Worker secret (wrangler secret put).
+name = "aladdin-media-edge"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+# postgres.js uses Node-compatible APIs over Cloudflare sockets.
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+# Option A (aladdindecore.com DNS moved to a Cloudflare Free zone): a Workers
+# Custom Domain. Option B (DNS stays on Vercel): deploy pages/ instead; see README.
+routes = [{ pattern = "media.aladdindecore.com", custom_domain = true }]
+
+[vars]
+# "on" enables a route family; any other value disables it (fails closed).
+PRIVATE_ROUTES = "on"
+PUBLIC_ROUTES = "on"
+# Keep verified bytes in the local edge cache (content-addressed by sha256).
+# Authorization still runs on every request. "off" reads R2 every time.
+EDGE_CACHE = "on"
+# Video playlists, segments and posters (/v). Off until video is approved.
+VIDEO_ROUTES = "off"
+# App origins allowed to fetch playlists and segments with hls.js (CORS).
+VIDEO_ALLOWED_ORIGINS = "https://aladdindecore.com,https://www.aladdindecore.com"
+
+# PRIVATE bucket. Never enable public access or r2.dev on it.
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "<private-media-bucket>"
+
+# Created with query caching DISABLED (see README): authorization results must never be cached.
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "<hyperdrive-config-id>"
+
+[observability]
+enabled = true

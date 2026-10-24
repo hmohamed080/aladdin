@@ -8,7 +8,9 @@ const state = vi.hoisted(() => ({
   }),
   list: vi.fn(),
   remove: vi.fn(),
+  authorize: vi.fn(), verify: vi.fn(), cleanup: vi.fn(),
 }));
+vi.mock("@/server/storage/media", () => ({ authorizeMediaUpload: state.authorize, verifyPendingMedia: state.verify, removeMedia: state.cleanup }));
 vi.mock("next/cache", () => ({ revalidatePath: state.revalidate }));
 vi.mock("next/navigation", () => ({ redirect: state.redirect }));
 vi.mock("@/lib/supabase/server", () => ({
@@ -48,6 +50,9 @@ beforeEach(() => {
   state.rpc.mockResolvedValue({ data: PRODUCT, error: null });
   state.list.mockResolvedValue({ data: [{ name: `${IMAGE}.png` }], error: null });
   state.remove.mockResolvedValue({ data: [], error: null });
+  state.authorize.mockResolvedValue({ provider: "supabase", bucket: "product-images", key: KEY, token: "synthetic" });
+  state.verify.mockResolvedValue(undefined);
+  state.cleanup.mockResolvedValue(undefined);
 });
 
 describe("price, colors and description reach the database through the one RPC path", () => {
@@ -224,7 +229,8 @@ describe("product audiences", () => {
 describe("product image actions", () => {
   it("requests an upload ticket only for an allowed image type", async () => {
     state.rpc.mockResolvedValue({ data: KEY, error: null });
-    expect(await requestProductImageUploadAction(PRODUCT, "image/png")).toEqual({ ok: true, key: KEY });
+    expect(await requestProductImageUploadAction(PRODUCT, "image/png", 100)).toMatchObject({ ok: true, key: KEY, grant: { provider: "supabase" } });
+    expect(state.authorize).toHaveBeenCalledWith(expect.anything(), "product", KEY, 100);
     expect(state.rpc).toHaveBeenCalledWith("product_image_request_upload", { p_product_id: PRODUCT, p_content_type: "image/png" });
     state.rpc.mockClear();
     expect((await requestProductImageUploadAction(PRODUCT, "application/pdf")).ok).toBe(false);
@@ -245,10 +251,10 @@ describe("product image actions", () => {
   it("confirms only after the bytes are really in Storage", async () => {
     state.rpc.mockResolvedValue({ data: IMAGE, error: null });
     expect(await confirmProductImageUploadAction(KEY)).toEqual({ ok: true, id: IMAGE });
-    expect(state.list).toHaveBeenCalledWith(`${ORG}/${PRODUCT}`, expect.objectContaining({ search: `${IMAGE}.png` }));
+    expect(state.verify).toHaveBeenCalledWith(expect.anything(), "product", KEY);
 
     state.rpc.mockClear();
-    state.list.mockResolvedValue({ data: [], error: null });
+    state.verify.mockRejectedValueOnce(Error("actual object bytes missing"));
     expect((await confirmProductImageUploadAction(KEY)).ok).toBe(false);
     expect(state.rpc).not.toHaveBeenCalled();
   });
@@ -261,13 +267,13 @@ describe("product image actions", () => {
   it("removes through the RPC and then cleans up the bytes", async () => {
     state.rpc.mockResolvedValue({ data: KEY, error: null });
     expect(await removeProductImageAction(IMAGE)).toEqual({ ok: true });
-    expect(state.remove).toHaveBeenCalledWith([KEY]);
+    expect(state.cleanup).toHaveBeenCalledWith(expect.anything(), "product", KEY);
   });
 
   it("does not touch Storage when the database refuses the removal", async () => {
     state.rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "catalog.write required" } });
     expect(await removeProductImageAction(IMAGE)).toEqual({ ok: false, code: "commerce.errors.denied" });
-    expect(state.remove).not.toHaveBeenCalled();
+    expect(state.cleanup).not.toHaveBeenCalled();
   });
 
   it("validates the ids it reorders", async () => {

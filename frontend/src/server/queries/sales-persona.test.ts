@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { claimsFrom } from "@/test/session-claims";
 
 vi.mock("server-only", () => ({}));
 
@@ -10,7 +11,7 @@ vi.mock("@/lib/supabase/server", () => ({
   getServerSupabase: vi.fn(async () => {
     let table = "";
     const builder: Record<string, unknown> = {
-      auth: { getUser },
+      auth: { getUser, getClaims: claimsFrom(getUser) },
       from(t: string) {
         table = t;
         asked.from.push(t);

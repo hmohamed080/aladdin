@@ -144,7 +144,7 @@ export function InstallerTopbarCore({
           data-testid="profile-menu-trigger"
           className="flex items-center gap-1.5 rounded-sm py-1 pe-1 ps-1 hover:bg-surface-2"
         >
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-pill bg-accent-solid text-label font-semibold text-on-accent">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-pill bg-accent-solid ring-1 ring-accent-edge text-label font-semibold text-on-accent">
             {initial}
           </span>
           <span className="hidden min-w-0 max-w-32 flex-col items-start desktop:flex">

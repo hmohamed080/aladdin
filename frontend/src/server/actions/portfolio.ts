@@ -1,5 +1,7 @@
 "use server";
 
+import { verifyPendingMedia } from "@/server/storage/media";
+import type { UploadGrant } from "@/lib/storage/provider-types";
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { mapPortfolioError } from "@/server/actions/error-mapping";
@@ -48,6 +50,7 @@ export type UploadTicket =
       /** Opaque for portfolio; the owner's own path for a certificate. */
       readonly objectPath: string;
       readonly token: string;
+      readonly grant?: UploadGrant;
     }
   | { readonly ok: false; readonly code: AssetErrorCode | string };
 
@@ -97,7 +100,7 @@ export async function startPortfolioUpload(input: {
   const row = (data as Array<{ item_id: string; object_key: string }> | null)?.[0];
   if (!row) return { ok: false, code: "states.genericRetry" };
 
-  const ticket = await createAssetUploadTicket("portfolio", row.object_key);
+  const ticket = await createAssetUploadTicket("portfolio", row.object_key, input.size);
   if (!ticket.ok) {
     // The row exists but nothing can be uploaded to it. Leaving it would show the
     // owner an unfinished card for an upload that never began, so it is removed
@@ -113,6 +116,7 @@ export async function startPortfolioUpload(input: {
     bucket: ASSET_POLICY.portfolio.bucket,
     objectPath: row.object_key,
     token: ticket.token,
+    ...(ticket.grant ? { grant: ticket.grant } : {}),
   };
 }
 
@@ -122,6 +126,14 @@ export async function startPortfolioUpload(input: {
  * finalization failed".
  */
 export async function finishPortfolioUpload(itemId: string): Promise<ActionState> {
+  const supabase = await getServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, code: "assets.errors.notAllowed" };
+  const { data: row, error: rowError } = await supabase.from("portfolio_items")
+    .select("object_key").eq("id", itemId).eq("owner_user_id", user.id).maybeSingle();
+  if (rowError || !row) return { ok: false, code: "assets.errors.gone" };
+  try { await verifyPendingMedia(supabase, "portfolio", row.object_key); }
+  catch { return { ok: false, code: "assets.errors.uploadFailed" }; }
   const { error } = await rpc("portfolio_item_finalize", { p_item_id: itemId });
   if (error) return { ok: false, code: mapPortfolioError(error) };
   refreshOwnerSurfaces("portfolio");
@@ -173,6 +185,23 @@ export async function movePortfolioItemAction(
 ): Promise<ActionState> {
   const { error } = await rpc("portfolio_item_move", {
     p_item_id: String(fd.get("itemId") ?? ""),
+    p_direction: String(fd.get("direction") ?? ""),
+  });
+  if (error) return { ok: false, code: mapPortfolioError(error) };
+  refreshOwnerSurfaces("portfolio");
+  return { ok: true };
+}
+
+/** Moves a photo or a video within the shared portfolio order (ADR-0020 Revision 2). */
+export async function movePortfolioMediaAction(
+  _prev: ActionState,
+  fd: FormData,
+): Promise<ActionState> {
+  const kind = String(fd.get("kind") ?? "");
+  if (kind !== "image" && kind !== "video") return { ok: false, code: "states.genericRetry" };
+  const { error } = await rpc("portfolio_media_move", {
+    p_kind: kind,
+    p_id: String(fd.get("id") ?? ""),
     p_direction: String(fd.get("direction") ?? ""),
   });
   if (error) return { ok: false, code: mapPortfolioError(error) };
@@ -246,7 +275,7 @@ export async function startCertificateUpload(input: {
   const row = (data as Array<{ item_id: string; object_path: string }> | null)?.[0];
   if (!row) return { ok: false, code: "states.genericRetry" };
 
-  const ticket = await createAssetUploadTicket("certificate", row.object_path);
+  const ticket = await createAssetUploadTicket("certificate", row.object_path, input.size);
   if (!ticket.ok) {
     await rpc("certificate_delete", { p_item_id: row.item_id });
     await rpc("certificate_purge", { p_item_id: row.item_id });
@@ -259,10 +288,19 @@ export async function startCertificateUpload(input: {
     bucket: ASSET_POLICY.certificate.bucket,
     objectPath: row.object_path,
     token: ticket.token,
+    ...(ticket.grant ? { grant: ticket.grant } : {}),
   };
 }
 
 export async function finishCertificateUpload(itemId: string): Promise<ActionState> {
+  const supabase = await getServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, code: "assets.errors.notAllowed" };
+  const { data: row, error: rowError } = await supabase.from("professional_certificates")
+    .select("object_path").eq("id", itemId).eq("owner_user_id", user.id).maybeSingle();
+  if (rowError || !row) return { ok: false, code: "assets.errors.gone" };
+  try { await verifyPendingMedia(supabase, "certificate", row.object_path); }
+  catch { return { ok: false, code: "assets.errors.uploadFailed" }; }
   const { error } = await rpc("certificate_finalize", { p_item_id: itemId });
   if (error) return { ok: false, code: mapPortfolioError(error) };
   refreshOwnerSurfaces("certificates");

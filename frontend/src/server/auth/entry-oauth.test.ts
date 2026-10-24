@@ -71,8 +71,8 @@ describe("completeEntryOAuth", () => {
 
   it("returns to sign-in when the provider refused or the code is missing or bad", async () => {
     database("access_ready");
-    expect((await completeEntryOAuth(client, { code: "c", kind: "showroom", next: null, providerError: "access_denied" })).path).toBe("/showroom/sign-in?error=oauth");
-    expect((await completeEntryOAuth(client, { code: null, kind: "showroom", next: null, providerError: null })).path).toBe("/showroom/sign-in?error=oauth");
+    expect((await completeEntryOAuth(client, { code: "c", kind: "showroom", next: null, providerError: "access_denied" })).path).toBe("/sign-in?error=oauth");
+    expect((await completeEntryOAuth(client, { code: null, kind: "showroom", next: null, providerError: null })).path).toBe("/sign-in?error=oauth");
     mocks.exchange.mockResolvedValue({ data: { user: null }, error: { code: "bad_code_verifier" } });
     expect((await completeEntryOAuth(client, { code: "c", kind: "installer", next: null, providerError: null })).path).toBe("/installer/sign-in?error=oauth");
     expect(mocks.rpc).not.toHaveBeenCalled();
@@ -80,7 +80,7 @@ describe("completeEntryOAuth", () => {
 
   it("refuses an identity without a confirmed email", async () => {
     database("unverified");
-    expect((await completeEntryOAuth(client, { code: "c", kind: "showroom", next: null, providerError: null })).path).toBe("/showroom/sign-in?error=oauth_email");
+    expect((await completeEntryOAuth(client, { code: "c", kind: "showroom", next: null, providerError: null })).path).toBe("/sign-in?error=oauth_email");
     expect(mocks.signOut).toHaveBeenCalled();
   });
 
@@ -93,7 +93,7 @@ describe("completeEntryOAuth", () => {
     database("consent_pending");
     const base = mocks.rpc.getMockImplementation()!;
     mocks.rpc.mockImplementation(async (name: string, args: unknown) => (name === "onboarding_select_account_type" ? { data: null, error: { code: "XX000" } } : base(name, args)));
-    expect((await completeEntryOAuth(client, { code: "c", kind: "showroom", next: null, providerError: null })).path).toBe("/showroom/sign-in?error=oauth");
+    expect((await completeEntryOAuth(client, { code: "c", kind: "showroom", next: null, providerError: null })).path).toBe("/sign-in?error=oauth");
     expect(mocks.signOut).toHaveBeenCalled();
   });
 });

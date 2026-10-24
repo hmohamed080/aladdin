@@ -63,3 +63,11 @@ First it claimed an anonymous caller could reach nothing; it found that listing,
 direct GET and HEAD were all permitted. Then it concluded that could not be
 narrowed; `storage.allow_only_operation` proved otherwise, and the public door is
 now one operation wide. Run it after any change to a storage policy.
+
+### `marketplace_image_removal_api_test.mjs`
+
+```bash
+node supabase/tests/marketplace_image_removal_api_test.mjs
+```
+
+The Marketplace image-removal lifecycle (Migration 07) over the real Storage HTTP API on the **isolated** stack (`aladdin-marketplace`, `SUPABASE_URL` default `http://127.0.0.1:54421`, `DB_CONTAINER` default `supabase_db_aladdin-marketplace`; refuses a non-local URL). Every "deleted" claim is checked three ways: the Storage answer, `storage.objects`, and a service-role GET. Self-cleaning; fails if the marketplace tables or bucket do not return to their starting counts.

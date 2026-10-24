@@ -54,6 +54,7 @@ export function Brand({
   tone = "ink",
   wordmark = true,
   variant = "emblem",
+  edition = "classic",
   className,
 }: {
   name: string;
@@ -107,8 +108,32 @@ export function Brand({
    * of composing the emblem with a manually typed name.
    */
   variant?: "emblem" | "lockup";
+  /**
+   * Which brand edition to draw. `"classic"` (default) is every existing call
+   * site. `"2026"` is the approved 2026 lockup (`aladdin-logo-2026.png`): the
+   * emblem with its own baked-in "ALADDIN" wordmark, in the four-colour palette.
+   * It is a complete lockup, so `wordmark` and `tone` do not apply — the same
+   * reasoning as `variant="lockup"`. Used by the workspace chrome while the 2026
+   * direction is previewed there (see `WorkspaceShell`).
+   */
+  edition?: "classic" | "2026";
   className?: string;
 }) {
+  if (edition === "2026") {
+    // Sized by height like the emblem; the lockup is near-square (720×773), so
+    // it needs a little more height than the bare emblem to keep the wordmark legible.
+    const lockup2026 = size === "lg" ? "h-20" : size === "sm" ? "h-12" : "h-9 tablet:h-14";
+    return (
+      <Image
+        src="/brand/aladdin-logo-2026.png"
+        alt={name}
+        width={720}
+        height={773}
+        priority
+        className={cn("w-auto shrink-0 object-contain", lockup2026, className)}
+      />
+    );
+  }
   if (variant === "lockup") {
     const lockup = size === "lg" ? "h-16" : size === "sm" ? "h-9" : "h-11 tablet:h-14";
     return (

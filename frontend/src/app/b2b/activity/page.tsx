@@ -6,6 +6,7 @@ import { normalizeActivityFilters } from "@/lib/activity";
 import { getMessages } from "@/lib/i18n/translate";
 import { organizationActivity } from "@/server/queries/activity";
 import { getPageContext } from "@/server/queries/page-context";
+import { readSessionIdentity } from "@/server/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +70,7 @@ export default async function ActivityPage({
   try {
     const [page, auth] = await Promise.all([
       organizationActivity(supabase, org.organizationId, before, filters),
-      supabase.auth.getUser(),
+      readSessionIdentity(supabase),
     ]);
 
     return (
@@ -79,7 +80,7 @@ export default async function ActivityPage({
           page={page}
           filters={filters}
           before={before}
-          currentUserId={auth.data.user?.id ?? null}
+          currentUserId={auth?.id ?? null}
           locale={locale}
         />
       </div>

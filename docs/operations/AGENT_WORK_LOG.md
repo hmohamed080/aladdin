@@ -1,3 +1,208 @@
+## 2026-10-24 — Next.js 15.5.28 → 16.4.2 (PR #99)
+
+Branch `feat/public-marketplace-20261011` (PR #99, from the `bstalent8-ux` fork). `next` and `eslint-config-next` pinned to exactly 16.4.2: it passes the 7-day `minimum-release-age` rule (published 2026-10-15); 16.4.3 (2026-10-23) does not yet. OpenNext `@opennextjs/cloudflare` 1.20.12 already declares `next >=16.4.1`. React stays 19.2.8.
+
+Changes: `eslint.config.mjs` loads `eslint-config-next/core-web-vitals` + `/typescript` as native flat configs (FlatCompat can no longer load them). eslint-config-next 16 enables eslint-plugin-react-hooks v7's React Compiler rules as errors; they flag 51 existing call sites (41 `set-state-in-effect` in 32 files, plus refs/purity/immutability/error-boundaries/static-components/globals) and are set to **warn** until those components are refactored. Audit harness (`frontend/e2e-audit`) typed instead of `any`. `src/middleware.ts` is **kept** (Next 16 deprecates it in favour of `proxy`, a warning only): `proxy` is Node-only, while the Cloudflare build needs Edge middleware.
+
+Validation: `tsc` clean; ESLint 0 errors / 61 warnings; full Vitest 348 files, 5,520 passed, 38 skipped; `next build` (Turbopack, now the default) OK in 73 s; Cloudflare path: `next build` with Edge middleware OK, OpenNext bundling then fails on Windows symlinks (EPERM, OpenNext's known Windows limit; `scripts/build-cloudflare.mjs` also cannot spawn `pnpm` on Windows) — to be verified on Linux/CI. Browser smoke on dev (Turbopack): /marketplace, /sign-in, /auth/sign-up?type=supplier render with no console errors; Docker was down, so no local Supabase data. Not run: pgTAP, Playwright E2E.
+
+Follow-up: refactor the React Compiler rule hits and switch them back to error; migrate `middleware` → `proxy` once the Cloudflare host supports Node middleware.
+
+## 2026-10-20 — Sync with everything uploaded (main + PRs #88, #89, #91, #92, #93, #94, #95 + the newest branches cloudflare-workers and cf-redis) (local only)
+
+Base `D:/projects/aladdin-landing-base-20261011` fast-forwarded to origin/main `bd0de0a` (PR #90, Terms of Service page). Branch `feat/public-marketplace-20261011`: local WIP committed first (sign-in and favicon; legal pages; Marketplace) and tagged `backup/pre-sync-20261020`, then merged in order origin/main, PR #88 (latest), the PR #94 chain (contains #89 R2 RC2, #91 media/backend, #92 Redis cache, #94 video on R2), PR #93 (four-colour brand palette) PR #95 (display time zone) and, last, the newest push `claude/cloudflare-workers-2ibvgs` (OpenNext / Cloudflare Workers scaffold on top of #94, no PR yet; Next 15.5.28) and `claude/cf-redis-2ibvgs` (Upstash REST transport for the Redis cache on Workers). Every upstream tip is an ancestor of the branch. Nothing pushed; no PR opened.
+
+Conflict decisions: legal pages keep the approved layout and use origin's published Terms text (the draft notice is gone); operations docs and `.env.example` keep both sides; header/footer keep the 2026 logo and `anchorBase` with the new image sizing; the role atlas is a transparent 50 kB webp (their webp idea on the transparent variant); `tokens.css` takes the palette PR plus the Arabic small-type block; `I18nProvider` now comes from `@/lib/i18n/provider`; to satisfy the palette PR rule, every terracotta fill in Marketplace/legal/seller code draws the navy `accent-edge` and terracotta is no longer a border colour (23 CSS rules, 3 class strings, 5 borders). Test 47: storage.objects policies 32 to 33 (restrictive `storage_objects_session_live`, 20261019163000).
+
+Database: seven new migrations (20261019100000 to 20261019170000: media edge authorization, historical media purge, RLS initplan, data API and storage/realtime session revocation, media videos) applied to the local QA stack on top of the Marketplace work (191 migrations; 824 products, Decore Store and its 3 delivery rates intact). Pre-sync dump: `D:/projects/_qa-backup-presync-20261020/presync.dump`. A stray `pgtap` extension left in `public` of the QA database by manual test runs was dropped.
+
+Validation: clean stack built from zero with all 191 migrations, full pgTAP 140 files / 6,638 tests PASS (log `D:/projects/_pgtap-clean-run-20261020.log`); `pnpm vitest run` 343 files, 5,471 passed, 38 skipped (final tree, after the Cloudflare merge); `tsc` clean; ESLint 0 errors in `src` (the untracked, uncommitted `frontend/e2e-audit/` folder of an earlier audit has 3 `no-explicit-any` errors that `eslint .` reports); `next build` OK twice (before and after the Cloudflare merge); `edge/media-worker` typecheck + 41 tests pass; browser smoke on /marketplace, /marketplace/cart, /legal/terms and / (no broken images). Not done: hosted staging data load (still on hold), push/PR, showroom login pages in a browser.
+
+## 2026-10-19 — Marketplace cart + per-showroom delivery prices by area (local only)
+
+Branch `feat/public-marketplace-20261011`. Migration `20261019090002_marketplace_delivery_and_cart.sql`: `marketplace_delivery_rates` (showroom price per governorate default or per area; no row = does not deliver; RLS member/staff SELECT, no client write), `marketplace_seller_delivery_get/_save`, `marketplace_seller_pickup_set`, and the anon-readable `marketplace_public_cart` (live catalogue resolution, availability capped at 9,999, per-showroom delivery answer, no organization ids). Frontend: real `/marketplace/cart` (flag-gated; replaces the former 404) matching `Layout/cart products.png` — products table with stepper/delete, trust strip, "you may also like" shelf, summary (products, delivery, total = products + delivery; **no VAT line** — an earlier build had 14 % and the owner asked to remove it), delivery/pickup, governorate/area, per-showroom delivery lines, checkout **disabled "Coming soon"**; Add to cart on the product page; header cart count; showroom pages `/b2c/seller/areas` (WHERE it delivers: governorates + single areas) and `/b2c/seller/delivery` (WHAT it charges at each covered place, blank = not set; plus the pickup switch), as two new items in a **الماركت / Marketplace** sidebar group (Marketplace products, المناطق, توصيل المناطق — same `marketplace.sell` gate) added to BOTH the Showroom account shell (`features/showroom-shell/navigation.ts` + `frame.tsx`, the one a showroom owner actually sees) and the older B2B workspace nav. Decisions agreed with the owner: several showrooms → each prices its own delivery and the page sums them; checkout closed. Full detail: `docs/marketplace/cart-and-delivery.md`.
+
+Validation: pgTAP `100_marketplace_delivery_and_cart_test.sql` 91/91; full suite on a **clean** stack built from zero with all 184 migrations (scratch project `aladdin-cleanrun`, since removed; log `D:/projects/_pgtap-clean-run-20261019.log`): 134 files, 6,345 tests, PASS after two count fixes forced by this migration (`95_…` seller RPCs 16→18, `93_…` A5 anon-readable functions + `marketplace_public_cart`). Frontend: `pnpm vitest run` 328 files, 4,068 passed, 24 skipped; `tsc --noEmit` clean; ESLint 0 errors (7 pre-existing warnings). Browser on QA data (Decore Store): add to cart, Cairo 80 / Nasr City 60 / Giza 120 / Alexandria not delivered, totals, quantity capped to stock, vanished product flagged, desktop + mobile. The showroom pages and the new menu group need a showroom login and were **not** opened in a browser (component + nav tests only).
+
+Storefront type strip / hero / All-products tile now read `features/marketplace/live/type-covers.ts` (static webp in `public/preview/landing/marketplace/type-*.webp`, 16 types, no database and no sample-catalogue dependency; six 0.4–0.9 MB PNG shots converted to ~30 KB webp; `hdf_flooring` reuses the SPC floor photo until an HDF photo is supplied).
+
+Local QA data touched: three delivery-rate rows for Decore Store (Cairo 80, Cairo/Nasr City 60, Giza 120, all covered and priced) inserted directly for the browser check; the table and RPCs were altered in place to the areas/prices design (migration file is the source; the clean-from-zero build confirms it). Nothing pushed or deployed; hosted Supabase untouched.
+
+Open: checkout / orders / payment (Kashier owner) and sign-in at checkout (DL-01/DL-07 say the cart itself needs sign-in and stores variant ids — built cart opens without sign-in and stores slug + SKU); delivery time estimates; header badge counts a withdrawn line; owner review of the reworded trust-strip claims.
+
+## 2026-10-20 — Redis on Cloudflare Workers: Upstash REST transport (ADR-0019 revision)
+
+Branch `claude/cf-redis-2ibvgs` (from `claude/cloudflare-workers-2ibvgs`). `withRedis` callers now use a small command interface with two transports: TCP (`@redis/client`, unchanged for Vercel/Node) and Upstash REST over `fetch` (`REDIS_REST_URL`/`REDIS_REST_TOKEN`; it wins when set). On Workers with only `REDIS_URL`, TCP is refused and Redis counts as unavailable, because in `workerd` a connection reused across requests hangs (`Cannot perform I/O on behalf of a different request`). Evidence and reasoning: ADR-0019 "Workers runtime". The usage clock now starts on first use, because the Workers clock reads 0 during module init.
+
+Validation: `vitest run src/server/cache` 38 pass (24 without `REDIS_TEST_URL`); with `REDIS_TEST_URL` against local Redis (db 0, db 5, and a password-protected instance) all pass; typecheck clean; eslint clean on the touched paths. Real `redis.ts`/`rate-limit.ts` ran in `wrangler dev` against a scratch REST shim.
+
+Not verified: real Upstash from Cloudflare's edge; the full OpenNext app build with Redis enabled.
+
+## 2026-10-19 — Landing mobile LCP under 2.5 s
+
+Branch `claude/landing-lcp-2ibvgs` (from `claude/video-r2-2ibvgs`). It fixes the one failing page in `performance-2026-10-19.md`. Header logo: `sizes="80px"`, no `priority`, lazy (it was fetched at 1920 px, 104 KB, and preloaded). Footer logo: `sizes="80px"` too. Hero image: `fetchPriority="high"` added to `priority`, and `sizes` capped at 2560 px. Mobile still selects the same 1200 w file, so it looks the same. Fonts: preload only the Latin faces of Readex, Archivo and Reem Kufi (≈ 86 KB, down from 160 KB). The Arabic faces and JetBrains Mono load on use. Arabic pages start their two Arabic faces from an inline `document.fonts.load` script in `<head>`. i18n: `context.tsx` (`useI18n`, new `I18nMessagesProvider`) no longer imports a catalog. The catalog-backed `I18nProvider` moved to `lib/i18n/provider.tsx`, and every layout import was updated. `/` and `/preview/landing` send only the `nav` namespace of the current locale. The bilingual catalog chunk (141 KB) is gone from the Landing page. `landing-messages.test.tsx` checks that the slice renders exactly like the full catalog in en and ar.
+
+Mobile median of 5, interleaved, load 1.5–2.3. Landing en: LCP 3028 → 2148 ms. Landing ar: 2824 → 2184 ms. CLS 0 on both. Transfer: 747 → 481 KB. Auth: 1312 → 1080 ms. Home: 1060 → 1076 ms (noise). Not done: AVIF (it would change encoding app-wide). The mobile hero is drawn `object-fit: cover` wider than the viewport, so a fully "correct" `sizes` would pick a much heavier file. `100vw` stays as a weight cap.
+
+## 2026-10-19 — Image uploads: no cap on originals, ceilings on derivatives
+
+Branch `claude/image-uploads-2ibvgs` (from `claude/video-r2-2ibvgs`, to be merged into it). Owner rule: a picked photo is never refused for its size. `lib/media/resize-image.ts` now always prepares the upload to the namespace's unchanged server cap (avatar/organization 3 MiB, portfolio/product/request 5 MiB, certificate image 10 MiB): header read without decoding, reduced-size decode above 24 MP with an orientation check, quality then long-edge steps, alpha kept, typed failure with a translated "could not be prepared on this device" message. Client-side source caps removed (avatar, organization, product pick, request validation, portfolio `MAX_SOURCE_FACTOR`, installer preview). Server caps, SQL and sharp's 25 MP limit unchanged. Documented in `docs/database/professional-asset-storage.md` §16, with the remaining limits (25 MP server decode on the derivative, browser canvas limits, Supabase Free 50 MB on the rollback path, documents 10 MiB).
+
+Not verified: real-browser behaviour on very large photos (unit tests mock canvas and `createImageBitmap`); purchase-request images still have no browser upload UI.
+
+## 2026-10-19 — Redis (PR #92), video on R2 + HLS (video PR), palette (PR #93)
+
+Branches: `claude/redis-cache-2ibvgs` (draft #92, base #91's branch), `claude/video-r2-2ibvgs` (stacked on #92), `claude/brand-palette-2ibvgs` (draft #93, base main). No hosted change, no paid service.
+
+Done:
+- **Redis (ADR-0019)**: optional, fail-open; reference vocabularies cached 600 s, per-user rate limits (media upload/read, video parts), Python job locks. Never authorization or bytes. Local benchmark: trades 4.48 → 0.47 ms p50, categories 3.53 → 0.39 ms.
+- **Video (ADR-0020)**: migration `20261019150000_media_videos` (pgTAP `103_*` 88 checks), browser → R2 multipart (resume, retry, progress), `backend/app/workers/video_transcode.py` (ffmpeg HLS fMP4 + poster, `--once/--loop/--purge`, `boto3` in the `video-worker` uv group), Worker `/v/` with a Postgres decision per segment, players lazy (poster only until play). Portfolio manager, public profile, product edit and catalog pages wired; all behind `VIDEO_ENABLED=false`.
+- **Isolated E2E** (`frontend/playwright.video.config.ts`, SeaweedFS as R2 stand-in, Worker handler on local HTTPS): R2 photo upload/edge retrieval/delete, rollback with R2 off, and video upload/transcode/play/seek/publish/revoke/delete/purge on desktop and mobile. It caught three bugs, fixed: origin check compared against the bind address, `video_upload_begin` needed `p_product_id` sent explicitly, and the public profile crashed because the player used the client i18n hook.
+- **Palette**: tokens remapped to #071A2D/#D8C7A6/#F2E9D8/#B96F52 with an AA contrast test; colors.json and DESIGN.md synced.
+
+Validation: Vitest 3,995 pass / 24 skipped; typecheck clean; lint 0 errors; Worker 41; backend pytest 74 (incl. real ffmpeg); pgTAP 128 files / 5,693; permission gate 626 PASS; Playwright video config 5/5 + rollback 1/1.
+
+Unfinished / needs the owner:
+- Real R2 untested from here (no network path); run `r2.live.test.ts` against the disposable acceptance buckets after approval.
+- Transcode host not chosen (paid; options in ADR-0020). R2 CORS + abort-multipart lifecycle rule, `VIDEO_ROUTES`, `VIDEO_ALLOWED_ORIGINS`, migration — all need approval.
+- Managed Redis not created (Upstash Free recommended in ADR-0019).
+- The test browser cannot decode H.264, so in-browser playback was verified with VP9 (`--test-codec`, local only); check H.264 playback in Chrome/Safari on a preview.
+
+## 2026-10-19 — Redis: Upstash readiness, fail-safe rate limits, usage monitoring (ADR-0019 Revision 2)
+
+Branch `claude/redis-cache-2ibvgs` (draft PR #92). No hosted call: Upstash is unreachable from the sandbox; everything was tested against local Redis 7.0 and a local TLS proxy.
+
+Done:
+- **Upstash-ready client** (`frontend/src/server/cache/redis.ts`): RESP2 with no client-info or maintenance handshake, so a connection costs 1 command, not 4. `MONITOR` showed `HELLO 3` plus three `CLIENT` commands before. No PING interval and no auto-reconnect (lazy reopen). One retry on a connection idle for 30 s or more. The breaker opens on a connect failure or two failed commands. Backend `app.coordination` likewise: redis-py `protocol=2`, `driver_info=None`, no health-check PING, client closed after the job; `redis>=8.1`.
+- **Fail-safe limits** (`rate-limit.ts`): a per-instance memory window when Redis is off or down, and a local block after a Redis refusal (no more commands spent). The result now carries `source` and has no `skipped` outcome; any test mock returning `{ outcome: "skipped" }` should return `allowed`.
+- **Monitoring**: command/connect counters, monthly projection, `cache.redis_budget` warnings at 50%/80% of `REDIS_MONTHLY_COMMAND_BUDGET`, and `cacheMetrics` in `/api/health`, which no longer PINGs on every probe.
+- **Caching**: re-measured with `pg_stat_statements` over 252 page loads. No new cache is justified: the costly per-page reads are entitlement or authorization. Empty vocabularies are now cached for 300 s.
+- Docs: [upstash-setup.md](../guides/upstash-setup.md), ADR-0019 Revision 2, DECISION_LOG. The guide covers the existing database `alert-bedbug-148148`, Vercel over `rediss://`, REST-only read checks from the cloud environment, a command estimate and the exhaustion risks. REST transport judged not worth adding.
+- Validation: Vitest full suite 3,965 pass / 24 skipped (with `REDIS_TEST_URL`). Four timing tests in `installer-work-production` and `public-image-variants` failed under machine load and pass alone (49/49). Cache tests 24/24 against local Redis and over a local TLS proxy (an untrusted certificate is refused); typecheck clean; lint 0 errors (7 existing warnings); backend pytest 53 pass, ruff clean; production build plus an end-to-end limiter, outage and health run on port 3304.
+
+Unfinished / needs the owner:
+- Check the existing database's plan and region, then set `REDIS_URL` in Vercel Preview, then Production (guide steps 1–4). No live Upstash check run: hosted calls are out of scope for this session.
+- `my_organization_application_slot()` costs ~13 ms locally on every B2B page and evaluates `app.application_slot` twice: a SQL fix, not done here.
+- Pay-as-you-go needs approval once traffic passes about 1,500 page views a day with images still proxied.
+
+## 2026-10-19 — Session revocation coverage and backend production configuration (PR #91)
+
+Branch `claude/media-backend-continuation-2ibvgs`. No hosted write, deploy or merge.
+
+- **Backend config:** `backend/app/config.py` derives the environment from `VERCEL_ENV` when `APP_ENV` is unset or `local` (Production → `production`, Preview → `staging`, unknown → `production`). Required when deployed: `SUPABASE_URL`, `SUPABASE_ANON_KEY` (the only values a deployed route reads); service-role key, `DATABASE_URL` and the legacy JWT secret are no longer required. A missing variable no longer raises at import: health answers 503 `misconfigured` with the names, `require_configured` makes every authenticated endpoint answer 503. Names per environment: [vercel-environment-variables.md](../guides/vercel-environment-variables.md). ADR-0009 revised, runbook superseded lines updated.
+- **Revocation audit:** real gaps were Storage API (bucket policies only; BV documents and request images are read, signed, uploaded and deleted with the caller's token) and Realtime postgres_changes (`leads`, `follow_up_tasks`; `realtime.apply_rls` checks RLS only). Fixed by migration `20261019163000` (restrictive `app.jwt_session_is_live()` policies; `authenticated` granted EXECUTE on the helper; permission contract `20261019163000.json`), pgTAP `103_*` (23), `47_*` and `102_*` updated. Already covered: PostgREST (hook), Server Actions and route handlers (every service-role use follows a caller-scoped RPC through the hook; admin-client calls follow network `getUser()`), media Worker (`media_edge_authorize`), FastAPI (`require_active_principal` → `my_account_status`).
+- **Cost:** helper 30–70 µs warm, evaluated once per statement (InitPlan, plan unchanged).
+
+Unfinished / needs the owner: set `SUPABASE_URL` and `SUPABASE_ANON_KEY` for Preview and Production; approve the migration with the others. Merging the video branch needs its `20261019150000.json` contract to include this grant (or this contract to include the video functions), whichever lands second.
+
+## 2026-10-19 — Media and backend continuation of PRs #88/#89 (stacked branch)
+
+Branch `claude/media-backend-continuation-2ibvgs`, stacked on PR #89 after merging PR #88's last three commits into it locally (conflicts only in this log and RUNTIME_STATE; HEAD side kept). `main` (`bd0de0a`, includes PR #90 legal pages) was audited and is untouched. No hosted write, deploy, merge, DNS or billing change.
+
+Done:
+- **Historical media purge** (owner: delete, do not migrate): migration `20261019120000`, pgTAP `100_*` (51), backend job `app/workers/historical_media_purge.py` (dry run default, `--confirm-project`), rehearsed locally against the real Storage API; certificates untouched.
+- **Backend integration**: the FastAPI service was a health-only scaffold with no caller. Added `app/auth` (JWKS verification, suspension and session guard) and made it the home of media jobs. `pyjwt[crypto]` declared (was transitive).
+- **Worker**: content-addressed edge byte cache after DB authorization; `media.aladdindecore.com` via Pages + CNAME (Option B) or a Cloudflare zone (Option A); local workerd E2E for Mode C and Mode P incl. revocation.
+- **Sessions**: migration `20261019140000` makes the PostgREST pre-request hook refuse signed-out, banned and deleted sessions on the next request (pgTAP `102_*`, real PostgREST check); middleware sends such sessions to Sign In; backend guard matches.
+- **Performance**: `vercel.json` `regions: ["cdg1"]` (functions were in iad1, database in Paris); RLS InitPlan for 20 platform-staff policies (migration `20261019130000`, pgTAP `101_*`; 212 ms to 0.75 ms locally, staging measured 260 ms mean); landing role atlas 1.46 MB PNG to 40 kB WebP (mobile LCP 12.5 s to 4.1–5.3 s, desktop 2.3 s to 0.9 s, page weight 2.1 MB to 0.72 MB).
+- **ADR-0018 Revision 2**, ARCHITECTURE_GUIDE, professional-asset-storage §15, backend/AGENTS.md.
+
+Validation: pgTAP 127 files / 5,604 pass after `supabase db reset` (177 migrations); permission gate 609 PASS; Vitest 3,942 pass / 24 skipped; typecheck clean; lint 0 errors (7 existing warnings); backend pytest 48, ruff clean; Worker 30 pass / 1 skipped; Playwright desktop `pr89-media` 2/2, `pr88-admin-showroom` 10/10, `sidebar-mode-sync` 3/3 (with `E2E_STUB_TURNSTILE=1`; Create Account specs cannot run here because Siteverify is unreachable).
+
+Tried and dropped: lazy per-locale message catalogs (first-load JS median 272 to 131 kB) broke the admin users type filter under E2E; not shipped. Both catalogs (~140 kB gzipped) still ship on every page; a per-locale route segment is the safer way.
+
+Unfinished / needs the owner:
+- Approvals: hosted migrations (PR #88 four + #89 six + three here), R2 activation, Worker/Pages + Hyperdrive, DNS CNAME, Workers Paid, Production purge run, merges, deploys.
+- Brand palette: only Showroom V2 and installer surfaces use #071A2D/#D8C7A6/#F2E9D8/#B96F52; landing, auth, `/b2b`, admin, home, settings use the older Aperture tokens (`src/styles/tokens.css`, 89 off-palette hex). A token-layer remap is a visible change on every page and needs design sign-off.
+- Backend Production `APP_ENV` is unset (reports `local`, fail-fast secret check skipped).
+- React #418 (intermittent route-sweep hydration error from 2026-10-01/18) not reproduced in 36 production loads here; still open.
+
+## 2026-10-18 — WP0: R2 media delivery documentation (ADR-0018 proposed)
+
+Branch `local/wp-docs` from `local/r2-rc2-snapshot` (same head as draft PR #89, `26edd40`). Docs only: no code, migration, push or hosted change.
+
+Covers the R2 work on PR #89:
+- the private R2 store;
+- the ticketed `media-edge` Worker, with Postgres authorization on every request through Hyperdrive (caching off);
+- WebP variants (320/768/1600);
+- migration tooling with an egress budget;
+- local JWT session reads;
+- the app proxy fallback while `MEDIA_EDGE_DELIVERY_ENABLED=false`.
+
+Sources: `/mnt/project-files/showroom-admin/r2-delivery-architecture.md` (plan WP0–WP10), `/mnt/project-files/showroom-admin/supabase-usage-audit.md`, `edge/media-worker/README.md`, [media-monitoring.md](media-monitoring.md), [auth-session-reads.md](../frontend/auth-session-reads.md), migrations `20261018100000`–`100003` and `20261019100000`, and the branch git log.
+
+Written:
+- [ADR-0018](../decisions/ADR-0018-r2-edge-media-delivery.md) (**Proposed**, needs owner approval), plus its row in [DECISION_LOG](../decisions/DECISION_LOG.md);
+- a Media Storage & Delivery section in [ARCHITECTURE_GUIDE](../architecture/ARCHITECTURE_GUIDE.md);
+- the current state in [RUNTIME_STATE](RUNTIME_STATE.md);
+- an R2 section in [professional-asset-storage.md](../database/professional-asset-storage.md);
+- a correction in [auth-session-reads.md](../frontend/auth-session-reads.md): `/api/media` calls Auth `getUser` on every private read again since `26edd40`.
+
+`PRODUCT_DIRECTION_GUIDE.md` is unchanged. It says nothing about media privacy that the R2 work contradicts.
+
+Validation: `python3 scripts/check_doc_links.py` reports 0 broken internal links.
+
+Unfinished:
+- **Variant backfill.** `scripts/media-variants.mjs` is not written yet. It must generate thumb/card/full for migrated media from the R2 copies, so that it spends no Supabase egress.
+- **Revocation canary.** A scheduled staging probe: upload or publish, fetch 200, delete or unpublish, then expect 404 on the next request through both the app route and the Worker. It also needs a canary account and CI secrets. Planned as a canary mode in `supabase/tests/public_media_exposure_test.mjs`.
+- **Hosted steps.** None done: the Worker login role, Hyperdrive, the private bucket, the zone and domain, Workers Paid, the ticket-key secrets, the Vercel env vars, and running the media migrations on hosted projects. Before the Worker role exists, check pg_net `EXECUTE` for `PUBLIC`/`anon` on the hosted projects and revoke it.
+- **Owner decisions:**
+  - **D1 (closed 2026-10-19):** the owner chose immediate revocation, so Mode C stays and Mode B (WP10) is dropped.
+  - **D3:** egress timing for the bulk copy (wait for the cycle reset or upgrade to Pro; about 0.29 GB is left).
+  - **D2:** should product images and organization logos become public? The recommendation is that both stay private.
+  - **D4:** the media domain.
+  - **D5:** Workers Paid ($5/month).
+  - Lowering hosted `jwt_expiry` (recommended 1800 s).
+  - Re-enabling the Production `db_pre_request` hook (`20260930100005`).
+
+## 2026-10-18 — WP8: fewer Supabase Auth requests per page (local JWT verification)
+
+Branch `local/wp-auth` from PR #89 head `ee96b48`. Middleware now reads the session with `auth.getClaims()` (local ES256 verification, same cookie refresh) instead of `auth.getUser()`; `/admin/**` keeps `getUser()`. The `my_account_status` suspension redirect is unchanged except that router prefetches skip it. The matcher skips `/api/media/*`, `/p/media/*` and more static extensions. `server/auth/session.ts` adds `getSessionIdentity()` / `readSessionIdentity(client)` (`cache()`d claims) and makes `getCurrentUser()` a `cache()`d network `getUser()`. Read-only loaders use the claims helper; admin and account-settings pages share one `getCurrentUser()`; Server Actions and auth flows are untouched. Estimated Auth `/user` calls: `/home` 8 → 0, `/b2b/*` 3 → 0, `/admin/users` 3 → 2, private image 2 → 0. Security argument and residual window (revoked, not suspended, session until `exp` ≤ 3600 s on non-admin pages): [auth-session-reads.md](../frontend/auth-session-reads.md).
+
+Validation: `pnpm typecheck` clean; `pnpm lint` 0 errors (7 pre-existing warnings); `pnpm test` 307 files, 3,889 passed, 24 skipped (baseline 3,860); `pnpm build` passed. No hosted change, no DB reset.
+
+Open: owner decision on lowering hosted `jwt_expiry` to 1800 s; re-enable the Production `db_pre_request` hook (`20260930100005`); move `server/queries/profile-identity.ts` `loadMyIdentity` to `getCurrentUser()` (media-owned file).
+
+## 2026-10-18 — Admin users/staff, Offers, secondary phone, R2 integration rehearsal
+
+Branch `claude/showroom-v2-admin-verification-vdrldz` (PR #88). `20261018090000_admin_users_account_type.sql`: `app.user_account_type` derives one of the nine public accounts (effective persona, else earliest owned organization type, else the onboarding choice) or `none`; new `admin_users_directory` filters on it, `admin_users_list` stays as a delegating wrapper. `/admin/users` shows a User Type column and filter; `/admin/staff` search and empty copy fixed. Offers and My Offers routes re-enabled (all audiences are feed-ready).
+
+`20261018090001_secondary_phone_reservations.sql`: one unverified secondary phone per account (E.164, global uniqueness under a per-number advisory lock, 7 days + one 7-day renewal, no auto-renew), active reservation blocks primary claims by other accounts (profiles trigger), expiry/cancel starts a 30-day cooldown that blocks secondary claims only, conversion to primary starts none. Current-password receipt (single-use, 60 s, bound to user/operation/number; 5 wrong in 15 min = 15-min lock). Support override `admin_phone_cooldown_override` needs `phones.cooldown_override` and a reason, written to an immutable table and audit. pgTAP 98 (69 checks) and a 19-way race script.
+
+R2: device worktree `.worktrees/r2-rc2-integration` snapshotted untouched (D:\projects\_claude-r2-snapshot-20261018) and merged locally with main + PR #88; contracts regenerated from the real Postgres 17 inventory, all 551 reviewed R2 entries unchanged. Real local Supabase: pgTAP 5,447 pass, permission gate pass, Vitest 3,860 pass. The legacy HTTP storage harness (not in CI) already fails 19 checks on main and 29 with R2, the extra 10 by design (finalize needs backend attestation, direct reads denied). Not pushed: needs the owner's choice of branch.
+
+Open: owner decision on Supabase Pro vs egress code fixes (see `/mnt/project-files/showroom-admin/supabase-usage-audit.md`); R2 push/branch; browser E2E; hosted migrations.
+
+## 2026-10-17 — Business verification (the Verified badge), separate from organization approval
+
+Branch `claude/showroom-v2-admin-verification-vdrldz` from `main` @ `9d9a1b6`. Migrations `20261017160000_business_verification_type.sql` (enum value `business`) and `20261017160001_business_verification.sql`: private bucket `business-verification-documents`, document/submission tables (RLS on, no table grants), owner RPCs (`business_verification_document_request_upload/confirm/remove`, `business_verification_submit`, `my_business_verification`) and Admin RPCs (`business_verification_queue/detail/start_review/request_info/approve/reject`), every decision with a mandatory reason, audited and notified. New permission `verification.approve` (super_admin + administrator; delegable to custom roles); `organizations.business_verified_at` is the badge source; `is_verified` keeps its activation meaning for every gate, and only display outputs were rewritten. No backfill (owner Decision B, 2026-10-18): existing organizations lose the badge until their documents are approved; a check constraint pairs `business_verified_at` with an approved `business_verification_id`. `verification.approve` does not grant organization activation: the application review keeps its Administrator gate.
+
+Frontend: `/showroom/verification` (owner upload, drafts, submit/resubmit, status, reasons, history), `/admin/business-verification` (queue, filters, pagination) and `/[id]` (evidence by round, previous requests, Admin Notes, start / request information / approve / reject). Documents stream through `/business-verification/file/<org>/<file>` as the caller (storage policy decides). Settings and the Admin organization detail now show the badge from `business_verified_at`. Classic `/admin/verifications` excludes the business type.
+
+Validation: typecheck clean; lint 0 errors; Vitest 294 files, all passing (one i18n whitelist added for file-format names); production build passed; pgTAP on a local Postgres 16 with a Supabase shim: 109/117 files, the same 8 shim-only failures as untouched `main`; new file 96 (72 checks) passes. Not run: browser journeys and screenshots (no Supabase stack here: Docker image pulls are rate-limited), E2E. No hosted write, deploy or merge.
+
+Open: owner decisions on the badge backfill, Offers/My Offers re-enable, invitation revoke/hashing, purchase-request UI, Points/staff-invite Preview buttons; the 30-day phone cooldown was not found in code or docs; hosted GoTrue CAPTCHA gap stays with the Auth owner.
+
+## 2026-10-19 — Palette contrast made strict (no exceptions)
+
+Branch `claude/brand-palette-2ibvgs`. The four palette hex values are unchanged. `palette-contrast.test.ts` now checks every text, border, focus, series, badge and status-ink pair on every ground (canvas, surface, surface-2, surface-hover, workspace, field, shell). It runs in six palettes: global light/dark, plus the `.installer-surface` scope (installer **and showroom**) and its flat variant, each light/dark. Nothing is skipped and there is no per-theme carve-out. Source scans fail any `bg-accent-solid` without the navy edge (`--accent-edge`, `ring-1 ring-accent-edge`), any `text/border/stroke-accent-solid`, and any CSS terracotta fill without the edge. New tokens: `--accent-edge`, `--on-status`, `--shell-accent`. Derived mixes were retuned and installer-scope inks were moved to derived terracotta steps. Review screenshots: `/mnt/project-files/showroom-admin/palette-screens-v2/`.
+
+Open: the WebKit range track gradient (installer budget slider) is not edge-bounded; the native checkbox `accent-color` is not measured.
+
+## 2026-10-19 — Approved palette enforced site-wide (token remap)
+
+Branch `claude/brand-palette-2ibvgs` from `main` @ `bd0de0a`. `frontend/src/styles/tokens.css` now derives every surface/ink/border/accent/focus token from Navy `#071A2D`, Sand `#D8C7A6`, Cream `#F2E9D8` and Terracotta `#B96F52` in light and dark; legacy Aperture primitive names are aliases of the palette; status tones are the only other hues (`--status-*`). Hard-coded white/black/rgba in components and CSS modules moved onto the palette. New `src/styles/palette-contrast.test.ts` measures every text/background pair (AA) in both themes. Mapping recorded in `UI-UX/UI_UX_SYSTEM_GUIDE.md` (2026-10-19). Colours only; no layout/RTL change.
+
+Follow-up commit: `design/tokens/colors.json` (v2.0.0) and the `DESIGN.md` frontmatter now mirror the mapping (derived steps computed to hex; `knownDrift` cleared). Open: the `/` landing is still light-only by design (fixed primitives); signed-in surfaces (`/b2b`, admin, home, settings, onboarding) were covered by the token remap and the contrast test but not screenshotted (no live backend).
+
+## 2026-10-19 — React #418 hydration mismatches: dates pinned to Egypt time
+
+Branch `claude/hydration-418-2ibvgs` from `main` @ `bd0de0a`. **Cause found and fixed:** the shared format layer (`lib/ui/format.ts`) formatted dates in the RUNTIME's zone, so a Client Component rendered "13:30" on the UTC server and "16:30" in a Cairo browser (`formatDateTime`/`formatTime`/`formatAdminDate*` always; `formatDate` only for instants 21:00-24:00 UTC, hence "intermittent"). All date formatters now use `DISPLAY_TIME_ZONE = "Africa/Cairo"`; chat "same day" uses the same calendar; the job card's relative "posted" age re-renders after mount (same pattern as `AvailabilityControl`). Server-rendered dates now also show Egypt time instead of UTC.
+
+Evidence (local prod build, server `TZ=UTC`, Chromium `timezoneId=Africa/Cairo`, ar-EG + en-US, 10 seeded users, 1,046 loads, 121 routes): text-type #418 **34 -> 0** loads (RFQ/quotation/order/lead detail pages). Unit: `format.test.ts` asserts identical output under UTC, Cairo and Los Angeles.
+
+Open: a separate, rare **HTML-type** #418 (4 and 6 loads per 1,046, mostly the Admin shell at `/admin`, also `/home/profile/edit`, `/b2b/suppliers`) is NOT fixed and not root-caused. It does not reproduce in `next dev` (126 loads) or with a DOM mutation recorder attached (0/752), and the recovered DOM matches the server HTML, so it looks like a timing race rather than different markup. Also noted, not changed: `follow-up-edit-form.tsx` builds its `datetime-local` default from the runtime zone (server UTC vs browser), and several components still format numbers with a bare `ar-EG` tag (identical in Node 22 and Chromium 141 today).
+
 ## 2026-10-20 — Registration data: saved, editable, and visible to Admin
 
 Branch `fix/registration-account-sync` from `main` @ `bd0de0a`; worktree `D:/projects/aladdin-wt-registration-sync`. Audited every field of the Showroom and Installer sign-ups against Settings and the Admin Dashboard. Found and fixed: (1) business contact stored twice (`organizations.contact_*` vs `organization_contacts`) with no editor for the registered values; (2) legal name and branch governorate/city had no edit path; (3) Admin showed no account type for a new Installer (declared persona vs `primary_account_type`) and could not read activities; (4) the registration review step hid phone, e-mail, activity and description. Migration `20261020090001_registration_data_sync.sql`, pgTAP 87 (43/43; 82, 91, 92, 93, 22, 71, 86 still green on the scratch DB), new Settings contact / legal-name / location UI, Admin Registration-details card. Details: `docs/frontend/registration-data-sync.md`.
@@ -27,6 +232,11 @@ Promotion: `app/admin/preview/*` moved onto `app/admin/*`, replacing the classic
 Open: E2E specs that asserted the classic Admin pages (`pilot-uat-round-1`, `personal-sales-readiness`) were not run here; the React #418 Preview blocker recorded on 2026-10-01 was not re-checked.
 
 ## 2026-10-15 — PR84 definitive functional acceptance passed
+
+## 2026-10-17 — Approved local RC2 R2 integration
+
+The owner authorized a dedicated integration branch based on exact RC2 main8bde19c4 and163 migrations. Original R2 worktree is preserved. Scope includes forward-only schema/permission reconciliation, actual-byte receipts, mixed providers and private application delivery for existing personal media plus RC2 product images and organization logos; preserve every current tenant/audience/org.manage/ordering rule. No hosted resource, cleanup, deployment, push or merge is authorized. Both R2 flagsfalse. Architecture: [ADR-0017](../decisions/ADR-0017-rc2-private-media-integration.md). Integration in progress; acceptance results must be recorded before completion.
+
 
 Exact committed8be67ba6: isolated GitHub functional run38697762123PASS24/24(0fail,0skip,58.7s), application CI38697762134and fullDB38697762167SUCCESS. All110versions/sixfeatureversions/old+v2RPCs verified; own runner teardown succeeded. Artifacts contain migration hashes and six desktop/mobile screenshots. No uncommitted CAPTCHA files included. Harness corrections preserve last-admin guards, use Node24 and settled action/UI assertions plus counter11; no product code/security weakening, no skipped tests/retries.
 
@@ -6630,7 +6840,147 @@ being driven — rather than the latency of a synthetic click. 5/5, no retries, 
 
 Per instruction: no full E2E, no pgTAP, no Lighthouse, no persona matrix.
 
+## Marketplace database — Migration 01 (taxonomy + dynamic attributes), 2026-10-13
+
+Branch `feat/public-marketplace-20261011` (new worktree `D:\projects\aladdin-wt-public-marketplace-20261011`, from `origin/main` @ `6c088d9`; the earlier landing-page worktree was left untouched and still holds the uncommitted marketplace UI preview).
+
+**Added:** `supabase/migrations/20261012090001_marketplace_taxonomy_and_attributes.sql` (five `marketplace_*` tables, RLS + explicit SELECT-only grants, three invoker integrity triggers, seed of 3 categories / 6 types / 28 attributes / 84 options / 52 type mappings), `supabase/tests/90_marketplace_taxonomy_attributes_test.sql` (63 assertions), `docs/database/marketplace-product-database.md`.
+
+**Validation:** applied from scratch on an isolated local Supabase stack (`project_id aladdin-marketplace`, ports 544xx via a machine-local, uncommitted `config.toml` override): all 105 migrations + seeds OK; `supabase test db` = **PASS, 88 files / 3741 tests**, including the new 63-assertion marketplace test and the whole existing B2B/RLS suite. Docker Desktop needed a clean restart (`wsl --shutdown` + relaunch), not a file deletion. An earlier scratch-PostgreSQL run came first.
+
+**Caught by the run:** a `CHECK (… unit_kind in (…))` that a NULL `unit_kind` satisfied silently; fixed with an explicit `is not null`. `ON DELETE RESTRICT` raises `23503` on PostgreSQL 17, not `23001`.
+
+**Next:** Migration 02 (products, variants, attribute values, images) after review. No push, PR, merge or deploy.
+
+## Marketplace database — Migration 02 (product core), 2026-10-13
+
+Branch `feat/public-marketplace-20261011` (merged with `origin/main` @ `10014e3` first; no incoming migrations).
+
+**Added:** `supabase/migrations/20261013090001_marketplace_product_core.sql` (five `marketplace_*` tables, triggers, RLS SELECT-only, no anon), `supabase/tests/91_marketplace_product_core_test.sql` (99 assertions). The Migration 01 test (`90_`) was scoped: its "exactly five tables" and "no FK outside marketplace" assertions were global and Migration 02 legitimately adds tables and a FK to `organizations`.
+
+**Validation:** `supabase db reset` (106 migrations) then `supabase test db`: **PASS, 89 files / 3840 tests**. A real two-session race on a duplicate option combination: one committed, one `23505`. Isolated stack `aladdin-marketplace` only; no remote database touched.
+
+**Found by running it (fixed before the record):** plpgsql evaluates both sides of an `OR`, so a record field missing on one table's NEW record errored (split into statements); `v_blockers || 'literal'` is parsed as an array literal (use `array_append`); `organizations.org_type` is not `public.account_type` (compared as text); a UTF-8 BOM written by PowerShell `Set-Content` into the local `config.toml` broke the Supabase CLI.
+
+**Deferred and documented:** seller enablement, inventory (Migration 03), media verification, public projection — publication stays unreachable.
+
+## Marketplace database — Migration 03 (inventory), 2026-10-13
+
+Branch `feat/public-marketplace-20261011`, after the B2B non-regression audit of Migrations 01–02 passed.
+
+**Added:** `supabase/migrations/20261013090002_marketplace_inventory.sql` (stock locations, inventory levels, append-only ledger, `public.marketplace_stock_apply`, availability helper, real stock rule in the publication blockers, EXECUTE hardening on `app.marketplace_*`), `supabase/tests/92_marketplace_inventory_test.sql` (101 assertions), `supabase/tests/marketplace_stock_concurrency_test.sh` (real multi-session race proof). Test 91 was adjusted (G2: the stock blocker is now real; J2: scoped to the product-core tables, since inventory legitimately references branches).
+
+**Validation:** `supabase db reset` (107 migrations) then `supabase test db`: **PASS, 90 files / 3941 tests**; the concurrency script: oversell race, same-key race and a 10-way stampede all PASS (floor(110/15)=7 winners, reserved 105, never above on-hand). Isolated stack `aladdin-marketplace` only.
+
+**Found by running it:** the first test run flagged "SECURITY DEFINER view in public" — it was pgTAP's own views, left in `public` because a manual `psql -f` of a test file ran its `create extension if not exists pgtap` outside the CLI's lifecycle. Dropped the stray extension from the disposable local DB; never run test files by hand with `psql -f`. Also: a JS `$$` replacement string collapses to `$` in `String.replace`.
+
+**Still deferred (Migration 04):** seller enablement and the public product projection. Publication stays unreachable.
+
+## Marketplace database — Migration 04 (seller enablement, publication, safe public catalog), 2026-10-13
+
+Branch `feat/public-marketplace-20261011`. Local only; nothing pushed.
+
+**Added:** `supabase/migrations/20261013090003_marketplace_seller_enablement_and_catalog.sql` (seller accounts + append-only events, `marketplace_sellers.read/manage` permissions, admin approve/suspend/revoke/reinstate RPCs, real publication blockers, publish/unpublish RPCs, `marketplace_public_catalog` / `marketplace_public_product` functions, media-verification platform flag defaulting to OFF, reserve-requires-enabled-seller trigger), `supabase/tests/93_marketplace_seller_enablement_test.sql` (108 assertions).
+
+**Changed existing tests:** `85_` permission-catalogue count 25 → 27 (two new permissions); `91_` G2 and `92_` J4 + fixtures (seller must be approved to reserve); concurrency script approves/cleans a fixture seller.
+
+**Validation:** `supabase db reset` (108 migrations) then `supabase test db`: **PASS, 91 files / 4049 tests**; concurrency script PASS. Isolated stack `aladdin-marketplace` only.
+
+**Still closed:** publication cannot succeed anywhere until `marketplace_platform_settings.media_verification_ready` is turned on by a deliberate platform act. No seller is approved. No checkout, no order-specific reservations, no seller write RPCs for product/variant/image/inventory, no R2.
+
+## Marketplace database — Migration 05 (bulk import foundation), 2026-10-13
+
+Branch `feat/public-marketplace-20261011`. Local only; nothing pushed.
+
+**Part A (Migration 04 final review):** test `85_` strengthened (25 original permissions + every role mapping pinned by content hash; two new permissions and their role mapping verified; Moderator read-only; Support / ordinary users have neither; functional `has_admin_permission` checks). Test `93_` extended with public-catalogue hardening checks (bounded paging, literal wildcards, injection-shaped search, no owner widening). `media_verification_ready` stays false; no code path enables it.
+
+**Part B:** `supabase/migrations/20261013090004_marketplace_bulk_import_foundation.sql` (import jobs / events / rows / assets / errors, state machine, lease, trusted worker functions, seller create/cancel/report), `supabase/tests/94_marketplace_bulk_import_test.sql` (126 assertions), `docs/database/marketplace-bulk-import.md`.
+
+**Validation:** `supabase db reset` (109 migrations) then `supabase test db`: **PASS, 92 files / 4199 tests**. Scale probe (15,000 rows / 15,000 images, one rolled-back transaction) recorded in the bulk-import doc.
+
+**Still closed:** no parser / worker / upload / R2, no checkout, no publication path, no real seller activated.
+
+## Marketplace seller product creation & management (Migration 06 + B2C seller UI), 2026-10-14
+
+Branch `feat/public-marketplace-20261011`. Local only; nothing pushed. Uncommitted at the time of writing (awaiting review).
+
+**DB:** `supabase/migrations/20261014090001_marketplace_seller_product_writes.sql` — trusted seller RPCs (product save/get/readiness, default location, stock adjust, image request/confirm/arrange/remove), private `marketplace-product-images` bucket + 3 storage policies, `marketplace_product_images.upload_state`. Tests: `95_marketplace_seller_product_writes_test.sql` (76), `marketplace_seller_stock_concurrency_test.sh`; `47_` updated (reviewed policies + one named storage-read exception); 92/93/94 hardening checks exempt only `app.marketplace_storage_*` (storage-policy predicates).
+
+**UI:** `/b2c/seller/products` (real data, thumbnails, inline − / + for one variant at one location, Edit), `/b2c/seller/products/new`, `/b2c/seller/products/[id]/edit` (type fields from the DB, variants, stock per variant/location, image upload/arrange, readiness, publish only when the server allows).
+
+**Validation:** pristine `supabase test db` 93 files / 4275 PASS (DB volume snapshotted and restored around the reset so the local Decore Store QA data survived); both concurrency scripts PASS; frontend vitest 2776 PASS; tsc clean. Browser E2E as Decore Store: draft with 2 variants + initial stock, real image upload (confirmed from storage, pending review), edit, duplicate-SKU refusal, inline stock change, stale-screen refusal.
+
+**Found while testing:** `mp:stock_changed` used SQLSTATE 40001, which PostgREST silently retries (48 s hang) — now P0001. Variant row ids used Date.now (hydration mismatch) — now deterministic.
+
+**Still blocked for public publishing:** the media verification pipeline (`media_verification_ready` stays false), so no product can be published.
+
+## Marketplace Migration 06 — pre-commit security & isolation audit, 2026-10-14
+
+Branch `feat/public-marketplace-20261011`. Local only; nothing pushed.
+
+**Audit (isolated local stack, rolled-back / self-cleaning probes):** storage policies + predicates, every SECURITY DEFINER function and EXECUTE grant, cross-org confirm/upload/delete/read, anon access, path manipulation, overwrite (no UPDATE policy), confirm-never-verifies, publish still blocked — all denied/closed as intended (SQL probe + 42-check Storage HTTP probe). All 18 functions in the stored migration match the live local DB byte-for-byte; 110 migrations applied.
+
+**Test exceptions tightened:** 92/93/94 now exempt exactly the three named predicates (`marketplace_storage_can_delete_image`, `_can_upload_image`, `_owns_image`) instead of the `marketplace_storage_%` pattern; `47_` keeps its exact-array exception for `marketplace_seller_image_confirm_upload`.
+
+**Known defect (not a security issue; fails closed):** `marketplace_seller_image_remove` deletes the image row, after which the Storage API refuses the owner's DELETE of the bytes (Storage reads the object first and `marketplace_images_select_member` requires an image row), so removed images leave an orphan object in the private bucket; `removeImageAction` ignores the failed `remove()`. Fix before public launch: let the select policy also admit a catalogue manager for an org-prefixed key with no confirmed row (or delete bytes with a server-side credential), and surface the error. Needs a new migration + test.
+
+**Not re-run here:** a clean-DB `db reset` + full suite (local QA data would be wiped). On the QA-populated DB, 47/90/92/94/95 pass; 91 and 93 fail only on global counts that include the approved Decore Store QA seller and its 9 products.
+
+## Marketplace Migration 07 — safe image removal lifecycle, 2026-10-14
+
+Branch `feat/public-marketplace-20261011`. Local only; nothing pushed; **uncommitted, awaiting review**.
+
+**Root cause.** `marketplace_seller_image_remove` deleted the image row before the bytes; Storage reads the object as the caller (select policy needs the row) so the owner's DELETE was refused ("Access denied") and the object orphaned, while `removeImageAction` ignored the failure.
+
+**Fix.** New `20261014090002_marketplace_image_removal_lifecycle.sql`: two-phase removal (mark `deleting`+`rejected`, keep the row; Storage deletes; `remove_finalize` forgets the row only when the object is really gone), `images_pending_removal` for retries, delete predicate authorised from the row (never the path), upload keys valid 1 h, per-product (10) and per-org-hour (200) limits, no resurrection of a removed image. App: `image-removal.ts` orchestration (idempotent, success only after finalize), `image-signature.ts` magic-byte gate in `confirmImageUploadAction`, signed URLs 300 s, retry banner in the images panel, AR/EN strings. No storage policy added or widened; `media_verification_ready` untouched (false).
+
+**Verification.** Clean `db reset` (111 migrations) + full `supabase test db`: 94 files / 4348 tests PASS; both stock concurrency scripts PASS; `marketplace_image_removal_api_test.mjs` 59/59 on the clean DB and on the QA DB; frontend vitest/tsc/lint clean. The pre-existing `professional_asset_storage_api_test.mjs` asserts the OLD Storage error `code` strings (`AccessDenied`, …) which Storage v1.66.4 no longer returns (it sends `error`); with a scratch shim mapping them all 59 checks pass — the repo copy still needs that update (not done here). It also hard-codes the non-isolated container/port.
+
+**Local QA safety.** The QA volumes (DB + Storage) were copied to `aladdin-mp-pre07-db` / `aladdin-mp-pre07-storage` before the reset and restored after. LESSON: `cp -a` in the Postgres image did NOT preserve the Storage file xattrs (content-type/cache-control), so the two QA objects (Decore Store product image, one avatar) returned 500 `ENODATA` until their bytes were re-uploaded with the platform credential (identical bytes verified). Next time snapshot the Storage volume with a xattr-preserving tool (or re-upload).
+
+**Limits.** Magic bytes are checked only on the app path (a direct confirm-RPC call skips it; uploads stay `pending`); deleted-image signed URLs are not guaranteed revoked on a CDN-fronted host; deleting a product row cascades image rows and would orphan bytes (platform-only path); row-less orphans need a trusted cleanup job (detection query in the DB doc).
+
+### Migration 07 follow-up — final checks (same day)
+
+- `professional_asset_storage_api_test.mjs` now understands the current Storage (v1.66.x) error shape: `(body.statusCode, body.error)` pairs `403|Unauthorized`, `415|invalid_mime_type`, `413|Payload too large`, `409|Duplicate`, `404|not_found` map to the old semantic codes; every other error stays `null`, so a 500 / 400 / 401 is never read as a denial. Assertions untouched; `DB_CONTAINER` env added. Unshimmed run on the isolated stack: **59 passed, 0 failed** (was 19 failing). `public_media_exposure_test.mjs` (also `DB_CONTAINER`): 53 passed, 0 failed against the worktree app.
+- QA media verified: the Decore Store product image and the avatar serve HTTP 200 with SHA-256 identical to the pre-snapshot originals; no orphan objects, no rows without objects; 111 migrations, `20261014090002` recorded and byte-identical to the file.
+- `scripts/local-storage-snapshot.mjs` + `docs/guides/local-supabase-qa-backup-restore.md`: xattr-safe backup/verify/restore of Storage through the API (restore proven only on disposable buckets).
+
+## Marketplace Migration 08 — nine more product types, 2026-10-14
+
+Branch `feat/public-marketplace-20261011`. Local only; uncommitted. Trigger: the seller "product type" dropdown showed 6 of the 15 approved types — types are DATABASE rows, so the fix is data, not UI. New `20261014090003_marketplace_product_types_expansion.sql` adds بانوهات, وزرة, أبواب داخلية, أبواب مصفحة, أرضيات فينيل, أرضيات SPC, ستائر, بوسترات, دهانات (4 new categories, ~33 field definitions, options, mappings; 5 new colours). No structural/security change. Tests: new `97_` (38), `90_` counts updated. Clean `db reset` (112 migrations) + full suite: **95 files / 4386 PASS**; removal HTTP test 59/59 and professional-asset HTTP test 59/59 on the clean DB. QA restored after: DB volume restored from a copy (DB files carry no xattrs), Storage was never copied (backed up/verified with `scripts/local-storage-snapshot.mjs`: 2/2, checksums identical). Note: "وزر" in the brief stored as "وزرة".
+
+## Marketplace catalog launch sprint (Decore Store), 2026-10-14
+
+Branch `feat/public-marketplace-20261011`, local only, nothing pushed. Commits: `47aa22f` Migration 09 (moderation, delivery ref, paged reads, import dispatcher), `e38553c` admin sellers + media moderation + public media route, `28b4c04` live `/marketplace` + product page, `0951eb2` server-paged seller list + `/b2c/seller/imports`, `264cb43` import attributes. Full write-up and numbers: `docs/marketplace/catalog-launch.md`.
+
+- Admin: `admin@aladdin.test` (Super Admin, local) reaches `/admin` because `loadPlatformRole` now reads `admin_my_access()`.
+- Real file imported as 1,200 draft variant rows / 786 products (31 price-0 rows refused); **0 published** — no photos, wallpaper attributes missing, media flag off. Synthetic sample proved moderation → publication → delivery → revocation end to end, then DB + Storage were restored (no synthetic data left).
+- `media_verification_ready` = **false** (was on only inside the restored synthetic run).
+- LESSON (again): volume `cp -a` loses Storage `user.supabase.*` xattrs → 500 `ENODATA`. The restore script now dumps/restores xattrs with `getfattr`/`setfattr` (alpine + attr); the two QA objects had their xattrs re-set from `storage.objects` metadata. Prefer `scripts/local-storage-snapshot.mjs`.
+- Open: photos + attributes from Decore, product names, unit labels for measurements, imports sidebar entry, staging rollout.
+
 ### Final independent review addendum — 2026-10-14
 Standards: CTA contrast and stale shared-module documentation corrected. Spec: quotation accepted transitions now enforce seller eligibility; RFQ remains open on denial and rejection allowed, verified by3newpgTAP assertions. Sequential taskDB119/119; focusedauth114/114. Direct business contact RPC country metadata validation remains missing, confirmed by rolled-back synthetic diagnostic; added as second merge blocker alongside native quota. No hosted writes. Reviewed build/renderedcontrast/screenshots checked before final push.
 
 Final packaging: implementation05c4eec8 and reviewfix4ae03891 pushed; [PR84](https://github.com/hmohamed080/aladdin/pull/84) verified OPEN/DRAFT targeting main. Additional journey rerun aborted due stalled Docker, not counted as pass; final non-mutating contrast/layout2/2passed and typecheckpassed. Preview3341HTTP200, localAPI63321; original14hashesunchanged. External untracked frontend/e2e/auth-captcha.spec.ts appeared and remains excluded/preserved. No merge/deployment/worktree cleanup. Native quota and direct contact metadata remain merge blockers.
+
+## Sync with origin/main (170 commits, Showroom rc2 + Admin Core + OAuth) — 2026-10-18
+
+Branch `feat/public-marketplace-20261011` merged with `origin/main` @ `9d9a1b6`; the base checkout's `main` fast-forwarded to the same commit. Nothing pushed.
+
+**Conflicts resolved (6):** `RUNTIME_STATE.md` (both sections kept); `admin-nav.tsx` (origin's Admin Core rail + the two Marketplace entries); `i18n.test.ts` (both literal-word lists); `platform.ts` (origin's `loadIsAdminStaff`, no other caller of the removed exports); `database.types.ts` (regenerated from the merged chain); `47_professional_asset_storage_test.sql` (28 policies: origin's 23 + the 5 Marketplace ones, all named).
+
+**Fixes the merge required:** (1) duplicate migration version — Migration 11 (HDF flooring) renamed `20261015090001` -> `20261018090001` (origin owns `20261015090001_showroom_suite_kpi_layouts`; the branch was never pushed, so no hosted DB saw it); (2) origin's `20261015090048` self-check fails on the text "40001" inside function bodies — two comments in our migrations 06/07 reworded (comment-only, no behaviour change); (3) `96_` no longer pins the whole-table policy count (47_ owns that), it pins the five Marketplace policies; (4) `middleware.test.ts` mock gains `isMarketplacePreviewEnabled`; (5) the two `/admin/marketplace*` pages call `requireAdminRoute` (origin's route-coverage test).
+
+**Verification on a clean `db reset` of the merged chain (175 migrations):** full pgTAP **126 files / 5,967 tests PASS** (after fix 3); Marketplace removal HTTP test 59/59; professional-asset Storage HTTP test 59/59; frontend typecheck clean, lint 0 errors in `src`, vitest 305 files / 3,900 passed. The local untracked audit harness (`frontend/e2e-audit`, `docs/qa`) was left untouched; its config was renamed `playwright.full-audit.config.ts` because origin now tracks a different `playwright.audit.config.ts`; `e2e-audit` has 3 `no-explicit-any` lint errors (so `pnpm lint` over the whole `frontend/` fails while it exists).
+
+## Merge of open PR #89 (R2 media RC2) and PR #88 (Showroom V2 + Admin), 2026-10-18
+
+`origin/main` had nothing new; the only other uploaded work was the two open PRs, both merged into `feat/public-marketplace-20261011` locally (nothing pushed, nothing merged on GitHub). PR #89 already contained PR #88 up to 10:00; #88's last commit (Arabic small type, toasts, cooldown button, same-phone checks) came in with the second merge.
+
+**Collision avoided:** Migration 11 (HDF flooring) was renumbered `20261019090001` because `20261018090001` belongs to #88/#89 (`secondary_phone_reservations`). If those PRs merge to main first, this branch only needs a fresh `git merge origin/main`.
+
+**Conflicts (8):** RUNTIME_STATE (both), middleware (#89's request-gate + the Marketplace palette header; `/b2c/seller` added to `isAuthRequiredPath`), `layout.tsx` imports, `database.types` (regenerated), `47_` (32 policies; the client-callable `storage.objects` readers are exactly the three named Marketplace functions — #89's stricter "no caller-accessible reader" rule is kept for everything else), `85_` (the 25 original permissions are hashed without the five later ones), `professional_asset_storage_api_test` (#89's refusal-kind map), `96_` A4 (client-callable readers only).
+
+**Verification (clean `db reset`, 183 migrations):** pgTAP 133 files / 6,254 tests PASS; Storage HTTP: Marketplace removal 59/59, professional assets 67/67; `pnpm install --frozen-lockfile` (new deps `@aws-sdk/client-s3`, `pdf-lib`); tsc clean; eslint `src` 0 errors; vitest 324 files / 4,027 passed. QA DB restored from a volume copy and upgraded with `migration up --include-all` after correcting the recorded HDF version: schema identical to the clean reset, 824 products / 20 images intact, 11/11 Storage objects verified by checksum. Backups: `D:\projects\_qa-backup-premerge2-20261018` and volume `aladdin-mp-premerge2-20261018-db`.

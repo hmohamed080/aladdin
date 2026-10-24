@@ -6,7 +6,7 @@ import { loadOrganizationDetail, loadOrganizationRegistration } from "@/server/q
 import { describeLocation } from "@/lib/location/describe-location";
 import { previewSubjectAudit } from "@/server/queries/admin-preview";
 import { localizedName } from "@/features/admin-preview/directory-mappers";
-import { can } from "@/lib/permissions/admin";
+import { can, meets } from "@/lib/permissions/admin";
 import { getMessages } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { formatAdminDate, formatDateTime, formatNumber } from "@/lib/ui/format";
@@ -103,7 +103,8 @@ export default async function PreviewOrgDetailPage({
           <AdminHeader locale={locale} title={name} subtitle={typeLabels[org.orgType] ?? org.orgType} />
           <div className="flex items-center gap-2">
             <StatusBadge status={org.status} label={statusLabels[org.status] ?? org.status} />
-            {org.isVerified ? <Badge tone="success">{m.admin.orgs.verified}</Badge> : null}
+            {/* The badge is business verification; approval of the application alone is the status above. */}
+            {org.businessVerifiedAt ? <Badge tone="success">{m.businessVerification.status.verified}</Badge> : null}
           </div>
         </div>
         <div className="flex flex-wrap gap-sm">
@@ -156,7 +157,7 @@ export default async function PreviewOrgDetailPage({
             <dl className="grid gap-md tablet:grid-cols-4">
               <Field label={t.tabs.overview}>{typeLabels[org.orgType] ?? org.orgType}</Field>
               <Field label={m.admin.orgs.status}>{statusLabels[org.status] ?? org.status}</Field>
-              <Field label={m.admin.orgs.verification}>{org.isVerified ? m.admin.orgs.verified : m.admin.orgs.notVerified}</Field>
+              <Field label={m.admin.orgs.verification}>{org.businessVerifiedAt ? m.admin.orgs.verified : m.admin.orgs.notVerified}</Field>
               <Field label={m.admin.orgs.created}>{formatAdminDate(org.createdAt, locale)}</Field>
               <Field label={m.onboarding.business.identity.phoneLabel}><span dir="ltr">{registration.phone ?? "—"}</span></Field>
               <Field label={m.onboarding.business.identity.emailLabel}><span dir="ltr">{registration.email ?? "—"}</span></Field>
@@ -274,6 +275,11 @@ export default async function PreviewOrgDetailPage({
 
       {tab === "verification" ? (
         <section className="flex flex-col gap-md">
+          {meets(access, ["organizations.verify", "verification.approve"]) ? (
+            <Link href={`/admin/business-verification?q=${encodeURIComponent(org.name)}`} className="text-label text-accent hover:underline">
+              {m.businessVerification.admin.title} →
+            </Link>
+          ) : null}
           {org.verifications.length === 0 ? (
             <StatePanel title={m.admin.orgs.noVerifications} />
           ) : (

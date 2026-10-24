@@ -61,7 +61,7 @@ export function PasswordSignInForm({
               {t("auth.installerPhoneSignIn")}
             </Link>
           </p>
-          <p><Link href={`/showroom/sign-in?next=${encodeURIComponent(next)}`} className="text-fg-muted hover:text-fg hover:underline">{t("showroomAuth.phoneSignIn")}</Link></p>
+          <p><Link href={`/sign-in?next=${encodeURIComponent(next)}`} className="text-fg-muted hover:text-fg hover:underline">{t("showroomAuth.phoneSignIn")}</Link></p>
         </div>
       }
     >

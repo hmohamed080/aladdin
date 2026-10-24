@@ -6,6 +6,8 @@ documents, embeddings, and workers — NOT the product's CRUD backend.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -28,6 +30,14 @@ API_PREFIX = "/api/backend"
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    if settings.missing_configuration:
+        # Deliberately not a crash: the service starts, /api/backend/health answers
+        # 503 `misconfigured` and authenticated endpoints refuse (app.auth).
+        logging.getLogger(__name__).error(
+            "backend misconfigured for %s; missing: %s",
+            settings.environment,
+            ", ".join(settings.missing_configuration),
+        )
     app = FastAPI(
         title="Aladdin AI/Document Service",
         version="0.1.0",

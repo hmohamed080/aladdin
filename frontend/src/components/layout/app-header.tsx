@@ -9,6 +9,7 @@ import { GlobalSearch } from "@/components/layout/global-search";
 import { ProfileMenu } from "@/components/layout/profile-menu";
 import { ThemeSwitch } from "@/components/layout/switchers";
 import { loadAccountIdentity, initialsOf } from "@/server/queries/identity";
+import { loadMyIdentity } from "@/server/queries/profile-identity";
 import { canSearchAdmin } from "@/server/actions/search";
 import { THEME_COOKIE, resolveTheme, resolveThemePreference } from "@/lib/theme/config";
 import { HelpIcon } from "@/components/ui/icons";
@@ -92,6 +93,7 @@ import type { CommerceStance } from "@/lib/workspace/supply-side";
  */
 export async function AppHeader({
   appName,
+  brandEdition = "classic",
   context,
   mobileContext,
   actions,
@@ -104,6 +106,8 @@ export async function AppHeader({
   variant = "bar",
 }: {
   appName: string;
+  /** Which brand edition the header draws (the bar variant only) — see `Brand`'s `edition`. */
+  brandEdition?: "classic" | "2026";
   /**
    * Which shell is rendering this header.
    *
@@ -153,7 +157,7 @@ export async function AppHeader({
   orgId?: string | null;
 }) {
   const supabase = await getServerSupabase();
-  const [identity, canAdmin, store, notificationRows, unreadCount, conversationRows, chatUnread] =
+  const [identity, canAdmin, store, notificationRows, unreadCount, conversationRows, chatUnread, myIdentity] =
     await Promise.all([
       loadAccountIdentity(),
       canSearchAdmin(),
@@ -168,6 +172,10 @@ export async function AppHeader({
       // postdates this reader's position — computed from the approved columns,
       // never from the bounded list below.
       countUnreadConversations(supabase),
+      // The person's own profile photo for the account avatar. Cached per render
+      // (settings reads the same loader) and the URL is a short-lived signed read.
+      // A failure here must never take the header down: the initials still work.
+      loadMyIdentity().catch(() => null),
     ]);
   const themePreference = resolveThemePreference(store.get(THEME_COOKIE)?.value);
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
@@ -297,7 +305,7 @@ export async function AppHeader({
         >
           {/* `md`, the header lockup — see `Brand`. The pre-workspace screens
               keep `sm`; this is the only surface that grew. */}
-          <Brand name={appName} size="md" />
+          <Brand name={appName} size="md" edition={brandEdition} />
         </Link>
 
         {!card && context ? (
@@ -379,6 +387,7 @@ export async function AppHeader({
             contact={identity?.contact ?? null}
             workspaceLabel={workspaceLabel}
             initials={initialsOf(identity?.displayName, identity?.contact)}
+            avatarUrl={myIdentity?.avatarUrl ?? null}
             profileHref="/onboarding/profile"
             preferencesHref={preferencesHref}
             themePreference={themePreference}

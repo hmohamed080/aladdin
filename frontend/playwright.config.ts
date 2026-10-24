@@ -18,6 +18,26 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 const executablePath = process.env.PW_CHROMIUM || undefined;
 const launchOptions = executablePath ? { executablePath } : undefined;
 
+// Optional locale / theme axis for the whole suite. E2E_LOCALE=en|ar and
+// E2E_THEME=light|dark seed the app's own cookies (NEXT_LOCALE, aladdin-theme)
+// in every context, and the theme also sets the emulated OS colour scheme.
+// Unset (the default) leaves the suite exactly as before: English, no theme cookie.
+const E2E_LOCALE = process.env.E2E_LOCALE;
+const E2E_THEME = process.env.E2E_THEME;
+if (E2E_LOCALE && !["en", "ar"].includes(E2E_LOCALE)) throw new Error("E2E_LOCALE must be en or ar");
+if (E2E_THEME && !["light", "dark"].includes(E2E_THEME)) throw new Error("E2E_THEME must be light or dark");
+const axisCookie = (name: string, value: string) => ({
+  name, value, domain: "127.0.0.1", path: "/", expires: -1, httpOnly: false, secure: false, sameSite: "Lax" as const,
+});
+const axisCookies = [
+  ...(E2E_LOCALE ? [axisCookie("NEXT_LOCALE", E2E_LOCALE)] : []),
+  ...(E2E_THEME ? [axisCookie("aladdin-theme", E2E_THEME)] : []),
+];
+const axisUse = {
+  ...(E2E_THEME ? { colorScheme: E2E_THEME as "light" | "dark" } : {}),
+  ...(axisCookies.length ? { storageState: { cookies: axisCookies, origins: [] } } : {}),
+};
+
 export default defineConfig({
   testDir: "./e2e",
   // Reset the sales fixtures + restore the seeded memberships ONCE before all
@@ -45,6 +65,7 @@ export default defineConfig({
     locale: "en-US",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    ...axisUse,
   },
   projects: [
     { name: "chromium-desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, launchOptions } },

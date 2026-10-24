@@ -1,0 +1,51 @@
+{
+  "Change product type (strip → wallpaper)": [
+    87,
+    190,
+    71,
+    82,
+    205
+  ],
+  "Apply colour filter": [
+    61,
+    84,
+    63,
+    71,
+    95
+  ],
+  "Apply price filter (max 1000, Enter)": [
+    75,
+    57,
+    55,
+    55,
+    51
+  ],
+  "Clear all filters": [
+    53,
+    84,
+    59,
+    69,
+    100
+  ],
+  "Change sorting (price high→low)": [
+    99,
+    99,
+    98,
+    99,
+    87
+  ],
+  "Open product details from card": [
+    95,
+    89,
+    89,
+    84,
+    92
+  ],
+  "Switch variant": [
+    291,
+    252,
+    282,
+    126,
+    79
+  ]
+}

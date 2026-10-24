@@ -81,6 +81,7 @@ export default {
           "active-fg": alpha("--shell-active-fg"),
           gold: alpha("--shell-gold"),
           "gold-soft": alpha("--shell-gold-soft"),
+          accent: alpha("--shell-accent"),
         },
         /* ---- Form fields ----
            A field's own neutrals, warm-derived so the control matches the ground
@@ -115,6 +116,9 @@ export default {
         accent: {
           DEFAULT: alpha("--accent"),
           solid: alpha("--accent-solid"),
+          // The navy hairline every `bg-accent-solid` fill carries
+          // (`ring-1 ring-accent-edge`). See tokens.css `--accent-edge`.
+          edge: alpha("--accent-edge"),
         },
         // The ONE ink for anything sitting on `accent-solid`. Not part of the
         // `accent` object because `text-accent-on` would read as a third accent
@@ -133,6 +137,8 @@ export default {
         warning: alpha("--warning"),
         danger: alpha("--danger"),
         info: alpha("--info"),
+        // The ink on a SOLID status fill (`bg-success text-on-status`).
+        "on-status": alpha("--on-status"),
         focus: alpha("--focus"),
 
         // ---- Categorical data-visualisation series (theme-aware) ----
@@ -151,6 +157,12 @@ export default {
 
         // ---- Fixed primitives (brand artwork, mark, seals) ----
         brand: {
+          // The four approved palette roots. Every other entry below is an
+          // alias of these (see tokens.css).
+          "deep-navy": alpha("--deep-navy"),
+          "warm-sand": alpha("--warm-sand"),
+          "soft-cream": alpha("--soft-cream"),
+          "muted-terracotta": alpha("--muted-terracotta"),
           basalt: alpha("--basalt"),
           "basalt-2": alpha("--basalt-2"),
           "basalt-3": alpha("--basalt-3"),
@@ -217,9 +229,11 @@ export default {
         ],
         body: ["0.875rem", { lineHeight: "1.5", fontWeight: "300" }],
         "body-lg": ["1rem", { lineHeight: "1.5", fontWeight: "400" }],
+        /* label + caption read per-script variables (src/styles/tokens.css, "Small type steps, per
+         * script"): Latin keeps 13px/1.2/0.02em and 12px/1.35/0.01em; Arabic steps up with zero tracking. */
         label: [
-          "0.8125rem",
-          { lineHeight: "1.2", letterSpacing: "0.02em", fontWeight: "500" },
+          "var(--type-label-size)",
+          { lineHeight: "var(--type-label-leading)", letterSpacing: "var(--type-label-tracking)", fontWeight: "500" },
         ],
         /* The METADATA step, below `label`.
          *
@@ -238,8 +252,8 @@ export default {
          * small step would just be a second label.
          */
         caption: [
-          "0.75rem",
-          { lineHeight: "1.35", letterSpacing: "0.01em", fontWeight: "400" },
+          "var(--type-caption-size)",
+          { lineHeight: "var(--type-caption-leading)", letterSpacing: "var(--type-caption-tracking)", fontWeight: "400" },
         ],
         mono: [
           "0.8125rem",

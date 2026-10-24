@@ -30,7 +30,7 @@ beforeEach(() => vi.clearAllMocks());
 
 it("returns a showroom phone account to its own sign-in entry", async () => {
   getUser.mockResolvedValue({ data: { user: { email: "p201012345678@craftsman-login.aladdin.invalid", app_metadata: { registration_source: "temporary_showroom_password_flow" } } } });
-  expect(await run()).toBe("REDIRECT:/showroom/sign-in");
+  expect(await run()).toBe("REDIRECT:/sign-in");
 });
 
 describe("signOut — returns each account to the sign-in page it can use", () => {

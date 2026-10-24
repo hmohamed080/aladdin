@@ -68,7 +68,7 @@ export function StorefrontAddIcon({ className }: { className?: string }) {
         <rect x="33" y="30" width="3.5" height="4.5" rx="0.75" className="stroke-accent" strokeWidth="1.75" />
         {/* Add badge */}
         <circle cx="41" cy="38" r="8" className="fill-success stroke-surface" strokeWidth="2" />
-        <path d="M41 34.5v7M37.5 38h7" stroke="white" strokeWidth="2" strokeLinecap="round" />
+        <path d="M41 34.5v7M37.5 38h7" className="stroke-brand-soft-cream dark:stroke-brand-deep-navy" strokeWidth="2" strokeLinecap="round" />
       </svg>
     </span>
   );

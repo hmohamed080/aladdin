@@ -58,7 +58,7 @@ export function MyProductsToolbar({
         {canCreate ? (
           <Link
             href={`${basePath}/new`}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-sm bg-accent-solid px-md text-label font-semibold text-on-accent shadow-sm hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-sm bg-accent-solid ring-1 ring-accent-edge px-md text-label font-semibold text-on-accent shadow-sm hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             data-testid="add-product"
           >
             <PlusIcon size={16} />

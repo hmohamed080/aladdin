@@ -39,7 +39,7 @@ export default async function ShowroomMyOffersPage({ searchParams }: { searchPar
           canWrite ? (
             <Link
               href={`${SHOWROOM_ROOT}/my-offers/new`}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-sm bg-accent-solid px-lg text-label font-semibold text-on-accent shadow-sm hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-sm bg-accent-solid ring-1 ring-accent-edge px-lg text-label font-semibold text-on-accent shadow-sm hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               data-testid="create-offer"
             >
               <TagIcon size={18} />

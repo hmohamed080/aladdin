@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 /**
  * GRID IS THE DEFAULT WHEREVER A PAGE OFFERS BOTH GRID AND LIST.
  *
- * The audit of the whole Production frontend found exactly three views with both modes. This guard keeps that true: a
+ * The audit of the whole Production frontend found exactly five views with both modes. This guard keeps that true: a
  * view that offers a Grid / List toggle must open on Grid (there is no persisted preference anywhere, so the first
  * render is the default and the choice lasts for the visit), and a NEW page that adds the toggle cannot start on List.
  * Pages that have no such toggle are not given one.
@@ -14,6 +14,8 @@ import { describe, expect, it } from "vitest";
  *   /home/jobs                installer-job-opportunities-preview/…-view.tsx             yes      grid
  *   /home/work                installer-my-work-preview/installer-my-work-view.tsx       yes      grid
  *   /home/reviews             installer-reviews-preview/installer-reviews-preview.tsx    yes      grid
+ *   /marketplace              marketplace/live/live-catalog.tsx (live data)              yes      grid
+ *   (not routed)              marketplace/marketplace-browser.tsx (sample preview)       yes      grid
  *   every other route         (no Grid / List toggle)                                     no       n/a
  */
 
@@ -39,11 +41,13 @@ describe("Grid is the default wherever Grid and List both exist", () => {
   // rule below is for the three installer views.
   const withToggle = files.filter((f) => offersBoth(f.text) && f.rel !== "features/showroom-shell/view-toggle.tsx");
 
-  it("the audit finds exactly the three known views", () => {
+  it("the audit finds exactly the five known views", () => {
     expect(withToggle.map((f) => f.rel).sort()).toEqual([
       "features/installer-job-opportunities-preview/installer-job-opportunities-view.tsx",
       "features/installer-my-work-preview/installer-my-work-view.tsx",
       "features/installer-reviews-preview/installer-reviews-preview.tsx",
+      "features/marketplace/live/live-catalog.tsx",
+      "features/marketplace/marketplace-browser.tsx",
     ]);
   });
 

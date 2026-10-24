@@ -179,7 +179,7 @@ function OfferCard({ offer, locale, canWrite, canPublish }: { offer: OwnOffer; l
         ) : null}
         <Link
           href={`${MY_OFFERS}/${offer.id}/edit`}
-          className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-sm bg-accent-solid px-2 text-label font-semibold text-on-accent hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-sm bg-accent-solid ring-1 ring-accent-edge px-2 text-label font-semibold text-on-accent hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           data-testid="offer-action-details"
         >
           {editable && canWrite ? <PencilIcon size={14} /> : <EyeIcon size={14} />}
@@ -364,7 +364,7 @@ export function MyOffersView({
                   data-testid={`offers-chip-${chip.value || "all"}`}
                   className={cn(
                     "inline-flex min-h-9 items-center gap-1.5 rounded-sm border px-3 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
-                    phase === chip.value ? "border-transparent bg-accent-solid text-on-accent" : "border-strong bg-surface text-fg-secondary hover:bg-surface-2",
+                    phase === chip.value ? "border-accent-edge bg-accent-solid text-on-accent" : "border-strong bg-surface text-fg-secondary hover:bg-surface-2",
                   )}
                 >
                   {chip.label}

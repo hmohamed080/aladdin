@@ -38,7 +38,7 @@ export function isOAuthProvider(value: unknown): value is OAuthProvider {
 }
 
 export function entrySignInPath(kind: EntryKind): string {
-  return kind === "showroom" ? "/showroom/sign-in" : "/installer/sign-in";
+  return kind === "showroom" ? "/sign-in" : "/installer/sign-in";
 }
 
 /** The callback URL handed to Supabase. Only the kind and a sanitized `next` ride it. */

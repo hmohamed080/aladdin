@@ -11,6 +11,11 @@ from functools import lru_cache
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# The environments this service knows. Anything else is a configuration error.
+ENVIRONMENTS = ("local", "staging", "production")
+# Vercel sets VERCEL_ENV on every deployment. A Preview deployment is staging.
+_FROM_VERCEL = {"production": "production", "preview": "staging", "development": "local"}
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -20,8 +25,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # local | staging | production
-    app_env: str = "local"
+    # APP_ENV: local | staging | production. Read through `environment`, which also
+    # consults VERCEL_ENV so a deployment can never run as `local`.
+    app_env: str = ""
+    # Set by Vercel itself (production | preview | development); never set by hand.
+    vercel_env: str = ""
 
     # --- Supabase ---
     supabase_url: str = ""
@@ -30,12 +38,35 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     # Service-role key — BYPASSES RLS. Trusted server/worker paths only.
     supabase_service_role_key: str = ""
+    # Legacy HS256 secret; only needed while a project still signs with it.
     supabase_jwt_secret: str = ""
     database_url: str = ""
 
     # --- OpenAI ---
     openai_api_key: str = ""
     openai_embedding_model: str = "text-embedding-3-small"
+
+    # --- Redis (optional; job locks and queue wake-ups, never authorization) ---
+    # redis:// or rediss://. Unset: jobs run without a cross-process lock.
+    redis_url: str = ""
+    # Separates environments that share one Redis database.
+    redis_key_env: str = ""
+
+    # --- R2 (video worker only; the private bucket holding originals and HLS) ---
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_private_bucket: str = ""
+    # S3-compatible stand-in for isolated local tests. Refused outside a local environment.
+    r2_local_s3_endpoint: str = ""
+
+    @property
+    def r2_endpoint(self) -> str:
+        if self.r2_local_s3_endpoint:
+            return self.r2_local_s3_endpoint
+        return (
+            f"https://{self.r2_account_id}.r2.cloudflarestorage.com" if self.r2_account_id else ""
+        )
 
     # --- Server ---
     # Comma-separated browser origins allowed to call the API (CORS).
@@ -46,31 +77,56 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
     @property
+    def environment(self) -> str:
+        """The effective environment.
+
+        On a Vercel deployment VERCEL_ENV decides whenever APP_ENV is unset or says
+        `local`: a deployed service must never skip the secret check below. An
+        unknown VERCEL_ENV counts as production (fail closed).
+        """
+        explicit = self.app_env.strip().lower()
+        vercel = self.vercel_env.strip().lower()
+        deployed = _FROM_VERCEL.get(vercel, "production") if vercel else None
+        if deployed in {"staging", "production"} and explicit in {"", "local"}:
+            return deployed
+        return explicit or deployed or "local"
+
+    @property
     def is_production_like(self) -> bool:
-        return self.app_env in {"staging", "production"}
+        # Anything but an explicit, undeployed `local` is held to deployed rules.
+        return self.environment != "local"
+
+    @property
+    def missing_configuration(self) -> list[str]:
+        """Names (never values) of the variables this deployment still needs.
+
+        Deployed (staging/production), the request path needs the project URL (JWT
+        issuer and JWKS) and the anon key (the caller-scoped account and session
+        check). The service-role key, DATABASE_URL and the legacy JWT secret are not
+        on any deployed request path: the media jobs run from an operator machine
+        or a worker host, and refuse on their own without the service-role key.
+
+        A non-empty list does not stop the process. `/api/backend/health` reports
+        it as `misconfigured` (503) and every authenticated endpoint refuses
+        (`app.auth.require_configured`), so a bad deployment is visible and closed
+        without taking the rest of the site with it.
+        """
+        missing: list[str] = []
+        if self.environment not in ENVIRONMENTS:
+            missing.append("APP_ENV")
+        if self.is_production_like:
+            required = {
+                "SUPABASE_URL": self.supabase_url,
+                "SUPABASE_ANON_KEY": self.supabase_anon_key,
+            }
+            missing += [name for name, value in required.items() if not value.strip()]
+        return missing
 
     @model_validator(mode="after")
-    def _require_secrets_outside_local(self) -> Settings:
-        """Fail fast in staging/production if security-sensitive config is missing.
-
-        No silent defaults for secrets in deployed environments; local/dev may
-        run without them (e.g. for the health check and unit tests).
-        """
-        if self.is_production_like:
-            missing = [
-                name
-                for name, value in {
-                    "SUPABASE_URL": self.supabase_url,
-                    "SUPABASE_SERVICE_ROLE_KEY": self.supabase_service_role_key,
-                    "SUPABASE_JWT_SECRET": self.supabase_jwt_secret,
-                    "DATABASE_URL": self.database_url,
-                }.items()
-                if not value
-            ]
-            if missing:
-                raise ValueError(
-                    f"Missing required configuration for {self.app_env}: {', '.join(missing)}"
-                )
+    def _local_storage_only_locally(self) -> Settings:
+        # A deployed worker must never write video bytes to a test stand-in.
+        if self.r2_local_s3_endpoint and self.environment != "local":
+            raise ValueError("R2_LOCAL_S3_ENDPOINT is only allowed in local isolated tests")
         return self
 
 

@@ -1,0 +1,18 @@
+{
+  "rows": 1200,
+  "products": 786,
+  "multiVariantGroups": 177,
+  "sizes": {
+    "max": 24,
+    "ge10": 2
+  },
+  "groupsWithDifferentAlbum": 0,
+  "groupsWithDifferentPrice": 0,
+  "groupsWithSparseSuffixes": 3,
+  "examplesDifferentPrice": [],
+  "examplesDifferentAlbum": [],
+  "examplesLarge": [
+    "106-Jaguar-160: 12 variants (160-007,160-010,160-015,160-017,160-023,160-040,160-060,160-085,160-087,160-102,160-103,160-105…)",
+    "106-Jaguar-161: 24 variants (161-003,161-020,161-021,161-022,161-024,161-025,161-050,161-051,161-052,161-061,161-062,161-063…)"
+  ]
+}

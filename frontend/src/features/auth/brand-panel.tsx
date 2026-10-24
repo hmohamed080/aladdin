@@ -9,16 +9,16 @@ import { Brand } from "@/components/layout/brand";
 export function AuthBrandPanel({ name, tagline, note }: { name: string; tagline: string; note: string }) {
   return (
     <div className="relative hidden overflow-hidden bg-brand-basalt desktop:flex desktop:flex-col desktop:justify-between desktop:p-xl">
-      {/* Restrained Lumen bloom in the corner (the aperture's focal glow). */}
+      {/* Restrained terracotta bloom in the corner (the aperture's focal glow). */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -end-24 -top-24 h-96 w-96 rounded-pill"
-        style={{ background: "radial-gradient(circle, rgba(243,171,62,0.16), transparent 62%)" }}
+        style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--muted-terracotta) 16%, transparent), transparent 62%)" }}
       />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
-        style={{ background: "linear-gradient(160deg, transparent, rgba(14,17,19,0.55))" }}
+        style={{ background: "linear-gradient(160deg, transparent, color-mix(in srgb, var(--deep-navy) 55%, transparent))" }}
       />
 
       <div className="relative flex items-center gap-sm">

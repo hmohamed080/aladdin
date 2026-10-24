@@ -1,0 +1,24 @@
+{"dataset":"5000 published products (10000 variants)","rpc":"public catalog page 1","n":15,"p50_ms":1951.2,"p95_ms":2210.6,"error":null}
+{"dataset":"5000 published products (10000 variants)","rpc":"public catalog last page","n":15,"p50_ms":1984.9,"p95_ms":2157.2,"error":null}
+{"dataset":"5000 published products (10000 variants)","rpc":"public catalog colour filter","n":15,"p50_ms":2157,"p95_ms":2410.1,"error":null}
+{"dataset":"5000 published products (10000 variants)","rpc":"public catalog price+stock+sort","n":15,"p50_ms":1415.5,"p95_ms":1520.4,"error":null}
+{"dataset":"5000 published products (10000 variants)","rpc":"public catalog search","n":15,"p50_ms":822,"p95_ms":959.1,"error":null}
+{"dataset":"5000 published products (10000 variants)","rpc":"public facets()","n":15,"p50_ms":417.8,"p95_ms":463,"error":null}
+{"dataset":"5000 published products (10000 variants)","rpc":"public facets(wallpaper)","n":15,"p50_ms":418.6,"p95_ms":473.3,"error":null}
+{"dataset":"5000 published products (10000 variants)","rpc":"public product detail","n":15,"p50_ms":6,"p95_ms":8,"error":null}
+{"dataset":"5000 published products (10000 variants)","rpc":"seller products page 1","n":15,"p50_ms":115.2,"p95_ms":123,"error":null}
+{"dataset":"5000 published products (10000 variants)","rpc":"seller products deep page","n":15,"p50_ms":117,"p95_ms":126.2,"error":null}
+{"dataset":"5000 published products (10000 variants)","rpc":"seller products search","n":15,"p50_ms":141,"p95_ms":172,"error":null}
+{"dataset":"5000 published products (10000 variants)","rpc":"seller product readiness","n":15,"p50_ms":9.2,"p95_ms":13.3,"error":null}
+{"dataset":"15000 published products (30000 variants)","rpc":"public catalog page 1","n":5,"p50_ms":3005.1,"p95_ms":3005.5,"error":"canceling statement due to statement timeout"}
+{"dataset":"15000 published products (30000 variants)","rpc":"public catalog last page","n":5,"p50_ms":3004.4,"p95_ms":3005.3,"error":"canceling statement due to statement timeout"}
+{"dataset":"15000 published products (30000 variants)","rpc":"public catalog colour filter","n":5,"p50_ms":3004.6,"p95_ms":3006.3,"error":"canceling statement due to statement timeout"}
+{"dataset":"15000 published products (30000 variants)","rpc":"public catalog price+stock+sort","n":5,"p50_ms":3004.6,"p95_ms":3005.1,"error":"canceling statement due to statement timeout"}
+{"dataset":"15000 published products (30000 variants)","rpc":"public catalog search","n":5,"p50_ms":1268.2,"p95_ms":1305.8,"error":null}
+{"dataset":"15000 published products (30000 variants)","rpc":"public facets()","n":5,"p50_ms":1198.2,"p95_ms":1220.7,"error":null}
+{"dataset":"15000 published products (30000 variants)","rpc":"public facets(wallpaper)","n":5,"p50_ms":1196.2,"p95_ms":1260.5,"error":null}
+{"dataset":"15000 published products (30000 variants)","rpc":"public product detail","n":5,"p50_ms":8.4,"p95_ms":8.8,"error":null}
+{"dataset":"15000 published products (30000 variants)","rpc":"seller products page 1","n":5,"p50_ms":340.8,"p95_ms":344.5,"error":null}
+{"dataset":"15000 published products (30000 variants)","rpc":"seller products deep page","n":5,"p50_ms":362.1,"p95_ms":379.6,"error":null}
+{"dataset":"15000 published products (30000 variants)","rpc":"seller products search","n":5,"p50_ms":388,"p95_ms":401.5,"error":null}
+{"dataset":"15000 published products (30000 variants)","rpc":"seller product readiness","n":5,"p50_ms":9,"p95_ms":9,"error":null}

@@ -1,0 +1,1202 @@
+[
+  {
+    "page": "home",
+    "width": 390,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 3,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "marketplace",
+    "width": 390,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "product",
+    "width": 390,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 2,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "sign-in",
+    "width": 390,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 4,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "showroom-sign-up",
+    "width": 390,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 3,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "b2b",
+    "width": 390,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-list",
+    "width": 390,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-new",
+    "width": 390,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      },
+      {
+        "id": "label",
+        "impact": "critical",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-edit",
+    "width": 390,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 11
+      },
+      {
+        "id": "label",
+        "impact": "critical",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "imports",
+    "width": 390,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "admin-sellers",
+    "width": 390,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "admin-media",
+    "width": 390,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 8,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "home",
+    "width": 390,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 3,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "marketplace",
+    "width": 390,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 3
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "product",
+    "width": 390,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 2,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "sign-in",
+    "width": 390,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 4,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "showroom-sign-up",
+    "width": 390,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 3,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "b2b",
+    "width": 390,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-list",
+    "width": 390,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-new",
+    "width": 390,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 1
+      },
+      {
+        "id": "label",
+        "impact": "critical",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-edit",
+    "width": 390,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 10
+      },
+      {
+        "id": "label",
+        "impact": "critical",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "imports",
+    "width": 390,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "admin-sellers",
+    "width": 390,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "admin-media",
+    "width": 390,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 8,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "home",
+    "width": 768,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "nodes": 4
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 10,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "marketplace",
+    "width": 768,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "nodes": 4
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 9,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "product",
+    "width": 768,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 1
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "nodes": 4
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 11,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "sign-in",
+    "width": 768,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 4,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "showroom-sign-up",
+    "width": 768,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 3,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "b2b",
+    "width": 768,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-list",
+    "width": 768,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-new",
+    "width": 768,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      },
+      {
+        "id": "label",
+        "impact": "critical",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-edit",
+    "width": 768,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 11
+      },
+      {
+        "id": "label",
+        "impact": "critical",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "imports",
+    "width": 768,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "admin-sellers",
+    "width": 768,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "admin-media",
+    "width": 768,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 8,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "home",
+    "width": 768,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "nodes": 4
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 10,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "marketplace",
+    "width": 768,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 3
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "nodes": 4
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 9,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "product",
+    "width": 768,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 1
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "nodes": 4
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 11,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "sign-in",
+    "width": 768,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 4,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "showroom-sign-up",
+    "width": 768,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 3,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "b2b",
+    "width": 768,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-list",
+    "width": 768,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-new",
+    "width": 768,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 1
+      },
+      {
+        "id": "label",
+        "impact": "critical",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-edit",
+    "width": 768,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 10
+      },
+      {
+        "id": "label",
+        "impact": "critical",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "imports",
+    "width": 768,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "admin-sellers",
+    "width": 768,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "admin-media",
+    "width": 768,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 8,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "home",
+    "width": 1440,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "nodes": 4
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 12,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "marketplace",
+    "width": 1440,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "nodes": 4
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 29,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "product",
+    "width": 1440,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "nodes": 4
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 13,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "sign-in",
+    "width": 1440,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 4,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "showroom-sign-up",
+    "width": 1440,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 3,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "b2b",
+    "width": 1440,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-list",
+    "width": 1440,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 7
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 7,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-new",
+    "width": 1440,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      },
+      {
+        "id": "label",
+        "impact": "critical",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 3,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-edit",
+    "width": 1440,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 11
+      },
+      {
+        "id": "label",
+        "impact": "critical",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 3,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "imports",
+    "width": 1440,
+    "scheme": "light",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "admin-sellers",
+    "width": 1440,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "admin-media",
+    "width": 1440,
+    "scheme": "light",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 8,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "home",
+    "width": 1440,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "nodes": 4
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 12,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "marketplace",
+    "width": 1440,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "nodes": 4
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 29,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "product",
+    "width": 1440,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "nodes": 4
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 13,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "sign-in",
+    "width": 1440,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 4,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "showroom-sign-up",
+    "width": 1440,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 3,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "b2b",
+    "width": 1440,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-list",
+    "width": 1440,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 7
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 7,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-new",
+    "width": 1440,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 1
+      },
+      {
+        "id": "label",
+        "impact": "critical",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 3,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "seller-edit",
+    "width": 1440,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 10
+      },
+      {
+        "id": "label",
+        "impact": "critical",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 3,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "imports",
+    "width": 1440,
+    "scheme": "dark",
+    "violations": [],
+    "overflowX": 0,
+    "smallTargets": 1,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "admin-sellers",
+    "width": 1440,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 1
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 0,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  },
+  {
+    "page": "admin-media",
+    "width": 1440,
+    "scheme": "dark",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": 2
+      }
+    ],
+    "overflowX": 0,
+    "smallTargets": 8,
+    "imgsNoAlt": 0,
+    "dir": "rtl",
+    "hydration": 0,
+    "hydrationSample": ""
+  }
+]

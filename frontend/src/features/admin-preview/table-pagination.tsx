@@ -110,7 +110,7 @@ export function TablePagination({
                 className={cn(
                   buttonBase,
                   "tabular-nums",
-                  item === page ? "bg-accent-solid text-on-accent" : "text-fg-secondary hover:bg-surface-2",
+                  item === page ? "bg-accent-solid ring-1 ring-accent-edge text-on-accent" : "text-fg-secondary hover:bg-surface-2",
                 )}
               >
                 {formatCount(item, locale)}

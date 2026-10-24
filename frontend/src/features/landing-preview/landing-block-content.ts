@@ -7,7 +7,7 @@ type Copy = {
   namePending: string; rolePending: string; cta: string; ctaText: string;
   register: string; contact: string; footerDescription: string; quickLinks: string;
   account: string; support: string; signIn: string; privacy: string;
-  terms: string; help: string; supportText: string; copyright: string;
+  terms: string; dataDeletion: string; help: string; supportText: string; copyright: string;
 };
 
 export const landingBlockContent = {
@@ -39,7 +39,7 @@ export const landingBlockContent = {
     register: "إنشاء حساب", contact: "تواصل معنا",
     footerDescription: "منصة تجمع الشركات والمبيعات والمحترفين وأصحاب المشاريع، من الاحتياج إلى القرار والتنفيذ.",
     quickLinks: "روابط سريعة", account: "حسابك", support: "تواصل معنا", signIn: "تسجيل الدخول",
-    privacy: "الخصوصية", terms: "الشروط", help: "المساعدة والدعم",
+    privacy: "الخصوصية", terms: "الشروط", dataDeletion: "حذف البيانات", help: "المساعدة والدعم",
     supportText: "للاستفسارات والمساعدة في الوصول إلى حسابك، زر صفحة الدعم.", copyright: "© Aladdin. جميع الحقوق محفوظة.",
   },
   en: {
@@ -70,7 +70,7 @@ export const landingBlockContent = {
     register: "Create account", contact: "Contact us",
     footerDescription: "Connecting businesses, sales teams, professionals and project owners, from a need to a decision and execution.",
     quickLinks: "Quick links", account: "Your account", support: "Contact us", signIn: "Sign in",
-    privacy: "Privacy", terms: "Terms", help: "Help and support",
+    privacy: "Privacy", terms: "Terms", dataDeletion: "Data deletion", help: "Help and support",
     supportText: "For questions and help accessing your account, visit our support page.", copyright: "© Aladdin. All rights reserved.",
   },
 } satisfies Record<"ar" | "en", Copy>;

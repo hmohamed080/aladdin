@@ -25,6 +25,8 @@ vi.mock("@/components/layout/app-shell", () => ({
 vi.mock("@/components/layout/sidebar-shell", () => ({ SidebarShell: () => null }));
 vi.mock("@/components/layout/workspace-nav", () => ({ WorkspaceNavPanel: () => null, MobileNav: () => null }));
 vi.mock("@/features/sales/sales-realtime", () => ({ SalesRealtime: () => null }));
+vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({}) }));
+vi.mock("@/server/queries/marketplace-seller", () => ({ loadMarketplaceSellerStatus: async () => null }));
 
 import { WorkspaceShell } from "./workspace-shell";
 import type { WorkspaceEntry } from "@/lib/workspace/model";

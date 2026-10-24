@@ -1,0 +1,120 @@
+{
+  "seller-new": [
+    {
+      "id": "color-contrast",
+      "nodes": [
+        {
+          "target": ".underline-offset-2",
+          "html": "<button type=\"button\" class=\"font-medium text-accent underline-offset-2 hover:underline disabled:opacity-50\">اختر من جهازك</button>",
+          "why": "Fix any of the following:\n  Element has insufficient color contrast of 2.81 (foreground color: #b96f52, background color: #e8dbc4, font size: 10.5pt (14px), fon"
+        },
+        {
+          "target": ".hover\\:underline.text-accent[href$=\"products\"]",
+          "html": "<a class=\"text-accent hover:underline\" href=\"/b2c/seller/products\">← <!-- -->منتجات الماركت</a>",
+          "why": "Fix any of the following:\n  Element has insufficient color contrast of 3.19 (foreground color: #b96f52, background color: #f2e9d8, font size: 9.8pt (13px), font"
+        }
+      ]
+    },
+    {
+      "id": "label",
+      "nodes": [
+        {
+          "target": "input[type=\"file\"]",
+          "html": "<input type=\"file\" accept=\"image/jpeg,image/png,image/webp\" multiple=\"\" class=\"sr-only\">",
+          "why": "Fix any of the following:\n  Element does not have an implicit (wrapped) <label>\n  Element does not have an explicit <label>\n  aria-label attribute does not exis"
+        }
+      ]
+    }
+  ],
+  "seller-edit": [
+    {
+      "id": "color-contrast",
+      "nodes": [
+        {
+          "target": ".underline-offset-2",
+          "html": "<button type=\"button\" class=\"font-medium text-accent underline-offset-2 hover:underline\">اختر من جهازك</button>",
+          "why": "Fix any of the following:\n  Element has insufficient color contrast of 2.81 (foreground color: #b96f52, background color: #e8dbc4, font size: 10.5pt (14px), fon"
+        },
+        {
+          "target": ".border-accent-solid > .flex-wrap.gap-1.flex > .border-danger\\/50.text-danger.hover\\:bg-danger\\/10",
+          "html": "<button type=\"button\" class=\"inline-flex select-none items-center justify-center rounded-sm font-medium transition-[background-color,color,o",
+          "why": "Fix any of the following:\n  Element has insufficient color contrast of 3.19 (foreground color: #b96f52, background color: #f2e9d8, font size: 9.8pt (13px), font"
+        },
+        {
+          "target": ".gap-xs.p-xs:nth-child(2) > .flex-wrap.gap-1.flex > .border-danger\\/50.text-danger.hover\\:bg-danger\\/10",
+          "html": "<button type=\"button\" class=\"inline-flex select-none items-center justify-center rounded-sm font-medium transition-[background-color,color,o",
+          "why": "Fix any of the following:\n  Element has insufficient color contrast of 3.19 (foreground color: #b96f52, background color: #f2e9d8, font size: 9.8pt (13px), font"
+        },
+        {
+          "target": ".gap-xs.p-xs:nth-child(3) > .flex-wrap.gap-1.flex > .border-danger\\/50.text-danger.hover\\:bg-danger\\/10",
+          "html": "<button type=\"button\" class=\"inline-flex select-none items-center justify-center rounded-sm font-medium transition-[background-color,color,o",
+          "why": "Fix any of the following:\n  Element has insufficient color contrast of 3.19 (foreground color: #b96f52, background color: #f2e9d8, font size: 9.8pt (13px), font"
+        }
+      ]
+    },
+    {
+      "id": "label",
+      "nodes": [
+        {
+          "target": "input[type=\"file\"]",
+          "html": "<input type=\"file\" accept=\"image/jpeg,image/png,image/webp\" multiple=\"\" class=\"sr-only\">",
+          "why": "Fix any of the following:\n  Element does not have an implicit (wrapped) <label>\n  Element does not have an explicit <label>\n  aria-label attribute does not exis"
+        }
+      ]
+    }
+  ],
+  "seller-list": [
+    {
+      "id": "color-contrast",
+      "nodes": [
+        {
+          "target": ".last\\:border-b-0.hover\\:bg-surface-2\\/40:nth-child(1) > .text-center:nth-child(5) > .gap-0\\.5.flex-col.items-center > .hover\\:underline.text-accent",
+          "html": "<a class=\"text-label text-accent hover:underline\" title=\"هذا المنتج له أكثر من خيار أو موقع — عدّل المخزون من صفحة المنتج.\" href=\"/b2c/selle",
+          "why": "Fix any of the following:\n  Element has insufficient color contrast of 3.19 (foreground color: #b96f52, background color: #f2e9d8, font size: 9.8pt (13px), font"
+        },
+        {
+          "target": ".last\\:border-b-0.hover\\:bg-surface-2\\/40:nth-child(5) > .text-center:nth-child(5) > .gap-0\\.5.flex-col.items-center > .hover\\:underline.text-accent",
+          "html": "<a class=\"text-label text-accent hover:underline\" title=\"هذا المنتج له أكثر من خيار أو موقع — عدّل المخزون من صفحة المنتج.\" href=\"/b2c/selle",
+          "why": "Fix any of the following:\n  Element has insufficient color contrast of 3.19 (foreground color: #b96f52, background color: #f2e9d8, font size: 9.8pt (13px), font"
+        },
+        {
+          "target": ".last\\:border-b-0.hover\\:bg-surface-2\\/40:nth-child(8) > .text-center:nth-child(5) > .gap-0\\.5.flex-col.items-center > .hover\\:underline.text-accent",
+          "html": "<a class=\"text-label text-accent hover:underline\" title=\"هذا المنتج له أكثر من خيار أو موقع — عدّل المخزون من صفحة المنتج.\" href=\"/b2c/selle",
+          "why": "Fix any of the following:\n  Element has insufficient color contrast of 3.19 (foreground color: #b96f52, background color: #f2e9d8, font size: 9.8pt (13px), font"
+        },
+        {
+          "target": ".last\\:border-b-0.hover\\:bg-surface-2\\/40:nth-child(9) > .text-center:nth-child(5) > .gap-0\\.5.flex-col.items-center > .hover\\:underline.text-accent",
+          "html": "<a class=\"text-label text-accent hover:underline\" title=\"هذا المنتج له أكثر من خيار أو موقع — عدّل المخزون من صفحة المنتج.\" href=\"/b2c/selle",
+          "why": "Fix any of the following:\n  Element has insufficient color contrast of 3.19 (foreground color: #b96f52, background color: #f2e9d8, font size: 9.8pt (13px), font"
+        }
+      ]
+    }
+  ],
+  "marketplace": [
+    {
+      "id": "target-size",
+      "nodes": [
+        {
+          "target": "a[href$=\"sign-up\"]",
+          "html": "<a href=\"/auth/sign-up\">إنشاء حساب</a>",
+          "why": "Fix any of the following:\n  Target has insufficient size (63.4px by 15px, should be at least 24px by 24px)\n  Target has insufficient space to its closest neighb"
+        },
+        {
+          "target": "li:nth-child(2) > a[href$=\"sign-in\"]",
+          "html": "<a href=\"/auth/sign-in\">تسجيل الدخول</a>",
+          "why": "Fix any of the following:\n  Target has insufficient size (76.6px by 15px, should be at least 24px by 24px)\n  Target has insufficient space to its closest neighb"
+        },
+        {
+          "target": "a[href$=\"privacy\"]",
+          "html": "<a href=\"/legal/privacy\">الخصوصية</a>",
+          "why": "Fix any of the following:\n  Target has insufficient size (56px by 15px, should be at least 24px by 24px)\n  Target has insufficient space to its closest neighbor"
+        },
+        {
+          "target": "a[href$=\"terms\"]",
+          "html": "<a href=\"/legal/terms\">الشروط</a>",
+          "why": "Fix any of the following:\n  Target has insufficient size (39.5px by 15px, should be at least 24px by 24px)\n  Target has insufficient space to its closest neighb"
+        }
+      ]
+    }
+  ]
+}

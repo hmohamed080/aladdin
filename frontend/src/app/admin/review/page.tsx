@@ -136,7 +136,7 @@ export default async function PreviewReviewQueuePage({
   };
   // A lead edge + badge tone per type, so the separated workflows are visible at a glance.
   const kindStyle: Record<Kind, { edge: string; tone: "accent" | "info" | "neutral" | "warning" }> = {
-    orgRequest: { edge: "bg-accent-solid", tone: "accent" },
+    orgRequest: { edge: "bg-accent-solid ring-1 ring-accent-edge", tone: "accent" },
     networkReferral: { edge: "bg-info", tone: "info" },
     verification: { edge: "bg-fg-muted", tone: "neutral" },
     salesReferral: { edge: "bg-warning", tone: "warning" },

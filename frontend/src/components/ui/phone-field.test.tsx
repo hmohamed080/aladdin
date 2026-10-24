@@ -2,7 +2,7 @@ import { renderToString } from "react-dom/server";
 import { fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { renderWithI18n } from "@/test/render";
-import { I18nProvider } from "@/lib/i18n/context";
+import { I18nProvider } from "@/lib/i18n/provider";
 import { directionFor } from "@/lib/i18n/config";
 import type { Locale } from "@/lib/i18n/locales";
 import { PhoneField } from "./phone-field";

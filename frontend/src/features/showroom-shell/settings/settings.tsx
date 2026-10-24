@@ -11,6 +11,7 @@ import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
 import { formatCount } from "@/lib/ui/format";
 import { maskEmail } from "@/lib/ui/mask-email";
 import { isCraftsmanLoginAlias, userFacingEmail } from "@/lib/auth/craftsman-login-alias";
+import { getCurrentUser } from "@/server/auth/session";
 import { OrganizationIdentityDialog } from "@/features/organization/organization-identity-dialog";
 import { BranchGovernance } from "@/features/organization/branch-governance";
 import { describeLocation, type BranchLocationValue } from "@/lib/location/describe-location";
@@ -108,7 +109,7 @@ export async function ShowroomSettings({ ctx, locale, section: rawSection }: { c
           {section === "activities" ? <ActivitiesSection ctx={ctx} locale={locale} /> : null}
           {section === "branches" ? <BranchesSection ctx={ctx} locale={locale} canManageBranches={canManageBranches} /> : null}
           {section === "access" ? <AccessSection ctx={ctx} locale={locale} canManagePeople={canManagePeople} /> : null}
-          {section === "account" ? <AccountSection ctx={ctx} locale={locale} /> : null}
+          {section === "account" ? <AccountSection locale={locale} /> : null}
           {section === "appearance" ? <AppearanceSection locale={locale} /> : null}
           {section === "support" ? (
             <Card>
@@ -132,7 +133,7 @@ async function BusinessSection({ ctx, locale, canManageOrg }: { ctx: Ctx; locale
   const [{ data: record }, identityState, imageUrl, ownContact] = await Promise.all([
     supabase
       .from("organizations")
-      .select("name, org_type, status, is_verified, name_ar, name_en, timezone, description, legal_name, contact_phone, contact_email")
+      .select("name, org_type, status, business_verified_at, name_ar, name_en, timezone, description, legal_name, contact_phone, contact_email")
       .eq("id", org.organizationId)
       .maybeSingle(),
     // A verified organization's name changes only through a review request (never a direct edit).
@@ -141,7 +142,8 @@ async function BusinessSection({ ctx, locale, canManageOrg }: { ctx: Ctx; locale
     // WhatsApp and the visibility flags (org.manage only); the phone and e-mail below come from the organization itself.
     canManageOrg ? getOwnOrganizationContact(supabase, org.organizationId) : Promise.resolve(null),
   ]);
-  const verified = record?.is_verified ?? false;
+  // The badge is business verification, not approval of the application (status above).
+  const verified = record?.business_verified_at != null;
   const pending = record?.status === "pending_verification";
   return (
     <>
@@ -197,6 +199,11 @@ async function BusinessSection({ ctx, locale, canManageOrg }: { ctx: Ctx; locale
           </div>
           <p className="text-body text-fg-secondary">{verified ? m.settings.verifiedBody : m.settings.unverifiedBody}</p>
           {pending ? <p className="text-label text-fg-muted">{m.settings.verificationPending}</p> : null}
+          {canManageOrg ? (
+            <Link href={`${SHOWROOM_ROOT}/verification`} className={buttonLink} data-testid="settings-business-verification-link">
+              <BadgeCheckIcon size={16} />{t("businessVerification.owner.title")}
+            </Link>
+          ) : null}
         </div>
       </Card>
     </>
@@ -293,13 +300,13 @@ function AccessSection({ ctx, locale, canManagePeople }: { ctx: Ctx; locale: Loc
   );
 }
 
-async function AccountSection({ ctx, locale }: { ctx: Ctx; locale: Locale }) {
-  const [identity, { data: auth }] = await Promise.all([loadMyIdentity(), ctx.supabase.auth.getUser()]);
+async function AccountSection({ locale }: { locale: Locale }) {
+  const [identity, authUser] = await Promise.all([loadMyIdentity(), getCurrentUser()]);
   const m = getMessages(locale);
   // An installer phone account's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
-  const visible = userFacingEmail(auth.user?.email);
+  const visible = userFacingEmail(authUser?.email);
   const signInEmail = visible ? maskEmail(visible) : null;
-  const phonePassword = isCraftsmanLoginAlias(auth.user?.email);
+  const phonePassword = isCraftsmanLoginAlias(authUser?.email);
   const t = createTranslator(locale);
   return (
     <>

@@ -6,37 +6,41 @@ import Cropper, { type Area } from "react-easy-crop";
 import { useI18n } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/controls";
 import { InlineError, InlineSuccess } from "@/components/ui/primitives";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { uploadWithGrant } from "@/lib/storage/browser-upload";
+import { encodeCanvasWithin, ImagePrepareError } from "@/lib/media/resize-image";
 import {
   AVATAR_ALLOWED_TYPES,
-  AVATAR_BUCKET,
+  AVATAR_MAX_BYTES,
   AVATAR_OUTPUT_PX,
   AVATAR_OUTPUT_TYPE,
   validateAvatarFile,
 } from "@/lib/storage/avatar-assets";
-import { confirmAvatarUploadAction, requestAvatarUploadAction } from "@/server/actions/profile-identity";
+import { confirmAvatarUploadAction, requestAvatarUploadAction, deleteAvatarAction } from "@/server/actions/profile-identity";
 
-/** Renders the chosen square of the source image into a fixed-size JPEG. */
+/**
+ * Renders the chosen square of the source image into a fixed 512 px asset: WebP
+ * where the browser can encode it (about a third smaller than the JPEG at the
+ * same quality), else JPEG. 512 px covers the largest avatar rendering at 3x DPR
+ * with margin; the server's derived 320 px thumb serves the small placements.
+ */
 async function cropToBlob(src: string, area: Area): Promise<Blob> {
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("image load failed"));
+    img.onerror = () => reject(new ImagePrepareError("decode"));
     img.src = src;
   });
   const canvas = document.createElement("canvas");
   canvas.width = AVATAR_OUTPUT_PX;
   canvas.height = AVATAR_OUTPUT_PX;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("canvas unavailable");
-  // JPEG has no alpha: a transparent PNG would otherwise flatten to black. This
-  // is pixel data baked into the uploaded file, not a themed UI colour.
+  if (!ctx) throw new ImagePrepareError("canvas");
+  // A JPEG fallback has no alpha: a transparent PNG would otherwise flatten to
+  // black. This is pixel data baked into the uploaded file, not a themed UI colour.
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, AVATAR_OUTPUT_PX, AVATAR_OUTPUT_PX);
   ctx.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, AVATAR_OUTPUT_PX, AVATAR_OUTPUT_PX);
-  return new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), AVATAR_OUTPUT_TYPE, 0.9),
-  );
+  return encodeCanvasWithin(canvas, 0.9, AVATAR_OUTPUT_TYPE, AVATAR_MAX_BYTES);
 }
 
 /**
@@ -97,20 +101,17 @@ export function AvatarField({ avatarUrl, displayName }: { avatarUrl: string | nu
     setError(null);
     try {
       const blob = await cropToBlob(source, area);
-      const ticket = await requestAvatarUploadAction(AVATAR_OUTPUT_TYPE);
+      const ticket = await requestAvatarUploadAction(blob.type, blob.size);
       if (!ticket.ok) throw new Error(ticket.code);
-      const supabase = createBrowserSupabaseClient();
-      const { error: uploadError } = await supabase.storage
-        .from(AVATAR_BUCKET)
-        .upload(ticket.key, blob, { contentType: AVATAR_OUTPUT_TYPE, upsert: false });
-      if (uploadError) throw uploadError;
+      await uploadWithGrant(ticket.grant, blob);
       const confirmed = await confirmAvatarUploadAction(ticket.key);
       if (!confirmed.ok) throw new Error(confirmed.code);
       reset();
       setSaved(true);
       router.refresh();
-    } catch {
-      setError(t("profileIdentity.avatar.errorUpload"));
+    } catch (e) {
+      // A photo this device could not crop or fit is named as such, not reported as a failed upload.
+      setError(t(e instanceof ImagePrepareError ? "profileIdentity.avatar.errorPrepare" : "profileIdentity.avatar.errorUpload"));
     } finally {
       setBusy(false);
     }
@@ -127,6 +128,9 @@ export function AvatarField({ avatarUrl, displayName }: { avatarUrl: string | nu
           <img
             src={avatarUrl}
             alt={t("profileIdentity.avatar.label")}
+            width={80}
+            height={80}
+            decoding="async"
             className="h-20 w-20 rounded-full border object-cover"
             data-testid="avatar-current"
           />
@@ -147,9 +151,22 @@ export function AvatarField({ avatarUrl, displayName }: { avatarUrl: string | nu
           data-testid="avatar-input"
           onChange={onPick}
         />
-        <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
+        <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => inputRef.current?.click()}>
           {avatarUrl ? t("profileIdentity.avatar.change") : t("profileIdentity.avatar.add")}
         </Button>
+        {avatarUrl ? (
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={async () => {
+            setBusy(true); setError(null);
+            try {
+              const result = await deleteAvatarAction();
+              if (!result.ok) setError(t(result.code));
+              else router.refresh();
+            } catch { setError(t("profileIdentity.avatar.errorUpload")); }
+            finally { setBusy(false); }
+          }}>
+            {t("profileIdentity.avatar.remove")}
+          </Button>
+        ) : null}
       </div>
       {saved ? <InlineSuccess>{t("profileIdentity.avatar.saved")}</InlineSuccess> : null}
       {error && !source ? <InlineError>{error}</InlineError> : null}
@@ -159,7 +176,7 @@ export function AvatarField({ avatarUrl, displayName }: { avatarUrl: string | nu
           role="dialog"
           aria-modal="true"
           aria-labelledby="avatar-crop-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-md"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-deep-navy/60 p-md"
         >
           <div className="flex w-full max-w-md flex-col gap-md rounded-lg bg-surface p-md shadow-lg">
             <h2 id="avatar-crop-title" className="text-title text-fg">

@@ -1,6 +1,6 @@
-import { HomeIcon, ClipboardIcon, StorefrontIcon, UserIcon, UsersIcon, BriefcaseIcon, GiftIcon, SettingsIcon, StarIcon, ScrollIcon, TagIcon, BarChartIcon, ActivityIcon, LayersIcon } from "@/components/ui/icons";
+import { HomeIcon, ClipboardIcon, StorefrontIcon, UserIcon, UsersIcon, BriefcaseIcon, GiftIcon, SettingsIcon, StarIcon, ScrollIcon, TagIcon, BarChartIcon, ActivityIcon, LayersIcon, BadgeCheckIcon, MapPinIcon, TruckIcon } from "@/components/ui/icons";
 import type { InstallerNavItem } from "@/features/installer-dashboard-preview/installer-nav";
-import { NAV_CAPS } from "@/lib/nav/modules";
+import { MARKETPLACE_SELL_ENTITLEMENT, NAV_CAPS } from "@/lib/nav/modules";
 
 export const SHOWROOM_ROOT = "/showroom";
 /** The completed commerce modules that still live under /b2b; the Showroom shell now frames them (see b2b/layout). */
@@ -43,10 +43,17 @@ export const SHOWROOM_GROUPS = [
   ] },
   { label: { ar: "المنتجات", en: "Products" }, items: [
     v2("catalog", "تصفح المنتجات", "Browse products", StorefrontIcon, NAV_CAPS.catalog ?? []),
-    pending("offers", "العروض", "Offers", TagIcon, NAV_CAPS.catalog ?? []),
+    v2("offers", "العروض", "Offers", TagIcon, NAV_CAPS.catalog ?? []),
     v2("saved", "المنتجات المحفوظة", "Saved products", StarIcon, NAV_CAPS.saved ?? []),
     v2("my-products", "منتجاتي", "My products", StorefrontIcon, NAV_CAPS.products ?? []),
-    pending("my-offers", "إدارة العروض", "My offers", TagIcon, NAV_CAPS.products ?? []),
+    v2("my-offers", "إدارة العروض", "My offers", TagIcon, NAV_CAPS.products ?? []),
+  ] },
+  // Selling to consumers on the public Marketplace (B2C). Drawn ONLY for an organization a platform admin approved as a
+  // seller - an entitlement the shell adds to the capability list (see ShowroomFrame) - and never unlocked by org.manage.
+  { label: { ar: "الماركت", en: "Marketplace" }, items: [
+    legacy("marketplace-products", "/b2c/seller/products", "منتجات الماركت", "Marketplace products", StorefrontIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
+    legacy("marketplace-areas", "/b2c/seller/areas", "المناطق", "Delivery areas", MapPinIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
+    legacy("marketplace-delivery", "/b2c/seller/delivery", "توصيل المناطق", "Delivery prices", TruckIcon, [MARKETPLACE_SELL_ENTITLEMENT]),
   ] },
   { label: { ar: "الشبكة", en: "Network" }, items: [
     legacy("suppliers", `${LEGACY}/suppliers`, "الموردون", "Suppliers", StorefrontIcon),
@@ -59,11 +66,15 @@ export const SHOWROOM_GROUPS = [
     legacy("reports", `${LEGACY}/reports`, "التقارير والتحليلات", "Reports & analytics", BarChartIcon, NAV_CAPS.reports ?? []),
     legacy("activity", `${LEGACY}/activity`, "سجل النشاط", "Activity log", ActivityIcon, NAV_CAPS.activity ?? []),
     legacy("points", `${LEGACY}/points`, "النقاط", "Points", GiftIcon),
+    // The Verified badge request; owners only (the RPCs require org.manage on this organization).
+    v2("verification", "توثيق النشاط", "Business verification", BadgeCheckIcon, ["org.manage"]),
     v2("settings", "الإعدادات", "Settings", SettingsIcon),
   ] },
 ];
 
 export function canNavigate(item: ShowroomNavItem, capabilities: readonly string[]) {
+  // Marketplace selling is an admin-granted entitlement of the organization: org.manage must not unlock it.
+  if (item.id.startsWith("marketplace-")) return capabilities.includes(MARKETPLACE_SELL_ENTITLEMENT);
   // The activity log is an exact-capability module in the legacy workspace: org.manage must not unlock it.
   if (item.id === "activity") return item.capabilities.some((cap) => capabilities.includes(cap));
   return !item.capabilities.length || capabilities.includes("org.manage") || item.capabilities.some((cap) => capabilities.includes(cap));

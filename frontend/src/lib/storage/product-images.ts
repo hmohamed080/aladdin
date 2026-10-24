@@ -9,7 +9,10 @@
  */
 
 export const PRODUCT_IMAGE_BUCKET = "product-images";
-/** Mirrors the bucket's `file_size_limit`. */
+/**
+ * Mirrors the bucket's `file_size_limit`. It is the ceiling of the PREPARED upload
+ * (`resizeImageForUpload` fits every photo under it), not of the photo a person picks.
+ */
 export const PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const PRODUCT_IMAGE_MAX_COUNT = 3;
 export const PRODUCT_IMAGE_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
@@ -30,14 +33,19 @@ export function isProductImageContentType(type: string): type is ProductImageCon
 export type ProductImageErrorCode =
   | "showroomProducts.images.errorType"
   | "showroomProducts.images.errorSize"
+  | "showroomProducts.images.errorPrepare"
   | "showroomProducts.images.errorUpload";
 
 export type ProductImageValidation = { ok: true } | { ok: false; code: ProductImageErrorCode };
 
-/** Type + size of a chosen file, checked the instant it is picked. */
+/**
+ * Type of a chosen file, and that it is not empty, checked the instant it is picked.
+ * Its size is never a reason to refuse it: the upload path prepares a derivative
+ * within PRODUCT_IMAGE_MAX_BYTES, and the server re-checks that derivative.
+ */
 export function validateProductImageFile(file: { type: string; size: number }): ProductImageValidation {
   if (!isProductImageContentType(file.type)) return { ok: false, code: "showroomProducts.images.errorType" };
-  if (file.size <= 0 || file.size > PRODUCT_IMAGE_MAX_BYTES) return { ok: false, code: "showroomProducts.images.errorSize" };
+  if (file.size <= 0) return { ok: false, code: "showroomProducts.images.errorSize" };
   return { ok: true };
 }
 
