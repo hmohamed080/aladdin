@@ -34,5 +34,7 @@ docker run --rm -i -e DB_URL="$DB_URL" -v "$BK":/bk:ro postgres:17 sh -c 'psql "
 # 3. Verify against what the backup recorded before the rebuild.
 ( sb db query --workdir "$EMPTY" --linked -f "$BK/schema-fingerprint.sql" --output-format json 2>/dev/null | rows '`${x.k}|${x.h}|${x.len}`' ) > "$BK/fingerprint-restored.txt"
 ( sb db query --workdir "$EMPTY" --linked -f "$BK/rowcounts.sql" --output-format json 2>/dev/null | rows 'x.t' ) > "$BK/rowcounts-restored.txt"
-diff "$BK/fingerprint-before.txt" "$BK/fingerprint-restored.txt" && echo "Schema fingerprint matches the backup."
-diff "$BK/rowcounts-before.txt" "$BK/rowcounts-restored.txt" && echo "Row counts match the backup."
+OK=1
+if diff "$BK/fingerprint-before.txt" "$BK/fingerprint-restored.txt"; then echo "Schema fingerprint matches the backup."; else echo "FAILED: schema fingerprint differs from the backup."; OK=0; fi
+if diff "$BK/rowcounts-before.txt" "$BK/rowcounts-restored.txt"; then echo "Row counts match the backup."; else echo "FAILED: row counts differ from the backup."; OK=0; fi
+[ "$OK" = 1 ] || { echo "The restore is NOT verified. Tell Claude in the thread."; exit 1; }

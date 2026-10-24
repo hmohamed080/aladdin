@@ -11,8 +11,8 @@ set -euo pipefail
 REF="nxossqhdfltcqdwvbewi"                                 # aladdin-r2-acceptance ONLY
 FORBIDDEN="kkpkgjrweysgvhvkhzun"                           # staging / live data: never
 BRANCH="claude/project-thread-lz98jd"
-SHA="c7d34c648639f4f5a3ecd74b31f8067c829a8674"             # consolidated baseline, tested locally
-MANIFEST="5a26a710d5f54cb0a4eeed5435c93bf873a44517a202afd8af214b1036277e37"  # sha256 of `shasum -a 256 *.sql`
+SHA="e27358c1c27a2697ebe71fb55f8c5e335076d55e"             # consolidated baseline, tested locally
+MANIFEST="76353b2d7555f6b1b124c58e31a005c21efaa4a40668d2edfe71e0d9584ed183"  # sha256 of `shasum -a 256 *.sql`
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BACKUP="${HOME}/aladdin-acceptance-backup-$(date +%Y%m%d-%H%M%S)"
 MODE="${1:-}"
@@ -80,11 +80,12 @@ sb db reset --linked --no-seed
 # 3. Verify: migration history and schema fingerprint against the tested local replay.
 sb migration list --linked | tee "$BACKUP/migration-list-after.txt" | tail -3
 fp > "$BACKUP/fingerprint-after.txt"
-if diff "$HERE/local-noseed-fingerprint.txt" "$BACKUP/fingerprint-after.txt"; then
-  echo "Schema fingerprint MATCHES the locally tested baseline."
-else
-  echo "Schema fingerprint DIFFERS from the tested baseline (categories above). Tell Claude before using acceptance."
+if ! diff "$HERE/local-noseed-fingerprint.txt" "$BACKUP/fingerprint-after.txt"; then
+  echo "FAILED: the schema fingerprint DIFFERS from the tested baseline (categories above)."
+  echo "Acceptance is NO-GO. Tell Claude in the thread before using it."
+  echo "If you need the old state back: bash $BACKUP/restore-acceptance.sh $BACKUP"
+  exit 1
 fi
-echo "Done. Tell Claude in the thread; it re-checks through the Supabase connection."
-echo "If anything is wrong: bash $BACKUP/restore-acceptance.sh $BACKUP"
+echo "Schema fingerprint MATCHES the locally tested baseline."
+echo "Tell Claude in the thread; it re-checks through the Supabase connection."
 echo "Afterwards you can remove the temporary checkout with: git worktree remove $WT"

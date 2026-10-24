@@ -4,7 +4,7 @@ Scope: the migration set that main plus the media/verification PR stack (#88, #8
 
 ## The baseline
 
-- 180 migration files. The count is a result, not a target: it is 163 RC2 files (frozen by `supabase/permissions/baseline.json`), main's `20261017134139_account_entry_allowed` and `20261020090001_registration_data_sync`, and the 15 migrations that exist only on the PR stack.
+- 180 migration files at the 2026-10-22 baseline, 181 with the 2026-10-24 privilege fix. The count is a result, not a target: it is 163 RC2 files (frozen by `supabase/permissions/baseline.json`), main's `20261017134139_account_entry_allowed` and `20261020090001_registration_data_sync`, and the 15 migrations that exist only on the PR stack.
 - Manifest: `cd supabase/migrations && shasum -a 256 *.sql | shasum -a 256` = `5a26a710d5f54cb0a4eeed5435c93bf873a44517a202afd8af214b1036277e37`.
 - Main's `20261020090001` is byte-identical to main. It may already be applied somewhere, so it is never edited.
 
@@ -70,6 +70,25 @@ Status: untouched, still 105 migrations, including four pre-RC2 media versions t
 2. After approval, `--rebuild` runs `db reset --linked --no-seed` and compares the hosted fingerprint with `local-noseed-fingerprint.txt`.
 3. If needed, `restore-acceptance.sh <backup>` empties the project, restores it and verifies the fingerprint and row counts.
 4. Then, through the Supabase connection: advisors, the `media_edge_worker` role, and real API/auth/RLS/media tests.
+
+## Hosted ACL mismatch and fix (2026-10-24)
+
+The hosted rebuild applied all 180 migrations, but `default_acl` and `table_acl` differed from the local fingerprint. Cause: a hosted project gives role `postgres` default privileges in `public` of ALL (`arwdDxtm`) on new tables and views and `rwU` on new sequences, for anon, authenticated and service_role. The local CLI image grants only `Dxtm` (TRUNCATE, REFERENCES, TRIGGER, MAINTAIN) and `w` on sequences. Replaying the 180 migrations locally under the hosted defaults reproduces both hosted hashes exactly.
+
+Most migrations strip the defaults before granting. These objects never got a strip-then-grant:
+
+| Objects | Hosted before the fix | Intended |
+|---|---|---|
+| `dashboard_kpi_layouts` and 9 `security_invoker` views (`order_list`, `project_list`, `quotation_list`, `rfq_list`, 5 `sales_*`) | anon and authenticated ALL, service_role ALL | authenticated SELECT |
+| `admin_cases`, `admin_follow_ups`, `admin_notes`, `admin_suspensions`, `org_co_owners`, `organization_duplicate_resolutions`, `platform_flags`, `publishers` | service_role SELECT/INSERT/UPDATE/DELETE plus Dxtm | no service_role access (definer RPCs only) |
+| `job_review_moderations_seq_seq` | every client role `rwU` | none |
+| Every table, locally too | client roles kept Dxtm wherever a migration did not `revoke all` | none |
+
+Effective risk, checked locally under hosted defaults: anon could TRUNCATE `dashboard_kpi_layouts`, which RLS does not stop, and could `setval` the sequence; service_role could TRUNCATE `platform_flags`. Writes through the Data API were still refused (no write policies; the views run as the invoker and anon has no base-table rights), and PostgREST cannot issue TRUNCATE or call `setval`. So nothing was found to be exploitable through the API, but the hosted grants did not match the tested database.
+
+Fix: `20261024090001_revoke_platform_default_privileges.sql`, forward-only. It revokes the postgres default privileges in public for tables and sequences, revokes Dxtm from every client role on every public/app relation, and resets the objects above to their intended grants. Function permissions are unchanged (635 contracts). `supabase/tests/100_client_role_privileges_test.sql` fails 6/6 without the fix and passes with it. Results: 5,797/5,797 pgTAP under hosted-like defaults and under local defaults; the fresh, upgrade and hosted-like fingerprints are identical; the upgrade gate passes 18/18; lint shows 0 errors.
+
+The kit scripts now exit nonzero on any fingerprint, restore or rehearsal mismatch instead of printing "Done".
 
 ## Production (`kkpkgjrweysgvhvkhzun`): data-preserving plan
 

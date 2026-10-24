@@ -6,6 +6,7 @@
 - Hosted: unchanged. Acceptance `nxossqhdfltcqdwvbewi` has 105 migrations (drifted, rebuild pending approval); Production `kkpkgjrweysgvhvkhzun` must be rehearsed with `scripts/hosted-db/production-rehearsal.sh` before any push.
 - Backups must use `scripts/hosted-db/` (`db dump` alone loses storage policies, the auth trigger and exact grants).
 
+- 2026-10-24: acceptance was rebuilt to the 180 baseline by the owner; its ACL fingerprint failed because of hosted default privileges. Fix migration `20261024090001_revoke_platform_default_privileges` (181 files) is tested locally, not yet applied to acceptance. Acceptance is **NO-GO** until it is applied and the fingerprint matches. A `media_edge_worker` LOGIN role exists on acceptance only, with no password.
 ## Cloudflare migration, PR #97 — 2026-10-22 (later)
 
 - Branch `claude/cloudflare-workers-2ibvgs`: Next.js 16.4.2; R2/DNS/cutover, cost, security, Redis and video audits merged in. Status report and GO/NO-GO: [cloudflare-migration-status-2026-10-22.md](cloudflare-migration-status-2026-10-22.md). **Production NO-GO.**
