@@ -30,3 +30,7 @@ Prompt: A precisely aligned 2 by 2 contact sheet with four separate photorealist
 ### portraits.webp
 
 Prompt: Exactly 2 by 2 contact sheet of four distinct professional headshot portraits, equal square quadrants, edge to edge no gaps, no text. Top left Egyptian male architect early 30s short black hair neat beard dark navy blazer cream shirt. Top right Egyptian female interior designer late 20s dark shoulder-length hair terracotta blouse. Bottom left Egyptian male electrician early 30s trimmed beard navy workshirt and sand hardhat. Bottom right Egyptian male site engineer late 30s short hair and beard cream workshirt. All centered head and shoulders frontal confident friendly expressions, neutral warm sand studio backgrounds, realistic editorial photography, natural skin detail. No brand no text no watermarks. Fictional people for explicitly local sample UI.
+
+## portfolio-services.webp — 2026-10-24
+
+Generated with the built-in image tool: six fictional architectural-service editorial photographs in a three-column/two-row contact sheet: site supervision, plans/model, interior materials, drafting, client meeting, house model. No real customer work or endorsement is depicted. WebP quality 86 conversion using the project's existing Sharp dependency; CSS crops the sheet without distorting its proportions. Used as illustrative service and contact imagery.

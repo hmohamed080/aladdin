@@ -444,3 +444,7 @@ verification and actual account statistics must never be invented.
 
 
 Public portfolio reference (2026-10-22): standalone navy header, architectural hero, language-aware identity alignment, actual published statistics and content sections, cream light/navy dark surfaces, compact footer and mobile stacking. Public content must come only from public projections; omit missing data instead of borrowing private owner examples. Copy links exclude query strings and fragments.
+
+## Public portfolio reference correction — 2026-10-24
+
+Owner references govern the navy public header/search, architectural cover fading behind identity, compact statistics strip, four photographic project cards, paired about/specialty content, service photography, reviews and contact banner. Latest steering supersedes the long-page layout: Overview, Projects, Services, Reviews and Contact are real tabs; only the selected panel is mounted, with no URL fragment. Light/dark and language direction share one component. Local visual data is explicitly approved and labelled, gated by local app environment, loopback database, loopback request host and one designated profile ID; it does not alter real public records or appear on hosted builds. Sample contact actions explicitly keep drafts for the current visit without sending.

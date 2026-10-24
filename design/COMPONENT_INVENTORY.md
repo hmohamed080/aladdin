@@ -66,3 +66,7 @@ The register of reusable UI components. **Search this file before creating any c
 - No component is implemented yet; all `Ready` criteria (keyboard, focus-trap, SR labels, touch targets, responsive) are **pending first implementation**.
 - Icon library not yet installed (policy decided — see [`icons/README.md`](./icons/README.md)).
 - PDF/document component fonts (Arabic shaping) unresolved — see `DESIGN.md` Typography.
+
+## Public engineer portfolio — 2026-10-24
+
+`PublicPortfolioTabs`: selected-only panels, ARIA tab relationships, keyboard navigation, LTR/RTL. `PortfolioRail`: overflow-aware controls and scroll snapping. `PortfolioSearch`: current-section-only search. `PortfolioSampleActions`: labelled native dialog, local draft only; not a production communication workflow. Light/dark desktop and mobile reviewed; production contact integration is outstanding.

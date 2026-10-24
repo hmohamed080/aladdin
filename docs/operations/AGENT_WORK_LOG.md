@@ -1,3 +1,14 @@
+
+## 2026-10-24 — Public portfolio fidelity, actual tabs and readable links
+
+User rejected the sparse initial result, approved clearly labelled local sample content, then requested isolated tab panels and account-type/username URLs. Rebuilt the public portfolio around the supplied light/dark references, generated service photography, preserved production public projections, and added a four-condition local fixture guard. No real account fields were changed. Contact/sample favorite actions are illustrative; no messages or quotes are sent.
+
+Implemented `/p/{persona}/{username}` for already-published professional personas; UUID links redirect after a publication-guarded lookup, wrong persona and unavailable handles return not found. New additive migration 20261024100000 applied only to dedicated local `supabase_db_aladdin_engineer`; 13 new rollback pgTAP assertions pass plus 40 existing public-profile assertions. No hosted schema/data change, push, merge or deployment.
+
+Validation: TypeScript and focused ESLint pass; 39 component/query/media/fixture tests pass. Browser verified canonical URL, selected-only Projects/Services/Contact panels, local contact dialog naming and no-send wording, Arabic light/dark desktop, mobile rail and compact action row. Reviewer passed the public-portfolio revision and route boundary scope, not the entire application. Desktop screenshots at D:/projects/portfolio-revision-light.png and dark.png; mobile and final action-row proof saved separately. Concurrent auth/settings changes remain untouched.
+
+Remaining: production profile-directed messaging/quote integration, hosted migration rollout and PR review. Profiles without a username retain their legacy link until an owner supplies one; consumers and business-only accounts are not newly made public.
+
 ## 2026-10-22 — Profile portrait and verification revision
 
 Engineer settings reference composition added at `/home/settings`, scoped to

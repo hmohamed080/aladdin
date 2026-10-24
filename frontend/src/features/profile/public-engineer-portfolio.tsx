@@ -6,56 +6,63 @@ import type { Review } from "@/server/queries/reviews";
 import type { Locale } from "@/lib/i18n/locales";
 import { createTranslator } from "@/lib/i18n/translate";
 import { specializationLabel, tradeLabel } from "@/lib/i18n/trade-label";
-import { languageLabel } from "@/lib/i18n/language-label";
 import { summarizeReviews } from "@/lib/reviews/summary";
 import { I18nProvider } from "@/lib/i18n/context";
 import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
-import { ButtonLink } from "@/components/ui/controls";
-import { BriefcaseIcon, StarIcon, MapPinIcon, BuildingIcon, PencilIcon, PackageIcon, UsersIcon, ShieldIcon } from "@/components/ui/icons";
-import { AvailabilityBadge, AvailabilityAge } from "./availability-status";
-import { availabilityState } from "@/lib/profile/availability-state";
-import { PublicPortfolio } from "./public-portfolio";
-import { PublicReviews } from "./public-reviews";
+import { BriefcaseIcon, StarIcon, MapPinIcon, BuildingIcon, PencilIcon, PackageIcon, UsersIcon, HomeIcon, MonitorIcon, ArrowUpRightIcon, HeartIcon } from "@/components/ui/icons";
 import { PublicShare } from "./public-share";
+import { portfolioSampleContent } from "./public-portfolio-samples";
+import { PortfolioRail, PortfolioSearch, PortfolioSampleActions } from "./portfolio-controls";
+import { PublicPortfolioTabs, PublicTabJump } from "./public-portfolio-tabs";
 import "./public-engineer-portfolio.css";
 
-/** Public projection only. Never import owner identity, collections or fixtures here. */
-export function PublicEngineerPortfolio({ profile, portfolio, reviews, locale, theme }: {
-  profile: PublicProfile; portfolio: PublicPortfolioItem[]; reviews: Review[]; locale: Locale; theme: "light" | "dark";
+export function PublicEngineerPortfolio({profile, portfolio, reviews, locale, theme, sample = false}: {
+  profile: PublicProfile; portfolio: PublicPortfolioItem[]; reviews: Review[]; locale: Locale; theme: "light" | "dark"; sample?: boolean;
 }) {
-  const ar = locale === "ar";
-  const t = createTranslator(locale);
-  const name = profile.displayName?.trim() || t("profile.publicPage.unnamed");
-  const summary = summarizeReviews(reviews);
-  const specialties = profile.tradeKeys.length ? profile.tradeKeys.map(key => tradeLabel(t, key)) : profile.specialization ? [specializationLabel(t, profile.specialization)] : [];
-  const serviceIcons = [BuildingIcon, PencilIcon, PackageIcon, UsersIcon, BriefcaseIcon];
-  return <I18nProvider locale={locale} dir={ar ? "rtl" : "ltr"}><div className="public-engineer" data-testid="public-engineer-portfolio">
+  const ar = locale === "ar", t = createTranslator(locale);
+  const demo = sample ? portfolioSampleContent(locale) : null;
+  const name = demo?.name ?? (profile.displayName?.trim() || t("profile.publicPage.unnamed"));
+  const visibleReviews = demo?.reviews ?? reviews, summary = summarizeReviews(visibleReviews);
+  const specialties = demo?.specialties ?? (profile.tradeKeys.length ? profile.tradeKeys.map(key => tradeLabel(t, key)) : profile.specialization ? [specializationLabel(t, profile.specialization)] : []);
+  const services = demo?.services ?? profile.services.map(s => t(`onboarding.professional.serviceItems.${s}`));
+  const years = demo ? 10 : profile.yearsExperience, projects = demo?.projects ?? portfolio;
+  const icons = [BuildingIcon, MonitorIcon, HomeIcon, PencilIcon, BriefcaseIcon];
+  const actions = demo ? <PortfolioSampleActions ar={ar} /> : <PublicShare profileId={profile.id} locale={locale} />;
+  const heading = (title: string, subtitle?: string, target?: string, linkLabel?: string) => <div className="portfolio-section-heading"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{target && <a className="portfolio-small-link" href={target}>{linkLabel}<ArrowUpRightIcon size={15} /></a>}</div>;
+  return <I18nProvider locale={locale} dir={ar ? "rtl" : "ltr"}><div className="public-engineer" data-testid="public-engineer-portfolio" dir={ar ? "rtl" : "ltr"}>
     <a href="#main" className="sr-only focus:not-sr-only">{ar ? "انتقل للمحتوى" : "Skip to content"}</a>
-    <header className="public-engineer-topbar"><Link href="/" className="public-engineer-brand">{ar ? "علاء الدين" : "Aladdin"}<BuildingIcon size={30} /></Link><nav aria-label={ar ? "التنقل الرئيسي" : "Main navigation"}><Link href="/">{ar ? "الرئيسية" : "Home"}</Link>{portfolio.length > 0 && <a href="#projects">{ar ? "المشاريع" : "Projects"}</a>}{profile.services.length > 0 && <a href="#services">{ar ? "الخدمات" : "Services"}</a>}</nav><div className="public-engineer-tools"><LanguageSwitch /><ThemeSwitch current={theme} /><ButtonLink href={`/auth/sign-in?next=${encodeURIComponent(`/p/${profile.id}`)}`} variant="outline" size="sm">{ar ? "دخول" : "Sign in"}</ButtonLink></div></header>
-    <div className="public-engineer-breadcrumb"><Link href="/">{ar ? "الرئيسية" : "Home"}</Link><span aria-hidden="true">/</span><span>{ar ? "ملف مهندس" : "Engineer portfolio"}</span><span aria-hidden="true">/</span><bdi>{name}</bdi></div>
+    <header className="public-engineer-topbar">
+      <Link href="/" className="public-engineer-brand"><Image src="/brand/aladdin-mark.png" width={32} height={32} alt="" />{ar ? "علاء الدين" : "Aladdin"}</Link>
+      <nav aria-label={ar ? "التنقل الرئيسي" : "Main navigation"}><Link href="/">{ar ? "الرئيسية" : "Home"}</Link><Link href="/home/engineer/professionals">{ar ? "المهندسين والمكاتب" : "Professionals"}</Link>{projects.length > 0 && <PublicTabJump id="projects">{ar ? "المشاريع" : "Projects"}</PublicTabJump>}{services.length > 0 && <PublicTabJump id="services">{ar ? "الخدمات" : "Services"}</PublicTabJump>}</nav>
+      <PortfolioSearch ar={ar} /><div className="public-engineer-tools"><LanguageSwitch /><ThemeSwitch current={theme} /><Link href="/home/engineer/saved" aria-label={ar ? "المفضلة" : "Favorites"}><HeartIcon /></Link><Link className="portfolio-account-link" href="/home/profile" aria-label={ar ? "حسابي" : "My account"}><UsersIcon /></Link></div>
+    </header>
+    {demo && <aside className="portfolio-sample-notice">{ar ? "بيانات وصور توضيحية محلية لمراجعة التصميم — ليست أعمالاً أو تقييمات حقيقية لهذا الحساب." : "Local illustrative data for design review — not this account’s real projects or reviews."}</aside>}
+    <div className="public-engineer-breadcrumb"><Link href="/">{ar ? "الرئيسية" : "Home"}</Link><span aria-hidden="true">‹</span><Link href="/home/engineer/professionals">{ar ? "المهندسين والمكاتب" : "Professionals"}</Link><span aria-hidden="true">‹</span><bdi>{name}</bdi></div>
     <main id="main">
-      <section className="public-engineer-hero" aria-labelledby="engineer-name"><Image src="/assets/engineer/hero-living-room.webp" alt="" fill priority sizes="100vw" className="public-engineer-cover" /><div className="public-engineer-intro"><div className="public-engineer-name"><span className="public-engineer-avatar" aria-hidden="true">{Array.from(name)[0]}</span><div><h1 id="engineer-name"><bdi>{name}</bdi></h1><p>{profile.headline || (ar ? "مهندس" : "Engineer")}</p>{summary.average !== null && <span className="public-engineer-rating"><StarIcon size={16} /><bdi>{summary.average.toFixed(1)}</bdi> ({summary.total} {ar ? "تقييم" : "reviews"})</span>}</div></div>
-        {profile.serviceAreas.length > 0 && <p className="public-engineer-meta"><MapPinIcon size={17} />{profile.serviceAreas.map(key => t(`onboarding.consumer.cities.${key}`)).join(" · ")}</p>}
-        {profile.yearsExperience !== null && <p className="public-engineer-meta"><BriefcaseIcon size={17} />{profile.yearsExperience} {ar ? "سنوات خبرة" : "years of experience"}</p>}
-        <div className="public-engineer-availability"><AvailabilityBadge state={availabilityState(profile.availableForWork, profile.availabilityUpdatedAt)} t={t} /><AvailabilityAge updatedAt={profile.availabilityUpdatedAt} locale={locale} t={t} /></div>
-        <div className="public-engineer-actions">{portfolio.length > 0 && <ButtonLink href="#projects" variant="accent">{ar ? "استعرض الأعمال" : "Explore projects"}</ButtonLink>}<PublicShare profileId={profile.id} locale={locale} /></div>
-      </div></section>
-      {(specialties.length > 0 || profile.yearsExperience !== null || summary.total > 0 || portfolio.length > 0) && <div className="public-engineer-statbar">
-        {specialties.length > 0 && <div><BuildingIcon /><span><strong>{specialties[0]}</strong><small>{ar ? "التخصص الرئيسي" : "Primary specialization"}</small></span></div>}
-        {profile.yearsExperience !== null && <div><BriefcaseIcon /><span><strong>{profile.yearsExperience}</strong><small>{ar ? "سنوات الخبرة" : "Years of experience"}</small></span></div>}
-        {summary.average !== null && <div><StarIcon /><span><strong>{summary.average.toFixed(1)}</strong><small>{ar ? "تقييم العملاء" : "Client rating"}</small></span></div>}
-        {portfolio.length > 0 && <div><PackageIcon /><span><strong>{portfolio.length}</strong><small>{ar ? "أعمال منشورة" : "Published works"}</small></span></div>}
+      <section className="public-engineer-hero" aria-labelledby="engineer-name"><Image src="/assets/engineer/hero-living-room.webp" alt="" fill priority sizes="100vw" className="public-engineer-cover" /><div className="public-engineer-intro"><div className="public-engineer-identity">
+        <div className="public-engineer-name"><span className={`public-engineer-avatar ${demo ? "portfolio-sample-avatar" : ""}`} aria-hidden="true">{!demo && Array.from(name)[0]}</span><div><h1 id="engineer-name"><bdi>{name}</bdi></h1><p>{demo?.headline ?? (profile.headline || (ar ? "مهندس" : "Engineer"))}</p>{summary.average !== null && <span className="public-engineer-rating"><bdi>{summary.average.toFixed(1)}</bdi><StarIcon size={14} /><span>({summary.total} {ar ? "تقييم" : "reviews"})</span></span>}</div></div>
+        {(demo || profile.serviceAreas.length > 0) && <p className="public-engineer-meta"><MapPinIcon size={16} />{demo ? (ar ? "القاهرة، مصر" : "Cairo, Egypt") : profile.serviceAreas.map(key => t(`onboarding.consumer.cities.${key}`)).join(" · ")}</p>}
+        {years !== null && <p className="public-engineer-meta"><BriefcaseIcon size={16} /><bdi>{years}{demo ? "+" : ""}</bdi> {ar ? "سنوات خبرة" : "years of experience"}</p>}
+        <div className="public-engineer-actions">{actions}</div>
+      </div></div></section>
+      {(specialties.length > 0 || years !== null || summary.total > 0 || projects.length > 0) && <div className="public-engineer-statbar">
+        {specialties.length > 0 && <div><span className="portfolio-stat-icon"><MonitorIcon /></span><span><strong className="portfolio-specialty-stat">{demo ? (ar ? "تصميم داخلي وخارجي" : "Interior & exterior design") : specialties[0]}</strong><small>{ar ? "التخصص الرئيسي" : "Primary specialization"}</small></span></div>}
+        {years !== null && <div><span className="portfolio-stat-icon"><BriefcaseIcon /></span><span><strong>{years}{demo ? "+" : ""}</strong><small>{ar ? "سنوات خبرة" : "Years of experience"}</small></span></div>}
+        {summary.average !== null && <div><span className="portfolio-stat-icon"><StarIcon /></span><span><strong>{summary.average.toFixed(1)}</strong><small>{ar ? "تقييم العملاء" : "Client rating"}</small></span></div>}
+        {projects.length > 0 && <div><span className="portfolio-stat-icon"><PackageIcon /></span><span><strong>{projects.length}</strong><small>{ar ? "أعمال منشورة" : "Published works"}</small></span></div>}
       </div>}
-      <nav className="public-engineer-section-nav" aria-label={ar ? "أقسام الملف العام" : "Public profile sections"}><a href="#overview">{ar ? "نبذة عامة" : "Overview"}</a>{portfolio.length > 0 && <a href="#projects">{ar ? "المشاريع" : "Projects"}</a>}{profile.services.length > 0 && <a href="#services">{ar ? "الخدمات" : "Services"}</a>}{reviews.length > 0 && <a href="#reviews">{ar ? "التقييمات" : "Reviews"}</a>}<a href="#share">{ar ? "مشاركة الملف" : "Share profile"}</a></nav>
-      <div className="public-engineer-body">
-        {portfolio.length > 0 && <section id="projects" className="public-engineer-projects"><PublicPortfolio items={portfolio} t={t} /></section>}
-        <section id="overview" className="public-engineer-overview"><article><h2>{ar ? "نبذة عني" : "About me"}</h2><p className="public-engineer-bio">{profile.bio || (ar ? "تعرّف على هذا المهندس من خلال المعلومات التي اختار نشرها على منصة علاء الدين." : "Discover this engineer through the information they have chosen to publish on Aladdin.")}</p>{profile.languages.length > 0 && <p className="public-engineer-languages">{ar ? "اللغات" : "Languages"}: {profile.languages.map(key => languageLabel(t, key)).join(" · ")}</p>}</article>
-        {specialties.length > 0 && <article><h2>{ar ? "التخصصات" : "Specializations"}</h2><div className="public-engineer-specialties">{specialties.map(label => <div key={label}><BuildingIcon size={28} /><span>{label}</span></div>)}</div></article>}</section>
-        {profile.services.length > 0 && <section id="services" className="public-engineer-services"><h2>{ar ? "الخدمات التي أقدمها" : "Services I offer"}</h2><div>{profile.services.map((service, i) => { const Icon = serviceIcons[i % serviceIcons.length]!; return <article key={service}><Icon size={32} /><h3>{t(`onboarding.professional.serviceItems.${service}`)}</h3></article>; })}</div></section>}
-        {reviews.length > 0 && <section id="reviews" className="public-engineer-reviews"><PublicReviews reviews={reviews} t={t} locale={locale} /></section>}
-        <section id="share" className="public-engineer-cta"><div><h2>{ar ? "تصميم يستحق المشاركة" : "Design worth sharing"}</h2><p>{ar ? "شارك الملف العام للاطلاع على الأعمال والخدمات المنشورة." : "Share this portfolio to explore published work and services."}</p></div><PublicShare profileId={profile.id} locale={locale} /></section>
-        <footer className="public-engineer-footer"><ShieldIcon size={17} /><p>{ar ? "يعرض هذا الملف المعلومات والأعمال المتاحة للنشر العام فقط." : "This portfolio shows only information and work available for public viewing."}</p><Link href="/legal/privacy">{ar ? "الخصوصية" : "Privacy"}</Link></footer>
-      </div>
+      <PublicPortfolioTabs ar={ar} panels={[
+        {id: "overview", label: ar ? "نبذة عامة" : "Overview", content: (<section id="overview" className="public-engineer-overview">
+          {specialties.length > 0 && <article><h2>{ar ? "التخصصات" : "Specializations"}</h2><div className="public-engineer-specialties">{specialties.map((label, i) => {const Icon = icons[i % icons.length]!; return <div key={label} data-portfolio-search tabIndex={-1}><Icon size={26} /><span>{label}</span></div>;})}</div></article>}
+          <article><h2>{ar ? "نبذة عني" : "About me"}</h2><p className="public-engineer-bio">{demo?.bio ?? profile.bio ?? (ar ? "تعرّف على هذا المهندس من خلال المعلومات التي اختار نشرها على منصة علاء الدين." : "Discover this engineer through the information they have chosen to publish on Aladdin.")}</p></article>
+        </section>)},
+        ...(projects.length > 0 ? [{id: "projects", label: ar ? "المشاريع" : "Projects", content: (<section id="projects" className="public-engineer-projects">{heading(ar ? "أبرز المشاريع" : "Featured projects", ar ? "مجموعة من أعمال التصميم والتنفيذ التي تعكس خبرتي وأسلوبي العملي" : "A selection of spaces, thoughtfully designed and carefully brought to life.")}
+          <PortfolioRail ar={ar} id="project-rail">{projects.map((item, i) => <article className="portfolio-project" key={item.id} data-portfolio-search tabIndex={-1}><div className="portfolio-project-photo">{demo ? <div role="img" aria-label={item.title} className="portfolio-sample-project" style={{backgroundPosition: `${[3,0,1,2][i]! % 2 ? "100%" : "0%"} ${[3,0,1,2][i]! > 1 ? "100%" : "0%"}`}} /> : <Image unoptimized src={`/p/media/${item.id}`} alt={item.title} fill sizes="(max-width: 600px) 80vw, 25vw" />}{demo && <><span className="portfolio-project-tag">{demo.projects[i]!.category}</span><span className="portfolio-photo-count"><PackageIcon size={14} />{demo.projects[i]!.count}</span></>}</div><h3><bdi>{item.title}</bdi></h3>{item.description && <p>{demo && <MapPinIcon size={13} />}<bdi>{item.description}</bdi></p>}</article>)}</PortfolioRail>
+        </section>)}] : []),
+        ...(services.length > 0 ? [{id: "services", label: ar ? "الخدمات" : "Services", content: (<section id="services" className="public-engineer-services">{heading(ar ? "الخدمات التي أقدمها" : "Services I offer", ar ? "حلول متكاملة من الفكرة إلى التنفيذ" : "From the first idea to the finishing details")}<div className="portfolio-services-grid">{services.map((service, i) => {const Icon = icons[i % icons.length]!; return <article key={service} data-portfolio-search tabIndex={-1}><h3><Icon size={18} />{service}</h3><div className="portfolio-service-photo" role="img" aria-label={ar ? `صورة توضيحية: ${service}` : `Illustration: ${service}`} style={{backgroundPosition: `${i < 3 ? i * 50 : (i - 3) * 50}% ${i < 3 ? 0 : 100}%`}} /></article>;})}</div></section>)}] : []),
+        ...(visibleReviews.length > 0 ? [{id: "reviews", label: ar ? "التقييمات" : "Reviews", content: (<section id="reviews" className="public-engineer-reviews">{heading(ar ? "تقييمات العملاء" : "Client reviews")}<PortfolioRail id="review-rail" ar={ar}>{visibleReviews.map(review => <article className="portfolio-review" key={review.id}><div className="portfolio-stars" aria-label={ar ? `${review.rating} من 5` : `${review.rating} out of 5`}>{Array.from({length: 5}, (_, i) => <StarIcon size={13} key={i} fill={i < review.rating ? "currentColor" : "none"} />)}<bdi>{review.rating.toFixed(1)}</bdi></div><p>{review.comment}</p><div className="portfolio-review-person"><span aria-hidden="true">{Array.from(review.orgName)[0]}</span><div><h3><bdi>{review.orgName}</bdi></h3><small><bdi>{review.jobTitle}</bdi></small></div></div></article>)}</PortfolioRail></section>)}] : []),
+        {id: "contact", label: ar ? "التواصل" : "Contact", content: (<section id="contact" className="public-engineer-cta"><div className="portfolio-cta-photo" aria-hidden="true" /><div><h2>{ar ? "ابدأ مشروعك الآن" : "Bring your next project to life"}</h2><p>{demo ? (ar ? `تواصل مع ${name} لمناقشة تفاصيل مشروعك والحصول على عرض سعر مخصص` : `Discuss your project with ${name} and explore what is possible.`) : (ar ? "شارك هذا الملف للاطلاع على الأعمال والخدمات المنشورة." : "Share this portfolio to explore published work and services.")}</p></div>{demo ? <PortfolioSampleActions ar={ar} compact /> : <PublicShare profileId={profile.id} locale={locale} />}</section>)}
+      ]} />
     </main>
   </div></I18nProvider>;
 }

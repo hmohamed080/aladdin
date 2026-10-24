@@ -407,3 +407,7 @@ Authentication/onboarding UI approved with 2026 derived brand assets, vertically
 ## Showroom Suite V2 is the design authority (2026-10-13)
 
 The user approved `/preview/showroom-suite-v2` (the `.installer-surface` theme: Deep Navy `#071A2D`, Warm Sand `#D8C7A6`, Soft Cream `#F2E9D8`, Muted Terracotta `#B96F52`, Readex Pro) as the visual language for every new or modified user-facing page, including future Supplier, Manufacturer, Importer, Contractor and Engineer interfaces (adapted to their needs). New pages consume the semantic token utilities and the shared V2 shell (`features/showroom-shell`); do not build a third shell and do not continue developing the legacy `/b2b` visual design. Third-party reference screenshots inform content and information architecture only, never branding.
+
+## Public portfolio tabs — 2026-10-24
+
+The public engineer profile's five sections use accessible tabs with a single visible panel, roving focus, RTL-aware arrow keys and Home/End navigation. Switching panels leaves the URL unchanged. The desktop project/review rails show navigation only when overflow exists and disable end controls; mobile rails use horizontal swipe. Public sample content requires a conspicuous local-only notice.

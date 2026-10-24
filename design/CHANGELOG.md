@@ -53,3 +53,7 @@ First approved, hardened Design System foundation. No product components impleme
 
 ### Changed
 - `UI_UX_SYSTEM_GUIDE.md` and `PRODUCT.md` reconciled from "brand not approved" to the approved identity + artifact-authority chain.
+
+## 2026-10-24 — Public portfolio reference correction
+
+Rebuilt public portfolio composition around supplied references, added generated service imagery and explicitly guarded local sample content. Replaced section anchors with isolated accessible tabs. Preserved the four-color palette and public-data restrictions.

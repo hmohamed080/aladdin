@@ -9,7 +9,9 @@ export function PublicShare({ profileId, locale }: { profileId: string; locale: 
   const [publicUrl, setPublicUrl] = useState("");
   const ar = locale === "ar";
   return <div className="public-share"><Button variant="outline" onClick={async () => {
-    const url = `${window.location.origin}/p/${encodeURIComponent(profileId)}`;
+    const path = /^\/p\/[a-z][a-z_]+\/[a-z][a-z0-9._]*$/.test(window.location.pathname)
+      ? window.location.pathname : `/p/${encodeURIComponent(profileId)}`;
+    const url = `${window.location.origin}${path}`;
     setPublicUrl(url);
     try {
       // Share only the public route, never query parameters or a session URL.

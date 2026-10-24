@@ -73,3 +73,7 @@ ranking. Production application of migrations and deployment follow review.
 - [Product direction](PRODUCT_DIRECTION_GUIDE.md)
 - [Architecture](../architecture/ARCHITECTURE_GUIDE.md)
 - [UI contract](../frontend/UI_CONTRACT.md)
+
+## Public portfolio refinement — 2026-10-24
+
+Public portfolios use the owner-supplied light/dark reference and tab-specific content rather than anchors. Existing unique usernames form readable account-type URLs. The requested visual sample is explicitly local and labelled; it is never a real portfolio claim. Messaging/quote controls in that sample do not send anything and remain pending an actual profile-directed workflow. Public records retain their existing eligibility and field restrictions.

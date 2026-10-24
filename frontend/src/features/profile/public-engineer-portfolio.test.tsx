@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { PublicEngineerPortfolio } from "./public-engineer-portfolio";
 import type { PublicProfile } from "@/server/queries/professional-profile";
 
 vi.mock("@/components/layout/switchers", () => ({ LanguageSwitch: () => null, ThemeSwitch: () => null }));
+vi.mock("server-only", () => ({}));
 const profile: PublicProfile = {
   id: "11111111-1111-4111-8111-111111111111", displayName: "Public engineer", headline: "Architecture",
   bio: "Published biography", persona: "engineer", languages: ["en"], specialization: null,
@@ -21,8 +22,22 @@ describe("public engineer portfolio boundary", () => {
   });
   it("uses only the guarded public media route for portfolio images", () => {
     render(<PublicEngineerPortfolio profile={profile} portfolio={[{ id: "public-item", title: "Published project", description: "A completed interior" }]} reviews={[]} locale="en" theme="dark" />);
+    fireEvent.click(screen.getByRole("tab", { name: "Projects" }));
     expect(screen.getByRole("img", { name: "Published project" })).toHaveAttribute("src", "/p/media/public-item");
     expect(screen.getByText("Published works")).toBeInTheDocument();
+  });
+  it("shows one section at a time without adding an anchor to the URL", () => {
+    const before = window.location.href;
+    render(<PublicEngineerPortfolio profile={profile} portfolio={[]} reviews={[]} locale="en" theme="light" sample />);
+    expect(screen.getByRole("heading", {name: "About me"})).toBeVisible();
+    expect(screen.queryByRole("heading", {name: "Featured projects"})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", {name: "Projects"}));
+    expect(screen.getByRole("heading", {name: "Featured projects"})).toBeVisible();
+    expect(screen.queryByRole("heading", {name: "About me"})).not.toBeInTheDocument();
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    fireEvent.keyDown(screen.getByRole("tab", {name: "Projects"}), {key: "ArrowRight"});
+    expect(screen.getByRole("tab", {name: "Services"})).toHaveAttribute("aria-selected", "true");
+    expect(window.location.href).toBe(before);
   });
   it("renders profile text literally rather than interpreting user HTML", () => {
     const bio = '<img src=x onerror="alert(1)">';
