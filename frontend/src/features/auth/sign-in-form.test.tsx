@@ -26,7 +26,11 @@ async function advanceToVerifyStep() {
   // ("A React form was unexpectedly submitted"). requestSubmit lets React
   // intercept and preventDefault first, deterministically invoking the action.
   await act(async () => {
-    (emailInput.closest("form") as HTMLFormElement).requestSubmit();
+    // React 19.3 hands the submitter to `new FormData(form, submitter)`, which happy-dom rejects
+    // when requestSubmit() is called without one; passing the real button mirrors a user submit.
+    (emailInput.closest("form") as HTMLFormElement).requestSubmit(
+      screen.getByRole("button", { name: ar.auth.sendCode }),
+    );
   });
   await screen.findByLabelText(ar.auth.codeLabel);
   // Let the post-send effect (which clears the editing override) fully settle so
