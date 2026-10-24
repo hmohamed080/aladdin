@@ -336,6 +336,16 @@ export function BusinessFlow({
                 value: state.orgType ? t(`onboarding.business.orgTypes.${state.orgType}`) : t("onboarding.consumer.notSet"),
                 to: (typePreselected ? "identity" : "type") as Step,
               },
+              ...(showroom
+                ? [
+                    { label: t("onboarding.business.identity.activityLabel"), value: state.activityType ? t(`onboarding.business.activities.${state.activityType}`) : t("onboarding.consumer.notSet"), to: "identity" as Step },
+                    { label: t("onboarding.business.identity.phoneLabel"), value: state.contactPhone ?? t("onboarding.consumer.notSet"), to: "identity" as Step, ltr: true },
+                    { label: t("onboarding.business.identity.emailLabel"), value: state.contactEmail.trim() || t("onboarding.consumer.notSet"), to: "identity" as Step, ltr: true },
+                  ]
+                : []),
+              ...(state.description.trim()
+                ? [{ label: t("onboarding.business.identity.descriptionLabel"), value: state.description.trim(), to: "identity" as Step }]
+                : []),
               {
                 label: t("onboarding.business.review.location"),
                 value: `${locationSummary()} — ${state.detailedAddress}`,
@@ -350,7 +360,7 @@ export function BusinessFlow({
               <div key={r.label} className="flex items-start justify-between gap-3 py-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <dt className="text-label text-fg-muted">{r.label}</dt>
-                  <dd className="break-words text-body text-fg">{r.value}</dd>
+                  <dd className="break-words text-body text-fg" dir={"ltr" in r && r.ltr ? "ltr" : undefined}>{r.value}</dd>
                 </div>
                 <button
                   type="button"

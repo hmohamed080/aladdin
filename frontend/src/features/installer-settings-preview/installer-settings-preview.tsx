@@ -21,25 +21,25 @@ const PhoneField = dynamic(() => import("@/features/installer-dashboard-preview/
   loading: () => <div className="h-11 rounded-md border bg-canvas" aria-busy="true" />,
 });
 
-function SettingsSection({ number, title, description, icon: Icon, compact, children }: {
+export function SettingsSection({ number, title, description, icon: Icon, compact, children }: {
   number: string; title: string; description: string; icon: Icon; compact?: boolean; children: ReactNode;
 }) {
   return (
-    <section aria-labelledby={`settings-${number}`} className="grid min-w-0 gap-md rounded-lg border bg-surface p-sm desktop:grid-cols-4">
-      <div className={`relative flex gap-md rounded-md bg-surface-2 p-md desktop:col-span-1 ${compact ? "items-center" : "items-center desktop:flex-col desktop:justify-center desktop:py-xl desktop:text-center"}`}>
+    <section aria-labelledby={`settings-${number}`} data-settings-section className="grid min-w-0 gap-md rounded-lg border bg-surface p-sm desktop:grid-cols-4">
+      <div data-settings-summary className={`relative flex gap-md rounded-md bg-surface-2 p-md desktop:col-span-1 ${compact ? "items-center" : "items-center desktop:flex-col desktop:justify-center desktop:py-xl desktop:text-center"}`}>
         <span className="absolute end-3 top-3 text-label font-semibold tabular-nums text-fg" aria-hidden="true">{number}</span>
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-pill bg-canvas text-fg"><Icon size={28} /></span>
+        <span data-settings-summary-icon className="grid h-12 w-12 shrink-0 place-items-center rounded-pill bg-canvas text-fg"><Icon size={28} /></span>
         <div className="min-w-0 pe-lg">
           <h2 id={`settings-${number}`} className="text-title font-semibold text-fg">{title}</h2>
           <p className="mt-2 text-body leading-relaxed text-fg-secondary">{description}</p>
         </div>
       </div>
-      <div className="min-w-0 p-sm desktop:col-span-3 desktop:p-md">{children}</div>
+      <div data-settings-body className="min-w-0 p-sm desktop:col-span-3 desktop:p-md">{children}</div>
     </section>
   );
 }
 
-function SettingRow({ title, hint, icon: Icon, children }: { title: string; hint: string; icon: Icon; children: ReactNode }) {
+export function SettingRow({ title, hint, icon: Icon, children }: { title: string; hint: string; icon: Icon; children: ReactNode }) {
   return <div className="flex flex-wrap items-center justify-between gap-sm rounded-sm border p-3">
     <div className="flex min-w-0 flex-1 items-center gap-sm">
       <Icon size={23} className="shrink-0 text-fg" />

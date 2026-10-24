@@ -1,3 +1,4 @@
+import { loadMyIdentity } from "@/server/queries/profile-identity";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -103,12 +104,14 @@ export default async function HomeLayout({ children }: { children: ReactNode }) 
     const supabase = await getServerSupabase();
     const searchOpportunities = await listJobOpportunities(supabase, { limit: SEARCH_OPPORTUNITIES_LIMIT });
     const searchJobs = toOpportunityVMs(searchOpportunities, createTranslator(locale), locale);
+    const identity = await loadMyIdentity().catch(() => null);
     return (
       <I18nProvider locale={locale} dir={dir}>
         <InstallerDashboardShell
           theme={resolveTheme(themePreference)}
           sidebarMode={sidebarMode}
           displayName={home.displayName}
+          avatarUrl={identity?.avatarUrl ?? null}
           location={location}
           searchJobs={searchJobs}
         >

@@ -4,7 +4,7 @@
  * redirect). Anything else falls back to the workspace; the post-auth action
  * then replaces that fallback with the caller's canonical derived surface.
  */
-const ALLOWED_PREFIXES = ["/admin", "/b2b", "/home", "/onboarding", "/auth/invite/"] as const;
+const ALLOWED_PREFIXES = ["/admin", "/b2b", "/home", "/onboarding", "/auth/invite/", "/settings/contact-email/"] as const;
 
 export function sanitizeNext(value: unknown): string {
   if (typeof value === "string" && value.startsWith("/") && !value.startsWith("//")) {

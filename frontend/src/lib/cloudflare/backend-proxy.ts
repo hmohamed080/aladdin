@@ -2,9 +2,14 @@
  * `/api/backend/*` on the Cloudflare-hosted frontend (ADR-0021).
  *
  * On Vercel, `vercel.json` rewrites `/api/backend(/.*)?` to the FastAPI service
- * inside the same deployment. On Workers the FastAPI service stays where it is
- * (a separate origin), and the Worker forwards the request there unchanged:
- * same path, method, body, query and headers, so the browser keeps calling the
+ * inside the same deployment. On Workers the Worker forwards the request to
+ * FastAPI unchanged, through one of two transports:
+ *   - the `BACKEND` service binding to the `aladdin-backend` Worker, which runs
+ *     FastAPI in a Cloudflare Container (ADR-0022). Preferred: that Worker has
+ *     no public hostname, and a binding call never leaves Cloudflare;
+ *   - otherwise `BACKEND_ORIGIN`, a separate public origin (Vercel until cutover).
+ * Either way the request keeps its
+ * path, method, body, query and headers, so the browser keeps calling the
  * app's own origin (no CORS, no cross-site cookies) and FastAPI keeps receiving
  * `/api/backend/...` exactly as it does behind the Vercel rewrite.
  *
@@ -20,7 +25,15 @@ export function isBackendPath(pathname: string): boolean {
   return pathname === BACKEND_PREFIX || pathname.startsWith(`${BACKEND_PREFIX}/`);
 }
 
+/** A Workers service binding (`Fetcher`); only `fetch` is used. */
+export type BackendBinding = { fetch(request: Request): Promise<Response> };
+
+// A service binding ignores the host; this one only has to be a valid, non-public URL.
+const BINDING_TARGET = new URL("https://aladdin-backend.internal/");
+
 export type BackendProxyConfig = {
+  /** The `BACKEND` service binding. Wins over `origin` when bound. */
+  binding?: BackendBinding | undefined;
   /** The FastAPI origin, e.g. `https://backend.example.com` (no path). */
   origin: string | undefined;
   /** `local` allows a plain-http loopback origin for isolated tests. */
@@ -65,6 +78,14 @@ export function backendRequest(request: Request, target: URL): Request {
 
 /** Forwards a `/api/backend` request, or answers 503 when no backend is configured. */
 export async function proxyToBackend(request: Request, config: BackendProxyConfig, send: typeof fetch = fetch): Promise<Response> {
+  if (config.binding) {
+    const binding = config.binding;
+    try {
+      return await binding.fetch(backendRequest(request, BINDING_TARGET));
+    } catch {
+      return Response.json({ status: "unreachable", service: "backend" }, { status: 502, headers: { "cache-control": "no-store" } });
+    }
+  }
   const target = backendOrigin(config);
   if (!target) {
     return Response.json({ status: "unavailable", service: "backend" }, { status: 503, headers: { "cache-control": "no-store" } });

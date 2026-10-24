@@ -13,7 +13,8 @@ import { describe, expect, it } from "vitest";
  *   ROUTE (Production)        VIEW                                                       TOGGLE   DEFAULT
  *   /home/jobs                installer-job-opportunities-preview/…-view.tsx             yes      grid
  *   /home/work                installer-my-work-preview/installer-my-work-view.tsx       yes      grid
- *   /home/reviews             installer-reviews-preview/installer-reviews-preview.tsx    yes      grid
+ *   /preview/installer-reviews installer-reviews-preview/installer-reviews-preview.tsx   yes      grid
+ *   /home/reviews (Installer) installer-reviews/installer-reviews.tsx                   yes      grid
  *   every other route         (no Grid / List toggle)                                     no       n/a
  */
 
@@ -39,11 +40,12 @@ describe("Grid is the default wherever Grid and List both exist", () => {
   // rule below is for the three installer views.
   const withToggle = files.filter((f) => offersBoth(f.text) && f.rel !== "features/showroom-shell/view-toggle.tsx");
 
-  it("the audit finds exactly the three known views", () => {
+  it("the audit finds exactly the known views", () => {
     expect(withToggle.map((f) => f.rel).sort()).toEqual([
       "features/installer-job-opportunities-preview/installer-job-opportunities-view.tsx",
       "features/installer-my-work-preview/installer-my-work-view.tsx",
       "features/installer-reviews-preview/installer-reviews-preview.tsx",
+      "features/installer-reviews/installer-reviews.tsx",
     ]);
   });
 

@@ -34,6 +34,12 @@ jobs:
   supabase-rls:
     name: supabase-rls
     runs-on: ubuntu-latest
+    # The destructive concurrency scripts never auto-select a database (supabase/tests/lib/db_target.sh): they need an
+    # explicit target. This runner is a throwaway VM with exactly one stack (the CLI default project id `aladdin`), so it
+    # names that container and explicitly opts in to the shared-stack name. Never set these on a developer machine.
+    env:
+      DB_CONTAINER: supabase_db_aladdin
+      ALLOW_SHARED_STACK: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +54,9 @@ jobs:
 
       # Installs the repo-pinned Supabase CLI (devDependency) into the workspace.
       - run: pnpm install --frozen-lockfile
+
+      - name: Self-test the destructive-test target guard (no Docker, no writes)
+        run: bash supabase/tests/lib/db_target_selftest.sh
 
       - name: Verify exact RC2 upgrade and atomic function permissions
         run: |
@@ -84,6 +93,9 @@ jobs:
 
       - name: Prove lead transitions are optimistic-locked (no lost update)
         run: bash supabase/tests/lead_transition_concurrency_test.sh
+
+      - name: Prove the installer phone-change journal (and its coexistence with secondary phones) under simultaneous requests
+        run: bash supabase/tests/installer_phone_change_concurrency_test.sh
 
       - name: Prove repeatability (second clean reset + tests)
         run: |

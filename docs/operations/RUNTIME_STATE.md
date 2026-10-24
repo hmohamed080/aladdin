@@ -1,5 +1,17 @@
 # Runtime State
 
+## Rebuilt Installer + Next 16.4.3 branch — 2026-10-24
+
+- Branch `claude/project-thread-724t0d` = PR #101 + `main` (#96) + Installer work + Next 16.4.3; supersedes PR #102 (`chore/next-16`), which must not be merged or pushed to any database. 191 migrations; Installer migrations are `20261024090002..11`.
+- Acceptance has `20261024090001` applied (2026-10-24, 181 migrations) and is **GO**: the hosted fingerprint matches `scripts/hosted-db/local-noseed-fingerprint.txt` in 14 of 15 categories, and the only difference is the expected `roles` (Acceptance-only `media_edge_worker` LOGIN role, no password). Security advisors show nothing new (6 anon SECURITY DEFINER = the reviewed public RPC allowlist; 9 mutable search_path helpers also exist on Production). Production has 165 migrations, latest `20261020090001` (PR #96 applied).
+- 2026-10-24 (later): Acceptance now has the Installer migrations `20261024090002..11` (owner approved; the owner ran the md5-guarded script in the SQL Editor because the MCP approval prompt cannot be shown in the project app). 191 migrations; every recorded statement's md5 equals the repository file. Fingerprint: 14 of 15 categories equal the local no-seed replay at `20261024090011`; `roles` differs as before (`media_edge_worker`). Advisors: no new lint type; the additions are the five private `app` tables (RLS on, no policy, by design) and the contracted cover/portfolio RPCs (3 anon public-profile reads, 14 authenticated).
+- FastAPI preview is live: Worker `aladdin-backend-preview` (Cloudflare Containers, Acceptance only). The frontend preview, deployed from this branch (which now includes #98), binds it as `BACKEND`; `/api/backend/health` returns `{"status":"ok","env":"staging"}`. No authenticated backend route exists yet, so sign-in refusal through the backend is untested.
+
+## FastAPI on Cloudflare Containers (draft PR, ADR-0022) — 2026-10-22
+
+- Branch `claude/project-thread-ea9qxg`, stacked on the frontend Workers branch `claude/cloudflare-workers-2ibvgs` (#97), which now contains the #100 database baseline (180 migrations). #98 adds no migrations. New Worker `edge/backend-worker` (`aladdin-backend`, environments `preview`/`production`) runs `backend/Dockerfile` in a Cloudflare Container; the frontend Worker prefers a `BACKEND` service binding over `BACKEND_ORIGIN`. **Nothing is deployed**; the frontend `wrangler.jsonc` does not bind `BACKEND` yet, so behaviour is unchanged; Vercel still serves FastAPI.
+- 2026-10-24: owner chose to hold the preview until the frontend preview's HTTPS works (Option B). Gates and the two separate approvals (Workers Paid, then the Acceptance-only preview): [fastapi-preview-prerequisites.md](fastapi-preview-prerequisites.md). pyjwt upgraded to 2.15.1 (audit). Costs and measurements in ADR-0022.
+
 ## Consolidated database baseline (draft PR) — 2026-10-22
 
 - Branch `claude/project-thread-lz98jd` (from the Workers branch, PR #97 head): 180 migrations = main's `20261020090001_registration_data_sync` (byte-identical) plus the PR stack, with the 15 PR-only migrations renamed to `20261021090001`..`15` so they run after main's. Mapping, verification and the Production plan: [database-baseline-2026-10-22.md](database-baseline-2026-10-22.md).
@@ -24,6 +36,16 @@
   - [R2 audit and prepared rules](r2/README.md), not applied;
   - [credentials checklist](cloudflare-credentials-checklist.md);
   - [cutover plan](cloudflare-frontend-cutover-plan.md), now 15 stages.
+
+## Installer profile completion and release scope — 2026-10-24
+
+- **State.** Branch `integration/approved-features-20261019` = `9cc8eb87` + one local checkpoint commit (not pushed). Base `origin/main` `a9723a01`. The branch carries PRs #88, #89, #91, #92 and #94 plus the Cloudflare Workers commits up to `68110d26` (PR #97 has since moved to `548bfc98`). Configured upstream is PR #91's branch; do not push to it.
+- **Database.** New local-only migration `20261024090000_installer_profile_completion` (191 migration files on this branch against 165 on `main`). It reads `public.portfolio_projects`, which only exists via `20261021090009`, so it cannot be applied to a database without the earlier stack migrations. Hosted staging was last audited at 164 migrations (max `20261017134139`).
+- **Smallest viable release scope.** Not today's checkpoint alone, and not the whole integration branch. The installer feature imports code and tables from the stacked PRs #88, #89, #91, #92 and #94 (`secondary-phone`, `server/storage/*`, `lib/storage/browser-upload`, `server/cache/*`, `server/video/*`; migrations `secondary_phone_reservations`, `rc2_verified_media_storage`, `historical_media_purge`, `media_videos`). A simulated cherry-pick of `9cc8eb87` onto PR #94's tip has no conflicts and needs none of the 15 Cloudflare/hydration commits between them. So: merge #89 → #91 → #92 → #94 (with #88's content already merged into them), then the installer commit and the checkpoint. PRs #97 and #98 (Cloudflare Workers, FastAPI on Containers) are not required.
+- **Port hazards (checked 2026-10-24, nothing attempted).** `origin/main` is not an ancestor of PR #94's tip: `main` has three commits the stack lacks (PR #96: `772f1c6b`, `5e511736`, `a9723a01`). Merging the stack into `main` conflicts in four files (`admin/users/[id]/page.tsx`, `showroom-shell/settings/settings.tsx`, `server/queries/profile-identity.ts` — `main` signs avatars from the Supabase bucket, the stack uses `readableMediaUrl` — and `AGENT_WORK_LOG.md`). Migration `20261020090001_registration_data_sync` exists on both with different contents: `main`'s patches the pre-#88 text of the admin functions unconditionally, the integration copy (added by `9cc8eb87`) patches only where that text is still present. One of them must win, which edits a migration already merged on `main` (owner decision; hosted databases have not applied it). The checkpoint itself applies on the stack plus the installer commit with three trivial conflicts (both docs files and the ESLint ignore line).
+- **Flags to keep off:** `R2_STORAGE_ENABLED`, `R2_PRODUCTION_WRITES_APPROVED`, `MEDIA_EDGE_DELIVERY_ENABLED`, `VIDEO_ENABLED`, `REDIS_CACHE_ENABLED` (all default false).
+- **Verification baseline:** typecheck, lint, Vitest (4,297), pgTAP on a clean DB (6,284 tests, 140 files), migration policy and permission gate pass; Playwright installer completion spec passes on desktop and mobile. See [AGENT_WORK_LOG.md](AGENT_WORK_LOG.md).
+- **Local environment.** The dev server on :3210 is a long-lived `next dev` using about 6.7 GB; never run the Playwright suite against `frontend/.env.local`'s database (its global setup truncates sales tables and rewrites memberships in the container named by `E2E_DB_CONTAINER`, default `supabase_db_aladdin`).
 
 ## Cloudflare Workers frontend (draft PR, ADR-0021) — 2026-10-20
 

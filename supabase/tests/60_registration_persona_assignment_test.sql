@@ -20,7 +20,7 @@ create function pg_temp.attest_owned_fixture() returns void language sql securit
   on conflict(namespace,object_key) do nothing;
 $$;
 
-select plan(147);
+select plan(149);
 
 
 insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data,
@@ -60,15 +60,17 @@ select is(app.effective_persona('60000000-0000-4000-8000-000000000001')::text, '
 select ok(not app.is_sales_persona('60000000-0000-4000-8000-000000000001'), 'trade: is not a sales persona');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"60000000-0000-4000-8000-000000000001","role":"authenticated"}';
-select is((public.my_profile_completion() ->> 'percent')::int, 13, 'trade: only the username counts at first');
+select is((public.my_profile_completion() ->> 'percent')::int, 11, 'trade: only the username counts at first');
 select lives_ok($$ select public.profile_set_display_name('P60 trade') $$, 'trade: confirms display name');
 select lives_ok($$ select public.profile_set_phone('EG', '1000000601', '+201000000601') $$, 'trade: saves phone');
 select set_config('test.key_trade', public.avatar_request_upload('image/jpeg'), true);
 select pg_temp.attest_owned_fixture();
 select lives_ok(format($$ select public.avatar_confirm_upload(%L) $$, current_setting('test.key_trade')), 'trade: avatar ready');
-select is((select array_agg(x order by x) from jsonb_array_elements_text(public.my_profile_completion() -> 'missing') x), array['activities','bio','headline','years_experience'], 'trade: only professional items remain');
-select lives_ok($$ select public.individual_save_professional('installer_technician'::public.persona_type, 'P60 headline', 4::smallint, null, 'P60 bio') $$, 'trade: professional profile editor save is admitted');
+select is((select array_agg(x order by x) from jsonb_array_elements_text(public.my_profile_completion() -> 'missing') x), array['activities','availability','location','portfolio','years_experience'], 'trade: only the approved Installer profile items remain (20261024090011)');
+select lives_ok($$ select public.individual_save_professional('installer_technician'::public.persona_type, 'P60 headline', 4::smallint, null, 'P60 bio', null, null, null, 'within_week') $$, 'trade: professional profile editor save is admitted');
 select lives_ok($$ select public.user_trades_set(array['painting']) $$, 'trade: can declare an active trade');
+select lives_ok($$ select public.user_service_areas_set('cairo', '[{"governorate_key":"cairo","city_key":null}]'::jsonb) $$, 'trade: sets a governorate');
+select lives_ok($$ select public.portfolio_project_create('P60 project', null, null) $$, 'trade: adds a portfolio project');
 select is((public.my_profile_completion() ->> 'percent')::int, 100, 'trade: reaches 100%');
 select is(public.my_registration_state(), 'access_ready', 'trade: still access_ready');
 reset role;

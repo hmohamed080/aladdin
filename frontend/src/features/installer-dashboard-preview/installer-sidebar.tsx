@@ -123,9 +123,7 @@ export function InstallerSidebar({
                 item={item}
                 locale={locale}
                 active={
-                  production && item.href
-                    ? pathname === item.href || (item.href !== "/home" && pathname.startsWith(`${item.href}/`))
-                    : item.id === previewActiveItemId
+                  production && item.href ? isActiveHref(pathname, item.href) : item.id === previewActiveItemId
                 }
                 narrow={narrow}
                 production={production}
@@ -144,7 +142,14 @@ export function InstallerSidebar({
             {INSTALLER_QUICK_NAV.filter((item) =>
               production ? Boolean(item.href) : !PREVIEW_HIDDEN_QUICK_NAV_IDS.has(item.id),
             ).map((item) => (
-              <NavRow key={item.id} item={item} locale={locale} active={!production && item.id === previewActiveItemId} narrow={narrow} production={production} />
+              <NavRow
+                key={item.id}
+                item={item}
+                locale={locale}
+                active={production && item.href ? isActiveHref(pathname, item.href) : item.id === previewActiveItemId}
+                narrow={narrow}
+                production={production}
+              />
             ))}
           </ul>
         </nav>
@@ -482,4 +487,9 @@ function NavRow({
       )}
     </li>
   );
+}
+
+/** The row for the current page: its own route or any page beneath it (`/home` matches only itself). */
+function isActiveHref(pathname: string, href: string): boolean {
+  return pathname === href || (href !== "/home" && pathname.startsWith(`${href}/`));
 }

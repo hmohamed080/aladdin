@@ -7,11 +7,9 @@ set -euo pipefail
 # on the lock, then re-reads the committed (bumped) version and fails with VC001 —
 # so only T1's edit applies. The single-session pgTAP test cannot prove this.
 
-db_container="$(docker ps --filter 'name=supabase_db_aladdin' --format '{{.Names}}' | head -n 1)"
-if [[ -z "${db_container}" ]]; then
-  echo "Supabase database container not found" >&2
-  exit 1
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/db_target.sh"
+db_target_require   # explicit DB_CONTAINER only; refuses shared / ambiguous / remote targets (no auto-selection)
+db_target_mark_dirty "$(basename "$0")"   # this script changes shared/seed rows: pgTAP must not run on this database afterwards
 
 # Self-contained fixture: activate 22222222 with sales.manage, create a Cairo lead
 # and an open follow-up on it (version 1).

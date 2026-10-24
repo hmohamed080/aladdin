@@ -8,11 +8,9 @@ set -euo pipefail
 # fail with VC001 — so only the first transition applies (no lost update). The
 # single-session pgTAP version-mismatch test cannot prove this serialization.
 
-db_container="$(docker ps --filter 'name=supabase_db_aladdin' --format '{{.Names}}' | head -n 1)"
-if [[ -z "${db_container}" ]]; then
-  echo "Supabase database container not found" >&2
-  exit 1
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/db_target.sh"
+db_target_require   # explicit DB_CONTAINER only; refuses shared / ambiguous / remote targets (no auto-selection)
+db_target_mark_dirty "$(basename "$0")"   # this script changes shared/seed rows: pgTAP must not run on this database afterwards
 
 # Self-contained fixture (independent of the other concurrency scripts, which
 # mutate the seed and do not roll back): ensure user 22222222's Org-A membership is

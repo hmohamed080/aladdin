@@ -5,3 +5,5 @@ packages:
   - "frontend"
   # Cloudflare media Worker (ADR-0017 follow-up); deployed separately with wrangler.
   - "edge/media-worker"
+  # FastAPI backend on Cloudflare Containers (ADR-0022); deployed separately with wrangler.
+  - "edge/backend-worker"

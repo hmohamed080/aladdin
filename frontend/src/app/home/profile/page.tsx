@@ -9,12 +9,20 @@ import { loadProfilePublication } from "@/server/queries/professional-profile";
 import { loadProfessionalAssetSummary } from "@/server/queries/portfolio";
 import { loadMyReviewSummary } from "@/server/queries/reviews";
 import { listMyNetworkOrganizations } from "@/server/queries/network";
-import { listMyAssignments, countAssignmentsByStatus } from "@/server/queries/job-assignments";
+import { countMyAssignments } from "@/server/queries/job-assignments";
 import { getPointsBalance } from "@/server/queries/points";
 import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { ProfileHub } from "@/features/profile/profile-hub";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
+
+import { InstallerProfilePage } from "@/features/installer-account/installer-profile-page";
+import { getIndividualOnboardingData } from "@/server/queries/onboarding";
+import { loadMyPortfolioProjects, PORTFOLIO_MAX_PROJECT_MEDIA, PORTFOLIO_MAX_PROJECTS } from "@/server/queries/portfolio-projects";
+import { videoEnabled } from "@/server/video/playback";
+import { loadMyIdentity, loadMyProfileCompletion } from "@/server/queries/profile-identity";
+import { loadMyServiceAreas } from "@/server/queries/service-areas";
+import { loadMyTrades } from "@/server/queries/trades";
 
 export const dynamic = "force-dynamic";
 
@@ -61,15 +69,50 @@ export default async function ProfileHubPage() {
 
   if (data.variant !== "professional") return <NoProfessionalProfile />;
 
-  const [publication, assets, reviews, network, assignments, pointsBalance] = await Promise.all([
+  const [publication, assets, reviews, network, assignmentCounts, pointsBalance] = await Promise.all([
     loadProfilePublication(),
     loadProfessionalAssetSummary(),
     loadMyReviewSummary(),
     listMyNetworkOrganizations(supabase),
-    listMyAssignments(supabase),
+    // The EXACT per-status count from the database (`my_work_counts`) — never derived from a capped row list.
+    countMyAssignments(supabase),
     getPointsBalance(supabase),
   ]);
-  const completedJobsCount = countAssignmentsByStatus(assignments).completed;
+  const completedJobsCount = assignmentCounts.completed;
+
+  if (data.accountType === "installer_technician") {
+    const [identity, areas, trades, individual, projects, completion] = await Promise.all([
+      loadMyIdentity(),
+      loadMyServiceAreas(),
+      loadMyTrades(),
+      getIndividualOnboardingData(),
+      loadMyPortfolioProjects(),
+      loadMyProfileCompletion(),
+    ]);
+    const answers = individual?.professional;
+    return (
+      <InstallerProfilePage
+        data={{
+          displayName: identity?.displayName ?? "",
+          avatarUrl: identity?.avatarUrl ?? null,
+          coverUrl: identity?.coverUrl ?? null,
+          yearsExperience: answers?.yearsExperience ?? 0,
+          tradeKeys: trades.keys,
+          bio: answers?.bio ?? "",
+          availability: answers?.availability ?? null,
+          governorate: areas.primaryGovernorate ?? answers?.governorate ?? null,
+          city: areas.primaryCities[0] ?? answers?.city ?? null,
+          otherGovernorates: [...new Set(areas.others.map((o) => o.governorateKey))],
+          projects,
+          maxProjects: PORTFOLIO_MAX_PROJECTS,
+          maxMedia: PORTFOLIO_MAX_PROJECT_MEDIA,
+          videoEnabled: videoEnabled(),
+          completion: completion ?? { percent: 0, missing: [] },
+          publicProfileHref: publication.listed && publication.profileId ? `/p/${publication.profileId}` : null,
+        }}
+      />
+    );
+  }
 
   return (
     <ProfileHub

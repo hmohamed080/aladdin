@@ -8,7 +8,7 @@ import type { Review } from "@/server/queries/reviews";
 import { formatNumber } from "@/lib/ui/format";
 import { distributionRows, type RatingSummary } from "@/lib/reviews/summary";
 import { DistributionRow, Stars } from "./parts";
-import { ReviewRow } from "./review-card";
+import { ReviewsList } from "./reviews-list";
 import { RatingFilter } from "./rating-filter";
 
 /**
@@ -43,9 +43,9 @@ import { RatingFilter } from "./rating-filter";
  *     has no basis to give.
  *   * An individual client name, face and "verified client" tick. The reviewer
  *     is the ORGANIZATION (§1), and the employee who typed it is never exposed.
- *   * Export, pagination and a per-row overflow menu. Nothing to export, nothing
- *     yet to paginate, and no action a professional can take on a review — it is
- *     immutable and there is no reply.
+ *   * Export and a per-row overflow menu. Nothing to export, and no action a
+ *     professional can take on a review — it is immutable and there is no reply.
+ *     The list itself pages by CURSOR ("Show more"), `created_at DESC, id DESC`.
  *
  * The reference's second column is not adopted wholesale, though — most of
  * what it holds (per-category scores, a trend chart, tips) is exactly the
@@ -55,13 +55,16 @@ import { RatingFilter } from "./rating-filter";
  */
 export function ReviewsPage({
   reviews,
+  nextCursor = null,
   summary,
   filter,
   t,
   locale,
 }: {
-  /** Already filtered for display; the summary is always of the WHOLE set. */
+  /** The FIRST page, already filtered in SQL for display; the summary is always of the WHOLE set. */
   reviews: Review[];
+  /** The cursor of the page after this one (`null` when this is all of them). */
+  nextCursor?: string | null;
   summary: RatingSummary;
   filter: number | null;
   t: TranslateFn;
@@ -102,13 +105,7 @@ export function ReviewsPage({
               <p className="text-body text-fg-secondary">{t("reviews.noneMatch")}</p>
             </Card>
           ) : (
-            <ul className="divide-y rounded-md border bg-surface shadow-card">
-              {reviews.map((review) => (
-                <li key={review.id} className="p-md">
-                  <ReviewRow review={review} t={t} locale={locale} />
-                </li>
-              ))}
-            </ul>
+            <ReviewsList reviews={reviews} nextCursor={nextCursor} rating={filter} />
           )}
         </WorkPane>
       )}

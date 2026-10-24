@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import {
@@ -116,6 +117,8 @@ export async function saveProfessional(input: ProfessionalInput): Promise<Indivi
     p_max_travel_km: v.maxTravelKm ?? undefined,
   });
   if (error) return { ok: false, code: error.code === "22023" && /description/i.test(error.message) ? "onboarding.error.descriptionTooLong" : "onboarding.error.saveFailed" };
+  // The installer header shows the governorate / city saved here and is drawn by the /home layout.
+  revalidatePath("/home", "layout");
   return OK;
 }
 

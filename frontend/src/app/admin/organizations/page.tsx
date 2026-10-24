@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { describeLocation } from "@/lib/location/describe-location";
 import { loadOrganizationsDirectory } from "@/server/queries/admin-directory";
 import { parseOrgsDirectoryParams, pageWindow } from "@/features/admin-preview/directory-params";
 import { localizedName, type AdminDirectoryOrg } from "@/features/admin-preview/directory-mappers";
@@ -102,8 +103,23 @@ export default async function PreviewOrganizationsPage({
           <span className="text-fg-muted">{t.noOwner}</span>
         ),
     },
-    { key: "phone", header: userCols.phone, minWidth: "11rem", nowrap: true, secondary: true, cell: () => unavailable(d.orgContactUnavailable) },
-    { key: "city", header: userCols.city, minWidth: "10rem", secondary: true, cell: () => unavailable(d.orgCityUnavailable) },
+    {
+      key: "phone",
+      header: userCols.phone,
+      minWidth: "11rem",
+      nowrap: true,
+      secondary: true,
+      cell: (o) => (o.contactPhone ? <span dir="ltr" className="text-label">{o.contactPhone}</span> : unavailable(d.orgContactUnavailable)),
+    },
+    {
+      key: "city",
+      header: userCols.city,
+      minWidth: "10rem",
+      secondary: true,
+      cell: (o) =>
+        describeLocation({ governorate: o.governorate ?? null, city: o.city ?? null, cityCustomName: o.cityCustomName ?? null }, locale) ??
+        unavailable(d.orgCityUnavailable),
+    },
     {
       key: "verification",
       header: cols.verification ?? m.admin.orgs.verification,

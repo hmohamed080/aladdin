@@ -43,9 +43,10 @@ describe("InstallerDashboardShell (production installer chrome)", () => {
     expect(container.textContent).not.toMatch(/Sheikh Zayed|الشيخ زايد/);
   });
 
-  it("keeps the notification bell out of production until it has a real source", () => {
+  it("shows the approved bell without an unread dot it cannot back", () => {
     shell({ location: "Cairo" });
-    expect(screen.queryByRole("button", { name: /notifications/i })).toBeNull();
+    const bell = screen.getByTestId("installer-notifications");
+    expect(bell.querySelector(".bg-danger")).toBeNull();
   });
 
   it("shows the real display name, not the preview persona", () => {

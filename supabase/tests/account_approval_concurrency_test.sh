@@ -5,11 +5,9 @@ set -euo pipefail
 # reviewer. The verification-row lock must serialize the calls; the second call
 # becomes an idempotent no-op and cannot overwrite the committed approval flag.
 
-db_container="$(docker ps --filter 'name=supabase_db_aladdin' --format '{{.Names}}' | head -n 1)"
-if [[ -z "${db_container}" ]]; then
-  echo "Supabase database container not found" >&2
-  exit 1
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/db_target.sh"
+db_target_require   # explicit DB_CONTAINER only; refuses shared / ambiguous / remote targets (no auto-selection)
+db_target_mark_dirty "$(basename "$0")"   # this script changes shared/seed rows: pgTAP must not run on this database afterwards
 
 verification_id="$(docker exec -i "${db_container}" psql -U postgres -d postgres -qAt -v ON_ERROR_STOP=1 <<'SQL'
 delete from public.verifications

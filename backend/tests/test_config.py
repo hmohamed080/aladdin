@@ -19,6 +19,7 @@ from app.main import API_PREFIX, create_app
 CONFIG_VARS = (
     "APP_ENV",
     "VERCEL_ENV",
+    "CLOUDFLARE_APPLICATION_ID",
     "SUPABASE_URL",
     "SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
@@ -51,6 +52,27 @@ def test_environment_is_derived_from_vercel_when_app_env_is_missing(
 ) -> None:
     settings = Settings(_env_file=None, app_env=app_env, vercel_env=vercel_env)
     assert settings.environment == expected
+
+
+@pytest.mark.parametrize(
+    ("app_env", "expected"),
+    [
+        # A Cloudflare container can never run as `local` either.
+        ("", "production"),
+        ("local", "production"),
+        ("staging", "staging"),
+        ("production", "production"),
+    ],
+)
+def test_cloudflare_container_never_runs_as_local(app_env: str, expected: str) -> None:
+    settings = Settings(_env_file=None, app_env=app_env, cloudflare_application_id="a1b2c3")
+    assert settings.environment == expected
+    assert settings.is_production_like
+
+
+def test_cloudflare_container_without_app_env_still_checks_secrets() -> None:
+    bare = Settings(_env_file=None, cloudflare_application_id="a1b2c3")
+    assert bare.missing_configuration == ["SUPABASE_URL", "SUPABASE_ANON_KEY"]
 
 
 @pytest.mark.parametrize("vercel_env", ["production", "preview"])

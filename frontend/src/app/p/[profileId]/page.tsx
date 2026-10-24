@@ -8,10 +8,12 @@ import { createTranslator } from "@/lib/i18n/translate";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { contentColumnClass } from "@/components/layout/content-column";
 import { PublicProfileView } from "@/features/profile/public-profile";
-import { PublicPortfolio } from "@/features/profile/public-portfolio";
+import { PublicPortfolio, PublicPortfolioProjects } from "@/features/profile/public-portfolio";
+import { loadPublicPortfolioProjects } from "@/server/queries/portfolio-projects";
 import { PublicReviews } from "@/features/profile/public-reviews";
 import { loadPublicPortfolioVideos } from "@/server/queries/videos";
 import { cn } from "@/lib/ui/cn";
+import { getServerSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +64,11 @@ export default async function PublicProfilePage({
   // Only ever the published items of a currently listed profile: the projection
   // itself carries that test, so this page adds no filter of its own and cannot
   // disagree with the media route about what is public.
-  const [portfolio, reviews, videos] = await Promise.all([
+  // The cover of a currently listed profile (the same listing test as this page); NULL draws no banner.
+  const supabase = await getServerSupabase();
+  const { data: coverKey } = await supabase.rpc("public_profile_cover_key", { p_profile_id: profileId });
+
+  const [allPortfolio, reviews, allVideos, projects] = await Promise.all([
     loadPublicPortfolio(profileId),
     // Unsuppressed reviews of a currently listed professional. The projection
     // carries that test, so this page adds no filter and cannot disagree with
@@ -71,14 +77,27 @@ export default async function PublicProfilePage({
     // Published videos of the same listed profile; the Worker re-checks
     // publication on every playlist and segment request.
     loadPublicPortfolioVideos(profileId),
+    // Published portfolio projects; their photos and videos are drawn with the
+    // project, so the flat list below keeps only work outside any project.
+    loadPublicPortfolioProjects(profileId),
   ]);
+  const inProjects = new Set(projects.flatMap((p) => p.order.map((m) => m.id)));
+  const portfolio = allPortfolio.filter((item) => !inProjects.has(item.id));
+  const videos = allVideos.filter((video) => !inProjects.has(video.id));
 
   return (
     <main className={cn(contentColumnClass, "flex flex-col gap-xl py-xl")} id="main">
+      {typeof coverKey === "string" ? (
+        <div className="relative aspect-[6/1] w-full overflow-hidden rounded-md border border-strong bg-surface-2" data-testid="public-profile-cover">
+          {/* eslint-disable-next-line @next/next/no-img-element -- streamed through /p/cover, which re-proves publication */}
+          <img src={`/p/cover/${profileId}`} alt="" className="h-full w-full object-cover" />
+        </div>
+      ) : null}
       <PublicProfileView profile={profile} t={t} locale={locale} />
       {/* Rendered only when there is something published. An empty section would
           tell a visitor that work exists and is being withheld, which is exactly
           the distinction the whole surface refuses to draw. */}
+      <PublicPortfolioProjects projects={projects} t={t} />
       <PublicPortfolio items={portfolio} videos={videos} t={t} />
       {/* Reviews after the work, for the same reason the work comes after the
           identity: a visitor decides who this is, sees what they have done, and

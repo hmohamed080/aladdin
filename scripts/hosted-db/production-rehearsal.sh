@@ -11,9 +11,9 @@ set -euo pipefail
 export LC_ALL=C
 
 PROD="kkpkgjrweysgvhvkhzun"
-BRANCH="claude/project-thread-lz98jd"
-SHA="e27358c1c27a2697ebe71fb55f8c5e335076d55e"
-MANIFEST="76353b2d7555f6b1b124c58e31a005c21efaa4a40668d2edfe71e0d9584ed183"
+BRANCH="claude/project-thread-724t0d"
+SHA="2ce6e109186fcc63cee534b1219d0f5622f86efb"
+MANIFEST="f76c64c2d0f3d762937cf550e7bd71a45ef0f96c672f086ecd9875db1bcc6812"
 HERE="$(cd "$(dirname "$0")" && pwd)"; KIT="${KIT:-$HERE}"; [ -s "$KIT/security-tail.sql" ] || KIT="$HERE/../acceptance-rebuild"
 OUT="${HOME}/aladdin-production-rehearsal-$(date +%Y%m%d-%H%M%S)"
 sb() { pnpm exec supabase "$@"; }

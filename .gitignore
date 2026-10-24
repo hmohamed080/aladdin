@@ -39,6 +39,9 @@ logs/
 node_modules/
 .pnp.*
 .next/
+# Extra build folders for side-by-side production builds (performance and review runs); never source.
+.next-perf/
+.next-review/
 out/
 build/
 dist/

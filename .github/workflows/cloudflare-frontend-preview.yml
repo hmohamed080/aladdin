@@ -83,7 +83,8 @@ jobs:
           set -o pipefail
           pnpm exec wrangler deploy --env preview \
             --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
-            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$NEXT_PUBLIC_SUPABASE_ANON_KEY" | tee "$RUNNER_TEMP/deploy.log"
+            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            --var "R2_ACCOUNT_ID:$CLOUDFLARE_ACCOUNT_ID" | tee "$RUNNER_TEMP/deploy.log"
           grep -oE 'https://[a-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/deploy.log" | head -1 > "$RUNNER_TEMP/preview-url"
       - name: Smoke check the preview
         if: vars.CLOUDFLARE_PREVIEW_ENABLED == 'true'

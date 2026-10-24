@@ -24,6 +24,7 @@ vi.mock("@/server/queries/job-opportunities", () => ({ listJobOpportunities: asy
 vi.mock("@/server/queries/workspace", () => ({ getWorkspaces: async () => ({ entries: state.entries }) }));
 vi.mock("@/server/queries/sales-persona", () => ({ loadIsSalesPersona: async () => state.isSales }));
 vi.mock("@/server/queries/personal-home", () => ({ loadPersonalHome: async () => state.home }));
+vi.mock("@/server/queries/profile-identity", () => ({ loadMyIdentity: async () => null }));
 
 // Layout chrome that is not under test is stubbed. The generic switcher is a
 // marker: it is mounted only for the approved five categories, and always

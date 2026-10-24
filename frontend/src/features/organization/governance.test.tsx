@@ -18,6 +18,10 @@ vi.mock("@/server/actions/organization-i18n", () => ({
   updateOrganizationI18nAction: vi.fn(),
   updateBranchI18nAction: vi.fn(),
 }));
+vi.mock("@/server/actions/organization-profile", () => ({
+  setBranchLocationAction: vi.fn(),
+  saveLegalNameAction: vi.fn(),
+}));
 
 import { IdentityChangePanel, type IdentityChangeView } from "./identity-change-panel";
 import { BranchGovernance, branchState, type BranchGovernanceRow } from "./branch-governance";
@@ -186,5 +190,41 @@ describe("governance error mapping", () => {
     expect(mapGovernanceError({ code: "23505", hint: "duplicate_branch_name" })).toBe("governance.errors.duplicateBranch");
     expect(mapGovernanceError({ code: "42501" })).toBe("governance.errors.denied");
     expect(mapGovernanceError({ code: "XX000" })).toBe("states.genericRetry");
+  });
+});
+
+describe("registered location on a branch", () => {
+  it("shows the governorate and city given at registration, and offers an edit", () => {
+    renderWithI18n(
+      <BranchGovernance
+        m={en}
+        orgId="o1"
+        rows={[branch()]}
+        orgIsApproved
+        locations={{ b1: { governorate: "cairo", city: "maadi", cityCustomName: null } }}
+      />,
+      "en",
+    );
+    expect(screen.getByTestId("branch-location").textContent).toBe("Cairo - Maadi");
+    expect(screen.getByRole("button", { name: "Edit location" })).toBeTruthy();
+  });
+
+  it("shows a typed city exactly as entered, and Arabic names in Arabic", () => {
+    renderWithI18n(
+      <BranchGovernance
+        m={en}
+        orgId="o1"
+        rows={[branch()]}
+        orgIsApproved
+        locations={{ b1: { governorate: "giza", city: null, cityCustomName: "Hay El Gamaa" } }}
+      />,
+      "ar",
+    );
+    expect(screen.getByTestId("branch-location").textContent).toBe("الجيزة - Hay El Gamaa");
+  });
+
+  it("draws no location line for a branch that never had one", () => {
+    renderWithI18n(<BranchGovernance m={en} orgId="o1" rows={[branch()]} orgIsApproved />, "en");
+    expect(screen.queryByTestId("branch-location")).toBeNull();
   });
 });

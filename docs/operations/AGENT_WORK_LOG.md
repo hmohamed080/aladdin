@@ -1,3 +1,11 @@
+## 2026-10-24 — Installer work and Next 16.4.3 rebuilt on the consolidated stack (replaces PR #102)
+
+Branch `claude/project-thread-724t0d` from PR #101 (`506ec9b`, = #97 + privilege fix). PR #102 (`chore/next-16`) was built on `integration/approved-features-20261019`, which forked from an old #97 point: it lacked 34 stack commits, used the retired 2026101x migration versions, edited the already-applied `20261020090001`, and numbered its Installer migrations `20261021090000..09`, colliding with the stack's `20261021090001..15` already on Acceptance. This branch: merges `main` (#96; same conflict resolutions as the integration branch), ports `9cc8eb8`, `5f18086`, `5dc6779` and `ec0b082`, renumbers the Installer migrations to `20261024090002..11`, drops the no-op #96/#88 reconcile migration and the edit to `20261020090001`, and carries the integration's permission contracts under the new versions. The Redis guard test now allows `REDIS_CACHE_ENABLED` only in the workers.dev preview (owner choice 2026-10-24).
+
+Validation (cloud sandbox): typecheck clean; lint 0 errors (58 warnings); Vitest 4,307 passed; permission gate upgrade replay passes every migration through `20261024090011`; fresh `db reset` + 688 exact function contracts; pgTAP 141 files / 6,290 tests pass; installer phone-change and last-owner concurrency proofs pass; migration policy clean against `main`. Not run: Playwright E2E, Cloudflare build.
+
+Hosted: Acceptance `nxossqhdfltcqdwvbewi` got `20261024090001` applied on 2026-10-24 (owner approved). Re-check: fingerprint matches the 181-migration local baseline except the expected `roles` row (`media_edge_worker`); advisors unchanged in kind. **Acceptance GO.** The Installer migrations `20261024090002..11` are not applied anywhere hosted. Production `kkpkgjrweysgvhvkhzun` untouched (165 migrations, latest `20261020090001`).
+
 ## 2026-10-22 — Consolidated database baseline, tested backup/restore, Production rehearsal
 
 Branch `claude/project-thread-lz98jd` (from `claude/cloudflare-workers-2ibvgs`, PR #97 head). Details: [database-baseline-2026-10-22.md](database-baseline-2026-10-22.md).
@@ -39,6 +47,35 @@ Findings:
 Validation: `python3 scripts/check_doc_links.py`; the JSON files parse.
 
 Unfinished: everything in the plan; it needs the owner's approval stage by stage.
+
+## 2026-10-24 — Installer profile completion: one rule on three surfaces, E2E, local checkpoint
+
+Branch `integration/approved-features-20261019`: HEAD `9cc8eb87` plus one local checkpoint commit. Base `origin/main` is `a9723a01` (fetched 2026-10-24); the branch is 89 commits ahead, 0 behind. **Nothing pushed, no hosted write, no deploy.** The branch's configured upstream is `origin/claude/media-backend-continuation-2ibvgs` (PR #91): never run a bare `git push` from it.
+
+- **Approved Installer profile.** `/home/profile` is the approved "Complete your profile" page on real data (`installer-profile-page.tsx`, `saveInstallerProfileAction`). Migration `20261024090000_installer_profile_completion` redefines `app.profile_completion` so an Installer counts the four shared items (username, photo, phone, confirmed name) plus the five the page asks for: experience, specialties, availability, a primary governorate/city and at least one portfolio project (9 items). Every other persona is unchanged. The dashboard banner, `/home/profile` and `/settings/profile` read the same figure. An Installer's `/home/settings` is the installer settings page and does not show completion.
+- **Polish in the same checkpoint.** Sidebar highlight, mobile top bar with bell and avatar, points page rewards, dark-mode Settings, service-area names on the public profile (`/p/<profiles.id>`; the user id deliberately 404s), `showroom-invite.png` height now matches its CSS size, test ids on the banner and the page percent, `.next-perf/` and `.next-review/` ignored by git and ESLint.
+- **Removed as temporary:** the `NEXT_LOCAL_DIST_DIR` block in `next.config.ts` and the build-generated edits to `next-env.d.ts` and `tsconfig.json`.
+
+### Verification (all on this working tree)
+
+- typecheck pass; `pnpm lint` 0 errors, 8 warnings; Vitest 336 files, 4,297 passed, 38 skipped, 0 failed. The one timing-sensitive Cloudflare Images test ("steps quality down…", 2.8 s alone, 5 s limit) can time out when the suite runs under heavy load; it passes alone and is unrelated.
+- pgTAP: all 140 files, 6,284 tests, on a fresh isolated stack (`supabase start` from a copied `supabase/` with other ports, deleted afterwards). On the long-lived local dev DB 32 files fail only because it holds dev data (74 users), so never use it as the pgTAP result.
+- Migration policy (as CI runs it) passes; guard unit tests 29/29; the permission gate's own functions, run read-only against a DB with the new migration, report the 163 reviewed migrations unchanged, atomic form OK and all 688 function contracts exact. No new `supabase/permissions/*.json` is needed.
+- E2E, isolated stack, production build of the working tree, desktop: new `installer-profile-completion.spec.ts` passes on desktop and mobile; `profile-completion.spec.ts` 10/12.
+
+### E2E changes (derived, not re-numbered)
+
+- New spec registers a fresh installer by phone, fills `/home/profile` through its real controls, adds a portfolio project and a photo, and after every step compares the banner, the page and the Settings card with a per-item count taken from the raw tables (not from `my_profile_completion()`), including the card's missing list. At 100% the banner and the card are correctly absent.
+- `profile-completion.spec.ts`: the generic-card tests now register a **Sales Team** member (card still drawn for non-installers). The 25% / 38% / 50% figures stay because the rule gives Sales 4 shared + headline, years, about and an activity = 8 items (migration `20260924090003` seeds `sales_rep` and `sales_manager`). The two Tradespeople tests now check the approved Installer page. Fixed stale locators: the phone country control is a listbox button (not a `<select>`), and an avatar replacement is a different `?key=` URL on the same `/api/media/avatar` path.
+- Still red and untouched by this diff: the two showroom-owner tests (`/b2b/settings` redirects to `/showroom/settings`, which has no `identity-card` or `activity-selector` there).
+
+### Not done / owner decisions
+
+- Hosted DB: this migration and the stack's ~26 unapplied migrations are not applied anywhere hosted. Push, PR and deploy wait for the owner.
+- Port to `origin/main` (assessed, not attempted): `main` lacks PR #96's three commits that the stack also lacks, so merging the stack conflicts in four files; migration `20261020090001` differs between `main` and this branch and one copy must win (edits a merged migration). Details in RUNTIME_STATE.md.
+- Favicon: none exists (`/favicon.ico` 404 on every page); needs a brand asset, separate change.
+- Concurrency, Storage-API and media-exposure scripts were not run: none touches an RPC or table this diff changes.
+- Node on this machine was upgraded to 24.22.1 (nvm); the dev server on :3210 still runs on the old process (about 6.7 GB RAM), restart it.
 
 ## 2026-10-20 — Cloudflare Workers frontend (ADR-0021), lead
 
@@ -214,6 +251,14 @@ Frontend: `/showroom/verification` (owner upload, drafts, submit/resubmit, statu
 Validation: typecheck clean; lint 0 errors; Vitest 294 files, all passing (one i18n whitelist added for file-format names); production build passed; pgTAP on a local Postgres 16 with a Supabase shim: 109/117 files, the same 8 shim-only failures as untouched `main`; new file 96 (72 checks) passes. Not run: browser journeys and screenshots (no Supabase stack here: Docker image pulls are rate-limited), E2E. No hosted write, deploy or merge.
 
 Open: owner decisions on the badge backfill, Offers/My Offers re-enable, invitation revoke/hashing, purchase-request UI, Points/staff-invite Preview buttons; the 30-day phone cooldown was not found in code or docs; hosted GoTrue CAPTCHA gap stays with the Auth owner.
+
+## 2026-10-20 — Registration data: saved, editable, and visible to Admin
+
+Branch `fix/registration-account-sync` from `main` @ `bd0de0a`; worktree `D:/projects/aladdin-wt-registration-sync`. Audited every field of the Showroom and Installer sign-ups against Settings and the Admin Dashboard. Found and fixed: (1) business contact stored twice (`organizations.contact_*` vs `organization_contacts`) with no editor for the registered values; (2) legal name and branch governorate/city had no edit path; (3) Admin showed no account type for a new Installer (declared persona vs `primary_account_type`) and could not read activities; (4) the registration review step hid phone, e-mail, activity and description. Migration `20261020090001_registration_data_sync.sql`, pgTAP 87 (43/43; 82, 91, 92, 93, 22, 71, 86 still green on the scratch DB), new Settings contact / legal-name / location UI, Admin Registration-details card. Details: `docs/frontend/registration-data-sync.md`.
+
+Follow-up same day: real-browser run of both sign-ups (see doc), Installer phone re-key with current password, Installer header refreshed through layout revalidation, Admin organizations list shows phone and city. pgTAP 87 now 45/45.
+
+Open: not pushed, migration not applied to any hosted database. pgTAP 60 fails on the scratch DB for an unrelated avatar-storage reason (also fails without this migration).
 
 ## 2026-10-18 — Terms of Service published
 
@@ -6857,3 +6902,23 @@ Preview became reachable (certificate issued). Fixed its 500s (empty `NEXT_PUBLI
 
 ### Acceptance ACL mismatch — 2026-10-24
 The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl` failed. Cause: hosted default privileges (ALL to client roles in public) versus the local image's (Dxtm only); 19 objects never stripped them. Reproduced both hosted hashes locally, then added forward-only `20261024090001_revoke_platform_default_privileges` and pgTAP 100. Validated: 5,797/5,797 pgTAP under both default sets; fresh, upgrade and hosted-like fingerprints identical; gate 18/18 and 635 contracts; lint 0 errors. Kit scripts now exit nonzero on mismatch. Unfinished: apply to acceptance (owner approval), re-verify, then GO/NO-GO; Production untouched.
+## 2026-10-22 — FastAPI on Cloudflare Containers (ADR-0022, draft PR)
+
+- Built `edge/backend-worker` (Worker + `BackendContainer`, `@cloudflare/containers` 0.3.7) on top of #97; optional `BACKEND` service binding in the frontend proxy (agreed with the #97 thread); backend fails closed on Cloudflare without `APP_ENV`; Dockerfile compiles bytecode, pins uv, fixes the health-check path.
+- Measured locally: 59 MB RSS; ready in 26.5 s on 1/16 vCPU and 4.5 s on 1/4 vCPU (41.1 s / 8.2 s before bytecode); binding → container 200 through `wrangler dev`.
+- **Unfinished:** preview deploy and real cold-start/latency numbers (owner approval, Workers Paid); bind `BACKEND` in `frontend/wrangler.jsonc` after the backend preview exists; production at cutover.
+- Sandbox notes: Docker Hub rate-limits (use `mirror.gcr.io/library/...`), ghcr blobs are blocked, builds need a local base image that trusts the proxy CA (never shipped); `wrangler dev` with containers works with `dockerd` started by hand.
+
+
+## 2026-10-24 — FastAPI preview prep on hold (Option B), PR #98
+
+- Merged #100 (180-migration baseline, retired-version gate) into #98 and retargeted #98 onto #100; #98 adds no migrations and none of the 15 old versions remain.
+- `pip-audit`: upgraded pyjwt 2.13.0 → 2.15.1 (15 advisories, auth path), cryptography, h2, multidict, certifi; 0 known after; backend 106 passed.
+- Dry runs for `preview`/`production` pass; image 396 MB, non-root, no secrets; cold start median 5.2 s at 1/4 vCPU; prices unchanged.
+- **Unfinished:** gates in [fastapi-preview-prerequisites.md](fastapi-preview-prerequisites.md): frontend preview HTTPS, Acceptance rebuild, then separate approvals for Workers Paid and the preview.
+
+## 2026-10-24 — #98 merged into #103, backend preview wired, Installer migrations on Acceptance
+
+- Merged #98 into `claude/project-thread-724t0d` and added the `BACKEND` service binding to the frontend `preview` env only. Redeployed the frontend preview (run 40100666573); `/api/backend/health` answers from the container.
+- Applied `20261024090002..11` to Acceptance (owner approved). Rehearsed first on a local DB reset to `20261024090001`, including a CRLF copy: all apply, 688 function permission contracts pass. Each migration ran inside a DO block that strips CR, checks the md5 of the repository file, executes it and records it, so a paste error aborts instead of drifting.
+- **Unfinished:** latency numbers (the sandbox cannot reach workers.dev); an authenticated backend route to test refusal against; the `schema_migrations.statements` placeholder for `20261024090001` on Acceptance (metadata only); Production stays untouched until the owner's GO after the stack merges.

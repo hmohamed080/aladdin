@@ -181,3 +181,50 @@ describe("KEYSET paging: offset paging is gone from Jobs and My Work", () => {
     }
   });
 });
+
+describe("the dashboard and profile 'completed jobs' come from the database's exact count, not from a capped list", () => {
+  for (const rel of ["app/home/page.tsx", "app/home/profile/page.tsx"]) {
+    it(`${rel} reads my_work_counts and never derives a count from rows`, () => {
+      const page = code(rel);
+      expect(page).toMatch(/countMyAssignments\(/);
+      expect(page).not.toMatch(/countAssignmentsByStatus/);
+      expect(page).toMatch(/completedJobsCount = assignmentCounts\.completed/);
+    });
+  }
+
+  it("the profile page no longer reads the capped assignment list at all", () => {
+    expect(code("app/home/profile/page.tsx")).not.toMatch(/listMyAssignments/);
+  });
+
+  it("countMyAssignments is one RPC (a COUNT per status), with no row limit", () => {
+    const q = read("server/queries/job-assignments.ts");
+    const body = q.slice(q.indexOf("export async function countMyAssignments"), q.indexOf("export async function listWorkCompanies"));
+    expect(body).toMatch(/rpc\("my_work_counts"\)/);
+    expect(body).not.toMatch(/LIST_LIMIT|\.limit\(|\.range\(/);
+  });
+});
+
+describe("Reviews page from the database by keyset, not from a capped read", () => {
+  it("the route reads one keyset page and the exact summary, never the whole list", () => {
+    const page = code("app/home/reviews/page.tsx");
+    expect(page).toMatch(/listMyReviewsPage\(/);
+    expect(page).toMatch(/loadMyReviewSummary\(/);
+    expect(page).not.toMatch(/listMyReviews\(|\.filter\(/);
+  });
+
+  it("the query orders by a TOTAL keyset (created_at, id; rating first for highest), filters by keyset, and uses no offset or range", () => {
+    const q = code("server/queries/reviews.ts");
+    const body = q.slice(q.indexOf("export async function listMyReviewsPageFrom"), q.indexOf("export async function listMyReviewsPage("));
+    // newest (default) is created_at DESC, id DESC; the approved workspace adds oldest (ASC) and highest (rating DESC first).
+    expect(body).toMatch(/\.order\("created_at", \{ ascending: order === "oldest" \}\)\s*\.order\("id", \{ ascending: order === "oldest" \}\)/);
+    expect(body).toMatch(/created_at\.lt\./);
+    expect(body).not.toMatch(/\.range\(|offset/);
+  });
+
+  it("the summary is counted in the database, one head COUNT per star, with no rows read", () => {
+    const q = code("server/queries/reviews.ts");
+    const body = q.slice(q.indexOf("export const loadMyReviewSummary"), q.indexOf("export async function loadPublicReviews"));
+    expect(body).toMatch(/count: "exact", head: true/);
+    expect(body).not.toMatch(/listMyReviews|summarizeReviews\(/);
+  });
+});

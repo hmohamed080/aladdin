@@ -64,9 +64,16 @@ describe("Redis use stays inside ADR-0019", () => {
 });
 
 describe("Redis stays off until accepted", () => {
-  it("ships disabled in .env.example and in every Workers environment", () => {
+  it("ships disabled in .env.example and outside the workers.dev preview", () => {
     expect(readFileSync(join(FRONTEND, ".env.example"), "utf8")).toMatch(/^REDIS_CACHE_ENABLED=false$/m);
     const wrangler = readFileSync(join(FRONTEND, "wrangler.jsonc"), "utf8");
-    expect(wrangler).not.toMatch(/"REDIS_CACHE_ENABLED"\s*:\s*"true"/);
+    // The owner accepted Redis for the acceptance preview only (2026-10-24, cf-preview key prefix).
+    // Every other environment, production included, keeps it off.
+    const enabled = [...wrangler.matchAll(/"REDIS_CACHE_ENABLED"\s*:\s*"true"/g)].map((m) => m.index ?? 0);
+    const preview = wrangler.indexOf('"preview": {');
+    const production = wrangler.indexOf('"production": {');
+    expect(preview).toBeGreaterThan(-1);
+    expect(production).toBeGreaterThan(preview);
+    expect(enabled.every((at) => at > preview && at < production)).toBe(true);
   });
 });

@@ -14,6 +14,9 @@ import { loadPointsPage } from "@/features/points/points-page";
 import { PointsBalance } from "@/features/points/points-balance";
 import { PointsHistory } from "@/features/points/points-history";
 import { NoProfessionalProfile } from "@/features/profile/no-professional-profile";
+import { InstallerPoints } from "@/features/installer-points/installer-points";
+import { toPointsEntryViews } from "@/features/points/view-model";
+import { getPointsOverview, listPointsEntries, resolveEntryOrganizationNames } from "@/server/queries/points";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +73,25 @@ export default async function PersonalPointsPage({
   // approved earning rule, so the destination is not theirs — stated, not
   // redirected, for the reason `NoProfessionalProfile` gives.
   if (home.variant !== "professional") return <NoProfessionalProfile />;
+
+  // An Installer gets the approved Points design (`/preview/installer-points`) on the real ledger.
+  if (home.accountType === "installer_technician") {
+    try {
+      const [overview, entries] = await Promise.all([getPointsOverview(supabase), listPointsEntries(supabase, { limit: 5 })]);
+      const names = await resolveEntryOrganizationNames(supabase, entries);
+      return (
+        <InstallerPoints
+          locale={locale}
+          overview={overview}
+          recent={toPointsEntryViews(entries, t, locale, names)}
+        />
+      );
+    } catch {
+      return (
+        <StatePanel tone="danger" icon={<GaugeIcon size={22} />} title={m.points.error.title} body={m.points.error.body} />
+      );
+    }
+  }
 
   const { show } = await searchParams;
   const data = await loadPointsPage(supabase, { show, locale, t, basePath: "/home/points" });

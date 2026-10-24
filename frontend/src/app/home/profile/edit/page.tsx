@@ -81,6 +81,12 @@ export default async function EditProfilePage() {
     loadMyServiceAreas(),
   ]);
 
+  // An Installer gets the approved "Complete your profile" design (`/preview/installer-account`): the real cover and
+  // photo editor in the hero, the real editors inside the approved numbered sections, and a progress rail computed
+  // from the database. Nothing here is a mock: every control saves through its own RPC.
+  // Installers edit their profile on /home/profile itself (the approved "Complete your profile" page).
+  if (home.accountType === "installer_technician") redirect("/home/profile");
+
   return (
     <div className="flex flex-col gap-xl">
       {/* TRADES SAVE THEMSELVES, ABOVE THE FORM RATHER THAN INSIDE IT. They are a

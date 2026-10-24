@@ -14,7 +14,13 @@ export type MyIdentity = {
   phoneCountryIso2: string | null;
   phoneNational: string | null;
   phoneE164: string | null;
+  /** `profiles.phone_verified_at` is set. A phone changed through the Installer flow stays UNVERIFIED (NULL) until an OTP step exists. */
+  phoneVerified: boolean;
+  /** The phone is also this account's sign-in key (phone + password accounts): changing it needs the current password. */
+  phoneIsLoginKey: boolean;
   avatarUrl: string | null;
+  /** The current profile cover (a short-lived readable URL), or null. */
+  coverUrl: string | null;
   /** A phone + password (Craftsman) account: its main phone is its login and cannot be moved here. */
   phoneLogin: boolean;
   /** The current unverified second phone reservation (V1, no OTP), or null. */
@@ -43,7 +49,7 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "display_name, display_name_confirmed_at, username, phone_country_iso2, phone_national, phone_e164, avatar_media_id",
+      "display_name, display_name_confirmed_at, username, phone_country_iso2, phone_national, phone_e164, phone_verified_at, avatar_media_id, cover_media_id",
     )
     .eq("user_id", user.id)
     .maybeSingle();
@@ -64,6 +70,20 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
     }
   }
 
+  let coverUrl: string | null = null;
+  if (profile.cover_media_id) {
+    const { data: cover } = await supabase
+      .from("avatar_uploads")
+      .select("object_key")
+      .eq("id", profile.cover_media_id)
+      .eq("state", "ready")
+      .maybeSingle();
+    if (cover?.object_key) {
+      try { coverUrl = await readableMediaUrl(supabase, "avatar", cover.object_key); }
+      catch { coverUrl = null; }
+    }
+  }
+
   const { data: secondary } = await supabase.rpc("my_secondary_phone");
 
   return {
@@ -73,7 +93,10 @@ export const loadMyIdentity = cache(async function loadMyIdentity(): Promise<MyI
     phoneCountryIso2: profile.phone_country_iso2,
     phoneNational: profile.phone_national,
     phoneE164: profile.phone_e164,
+    phoneVerified: profile.phone_verified_at !== null,
+    phoneIsLoginKey: isCraftsmanLoginAlias(user.email),
     avatarUrl,
+    coverUrl,
     phoneLogin: isCraftsmanLoginAlias(user.email),
     secondaryPhone: mapSecondaryPhone(secondary),
   };
@@ -92,6 +115,10 @@ export const PROFILE_COMPLETION_ITEMS = [
   "organization_address",
   "organization_activities",
   "organization_setup",
+  // Installer items (20261024090011_installer_profile_completion.sql).
+  "availability",
+  "location",
+  "portfolio",
 ] as const;
 export type ProfileCompletionItem = (typeof PROFILE_COMPLETION_ITEMS)[number];
 

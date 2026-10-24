@@ -171,7 +171,7 @@ export function toProfileCompletionVM(
     verifiedHint: verified
       ? { ar: "حساب موثّق", en: "Verified account" }
       : { ar: "التوثيق منفصل عن اكتمال الملف", en: "Verification is separate from profile completion" },
-    href: "/home/profile/edit",
+    href: "/home/profile",
   };
 }
 

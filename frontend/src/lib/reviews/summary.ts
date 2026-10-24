@@ -58,6 +58,23 @@ export function summarizeReviews(reviews: readonly RatedReview[]): RatingSummary
   };
 }
 
+/**
+ * The same summary from EXACT per-star counts (a COUNT in the database) instead of from rows, for a list too
+ * long to load. Same arithmetic, same rounding, same null-for-empty rule as `summarizeReviews`.
+ */
+export function summarizeReviewCounts(counts: Record<RatingValue, number>): RatingSummary {
+  const distribution: Record<RatingValue, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let sum = 0;
+  let total = 0;
+  for (const star of STARS) {
+    const n = Number.isInteger(counts[star]) && counts[star] > 0 ? counts[star] : 0;
+    distribution[star] = n;
+    sum += star * n;
+    total += n;
+  }
+  return { average: total === 0 ? null : Math.round((sum / total) * 10) / 10, total, distribution };
+}
+
 /** The five rows of a distribution, highest first, as the reference shows them. */
 export function distributionRows(
   summary: RatingSummary,

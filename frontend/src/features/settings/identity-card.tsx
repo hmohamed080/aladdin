@@ -6,7 +6,7 @@ import { Card, InlineError, InlineSuccess } from "@/components/ui/primitives";
 import { Input, LabeledField, SubmitButton } from "@/components/ui/controls";
 import { PhoneField } from "@/components/ui/phone-field";
 import type { CanonicalPhone } from "@/lib/contact/phone";
-import { setDisplayNameAction, setPhoneAction, type IdentityFieldState } from "@/server/actions/profile-identity";
+import { changeLoginPhoneAction, setDisplayNameAction, setPhoneAction, type IdentityFieldState } from "@/server/actions/profile-identity";
 import type { MyIdentity } from "@/server/queries/profile-identity";
 import { AvatarField } from "./avatar-field";
 import { SecondaryPhoneSection } from "./secondary-phone";
@@ -26,7 +26,7 @@ const INITIAL: IdentityFieldState = { ok: false };
 export function IdentityCard({ identity }: { identity: MyIdentity }) {
   const { t } = useI18n();
   const [nameState, submitName] = useActionState(setDisplayNameAction, INITIAL);
-  const [phoneState, submitPhone] = useActionState(setPhoneAction, INITIAL);
+  const [phoneState, submitPhone] = useActionState(identity.phoneIsLoginKey ? changeLoginPhoneAction : setPhoneAction, INITIAL);
   const [phone, setPhone] = useState<CanonicalPhone | null>(null);
 
   return (
@@ -73,6 +73,11 @@ export function IdentityCard({ identity }: { identity: MyIdentity }) {
             onChange={setPhone}
           />
           <p className="text-label text-fg-muted">{t("profileIdentity.phone.hint")}</p>
+          {identity.phoneIsLoginKey ? (
+            <LabeledField label={t("profileIdentity.phone.passwordLabel")} htmlFor="phone-current-password" hint={t("profileIdentity.phone.loginKeyHint")}>
+              <Input id="phone-current-password" name="currentPassword" type="password" autoComplete="current-password" maxLength={200} required />
+            </LabeledField>
+          ) : null}
           <input type="hidden" name="countryIso2" value={phone?.countryIso2 ?? ""} />
           <input type="hidden" name="national" value={phone?.national ?? ""} />
           <input type="hidden" name="e164" value={phone?.e164 ?? ""} />

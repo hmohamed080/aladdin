@@ -335,3 +335,29 @@ describe("BusinessFlow — location step", () => {
     expect(ar.onboarding.business.location.customCityLabel).toBe("اكتب اسم المدينة");
   });
 });
+
+describe("BusinessFlow — review shows everything that will be saved", () => {
+  it("lists the activity, phone, e-mail and description of a showroom before it is submitted", () => {
+    renderWithI18n(
+      <BusinessFlow
+        answers={names({ orgType: "showroom_dealer", contactEmail: "owner@alnoor.example", description: "Tiles and paint for homes" })}
+        presetOrgType="showroom_dealer"
+        draftId="draft-1"
+      />,
+      "en",
+    );
+    const review = screen.getByText(en.onboarding.business.review.name).closest("dl") as HTMLElement;
+    expect(within(review).getByText(en.onboarding.business.activities.decor_showroom)).toBeTruthy();
+    expect(within(review).getByText("+201012345678")).toBeTruthy();
+    expect(within(review).getByText("owner@alnoor.example")).toBeTruthy();
+    expect(within(review).getByText("Tiles and paint for homes")).toBeTruthy();
+    expect(within(review).getByText(/10 Test Street/)).toBeTruthy();
+  });
+
+  it("does not ask a supplier to review a showroom phone or activity", () => {
+    renderWithI18n(<BusinessFlow answers={names({ orgType: "supplier" })} presetOrgType="supplier" draftId="draft-1" />, "en");
+    const review = screen.getByText(en.onboarding.business.review.name).closest("dl") as HTMLElement;
+    expect(within(review).queryByText(en.onboarding.business.identity.phoneLabel)).toBeNull();
+    expect(within(review).queryByText(en.onboarding.business.identity.activityLabel)).toBeNull();
+  });
+});

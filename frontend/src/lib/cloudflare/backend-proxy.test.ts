@@ -49,4 +49,36 @@ describe("backend proxy (Cloudflare frontend)", () => {
     const failing = vi.fn(async () => { throw new TypeError("network"); });
     expect((await proxyToBackend(request, config, failing as unknown as typeof fetch)).status).toBe(502);
   });
+
+  it("prefers the BACKEND service binding over BACKEND_ORIGIN, with the same request", async () => {
+    const binding = { fetch: vi.fn(async (request: Request) => Response.json({ seen: await request.text() })) };
+    const origin = vi.fn(async () => new Response("wrong transport"));
+    const request = new Request("https://aladdindecore.com/api/backend/documents?x=1", {
+      method: "POST",
+      headers: { authorization: "Bearer jwt", connection: "keep-alive", "cf-connecting-ip": "203.0.113.9" },
+      body: "payload",
+    });
+    const response = await proxyToBackend(request, { ...config, binding }, origin as unknown as typeof fetch);
+    expect(origin).not.toHaveBeenCalled();
+    const sent = binding.fetch.mock.calls[0]![0];
+    expect(new URL(sent.url).pathname).toBe("/api/backend/documents");
+    expect(new URL(sent.url).search).toBe("?x=1");
+    expect(sent.method).toBe("POST");
+    expect(sent.redirect).toBe("manual");
+    expect(sent.headers.get("authorization")).toBe("Bearer jwt");
+    expect(sent.headers.get("connection")).toBeNull();
+    expect(sent.headers.get("x-forwarded-host")).toBe("aladdindecore.com");
+    expect(sent.headers.get("x-forwarded-for")).toBe("203.0.113.9");
+    expect(await response.json()).toEqual({ seen: "payload" });
+  });
+
+  it("uses the binding even when no origin is set, and answers 502 when the binding throws", async () => {
+    const request = new Request("https://aladdindecore.com/api/backend/health");
+    const ok = { fetch: vi.fn(async () => Response.json({ status: "ok" })) };
+    expect((await proxyToBackend(request, { origin: undefined, appEnv: "production", binding: ok })).status).toBe(200);
+    const broken = { fetch: vi.fn(async () => { throw new Error("binding down"); }) };
+    const response = await proxyToBackend(request, { origin: undefined, appEnv: "production", binding: broken });
+    expect(response.status).toBe(502);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
 });

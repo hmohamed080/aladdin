@@ -12,6 +12,9 @@ import { THEME_COOKIE } from "@/lib/theme/config";
 import { maskEmail } from "@/lib/ui/mask-email";
 import { isCraftsmanLoginAlias, userFacingEmail } from "@/lib/auth/craftsman-login-alias";
 import { PersonalSettings } from "@/features/settings/personal-settings";
+import { InstallerSettings } from "@/features/installer-settings/installer-settings";
+import { getContactEmailAdminClient, PASSWORD_SET_FLAG } from "@/lib/supabase/admin-server";
+import { loadContactEmailStatus } from "@/server/identity/contact-email";
 import { loadMyIdentity, loadMyProfileCompletion } from "@/server/queries/profile-identity";
 import { loadMyAvailabilityWindows } from "@/server/queries/service-areas";
 
@@ -45,6 +48,28 @@ export default async function PersonalSettingsPage() {
   // An installer phone account's internal login alias is never shown (lib/auth/craftsman-login-alias.ts).
   const visibleEmail = userFacingEmail(authUser?.email);
   const signInEmail = visibleEmail ? maskEmail(visibleEmail) : null;
+
+  // An Installer gets the approved Installer Settings design (the production shell around it is the /home layout's).
+  // The client receives only the caller's own fields and a boolean for "signs in with phone + password" - never the alias.
+  if (home.accountType === "installer_technician" && identity && authUser) {
+    const phoneAccount = isCraftsmanLoginAlias(authUser.email);
+    const contactEmail = await loadContactEmailStatus(getContactEmailAdminClient(), authUser.id);
+    return (
+      <InstallerSettings
+        data={{
+          displayName: identity.displayName,
+          username: identity.username,
+          phoneE164: identity.phoneE164,
+          phoneNational: identity.phoneNational,
+          phoneVerified: identity.phoneVerified,
+          phoneAccount,
+          contactEmail,
+          hasPassword: phoneAccount || authUser.app_metadata?.[PASSWORD_SET_FLAG] === true,
+          secondaryPhone: identity.secondaryPhone,
+        }}
+      />
+    );
+  }
 
   return (
     <PersonalSettings

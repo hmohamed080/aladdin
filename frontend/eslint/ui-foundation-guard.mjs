@@ -296,4 +296,6 @@ export const FOUNDATION_FILES = [
   "src/features/showroom-shell/products/color-library.test.ts",
   "src/features/showroom-shell/products/color-ui.test.tsx",
   "src/lint/foundation-guard.test.ts",
+  // HTML email cannot read CSS tokens: the four approved palette values, for transactional mail only.
+  "src/server/email/brand.ts",
 ];

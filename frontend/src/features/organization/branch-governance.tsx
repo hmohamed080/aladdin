@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/primitives";
 import { Input, LabeledField, Select } from "@/components/ui/controls";
 import { BadgeCheckIcon, MapPinIcon, PlusIcon } from "@/components/ui/icons";
 import { BranchIdentityDialog } from "@/features/organization/branch-identity-dialog";
+import { BranchLocationDialog } from "@/features/organization/branch-location-dialog";
+import { describeLocation, type BranchLocationValue } from "@/lib/location/describe-location";
 import { useI18n } from "@/lib/i18n/context";
 import { resolveBilingualText } from "@/lib/i18n/bilingual";
 import { TIMEZONE_OPTIONS } from "@/lib/workspace/timezone-options";
@@ -59,11 +61,14 @@ export function BranchGovernance({
   orgId,
   rows,
   orgIsApproved,
+  locations = {},
 }: {
   m: Messages;
   orgId: string;
   rows: BranchGovernanceRow[];
   orgIsApproved: boolean;
+  /** Governorate / city per branch id, as given at registration. */
+  locations?: Record<string, BranchLocationValue>;
 }) {
   const { t, locale } = useI18n();
 
@@ -139,6 +144,7 @@ export function BranchGovernance({
                   </Badge>
                 </span>
               </span>
+              {describeLocation(locations[b.id], locale) ? <span className="ms-6 text-label text-fg-muted" data-testid="branch-location">{describeLocation(locations[b.id], locale)}</span> : null}
               {address ? <span className="ms-6 text-label text-fg-muted">{address}</span> : null}
               {b.hasUnreviewedChanges && state !== "pending_review" ? (
                 <span className="ms-6 text-label text-warning" data-testid="branch-unreviewed">
@@ -161,6 +167,7 @@ export function BranchGovernance({
                   addressEn={b.addressEn}
                   timezone={b.timezone}
                 />
+                <BranchLocationDialog branchId={b.id} branchName={displayName} location={locations[b.id]} />
                 {canRequest ? (
                   <ConfirmDialog
                     trigger={b.locationVerified ? t("governance.branches.requestAmendment") : t("governance.branches.requestVerification")}

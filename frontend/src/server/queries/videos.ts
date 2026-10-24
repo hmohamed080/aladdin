@@ -12,6 +12,8 @@ export type ManagedVideo = VideoSummary & {
   failureCode: string | null;
   createdAt: string;
   playback: VideoPlayback | null;
+  /** The portfolio project it belongs to, or null. */
+  projectId?: string | null;
 };
 
 type Row = {
@@ -25,7 +27,7 @@ function summary(row: Row): VideoSummary {
     position: row.sort_order ?? row.slot ?? null, createdAt: row.created_at ?? null };
 }
 
-const MANAGED_COLUMNS = "id, scope, title, visibility, state, duration_seconds, width, height, has_poster, failure_code, created_at, sort_order, slot" as const;
+const MANAGED_COLUMNS = "id, scope, title, visibility, state, duration_seconds, width, height, has_poster, failure_code, created_at, sort_order, slot, project_id" as const;
 
 /**
  * Videos the caller manages: their own portfolio videos, or one product's videos
@@ -50,7 +52,7 @@ export async function listManagedVideos(target: { scope: "portfolio" } | { scope
       ? await privateVideoPlayback(supabase, video, { workspace: target.scope === "product" ? target.workspace ?? null : null }).catch(() => null)
       : null;
     return { ...video, scope: row.scope, state: row.state as ManagedVideo["state"], isPublic: row.visibility === "public",
-      failureCode: row.failure_code, createdAt: row.created_at, playback };
+      failureCode: row.failure_code, createdAt: row.created_at, playback, projectId: row.project_id };
   }));
 }
 

@@ -12,6 +12,16 @@ import { IDENTITIES, messageIdsFor, readNewOtp, selectAccountType, signIn } from
 
 const STRONG_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
 
+/**
+ * Registration choices used here. The generic "Complete your profile" card is drawn for every persona
+ * EXCEPT an Installer, whose completion lives on the approved `/home/profile` page and the dashboard banner
+ * (`installer-profile-completion.spec.ts` covers those three surfaces). So the generic-card tests register a
+ * Sales Team member: a professional persona on the unchanged rule. Tradespeople stay where the test is
+ * about the installer persona itself.
+ */
+const SALES = /sales team|فريق المبيعات/i;
+const TRADESPEOPLE = /craftsmen|الصنايعية/i;
+
 function uniq(): string {
   return `${Date.now()}${Math.floor(Math.random() * 1e5)}`;
 }
@@ -35,12 +45,12 @@ function uniqueEgMobile(): string {
   return `10${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
 }
 
-async function fillSignUp(page: Page, email: string, username: string): Promise<void> {
+async function fillSignUp(page: Page, email: string, username: string, accountType: RegExp = SALES): Promise<void> {
   await page.goto("/auth/sign-up");
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
   await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
   await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
-  await selectAccountType(page);
+  await selectAccountType(page, accountType);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
   await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
   await page.getByLabel(/terms of service|شروط الخدمة/i).check();
@@ -65,10 +75,10 @@ async function verify(page: Page, request: APIRequestContext, email: string, see
 }
 
 /** Registers and verifies a fresh account; returns once it has landed in the app. */
-async function register(page: Page, request: APIRequestContext, tag: string): Promise<{ email: string; username: string }> {
+async function register(page: Page, request: APIRequestContext, tag: string, accountType: RegExp = SALES): Promise<{ email: string; username: string }> {
   const email = uniqueEmail(tag);
   const username = uniqueUsername(tag);
-  await fillSignUp(page, email, username);
+  await fillSignUp(page, email, username, accountType);
   const seen = await submitSignUp(page, request, email);
   await verify(page, request, email, seen);
   await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
@@ -103,6 +113,29 @@ async function pngBytes(page: Page, colour: string): Promise<Buffer> {
 
 async function setLocale(context: BrowserContext, locale: "ar" | "en"): Promise<void> {
   await context.addCookies([{ name: "NEXT_LOCALE", value: locale, url: "http://127.0.0.1:3100" }]);
+}
+
+/**
+ * The phone country control is the design-system picker: a button showing the flag and calling code that opens
+ * a searchable listbox (not a native <select>). Scope to the identity card — the secondary-phone section on the
+ * same page has its own picker with the same label.
+ */
+function phoneCountry(page: Page) {
+  // The primary phone comes first in the card; the secondary-phone section (its own picker) follows it.
+  return page.getByTestId("identity-card").getByRole("button", { name: "Country" }).first();
+}
+async function countryOptionCount(page: Page): Promise<number> {
+  await phoneCountry(page).click();
+  const count = await page.getByRole("dialog", { name: "Country" }).getByRole("option").count();
+  await page.keyboard.press("Escape");
+  return count;
+}
+async function chooseEgypt(page: Page): Promise<void> {
+  const trigger = phoneCountry(page);
+  if (((await trigger.textContent()) ?? "").includes("+20")) return;
+  await trigger.click();
+  await page.getByRole("dialog", { name: "Country" }).getByRole("option", { name: /egypt|مصر/i }).first().click();
+  await expect(trigger).toContainText("+20");
 }
 
 test.describe("Registration — account-type dropdown", () => {
@@ -144,15 +177,26 @@ test.describe("Direct entry after registration", () => {
     expect(visited.filter((p) => /^\/onboarding\/(profile|contact|professional|consumer|business)/.test(p))).toEqual([]);
   });
 
-  test("the Tradespeople choice becomes an authoritative professional persona — trades are editable", async ({ page, request }) => {
-    await register(page, request, "persona");
-    await page.goto("/home/profile/edit");
-    await expect(page.getByTestId("trade-selector")).toBeVisible();
-    const painting = page.getByRole("button", { name: /^(painter \/ decorator|نقاش ودهانات)$/i });
-    await painting.click();
-    await page.getByRole("button", { name: /save trades|حفظ المهن/i }).click();
+  test("the Tradespeople choice becomes the Installer persona — the approved profile page opens and its specialties persist", async ({ page, request, context }) => {
+    await setLocale(context, "en");
+    await register(page, request, "persona", TRADESPEOPLE);
+    // An Installer's profile is the approved page, not the generic editor.
+    await page.goto("/home/profile");
+    await expect(page.getByTestId("profile-hero")).toBeVisible();
+    await page.getByRole("button", { name: "Choose specialties" }).click();
+    const first = page.getByRole("listbox", { name: "Specialties list" }).getByRole("option").first();
+    const label = ((await first.textContent()) ?? "").trim();
+    expect(label.length).toBeGreaterThan(0);
+    await first.click();
+    await page.keyboard.press("Escape");
+    // The page needs a governorate and the years before it will save the specialties it asks for together.
+    await page.locator("button#governorate").click();
+    await page.getByRole("listbox").getByRole("option").first().click();
+    // "Save draft" stays on the page and reports the result; "Save and continue" would redirect to /home.
+    await page.getByTestId("profile-save-draft").click();
+    await expect(page.getByTestId("profile-save-message")).toHaveText(/saved/i, { timeout: 20_000 });
     await page.reload();
-    await expect(page.getByRole("button", { name: /^(painter \/ decorator|نقاش ودهانات)$/i })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
   });
 
   test("a username lost during the OTP window goes to the explicit recovery screen, then into the app", async ({ browser, request }) => {
@@ -164,9 +208,9 @@ test.describe("Direct entry after registration", () => {
 
     const emailA = uniqueEmail("racea");
     const emailB = uniqueEmail("raceb");
-    await fillSignUp(pageA, emailA, shared);
+    await fillSignUp(pageA, emailA, shared, TRADESPEOPLE);
     const seenA = await submitSignUp(pageA, request, emailA);
-    await fillSignUp(pageB, emailB, shared);
+    await fillSignUp(pageB, emailB, shared, TRADESPEOPLE);
     const seenB = await submitSignUp(pageB, request, emailB);
 
     // B verifies first and claims the name; A's claim now collides.
@@ -192,9 +236,9 @@ test.describe("Direct entry after registration", () => {
     await pageA.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("racefix"));
     await pageA.getByRole("button", { name: /continue|متابعة/i }).click();
     await pageA.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
-    // Recovery keeps the registration choice: A is still a Tradesperson.
-    await pageA.goto("/home/profile/edit");
-    await expect(pageA.getByTestId("trade-selector")).toBeVisible();
+    // Recovery keeps the registration choice: A is still a Tradesperson, so it gets the approved Installer profile page.
+    await pageA.goto("/home/profile");
+    await expect(pageA.getByTestId("profile-hero")).toBeVisible();
     await a.close();
     await b.close();
   });
@@ -207,9 +251,10 @@ test.describe("Complete your profile", () => {
     await register(page, request, "complete");
     await page.goto("/home/settings");
     const percent = page.getByTestId("complete-profile-percent");
-    // A fresh Tradesperson: 4 shared items + 4 professional items; the
-    // username AND the Full Name entered at sign-up (confirmed through
-    // profile_set_display_name after the OTP) are done — 2/8.
+    // A fresh Sales Team member: 4 shared items + the 4 professional ones — headline, years, about,
+    // and an activity (supabase/migrations/20260924090003 seeds sales_rep and sales_manager, so activities
+    // count for this persona) — = 8. The username AND the Full Name entered at sign-up (confirmed through
+    // profile_set_display_name after the OTP) are done — 2/8 = 25%; the phone makes 3/8 = 38%; the photo 4/8 = 50%.
     await expect(percent).toHaveText("25% complete");
     await expect(page.getByText(/preferred language|اللغة المفضّلة/i)).toHaveCount(0);
 
@@ -226,9 +271,8 @@ test.describe("Complete your profile", () => {
     await expect(percent).toHaveText("25% complete");
 
     // Phone: Egypt is the default, not the only choice.
-    const country = primaryCountry(page);
-    await expect(country).toContainText("+20");
-    await chooseCountry(page, "Egypt", { expectMany: true });
+    await expect(phoneCountry(page)).toContainText("+20");
+    expect(await countryOptionCount(page)).toBeGreaterThan(200);
     const national = uniqueEgMobile();
     await page.locator("#phone-national").fill("123");
     await expect(page.getByText(/valid phone number/i)).toBeVisible();
@@ -237,7 +281,7 @@ test.describe("Complete your profile", () => {
     await expect(page.getByText("Phone saved")).toBeVisible();
     await page.reload();
     await expect(page.locator("#phone-national")).toHaveValue(national);
-    await expect(primaryCountry(page)).toContainText("+20");
+    await expect(phoneCountry(page)).toContainText("+20");
     await expect(percent).toHaveText("38% complete");
 
     // Avatar: cancel uploads nothing.
@@ -279,7 +323,9 @@ test.describe("Complete your profile", () => {
     await expect(page.getByText("Photo updated")).toBeVisible({ timeout: 20000 });
     await page.reload();
     const secondSrc = await page.getByTestId("avatar-current").getAttribute("src");
-    // R2 media serves every avatar from /api/media/avatar; the query names the object, so it is what changes.
+    // The media proxy serves every avatar from the same path; the stored object is identified by the `key` query
+    // parameter, so a replacement shows up as a different URL, not a different path.
+    expect(secondSrc).toBeTruthy();
     expect(secondSrc).not.toBe(firstSrc);
   });
 
@@ -346,8 +392,9 @@ test.describe("Complete your profile — seeded account", () => {
     await page.reload();
     await expect(page.getByTestId("display-name-status")).toHaveText("Confirmed");
 
-    await expect(primaryCountry(page)).toContainText(/\+\d+/);
-    await chooseCountry(page, "Egypt", { expectMany: true });
+    await expect(phoneCountry(page)).toContainText(/\+\d+/);
+    expect(await countryOptionCount(page)).toBeGreaterThan(200);
+    await chooseEgypt(page);
     const national = uniqueEgMobile();
     await page.locator("#phone-national").fill("123");
     await expect(page.getByText(/valid phone number/i)).toBeVisible();
@@ -356,7 +403,7 @@ test.describe("Complete your profile — seeded account", () => {
     await expect(page.getByText("Phone saved")).toBeVisible();
     await page.reload();
     await expect(page.locator("#phone-national")).toHaveValue(national);
-    await expect(primaryCountry(page)).toContainText("+20");
+    await expect(phoneCountry(page)).toContainText("+20");
 
     const red = await pngBytes(page, "red");
     await page.getByTestId("avatar-input").setInputFiles({ name: "a.png", mimeType: "image/png", buffer: red });
@@ -387,7 +434,9 @@ test.describe("Complete your profile — seeded account", () => {
     await expect(page.getByText("Photo updated")).toBeVisible({ timeout: 20000 });
     await page.reload();
     const secondSrc = await page.getByTestId("avatar-current").getAttribute("src");
-    // R2 media serves every avatar from /api/media/avatar; the query names the object, so it is what changes.
+    // The media proxy serves every avatar from the same path; the stored object is identified by the `key` query
+    // parameter, so a replacement shows up as a different URL, not a different path.
+    expect(secondSrc).toBeTruthy();
     expect(secondSrc).not.toBe(firstSrc);
 
     const after = (await page.getByTestId("complete-profile-card").count()) > 0 ? await percentOf(page) : 100;
@@ -403,7 +452,7 @@ test.describe("Complete your profile — seeded account", () => {
     const pageA = await a.newPage();
     await signIn(pageA, request, IDENTITIES.consumer, /\/home(\/|$|\?)/);
     await pageA.goto("/home/settings");
-    await chooseCountry(pageA, "Egypt");
+    await chooseEgypt(pageA);
     await pageA.locator("#phone-national").fill(national);
     await pageA.getByRole("button", { name: "Save phone" }).click();
     await expect(pageA.getByText("Phone saved")).toBeVisible();
@@ -415,7 +464,7 @@ test.describe("Complete your profile — seeded account", () => {
     await signIn(pageB, request, IDENTITIES.showroom);
     await pageB.goto("/b2b/settings");
     await expect(pageB.getByTestId("identity-card")).toBeVisible();
-    await chooseCountry(pageB, "Egypt");
+    await chooseEgypt(pageB);
     await pageB.locator("#phone-national").fill(national);
     await pageB.getByRole("button", { name: "Save phone" }).click();
     await expect(pageB.getByText("That phone number is unavailable. Please use a different one.")).toBeVisible();

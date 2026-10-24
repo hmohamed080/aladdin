@@ -38,10 +38,11 @@ describe("checkVideoFile", () => {
 
 describe("part sizes", () => {
   const GiB = 1024 ** 3;
-  it("stay at 8 MiB until 10,000 parts would not be enough, then grow", () => {
-    expect(videoPartBytes(500 * 1024 ** 2)).toBe(8 * 1024 ** 2);
-    expect(videoPartCount(78 * GiB)).toBeLessThanOrEqual(10_000);
-    for (const bytes of [100 * GiB, 1024 * GiB, VIDEO_STORAGE_MAX_BYTES]) {
+  it("stay at 100 MiB until 10,000 parts would not be enough, then grow", () => {
+    expect(videoPartBytes(500 * 1024 ** 2)).toBe(100 * 1024 ** 2);
+    expect(videoPartBytes(900 * GiB)).toBe(100 * 1024 ** 2);
+    expect(videoPartCount(900 * GiB)).toBeLessThanOrEqual(10_000);
+    for (const bytes of [1000 * GiB, 2048 * GiB, VIDEO_STORAGE_MAX_BYTES]) {
       const count = videoPartCount(bytes);
       expect(count).toBeLessThanOrEqual(10_000);
       expect(videoPartBytes(bytes)).toBeLessThanOrEqual(5 * GiB);

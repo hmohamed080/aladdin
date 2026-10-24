@@ -57,6 +57,8 @@ jobs:
       # Media Worker (edge/media-worker): unit tests with fake R2/database bindings, no Cloudflare account.
       - run: pnpm --filter @aladdin/media-worker typecheck
       - run: pnpm --filter @aladdin/media-worker test
+      # Backend Worker (edge/backend-worker, ADR-0022): container env allowlist and routing rules.
+      - run: pnpm --filter @aladdin/backend-worker test
 
   # The same app built for Cloudflare Workers (OpenNext, ADR-0021). Builds and bundles only:
   # no Cloudflare account, no deploy. Catches anything that breaks the Workers runtime build.
