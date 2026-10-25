@@ -64,4 +64,4 @@ bucket_name = "aladdin-r2-acceptance-20261011-private"
 
 [[env.preview.hyperdrive]]
 binding = "HYPERDRIVE"
-id = "<acceptance-hyperdrive-config-id>"
+id = "163eb6ad3a4c4b89840b28983999b995"

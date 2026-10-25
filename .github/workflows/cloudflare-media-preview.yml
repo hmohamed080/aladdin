@@ -8,7 +8,8 @@
 # on the frontend preview (a separate, owner-approved change).
 #
 # SAFE BY DEFAULT: nothing is deployed unless the GitHub Environment `cloudflare-preview` has the variable
-# CLOUDFLARE_MEDIA_PREVIEW_ENABLED set to exactly "true", and the Hyperdrive id in wrangler.toml is real.
+# CLOUDFLARE_MEDIA_PREVIEW_ENABLED set to exactly "true", the Hyperdrive id in wrangler.toml is real, and the run
+# was started by hand (workflow_dispatch). Pushes only test and bundle.
 #
 # GitHub Environment `cloudflare-preview` (shared with the frontend and backend previews):
 #   secrets:   CLOUDFLARE_API_TOKEN   (Workers Scripts:Edit; add Hyperdrive:Read if the deploy says the binding is not allowed)
@@ -69,7 +70,7 @@ jobs:
         working-directory: edge/media-worker
         run: node ../../frontend/node_modules/wrangler/bin/wrangler.js deploy --env preview --dry-run --outdir "$RUNNER_TEMP/worker"
       - name: Deploy aladdin-media-edge-preview
-        if: vars.CLOUDFLARE_MEDIA_PREVIEW_ENABLED == 'true' && steps.guard.outputs.hyperdrive_ready == 'true'
+        if: github.event_name == 'workflow_dispatch' && vars.CLOUDFLARE_MEDIA_PREVIEW_ENABLED == 'true' && steps.guard.outputs.hyperdrive_ready == 'true'
         working-directory: edge/media-worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -79,7 +80,7 @@ jobs:
           node ../../frontend/node_modules/wrangler/bin/wrangler.js deploy --env preview | tee "$RUNNER_TEMP/deploy.log"
           grep -oE 'https://[a-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/deploy.log" | head -1 > "$RUNNER_TEMP/media-url"
       - name: Smoke check (every unauthorized request must be the same 404)
-        if: vars.CLOUDFLARE_MEDIA_PREVIEW_ENABLED == 'true' && steps.guard.outputs.hyperdrive_ready == 'true'
+        if: github.event_name == 'workflow_dispatch' && vars.CLOUDFLARE_MEDIA_PREVIEW_ENABLED == 'true' && steps.guard.outputs.hyperdrive_ready == 'true'
         working-directory: edge/media-worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
