@@ -141,14 +141,21 @@ Isolated test copy only: Worker `aladdin-media-edge-preview` on workers.dev, buc
 `aladdin-r2-acceptance-20261011-private`, acceptance project `nxossqhdfltcqdwvbewi`
 (eu-west-1). The `media_edge_worker` role already exists there with the step 2 shape.
 
-1. **Password + Hyperdrive, one command** (owner's PC, repository root, after
-   `pnpm install` and `pnpm --dir frontend exec wrangler login`):
+1. **Password + Hyperdrive, one command** (owner's PC, repository root; Node only,
+   no `pnpm install`): put a short-lived Cloudflare API token with only
+   *Account > Hyperdrive > Edit* into `CF_HYPERDRIVE_TOKEN` with `read -rs`, then
    `node scripts/hosted-db/media-edge-preview-link.mjs`. It generates the password
-   in memory, prints SQL that stores only its SCRAM-SHA-256 verifier (run it in the
-   acceptance SQL Editor), then creates Hyperdrive `aladdin-media-edge-preview`
-   (Supavisor session pooler, port 5432, `sslmode=require`, caching disabled,
-   5 origin connections against the role's limit of 10). Nobody ever sees the
-   password; rerun the script to rotate it.
+   in memory and prints SQL (shown once, never saved) that stores only its
+   SCRAM-SHA-256 verifier; run it in the acceptance SQL Editor. It then creates
+   Hyperdrive `aladdin-media-edge-preview` (Supavisor session pooler, port 5432,
+   `sslmode=require`, caching disabled, 5 origin connections against the role's
+   limit of 10) with one HTTPS call to the Cloudflare API. It does not use
+   `wrangler hyperdrive create`: in 4.151.x that command takes the password only
+   as a command-line argument (`--origin-password` or `--connection-string`).
+   The password then exists in the script's memory for the run, in that one TLS
+   request body, and in the Hyperdrive configuration Cloudflare stores. It is not
+   printed, logged or written to disk, and the database holds only the verifier.
+   Rerun the script to rotate it (delete the old Hyperdrive first).
 2. Put the printed Hyperdrive id in `[[env.preview.hyperdrive]]` in `wrangler.toml`.
 3. Set `CLOUDFLARE_MEDIA_PREVIEW_ENABLED=true` on the `cloudflare-preview` GitHub
    Environment and run `Cloudflare media preview`. Its smoke check requires the same
