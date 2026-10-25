@@ -25,6 +25,19 @@ import { RequestComposer, RequestLifecycle } from "./request-composer";
 
 beforeEach(() => vi.clearAllMocks());
 describe("engineer quotation journey", () => {
+  it("keeps the summary in sync and lets the user return to an item", () => {
+    renderWithI18n(<RequestComposer sample />, "en");
+    expect(screen.getByText(/Local example requirements/)).toBeInTheDocument();
+    const name = screen.getAllByLabelText("Product name")[0]!;
+    fireEvent.change(name, { target: { value: "Acoustic wall panels" } });
+    expect(screen.getByRole("button", { name: "Edit item 1" })).toHaveTextContent("Acoustic wall panels");
+    fireEvent.click(screen.getByRole("button", { name: "Edit item 1" }));
+    expect(name).toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: "Remove item 2" }));
+    expect(screen.getAllByLabelText("Product name")).toHaveLength(3);
+    expect(screen.getByText("3 items in this request")).toBeInTheDocument();
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
   it("rejects invalid quantities before saving and focuses the field", () => {
     const { container } = renderWithI18n(<RequestComposer />, "en");
     const quantity = screen.getByLabelText("Quantity");

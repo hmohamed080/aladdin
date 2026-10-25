@@ -11,7 +11,6 @@ import {
   Textarea,
   LabeledField,
 } from "@/components/ui/controls";
-import { Card } from "@/components/ui/primitives";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   PlusIcon,
@@ -19,6 +18,12 @@ import {
   FileTextIcon,
   ShieldIcon,
   BoltIcon,
+  StorefrontIcon,
+  MapPinIcon,
+  UploadIcon,
+  SendIcon,
+  HelpIcon,
+  UsersIcon,
 } from "@/components/ui/icons";
 import {
   CANONICAL_CATEGORY_CODES,
@@ -39,6 +44,8 @@ import {
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import type { OwnRequest } from "@/server/queries/purchase-requests";
 import type { CatalogRow } from "@/server/queries/commerce";
+
+import "./request-composer.css";
 
 type Line = {
   key: string;
@@ -64,12 +71,14 @@ const blank = (key: string): Line => ({
 
 export function RequestComposer({
   existing,
+  sample = false,
   product,
   imageUrls = {},
   showrooms = [],
   context = { location: "", showroomIds: [] },
 }: {
   existing?: OwnRequest;
+  sample?: boolean;
   product?: CatalogRow | null;
   imageUrls?: Record<string, string>;
   showrooms?: { id: string; name: string }[];
@@ -86,7 +95,7 @@ export function RequestComposer({
   const quantityHelp = ar
     ? "أدخل كمية أكبر من صفر وحتى ١٬٠٠٠٬٠٠٠، بحد أقصى ٣ أرقام عشرية."
     : "Enter a quantity greater than zero and up to 1,000,000, with at most 3 decimal places.";
-  const [title, setTitle] = useState(existing?.request.title ?? "");
+  const [title, setTitle] = useState(existing?.request.title ?? (sample ? (ar ? "تشطيبات شقة — طلب توضيحي" : "Apartment finishing — example request") : ""));
   const [location, setLocation] = useState(context.location);
   const [showroomIds, setShowroomIds] = useState(context.showroomIds);
   const [notes, setNotes] = useState(existing?.request.notes ?? "");
@@ -104,7 +113,12 @@ export function RequestComposer({
           code: i.code ?? "",
           colors: i.colors,
         }))
-      : [
+      : sample && !product ? [
+          { ...blank("wood"), name: ar ? "بديل خشب" : "Wood alternative", quantity: "120", specs: ar ? "WPC — حوائط داخلية" : "WPC — interior walls" },
+          { ...blank("marble"), name: ar ? "بديل رخام" : "Marble alternative", categoryCode: "marble_alternative", quantity: "80" },
+          { ...blank("floor"), name: ar ? "أرضيات" : "Flooring", categoryCode: "spc_flooring", quantity: "200", specs: "SPC" },
+          { ...blank("paint"), name: ar ? "دهانات" : "Paint", categoryCode: "paints", quantity: "15", unit: "pail" },
+        ] : [
           {
             ...blank("first"),
             name: product?.name ?? "",
@@ -219,50 +233,17 @@ export function RequestComposer({
         e.preventDefault();
         save();
       }}
-      className="flex flex-col gap-lg"
+      className="request-composer"
       aria-busy={pending}
     >
-      <header className="engineer-hero relative isolate overflow-hidden rounded-lg p-lg tablet:p-xl">
-        <Image
-          src="/assets/showroom-auth/showroom-interior-2026.png"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover opacity-30"
-        />
-        <div className="relative max-w-2xl">
-          <h1 className="text-headline">
-            {ar
-              ? "اطلب عروض أسعار لمشروعك"
-              : "Bring your project requirements together"}
-          </h1>
-          <p className="mt-3 text-body-lg text-fg-secondary">
-            {ar
-              ? "حدد الخامات والكميات، ثم انشر طلبك للمعارض المناسبة وقارن عروضها."
-              : "Specify your materials and quantities, publish to eligible showrooms, and compare their responses."}
-          </p>
+      <header className="request-hero engineer-hero">
+        <Image src="/assets/engineer/hero-living-room.webp" alt="" fill priority sizes="(min-width: 1024px) 80vw, 100vw" className="object-cover" />
+        <div className="request-hero-copy">
+          <h1>{ar ? "اطلب عروض أسعار" : "Request project quotations"}</h1>
+          <p>{ar ? "أضف كل احتياجات مشروعك في مكان واحد، واحصل على عروض من المعارض المناسبة." : "Bring your project needs together. Get quotations from suitable showrooms, all in one place."}</p>
         </div>
       </header>
-      <div className="grid gap-md tablet:grid-cols-3">
-        {[
-          [BoltIcon, ar ? "سريع وسهل" : "Quick and easy"],
-          [ShieldIcon, ar ? "من معارض مناسبة" : "Eligible showrooms"],
-          [FileTextIcon, ar ? "مقارنة في مكان واحد" : "Compare in one place"],
-        ].map(([Icon, text]) => {
-          const I = Icon as typeof BoltIcon;
-          return (
-            <Card
-              key={String(text)}
-              pad="sm"
-              className="flex items-center gap-md"
-            >
-              <I size={25} />
-              <span className="text-body">{String(text)}</span>
-            </Card>
-          );
-        })}
-      </div>
+      {sample && !existing && <p className="request-sample-note">{ar ? "بيانات توضيحية محلية — عدّل المنتجات قبل حفظ طلبك. لا يتم إرسال أي شيء تلقائياً." : "Local example requirements — edit before saving. Nothing is sent automatically."}</p>}
       {error && (
         <p
           role="alert"
@@ -273,203 +254,54 @@ export function RequestComposer({
           {error}
         </p>
       )}
-      <fieldset disabled={pending} className="grid min-w-0 items-start gap-lg desktop:grid-cols-3 [overflow-wrap:anywhere]">
-        <div className="flex flex-col gap-lg desktop:col-span-2">
-          <Card className="flex flex-col gap-md">
-            <h2 className="text-title">
-              1. {ar ? "احتياجات مشروعك" : "Your project requirements"}
-            </h2>
-            <LabeledField
-              label={ar ? "اسم المشروع أو الطلب" : "Project or request title"}
-              htmlFor="request-title"
-            >
-              <Input
-                id="request-title"
-                required
-                minLength={2}
-                maxLength={160}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </LabeledField>
+      <fieldset disabled={pending} className="request-layout">
+        <div className="request-main">
+          <div className="request-benefits">
+            {[
+              [BoltIcon, ar ? "سريع وسهل" : "Quick and easy", ar ? "أضف احتياجاتك في دقائق" : "Add requirements in minutes"],
+              [StorefrontIcon, ar ? "معارض مناسبة" : "Suitable showrooms", ar ? "اختر شركاء مشروعك" : "Choose your project partners"],
+              [ShieldIcon, ar ? "مقارنة سهلة" : "Easy comparison", ar ? "راجع المواصفات والعروض" : "Review specifications and quotes"],
+              [UsersIcon, ar ? "القرار لك" : "You're in control", ar ? "راجع طلبك قبل النشر" : "Review before publishing"],
+            ].map(([Icon, label, detail]) => { const I = Icon as typeof BoltIcon; return <div key={String(label)}><I size={30} /><span><strong>{String(label)}</strong><small>{String(detail)}</small></span></div>; })}
+          </div>
+          <section className="request-section">
+            <div className="request-section-heading">
+              <span className="request-step">1</span>
+              <div><h2>{ar ? "أضف احتياجات مشروعك" : "Add your project requirements"}</h2><p>{ar ? "اختر المنتجات وحدد الكمية والمواصفات لكل منتج في نفس الطلب." : "Add products, quantities and specifications to one request."}</p></div>
+              <Button variant="outline" disabled={pending || lines.length >= 30} onClick={() => { const key = crypto.randomUUID(); setLines((old) => [...old, blank(key)]); requestAnimationFrame(() => document.getElementById(`name-${key}`)?.focus()); }}><PlusIcon size={18} />{ar ? "إضافة منتج جديد" : "Add product"}</Button>
+            </div>
+            <LabeledField label={ar ? "اسم المشروع أو الطلب" : "Project or request title"} htmlFor="request-title"><Input id="request-title" required minLength={2} maxLength={160} placeholder={ar ? "مثال: تشطيب فيلا — التجمع الخامس" : "e.g. Villa finishing — New Cairo"} value={title} onChange={(e) => setTitle(e.target.value)} /></LabeledField>
+            <div className="request-items">
             {lines.map((line, index) => (
-              <fieldset
-                key={line.key}
-                className="grid gap-3 rounded-sm border p-md tablet:grid-cols-2"
-              >
-                <legend className="px-2 text-label">
-                  {ar ? "المنتج" : "Item"} {index + 1}
-                </legend>
-                <LabeledField
-                  label={ar ? "اسم المنتج" : "Product name"}
-                  htmlFor={`name-${line.key}`}
-                >
-                  <Input
-                    id={`name-${line.key}`}
-                    required
-                    minLength={2}
-                    maxLength={160}
-                    value={line.name}
-                    onChange={(e) => patch(line.key, { name: e.target.value })}
-                  />
-                </LabeledField>
-                <LabeledField
-                  label={ar ? "الصنف" : "Category"}
-                  htmlFor={`cat-${line.key}`}
-                >
-                  <Select
-                    id={`cat-${line.key}`}
-                    value={line.categoryCode}
-                    onChange={(e) =>
-                      patch(line.key, { categoryCode: e.target.value })
-                    }
-                  >
-                    {CANONICAL_CATEGORY_CODES.map((c) => (
-                      <option key={c} value={c}>
-                        {t(`commerce.canonicalCategories.${c}`)}
-                      </option>
-                    ))}
-                  </Select>
-                </LabeledField>
-                <LabeledField
-                  label={ar ? "الكمية" : "Quantity"}
-                  htmlFor={`qty-${line.key}`}
-                >
-                  <Input
-                    id={`qty-${line.key}`}
-                    required
-                    inputMode="decimal"
-                    aria-invalid={invalidQuantities.includes(line.key) || undefined}
-                    aria-describedby={`qty-help-${line.key}`}
-                    value={line.quantity}
-                    onChange={(e) => {
-                      patch(line.key, { quantity: e.target.value });
-                      setInvalidQuantities((old) => old.filter((key) => key !== line.key));
-                    }}
-                  />
-                  <p id={`qty-help-${line.key}`} className={invalidQuantities.includes(line.key) ? "text-label text-danger" : "text-label text-fg-secondary"}>
-                    {quantityHelp}
-                  </p>
-                </LabeledField>
-                <LabeledField
-                  label={ar ? "الوحدة" : "Unit"}
-                  htmlFor={`unit-${line.key}`}
-                >
-                  <Select
-                    id={`unit-${line.key}`}
-                    value={line.unit}
-                    onChange={(e) => patch(line.key, { unit: e.target.value })}
-                  >
-                    {SHARED_UNITS.map((u) => (
-                      <option key={u} value={u}>
-                        {t(`commerce.units.${u}`)}
-                      </option>
-                    ))}
-                  </Select>
-                </LabeledField>
-                <div className="tablet:col-span-2">
-                  <LabeledField
-                    label={
-                      ar
-                        ? "المواصفات ومكان الاستخدام"
-                        : "Specifications and intended use"
-                    }
-                    htmlFor={`spec-${line.key}`}
-                  >
-                    <Input
-                      id={`spec-${line.key}`}
-                      maxLength={250}
-                      value={line.specs}
-                      onChange={(e) =>
-                        patch(line.key, { specs: e.target.value })
-                      }
-                    />
-                  </LabeledField>
+              <fieldset key={line.key} className="request-item">
+                <legend className="sr-only">{ar ? "المنتج" : "Item"} {index + 1}</legend>
+                <MaterialThumbnail category={line.categoryCode} />
+                <div className="request-item-fields">
+                  <div className="request-item-name"><LabeledField label={ar ? "اسم المنتج" : "Product name"} htmlFor={`name-${line.key}`}><Input id={`name-${line.key}`} required minLength={2} maxLength={160} placeholder={ar ? "اسم المنتج المطلوب" : "Product name"} value={line.name} onChange={(e) => patch(line.key, { name: e.target.value })} /></LabeledField>
+                  <Button variant="ghost" size="sm" aria-label={ar ? `حذف المنتج ${index + 1}` : `Remove item ${index + 1}`} disabled={pending || lines.length === 1} onClick={() => setLines((old) => old.filter((l) => l.key !== line.key))}><TrashIcon size={16} /></Button></div>
+                  <div className="request-item-details">
+                    <LabeledField label={ar ? "الصنف" : "Category"} htmlFor={`cat-${line.key}`}><Select id={`cat-${line.key}`} value={line.categoryCode} onChange={(e) => patch(line.key, { categoryCode: e.target.value })}>{CANONICAL_CATEGORY_CODES.map((c) => <option key={c} value={c}>{t(`commerce.canonicalCategories.${c}`)}</option>)}</Select></LabeledField>
+                    <LabeledField label={ar ? "الكمية" : "Quantity"} htmlFor={`qty-${line.key}`}><Input id={`qty-${line.key}`} required inputMode="decimal" aria-invalid={invalidQuantities.includes(line.key) || undefined} aria-describedby={invalidQuantities.includes(line.key) ? `qty-help-${line.key}` : undefined} value={line.quantity} onChange={(e) => { patch(line.key, { quantity: e.target.value }); setInvalidQuantities((old) => old.filter((key) => key !== line.key)); }} />{invalidQuantities.includes(line.key) && <p id={`qty-help-${line.key}`} className="text-label text-danger">{quantityHelp}</p>}</LabeledField>
+                    <LabeledField label={ar ? "الوحدة" : "Unit"} htmlFor={`unit-${line.key}`}><Select id={`unit-${line.key}`} value={line.unit} onChange={(e) => patch(line.key, { unit: e.target.value })}>{SHARED_UNITS.map((u) => <option key={u} value={u}>{t(`commerce.units.${u}`)}</option>)}</Select></LabeledField>
+                    <LabeledField label={ar ? "المواصفات ومكان الاستخدام" : "Specifications and intended use"} htmlFor={`spec-${line.key}`}><Input id={`spec-${line.key}`} maxLength={250} placeholder={ar ? "مثال: حوائط داخلية، مقاوم للمياه" : "e.g. Interior walls, water resistant"} value={line.specs} onChange={(e) => patch(line.key, { specs: e.target.value })} /></LabeledField>
+                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    setLines((old) => old.filter((l) => l.key !== line.key))
-                  }
-                  disabled={pending || lines.length === 1}
-                >
-                  <TrashIcon size={16} />
-                  {ar ? "حذف المنتج" : "Remove item"}
-                </Button>
               </fieldset>
             ))}
-            <Button
-              variant="outline"
-              disabled={pending || lines.length >= 30}
-              onClick={() =>
-                setLines((old) => [...old, blank(crypto.randomUUID())])
-              }
-            >
-              <PlusIcon size={18} />
-              {ar ? "إضافة منتج جديد" : "Add another item"}
-            </Button>
-          </Card>
-          <Card className="flex flex-col gap-md">
-            <h2 className="text-title">
-              2. {ar ? "الموقع وموعد الاحتياج" : "Location and timing"}
-            </h2>
-            <LabeledField
-              label={ar ? "موقع المشروع" : "Project location"}
-              htmlFor="location"
-            >
-              <Input
-                id="location"
-                maxLength={200}
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
-            </LabeledField>
-            <LabeledField
-              label={ar ? "التاريخ المطلوب (اختياري)" : "Needed by (optional)"}
-              htmlFor="needed-by"
-            >
-              <Input
-                id="needed-by"
-                type="date"
-                value={neededBy}
-                onChange={(e) => setNeededBy(e.target.value)}
-              />
-            </LabeledField>
-            <h2 className="mt-3 text-title">
-              3.{" "}
-              {ar
-                ? "ملاحظات عامة (اختياري)"
-                : "General notes (optional)"}
-            </h2>
-            <LabeledField
-              label={
-                ar
-                  ? "تعليمات التوريد وتفاصيل إضافية"
-                  : "Delivery instructions and additional details"
-              }
-              htmlFor="notes"
-            >
-              <Textarea
-                id="notes"
-                maxLength={500}
-                rows={4}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </LabeledField>
-            <span className="text-end text-label text-fg-secondary">
-              {Array.from(notes).length}/500
-            </span>
-          </Card>
-          <Card className="flex flex-col gap-md">
-            <h2 className="text-title">
-              4. {ar ? "صور مرجعية" : "Reference images"}
-            </h2>
-            <p className="text-body text-fg-secondary">
-              {ar
-                ? "احفظ المسودة أولاً، ثم أضف صورتين لكل منتج (JPG، PNG، WebP، بحد أقصى 5 ميجابايت)."
-                : "Save your draft first, then attach up to two images per item (JPG, PNG, WebP; 5 MB each)."}
-            </p>
+            </div>
+          </section>
+          <section className="request-section request-location">
+            <div className="request-section-heading"><span className="request-step">2</span><div><h2>{ar ? "مكان المشروع" : "Project location"}</h2><p>{ar ? "حدد موقع المشروع وموعد احتياجك للخامات." : "Tell showrooms where and when materials are needed."}</p></div></div>
+            <div className="request-two-fields"><LabeledField label={ar ? "موقع المشروع" : "Project location"} htmlFor="location"><Input id="location" maxLength={200} value={location} placeholder={ar ? "المدينة، المنطقة" : "City, area"} onChange={(e) => setLocation(e.target.value)} /></LabeledField><LabeledField label={ar ? "التاريخ المطلوب (اختياري)" : "Needed by (optional)"} htmlFor="needed-by"><Input id="needed-by" type="date" value={neededBy} onChange={(e) => setNeededBy(e.target.value)} /></LabeledField></div>
+          </section>
+          <section className="request-section request-notes">
+            <div className="request-section-heading"><span className="request-step">3</span><div><h2>{ar ? "ملاحظات عامة (اختياري)" : "General notes (optional)"}</h2><p>{ar ? "أضف التفاصيل التي تساعد المعارض على فهم طلبك." : "Add details that help showrooms understand your request."}</p></div></div>
+            <div><LabeledField label={ar ? "تعليمات التوريد وتفاصيل إضافية" : "Delivery instructions and additional details"} htmlFor="notes"><Textarea id="notes" maxLength={500} rows={3} placeholder={ar ? "موعد التنفيذ، جودة الخامات، أو تعليمات التوريد…" : "Schedule, material quality or delivery instructions…"} value={notes} onChange={(e) => setNotes(e.target.value)} /></LabeledField><p className="request-count">{Array.from(notes).length}/500</p></div>
+          </section>
+          <section className="request-section">
+            <div className="request-section-heading"><span className="request-step">4</span><div><h2>{ar ? "صور مرجعية (اختياري)" : "Reference images (optional)"}</h2><p>{ar ? "أضف صور الموقع أو الخامات لتوضيح احتياجاتك." : "Show your space or materials to make requirements clear."}</p></div></div>
+            {!existing && <div className="request-upload-hint"><UploadIcon size={28} /><strong>{ar ? "احفظ المسودة لإرفاق صورك" : "Save your draft to attach images"}</strong><span>{ar ? "صورتان لكل منتج · JPG، PNG، WebP · حتى 5 ميجابايت للصورة" : "Two images per item · JPG, PNG, WebP · up to 5 MB each"}</span></div>}
+            {existing && <p>{ar ? "صورتان لكل منتج · JPG، PNG، WebP · حتى 5 ميجابايت للصورة" : "Two images per item · JPG, PNG, WebP · up to 5 MB each"}</p>}
             {existing?.items.map((item) => (
               <div key={item.id} className="flex flex-col gap-3 border-t pt-3">
                 <label className="text-label">
@@ -522,102 +354,33 @@ export function RequestComposer({
                 </div>
               </div>
             ))}
-          </Card>
-          <Button type="submit" disabled={pending}>
-            {pending
-              ? ar
-                ? "جارٍ الحفظ…"
-                : "Saving…"
-              : ar
-                ? "حفظ المسودة ومراجعة الطلب"
-                : "Save draft & review"}
-          </Button>
+
+          </section>
+          <Button className="request-submit" type="submit" disabled={pending}><SendIcon size={20} />{pending ? (ar ? "جارٍ الحفظ…" : "Saving…") : (ar ? "حفظ المسودة ومراجعة الطلب" : "Save draft & review")}</Button>
+          <p className="request-submit-note">{ar ? "راجع طلبك وأضف الصور، ثم انشره للمعارض المناسبة. لا يتم إرسال المسودة." : "Review your request and attach images before publishing. Drafts are not sent."}</p>
         </div>
-        <aside className="flex flex-col gap-md">
-          <Card className="flex flex-col gap-3">
-            <h2 className="text-title">
-              {ar ? "المعارض المناسبة لطلبك" : "Select showrooms"}
-            </h2>
-            <p className="text-label text-fg-secondary">
-              {ar
-                ? "اختر معارض محددة، أو اترك القائمة فارغة ليظهر طلبك لكل المعارض المؤهلة."
-                : "Choose specific showrooms, or leave all unchecked to reach every eligible showroom."}
-            </p>
-            {showrooms.map((s) => (
-              <label key={s.id} className="flex items-center gap-3 text-body">
-                <input
-                  type="checkbox"
-                  checked={showroomIds.includes(s.id)}
-                  onChange={(e) =>
-                    setShowroomIds((old) =>
-                      e.target.checked
-                        ? [...old, s.id]
-                        : old.filter((id) => id !== s.id),
-                    )
-                  }
-                  disabled={
-                    !showroomIds.includes(s.id) && showroomIds.length >= 30
-                  }
-                />
-                {s.name}
-              </label>
-            ))}
-          </Card>
-          <Card className="flex flex-col gap-md">
-            <h2 className="text-title">
-              {ar ? "ملخص الطلب" : "Request summary"}
-            </h2>
-            <p className="text-body text-fg-secondary">
-              {lines.length}{" "}
-              {ar ? "منتجات في هذا الطلب" : "items in this request"}
-            </p>
-            {lines.map((l) => (
-              <div key={l.key} className="border-t pt-3">
-                <p className="text-body font-medium">
-                  {l.name || (ar ? "منتج جديد" : "New item")}
-                </p>
-                <p className="text-label text-fg-secondary">
-                  {l.quantity} {t(`commerce.units.${l.unit}`)}
-                </p>
-              </div>
-            ))}
-            <p className="border-t pt-3 text-body text-fg-secondary">
-              {ar
-                ? "لا يتم إرسال المسودة. ستتمكن من مراجعتها ثم نشرها للمعارض المؤهلة."
-                : "Drafts are not sent. Review your saved request before publishing it to eligible showrooms."}
-            </p>
-          </Card>
-          <Card>
-            <h2 className="mb-3 text-title">
-              {ar ? "ماذا يحدث بعد النشر؟" : "What happens after publishing?"}
-            </h2>
-            <ol className="list-inside list-decimal space-y-3 text-body text-fg-secondary">
-              <li>
-                {ar
-                  ? "تظهر احتياجاتك للمعارض المناسبة."
-                  : "Eligible showrooms can discover your requirements."}
-              </li>
-              <li>
-                {ar
-                  ? "تستقبل عروض الأسعار على طلبك."
-                  : "Their responses appear on your request."}
-              </li>
-              <li>
-                {ar
-                  ? "قارن المواصفات والكميات والتكلفة."
-                  : "Compare specifications, quantities and cost."}
-              </li>
-              <li>
-                {ar
-                  ? "العروض غير ملزمة ولا تنشئ طلب شراء تلقائياً."
-                  : "Responses are non-binding and do not create an order."}
-              </li>
-            </ol>
-          </Card>
+        <aside className="request-sidebar">
+          <section className="request-summary request-section">
+            <h2><FileTextIcon size={21} />{ar ? "ملخص الطلب" : "Request summary"}</h2>
+            <p>{lines.length} {ar ? "منتجات في هذا الطلب" : "items in this request"}</p>
+            {lines.map((line, index) => <button type="button" key={line.key} className="request-summary-item" onClick={() => document.getElementById(`name-${line.key}`)?.focus()} aria-label={ar ? `تعديل المنتج ${index + 1}` : `Edit item ${index + 1}`}><MaterialThumbnail category={line.categoryCode} /><span><strong>{line.name || (ar ? "منتج جديد" : "New item")}</strong><small>{line.quantity} {t(`commerce.units.${line.unit}`)}</small><small>{line.specs || t(`commerce.canonicalCategories.${line.categoryCode}`)}</small></span></button>)}
+            <button type="button" className="request-summary-detail" onClick={() => document.getElementById("location")?.focus()}><MapPinIcon size={20} /><span><strong>{ar ? "مكان المشروع" : "Project location"}</strong><small>{location || (ar ? "أضف مكان المشروع" : "Add project location")}</small></span></button>
+            <button type="button" className="request-summary-detail" onClick={() => document.getElementById("notes")?.focus()}><FileTextIcon size={20} /><span><strong>{ar ? "ملاحظات عامة" : "General notes"}</strong><small>{notes || (ar ? "لا توجد ملاحظات" : "No notes yet")}</small></span></button>
+          </section>
+          <section className="request-next request-section"><h2><HelpIcon size={22} />{ar ? "ماذا يحدث بعد النشر؟" : "What happens after publishing?"}</h2><ol>{(ar ? ["يظهر طلبك للمعارض المناسبة.", "تستقبل عروض الأسعار على طلبك.", "قارن المواصفات والكميات والتكلفة.", "اختر العرض الأنسب لمشروعك؛ العروض غير ملزمة."] : ["Eligible showrooms discover your requirements.", "Receive quotations on your request.", "Compare specifications, quantities and cost.", "Choose what suits your project. Quotes are non-binding."]).map((text) => <li key={text}>{text}</li>)}</ol></section>
+          <section className="request-section request-showrooms"><h2><StorefrontIcon size={22} />{ar ? "المعارض المناسبة لطلبك" : "Select showrooms"}</h2><p>{ar ? "حدد المعارض، أو اترك القائمة فارغة للوصول لكل المعارض المؤهلة عند النشر." : "Select showrooms, or leave unchecked to reach all eligible showrooms when publishing."}</p>
+          {showrooms.length === 0 ? <p>{ar ? "لا توجد معارض متاحة حالياً. سيظهر طلبك للمعارض المؤهلة عند النشر." : "No showrooms are listed yet. Eligible showrooms can discover your published request."}</p> : <div role="group" aria-label={ar ? "المعارض المناسبة لطلبك" : "Select showrooms"}>{showrooms.map((s) => <label key={s.id} className="request-showroom"><span className="request-showroom-mark"><StorefrontIcon size={24} /></span><span>{s.name || (ar ? "معرض بدون اسم" : "Unnamed showroom")}</span><input type="checkbox" checked={showroomIds.includes(s.id)} disabled={!showroomIds.includes(s.id) && showroomIds.length >= 30} onChange={(e) => setShowroomIds((old) => e.target.checked ? [...old, s.id] : old.filter((id) => id !== s.id))} /></label>)}</div>}
+          </section>
         </aside>
       </fieldset>
     </form>
   );
+}
+
+/** Category imagery is illustrative, never a supplier product photograph. */
+function MaterialThumbnail({ category }: { category: string }) {
+  const image = category === "marble_alternative" ? "/assets/installer-dashboard/jobs/marble-alt.jpg" : category === "paints" ? "/assets/installer-dashboard/jobs/interior-painting.png" : category === "spc_flooring" || category === "vinyl_flooring" ? "/assets/installer-dashboard/jobs/spc-flooring.jpg" : "/assets/installer-dashboard/jobs/decorative-wall.png";
+  return <span className="request-material"><Image src={image} alt="" fill sizes="80px" className="object-cover" /></span>;
 }
 
 export function RequestLifecycle({
@@ -673,3 +436,4 @@ export function RequestLifecycle({
     />
   );
 }
+

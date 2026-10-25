@@ -365,6 +365,16 @@ The form language is **precise and chamfered**, echoing the Aperture: corners ar
 
 ## Components
 
+### Engineer quotation composer — 2026-10-25
+
+The owner-reference composition uses a compact architectural photo hero, four
+task benefits, and numbered requirements, location, notes and reference-image
+sections. A live summary sits on the right in Arabic and mirrors to the left
+in English; on mobile it follows the form. Category thumbnails are illustrative,
+not supplier product photography. Retain the existing engineer palette and
+semantic surfaces. This is a page-specific composition, not a shared-shell or
+global token revision; see [engineer account](docs/product/engineer-account.md).
+
 ### Buttons
 - **Shape:** Gently rounded (10px, `rounded.sm`).
 - **Primary (light):** Ink (#17191A) fill, Limestone text, label type, 11px 16px padding. **Primary (dark):** inverts to Limestone fill, Basalt text.

@@ -9,6 +9,21 @@ Each entry uses: Added · Changed · Fixed · Deprecated · Removed · Migration
 
 ---
 
+## Unreleased — 2026-10-25 — Engineer RFQ page composition
+
+Changed: owner-reference compact architectural hero, four task benefits,
+numbered product/location/notes/images sections, live summary (right in Arabic,
+mirrored in English; stacked on mobile) and real showroom selection.
+
+Added: explicitly labelled local four-requirement example behind the existing
+local-environment and loopback-database gate. Production retains real product,
+saved draft or empty input.
+
+Migration notes: existing engineer palette, save-draft → review → explicit-publish
+flow and private saved-item images are preserved. JPEG/PNG/WebP only, two images
+per item, 5 MB each; PDF and pre-save uploading remain unsupported. No token,
+shared-shell, schema or deployment change belongs to this entry. TypeScript, focused lint and six composer tests pass; this is not a release-readiness claim.
+
 ## 1.1.0 — 2026-10-19 — Engineer account theme
 
 Added: owner-approved engineer palette in `tokens/engineer.json` and its scoped semantic CSS mapping. The colors are sand `#D8C7A6`, terracotta `#B96F52`, cream `#F2E9D8`, and navy `#071A2D`.

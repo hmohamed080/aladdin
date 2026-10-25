@@ -1,4 +1,29 @@
 
+## 2026-10-25 — Engineer RFQ reference redesign
+
+- **Purpose / scope:** document the owner-reference RFQ page only. Compact
+  architectural hero, four benefits, numbered product/location/notes/images
+  sections, live Arabic right-side summary mirrored in English, mobile stacking
+  and real showroom selection reuse the existing composer. Engineer palette
+  unchanged; concurrent shared-shell/auth/settings edits are outside this work.
+- **Behavior / boundaries:** labelled four-requirement examples use the existing
+  local-app plus loopback-Supabase gate; production remains empty unless a real
+  product or draft supplies input. Save draft → review → explicit publish and
+  private saved-item image handling remain intact. JPEG/PNG/WebP only, two per
+  item, 5 MB each; no PDF or upload before the first save.
+- **Evidence:** `.impeccable/review/request-desktop.png`,
+  `.impeccable/review/request-mobile-top.png` and
+  `.impeccable/review/request-mobile-fields.png` are the desktop and corrected
+  mobile viewport captures. Earlier malformed long mobile capture is excluded.
+- **Validation:** TypeScript, focused ESLint and six composer tests pass. Reviewer scored corrected mobile evidence and saved-draft upload guidance resolved. English desktop and dark theme also checked in browser; Arabic/light restored. Summary-to-field focus verified in browser; mobile document width380 within viewport390. Documenter wrote scoped docs before hitting its usage limit; parent reviewed and finished the documentation.
+- **Runtime / release:** local dev session `58754`, port `3350`, as reported by
+  parent. No hosted data/schema, deployment or PR changes; no commit in this pass.
+- **Related files:** `DESIGN.md`, `UI-UX/UI_UX_SYSTEM_GUIDE.md`,
+  `design/COMPONENT_INVENTORY.md`, `design/CHANGELOG.md`,
+  `docs/product/engineer-account.md`; implementation is
+  `frontend/src/features/engineer/request-composer.tsx`, its CSS and
+  `frontend/src/app/home/engineer/requests/new/page.tsx`.
+
 ## 2026-10-24 — Public portfolio fidelity, actual tabs and readable links
 
 User rejected the sparse initial result, approved clearly labelled local sample content, then requested isolated tab panels and account-type/username URLs. Rebuilt the public portfolio around the supplied light/dark references, generated service photography, preserved production public projections, and added a four-condition local fixture guard. No real account fields were changed. Contact/sample favorite actions are illustrative; no messages or quotes are sent.

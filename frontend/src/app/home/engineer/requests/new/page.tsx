@@ -1,3 +1,4 @@
+import { useLocalEngineerSamples as getLocalEngineerSamples } from "@/features/engineer/sample-content";
 import { listOrganizations } from "@/server/queries/directory";
 import { cookies } from "next/headers";
 import { requireEngineer } from "@/server/queries/engineer";
@@ -25,6 +26,7 @@ export default async function NewRequestPage({
   return (
     <div lang={locale}>
       <RequestComposer
+        sample={getLocalEngineerSamples()}
         product={product}
         showrooms={showrooms}
         context={{
@@ -38,3 +40,4 @@ export default async function NewRequestPage({
     </div>
   );
 }
+

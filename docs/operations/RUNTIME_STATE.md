@@ -1,4 +1,23 @@
 
+## 2026-10-25 — Engineer RFQ frontend review
+
+Request composition now follows the owner reference: compact architectural hero,
+four benefits, numbered requirements/location/notes/images form, live summary
+(right in Arabic, mirrored in English; stacked on mobile) and real showroom
+selection. Palette and existing draft-save → review → explicit-publish boundary
+are preserved. Labelled four-item examples require local app and loopback
+Supabase; production has no example requirements. Private images attach only
+after saving, JPEG/PNG/WebP, two per item, 5 MB each; PDF and pre-save upload
+remain unsupported.
+
+Current local development server reported by parent: exec session `58754` on
+port `3350` (supersedes the older session reference below). Desktop evidence:
+`.impeccable/review/request-desktop.png`; corrected mobile evidence:
+`request-mobile-top.png` and `request-mobile-fields.png` in the same directory.
+TypeScript, focused ESLint and six composer tests pass. Reviewer scored mobile capture and upload guidance fixes resolved. English desktop and dark theme checked; Arabic/light restored. Full-stack
+release work remains paused. Concurrent shared-shell/auth/settings edits are
+outside this RFQ documentation scope; no hosted, deployment or PR changes.
+
 ## 2026-10-24 — Public portfolio fidelity, actual tabs and readable links
 
 User rejected the sparse initial result, approved clearly labelled local sample content, then requested isolated tab panels and account-type/username URLs. Rebuilt the public portfolio around the supplied light/dark references, generated service photography, preserved production public projections, and added a four-condition local fixture guard. No real account fields were changed. Contact/sample favorite actions are illustrative; no messages or quotes are sent.

@@ -48,6 +48,27 @@ Resume the full-stack phase after frontend review.
 
 ## Rationale and boundaries
 
+### RFQ reference redesign — 2026-10-25
+
+The request composer follows the owner's image with a compact architectural
+hero, four task benefits and numbered product, location, optional notes and
+reference-image sections. A live summary appears on the right in Arabic and
+mirrors in English; mobile stacks it after the form. Showroom selection is
+populated from real directory results, never illustrative businesses.
+
+A labelled local example supplies four requirements (wood alternative, marble
+alternative, flooring and paint) only through the existing local-app plus
+loopback-Supabase gate. Existing drafts and real product requirements take
+precedence; production starts with empty inputs unless real data supplies them.
+The four-colour palette is unchanged.
+
+Saving creates or updates a draft and opens review. Publication remains a
+separate explicit action; drafts are not sent. Images use the existing private
+saved-item upload flow, accepting JPEG, PNG and WebP, at most two per item and
+5 MB per image. PDF attachments and uploading before the first save are not
+supported; the new form explains that the draft must be saved first. This work
+is frontend review only. TypeScript, focused lint and six composer tests pass; no hosted, deployment or PR change.
+
 The engineer is a personal persona and must not need an organization to request
 materials. Reuse caller-JWT purchase request RPCs, private media delivery,
 professional profile editing, reviews and messaging. Existing business RFQs stay
