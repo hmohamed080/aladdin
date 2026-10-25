@@ -90,18 +90,20 @@ jobs:
           [ -n "$url" ] || { echo "The deploy printed no workers.dev URL"; exit 1; }
           echo "Media preview: $url" | tee -a "$GITHUB_STEP_SUMMARY"
           failures=0
-          # A new workers.dev name can take a minute or two to resolve.
+          # A new workers.dev name can take a minute or two to route. Until then Cloudflare itself answers 404
+          # (with its own headers), so wait for a 404 that carries the Worker's sandbox CSP.
+          worker_csp="content-security-policy: default-src 'none'; sandbox"
           for attempt in $(seq 1 18); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url/m/avatar/original?t=x" || true)
-            [ "$code" = "404" ] && break
+            curl -s -D - -o /dev/null --max-time 20 "$url/m/avatar/original?t=x" | tr -d '\r' | grep -qiF "$worker_csp" && break
             sleep 10
           done
           for path in "/" "/m/avatar/original" "/m/avatar/original?t=k1.e30.AAAA" "/c/avatar/00000000-0000-0000-0000-000000000000/original" "/v/x"; do
             headers=$(curl -s -D - -o /dev/null --max-time 20 "$url$path" || true)
             code=$(printf '%s' "$headers" | head -1 | awk '{print $2}')
             cache=$(printf '%s' "$headers" | tr -d '\r' | grep -i '^cache-control:' | cut -d' ' -f2-)
-            echo "$path -> $code ($cache)" | tee -a "$GITHUB_STEP_SUMMARY"
-            [ "$code" = "404" ] && case "$cache" in "private, no-store"*) true ;; *) false ;; esac || failures=$((failures + 1))
+            csp=$(printf '%s' "$headers" | tr -d '\r' | grep -ciF "$worker_csp" || true)
+            echo "$path -> $code ($cache; worker csp: $csp)" | tee -a "$GITHUB_STEP_SUMMARY"
+            [ "$code" = "404" ] && [ "$cache" = "private, no-store, max-age=0" ] && [ "$csp" = "1" ] || failures=$((failures + 1))
           done
           if node ../../frontend/node_modules/wrangler/bin/wrangler.js secret list --env preview | grep -q '"TICKET_KEYS"'; then
             echo "TICKET_KEYS is set." | tee -a "$GITHUB_STEP_SUMMARY"
