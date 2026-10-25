@@ -135,6 +135,31 @@ MEDIA_EDGE_LIVE_ADMIN_URL=postgres://postgres:postgres@127.0.0.1:54322/postgres 
    keeps public portfolio on `/p/media` if Mode C is not approved (D1).
 8. **Canary:** publish → 200, unpublish → 404 on the next request; sign out → 404.
 
+### Acceptance preview (`--env preview`)
+
+Isolated test copy only: Worker `aladdin-media-edge-preview` on workers.dev, bucket
+`aladdin-r2-acceptance-20261011-private`, acceptance project `nxossqhdfltcqdwvbewi`
+(eu-west-1). The `media_edge_worker` role already exists there with the step 2 shape.
+
+1. **Password + Hyperdrive, one command** (owner's PC, repository root, after
+   `pnpm install` and `pnpm --dir frontend exec wrangler login`):
+   `node scripts/hosted-db/media-edge-preview-link.mjs`. It generates the password
+   in memory, prints SQL that stores only its SCRAM-SHA-256 verifier (run it in the
+   acceptance SQL Editor), then creates Hyperdrive `aladdin-media-edge-preview`
+   (Supavisor session pooler, port 5432, `sslmode=require`, caching disabled,
+   5 origin connections against the role's limit of 10). Nobody ever sees the
+   password; rerun the script to rotate it.
+2. Put the printed Hyperdrive id in `[[env.preview.hyperdrive]]` in `wrangler.toml`.
+3. Set `CLOUDFLARE_MEDIA_PREVIEW_ENABLED=true` on the `cloudflare-preview` GitHub
+   Environment and run `Cloudflare media preview`. Its smoke check requires the same
+   `404` + `private, no-store` for every unauthorized path.
+4. Ticket key (`TICKET_KEYS` here, `MEDIA_EDGE_TICKET_SECRET` on the frontend preview),
+   then `MEDIA_EDGE_ORIGIN` + `MEDIA_EDGE_DELIVERY_ENABLED=true` on the frontend
+   preview: a separate, owner-approved switch. Until then the app keeps serving
+   media itself.
+
+The Cache API does nothing on workers.dev, so the preview reads R2 on every request.
+
 **Rotation:** add `k2` to `TICKET_KEYS`, switch the app to `k2`, wait 5 minutes,
 remove `k1`. **Rollback:** `MEDIA_EDGE_DELIVERY_ENABLED=false` returns every URL
 to the application proxy at the next render; no data changes. Setting
