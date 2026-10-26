@@ -160,15 +160,25 @@ Isolated test copy only: Worker `aladdin-media-edge-preview` on workers.dev, buc
 3. Set `CLOUDFLARE_MEDIA_PREVIEW_ENABLED=true` on the `cloudflare-preview` GitHub
    Environment and run `Cloudflare media preview`. Its smoke check requires the same
    `404` + `private, no-store` for every unauthorized path.
-4. Ticket key (`TICKET_KEYS` here, `MEDIA_EDGE_TICKET_SECRET` on the frontend preview),
-   then `MEDIA_EDGE_ORIGIN` + `MEDIA_EDGE_DELIVERY_ENABLED=true` on the frontend
-   preview: a separate, owner-approved switch. Until then the app keeps serving
-   media itself.
+4. **Ticket key, one command** (owner's PC, separate GO): a token with only
+   *Account > Workers Scripts > Edit*, expiring within 24 h, in `CF_MEDIA_KEY_TOKEN`
+   via `read -rs`, then `node scripts/hosted-db/media-edge-ticket-key.mjs` (checks
+   only) and `--apply`. It generates the key in memory and sets `TICKET_KEYS` here and
+   `MEDIA_EDGE_TICKET_SECRET` + `MEDIA_EDGE_TICKET_KID` on `aladdin-frontend-preview`
+   through the Cloudflare API, after checking both Workers are wired to Acceptance
+   resources only. Each secret change deploys a new version of that Worker at once
+   (same code). Details, review and recovery:
+   `docs/operations/media-edge-acceptance-key-and-e2e-plan.md`.
+5. `MEDIA_EDGE_ORIGIN` + `MEDIA_EDGE_DELIVERY_ENABLED=true` on the frontend preview:
+   a separate, owner-approved switch, after the E2E plan in that document. Until then
+   the app keeps serving media itself.
 
 The Cache API does nothing on workers.dev, so the preview reads R2 on every request.
 
-**Rotation:** add `k2` to `TICKET_KEYS`, switch the app to `k2`, wait 5 minutes,
-remove `k1`. **Rollback:** `MEDIA_EDGE_DELIVERY_ENABLED=false` returns every URL
+**Rotation:** zero-gap needs both keys at once: add `k2` to `TICKET_KEYS`, switch
+the app to `k2`, wait 5 minutes, remove `k1`. The preview key script cannot read the
+old key back, so it replaces both sides in one pass (tickets older than the switch,
+at most 120 s, answer 404). **Rollback:** `MEDIA_EDGE_DELIVERY_ENABLED=false` returns every URL
 to the application proxy at the next render; no data changes. Setting
 `PRIVATE_ROUTES`/`PUBLIC_ROUTES` to anything but `on` disables a route family at
 the edge.

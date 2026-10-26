@@ -7051,3 +7051,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - CI evidence (run 40291171352, 4ee9a7a, Supabase Auth CAPTCHA on): 44/44 browser tests; direct `/auth/v1` pass/fail/spent 10/10 each. Cloudflare's 1x test secret answers `success:true` even for a made-up token, so forged tokens are proven refused through the 2x job.
 - Owner GO (08:32Z, 2026-10-26): merge #105 then #106 once every check, migration-policy included, is green against `main`. Not covered: deploy, promotion, hosted CAPTCHA switch.
 - **Unfinished / owner steps:** merge #105, then this PR; deploy; then the owner enables CAPTCHA protection (Turnstile, real secret) on Acceptance, smoke test, then Production. Until then hosted projects remain presence-only. The current hosted setting was not readable from here (owner to check). Real replay can only be observed with real keys.
+
+### 2026-10-26 — Media edge signing key: script and E2E plan prepared (Acceptance only, NOT executed)
+
+- Added `scripts/hosted-db/media-edge-ticket-key.mjs` (owner-run; generates a 256-bit key in memory and sets `TICKET_KEYS` on `aladdin-media-edge-preview` plus `MEDIA_EDGE_TICKET_SECRET`/`MEDIA_EDGE_TICKET_KID` on `aladdin-frontend-preview` via the Cloudflare API; fixed targets; fails closed on token lifetime > 24 h, wrong/extra account, R2 or Hyperdrive read rights, non-Acceptance bindings, delivery already on). Self-test `media-edge-ticket-key.selftest.mjs`: 26/26 against a loopback mock; values cross-checked against the Worker's `verifyTicket`.
+- Added `docs/operations/media-edge-acceptance-key-and-e2e-plan.md`: security review, version effects (each secret PUT deploys a new version with the same code; 3 per install), execution, recovery/rotation, E2E plan.
+- Read-only Acceptance check: 9 R2 rows (3 avatar, 6 portfolio), all verified with sha256, one owner; 2 test users; 0 sessions; 0 videos.
+- Unfinished: running the script and enabling `MEDIA_EDGE_DELIVERY_ENABLED` each need a separate owner GO. No hosted changes made.

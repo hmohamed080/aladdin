@@ -14,7 +14,7 @@
 # GitHub Environment `cloudflare-preview` (shared with the frontend and backend previews):
 #   secrets:   CLOUDFLARE_API_TOKEN   (Workers Scripts:Edit; add Hyperdrive:Read if the deploy says the binding is not allowed)
 #   variables: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_MEDIA_PREVIEW_ENABLED
-# Worker secret TICKET_KEYS is set once by an operator (`wrangler secret put TICKET_KEYS --env preview`),
+# Worker secret TICKET_KEYS is set once by the owner (scripts/hosted-db/media-edge-ticket-key.mjs),
 # never in GitHub. Until it exists every /m request is a 404, which is the fail-closed default.
 #
 # Rollback: `wrangler delete --env preview` from edge/media-worker (no data changes), and/or delete the
