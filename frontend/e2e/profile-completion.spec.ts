@@ -1,5 +1,10 @@
 import { test, expect, type Page, type APIRequestContext, type BrowserContext } from "@playwright/test";
-import { IDENTITIES, messageIdsFor, readNewOtp, selectAccountType, signIn } from "./helpers/auth";
+import { IDENTITIES, messageIdsFor, readNewOtp, selectAccountType, signIn, stubTurnstileWhenOffline } from "./helpers/auth";
+
+// Offline sandboxes only (E2E_STUB_TURNSTILE=1); a no-op in CI, where the real widget runs.
+test.beforeEach(async ({ page }) => {
+  await stubTurnstileWhenOffline(page);
+});
 
 /**
  * Staging-prep registration + profile completion, end to end against the REAL

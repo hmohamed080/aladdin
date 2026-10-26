@@ -1,3 +1,33 @@
+## 2026-10-25 (run 3 follow-up) — Rehearsal restore now reproduces Production's ACLs exactly
+
+- Owner's Windows run 3 (`--resume-backup`, commit `04234d9`) failed on ACLs only; backup checksums unchanged before and after. Root causes, each confirmed against Production's fingerprint hashes from that run:
+  - the local image starts with default privileges for `postgres` in `public` that give anon/authenticated/service_role UPDATE on new sequences; Production lacks them (default_acl 708 vs 643 chars). New `local-default-privileges-reset.sql` clears postgres's non-owner defaults in public/app inside the restore transaction, before `schema.sql`, so the dump's own ALTER DEFAULT PRIVILEGES define them;
+  - the same leftover gave `public.job_review_moderations_seq_seq` an explicit ACL, while on Production it is NULL (table_acl 12544 vs 12458); fixed by the same reset;
+  - the `04234d9` local-only-role cleanup used blanket `REVOKE ALL ON ALL ...`, which turned NULL ACLs into explicit ones; it now revokes only entries the role actually holds, object by object.
+- With both Production traits mirrored, the self-test source matches Production's default_acl (`c864e7c4…`/643) and table_acl (`f4f72287…`/12458) hashes exactly; self-test and `--resume-backup` on its backup both PASS.
+- Still open: after the push, `functions` differs from the 191 baseline with the same length (run 2 and run 3). The restore reproduces Production's functions exactly, and the local 165 replay hashes `13671b0c…` vs Production `72375f89…`, so Production carries a function body/flag drift that the 26 migrations do not replace. New `schema-detail.sql` + `local-noseed-detail.txt` (names, hashes, privileges only) make the report name the exact functions and flag CRLF bodies.
+- Run 4 on Windows (`1f3638c`): restore **exact** (all 15 categories equal Production). The function drift is CRLF line endings in 9 Production function bodies (app.can_participate, app.conversation_parties, app.mandatory_registration_business_type, public.job_application_reject, job_assignment_cancel, job_assignment_complete, job_progress_add, mark_conversation_read, open_conversation); with CRs removed each equals the baseline, and flags/search_path/ACLs are identical. The rehearsal now accepts exactly that case (CR-only body difference, already present right after the restore, nothing else changed) and still fails on anything else; self-test models one CRLF function and passes, negative tests fail as expected.
+- **Unfinished:** owner rerun on Windows (run 5). Optional later cleanup: re-create the 9 functions without CRs on Production in a reviewed migration (owner decision).
+
+## 2026-10-25 (later) — Rehearsal: 6-column migration history, `--resume-backup`, fail-closed backup validation
+
+The owner's Windows run (`10223cc`) passed the Auth/Storage preflight but failed the restore: Production's `supabase_migrations.schema_migrations` has 6 columns (`version`, `statements`, `name`, `created_by`, `idempotency_key`, `rollback`), and the script created only 3. Fixes in `production-rehearsal.sh`:
+- **History table:** the local `supabase_migrations` tables are now built from the backup's own COPY column lists. A column with no known type fails closed.
+- **`--resume-backup <folder>`:** reuses an earlier backup without any link, password or query. The earlier folder is only read, and results go to a new `-resumed-*` folder.
+- **Fail-closed validation before any stack starts:**
+  - SHA256SUMS verification and the exact four-file list;
+  - the saved checksum copy is identical;
+  - every metadata file is present: fingerprints (all categories), row counts, Auth/Storage columns with markers, parameter grants, three version pins and migration history;
+  - per-table row counts counted from `data.sql` equal Production's counts;
+  - the history in `data.sql` equals `history-production.txt`;
+  - `backup-meta.txt` (new; baseline SHA and manifest) is checked when present.
+- **Unchanged:** the checksums are re-verified after the rehearsal, the git fetch falls back offline to the pinned commit, and the Git Bash fixes are kept.
+
+Local evidence:
+- The self-test with a 6-column source history passes.
+- `--resume-backup` on a copy without `backup-meta.txt` passes with no source database running, and the backup files stay byte-identical.
+- A tampered copy (edited schema.sql, missing columns file, edited history) fails validation, listing all four problems, before any stack starts.
+
 ## 2026-10-25 — Production rehearsal: restore blocked by older local Auth/Storage, fixed by pinning hosted versions
 
 The owner's Windows run of `production-rehearsal.sh` failed during the restore, one Auth/Storage error at a time (first four missing Auth tables, then `auth.one_time_tokens.expires_at` with 61 rows). **Root cause:** `supabase start` used the CLI 2.110.0 default images (gotrue v2.193.0, storage-api v1.66.4, postgres 17.6.1.143). Production runs newer services: Auth has 82 migrations up to `20260831180000`, Storage has 74 migrations up to `revoke-grants-to-unused-operations`, and Postgres is 17.6.1.155. The script stopped the stack from inheriting the `link` version pins when it deleted `supabase/.temp` before starting it.
@@ -29,6 +59,24 @@ Branch `claude/project-thread-724t0d` from PR #101 (`506ec9b`, = #97 + privilege
 Validation (cloud sandbox): typecheck clean; lint 0 errors (58 warnings); Vitest 4,307 passed; permission gate upgrade replay passes every migration through `20261024090011`; fresh `db reset` + 688 exact function contracts; pgTAP 141 files / 6,290 tests pass; installer phone-change and last-owner concurrency proofs pass; migration policy clean against `main`. Not run: Playwright E2E, Cloudflare build.
 
 Hosted: Acceptance `nxossqhdfltcqdwvbewi` got `20261024090001` applied on 2026-10-24 (owner approved). Re-check: fingerprint matches the 181-migration local baseline except the expected `roles` row (`media_edge_worker`); advisors unchanged in kind. **Acceptance GO.** The Installer migrations `20261024090002..11` are not applied anywhere hosted. Production `kkpkgjrweysgvhvkhzun` untouched (165 migrations, latest `20261020090001`).
+
+## 2026-10-24 — Video transcode: originals larger than the Container disk
+
+Branch `claude/cf-video-large-2ibvgs` (local, from `claude/cloudflare-workers-2ibvgs`). This is code and docs only, with nothing deployed. Details: [video-transcode-cloudflare-containers.md](../architecture/video-transcode-cloudflare-containers.md#does-a-long-video-fit).
+
+**Changes in `backend/app/workers/video_transcode.py`:**
+- Finished HLS segments are uploaded to the revision prefix while ffmpeg runs, then deleted locally. Playlists are still uploaded last.
+- An original larger than the free disk minus 1 GiB is read from R2 through a presigned GET URL for that one object. The URL lives as long as the run's own timeout plus 5 min, at most 7 days. The input allows only `https,tls,tcp` and the forced demuxer, with reconnect flags, and the URL is redacted from logs.
+- An original that fits is still read from local disk only.
+- The ceiling moves from ≈ 7.5 GB to R2's 5 TiB object limit and a 7-day wall time per job.
+- **Bug found and fixed** while testing against SeaweedFS: an expired URL or network error during ffprobe was rejected as `invalid_media`. It is now a retry.
+
+**Validation:**
+- `uv run pytest`: 118 passed, 3 skipped (Redis).
+- `ruff check` and `ruff format --check` are clean.
+- A real ffmpeg transcode over local HTTP Range passed, and so did a real S3 API run on SeaweedFS.
+
+**Unfinished:** real R2 and Container tests, the bookworm image (ffmpeg 5.1), a multi-GB original, and a mid-transcode connection drop.
 
 ## 2026-10-22 — Consolidated database baseline, tested backup/restore, Production rehearsal
 
@@ -283,6 +331,14 @@ Branch `fix/registration-account-sync` from `main` @ `bd0de0a`; worktree `D:/pro
 Follow-up same day: real-browser run of both sign-ups (see doc), Installer phone re-key with current password, Installer header refreshed through layout revalidation, Admin organizations list shows phone and city. pgTAP 87 now 45/45.
 
 Open: not pushed, migration not applied to any hosted database. pgTAP 60 fails on the scratch DB for an unrelated avatar-storage reason (also fails without this migration).
+
+## 2026-10-19 — React #418 hydration mismatches: dates pinned to Egypt time
+
+Branch `claude/hydration-418-2ibvgs` from `main` @ `bd0de0a`. **Cause found and fixed:** the shared format layer (`lib/ui/format.ts`) formatted dates in the RUNTIME's zone, so a Client Component rendered "13:30" on the UTC server and "16:30" in a Cairo browser (`formatDateTime`/`formatTime`/`formatAdminDate*` always; `formatDate` only for instants 21:00-24:00 UTC, hence "intermittent"). All date formatters now use `DISPLAY_TIME_ZONE = "Africa/Cairo"`; chat "same day" uses the same calendar; the job card's relative "posted" age re-renders after mount (same pattern as `AvailabilityControl`). Server-rendered dates now also show Egypt time instead of UTC.
+
+Evidence (local prod build, server `TZ=UTC`, Chromium `timezoneId=Africa/Cairo`, ar-EG + en-US, 10 seeded users, 1,046 loads, 121 routes): text-type #418 **34 -> 0** loads (RFQ/quotation/order/lead detail pages). Unit: `format.test.ts` asserts identical output under UTC, Cairo and Los Angeles.
+
+Open: a separate, rare **HTML-type** #418 (4 and 6 loads per 1,046, mostly the Admin shell at `/admin`, also `/home/profile/edit`, `/b2b/suppliers`) is NOT fixed and not root-caused. It does not reproduce in `next dev` (126 loads) or with a DOM mutation recorder attached (0/752), and the recovered DOM matches the server HTML, so it looks like a timing race rather than different markup. Also noted, not changed: `follow-up-edit-form.tsx` builds its `datetime-local` default from the runtime zone (server UTC vs browser), and several components still format numbers with a bare `ar-EG` tag (identical in Node 22 and Chromium 141 today).
 
 ## 2026-10-18 — Terms of Service published
 
@@ -6962,3 +7018,36 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - **Unfinished:** owner runs the script; Hyperdrive id into `wrangler.toml`; first deploy; ticket key on both Workers; `MEDIA_EDGE_DELIVERY_ENABLED` on the frontend preview (feature flag, needs owner wording); real-R2 revocation canary.
 - Owner ran the link script: Hyperdrive `aladdin-media-edge-preview` id `163eb6ad3a4c4b89840b28983999b995` (read back: session pooler `aws-0-eu-west-1`, user `media_edge_worker.nxossqhdfltcqdwvbewi`, caching disabled, `sslmode=require`, 5 connections). Role on Acceptance unchanged apart from the password. Id committed; the workflow now deploys only on a manual run, so pushes never deploy.
 - Owner approved the deploy. `aladdin-media-edge-preview` is live at https://aladdin-media-edge-preview.bstalent9.workers.dev (run 40183317184, version from f72f8ad): every unauthorized path is the Worker's own 404 with `private, no-store, max-age=0` and the sandbox CSP. The first run (40183230961) deployed fine but failed its smoke check because the new workers.dev name was still answered by Cloudflare's routing 404; the check now waits for the Worker's CSP. `TICKET_KEYS` not set, frontend not switched: private media still comes from the app.
+
+### 2026-10-25 — Phase B: 26 migrations applied to Production
+
+- Owner GO for Phase B (12:37Z). Owner ran it themselves: manifest `f76c64c2…`, `migration list` (165 + 26 local-only), dry run (exactly 26), `db push --linked` (all applied; a post-push CLI `failed to cache migrations catalog` timeout warning only), then `scripts/hosted-db/production-post-migration-check.sh` → PASS at 12:59:03Z (191 versions, latest `20261024090011`, 9 known CRLF-only function bodies).
+- Claude (read-only): advisors before/after saved under `/mnt/project-files/reports/phase-b/` — security 300→369, performance 191→221, nothing resolved, every new finding on an object created by the 26 migrations (6 anon security-definer findings are the intended public read RPCs). Supabase edge/auth logs: no 5xx; Postgres: no errors; Vercel runtime errors: none.
+- **Unfinished:** owner smoke test with a real account (sign in, dashboard, registration); Phase C (production config, retarget/merge #103 after turning off Vercel auto-assign) needs a separate GO. Not approved: main merge, deploys, DNS, cutover.
+
+### 2026-10-25 — Phase C: pre-merge review and merge of #103
+
+- Owner confirmed: Production smoke test PASS (sign in, dashboard, registration, sign out); Vercel *Auto-assign Custom Production Domains* OFF; `STAGING_PROMOTION_ENABLED=false` (so a push to `main` runs `deploy-staging.yml` plan-only).
+- Found: on 2026-10-20 `deploy-staging.yml` ran in DEPLOY mode for `a9723a0` (db push + `vercel promote`); its live check then confirmed auto-assign was already OFF.
+- Release content `ad2dabf` contains #88 #89 #91 #92 #94 #95 #97 #98 #101 and all of `main`; merge tree identical. #93 and #104 stay separate; branch `claude/project-thread-724t0d` is kept (base of #104).
+- CI, pgTAP and migration-policy green on `ad2dabf`. `auth-captcha-e2e`: 34 passed, 10 failed (never green; first run on #97's head failed 11). **Owner rule:** these failures block any new application-code Production promotion (Vercel or Cloudflare) until fixed or explicitly accepted. Review: `/mnt/project-files/reports/phase-c-pre-merge-review-2026-10-25.md`.
+- Owner GO (15:18Z) to merge #103 into `main` with a merge commit. This entry is the only change after `ad2dabf`; it re-runs the required pull-request checks.
+
+### 2026-10-25 — Auth CAPTCHA E2E remediation (branch `claude/auth-e2e-remediation`, from `main` 5720d0c)
+
+- Owner GO (15:43Z) for isolated remediation only: no merge, deploy, promotion, DNS or Production change.
+- **App fix 1 — submitting before the security check finishes.** Sign In (email and installer phone) and the email-code send forward a Turnstile token and refuse an empty one. The interaction-only widget mints it a moment after the form appears, and again after every attempt (single-use token, `resetKey`). A fast submit, including a retry right after a wrong password, got "complete the verification challenge" instead of its real answer, and no code was sent. `TurnstileWidget` now holds such a submission and replays it (same submit button) once the token arrives; if the challenge errors or no token arrives within 8 s, it goes through and the server refuses it exactly as before. No server-side check changed.
+- **App fix 2 — installer Settings for an email account** (`/home/settings`, `InstallerSettings`): it said "this number is also how you sign in" and never stated how the account signs in. It now shows the sign-in method sentence the personal Settings page uses (phone + password, or email + password) and shows the phone hint only to phone accounts.
+- **Stale tests:** the installer shell's sign-out label is "تسجيل خروج"; Next 16 answers an RSC request without `_rsc` with a 307 cache-busting hop before page code runs (the phone account was never sent to the migration form); the refresh test typed before hydration.
+- Test infra: `E2E_STUB_TURNSTILE_DELAY_MS` (offline stub only) reproduces the real widget's delay; the email specs use the offline stub when `E2E_STUB_TURNSTILE=1`. CI keeps both stubs off.
+- **Unfinished / owner decision:** the canonical docs (CLAUDE.md, PRODUCT_DIRECTION_GUIDE, ARCHITECTURE_GUIDE, `docs/frontend/auth-password-preview.md`) say Sign In has no CAPTCHA, but since PR #84 / 05c4eec Sign In and the email-code send require a token that, with `[auth.captcha]` off, nobody verifies (presence check only). Either drop it from Sign In (docs win) or verify it; this branch keeps the current behaviour.
+
+### 2026-10-26 — Real Turnstile verification, Option B (branch `claude/auth-turnstile-verification`, stacked on #105)
+
+- Resolves the owner decision left open above. Owner chose Option 2 (real server-side verification), then Option B on the proposal: **Supabase Auth verifies** the tokens of every operation it processes (Sign In included); the app keeps Siteverify (hostname + action) only for the phone sign-up's Admin-API creation. [ADR-0023](../decisions/ADR-0023-supabase-auth-verifies-turnstile.md), [auth-captcha.md](../frontend/auth-captcha.md).
+- Audit: every token except the phone sign-up's account-creation token was presence-only, live Production included (05c4eec moved verification to Supabase Auth while `[auth.captcha]` stayed off).
+- Code: the Installer password-change probe now asks `account_password_confirm` instead of making a token-less password grant. Comments in `turnstile.ts`, `auth-password-preview.ts` and `config.toml` corrected.
+- CI: `auth-captcha-e2e.yml` turns `[auth.captcha]` on with Cloudflare test secrets (`scripts/ci/enable-gotrue-captcha.sh`) for the browser suites, and `frontend/e2e-gotrue-captcha/` calls `/auth/v1` directly with the public key (missing, forged, rejected 2x, spent 3x tokens).
+- CI evidence (run 40291171352, 4ee9a7a, Supabase Auth CAPTCHA on): 44/44 browser tests; direct `/auth/v1` pass/fail/spent 10/10 each. Cloudflare's 1x test secret answers `success:true` even for a made-up token, so forged tokens are proven refused through the 2x job.
+- Owner GO (08:32Z, 2026-10-26): merge #105 then #106 once every check, migration-policy included, is green against `main`. Not covered: deploy, promotion, hosted CAPTCHA switch.
+- **Unfinished / owner steps:** merge #105, then this PR; deploy; then the owner enables CAPTCHA protection (Turnstile, real secret) on Acceptance, smoke test, then Production. Until then hosted projects remain presence-only. The current hosted setting was not readable from here (owner to check). Real replay can only be observed with real keys.

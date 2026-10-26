@@ -58,6 +58,19 @@ describe("installer settings (production)", () => {
     expect(within(screen.getByTestId("settings-current-phone")).getByText("+201012345678")).toBeInTheDocument();
     expect(screen.getByTestId("settings-phone-status")).toHaveTextContent("Not verified");
     expect(document.body).not.toHaveTextContent(/preview/i);
+  });
+
+  it("states how THIS account signs in: phone + password, or email + password", () => {
+    const { unmount } = renderWithI18n(<InstallerSettings data={DATA} />, "en");
+    expect(screen.getByTestId("settings-sign-in-method")).toHaveTextContent("You sign in with the phone number you registered with and your password.");
+    expect(screen.getByText("This number is also how you sign in.")).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/your email address and your password/);
+    unmount();
+
+    renderWithI18n(<InstallerSettings data={{ ...DATA, phoneAccount: false }} />, "en");
+    expect(screen.getByTestId("settings-sign-in-method")).toHaveTextContent(/^You sign in with your email address and your password\./);
+    expect(screen.queryByText("This number is also how you sign in.")).not.toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/phone number you registered with/);
     expect(document.body).not.toHaveTextContent("Ahmed Mahmoud".replace("Ahmed", "Mona")); // sanity: nothing hard-coded
   });
 

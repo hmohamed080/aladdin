@@ -14,6 +14,13 @@
 # The E2E Turnstile stubs (E2E_STUB_TURNSTILE / E2E_TURNSTILE_STUB) are forced OFF so the real widget script and
 # the real Siteverify call run.
 #
+# Supabase Auth CAPTCHA protection is ON for these runs (ADR-0023): scripts/ci/enable-gotrue-captcha.sh adds
+# [auth.captcha] with a Cloudflare TEST secret to this runner's checkout before the stack starts, so every sign up,
+# resend, password sign in, email code and recovery the browser suites make is verified by Supabase Auth itself. The
+# `gotrue-direct` steps and job call /auth/v1 directly with the public key only (no app) and prove that a missing,
+# rejected (2x: what a real secret answers for a made-up token) or already-spent (3x) token is refused there too. The
+# always-pass 1x secret accepts ANY token, so a made-up token is only proven refused through the 2x job.
+#
 # Not run here (known, non-CAPTCHA, tracked in the triage doc): the Sign In "renders no Turnstile widget" check
 # (owner decision pending) and the profile-completion "seeded account" block (Showroom RC2 product review).
 
@@ -41,6 +48,9 @@ on:
       - "frontend/e2e/helpers/**"
       - "frontend/e2e/global-setup.ts"
       - "frontend/playwright.config.ts"
+      - "frontend/playwright.gotrue-captcha.config.ts"
+      - "frontend/e2e-gotrue-captcha/**"
+      - "scripts/ci/enable-gotrue-captcha.sh"
       - "supabase/config.toml"
       - ".github/workflows/auth-captcha-e2e.yml"
 
@@ -94,6 +104,13 @@ jobs:
             --data-urlencode "response=XXXX.DUMMY.TOKEN.XXXX" > "$ARTIFACTS/siteverify-test-key.json"
           cat "$ARTIFACTS/siteverify-test-key.json"; echo
           jq -e '.success == true' "$ARTIFACTS/siteverify-test-key.json" > /dev/null
+          # Evidence for the direct-call spec: what the same test secret answers for a token Cloudflare never minted.
+          curl -sS --max-time 15 -X POST https://challenges.cloudflare.com/turnstile/v0/siteverify \
+            --data-urlencode "secret=$TURNSTILE_SECRET_KEY" \
+            --data-urlencode "response=forged-token-not-from-cloudflare" > "$ARTIFACTS/siteverify-test-key-forged.json"
+          cat "$ARTIFACTS/siteverify-test-key-forged.json"; echo
+      - name: Turn on Supabase Auth CAPTCHA protection (always-pass test secret)
+        run: bash scripts/ci/enable-gotrue-captcha.sh "$TURNSTILE_SECRET_KEY"
       - name: Start local Supabase and replay migrations + seeds
         run: |
           set -o pipefail
@@ -127,6 +144,22 @@ jobs:
             e2e/recovery-replay.spec.ts \
             --grep-invert "renders no Turnstile widget|Complete your profile — seeded account" \
             2>&1 | tee "$ARTIFACTS/playwright.log"
+      - name: Direct Supabase Auth calls - missing token refused, accepted token gets through
+        if: always()
+        working-directory: frontend
+        env:
+          E2E_GOTRUE_CAPTCHA: pass
+        run: |
+          set -o pipefail
+          pnpm exec playwright test --config playwright.gotrue-captcha.config.ts 2>&1 | tee "$ARTIFACTS/gotrue-direct-pass.log"
+      - name: Show what the page rendered for each failure
+        # First attempts only; the ARIA snapshot names the on-screen error the assertion missed.
+        if: failure()
+        working-directory: frontend
+        run: |
+          find test-results -path '*-chromium-desktop/error-context.md' | sort | while read -r f; do
+            echo "::group::$f"; head -c 8000 "$f"; echo; echo "::endgroup::"
+          done
       - name: Collect redacted stack log
         if: always()
         run: |
@@ -148,5 +181,53 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
       - name: Stop the runner-local stack
+        if: always()
+        run: timeout 90s pnpm exec supabase stop --no-backup || true
+
+  gotrue-direct:
+    # Supabase Auth with a Cloudflare test secret that rejects every token (2x) or reports it already spent (3x, the
+    # replay / expiry answer). No app build: the spec calls /auth/v1 directly with the public key.
+    name: gotrue-direct (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: fail
+            secret: 2x0000000000000000000000000000000AA
+          - mode: spent
+            secret: 3x0000000000000000000000000000000AA
+    env:
+      E2E_GOTRUE_CAPTCHA: ${{ matrix.mode }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+          pnpm install --frozen-lockfile
+          mkdir -p .artifacts/auth-captcha
+      - name: Turn on Supabase Auth CAPTCHA protection (${{ matrix.mode }} test secret)
+        run: bash scripts/ci/enable-gotrue-captcha.sh "${{ matrix.secret }}"
+      - name: Start a local Supabase stack
+        run: |
+          set -o pipefail
+          pnpm exec supabase start --exclude studio,postgres-meta,edge-runtime,logflare,vector,supavisor,realtime,storage-api,imgproxy > "$RUNNER_TEMP/stack.log" 2>&1
+          pnpm exec supabase status -o json > "$RUNNER_TEMP/status.json"
+          status=$(jq 'if type == "array" then .[0] else . end' "$RUNNER_TEMP/status.json")
+          anon=$(jq -r '.ANON_KEY // empty' <<<"$status")
+          test -n "$anon" || { echo "Local anon key missing from supabase status"; exit 1; }
+          echo "::add-mask::$anon"
+          { echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r '.API_URL' <<<"$status")"; echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon"; } >> "$GITHUB_ENV"
+      - name: Direct Supabase Auth calls are refused
+        working-directory: frontend
+        run: pnpm exec playwright test --config playwright.gotrue-captcha.config.ts
+      - name: Stop the stack
         if: always()
         run: timeout 90s pnpm exec supabase stop --no-backup || true

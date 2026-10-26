@@ -6,16 +6,16 @@
 
 **Code:**
 - [`backend/cloudflare/transcode/`](../../backend/cloudflare/transcode/): `Dockerfile`, `wrangler.jsonc`, `src/index.ts`.
-- [`backend/app/workers/video_transcode.py`](../../backend/app/workers/video_transcode.py): new `--drain` mode and SIGTERM handling.
+- [`backend/app/workers/video_transcode.py`](../../backend/app/workers/video_transcode.py): new `--drain` mode and SIGTERM handling. Since 2026-10-24: progressive segment upload and the R2-over-HTTPS input for originals the disk cannot hold ([Long videos](#does-a-long-video-fit)).
 
 ## Recommendation
 
-**Containers fits, with one real gap: disk.**
+**Containers fits.** The disk gap found on 2026-10-22 is closed in code (2026-10-24): the instance disk no longer limits the size of an original. See [Long videos](#does-a-long-video-fit).
 - **Shape:** one Worker, one Durable Object class (`TranscodeSlot`) and one separate image. A slot starts a container that drains every claimable video, then exits, so billing stops.
 - **Coordination:** Postgres remains the only job authority. Nothing new holds job state.
 - **Cost:** about **$0.22–0.38 of compute per hour of 1080p source video**. Total cost is **≈ $0.25–0.40** with R2 operations, and up to **≈ $0.55** if container-to-R2 uploads count as egress after the free allowance. On top of that, Workers Paid costs $5/month.
 - **Duration:** a long video fits. Cloudflare sets no runtime cap.
-- **Disk:** a large original does not always fit. The default maximum disk is 20 GB, which caps an original at about 7.5 GB. That is roughly 1 h of 1080p phone video, or 20–45 min of 4K. Fix this before relying on Containers alone. See [Long videos](#does-a-long-video-fit).
+- **Disk:** no longer a size limit. Before 2026-10-24 the 20 GB maximum capped an original at about 7.5 GB. Now an original up to ≈ 18.5 GB is read from a local copy, and a larger one is read straight from R2 over a presigned HTTPS URL. Finished segments leave the disk while ffmpeg runs. The remaining limit for one job is wall time, about 3–7 days of source video. See [Long videos](#does-a-long-video-fit).
 
 ## Platform facts (Cloudflare docs, read 2026-10-22)
 
@@ -54,8 +54,9 @@ cron */10 ───────────────────────�
                            the inactivity timeout while running · monitor() logs the exit
                                                            ▼
                          container: python -m app.workers.video_transcode --drain
-                           loop: expire → claim (lease) → download → ffprobe/ffmpeg
-                                 → upload revision → finish; until nothing to claim
+                           loop: expire → claim (lease) → download, or presign if too big
+                                 → ffprobe/ffmpeg (segments uploaded as written)
+                                 → upload playlists last → finish; until nothing to claim
                            then purge; exit 0 (1 if a job was released for retry)
 ```
 
@@ -87,7 +88,7 @@ cron */10 ───────────────────────�
 | Failure | What happens |
 |---|---|
 | Invalid media / no video stream | `video_job_fail(retry=false)` → `failed`, no retry (unchanged) |
-| ffmpeg error, R2 or network error | `video_job_fail(retry=true)`; the same drain or the next one reclaims it; 3 attempts in total |
+| ffmpeg error, R2 or network error | `video_job_fail(retry=true)`; the same drain or the next one reclaims it; 3 attempts in total. On the R2 input, a probe that fails with an HTTP or network message (including an expired URL's 403) is retried, never rejected as `invalid_media` |
 | SIGTERM (host restart, rollout of a new image) | `--drain` turns it into `Terminated` inside the job: `subprocess.run` kills ffmpeg, the job is released for retry, temp files are removed, and the process exits well within the 15-min grace. Python is PID 1, so without this handler SIGTERM would be ignored until SIGKILL |
 | SIGKILL / OOM / host loss | Lease expires ≤ 15 min, then the next cron or wake reclaims it |
 | Container fails to start (image, `max_instances`, capacity) | `monitor()` rejects → `transcode.failed` log; the next kick tries again |
@@ -126,6 +127,7 @@ Two caveats:
 | **Total** | **≈ $0.23** | **≈ $0.55** |
 
 - **Included each month:** the Workers Paid allowances cover about the first **2 video hours** (375 vCPU-min, 25 GiB-h). These allowances are **account-wide and shared** with the FastAPI container and the sandbox.
+- **Reading large originals from R2 (2026-10-24):** this costs about the same. R2 charges no egress fee. The container *receives* the bytes, and Containers bills egress only on bytes leaving the container. A streamed read moves the original about once, the same as the download it replaces. Probe and poster read a few MB more with Range. Each HTTP request is one R2 Class B operation ($0.36/M). One request per ffprobe, ffmpeg run, seek and reconnect comes to tens per job, ≈ $0.00001. Segment uploads are the same PUTs as before, only earlier. The one real cost is time: a poorly interleaved MP4 makes ffmpeg seek often, and every seek is a new request with its own latency. Phone recordings interleave in ≈ 1 s chunks, so this was not measured on R2. Disk stays at 20 GB, because the local path still speeds up originals up to ≈ 18.5 GB. Disk costs ≈ $0.005–0.011 per video hour anyway.
 - **Idle overhead:** a cron start every 10 min with nothing to do costs about 10 s × 4,320 starts/month. That is ≈ 72 GiB-h and 240 GB-h, so **≈ $0.45/month** above the allowances (an estimate; measure after a pilot).
 - **Storage:** HLS output adds about 4 GB per video hour, ≈ $0.06/month at R2 rates. The original is kept too.
 - **ADR-0020 was too low.** Its "$0.02–0.05 per hour" for per-second machines underestimated three 1080p renditions on a small CPU. Use this table instead.
@@ -133,20 +135,50 @@ Two caveats:
 ## Does a long video fit?
 
 - **Duration: yes.** Cloudflare sets no runtime cap. The lease heartbeat (5/15 min) and the alarm-renewed inactivity timeout keep a multi-hour job alive. ffmpeg's own budget is 8 s per media second. At 1.0–2.2 × real time, a 2-hour video takes about 2–4.5 h. The only duration risk is repeated host restarts (see the caveats above).
-- **Disk: only up to a size.** The worker needs 2.5 × the original free (`DISK_FACTOR`). A 20 GB instance minus a ≈ 0.5 GB image (Cloudflare limits image size by instance disk, so the image is assumed to share it) leaves room for originals up to **≈ 7.5 GB**. Using Apple's camera-settings sizes per minute:
+- **Disk: no longer a size limit (fixed 2026-10-24).**
 
-| Source | ≈ MB/min | Longest original that fits |
+**The problem (2026-10-22).** The worker downloaded the original, then wrote every rendition beside it. It needed 2.5 × the original free (`DISK_FACTOR`). A 20 GB instance minus a ≈ 0.5 GB image left room for originals up to **≈ 7.5 GB**: about 1 h of 1080p H.264 phone video, or 19–45 min of 4K. A larger original raised `InsufficientDisk` on every container and was `failed` after 3 attempts. The owner's rule is no user-facing size or duration cap (ADR-0020 Revision 2), so rejecting it was not an option.
+
+**Options weighed:**
+
+| Option | Disk need | Verdict |
 |---|---|---|
-| 1080p30 HEVC | 60 | ~2 h |
-| 1080p30 H.264 | 130 | ~1 h |
-| 4K30 HEVC | 170 | ~45 min |
-| 4K30 H.264 | 350 | ~22 min |
-| 4K60 HEVC | 400 | ~19 min |
+| (a) ffmpeg reads the original from a presigned R2 GET URL | renditions only, ≈ 4 GB per hour of source | Removes the original from disk, but output still scales with duration (≈ 4.5 h of video on 19.5 GB). Not enough alone |
+| (b) upload each finished HLS segment while ffmpeg runs, then delete it | original + a few MB | Removes output growth, but the original must still fit (≈ 18.5 GB). Not enough alone |
+| (c) choose (a) only when the original would not fit locally | — | Keeps the common case on `file:` only, which is the tightest input hardening, with one robust boto3 download and no network reads during a multi-hour encode |
+| Raise the Containers disk limit | unchanged | Moves the ceiling, does not remove it; needs Cloudflare support |
+| Claim size filter + a bigger fallback host | unchanged | Needs a migration and a second, always-on host |
+| R2 FUSE mount | renditions | Needs FUSE in the container (privileges, an extra daemon) |
 
-**Today, a larger original fails.** The worker raises `InsufficientDisk` and releases the job. Every container is the same size, so after 3 attempts the video is `failed`. The product has **no size cap** (ADR-0020 Revision 2), so this must be solved before Containers is the only host. Options, in order:
-1. **Ask Cloudflare to raise the disk limit.** The docs say maximums are defaults that support can increase. No code change.
-2. **Add a size filter to the claim.** A small migration adds `p_max_bytes` to `video_job_claim`. A container then never claims, or burns attempts on, an original it cannot hold, and a larger host (a VM running `--loop`) takes those. No user-facing cap.
-3. **Halve the disk need** by not downloading the original. An R2 FUSE mount keeps ffmpeg on `file:` only. A presigned HTTPS input would loosen the `-protocol_whitelist file` rule, so it is not recommended. Needs testing.
+**Chosen: (b) always, plus (a) selected by (c).** No new dependency, no schema change. The lease, heartbeat, attempts, revision and "playlists last" rules are unchanged.
+
+- **Selection** (`read_locally`): with `OUTPUT_HEADROOM_BYTES` = 1 GiB, an original is read locally when `free ≥ size + 1 GiB`, read from R2 when it is bigger, and `InsufficientDisk` (retry) is raised only when less than 1 GiB is free. In both cases the size is checked against the database first: by the download, or by a `HEAD` for R2. A short object is still `upload_incomplete`.
+- **Progressive upload** (`SegmentUploader`, `run_ticking`): every 2 s, from the worker's main thread, each rendition's segments except the newest go to `video/<id>/<revision>/` and are deleted locally. ffmpeg writes a rendition's segments one after another, so all older ones are complete. When ffmpeg exits, the rest go up. The worker then checks that every segment named in a playlist was uploaded, and uploads init segments, the poster and playlists, playlists last. A failed upload kills ffmpeg and retries the job. ffmpeg's stderr goes to a file, so a long run never blocks on a pipe.
+- **R2 input hardening** (`_input_args`): only the single `-i` changes. Its `-protocol_whitelist` is `https,tls,tcp`, where `http,tcp` is accepted only for the local S3 stand-in, which config refuses outside `APP_ENV=local`. `S3VideoStore.presign_get` also refuses a non-HTTPS URL unless it was built for that stand-in. `file`, `crypto`, `hls` and `data` are all off. Both paths now also pass `-format_whitelist <forced demuxer>` (`mov` or `matroska`). ffmpeg copies both whitelists into anything a demuxer opens in turn, so a crafted file cannot open a playlist, a concat list or another URL. mov's external data references (`enable_drefs`) stay off by default. Outputs are unchanged: local paths that the worker builds.
+- **The URL:** SigV4 signs the bucket and key, so the URL works for this one object only (verified: the same signature on another key returns 403). It allows GET only. Each ffmpeg run gets a fresh URL that lives for that run's own hard timeout plus 5 min (`url_seconds`): 6 min for ffprobe and the poster, and `8 s × duration + 15 min` for the transcode. The cap is 7 days, the SigV4/R2 maximum. The URL is never logged. ffmpeg echoes a failing input URL with its signature, as a test against SeaweedFS showed, so its stderr is redacted before it is truncated. The retry log's `detail` is redacted too, which covers `TimeoutExpired`, whose text holds the command line. A timeout of the transcode itself raises `FfmpegTimeout`, whose message has no command line. The URL does sit in ffmpeg's argv (`/proc/<pid>/cmdline`) inside the container. That container already holds the R2 secret key in its environment, and the URL grants strictly less.
+- **Range and retry over HTTPS:** the flags are `-reconnect 1 -reconnect_on_network_error 1 -reconnect_on_http_error 5xx -reconnect_delay_max 30 -rw_timeout 60000000`, all present in ffmpeg 5.1, Debian bookworm's version. A dropped or stalled connection (no data for 60 s), or a 5xx, resumes at the same byte offset with a Range request, with backoff up to 30 s. A 4xx, such as an expired URL's 403, fails at once. A probe that fails with an HTTP or network message is a retry, not `invalid_media`. That was found and fixed while testing against SeaweedFS.
+- **A URL expiring mid-job:** the signature is checked when a request starts, not while bytes stream. Expiry therefore matters only for a seek or reconnect after the URL's lifetime. That lifetime already outlasts ffmpeg's own hard timeout, so a URL never expires before ffmpeg would be killed anyway, unless the timeout exceeds 7 days. If one does expire, the run fails, the job is released, and the next attempt gets a fresh URL.
+
+**The new ceiling, with its arithmetic:**
+- **Disk:** none in size. Usable disk is 20 GB − ≈ 0.5 GB image = 19.5 GB. A local read needs `size + 1 GiB ≤ 19.5 GB`, so originals up to **≈ 18.4 GB** are read from disk. That is 2.5× the old 7.5 GB, because the outputs no longer accumulate. Anything larger is streamed and needs only the 1 GiB headroom.
+- **Object:** R2's 5 TiB object limit (ADR-0020) is the only byte ceiling left.
+- **Wall time:** a single transcode must finish within the URL's 7-day maximum: 604,800 s. At the measured 1.0–2.2 × real time for 1080p, that is about **76–168 h of source in one job**, roughly 3–7 days of video. ffmpeg's own budget (`8 s × duration + 600 s`) reaches 7 days at about 21 h of source. For a longer video, ffmpeg's timeout, not the URL, would still allow the run. The run then depends on no reconnect being needed after day 7. 4K decode is slower than the 1080p measurement, so for 4K use the low end.
+- **Restarts:** platform restarts still cost an attempt each (see the caveats above). For multi-day jobs that is the more likely limit.
+
+| Source | ≈ MB/min | Before: longest that fit | Now: read from disk up to | Above that |
+|---|---|---|---|---|
+| 1080p30 HEVC | 60 | ~2 h | ~5 h | streamed from R2 |
+| 1080p30 H.264 | 130 | ~1 h | ~2.4 h | streamed from R2 |
+| 4K30 HEVC | 170 | ~45 min | ~1.8 h | streamed from R2 |
+| 4K30 H.264 | 350 | ~22 min | ~52 min | streamed from R2 |
+| 4K60 HEVC | 400 | ~19 min | ~46 min | streamed from R2 |
+
+**Still needs a real-provider test (not done):**
+1. **R2 over HTTPS from a Container:** whitelist `https,tls,tcp` against `<account>.r2.cloudflarestorage.com`, the image's ffmpeg 5.1 with its TLS backend, and Range and seek behaviour on R2.
+2. **A multi-GB original streamed end to end:** throughput against encode speed, and how many Class B requests one job makes.
+3. **Reconnect on a real drop:** cut the connection mid-transcode and confirm ffmpeg resumes at the right offset with no corrupted segment.
+4. **The image build:** Docker Hub was rate-limited earlier, so the bookworm image and its ffmpeg 5.1 flags have not been run.
+5. **A poorly interleaved MP4 over R2:** wall time.
 
 ## Shared with the "FastAPI on Cloudflare" thread (not duplicated)
 
@@ -195,9 +227,33 @@ Before switching video on, test these on real hardware and branded browsers:
 - The same dry run without the containers block bundled the Worker (2.84 KiB) with its bindings: `TRANSCODE` Durable Object, `APP_ENV`, `TRANSCODE_SLOTS`.
 - Nothing was deployed, pushed or billed.
 
+**Large-original fix (2026-10-24, local only):**
+- `uv run pytest`: 118 passed, 3 skipped. The skips are the Redis tests, which need `REDIS_TEST_URL`. `ruff check .` and `ruff format --check .` are clean.
+- New unit tests cover:
+  - URL input argument construction and the whitelists;
+  - refusal of non-http(s) inputs;
+  - the local-or-R2 selection;
+  - the URL lifetime and its 7-day cap;
+  - `S3VideoStore.presign_get` refusing http and capping the expiry;
+  - segments leaving the disk during the run, with only the newest per rendition kept;
+  - playlists uploaded last;
+  - a playlist naming a missing segment failing the job;
+  - no URL, `X-Amz` or host in any log for a 403, a probe timeout and a transcode timeout;
+  - redaction of truncated signature fragments;
+  - `run_ticking` ticking, killing ffmpeg on a failed tick, a timeout or SIGTERM;
+  - a storage error during the probe being retried;
+  - temp directory cleanup.
+- **Real ffmpeg 6.1.1, local HTTP with Range:** a 20 s 720p MP4 with its moov at the end was read only over `http,tcp`. Segments were uploaded while ffmpeg ran. Every playlist URI was stored. The test is `test_real_transcode_reads_the_original_over_http_and_uploads_segments_as_it_goes`.
+- **Real S3 API, SeaweedFS 127.0.0.1:8333:** a scratch script, not committed, ran the real `S3VideoStore` (boto3 SigV4 presign, `HEAD`, uploads) through `process_one` on the R2 path. Result:
+  - 16 objects stored, the poster included, with 0 downloads;
+  - the presigned URL for one key was refused for another key (403);
+  - an expired URL was retried after the fix (`invalid_media` before it);
+  - no URL or signature in the logs.
+- **Not run:** real R2, a real Container, the bookworm image (ffmpeg 5.1), multi-GB originals, and a mid-transcode network drop.
+
 ## Owner decisions before any hosted step
 
 1. Workers Paid (likely already needed for the frontend, ADR-0021) and the Containers usage above.
-2. Disk for large originals: ask Cloudflare to raise the limit, or add the claim size filter plus a fallback host. One of these is required by "no size cap".
+2. ~~Disk for large originals~~: solved in code (2026-10-24, [Long videos](#does-a-long-video-fit)). Remaining step: approve a real-provider test with one multi-GB original on R2.
 3. An R2 token scoped to the private bucket for this Worker's secrets.
 4. Whether the app wakes the worker by service binding (frontend on Workers) or by cron only.

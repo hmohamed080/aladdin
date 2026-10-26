@@ -9,7 +9,8 @@
 -- Save the output as security-tail.out.sql and apply it last, in the same transaction as the restore.
 with roles as (
   select string_agg(quote_ident(rolname), ', ' order by rolname) r from pg_roles
-  where rolname !~ '^pg_' and rolname not in ('supabase_admin')
+  -- cli_login_* are the CLI's own temporary login roles: they exist only while the CLI is connected.
+  where rolname !~ '^pg_' and rolname !~ '^cli_login_' and rolname not in ('supabase_admin')
 ),
 rels as (
   select c.oid, c.relkind, format('%I.%I', n.nspname, c.relname) q, c.relacl

@@ -1045,7 +1045,11 @@ caller here already proved the current credential).
   `aladdin-staging` or production, which keep GoTrue's real, unmodified
   defaults.
 
-## CAPTCHA — implemented architecture (application-scoped, 2026-09-24)
+## CAPTCHA — current behaviour (2026-10-26)
+
+**Superseded:** the 2026-09-24 section below is history. The approved behaviour is [ADR-0023](../decisions/ADR-0023-supabase-auth-verifies-turnstile.md), described in [auth-captcha.md](auth-captcha.md): Supabase Auth verifies the token of every operation it processes (Sign In included; interaction-only widget), hosted projects run Supabase Auth CAPTCHA protection ON, and the app verifies with Siteverify only the phone sign-up's Admin-API account creation.
+
+## CAPTCHA — implemented architecture (application-scoped, 2026-09-24) (HISTORY, superseded by ADR-0023)
 
 **This section is authoritative; the two sections below are history.** The
 "Option B" recommendation below was approved and is implemented:

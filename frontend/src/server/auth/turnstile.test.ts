@@ -87,6 +87,28 @@ describe("verifyTurnstileToken — Cloudflare Siteverify, fail closed", () => {
     expect(await verifyTurnstileToken("tok", { fetchImpl: reply(body), ...EXPECT })).toEqual({ ok: false, reason: "rejected" });
   });
 
+  it("calls Siteverify exactly once per verification and never retries, even when Cloudflare is unavailable", async () => {
+    const ok = reply(genuine());
+    await verifyTurnstileToken("tok", { fetchImpl: ok, ...EXPECT });
+    expect(ok).toHaveBeenCalledTimes(1);
+    const down = reply(genuine(), 503);
+    await verifyTurnstileToken("tok", { fetchImpl: down, ...EXPECT });
+    expect(down).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a replayed token: a stateful single-use Siteverify passes it once, then answers timeout-or-duplicate", async () => {
+    const spent = new Set<string>();
+    const siteverify = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      const token = new URLSearchParams(String(init?.body)).get("response")!;
+      const body = spent.has(token) ? { success: false, "error-codes": ["timeout-or-duplicate"] } : genuine();
+      spent.add(token);
+      return new Response(JSON.stringify(body), { status: 200 });
+    });
+    const fetchImpl = siteverify as unknown as typeof fetch;
+    expect(await verifyTurnstileToken("tok-once", { fetchImpl, ...EXPECT })).toEqual({ ok: true });
+    expect(await verifyTurnstileToken("tok-once", { fetchImpl, ...EXPECT })).toEqual({ ok: false, reason: "rejected" });
+  });
+
   it("rejects a real token minted for ANOTHER hostname", async () => {
     expect(await verifyTurnstileToken("tok", { fetchImpl: reply(genuine({ hostname: "evil.example" })), ...EXPECT })).toEqual({
       ok: false,

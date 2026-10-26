@@ -35,8 +35,12 @@ const MAILPIT = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
  * Siteverify (Create Account, Forgot Password) still need the real network and still fail closed.
  * Unset (the default), nothing is stubbed.
  */
-const TURNSTILE_STUB =
-  'window.turnstile={render:function(el,o){setTimeout(function(){o.callback("XXXX.DUMMY.TOKEN.XXXX")},0);return "local-test"},remove:function(){},reset:function(){}};';
+/**
+ * E2E_STUB_TURNSTILE_DELAY_MS (default 0) makes the stand-in mint its token that much later, like the real
+ * widget does, so a test that submits before the token exists fails offline exactly as it does online.
+ */
+export const TURNSTILE_STUB_DELAY_MS = Number(process.env.E2E_STUB_TURNSTILE_DELAY_MS ?? 0) || 0;
+const TURNSTILE_STUB = `window.turnstile={render:function(el,o){setTimeout(function(){o.callback("XXXX.DUMMY.TOKEN.XXXX")},${TURNSTILE_STUB_DELAY_MS});return "local-test"},remove:function(){},reset:function(){}};`;
 const stubbedContexts = new WeakSet<object>();
 export async function stubTurnstileWhenOffline(page: Page): Promise<void> {
   if (process.env.E2E_STUB_TURNSTILE !== "1") return;

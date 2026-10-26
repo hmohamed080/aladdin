@@ -144,8 +144,10 @@ function isRateLimitError(error: GoTrueError): boolean {
  * GOTRUE-VALIDATED CAPTCHA (server/auth/captcha.ts). Every operation in this
  * module that GoTrue itself processes - signUp, resend, resetPasswordForEmail,
  * signInWithPassword - forwards the Turnstile token through the supported
- * `captchaToken` option and lets GoTrue judge it (Supabase's `[auth.captcha]`
- * is ON for protected environments). The application does NOT also call
+ * `captchaToken` option and lets GoTrue judge it. That judgement is only real
+ * where Supabase Auth's CAPTCHA protection (`[auth.captcha]`, Turnstile) is
+ * ON; where it is off, the presence check below is all there is (ADR-0023,
+ * docs/frontend/auth-captcha.md). The application does NOT also call
  * Siteverify for these tokens: a Turnstile token is single-use, so a second
  * validation would fail with `timeout-or-duplicate`. A missing token is
  * refused HERE, before any GoTrue call, so no email is sent and no account is

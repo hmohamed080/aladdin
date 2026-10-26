@@ -18,6 +18,8 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Manual runs on stacked release branches (their PRs do not target main yet).
+  workflow_dispatch:
 
 # Cancel superseded runs on the same ref.
 concurrency:

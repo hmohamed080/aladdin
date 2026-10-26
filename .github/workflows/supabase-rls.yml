@@ -21,6 +21,8 @@ name: supabase-rls
 on:
   pull_request:
     branches: [main]
+  # Manual runs on stacked release branches (their PRs do not target main yet).
+  workflow_dispatch:
 
 concurrency:
   group: supabase-rls-${{ github.ref }}

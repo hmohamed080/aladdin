@@ -7,9 +7,15 @@ import {
   newMessageSubjectsFor,
   registerWithPassword,
   selectAccountType,
+  stubTurnstileWhenOffline,
   waitForCaptchaToken,
 } from "./helpers/auth";
 import { createConfirmedAccount } from "./helpers/fixtures";
+
+// Offline sandboxes only (E2E_STUB_TURNSTILE=1); a no-op in CI, where the real widget runs.
+test.beforeEach(async ({ page }) => {
+  await stubTurnstileWhenOffline(page);
+});
 
 /**
  * Real, no-bypass E2E coverage for the password auth flow, now CANONICAL at
@@ -190,7 +196,8 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
     // The Full Name entered at Step 1 is the CONFIRMED display name.
     await page.goto("/settings/profile");
     await expect(page.getByTestId("identity-card")).toBeVisible();
-    await expect(page.locator("#display-name").locator("input").first()).toHaveValue("E2E Tester");
+    // By id: the server-action form also renders hidden `$ACTION_*` inputs before the visible field.
+    await expect(page.locator("#displayName")).toHaveValue("E2E Tester");
     await expect(page.getByTestId("display-name-status")).toHaveText(/^(confirmed|مؤكَّد)$/i);
   });
 });
@@ -529,7 +536,9 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     // Hard refresh — this component holds step state only in React memory
     // (no URL/cookie step marker), so a refresh deliberately lands back at
     // Step 1. Never crashes, never asks to re-enter a password it doesn't have.
-    await page.reload({ waitUntil: "commit" });
+    // Wait for the reloaded page to finish loading: fields typed into the server-rendered HTML before React
+    // hydrates are reset by hydration, which made this resubmission flaky (empty name and email).
+    await page.reload({ waitUntil: "load" });
     await expect(page.getByLabel(/email address|البريد الإلكتروني/i)).toBeVisible();
     await expect(page.getByLabel(/one-time code|الرمز لمرة واحدة/i)).toHaveCount(0);
 
@@ -698,7 +707,8 @@ test.describe("Forgot password — full 4-screen journey", () => {
 
     // SCREEN 4 — terminal success, no auto-redirect into the app.
     await page.waitForURL(/\/forgot-password\/success$/, { waitUntil: "commit" });
-    await expect(page.getByText(/password changed|تم تغيير كلمة المرور/i)).toBeVisible();
+    // The heading, not any text: Next's route announcer repeats the page title.
+    await expect(page.getByRole("heading", { name: /password changed|تم تغيير كلمة المرور/i })).toBeVisible();
 
     // The account has NO active session at this point (global sign-out) — a
     // fresh Email + Password sign-in with the NEW password is required.

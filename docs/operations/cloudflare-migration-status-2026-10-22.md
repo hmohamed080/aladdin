@@ -24,6 +24,7 @@ The owner brief's section 14 report for the frontend, R2, credentials/CI, Redis,
 - Fixed the preview's 500s: an empty `NEXT_PUBLIC_TURNSTILE_SITE_KEY` variable was inlined as `""` and failed env validation; the build now leaves it unset.
 - `TURNSTILE_ALLOWED_HOSTNAMES` for the preview pinned in `wrangler.jsonc`.
 - pyjwt 2.15.1 and the audited backend dependency bumps ported from #98.
+- Video originals larger than about 7.5 GB: segments upload while ffmpeg runs, and originals that don't fit on disk are read from R2 through a short-lived presigned URL (HTTPS only, demuxer whitelisted, URL redacted from logs). Not yet tested against real R2 or a real Container. [Evaluation](../architecture/video-transcode-cloudflare-containers.md).
 - CAPTCHA-dependent E2E suites run on a GitHub runner with Cloudflare's public test keys (`.github/workflows/auth-captcha-e2e.yml`).
 - E2E: stale installer, Country picker, avatar and recovery-replay specs fixed; all 51 shared failures classified.
 - Security audit: 4 fixes (spoofable client IP for phone-auth throttling, spoofable host/proto, refresh-token cookie forwarded to FastAPI, missing frame/nosniff headers). [Report](security-audit-cloudflare-2026-10-22.md).
@@ -36,7 +37,7 @@ The owner brief's section 14 report for the frontend, R2, credentials/CI, Redis,
 
 ## 3. In progress
 
-- Video transcoding for originals larger than about 7.5 GB (stream the input from R2 instead of downloading it).
+- Nothing running in this thread; waiting on the blockers below.
 
 ## 4. Blockers
 

@@ -4,11 +4,11 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/admin-server", () => ({ getInstallerSecurityAdminClient: () => ({}) }));
 vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_SUPABASE_URL: "http://localhost:1", NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon" }) }));
 
-import { SECURITY_CODES, performPasswordChange, performPhoneChange, type SecurityActor, type SecurityDeps, type SessionOps } from "./installer-security";
+import { SECURITY_CODES, performPasswordChange, performPhoneChange, verifyPasswordAsUser, type SecurityActor, type SecurityDeps, type SessionOps } from "./installer-security";
 
 /**
  * MOCKED unit tests: every collaborator (PR #88's account_password_confirm, the M3/M4 RPCs, the Auth Admin API, the
- * isolated new-password probe) is a
+ * database new-password probe) is a
  * fake, so these prove the ORCHESTRATION - ordering, trust, error mapping, what is and is not called. They are not
  * integration tests; the real-GoTrue / real-Postgres proof is `installer-security.live.test.ts`.
  */
@@ -464,5 +464,39 @@ describe("performPasswordChange (mocked collaborators)", () => {
   it("a missing current password is refused first", async () => {
     const t = build();
     expect(await performPasswordChange(t.deps, actor, t.session, pwInput({ currentPassword: "" }))).toEqual({ ok: false, code: SECURITY_CODES.passwordRequired });
+  });
+});
+
+describe("verifyPasswordAsUser (the unknown-outcome probe)", () => {
+  function userClient(reply: { data: unknown; error: { code?: string } | null }) {
+    const rpc = vi.fn(async () => reply);
+    return { client: { rpc } as unknown as Parameters<typeof verifyPasswordAsUser>[0], rpc };
+  }
+
+  it("asks the database through the caller's own session, never with a password grant", async () => {
+    const { client, rpc } = userClient({ data: { ok: true, receipt: RECEIPT }, error: null });
+    const signal = { upstreamFailed: false };
+    expect(await verifyPasswordAsUser(client, { password: NEW_PW }, signal)).toBe(true);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("account_password_confirm", { p_password: NEW_PW, p_operation: "password.change", p_target: "self" });
+    expect(signal.upstreamFailed).toBe(false);
+  });
+
+  it("answers no for a wrong password", async () => {
+    const { client } = userClient({ data: { ok: false, reason: "wrong_password" }, error: null });
+    const signal = { upstreamFailed: false };
+    expect(await verifyPasswordAsUser(client, { password: NEW_PW }, signal)).toBe(false);
+    expect(signal.upstreamFailed).toBe(false);
+  });
+
+  it.each([
+    ["locked", { data: { ok: false, reason: "locked", retry_at: new Date(Date.now() + 60_000).toISOString() }, error: null }],
+    ["an RPC error", { data: null, error: { code: "PGRST301" } }],
+    ["a malformed answer", { data: { ok: true }, error: null }],
+  ])("treats %s as could-not-check, never as no", async (_label, reply) => {
+    const { client } = userClient(reply);
+    const signal = { upstreamFailed: false };
+    expect(await verifyPasswordAsUser(client, { password: NEW_PW }, signal)).toBe(false);
+    expect(signal.upstreamFailed).toBe(true);
   });
 });

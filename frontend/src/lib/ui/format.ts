@@ -43,6 +43,22 @@ export function localeTag(locale: Locale): string {
 }
 
 /**
+ * The zone every date and clock time in the product is shown in.
+ *
+ * Pinned for the same reason the numbering system is: the page is rendered twice,
+ * once by the server (a UTC host in every deployed environment) and once more in
+ * the browser during hydration (an Egyptian reader is on `Africa/Cairo`). A date
+ * formatter that falls back to the runtime's own zone prints "19 Sep, 13:30" on
+ * the server and "19 Sep, 16:30" in the browser, and React reports that as a
+ * hydration mismatch (error #418) and throws the server HTML away. Date-only
+ * values drift too, but only for instants within three hours of midnight UTC,
+ * which is why the error looked intermittent. It is Egypt time because the
+ * business is in Egypt (the same zone `DASHBOARD_TIMEZONE_FALLBACK` and
+ * `DEFAULT_OFFER_TIMEZONE` default to).
+ */
+export const DISPLAY_TIME_ZONE = "Africa/Cairo";
+
+/**
  * `Intl` constructors are among the most expensive calls in the standard
  * library, and a table of fifty rows with four money columns builds two hundred
  * of them per render. They are immutable, so one instance per (tag, options)
@@ -71,7 +87,7 @@ function dateFormat(locale: Locale, options: Intl.DateTimeFormatOptions): Intl.D
     // Gregorian is pinned for the same reason the numbering system is: `ar-EG`
     // does not select the Hijri calendar today, but the business runs on
     // Gregorian delivery dates and that must not depend on an ICU default.
-    f = new Intl.DateTimeFormat(tag, { calendar: "gregory", ...options });
+    f = new Intl.DateTimeFormat(tag, { calendar: "gregory", timeZone: DISPLAY_TIME_ZONE, ...options });
     dateFormats.set(key, f);
   }
   return f;
@@ -238,10 +254,41 @@ export function formatAdminDate(iso: string | null | undefined, locale: Locale):
   // convention exists to avoid). Each part still runs through formatNumber
   // so the DIGITS stay locale-correct (Arabic-Indic for ar); only the
   // ordering is pinned rather than left to the locale pattern.
-  const day = formatNumber(d.getDate(), locale, { minimumIntegerDigits: 2 });
-  const month = formatNumber(d.getMonth() + 1, locale, { minimumIntegerDigits: 2 });
-  const year = formatNumber(d.getFullYear(), locale, { useGrouping: false });
+  const p = displayZoneParts(d);
+  const day = formatNumber(p.day, locale, { minimumIntegerDigits: 2 });
+  const month = formatNumber(p.month, locale, { minimumIntegerDigits: 2 });
+  const year = formatNumber(p.year, locale, { useGrouping: false });
   return `${day}/${month}/${year}`;
+}
+
+const zonePartsFormat = new Intl.DateTimeFormat("en-US", {
+  timeZone: DISPLAY_TIME_ZONE,
+  calendar: "gregory",
+  numberingSystem: "latn",
+  hourCycle: "h23",
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "numeric",
+  second: "numeric",
+});
+
+/**
+ * The wall-clock fields of an instant in `DISPLAY_TIME_ZONE`. `Date#getDate()`
+ * and friends read the RUNTIME's zone, which differs between the server and the
+ * browser; see `DISPLAY_TIME_ZONE`.
+ */
+function displayZoneParts(d: Date): { year: number; month: number; day: number; hour: number; minute: number; second: number } {
+  const parts = zonePartsFormat.formatToParts(d);
+  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute"), second: get("second") };
+}
+
+/** `YYYY-MM-DD` of an instant on the display calendar — for "is this today?" checks that must agree on both renders. */
+export function displayDayKey(d: Date): string {
+  const p = displayZoneParts(d);
+  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
 }
 
 /**
@@ -256,7 +303,8 @@ export function formatAdminDateTime(iso: string | null | undefined, locale: Loca
   const d = parse(iso);
   if (!d) return EMPTY;
   const two = (n: number) => formatNumber(n, locale, { minimumIntegerDigits: 2, useGrouping: false });
-  return `${formatAdminDate(iso, locale)} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
+  const p = displayZoneParts(d);
+  return `${formatAdminDate(iso, locale)} ${two(p.hour)}:${two(p.minute)}:${two(p.second)}`;
 }
 
 /**

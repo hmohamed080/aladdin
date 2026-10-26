@@ -1,7 +1,6 @@
 import "server-only";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { readPublicEnv } from "@/lib/env";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 import { toCanonicalPhone, splitE164 } from "@/lib/contact/phone";
 import type { CountryCode } from "libphonenumber-js";
@@ -98,7 +97,7 @@ export type SecurityDeps = {
    */
   confirmPassword(operation: ConfirmOperation, target: string, password: string): Promise<ConfirmOutcome>;
   /**
-   * Only used to ANSWER an unknown password-update outcome (does the NEW password work now?). Isolated, non-persisting.
+   * Only used to ANSWER an unknown password-update outcome (does the NEW password work now?). Database-checked, no grant.
    * `upstreamFailed` is set when the answer is "could not check" (Auth rate limit / outage) rather than "no".
    */
   verifyPassword(input: { email: string; password: string; expectedUserId: string }, signal: { upstreamFailed: boolean }): Promise<boolean>;
@@ -132,7 +131,7 @@ export function defaultSecurityDeps(user: RpcClient): SecurityDeps {
     rpc: client,
     admin: client.auth.admin,
     confirmPassword: (operation, target, password) => confirmPasswordAsUser(user, operation, target, password),
-    verifyPassword: verifyPasswordIsolated,
+    verifyPassword: (input, signal) => verifyPasswordAsUser(user, input, signal),
     newId: () => globalThis.crypto.randomUUID(),
   };
 }
@@ -140,25 +139,21 @@ export function defaultSecurityDeps(user: RpcClient): SecurityDeps {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Isolated, non-persisting password check. Never touches the caller's cookies; its own throwaway session is revoked.
- * Used ONLY to resolve an unknown password-update outcome; the current-password PROOF is account_password_confirm.
+ * Does `password` work for the CALLER now? Used ONLY to resolve an unknown password-update outcome; the current-password
+ * PROOF is account_password_confirm too. It is answered by the database through the caller's own session (bound to
+ * auth.uid(), so `expectedUserId` is the session user by construction), NOT by a password grant: Supabase Auth protects
+ * the password grant with CAPTCHA and a server-side re-check has no challenge token to present. A "locked" or failed call
+ * means "could not check" (`upstreamFailed`), never "no". The unused receipt expires on its own after 60 seconds.
  */
-export async function verifyPasswordIsolated(
-  input: { email: string; password: string; expectedUserId: string },
+export async function verifyPasswordAsUser(
+  user: RpcClient,
+  input: { password: string },
   signal: { upstreamFailed: boolean },
 ): Promise<boolean> {
-  const env = readPublicEnv();
-  const isolated = createClient<Database>(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-  const { data, error } = await isolated.auth.signInWithPassword({ email: input.email, password: input.password });
-  if (data?.session) await isolated.auth.signOut({ scope: "local" }).catch(() => undefined);
-  if (error) {
-    const status = (error as { status?: number }).status;
-    if (status === undefined || status === 429 || status >= 500) signal.upstreamFailed = true;
-    return false;
-  }
-  return data.user?.id === input.expectedUserId;
+  const outcome = await confirmPasswordAsUser(user, "password.change", "self", input.password);
+  if (outcome.ok) return true;
+  if (outcome.reason !== "wrong_password") signal.upstreamFailed = true;
+  return false;
 }
 
 function diag(op: string, error: { code?: string; status?: number } | null | undefined) {

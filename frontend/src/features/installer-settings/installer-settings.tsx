@@ -200,7 +200,8 @@ export function InstallerSettings({ data }: { data: InstallerSettingsData }) {
                 {data.phoneVerified ? p.phoneVerified : p.phoneUnverified}
               </span>
             </div>
-            <p className="text-label text-fg-secondary">{p.phoneSignInHint}</p>
+            {/* Only a phone + password account signs in with this number; an email account's phone is contact data. */}
+            {data.phoneAccount ? <p className="text-label text-fg-secondary">{p.phoneSignInHint}</p> : null}
           </div>
           {data.phoneAccount ? <PhoneChangePanel c={p} /> : <p className="text-caption text-fg-secondary tablet:col-span-2">{p.phoneOnlyPhoneAccounts}</p>}
           <div className="flex flex-wrap items-center justify-between gap-md tablet:col-span-2">
@@ -224,6 +225,10 @@ export function InstallerSettings({ data }: { data: InstallerSettingsData }) {
       <SettingsSection number="02" title={c.security} description={c.securityHint} icon={ShieldIcon}>
         <div className="flex flex-col gap-sm">
           <div className="flex items-center gap-sm"><ShieldIcon size={23} /><div><h3 className="text-body-lg font-semibold">{c.login}</h3><p className="text-caption text-fg-secondary">{p.loginHint}</p></div></div>
+          {/* How THIS account signs in, in the same words as the personal Settings page. */}
+          <p className="text-body text-fg-secondary" data-testid="settings-sign-in-method">
+            {t(data.phoneAccount ? "personalSettings.account.signInBodyPhonePassword" : "personalSettings.account.signInBody")}
+          </p>
           <ul className="divide-y rounded-sm border">
             {[
               { name: "Google", connected: false, known: false, Icon: GlobeIcon },

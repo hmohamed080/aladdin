@@ -4,16 +4,15 @@ import { isIP } from "node:net";
 import { parseServerEnv, readPublicEnv } from "@/lib/env";
 
 /**
- * APPLICATION-SCOPED Cloudflare Turnstile verification — the ONE place a
- * CAPTCHA token is judged.
- *
- * The approved architecture: Supabase's project-wide `[auth.captcha]` switch
- * stays OFF (it has no per-endpoint scope and would force a token onto every
- * canonical passwordless flow and onto Sign In). Instead the app verifies the
- * token itself, server-side, against Cloudflare Siteverify, BEFORE calling
- * Supabase Auth — on exactly the abuse-sensitive endpoints that need it:
- * Create Account (signUp + resend code) and Forgot Password request. Normal
- * Email+Password Sign In carries no CAPTCHA at all.
+ * Application-side Cloudflare Turnstile verification, FOR OPERATIONS THAT
+ * BYPASS SUPABASE AUTH ONLY: the service-role Admin API account creation of
+ * the phone sign-up (Installer/Showroom), where Supabase Auth never sees a
+ * token. Every operation Supabase Auth processes itself (sign up, resend,
+ * password sign in, email code, password recovery) forwards its token to
+ * Supabase Auth instead, whose CAPTCHA protection verifies it — never both, a
+ * token is single-use (server/auth/captcha.ts, ADR-0023,
+ * docs/frontend/auth-captcha.md). Here the hostname and action are checked
+ * too, which Supabase Auth does not do.
  *
  * FAIL CLOSED. Anything other than an explicit `success: true` from Cloudflare
  * — a missing/oversized token, a rejected token, a network error, a timeout,

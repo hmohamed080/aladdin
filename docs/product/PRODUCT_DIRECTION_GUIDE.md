@@ -72,7 +72,7 @@ One person can legitimately relate to the platform in several capacities (End Co
 - **Email + Password is canonical** (since 2026-09-28, see Change History):
   - *General accounts* — sign up with Full Name + Email + Username + Account Type + Password, then Email OTP verification; sign in with Email + Password; Forgot Password via Email OTP recovery.
   - *Installer/Technician exception* — `/installer/sign-up`: Full Name + Phone + Password (no email, OTP or username in that flow); `/installer/sign-in`: Phone + Password; same canonical user/persona model; installer Forgot Password deferred.
-  - *CAPTCHA* — Supabase global CAPTCHA off; application-scoped Turnstile on Create Account, Resend Signup and the Forgot Password request only; no CAPTCHA on Sign In.
+  - *CAPTCHA* — Cloudflare Turnstile on Create Account, Resend, Sign In (email and phone), email code, Forgot Password, Change Password and phone sign-up; invisible unless Cloudflare needs interaction on Sign In, resends and Change Password. Supabase Auth verifies the tokens (also for direct API calls); the app verifies only the phone sign-up's account creation. In effect on a hosted project only once the owner switches its CAPTCHA protection on ([ADR-0023](../decisions/ADR-0023-supabase-auth-verifies-turnstile.md)).
 - ~~**Passwordless.** No passwords, and no password/forgot/reset flows anywhere~~ — *superseded 2026-09-28.*
 - A general account verifies its email at account creation; further contacts (e.g. phone) are added later from profile settings.
 - **Organization membership, branch assignment, and permission capabilities are separate from identity** — they attach to the canonical account, they do not fork it.
@@ -379,6 +379,11 @@ During every account review, Landing Page review, Registration review, and featu
 
 ## Change History
 Newest first. Every product-direction change gets an entry: date, what changed, why, and who approved it.
+
+### 2026-10-26 — Sign-in CAPTCHA is verified by Supabase Auth, Sign In included
+- **What:** Turnstile runs on Sign In too (email and phone, invisible unless Cloudflare needs interaction), as well as Create Account, Resend, email code, Forgot Password, Change Password and phone sign-up. Supabase Auth verifies every token it receives, which also blocks direct API calls; the app keeps its own Cloudflare check only for the phone sign-up's account creation. Supersedes "Sign In has no CAPTCHA" and "Supabase global CAPTCHA off" (2026-09-24 / 2026-09-28 entries).
+- **Why:** The audit found every token except the phone sign-up's was only checked for presence, live site included, and anyone holding the public key could call Supabase Auth directly.
+- **Approved by:** the owner, 2026-10-26 (Option 2, then Option B). The hosted switch is a separate owner step per project ([ADR-0023](../decisions/ADR-0023-supabase-auth-verifies-turnstile.md)).
 
 ### 2026-09-28 — Email + Password becomes the canonical authentication model
 - **What:** General accounts sign up at `/auth/sign-up` with Full Name + Email + Username + Account Type + Password and verify the email with a one-time code (Email OTP); they sign in at `/auth/sign-in` with Email + Password; Forgot Password (`/auth/forgot-password`) recovers access through an Email OTP. Installers/technicians keep the permanent exception: `/installer/sign-up` (Full Name + Phone + Password; no email, OTP or username) and `/installer/sign-in` (Phone + Password), with the same canonical user/persona model; `/auth/sign-in` links to it. Installer Forgot Password stays deferred. Supabase's global CAPTCHA stays off; application-scoped Turnstile covers Create Account, Resend Signup and the Forgot Password request; Sign In has no CAPTCHA.
