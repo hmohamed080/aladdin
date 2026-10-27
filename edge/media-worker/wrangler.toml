@@ -27,7 +27,7 @@ VIDEO_ALLOWED_ORIGINS = "https://aladdindecore.com,https://www.aladdindecore.com
 # PRIVATE bucket. Never enable public access or r2.dev on it.
 [[r2_buckets]]
 binding = "MEDIA_BUCKET"
-bucket_name = "<private-media-bucket>"
+bucket_name = "replace-with-private-media-bucket"
 
 # Created with query caching DISABLED (see README): authorization results must never be cached.
 [[hyperdrive]]
@@ -36,3 +36,32 @@ id = "<hyperdrive-config-id>"
 
 [observability]
 enabled = true
+
+# Isolated acceptance preview (aladdin-r2-acceptance, nxossqhdfltcqdwvbewi), served on workers.dev
+# next to aladdin-frontend-preview. Never the live project, the live bucket or the live domain.
+# Deployed by .github/workflows/cloudflare-media-preview.yml. The Hyperdrive config is created by
+# scripts/hosted-db/media-edge-preview-link.mjs (caching disabled, role media_edge_worker).
+# Note: the Cache API is a no-op on workers.dev, so EDGE_CACHE has no effect here and every
+# request reads R2 after the database check.
+[env.preview]
+name = "aladdin-media-edge-preview"
+workers_dev = true
+preview_urls = false
+# `routes` is inherited by environments; the preview must not claim the production custom domain.
+routes = []
+
+[env.preview.vars]
+PRIVATE_ROUTES = "on"
+# Mode C (conditional public, D1) stays off until approved; the app keeps /p/media for it.
+PUBLIC_ROUTES = "off"
+EDGE_CACHE = "on"
+VIDEO_ROUTES = "off"
+VIDEO_ALLOWED_ORIGINS = "https://aladdin-frontend-preview.bstalent9.workers.dev"
+
+[[env.preview.r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "aladdin-r2-acceptance-20261011-private"
+
+[[env.preview.hyperdrive]]
+binding = "HYPERDRIVE"
+id = "163eb6ad3a4c4b89840b28983999b995"

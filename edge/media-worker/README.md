@@ -135,8 +135,50 @@ MEDIA_EDGE_LIVE_ADMIN_URL=postgres://postgres:postgres@127.0.0.1:54322/postgres 
    keeps public portfolio on `/p/media` if Mode C is not approved (D1).
 8. **Canary:** publish → 200, unpublish → 404 on the next request; sign out → 404.
 
-**Rotation:** add `k2` to `TICKET_KEYS`, switch the app to `k2`, wait 5 minutes,
-remove `k1`. **Rollback:** `MEDIA_EDGE_DELIVERY_ENABLED=false` returns every URL
+### Acceptance preview (`--env preview`)
+
+Isolated test copy only: Worker `aladdin-media-edge-preview` on workers.dev, bucket
+`aladdin-r2-acceptance-20261011-private`, acceptance project `nxossqhdfltcqdwvbewi`
+(eu-west-1). The `media_edge_worker` role already exists there with the step 2 shape.
+
+1. **Password + Hyperdrive, one command** (owner's PC, repository root; Node only,
+   no `pnpm install`): put a short-lived Cloudflare API token with only
+   *Account > Hyperdrive > Edit* into `CF_HYPERDRIVE_TOKEN` with `read -rs`, then
+   `node scripts/hosted-db/media-edge-preview-link.mjs`. It generates the password
+   in memory and prints SQL (shown once, never saved) that stores only its
+   SCRAM-SHA-256 verifier; run it in the acceptance SQL Editor. It then creates
+   Hyperdrive `aladdin-media-edge-preview` (Supavisor session pooler, port 5432,
+   `sslmode=require`, caching disabled, 5 origin connections against the role's
+   limit of 10) with one HTTPS call to the Cloudflare API. It does not use
+   `wrangler hyperdrive create`: in 4.151.x that command takes the password only
+   as a command-line argument (`--origin-password` or `--connection-string`).
+   The password then exists in the script's memory for the run, in that one TLS
+   request body, and in the Hyperdrive configuration Cloudflare stores. It is not
+   printed, logged or written to disk, and the database holds only the verifier.
+   Rerun the script to rotate it (delete the old Hyperdrive first).
+2. Put the printed Hyperdrive id in `[[env.preview.hyperdrive]]` in `wrangler.toml`.
+3. Set `CLOUDFLARE_MEDIA_PREVIEW_ENABLED=true` on the `cloudflare-preview` GitHub
+   Environment and run `Cloudflare media preview`. Its smoke check requires the same
+   `404` + `private, no-store` for every unauthorized path.
+4. **Ticket key, one command** (owner's PC, separate GO): a token with only
+   *Account > Workers Scripts > Edit*, expiring within 24 h, in `CF_MEDIA_KEY_TOKEN`
+   via `read -rs`, then `node scripts/hosted-db/media-edge-ticket-key.mjs` (checks
+   only) and `--apply`. It generates the key in memory and sets `TICKET_KEYS` here and
+   `MEDIA_EDGE_TICKET_SECRET` + `MEDIA_EDGE_TICKET_KID` on `aladdin-frontend-preview`
+   through the Cloudflare API, after checking both Workers are wired to Acceptance
+   resources only. Each secret change deploys a new version of that Worker at once
+   (same code). Details, review and recovery:
+   `docs/operations/media-edge-acceptance-key-and-e2e-plan.md`.
+5. `MEDIA_EDGE_ORIGIN` + `MEDIA_EDGE_DELIVERY_ENABLED=true` on the frontend preview:
+   a separate, owner-approved switch, after the E2E plan in that document. Until then
+   the app keeps serving media itself.
+
+The Cache API does nothing on workers.dev, so the preview reads R2 on every request.
+
+**Rotation:** zero-gap needs both keys at once: add `k2` to `TICKET_KEYS`, switch
+the app to `k2`, wait 5 minutes, remove `k1`. The preview key script cannot read the
+old key back, so it replaces both sides in one pass (tickets older than the switch,
+at most 120 s, answer 404). **Rollback:** `MEDIA_EDGE_DELIVERY_ENABLED=false` returns every URL
 to the application proxy at the next render; no data changes. Setting
 `PRIVATE_ROUTES`/`PUBLIC_ROUTES` to anything but `on` disables a route family at
 the edge.

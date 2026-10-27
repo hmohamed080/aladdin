@@ -1,0 +1,113 @@
+# Aladdin - media edge Worker PREVIEW (ADR-0018), acceptance only.
+#
+# Deploys edge/media-worker's `preview` environment: Worker `aladdin-media-edge-preview` on workers.dev,
+# private R2 bucket aladdin-r2-acceptance-20261011-private, Hyperdrive (caching disabled) to the isolated
+# acceptance Supabase project (nxossqhdfltcqdwvbewi) as the `media_edge_worker` role. It never touches
+# Vercel, DNS, aladdindecore.com, the live Supabase project or any Production resource, and it does not
+# switch the app over: the frontend keeps serving media itself until MEDIA_EDGE_DELIVERY_ENABLED is set
+# on the frontend preview (a separate, owner-approved change).
+#
+# SAFE BY DEFAULT: nothing is deployed unless the GitHub Environment `cloudflare-preview` has the variable
+# CLOUDFLARE_MEDIA_PREVIEW_ENABLED set to exactly "true", the Hyperdrive id in wrangler.toml is real, and the run
+# was started by hand (workflow_dispatch). Pushes only test and bundle.
+#
+# GitHub Environment `cloudflare-preview` (shared with the frontend and backend previews):
+#   secrets:   CLOUDFLARE_API_TOKEN   (Workers Scripts:Edit; add Hyperdrive:Read if the deploy says the binding is not allowed)
+#   variables: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_MEDIA_PREVIEW_ENABLED
+# Worker secret TICKET_KEYS is set once by the owner (scripts/hosted-db/media-edge-ticket-key.mjs),
+# never in GitHub. Until it exists every /m request is a 404, which is the fail-closed default.
+#
+# Rollback: `wrangler delete --env preview` from edge/media-worker (no data changes), and/or delete the
+# Hyperdrive config `aladdin-media-edge-preview`.
+
+name: Cloudflare media preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-b8cw9g]
+    paths: ["edge/media-worker/**", ".github/workflows/cloudflare-media-preview.yml"]
+
+concurrency:
+  group: cloudflare-media-preview
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    name: cloudflare-media-preview
+    runs-on: ubuntu-latest
+    environment: cloudflare-preview
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Enable pnpm (corepack, pinned to packageManager)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+      - name: Refuse anything but the acceptance resources
+        id: guard
+        working-directory: edge/media-worker
+        run: |
+          node -e '
+            const t = require("fs").readFileSync("wrangler.toml", "utf8");
+            const preview = t.slice(t.indexOf("[env.preview]"));
+            const fail = (m) => { console.error(m); process.exit(1); };
+            if (!preview.includes("bucket_name = \"aladdin-r2-acceptance-20261011-private\"")) fail("preview bucket is not the acceptance private bucket");
+            if (/kkpkgjrweysgvhvkhzun|aladdindecore\.com/.test(preview)) fail("preview must never point at the live project or domain");
+            if (!/^routes = \[\]$/m.test(preview)) fail("preview must not inherit the production custom domain");
+            const id = preview.match(/\[\[env\.preview\.hyperdrive\]\][^\[]*id = "([^"]*)"/)?.[1] ?? "";
+            require("fs").appendFileSync(process.env.GITHUB_OUTPUT, `hyperdrive_ready=${/^[0-9a-f]{32}$/.test(id)}\n`);'
+      - run: pnpm install --frozen-lockfile --filter frontend --filter @aladdin/media-worker
+      - run: pnpm --filter @aladdin/media-worker typecheck
+      - run: pnpm --filter @aladdin/media-worker test
+      # wrangler is pinned once in the repository (frontend/package.json); the media Worker reuses it.
+      - name: Bundle (dry run)
+        working-directory: edge/media-worker
+        run: node ../../frontend/node_modules/wrangler/bin/wrangler.js deploy --env preview --dry-run --outdir "$RUNNER_TEMP/worker"
+      - name: Deploy aladdin-media-edge-preview
+        if: github.event_name == 'workflow_dispatch' && vars.CLOUDFLARE_MEDIA_PREVIEW_ENABLED == 'true' && steps.guard.outputs.hyperdrive_ready == 'true'
+        working-directory: edge/media-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          node ../../frontend/node_modules/wrangler/bin/wrangler.js deploy --env preview | tee "$RUNNER_TEMP/deploy.log"
+          grep -oE 'https://[a-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/deploy.log" | head -1 > "$RUNNER_TEMP/media-url"
+      - name: Smoke check (every unauthorized request must be the same 404)
+        if: github.event_name == 'workflow_dispatch' && vars.CLOUDFLARE_MEDIA_PREVIEW_ENABLED == 'true' && steps.guard.outputs.hyperdrive_ready == 'true'
+        working-directory: edge/media-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          url=$(cat "$RUNNER_TEMP/media-url")
+          [ -n "$url" ] || { echo "The deploy printed no workers.dev URL"; exit 1; }
+          echo "Media preview: $url" | tee -a "$GITHUB_STEP_SUMMARY"
+          failures=0
+          # A new workers.dev name can take a minute or two to route. Until then Cloudflare itself answers 404
+          # (with its own headers), so wait for a 404 that carries the Worker's sandbox CSP.
+          worker_csp="content-security-policy: default-src 'none'; sandbox"
+          for attempt in $(seq 1 18); do
+            curl -s -D - -o /dev/null --max-time 20 "$url/m/avatar/original?t=x" | tr -d '\r' | grep -qiF "$worker_csp" && break
+            sleep 10
+          done
+          for path in "/" "/m/avatar/original" "/m/avatar/original?t=k1.e30.AAAA" "/c/avatar/00000000-0000-0000-0000-000000000000/original" "/v/x"; do
+            headers=$(curl -s -D - -o /dev/null --max-time 20 "$url$path" || true)
+            code=$(printf '%s' "$headers" | head -1 | awk '{print $2}')
+            cache=$(printf '%s' "$headers" | tr -d '\r' | grep -i '^cache-control:' | cut -d' ' -f2-)
+            csp=$(printf '%s' "$headers" | tr -d '\r' | grep -ciF "$worker_csp" || true)
+            echo "$path -> $code ($cache; worker csp: $csp)" | tee -a "$GITHUB_STEP_SUMMARY"
+            [ "$code" = "404" ] && [ "$cache" = "private, no-store, max-age=0" ] && [ "$csp" = "1" ] || failures=$((failures + 1))
+          done
+          if node ../../frontend/node_modules/wrangler/bin/wrangler.js secret list --env preview | grep -q '"TICKET_KEYS"'; then
+            echo "TICKET_KEYS is set." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "TICKET_KEYS is not set yet: private media stays 404 until the operator sets it." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          [ "$failures" -eq 0 ] || { echo "$failures request(s) did not return the uniform 404"; exit 1; }
