@@ -15,12 +15,19 @@ Read-only aggregate SQL against `nxossqhdfltcqdwvbewi` (no user identity or phon
 
 **Interpretation:** hosted Acceptance has no existing synthetic-phone-alias fixture to prove preservation of a canonical installer/showroom user ID. Do not claim full compatibility based on transport or isolated OTP tests. A controlled seeded fixture on local Supabase first (then Acceptance only after approval) is necessary.
 
+## Additional transport blocker — `new_phone` contract (2026-10-28)
+Supabase's phone-change hook troubleshooting documentation explicitly discusses a `new_phone` field on phone-change payloads, whereas its generic Send SMS Hook example shows `user.phone`. The *precise destination contract and field nesting for the hosted GoTrue build* is not yet validated. **Do not infer that `user.phone` is the intended recipient of a `phone_change` OTP.**
+
+The current transport now rejects requests containing `new_phone` at top level, inside `user`, or inside `sms` with 422, before Meta or D1; this is an intentional fail-closed stopgap. It means the signed-in `phone_change` pilot below **cannot be activated** until the payload is verified with an isolated real Auth hook fixture and the Worker has safe explicit new-recipient resolution, caller binding and anti-takeover tests. Do not relax this check just to make the hook return 200.
+
+**Reference:** [Supabase phone-change hook troubleshooting](https://supabase.com/docs/guides/troubleshooting/auth-hooks-invalid-payload-when-anonymous-users-attempt-phone-changes-022c47).
+
 ## Proposed first product pilot — signed-in phone ownership proof (NOT anonymous login)
 Given a pre-existing **authenticated** account (initially an owner-controlled test fixture), validate the current primary phone and initiate a verified phone change/enrollment via Supabase Auth:
 1. Start with an authenticated SSR session and obtain `auth.getUser()` server-side; verify original `user.id` and entry account category. Reconfirm current password using existing audited password-confirm receipt if a password exists. Reuse existing rate limiter/Turnstile protections.
 2. Check the requested canonical Egyptian E.164 number against `public.profiles.phone_e164` and reservation/secondary-phone rules before initiating a challenge; the authenticated user may challenge only **their already claimed primary phone** at first. Do not rely solely on the client-supplied phone.
 3. If accepted by GoTrue, call `supabase.auth.updateUser({phone})` **on the current authenticated user's session**. This is the Supabase-documented phone-update flow, not new-user `signInWithOtp`. This may require enabling phone provider in isolated Acceptance; review its global signup implications first.
-4. Supabase Auth creates/sends the phone-change challenge; the signed HTTPS Send SMS Hook can transport it to Meta only when the approved Acceptance allowlist/delivery gate is enabled. The Worker does not generate/store/verify codes.
+4. Supabase Auth creates the phone-change challenge. **Do not send** until the real `new_phone` vs `user.phone` hook recipient contract has been verified and explicitly implemented; the current Worker rejects the unverified phone-change payload. Once resolved, the signed HTTPS Hook can transport an approved Acceptance allowlisted recipient to Meta.
 5. User supplies code; only Supabase `verifyOtp({phone,token,type:"phone_change"})` can validate it. Check `user.id` **before and after**; abort/quarantine any mismatch, verified-phone conflict or unauthorized target change.
 6. Confirm original password login still functions, the alias email remains unchanged, all memberships/RLS/points unchanged, and any Auth/provider identities behave as expected. Never silently change profile phone or secondary reservation during this test.
 
