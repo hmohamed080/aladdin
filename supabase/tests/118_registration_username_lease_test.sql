@@ -2,15 +2,16 @@
 -- (20261028090003_registration_username_lease.sql).
 --
 -- Proves, against the real schema:
---   * a pending registration takes a 30-minute lease on its username, which
---     makes the name unavailable to everyone else (username_available, a
---     second registration, and a verified account's profile_set_username);
+--   * a new registration takes a 30-minute lease on its username, which makes
+--     the name unavailable to everyone else (username_available, a second
+--     registration, and a verified account's profile_set_username);
 --   * the holder is never blocked by its own lease;
---   * a repeat sign-up for the same user and name never extends the lease,
---     and an expired lease is not granted again to the same user (no
---     indefinite squatting), while a different name starts a fresh lease;
+--   * the row is staged ONCE: a repeat sign-up (which GoTrue answers with the
+--     account's real user id, for anyone who knows the email) cannot rename,
+--     restage, change the account type of, or extend another registration;
+--   * only a just-created, unconfirmed account can stage at all;
 --   * an expired lease frees the name for others;
---   * reserved and already-taken names are never leased;
+--   * reserved, taken and malformed names are never leased;
 --   * consume returns the username only while its lease is active, and a
 --     NULL username keeps the account type;
 --   * a successful claim releases the holder's lease;
@@ -21,21 +22,25 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(44);
+select plan(46);
 
--- Fixtures: p1..p4 unconfirmed registrants, v1 a verified account,
--- e1 an existing confirmed account that already owns "existingname".
+-- Fixtures: p1..p6 just-created unconfirmed registrants, s1 an unconfirmed
+-- account created 20 minutes ago, v1 a verified account, e1 an existing
+-- confirmed account that already owns "existingname".
 insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data,
                         email_confirmed_at, created_at, updated_at)
 select id::uuid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', email,
-       '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, confirmed, now(), now()
+       '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, confirmed, created, now()
 from (values
-  ('91180000-0000-4000-8000-0000000000a1', 'lease-p1@example.test', null::timestamptz),
-  ('91180000-0000-4000-8000-0000000000a2', 'lease-p2@example.test', null::timestamptz),
-  ('91180000-0000-4000-8000-0000000000a3', 'lease-p3@example.test', null::timestamptz),
-  ('91180000-0000-4000-8000-0000000000a4', 'lease-p4@example.test', null::timestamptz),
-  ('91180000-0000-4000-8000-0000000000b1', 'lease-v1@example.test', now()),
-  ('91180000-0000-4000-8000-0000000000e1', 'lease-e1@example.test', now())) v(id, email, confirmed);
+  ('91180000-0000-4000-8000-0000000000a1', 'lease-p1@example.test', null::timestamptz, now()),
+  ('91180000-0000-4000-8000-0000000000a2', 'lease-p2@example.test', null::timestamptz, now()),
+  ('91180000-0000-4000-8000-0000000000a3', 'lease-p3@example.test', null::timestamptz, now()),
+  ('91180000-0000-4000-8000-0000000000a4', 'lease-p4@example.test', null::timestamptz, now()),
+  ('91180000-0000-4000-8000-0000000000a5', 'lease-p5@example.test', null::timestamptz, now()),
+  ('91180000-0000-4000-8000-0000000000a6', 'lease-p6@example.test', null::timestamptz, now()),
+  ('91180000-0000-4000-8000-0000000000c1', 'lease-s1@example.test', null::timestamptz, now() - interval '20 minutes'),
+  ('91180000-0000-4000-8000-0000000000b1', 'lease-v1@example.test', now(), now()),
+  ('91180000-0000-4000-8000-0000000000e1', 'lease-e1@example.test', now(), now())) v(id, email, confirmed, created);
 
 update public.profiles set username = 'existingname' where user_id = '91180000-0000-4000-8000-0000000000e1';
 
@@ -93,19 +98,22 @@ select is((select audience_value from app.pending_registrations where user_id = 
   'showroom_dealer', 'p2 row still keeps its account type');
 
 -- ===========================================================================
--- 4. Repeat sign-up: same user + same name never extends the lease
+-- 4. Staged once: a repeat sign-up cannot hijack, rename or extend
 -- ===========================================================================
 update app.pending_registrations set username_reserved_at = now() - interval '10 minutes'
  where user_id = '91180000-0000-4000-8000-0000000000a1';
 set local role service_role;
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a1', 'falcon', 'persona_type', 'engineer'),
-  true, 'p1 repeat sign-up keeps its active lease');
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a1', 'Hijacker', 'organization_type', 'importer'),
+  true, 'a repeat sign-up only reports the existing active lease');
 reset role;
+select results_eq($$ select username, audience_value from app.pending_registrations where user_id = '91180000-0000-4000-8000-0000000000a1' $$,
+  $$ values ('Falcon'::text, 'engineer'::text) $$, 'the staged username and account type are unchanged (no hijack)');
 select ok((select username_reserved_at from app.pending_registrations where user_id = '91180000-0000-4000-8000-0000000000a1')
           < now() - interval '9 minutes', 'the lease start did NOT move forward');
+select ok(public.username_available('Hijacker'), 'the repeat sign-up did not lease its new name');
 
 -- ===========================================================================
--- 5. Expired lease: frees the name for others, is not re-granted to the same user
+-- 5. Expired lease: frees the name for others, is never renewed
 -- ===========================================================================
 update app.pending_registrations set username_reserved_at = now() - interval '31 minutes'
  where user_id = '91180000-0000-4000-8000-0000000000a1';
@@ -116,39 +124,46 @@ reset role;
 
 set local role service_role;
 select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a1', 'Falcon', 'persona_type', 'engineer'),
-  false, 'p1 cannot renew its own expired lease on the same name by signing up again');
-reset role;
-select is((select username from app.pending_registrations where user_id = '91180000-0000-4000-8000-0000000000a1'),
-  null, 'p1 row dropped the username');
-select is((select audience_value from app.pending_registrations where user_id = '91180000-0000-4000-8000-0000000000a1'),
-  'engineer', 'p1 row keeps its account type');
-
-set local role service_role;
+  false, 'p1 cannot renew its expired lease by signing up again');
 select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a3', 'Falcon', 'persona_type', 'contractor'),
   true, 'p3 can now lease "Falcon"');
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a1', 'Eagle', 'persona_type', 'engineer'),
-  true, 'p1 can lease a different name');
--- ===========================================================================
--- 6. Reserved and taken names are never leased
--- ===========================================================================
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a4', 'Admin', 'persona_type', 'engineer'),
-  false, 'a reserved word is never leased');
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a4', 'ExistingName', 'persona_type', 'engineer'),
-  false, 'a name an existing account owns is never leased');
-select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a4', 'bad name!', 'persona_type', 'engineer'),
-  false, 'a malformed name is never leased (row still staged)');
-reset role;
-select is((select audience_value from app.pending_registrations where user_id = '91180000-0000-4000-8000-0000000000a4'),
-  'engineer', 'p4 still has its staged account type');
 
 -- ===========================================================================
--- 7. Existing confirmed accounts are untouched
+-- 6. Only a just-created, unconfirmed account can stage
+-- ===========================================================================
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000c1', 'Merlin', 'persona_type', 'engineer'),
+  false, 'an unconfirmed account created 20 minutes ago cannot stage');
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000b1', 'Merlin', 'persona_type', 'engineer'),
+  false, 'a confirmed account cannot stage');
+reset role;
+select is((select count(*)::int from app.pending_registrations
+            where user_id in ('91180000-0000-4000-8000-0000000000c1', '91180000-0000-4000-8000-0000000000b1')), 0,
+  'neither got a pending row');
+
+-- ===========================================================================
+-- 7. Reserved, taken and malformed names are never leased
+-- ===========================================================================
+set local role service_role;
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a4', 'Admin', 'persona_type', 'engineer'),
+  false, 'a reserved word is never leased');
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a5', 'ExistingName', 'persona_type', 'engineer'),
+  false, 'a name an existing account owns is never leased');
+select is(public.pending_registration_save('91180000-0000-4000-8000-0000000000a6', 'bad name!', 'persona_type', 'engineer'),
+  false, 'a malformed name is never leased');
+reset role;
+select is((select count(*)::int from app.pending_registrations
+            where user_id in ('91180000-0000-4000-8000-0000000000a4', '91180000-0000-4000-8000-0000000000a5', '91180000-0000-4000-8000-0000000000a6')
+              and username is null and audience_value = 'engineer'), 3,
+  'all three are still staged with their account type and no username');
+
+-- ===========================================================================
+-- 8. Existing confirmed accounts are untouched
 -- ===========================================================================
 select is((select username from public.profiles where user_id = '91180000-0000-4000-8000-0000000000e1'),
   'existingname', 'the existing account keeps its username');
 
 -- ===========================================================================
--- 8. A verified account cannot snipe a leased name; the holder can claim it
+-- 9. A verified account cannot snipe a leased name; the holder can claim it
 -- ===========================================================================
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"91180000-0000-4000-8000-0000000000b1","role":"authenticated"}';
@@ -170,24 +185,25 @@ select is((select audience_value from app.pending_registrations where user_id = 
   'contractor', 'the claim leaves the staged account type for consume');
 
 -- ===========================================================================
--- 9. consume: username only while its lease is active
+-- 10. consume: username only while its lease is active
 -- ===========================================================================
 update auth.users set email_confirmed_at = now() where id in
   ('91180000-0000-4000-8000-0000000000a1', '91180000-0000-4000-8000-0000000000a2', '91180000-0000-4000-8000-0000000000a4');
 
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"91180000-0000-4000-8000-0000000000a1","role":"authenticated"}';
-select results_eq($$ select username, audience_value from public.pending_registration_consume() $$,
-  $$ values ('Eagle'::text, 'engineer'::text) $$, 'consume returns the leased name and account type');
-select is((select count(*)::int from public.pending_registration_consume()), 0, 'consume is one-shot');
-reset role;
-
-update app.pending_registrations set username = 'Osprey', username_reserved_at = now() - interval '40 minutes'
+-- p2 holds a fresh lease on a free name (set directly: its own save could not lease "Falcon").
+update app.pending_registrations set username = 'Osprey', username_reserved_at = now() - interval '5 minutes'
  where user_id = '91180000-0000-4000-8000-0000000000a2';
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"91180000-0000-4000-8000-0000000000a2","role":"authenticated"}';
 select results_eq($$ select username, audience_value from public.pending_registration_consume() $$,
-  $$ values (null::text, 'showroom_dealer'::text) $$, 'an expired lease consumes as a NULL username with the account type kept');
+  $$ values ('Osprey'::text, 'showroom_dealer'::text) $$, 'consume returns the leased name and account type');
+select is((select count(*)::int from public.pending_registration_consume()), 0, 'consume is one-shot');
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"91180000-0000-4000-8000-0000000000a1","role":"authenticated"}';
+select results_eq($$ select username, audience_value from public.pending_registration_consume() $$,
+  $$ values (null::text, 'engineer'::text) $$, 'an expired lease consumes as a NULL username with the account type kept');
 reset role;
 
 update app.pending_registrations set expires_at = now() - interval '1 minute'
@@ -200,7 +216,7 @@ select is((select count(*)::int from app.pending_registrations where user_id = '
   'and the stale row is removed');
 
 -- ===========================================================================
--- 10. email-resend throttle
+-- 11. email-resend throttle
 -- ===========================================================================
 set local role service_role;
 select ok(public.phone_auth_consume_limit('email-resend', repeat('a', 64), repeat('b', 64)), 'resend 1 allowed');

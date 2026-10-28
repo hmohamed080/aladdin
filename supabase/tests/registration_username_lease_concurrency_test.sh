@@ -18,6 +18,7 @@ run="$(python3 -c 'import uuid;print(uuid.uuid4().hex[:8])')"
 p1="7a10${run:0:4}-0000-4000-8000-0000${run}"
 p2="7a11${run:0:4}-0000-4000-8000-0000${run}"
 p3="7a12${run:0:4}-0000-4000-8000-0000${run}"
+p4="7a15${run:0:4}-0000-4000-8000-0000${run}"
 v1="7a13${run:0:4}-0000-4000-8000-0000${run}"
 v2="7a14${run:0:4}-0000-4000-8000-0000${run}"
 nameA="raceA${run}"
@@ -33,13 +34,14 @@ from (values
   ('${p1}', 'lease-race-p1-${run}@example.test', null::timestamptz),
   ('${p2}', 'lease-race-p2-${run}@example.test', null::timestamptz),
   ('${p3}', 'lease-race-p3-${run}@example.test', null::timestamptz),
+  ('${p4}', 'lease-race-p4-${run}@example.test', null::timestamptz),
   ('${v1}', 'lease-race-v1-${run}@example.test', now()),
   ('${v2}', 'lease-race-v2-${run}@example.test', now())) v(id, email, confirmed);
 SQL
 
 cleanup() {
   rm -f "${tA:-}" "${tB:-}" "${tC:-}"
-  psql_run >/dev/null -c "delete from auth.users where id in ('${p1}','${p2}','${p3}','${v1}','${v2}');" || true
+  psql_run >/dev/null -c "delete from auth.users where id in ('${p1}','${p2}','${p3}','${p4}','${v1}','${v2}');" || true
 }
 tA="$(mktemp)"; tB="$(mktemp)"; tC="$(mktemp)"
 trap cleanup EXIT
@@ -101,7 +103,7 @@ claim_sql "${v2}" "${nameC}" 3 | docker exec -i "${db_container}" psql -U postgr
 pc=$!
 sleep 1
 start=$(date +%s)
-save_sql "${p1}" "${nameC}" 0 | docker exec -i "${db_container}" psql -U postgres -d postgres -At >"${tB}" 2>&1
+save_sql "${p4}" "${nameC}" 0 | docker exec -i "${db_container}" psql -U postgres -d postgres -At >"${tB}" 2>&1
 elapsed=$(( $(date +%s) - start ))
 wait "${pc}"
 c_claim="$(grep -c 'CLAIMED:' "${tC}" || true)"

@@ -9,14 +9,14 @@
 --
 -- DESIGN. The pending row itself becomes a short-lived LEASE on its username:
 --
---   * Lease = 30 minutes from the moment THIS user first staged THIS name
---     (username_reserved_at). A repeat sign-up for the same unconfirmed user
---     and the same name keeps the ORIGINAL lease; it never extends it. Once a
---     user's lease on a name has run out it is not granted again for that
---     name (the row keeps the account type and drops the username), so one
---     account cannot squat a name forever by re-submitting sign-up. Picking a
---     DIFFERENT name starts a new lease and releases the old one (one row per
---     user, so at most one active lease per account).
+--   * Lease = 30 minutes from the FIRST sign-up of a new account
+--     (username_reserved_at). The row is staged once, only for a user that is
+--     still unconfirmed and was created moments ago, and is never replaced:
+--     a repeat sign-up (which GoTrue answers with the account's REAL user id,
+--     for anyone who knows the email) cannot rename, restage or extend it.
+--     So no lease outlives created_at + 30 minutes and nobody can hijack
+--     another person's staged username/account type. One row per user, so
+--     at most one lease per account.
 --   * Concurrency: every lease grant and every final claim takes the same
 --     transaction-scoped advisory lock on the normalized name, then checks
 --     profiles + reserved words + other users' active leases. Two concurrent
@@ -131,7 +131,6 @@ declare
   v_username   text := btrim(p_username);
   v_norm       text;
   v_existing   app.pending_registrations;
-  v_reserved   timestamptz;
   v_grant      boolean := false;
 begin
   if p_user_id is null then
@@ -143,51 +142,55 @@ begin
    where expires_at < now() - interval '1 day'
      and (username_reserved_at is null or username_reserved_at < now() - interval '1 day');
 
+  -- STAGE ONCE, ONLY FOR A NEW ACCOUNT. A repeat signUp() for an existing
+  -- unconfirmed email returns that account's REAL user id, and anyone who
+  -- knows the email can trigger it. So a save may only create the row for a
+  -- user that is still unconfirmed and was created moments ago (the first
+  -- signUp() of this address), and never replaces a row that already exists.
+  -- Nothing else can restage, rename or extend a lease: the lease cannot
+  -- outlive created_at + app.username_lease_interval(). (GoTrue itself keeps
+  -- the FIRST password and metadata on a repeat signUp(); this matches it.)
+  if not exists (select 1 from auth.users u
+                  where u.id = p_user_id
+                    and u.email_confirmed_at is null
+                    and u.created_at > now() - interval '10 minutes') then
+    return false;
+  end if;
+
   if v_username is not null and v_username <> ''
      and char_length(v_username) between 3 and 24
      and v_username ~ '^[a-zA-Z][a-zA-Z0-9]*([._][a-zA-Z0-9]+)*$' then
     v_norm := app.normalize_username_for_uniqueness(v_username);
     perform app.lock_username(v_norm);
+  end if;
 
-    select * into v_existing from app.pending_registrations where user_id = p_user_id for update;
+  select * into v_existing from app.pending_registrations where user_id = p_user_id for update;
+  if found then
+    -- Already staged by the first sign-up: report its lease, change nothing.
+    return v_existing.username is not null
+       and v_existing.username_reserved_at > now() - app.username_lease_interval();
+  end if;
 
-    if found and v_existing.username is not null
-       and app.normalize_username_for_uniqueness(v_existing.username) = v_norm then
-      -- Same user, same name: keep the ORIGINAL lease, never extend it.
-      v_reserved := v_existing.username_reserved_at;
-      v_grant := v_reserved > now() - app.username_lease_interval();
-    else
-      v_reserved := now();
-      v_grant := true;
-    end if;
-
-    if v_grant then
-      v_grant := not exists (select 1 from public.reserved_usernames where normalized = v_norm)
-             and not exists (select 1 from public.profiles where username_normalized = v_norm)
-             and not app.username_leased_by_other(v_norm, p_user_id);
-    end if;
+  if v_norm is not null then
+    v_grant := not exists (select 1 from public.reserved_usernames where normalized = v_norm)
+           and not exists (select 1 from public.profiles where username_normalized = v_norm)
+           and not app.username_leased_by_other(v_norm, p_user_id);
   end if;
 
   insert into app.pending_registrations
     (user_id, username, username_reserved_at, audience_kind, audience_value, expires_at)
   values (p_user_id,
           case when v_grant then v_username end,
-          case when v_grant then v_reserved end,
+          case when v_grant then now() end,
           p_audience_kind, p_audience_value,
           now() + make_interval(mins => greatest(coalesce(p_ttl_minutes, 30), 1)))
-  on conflict (user_id) do update
-    set username             = excluded.username,
-        username_reserved_at = excluded.username_reserved_at,
-        audience_kind        = excluded.audience_kind,
-        audience_value       = excluded.audience_value,
-        expires_at           = excluded.expires_at,
-        updated_at           = now();
+  on conflict (user_id) do nothing;
 
   return v_grant;
 end;
 $$;
 comment on function public.pending_registration_save(uuid, text, public.activity_audience_kind, text, int) is
-  'Upserts the pending-registration row for an explicit user id and tries to take a 30-minute lease on its username (see app.username_lease_interval). Returns true when the lease is held. Never extends an existing lease for the same user and name; never grants a name that is reserved, taken, or actively leased by another user. Granted to service_role ONLY — it accepts an arbitrary user id and is called exclusively from the admin client right after a trusted signUp() response.';
+  'Stages the pending-registration row ONCE, for a just-created unconfirmed user (created < 10 minutes ago), and tries to take a 30-minute lease on its username (see app.username_lease_interval). Returns true when the lease is held. Never replaces an existing row, so a repeat signUp() by anyone who knows the email cannot rename, restage or extend it; never grants a name that is reserved, taken, or actively leased by another user. Granted to service_role ONLY — it accepts an arbitrary user id and is called exclusively from the admin client right after a trusted signUp() response.';
 revoke execute on function public.pending_registration_save(uuid, text, public.activity_audience_kind, text, int) from public, anon, authenticated;
 grant execute on function public.pending_registration_save(uuid, text, public.activity_audience_kind, text, int) to service_role;
 
