@@ -14,6 +14,17 @@
 - **Security detail confirmed from Cloudflare docs:** `wrangler secret put` can deploy immediately; for the first controlled release use a reviewed secret-safe deployment mechanism and **never** treat that command as read-only staging.
 - Runbook: [Preview release and rollback](WHATSAPP_OTP_PREVIEW_RELEASE_RUNBOOK.md).
 
+## Continuation checkpoint — 2026-10-28, local Worker/D1 integration (NO DEPLOY)
+- [x] First verified earlier last-head CI: OTP Transport #17, General CI #311 and Supabase RLS #228 **PASS** before the new test changes.
+- [x] Added `test/miniflare-d1.test.ts`: runs the **actual D1 SQL engine** locally with committed migration DDL, verifies atomic event-hash reservations on simultaneous signed requests, accepted replay without second Meta attempt, failed-provider replay denial and signature rejection. Uses dummy phone, dummy OTP and mocked provider; **no real Meta request**.
+- [x] Added a second, **bundled Worker HTTP** test: loads the exact Wrangler dry-run JS bundle into the Miniflare/workerd runtime with delivery OFF and local D1, checks 404 for GET, 415 unsupported media, 401 missing signature, and 503 for correctly signed dummy request with `delivery_disabled`; proves no D1 event is written while disabled. **Does not contact hosted D1 or Cloudflare Worker**.
+- [x] Pinned local test runtime to `miniflare@4.20260730.0`, whose workerd compatibility cap is 2026-08-06. **Only the local HTTP test** uses 2026-08-06; actual `wrangler.jsonc` remains `compatibility_date:2026-10-01`. Bundled Worker is loaded by inline module contents to avoid CI temporary-path sandbox restrictions.
+- [x] Corrected mock sender ID to match the configured Acceptance sender `1415528588305492`.
+- [x] Dedicated [OTP CI run #30](https://github.com/hmohamed080/aladdin/actions/runs/40702210775) **PASS**: guard, Wrangler dry-run, TypeScript, real local D1 signed-handler integration, bundled Worker HTTP runtime and mock unit/security suites.
+- [ ] Full-hosted Worker + **hosted** D1 and Supabase Hook integration still untested; no Preview Worker deployed, no signing secret configured, and no authorized real OTP flow. Production unchanged.
+- [ ] General CI / Supabase RLS on last documentation commit to be checked separately (successful OTP CI on pre-doc commit is verified; do not imply otherwise).
+- **Test debugging record:** initial CI of new D1 integration failed because D1.exec does not accept multiline migration/comments as one statement; fixture switched to prepared DDL statements without altering the actual schema. Bundled Worker test initially failed because the stable Miniflare runtime supports an earlier compatibility date, then because an external absolute bundle path violated the workerd sandbox; both were fixed in test-only options, with no deploy or behavior changes to the production code.
+
 ## Architecture & intent
 Aladdin clients (web/future mobile) → Supabase Auth as OTP issuer/verifier and session authority → signed HTTPS **Send SMS Hook** → dedicated Cloudflare `aladdin-whatsapp-otp-preview` Worker → Meta WhatsApp Cloud API → user handset. The Worker does **not** issue, persist or validate credentials. This architecture is a *target*, not an active authentication flow.
 
@@ -93,7 +104,7 @@ Existing installer/showroom **Phone + Password** uses synthetic email aliases, a
 
 ## Evidence links
 - [Draft PR #114](https://github.com/hmohamed080/aladdin/pull/114)
-- [OTP CI run #16 — current guarded dry-run + expanded suite](https://github.com/hmohamed080/aladdin/actions/runs/40695164280)
+- [OTP CI run #16 — earlier guarded dry-run + expanded suite](https://github.com/hmohamed080/aladdin/actions/runs/40695164280)
 - [OTP CI run #7 — earlier green dry-run](https://github.com/hmohamed080/aladdin/actions/runs/40689531760)
 - [General CI run](https://github.com/hmohamed080/aladdin/actions/runs/40689531672)
 - [RLS CI run](https://github.com/hmohamed080/aladdin/actions/runs/40689531897)
