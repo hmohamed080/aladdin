@@ -1,6 +1,17 @@
 # WhatsApp OTP — Implementation & Verification Record
 **Updated:** 2026-10-28 | **Scope:** PR #114, Acceptance-only preparation | **Owner approval:** no merge, production rollout or active OTP traffic authorized
 
+## Continuation checkpoint — 2026-10-28 (after initial ledger)
+- [x] Confirmed that the *initial ledger update* CI runs **OTP #8, General CI #301, RLS #218** all completed **successfully** before further changes.
+- [x] Added `edge/whatsapp-otp-worker/scripts/check-preview-config.mjs`: blocks non-preview Worker names, missing required signing secret, wrong D1/Secrets Store resource, unexpected production routes, changed sender/template, or `WHATSAPP_DELIVERY_ENABLED != false`. Wired into dedicated OTP CI **before** Wrangler dry-run.
+- [x] Updated ADR-0025 and Worker README to distinguish completed D1 provisioning/schema and dry-run tests from the **not-deployed** Worker, absent signing secret and not-enabled Supabase Hook.
+- [x] Created `docs/operations/WHATSAPP_OTP_PREVIEW_RELEASE_RUNBOOK.md` with preflight, secret custody, actual Preview-only deployment preparation, explicit owner approval, zero-delivery runtime smoke checks, error/rollback protocol.
+- [x] Independently reconfirmed Cloudflare: token name/status active, Acceptance D1 exists, replay table empty after smoke-test cleanup, index exists and **no OTP Preview Worker** among deployed Workers.
+- [ ] New CI run after the guard and documentation commits: verify final head before any deploy claim. Prior green CI is *not* proof that later commits already passed.
+- [ ] No hosted Worker change, signing secret creation, Supabase Hook enablement, real OTP sending, Production change or Merge by this continuation.
+- **Security detail confirmed from Cloudflare docs:** `wrangler secret put` can deploy immediately; for the first controlled release use a reviewed secret-safe deployment mechanism and **never** treat that command as read-only staging.
+- Runbook: [Preview release and rollback](WHATSAPP_OTP_PREVIEW_RELEASE_RUNBOOK.md).
+
 ## Architecture & intent
 Aladdin clients (web/future mobile) → Supabase Auth as OTP issuer/verifier and session authority → signed HTTPS **Send SMS Hook** → dedicated Cloudflare `aladdin-whatsapp-otp-preview` Worker → Meta WhatsApp Cloud API → user handset. The Worker does **not** issue, persist or validate credentials. This architecture is a *target*, not an active authentication flow.
 
