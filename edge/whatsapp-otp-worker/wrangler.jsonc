@@ -7,6 +7,7 @@
   "routes": [],
   "observability": { "enabled": true },
   "vars": {
+    "WHATSAPP_PHONE_NUMBER_ID": "1415528588305492",
     "WHATSAPP_OTP_TEMPLATE": "aladdin_otp",
     "WHATSAPP_OTP_LANGUAGE": "ar",
     "WHATSAPP_GRAPH_API_VERSION": "v25.0",
@@ -20,6 +21,6 @@
     }
   ],
   "secrets": {
-    "required": ["WHATSAPP_PHONE_NUMBER_ID", "SUPABASE_SEND_SMS_HOOK_SECRET"]
+    "required": ["SUPABASE_SEND_SMS_HOOK_SECRET"]
   }
 }
