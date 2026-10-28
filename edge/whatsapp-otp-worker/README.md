@@ -31,4 +31,10 @@ Never commit secrets, paste them into a chat, or put them in NEXT_PUBLIC variabl
 5. CI workflow `WhatsApp OTP Transport CI` runs typecheck and mocked security tests; additionally require real D1/Worker integration testing, Wrangler dry-run, then Preview deployment **only after explicit approval**. Never enable Production hooks on this branch.
 6. Create a separate Meta message-status webhook if handset delivery auditing is required. No automatic retries of failed Meta requests.
 
+## Completed isolated runtime integration
+- `npm run test:integration` runs Miniflare D1 SQL (actual Cloudflare local workerd D1 engine, **not hosted D1**) against the signed handler and verifies concurrency, accepted replay, and failed provider no-retry behavior using a mocked provider. No external network sends.
+- A separate Miniflare test loads Wrangler's **built JS bundle** and sends real local HTTP requests with `WHATSAPP_DELIVERY_ENABLED=false`. Verifies GET `404`, unsupported content `415`, unsigned JSON `401`, signed dummy OTP `503` and **zero D1 writes**.
+- `npm run test:unit` covers mock security/failure logic and negative preview-config checks. GitHub OTP CI executes these as separate steps after a Wrangler dry-run.
+- Pinned stable Miniflare's local workerd supports only compatibility date `2026-08-06`; the **test-only HTTP runtime** uses that date, while the real Worker config remains `2026-10-01`. A hosted smoke test on the target date is still required.
+
 **Verification status (2026-10-28):** dedicated OTP CI PASS (including Wrangler dry-run, typecheck and mocked security tests); general CI and RLS PASS. The dedicated remote D1 passed sequential and parallel replay duplicate-insert tests with fake hashes, and all test rows were deleted. The `aladdin-whatsapp-otp-preview` Worker is **not deployed**, Secrets Store runtime access is untested, and no Supabase Hook or real Auth integration has been activated. See `docs/operations/WHATSAPP_OTP_IMPLEMENTATION_LOG.md`.
