@@ -120,7 +120,8 @@ test("built Worker runs through Miniflare HTTP with real D1, delivery OFF", asyn
   const files = readdirSync(bundled).filter(name => name.endsWith(".js"));
   assert.equal(files.length, 1, "expected one bundled Worker JS entrypoint");
   const mf = new Miniflare({
-    modules: [{ type: "ESModule", path: join(bundled, files[0]) }],
+    // In-memory module content avoids workerd chroot path traversal for CI /tmp bundle paths.
+    modules: [{ type: "ESModule", path: "worker.js", contents: readFileSync(join(bundled, files[0]), "utf8") }],
     // Pinned stable Miniflare workerd supports up to 2026-08-06; this affects the local test only.
     // The actual Wrangler Preview compatibility date remains 2026-10-01.
     compatibilityDate: "2026-08-06",
