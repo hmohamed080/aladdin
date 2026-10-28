@@ -1,5 +1,5 @@
-# WhatsApp OTP — Acceptance Preview Deployment Runbook (NOT EXECUTED)
-**Status:** prepared on PR #114, 2026-10-28. **NO release approval** for delivery or Production. No new Worker deployed as of this document.
+# WhatsApp OTP — Acceptance Preview Deployment Runbook (DEPLOYED; HTTP SMOKE PENDING)
+**Status:** first delivery-disabled Preview Worker deployment verified with Cloudflare API on 2026-10-28. **NO release approval** for delivery or Production. HTTPS smoke tests pending.
 
 > Do not treat this runbook as an instruction to enable SMS/WhatsApp Auth. The current Phone + Password installer/showroom identities are synthetic email-alias accounts; enabling Supabase Phone Auth without a migration/linking design can create duplicate users.
 
@@ -36,14 +36,14 @@ Working directory is repository `edge/whatsapp-otp-worker`; Node.js >=22 and Clo
 - Avoid putting the secret in `wrangler.jsonc`, `.dev.vars` tracked by Git, any `NEXT_PUBLIC_*` variable, GitHub PR comments, terminal command lines or shell history. The signed hook remains disabled at Supabase.
 - Do not configure test recipient numbers until a separate explicitly approved end-to-end test; then keep them only in protected Worker secret storage.
 
-## First controlled Preview deployment (NOT DONE)
+## First controlled Preview deployment (COMPLETED; see actual evidence below)
 1. After owner approval, use isolated Cloudflare account credentials limited to deploying this Worker. Ensure production Cloudflare variables/domains are not targeted.
 2. Repeat the preflight guard, then upload the tested bundle and required signing secret in the same reviewed transaction (or prepare a non-deployed version and deploy separately), always with delivery disabled.
 3. Confirm the deployment actually has exactly the planned bindings: `IDEMPOTENCY_DB` (Acceptance D1) and `WHATSAPP_ACCESS_TOKEN` (Secrets Store). Never echo secret values.
 4. Capture the **actual deployed** `workers.dev` URL from Cloudflare; **do not invent one**. Record version/deployment ID and time in the implementation ledger.
 5. Keep Supabase Send SMS Hook disabled and avoid real-auth traffic until identity compatibility is approved.
 
-## Host runtime smoke tests (NOT DONE)
+## Host runtime smoke tests (PENDING; no claims of PASS yet)
 Only use the actual deployed Worker URL once available. All cases below must result in **zero Meta calls**:
 - `GET /hooks/supabase/send-sms` → HTTP 404.
 - `POST` with wrong Content-Type → 415.
@@ -53,6 +53,13 @@ Only use the actual deployed Worker URL once available. All cases below must res
 - Signed request timestamp outside 5-minute window → 401.
 - Confirm D1 remains empty and `WHATSAPP_ACCESS_TOKEN` was not read for the disabled case. Runtime binding introspection must not retrieve or expose the token.
 - Only after a separately approved controlled test with delivery enabled, verify a new `webhook-id` is reserved in D1 and a replay is suppressed, including concurrent requests, provider failure and cleanup. **That later test is not part of this zero-delivery deployment.**
+
+## Actual first-deploy evidence
+- URL: `https://aladdin-whatsapp-otp-preview.bstalent9.workers.dev`
+- Deployment ID: `d919a391-a557-49c3-9b67-9804039e5af9`; Version ID: `39b1dc27-8810-46f4-a328-5be1e7182ec5`.
+- Cloudflare reports 100% Preview deployment with expected D1, both Secrets Store bindings, compatibility date `2026-10-01`, workers.dev enabled, and delivery variable `false`.
+- Acceptance D1 journal count after deployment: **0**.
+- HTTP endpoint has **not** yet passed hosted smoke verification. External fetch tool was unable to access URL; use owner-side PowerShell tests without signing headers or OTP values first. Do not enable message delivery, Auth Hook or Production.
 
 ## Go/no-go & rollback
 - **Current verdict: NO-GO for any delivery, account migration, Supabase Hook, merge to main or Production.** A Preview Worker deployment with delivery disabled requires explicit approval but cannot be mistaken for Auth readiness.
