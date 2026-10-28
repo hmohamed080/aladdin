@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test test/*.test.ts"
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "test:unit": "node --experimental-strip-types --test test/index.test.ts test/preview-config.test.ts",
+    "test:integration": "node --experimental-strip-types --test test/miniflare-d1.test.ts"
   }
 }
