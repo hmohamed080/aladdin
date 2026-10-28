@@ -28,7 +28,7 @@ async function signedRequest(id: string) {
 
 function baseEnv(db: ReplayDb) {
   return {
-    SUPABASE_SEND_SMS_HOOK_SECRET:signingSecret,
+    SUPABASE_SEND_SMS_HOOK_SECRET:{get:async()=>signingSecret},
     WHATSAPP_ACCESS_TOKEN:{get:async () => "local-fake-token-not-a-credential"},
     WHATSAPP_PHONE_NUMBER_ID:"1415528588305492",
     WHATSAPP_OTP_TEMPLATE:"aladdin_otp",
@@ -127,7 +127,7 @@ test("built Worker runs through Miniflare HTTP with real D1, delivery OFF", asyn
     compatibilityDate: "2026-08-06",
     d1Databases: { IDEMPOTENCY_DB: "otp-http-workerd-test" },
     bindings: {
-      SUPABASE_SEND_SMS_HOOK_SECRET: signingSecret,
+      SUPABASE_SEND_SMS_HOOK_SECRET: {get:async()=>signingSecret},
       WHATSAPP_PHONE_NUMBER_ID: "1415528588305492",
       WHATSAPP_OTP_TEMPLATE: "aladdin_otp",
       WHATSAPP_OTP_LANGUAGE: "ar",
