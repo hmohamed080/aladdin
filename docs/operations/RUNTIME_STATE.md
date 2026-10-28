@@ -1,5 +1,15 @@
 # Runtime State
 
+## 2026-10-28 — WhatsApp OTP preview-only groundwork (NOT HOSTED)
+
+- Branch `feat/whatsapp-otp-transport-20261028` created from protected `main` at `f823d88cc80e14daebc0fe50949724ee0120bd70`, separate from the live production services.
+- Proposed isolated Worker under `edge/whatsapp-otp-worker/`: signed Supabase HTTP Hook verification, Egyptian E.164 validation, Meta Arabic Copy Code sender, delivery OFF by default (`WHATSAPP_DELIVERY_ENABLED=false`), sanitized failures. No credentials committed.
+- Local prototype typecheck and seven mock tests passed; repo-wide CI on branch not yet verified.
+- **Blockers:** synthetic email-alias Phone + Password login is not Supabase Phone Auth; no identity migration approved. Durable webhook replay/idempotency guard not yet implemented.
+- Hosted Acceptance `nxossqhdfltcqdwvbewi`, hosted Production `kkpkgjrweysgvhvkhzun`, and all Cloudflare Workers: **no write/deploy/secret/hook changes made by this work**.
+- Meta Arabic `aladdin_otp` was manually tested by owner prior to this branch. English approval and Meta System User token pending.
+
+
 ## Live site on Cloudflare Workers — 2026-10-27
 - `aladdindecore.com`, `www` and `next` are served by Worker `aladdin-frontend-production` (Custom Domains, attached by the owner 17:23–17:40Z). It binds `aladdin-backend-production` and uses the live Supabase project `kkpkgjrweysgvhvkhzun` (193 migrations). R2 and Redis are off in production.
 - DNS: Cloudflare zone `c90ddcdec7bacd2485e1e5bcbac8afce` (nameservers johnathan/mona.ns.cloudflare.com, registrar GoDaddy). Zoho MX/SPF/DKIM unchanged; wildcard `*` still CNAME to Vercel, DNS only. No DMARC.
