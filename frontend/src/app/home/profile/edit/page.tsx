@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { isEngineer } from "@/features/engineer/links";
 import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadWorkspaces } from "@/server/queries/workspace";
@@ -56,6 +57,7 @@ export default async function EditProfilePage() {
 
   const home = await loadPersonalHome();
   if (!home) redirect("/auth/sign-in");
+  if (isEngineer(home)) redirect("/home/profile/complete");
   if (home.variant !== "professional") return <NoProfessionalProfile />;
 
   const individual = await getIndividualOnboardingData();

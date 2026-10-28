@@ -2,6 +2,13 @@
 
 ## Profile completion — 2026-10-28
 
+The completion workspace is also the engineer's canonical profile editor.
+Engineer `/home/profile/edit` redirects to `/home/profile/complete`; profile edit
+links go directly there, with one edit CTA instead of duplicate completion/edit
+buttons. Other account editors remain unchanged. The owner pinned the existing
+progress/step navigator; only the editing canvas adopts the installer reference's
+cream panels, warm outlines, numbered section headings and compact field grids.
+
 The owner requested the installer's full profile-completion experience for the
 engineer. `/home/profile/complete` reuses the existing authenticated engineer
 shell and four guided sections: identity, expertise/services/work areas,

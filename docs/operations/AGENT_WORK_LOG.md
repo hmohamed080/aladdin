@@ -1,6 +1,11 @@
 
 ## 2026-10-28 — Engineer profile completion
 
+Follow-up: unified engineer edit links and legacy edit route with the completion
+workspace. Preserved the owner-approved progress navigator; restyled only the
+inner form canvas to the installer reference. Focused ESLint passed; browser
+confirmed the legacy URL redirects and the new layout renders. No broad test run.
+
 - **Request:** reuse the installer's full completion experience for engineers.
 - **Delivered:** guarded `/home/profile/complete`, four sections with existing
   identity, professional, availability and portfolio editors; saved-data progress,

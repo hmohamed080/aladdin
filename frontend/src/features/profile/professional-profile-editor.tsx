@@ -152,7 +152,7 @@ export function ProfessionalProfileEditor({
     });
 
   return (
-    <div className="flex flex-col gap-xl" data-testid="profile-editor">
+    <div className={`flex flex-col gap-xl ${embedded ? "engineer-edit-professional" : ""}`} data-testid="profile-editor">
       {!embedded && <header className="flex flex-col gap-1">
         <h1 className="text-headline text-fg">{t("profile.edit.title")}</h1>
         <p className="max-w-prose text-body text-fg-secondary">{t("profile.edit.body")}</p>

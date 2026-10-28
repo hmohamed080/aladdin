@@ -35,7 +35,7 @@ export default async function CompleteEngineerProfilePage() {
   return <EngineerProfileCompletion name={identity.displayName} avatar={identity.avatarUrl} completion={completion} panels={[
     <div key="identity" className="space-y-md">
       <IdentityCard identity={identity} />
-      <div className="flex flex-wrap items-center justify-between gap-md rounded-md border bg-surface p-lg">
+      <div className="engineer-edit-username flex flex-wrap items-center justify-between gap-md rounded-md border bg-surface p-lg">
         <div><h3 className="font-semibold">{ar ? "اسم المستخدم ورابط ملفك" : "Username & profile link"}</h3><p className="mt-1 text-label text-fg-secondary">{identity.username || (ar ? "اختر اسمًا يسهل مشاركته مع العملاء." : "Choose a name that is easy to share with clients.")}</p></div>
         <ButtonLink href="/home/settings">{ar ? "تعديل اسم المستخدم" : "Edit username"}</ButtonLink>
       </div>

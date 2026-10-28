@@ -131,10 +131,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
             </div>
           </div>
           <div className="flex flex-col gap-3">
-              <ButtonLink href="/home/profile/complete" variant="accent">
-                {ar ? "استكمال الملف الشخصي" : "Complete profile"}
-              </ButtonLink>
-            <ButtonLink href="/home/profile/edit">
+              <ButtonLink href="/home/profile/complete">
               <PencilIcon size={16} />
               {ar ? "تعديل الملف الشخصي" : "Edit profile"}
             </ButtonLink>
@@ -160,7 +157,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
 { id: "overview", label: ar ? "نبذة عامة" : "Overview", content: (<div className="flex flex-col gap-lg">      <div className="engineer-profile-row grid items-start gap-lg desktop:grid-cols-2">
         <div id="about">
           <Card>
-            <div className="mb-md flex items-center justify-between gap-3"><h2 className="text-title">{ar ? "نبذة عني" : "About me"}</h2><ButtonLink href="/home/profile/edit" variant="ghost" size="sm"><PencilIcon size={14} />{ar ? "تعديل" : "Edit"}</ButtonLink></div>
+            <div className="mb-md flex items-center justify-between gap-3"><h2 className="text-title">{ar ? "نبذة عني" : "About me"}</h2><ButtonLink href="/home/profile/complete" variant="ghost" size="sm"><PencilIcon size={14} />{ar ? "تعديل" : "Edit"}</ButtonLink></div>
             <p className="whitespace-pre-wrap text-body-lg leading-relaxed text-fg-secondary">
               {p.bio || (samples ? (ar ? "مهندس معماري متخصص في التصميم الداخلي والخارجي للمشاريع السكنية والتجارية والإدارية. أهتم بتصميم مساحات عملية وجمالية تعكس احتياجات العميل وتناسب أسلوب حياته." : "Architect focused on residential, commercial and workplace interiors. Thoughtful spaces combine practical planning with a personal sense of place.") : null) ||
                 (ar
@@ -258,7 +255,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
           ) : (
             <EngineerEmpty
               locale={locale}
-              href="/home/profile/edit"
+              href="/home/profile/complete"
               action={ar ? "إضافة خدمات" : "Add services"}
             />
           )}
@@ -437,3 +434,4 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
     </div>
   );
 }
+

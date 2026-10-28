@@ -1,0 +1,99 @@
+/* Only the editing canvas changes; the approved completion navigator is untouched. */
+.engineer-edit-hero {
+  min-height: 13rem;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+}
+
+.engineer-edit-hero > div { width: 100%; }
+.engineer-edit-hero > img {
+  opacity: .38;
+  mask-image: linear-gradient(to right, transparent, #000);
+}
+[dir="rtl"] .engineer-edit-hero > img {
+  mask-image: linear-gradient(to left, transparent, #000);
+}
+.engineer-edit-hero h1,
+.engineer-edit-hero p { color: var(--fg); }
+
+.engineer-edit-section,
+.engineer-edit-footer {
+  padding: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--accent-solid) 50%, var(--border));
+  border-radius: 0.75rem;
+  background: var(--surface-2);
+}
+
+.engineer-edit-section-heading {
+  border-color: color-mix(in srgb, var(--accent-solid) 45%, var(--border));
+  margin-bottom: 1rem;
+}
+
+/* Existing forms keep their save/error behavior; the section provides the frame. */
+.engineer-edit-content .engineer-edit-section .shadow-card {
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  padding: 0;
+}
+
+.engineer-edit-section input:not([type="checkbox"]):not([type="file"]),
+.engineer-edit-section select,
+.engineer-edit-section textarea {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--accent-solid) 50%, var(--border));
+}
+
+.engineer-edit-section textarea { min-height: 7rem; }
+.engineer-edit-section [data-testid="profile-editor"] { gap: 1.25rem; }
+.engineer-edit-section #identity { gap: 1rem; }
+.engineer-edit-section [data-testid="avatar-field"] {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-strong);
+}
+.engineer-edit-section [data-testid="avatar-field"] span[aria-hidden="true"] {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+}
+.engineer-edit-content .engineer-edit-username {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border-strong);
+  border-radius: 0;
+  padding: 1rem 0 0;
+  box-shadow: none;
+}
+.engineer-edit-section #display-name,
+.engineer-edit-section #phone { border: 0; padding-top: 0; }
+.engineer-edit-section #identity > form { justify-content: space-between; }
+.engineer-edit-professional > .shadow-card + .shadow-card {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-strong);
+  border-radius: 0;
+}
+
+@media (min-width: 768px) {
+  .engineer-edit-section #identity {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .engineer-edit-section [data-testid="avatar-field"] { grid-column: 1 / -1; }
+  .engineer-edit-professional > .shadow-card:first-of-type {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+  .engineer-edit-professional > .shadow-card:first-of-type > :first-child,
+  .engineer-edit-professional > .shadow-card:first-of-type > :has(#spec),
+  .engineer-edit-professional > .shadow-card:first-of-type > :has(#bio) { grid-column: 1 / -1; }
+}
+
+@media (max-width: 767px) {
+  .engineer-edit-section,
+  .engineer-edit-footer { padding: 1rem; }
+  .engineer-edit-hero { min-height: 0; }
+}
+

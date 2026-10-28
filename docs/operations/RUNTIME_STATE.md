@@ -1,6 +1,10 @@
 
 ## 2026-10-28 — Engineer profile completion
 
+The completion page now serves as the engineer profile editor. The legacy edit
+URL redirects for engineers only. Inner panels use the installer reference
+styling while the approved progress/navigation box remains unchanged.
+
 `/home/profile/complete` is available on the existing local app at port 3350,
 branch `feature/engineer-account`. Four selectable sections reuse owner-scoped
 editors and preserve unsaved inputs between steps. The home completion prompt
