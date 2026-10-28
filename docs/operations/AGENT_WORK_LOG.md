@@ -1,5 +1,18 @@
 ## 2026-10-26 — Owner Sales delegation capabilities (Stage 6 finding, Option A)
 
+## 2026-10-28 — WhatsApp OTP transport preparation (draft, unmerged)
+
+**Goal:** Prepare Supabase Auth → signed HTTP Hook → isolated Cloudflare transport → Meta WhatsApp without altering existing auth flows or production.
+
+**Read-only inventory:** Verified Production and Acceptance Supabase projects and Cloudflare frontend/backend preview workers. GitHub connected repo `hmohamed080/aladdin`. Current General = Email + Password with Email OTP; installer/showroom Phone + Password uses synthetic alias and Supabase Phone Auth off.
+
+**Changes (feature branch only):** Created `feat/whatsapp-otp-transport-20261028`. Added isolated `edge/whatsapp-otp-worker/` (signature verification, bounded validation, Arabic Meta Copy Code send, delivery OFF) and proposed ADR-0025.
+
+**Validation:** Local Worker prototype `tsc --noEmit` PASS and 7 mock tests PASS; GitHub branch full CI not yet run. No real provider sends during preparation.
+
+**Open gates:** Meta System User credential, verified phone identity/enrollment plan, durable replay/idempotency, QA auth rate limits/CAPTCHA, English template as needed, Preview deployment approval, hosted Hook activation approval. **No Production modifications, no Hook enabled.**
+
+
 - Finding (Stage 6 Step 2, Acceptance): a showroom owner created by `app.organization_create_owned` holds `org.manage` and the pilot `sales.opportunity.*` keys but not `sales.read/write/assign/manage`, so `membership_set_capabilities` (no-escalation) refuses the Sales Rep and Sales Manager presets (`frontend/src/lib/org/roles.ts`).
 - Owner decision 2026-10-26: permanent product fix, no one-off DB grant.
 - Migration `20261026090001_owner_sales_delegation_capabilities.sql`:
