@@ -45,7 +45,7 @@ test("preview config refuses D1 substitution", () => {
   assertBlocked("wrong D1", o => { o.d1_databases[0].database_id = "00000000-0000-0000-0000-000000000000"; });
 });
 test("preview config refuses missing signing secret", () => {
-  assertBlocked("unsigned Worker", o => { o.secrets.required = []; });
+  assertBlocked("unsigned Worker", o => { o.secrets_store_secrets = o.secrets_store_secrets.filter((s:any) => s.binding !== "SUPABASE_SEND_SMS_HOOK_SECRET"); });
 });
 test("preview config refuses unexpected Meta token binding", () => {
   assertBlocked("wrong Secrets Store", o => { o.secrets_store_secrets[0].secret_name = "wrong_secret"; });
