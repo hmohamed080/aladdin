@@ -1,3 +1,11 @@
+## First hosted Preview deployment — Cloudflare confirmed (2026-10-28)
+- **Owner-authorized isolated Worker deployed via Wrangler**, without changing existing Workers or Production, at `https://aladdin-whatsapp-otp-preview.bstalent9.workers.dev`.
+- Cloudflare deployment API confirms **Deployment ID** `d919a391-a557-49c3-9b67-9804039e5af9` / **Version ID** `39b1dc27-8810-46f4-a328-5be1e7182ec5`, deployment source `wrangler`, 100% of this Preview Worker version, created `2026-10-28T16:37:12.470301Z`.
+- Verified actual Worker settings: compatibility date `2026-10-01`; **`WHATSAPP_DELIVERY_ENABLED=false`**; D1 binding `IDEMPOTENCY_DB` targeting dedicated Acceptance database `da65d5e4-8344-4078-9c2d-8a4bb4907f79`; both `SUPABASE_SEND_SMS_HOOK_SECRET` and `WHATSAPP_ACCESS_TOKEN` bound to account Secrets Store `acfaa67f391e499db6fde398022f50ce` by name. No secret values retrieved.
+- Cloudflare API confirms workers.dev enabled and the D1 replay journal contains **0 rows** after deployment. No delivery recipient allowlist configured.
+- **HTTP smoke tests NOT YET VERIFIED:** external URL fetch tool could not access endpoint; no claim of 404/415/401/503 yet. Await operator's safe PowerShell HTTP checks or other network-capable verified method. Do not enable Supabase Hook, Phone Auth or Meta delivery on the strength of deployment metadata alone.
+- Deployment was made from the approved local checkout at `439d21d44ab27bb21e7cb30840c9b9bb2b6190b1`; this log commit does not redeploy. PR remains Draft/unmerged, Production untouched.
+
 ## Owner authorization and final preflight — 2026-10-28
 - Owner explicitly approved **first isolated Cloudflare Preview Worker deployment only**, with `WHATSAPP_DELIVERY_ENABLED=false`, no Supabase Hook, no live WhatsApp sending, no Merge and no Production changes.
 - Read-only CI verification at commit `a85bb4bb4ade086aeeea1cad1f2e04a858016f17`: [WhatsApp OTP CI](https://github.com/hmohamed080/aladdin/actions/runs/40715681844) **PASS**; [General CI](https://github.com/hmohamed080/aladdin/actions/runs/40715681759) **PASS**; [Supabase RLS](https://github.com/hmohamed080/aladdin/actions/runs/40715682006) **PASS**.
