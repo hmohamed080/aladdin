@@ -31,6 +31,6 @@ jobs:
       - name: Typecheck isolated Worker
         run: npm run typecheck
       - name: Test signed handlers against local Cloudflare D1 SQL engine (no live network)
-        run: node --experimental-strip-types --test test/miniflare-d1.test.ts
+        run: npm run test:integration
       - name: Test fail-closed, signature and replay behavior
-        run: npm test
+        run: npm run test:unit
