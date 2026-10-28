@@ -1,5 +1,5 @@
 import { test, expect, type Page, type APIRequestContext, type BrowserContext } from "@playwright/test";
-import { IDENTITIES, messageIdsFor, readNewOtp, selectAccountType, signIn, stubTurnstileWhenOffline } from "./helpers/auth";
+import { E2E_BIRTH_DATE, IDENTITIES, messageIdsFor, readNewOtp, selectAccountType, signIn, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline } from "./helpers/auth";
 
 // Offline sandboxes only (E2E_STUB_TURNSTILE=1); a no-op in CI, where the real widget runs.
 test.beforeEach(async ({ page }) => {
@@ -52,21 +52,18 @@ function uniqueEgMobile(): string {
 
 async function fillSignUp(page: Page, email: string, username: string, accountType: RegExp = SALES): Promise<void> {
   await page.goto("/auth/sign-up");
+  await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(email);
+  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
+  await page.locator('input[name="birthDate"]').fill(E2E_BIRTH_DATE);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-  await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
   await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
   await selectAccountType(page, accountType);
-  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-  await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-  await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
   await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30000 });
 }
 
 async function submitSignUp(page: Page, request: APIRequestContext, email: string): Promise<Set<string>> {
   const seen = await messageIdsFor(request, email);
-  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+  await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
   // Real Siteverify → Server Action → signUp() → email round trip; scoped
   // longer timeout for this transition only (see auth-password-preview.spec.ts).
   await expect(page.getByText(/next step|الخطوة التالية/i)).toBeVisible({ timeout: 20_000 });

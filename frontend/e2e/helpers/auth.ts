@@ -109,6 +109,13 @@ export async function readNewOtp(
  * through `/auth/sign-up` choose it themselves. Never a production credential.
  */
 export const E2E_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
+/** Sign-up requires an 18+ birthday (ADR-0025). */
+export const E2E_BIRTH_DATE = "1990-01-15";
+/** The one sign-in field and the sign-up contact field (ADR-0025), EN and AR. */
+export const SIGN_IN_IDENTIFIER_LABEL = /^mobile number, username or email$|^رقم الموبايل أو اسم المستخدم أو البريد الإلكتروني$/i;
+export const SIGN_UP_CONTACT_LABEL = /^mobile number or email$|^رقم الموبايل أو البريد الإلكتروني$/i;
+export const SIGN_IN_BUTTON = /^log in$|^تسجيل الدخول$/i;
+export const SIGN_UP_BUTTON = /^sign up$|^تسجيل$/i;
 
 /**
  * Sign in through the REAL canonical Email + Password flow (`/auth/sign-in`,
@@ -124,13 +131,13 @@ export async function signIn(
 ): Promise<void> {
   await stubTurnstileWhenOffline(page);
   await page.goto("/auth/sign-in");
-  await page.getByLabel(/^email address$|^البريد الإلكتروني$/i).fill(email);
+  await page.getByLabel(SIGN_IN_IDENTIFIER_LABEL).fill(email);
   // Anchored: the "Show password" toggle is labelled too.
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
   // PR #84: sign-in forwards a Turnstile token to GoTrue and refuses an unchallenged request, so wait for the REAL widget
   // (always-pass TEST site key locally) to produce it before submitting.
   await waitForCaptchaToken(page);
-  await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
+  await page.getByRole("button", { name: SIGN_IN_BUTTON }).click();
 
   // Wait on the URL committing, not the full "load" event — under sustained
   // full-suite load the load event can lag far behind an interactive page.
@@ -192,7 +199,7 @@ export async function accountTypeOptions(page: Page): Promise<Array<{ text: stri
 
 /**
  * Register a brand-new account through the REAL canonical `/auth/sign-up`
- * (Full Name, email, username, account type, password, consents, Turnstile)
+ * (email, password, birthday, Full Name, username, account type, Turnstile)
  * and its OTP confirmation, then wait for the app landing. Leaves the browser
  * signed in; the account's password is `E2E_PASSWORD`.
  */
@@ -209,19 +216,16 @@ export async function registerWithPassword(
 ): Promise<void> {
   await stubTurnstileWhenOffline(page);
   await page.goto("/auth/sign-up");
+  await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(email);
+  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(E2E_PASSWORD);
+  await page.locator('input[name="birthDate"]').fill(E2E_BIRTH_DATE);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill(displayName);
-  await page.getByLabel(/^email address$|^البريد الإلكتروني$/i).fill(email);
   await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
   await selectAccountType(page, accountType);
-  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(E2E_PASSWORD);
-  await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(E2E_PASSWORD);
-  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-  await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
   const seen = await messageIdsFor(request, email);
   await waitForCaptchaToken(page);
-  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-  await expect(page.getByText(/next step|الخطوة التالية/i)).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
+  await expect(page.getByRole("heading", { name: /verify your email|تحقق من بريدك الإلكتروني/i })).toBeVisible({ timeout: 20_000 });
   const code = await readNewOtp(request, email, seen);
   await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
   await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
