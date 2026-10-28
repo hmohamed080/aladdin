@@ -121,7 +121,9 @@ test("built Worker runs through Miniflare HTTP with real D1, delivery OFF", asyn
   assert.equal(files.length, 1, "expected one bundled Worker JS entrypoint");
   const mf = new Miniflare({
     modules: [{ type: "ESModule", path: join(bundled, files[0]) }],
-    compatibilityDate: "2026-10-01",
+    // Pinned stable Miniflare workerd supports up to 2026-08-06; this affects the local test only.
+    // The actual Wrangler Preview compatibility date remains 2026-10-01.
+    compatibilityDate: "2026-08-06",
     d1Databases: { IDEMPOTENCY_DB: "otp-http-workerd-test" },
     bindings: {
       SUPABASE_SEND_SMS_HOOK_SECRET: signingSecret,
