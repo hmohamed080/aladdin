@@ -106,7 +106,15 @@ export function parseEvent(body: string): { phone: string; otp: string } | null 
   let event: unknown;
   try { event = JSON.parse(body); } catch { return null; }
   if (!event || typeof event !== "object") return null;
-  const v = event as { user?: { phone?: unknown }; sms?: { otp?: unknown } };
+  const v = event as {
+    new_phone?: unknown;
+    user?: { phone?: unknown; new_phone?: unknown };
+    sms?: { otp?: unknown; new_phone?: unknown };
+  };
+  // Supabase phone_change may carry the proposed recipient as new_phone while
+  // user.phone still refers to the old number. NEVER send a change OTP to user.phone.
+  // This transport does not implement a verified phone_change payload contract yet.
+  if (v.new_phone !== undefined || v.user?.new_phone !== undefined || v.sms?.new_phone !== undefined) return null;
   if (typeof v.user?.phone !== "string" || !MOBILE.test(v.user.phone)) return null;
   if (typeof v.sms?.otp !== "string" || !CODE.test(v.sms.otp)) return null;
   return { phone: v.user.phone, otp: v.sms.otp };
