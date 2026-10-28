@@ -24,6 +24,8 @@ jobs:
           node-version: "22"
       - name: Install pinned TypeScript (no lockfile mutation)
         run: npm install --no-save --package-lock=false typescript@5.8.3 wrangler@4
+      - name: Refuse non-acceptance settings or enabled OTP delivery
+        run: node scripts/check-preview-config.mjs
       - name: Bundle Worker (dry run only; no deployment)
         run: npx wrangler deploy --dry-run --outdir /tmp/otp-worker-bundle
       - name: Typecheck isolated Worker
