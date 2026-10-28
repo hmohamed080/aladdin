@@ -20,13 +20,13 @@
       "binding": "WHATSAPP_ACCESS_TOKEN",
       "store_id": "acfaa67f391e499db6fde398022f50ce",
       "secret_name": "WHATSAPP_ACCESS_TOKEN"
+    },
+    {
+      "binding": "SUPABASE_SEND_SMS_HOOK_SECRET",
+      "store_id": "acfaa67f391e499db6fde398022f50ce",
+      "secret_name": "SUPABASE_SEND_SMS_HOOK_SECRET"
     }
   ],
-  "secrets": {
-    "required": [
-      "SUPABASE_SEND_SMS_HOOK_SECRET"
-    ]
-  },
   "d1_databases": [
     {
       "binding": "IDEMPOTENCY_DB",
