@@ -136,7 +136,7 @@ test("built Worker runs through Miniflare HTTP with real D1, delivery OFF", asyn
   try {
     const db = await mf.getD1Database("IDEMPOTENCY_DB");
     const ddl = readFileSync(new URL("../migrations/0001_hook_events.sql",import.meta.url),"utf8")
-      .split(/\\r?\\n/).filter(line => !line.trim().startsWith("--")).join("\\n");
+      .split(String.fromCharCode(10)).filter(line => !line.trim().startsWith("--")).join(" ");
     for (const stmt of ddl.split(";").map(x=>x.trim()).filter(Boolean)) {
       assert.equal((await db.prepare(stmt).run()).success, true);
     }
