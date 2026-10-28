@@ -1,5 +1,16 @@
 ## 2026-10-26 — Owner Sales delegation capabilities (Stage 6 finding, Option A)
 
+## 2026-10-28 — WhatsApp OTP security hardening on Draft PR #114
+
+**Changes:** Added D1 atomic webhook-id claim journal (SHA-256 event hashes only, no OTP or phone storage), no-retry provider semantics, fail-closed DB failure handling and mandatory Acceptance phone allowlist. Added migration SQL and GitHub security test workflow. Kept Meta Token in owner-created Cloudflare Secrets Store and sender ID as non-secret preview var.
+
+**Evidence:** Dedicated `WhatsApp OTP Transport CI` workflow run #2 `40684963776` succeeded for TypeScript and mocked test suite; no live D1/Meta verification performed. Full project CI remains unverified.
+
+**Hosted state:** Acceptance & Production Supabase unchanged; no Send SMS Hook; no Cloudflare D1 provisioned, no Worker deployed; delivery flag stays false; no messages sent in this work session.
+
+**Next gate:** Owner-provisioned isolated Acceptance D1 (no Production), migration applied and bind configured, real D1 replay tests, identity strategy review. Owner approval required for any deployment, Hook activation or live send.
+
+
 ## 2026-10-28 — WhatsApp OTP transport preparation (draft, unmerged)
 
 **Goal:** Prepare Supabase Auth → signed HTTP Hook → isolated Cloudflare transport → Meta WhatsApp without altering existing auth flows or production.
