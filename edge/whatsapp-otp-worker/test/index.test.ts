@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { handleRequest, verifySignature, parseEvent } from "../src/index.ts";
+import { handleRequest, verifySignature, parseEvent, type ReplayDb } from "../src/index.ts";
 
 const secret = "v1,whsec_" + btoa("A".repeat(32));
 const env = {
@@ -11,8 +11,45 @@ const env = {
   WHATSAPP_OTP_LANGUAGE: "ar",
   WHATSAPP_GRAPH_API_VERSION: "v25.0",
   WHATSAPP_DELIVERY_ENABLED: "false",
+  OTP_ALLOWED_RECIPIENTS: "+201012345678",
 };
 const event = JSON.stringify({ user: { phone: "+201012345678" }, sms: { otp: "123456" } });
+
+/** Fake D1 unique constraint: insert claim synchronously before returning its promise. */
+function makeReplayDb(): ReplayDb {
+  const saved = new Map<string, string>();
+  return {
+    prepare(sql: string) {
+      return {
+        bind(...values: (string | number)[]) {
+          return {
+            async run() {
+              if (sql.startsWith("INSERT OR IGNORE")) {
+                const id = String(values[0]);
+                if (saved.has(id)) return { success: true, meta: { changes: 0 } };
+                saved.set(id, "reserved");
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (sql.startsWith("UPDATE")) {
+                const [nextState, idValue] = values;
+                const id = String(idValue);
+                if (saved.get(id) !== "reserved") return { success: true, meta: { changes: 0 } };
+                saved.set(id, String(nextState));
+                return { success: true, meta: { changes: 1 } };
+              }
+              throw new Error("Unexpected SQL");
+            },
+            async first<T>() {
+              const id = String(values[0]);
+              return (saved.has(id) ? { state: saved.get(id) } : null) as T | null;
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
 
 async function signedRequest(body: string, valid = true, offsetSeconds = 0): Promise<Request> {
   const id = "msg_test_123";
@@ -39,7 +76,7 @@ test("accepts correctly signed raw hook", async () => {
 });
 test("rejects altered signature and never calls Meta", async () => {
   let calls = 0;
-  const result = await handleRequest(await signedRequest(event, false), { ...env, WHATSAPP_DELIVERY_ENABLED: "true" }, (async () => {
+  const result = await handleRequest(await signedRequest(event, false), { ...env, WHATSAPP_DELIVERY_ENABLED: "true", IDEMPOTENCY_DB: makeReplayDb() }, (async () => {
     calls++; return new Response();
   }) as typeof fetch);
   assert.equal(result.status, 401);
@@ -72,6 +109,7 @@ test("missing Secrets Store secret refuses to contact Meta", async () => {
   const guarded = {
     ...env, WHATSAPP_DELIVERY_ENABLED: "true",
     WHATSAPP_ACCESS_TOKEN: { get: async () => "" },
+    IDEMPOTENCY_DB: makeReplayDb(),
   };
   const result = await handleRequest(await signedRequest(event), guarded, (async () => {
     calls++; return new Response(JSON.stringify({ messages: [{ id: "wrong" }] }), { status: 200 });
@@ -81,7 +119,7 @@ test("missing Secrets Store secret refuses to contact Meta", async () => {
 });
 test("sends copy-code Arabic template once with matching body and button", async () => {
   let calls = 0;
-  const result = await handleRequest(await signedRequest(event), { ...env, WHATSAPP_DELIVERY_ENABLED: "true" }, (async (url, init) => {
+  const result = await handleRequest(await signedRequest(event), { ...env, WHATSAPP_DELIVERY_ENABLED: "true", IDEMPOTENCY_DB: makeReplayDb() }, (async (url, init) => {
     calls++;
     assert.equal(String(url), "https://graph.facebook.com/v25.0/141552388305492/messages");
     const sent = JSON.parse(String(init?.body));
@@ -101,8 +139,64 @@ test("rejects wrong phone and malformed OTP", () => {
   assert.equal(parseEvent(JSON.stringify({ user: { phone: "+201012345678" }, sms: { otp: "12345" } })), null);
   assert.equal(parseEvent("bad json"), null);
 });
+test("identical accepted event returns 200 but sends only once", async () => {
+  const replayDb = makeReplayDb();
+  const e = { ...env, WHATSAPP_DELIVERY_ENABLED: "true", IDEMPOTENCY_DB: replayDb };
+  let sends = 0;
+  const mockMeta = (async () => {
+    sends++;
+    return new Response(JSON.stringify({ messages: [{ id: "wamid.mock" }] }), { status: 200 });
+  }) as typeof fetch;
+  const first = await handleRequest(await signedRequest(event), e, mockMeta);
+  const second = await handleRequest(await signedRequest(event), e, mockMeta);
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.equal(sends, 1);
+});
+test("concurrent signed events with the same webhook-id cannot send twice", async () => {
+  const replayDb = makeReplayDb();
+  const e = { ...env, WHATSAPP_DELIVERY_ENABLED: "true", IDEMPOTENCY_DB: replayDb };
+  let sends = 0;
+  const mockMeta = (async () => {
+    sends++;
+    await Promise.resolve();
+    return new Response(JSON.stringify({ messages: [{ id: "wamid.mock" }] }), { status: 200 });
+  }) as typeof fetch;
+  const pair = await Promise.all([
+    handleRequest(await signedRequest(event), e, mockMeta),
+    handleRequest(await signedRequest(event), e, mockMeta),
+  ]);
+  assert.equal(sends, 1);
+  assert.ok(pair.some(x => x.status === 200));
+  assert.ok(pair.every(x => x.status === 200 || x.status === 503));
+});
+test("no database or allowed recipient means fail-closed with no Meta calls", async () => {
+  let sends = 0;
+  const mockMeta = (async () => {
+    sends++;
+    return new Response(JSON.stringify({ messages: [{ id: "wamid.mock" }] }), { status: 200 });
+  }) as typeof fetch;
+  const noDb = await handleRequest(await signedRequest(event), { ...env, WHATSAPP_DELIVERY_ENABLED: "true" }, mockMeta);
+  const noAllow = await handleRequest(await signedRequest(event), {
+    ...env, WHATSAPP_DELIVERY_ENABLED: "true", IDEMPOTENCY_DB: makeReplayDb(), OTP_ALLOWED_RECIPIENTS: "",
+  }, mockMeta);
+  assert.equal(noDb.status, 503);
+  assert.equal(noAllow.status, 403);
+  assert.equal(sends, 0);
+});
+test("failed Meta call is recorded and never automatically retried", async () => {
+  const replayDb = makeReplayDb();
+  const e = { ...env, WHATSAPP_DELIVERY_ENABLED: "true", IDEMPOTENCY_DB: replayDb };
+  let sends = 0;
+  const mockMeta = (async () => { sends++; return new Response("{}", { status: 400 }); }) as typeof fetch;
+  const first = await handleRequest(await signedRequest(event), e, mockMeta);
+  const second = await handleRequest(await signedRequest(event), e, mockMeta);
+  assert.equal(first.status, 502);
+  assert.equal(second.status, 503);
+  assert.equal(sends, 1);
+});
 test("does not leak Meta errors or OTPs", async () => {
-  const r = await handleRequest(await signedRequest(event), { ...env, WHATSAPP_DELIVERY_ENABLED: "true" }, (async () =>
+  const r = await handleRequest(await signedRequest(event), { ...env, WHATSAPP_DELIVERY_ENABLED: "true", IDEMPOTENCY_DB: makeReplayDb() }, (async () =>
     new Response(JSON.stringify({ error: { message: "do-not-log" } }), { status: 400 })
   ) as typeof fetch);
   assert.equal(r.status, 502);
