@@ -6266,6 +6266,7 @@ export const ar: Messages = {
     emailPlaceholder: "you@company.com",
     accountTypeLabel: "كيف ستستخدم علاء الدين؟",
     accountTypePlaceholder: "اختر نوع الحساب",
+    accountTypeLocked: "التسجيل كـ",
     accountTypeComingSoonOption: "{label} — قريبًا",
     passwordLabel: "كلمة المرور",
     confirmPasswordLabel: "تأكيد كلمة المرور",

@@ -6426,6 +6426,7 @@ export const en = {
     emailPlaceholder: "you@company.com",
     accountTypeLabel: "How will you use Aladdin?",
     accountTypePlaceholder: "Choose an account type",
+    accountTypeLocked: "Registering as",
     accountTypeComingSoonOption: "{label} — Coming soon",
     passwordLabel: "Password",
     confirmPasswordLabel: "Confirm password",

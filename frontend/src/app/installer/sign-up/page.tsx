@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { createTranslator } from "@/lib/i18n/translate";
-import { CraftsmanAuthShell } from "@/features/installer-phone-auth/auth-shell";
+import { AuthStage, AuthStageFooter, AuthStageHeader } from "@/features/entry-auth/auth-stage";
 import { CraftsmanSignUpForm } from "@/features/installer-phone-auth/sign-up-form";
 import { INSTALLER_SIGN_IN_PATH } from "@/features/installer-phone-auth/routes";
 import { oauthAvailability } from "@/server/auth/entry-oauth";
@@ -30,17 +30,14 @@ export default async function InstallerSignUpPage({
   if (user) redirect("/onboarding");
 
   return (
-    <CraftsmanAuthShell
-      variant="signUp"
-      t={t}
-      title={t("temporaryCraftsman.signUp.title")}
-      subtitle={t("temporaryCraftsman.signUp.subtitle")}
-      footer={{
-        prompt: t("temporaryCraftsman.signUp.haveAccount"),
-        linkLabel: t("temporaryCraftsman.signUp.signInLink"),
-        href: INSTALLER_SIGN_IN_PATH,
-      }}
-    >
+    <AuthStage labelledBy="installer-auth-title">
+      <AuthStageHeader
+        id="installer-auth-title"
+        appName={t("common.appName")}
+        badge={t("onboarding.accountType.types.installer_technician")}
+        title={t("temporaryCraftsman.signUp.title")}
+        description={t("temporaryCraftsman.signUp.subtitle")}
+      />
       <EntryAuthPanel
         kind="installer"
         providers={await oauthAvailability()}
@@ -49,6 +46,7 @@ export default async function InstallerSignUpPage({
         phone={<CraftsmanSignUpForm />}
         email={<EntryEmailSignUpForm kind="installer" />}
       />
-    </CraftsmanAuthShell>
+      <AuthStageFooter prompt={t("temporaryCraftsman.signUp.haveAccount")} linkLabel={t("temporaryCraftsman.signUp.signInLink")} href={INSTALLER_SIGN_IN_PATH} />
+    </AuthStage>
   );
 }

@@ -1,0 +1,44 @@
+/* The approved sign-in / sign-up composition (first built for the showroom pages):
+   a full-height photo beside a cream sheet with soft sand circles, the 2026 logo,
+   an optional account badge and a large title. Palette comes from the scoped
+   `.installer-surface` theme; controls remain the canonical controls. */
+.stage { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(420px, 1fr); min-height: 100dvh; direction: ltr; background: var(--canvas); color: var(--fg); --fg-secondary: color-mix(in srgb, var(--deep-navy) 75%, var(--soft-cream)); --fg-muted: var(--fg-secondary); }
+.photo { position: relative; grid-column: 1; grid-row: 1; min-height: 100dvh; }
+.photo img { object-fit: cover; object-position: center; }
+.sheet { z-index: 1; position: relative; isolation: isolate; grid-column: 2; grid-row: 1; display: flex; flex-direction: column; overflow: hidden; @apply p-xl; background: var(--canvas); }
+.sheet::before, .sheet::after { content: ""; position: absolute; z-index: -1; width: 100%; aspect-ratio: 1; border-radius: 50%; background: color-mix(in srgb, var(--warm-sand) 18%, transparent); pointer-events: none; }
+.sheet::before { inset-block-start: -35%; inset-inline-start: -50%; }
+.sheet::after { inset-block-end: -45%; inset-inline-end: -45%; }
+.toolbar { display: flex; justify-content: flex-end; @apply gap-sm; }
+.body { flex: 1; display: flex; align-items: center; }
+.inner { width: 100%; max-width: 480px; margin-inline: auto; @apply py-lg; }
+.header { text-align: center; @apply mb-xl; }
+.brand { display: flex; flex-direction: column; align-items: center; @apply gap-xs; @apply mb-lg; }
+.logo { width: 180px; height: auto; object-fit: contain; }
+.badge { display: inline-flex; align-items: center; @apply gap-sm; @apply py-sm px-lg; @apply rounded-full; background: color-mix(in srgb, var(--warm-sand) 55%, transparent); @apply text-body; color: var(--fg); @apply mb-lg; }
+.header h1 { font-size: clamp(2rem, 3vw, 3rem); line-height: 1.35; font-weight: 700; @apply mb-sm; }
+.subtitle { @apply text-title; @apply mb-sm; }
+.description { @apply text-body; color: var(--fg-secondary); line-height: 1.8; }
+.footer { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; @apply gap-sm; @apply mt-lg; text-align: center; @apply text-body; }
+.footer::before, .footer::after { content: ""; height: 1px; background: var(--warm-sand); flex: 1; @apply min-w-4; }
+.footer a { text-decoration: underline; text-underline-offset: 4px; font-weight: 600; }
+.links { display: flex; flex-direction: column; align-items: center; @apply gap-xs; @apply mt-md; @apply text-body; color: var(--fg-secondary); text-align: center; }
+.links a:hover { color: var(--fg); text-decoration: underline; }
+/* The generic email + password forms get the same field and button scale. */
+.content form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), .content form select { min-height: 52px; background-color: color-mix(in srgb, var(--surface) 75%, transparent); border-color: color-mix(in srgb, var(--fg) 50%, var(--surface)); }
+.content form input::placeholder { color: var(--fg-muted); opacity: 1; }
+.content form button[type="submit"] { width: 100%; min-height: 56px; @apply text-title; @apply rounded-md; background: var(--muted-terracotta); color: var(--soft-cream); font-weight: 700; box-shadow: none; }
+.content form button[type="submit"]:hover { background: color-mix(in srgb, var(--muted-terracotta) 88%, var(--deep-navy)); }
+:global(.dark) .sheet { background: var(--deep-navy); }
+:global(.dark) .badge { background: color-mix(in srgb, var(--warm-sand) 12%, var(--deep-navy)); }
+:global(.dark) .stage { --fg-secondary: var(--warm-sand); --fg-muted: var(--warm-sand); }
+:global(.dark) .logo { filter: brightness(0) invert(93%) sepia(13%) saturate(374%); }
+@media (max-width: 767px) {
+  .stage { display: flex; flex-direction: column-reverse; }
+  .photo { height: calc(57.7vw + 24px); min-height: 0; }
+  .sheet { margin-block-start: -24px; border-start-start-radius: 28px; border-start-end-radius: 28px; @apply p-lg; }
+  .inner { @apply py-md; }
+  .brand { @apply mb-md; }
+  .header { @apply mb-lg; }
+  .header h1 { font-size: 2rem; }
+}

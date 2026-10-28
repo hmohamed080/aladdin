@@ -1,20 +1,5 @@
-/* Supplied references authorize this composition. Palette comes from the
-   existing approved scoped theme; controls remain the canonical controls. */
-.stage { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(420px, 1fr); min-height: 100dvh; direction: ltr; background: var(--canvas); color: var(--fg); --fg-secondary: color-mix(in srgb, var(--deep-navy) 75%, var(--soft-cream)); --fg-muted: var(--fg-secondary); }
-.photo { position: relative; grid-column: 1; grid-row: 1; min-height: 100dvh; }
-.photo img { object-fit: cover; object-position: center; }
-.sheet { z-index: 1; direction: rtl; position: relative; isolation: isolate; grid-column: 2; grid-row: 1; display: flex; align-items: center; overflow: hidden; @apply p-xl; background: var(--canvas); }
-.sheet::before, .sheet::after { content: ""; position: absolute; z-index: -1; width: 100%; aspect-ratio: 1; border-radius: 50%; background: color-mix(in srgb, var(--warm-sand) 18%, transparent); pointer-events: none; }
-.sheet::before { inset-block-start: -35%; inset-inline-start: -50%; }
-.sheet::after { inset-block-end: -45%; inset-inline-end: -45%; }
-.inner { width: 100%; max-width: 480px; margin-inline: auto; @apply py-lg; }
-.header { text-align: center; @apply mb-xl; }
-.brand { display: flex; flex-direction: column; align-items: center; @apply gap-xs; @apply mb-lg; }
-.brand > span:last-child { @apply text-title; line-height: 1.2; }
-.badge { display: inline-flex; align-items: center; @apply gap-sm; @apply py-sm px-lg; @apply rounded-full; background: color-mix(in srgb, var(--warm-sand) 55%, transparent); @apply text-body; color: var(--fg); @apply mb-lg; }
-.header h1 { font-size: clamp(2rem, 3vw, 3rem); line-height: 1.35; font-weight: 700; @apply mb-sm; }
-.subtitle { @apply text-title; @apply mb-sm; }
-.description { @apply text-body; color: var(--fg-secondary); line-height: 1.8; }
+/* Showroom form details. The page composition (photo, sheet, logo, badge, title,
+   footer) is the shared `features/entry-auth/auth-stage`. */
 .form { display: flex; flex-direction: column; @apply gap-md; }
 .form input:not([type="hidden"]):not([type="checkbox"]) { min-height: 52px; background: color-mix(in srgb, var(--surface) 75%, transparent); border-color: color-mix(in srgb, var(--fg) 50%, var(--surface)); @apply rounded-sm; }
 .form input::placeholder { color: var(--fg-muted); opacity: 1; }
@@ -23,27 +8,12 @@
 .form button[aria-haspopup="listbox"] { min-height: 52px; }
 .form button[aria-pressed] { min-width: 44px; }
 .consent { display: flex; align-items: flex-start; @apply gap-sm; @apply text-body; line-height: 1.8; }
-.consent a, .footer a { text-decoration: underline; text-underline-offset: 4px; font-weight: 600; }
+.consent a { text-decoration: underline; text-underline-offset: 4px; font-weight: 600; }
 .error { color: var(--fg); @apply text-body; font-weight: 500; @apply ps-sm; border-inline-start: 1px solid var(--danger); }
 .hint { color: var(--fg-secondary); @apply text-label; line-height: 1.5; }
 .submit { width: 100%; min-height: 60px; @apply text-title; @apply gap-md; @apply rounded-md; background: var(--muted-terracotta); color: var(--soft-cream); font-weight: 700; box-shadow: none; }
-.footer { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; @apply gap-sm; @apply mt-lg; text-align: center; @apply text-body; }
-.footer::before, .footer::after { content: ""; height: 1px; background: var(--warm-sand); flex: 1; @apply min-w-4; }
-:global(.dark) .sheet { background: var(--deep-navy); }
-:global(.dark) .badge { background: color-mix(in srgb, var(--warm-sand) 12%, var(--deep-navy)); }
-:global(.dark) .stage { --fg-secondary: var(--warm-sand); --fg-muted: var(--warm-sand); }
 @media (max-width: 767px) {
-  .stage { display: flex; flex-direction: column-reverse; }
-  .photo { height: calc(57.7vw + 24px); min-height: 0; }
-  .photo img { object-position: center; }
-  .sheet { margin-block-start: -24px; border-start-start-radius: 28px; border-start-end-radius: 28px; @apply p-lg; }
-  .inner { @apply py-md; }
-  .brand { @apply mb-md; }
-  .header { @apply mb-lg; }
-  .header h1 { font-size: 2rem; }
-  .description { @apply text-body; }
   .form { @apply gap-md; }
-  .footer { @apply mt-lg; }
 }
 
 .form [data-phone-layout="joined"] { gap: 0; border: 1px solid color-mix(in srgb, var(--fg) 50%, var(--surface)); @apply rounded-sm; overflow: hidden; background: var(--surface); }
@@ -56,9 +26,6 @@
 @media (max-width: 767px) {
   .form[data-showroom-form="signUp"] label[for]:not([for="showroom-consent"]) { @apply sr-only; }
 }
-
-.logo { width: 180px; height: auto; object-fit: contain; }
-:global(.dark) .logo { filter: brightness(0) invert(93%) sepia(13%) saturate(374%); }
 
 .form [data-phone-layout="joined"] > div:first-of-type { display: flex; align-items: stretch; }
 .form [data-phone-layout="joined"] button[aria-haspopup="listbox"] { height: 100%; }
