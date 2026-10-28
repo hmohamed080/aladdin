@@ -583,6 +583,48 @@ Revision 4's two open items are now addressed:
    and appears environment/ordering-related rather than caused by this
    revision's changes.
 
+## Interrupted registration and the pending-username lease (2026-10-28)
+
+### Root cause — why repeat sign-ups did not reliably send another code
+
+Evidence from Acceptance (`nxossqhdfltcqdwvbewi`) and Production (`kkpkgjrweysgvhvkhzun`) auth logs, `auth.users`, Resend's API log, and the local GoTrue + Mailpit stack. Each cause is separate and leaves a different trace:
+
+| Cause | Evidence | How it reaches the person |
+|---|---|---|
+| **SMTP authentication failure** | Production `/recover` 15:21:52 and 15:35:46 UTC 2026-10-28: `500 unexpected_failure`, `535 "Authentication credentials invalid"`. Config reload at 15:36:22, next `/recover` 15:36:33 → 200. Resend had received no `resend-smtp` request since 2026-10-22; every older API key had been removed when `aladdin-production` was created at 08:28 UTC, so both projects' stored SMTP password was a deleted key. A rejected SMTP login never appears in Resend's log. | `sendFailed`, no email. To the person it looks like nothing happened. |
+| **Project email rate limit** | Acceptance log 14:59:59 UTC: `updating Email limiter from 2/1h to 30`. Until custom SMTP was enabled the project could send 2 auth emails per hour in total. | `429 over_email_send_rate_limit` → `rateLimited`. |
+| **Per-address minimum interval** | Local GoTrue: a `signup`/`resend` for the same address inside `max_frequency` returns `429 {"error_code":"over_email_send_rate_limit","msg":"For security purposes, you can only request this after N seconds."}`. Hosted: 60 s. | `rateLimited`; the UI cooldown hides most of it. |
+| **CAPTCHA** | Hosted CAPTCHA protection is ON: `400 captcha_failed` (`no captcha_token found`, `invalid-input-response`) in both projects' logs. Turnstile tokens are single-use. | `captchaRejected` / `captchaRequired`; no email. |
+| **Application behaviour** | The code step lived only in React state. A refresh, closed tab or lost connection dropped it, and the only way back was to submit the whole sign-up form again. Verified locally: a repeat `signUp()` for an unconfirmed address re-sends the code but **keeps the ORIGINAL password and `user_metadata`** (the first password signs in after verification; the second gets 400). The person believes they set a new password; they did not. | Lost code step; a confusing "wrong password" after a "successful" re-registration. |
+| **Built-in mailer template** (Acceptance, before 15:00 UTC) | The 14:56 UTC confirmation was completed by `GET /verify` (a link, not the 6-digit code) and is absent from Resend: it went through Supabase's default mailer and default template. | Works, but bypasses the app's code UX. |
+
+### What changed
+
+* **`/auth/continue-registration`** — email + CAPTCHA → `resend({type:"signup"})` (never a second `signUp()`, so no password is asked for or re-sent) → the same `verifyPasswordSignUp`. Entry points: the sign-in and sign-up footers, plus a notice on `/auth/sign-up` when this browser has an unfinished registration. The code step says plainly that the password is the one chosen first, with a Forgot Password link.
+* **Routing cookie `reg_email`** — httpOnly, `path=/auth`, 30 minutes. It holds the email only, is set identically whether or not the address has an account, and is cleared on a successful verify. A refresh or a later visit lands on the code step. Never the password, the code or any token; nothing in the URL or browser storage.
+* **Server-side throttle** — `phone_auth_consume_limit('email-resend', …)`: 5 per email and 20 per IP per 15 minutes (HMAC keys), on top of GoTrue's own per-address interval and project limit. Fails closed. CAPTCHA is checked before the throttle is spent.
+* **Diagnostics** — a send failure that is not CAPTCHA or a rate limit (typically SMTP 535) is logged as `status` + GoTrue `code` only.
+* **Restore after verification** — unchanged path: `pending_registration_consume()` restores account type + username; anything missing (expired staging, lost lease) goes to finish-registration, which asks only for what is missing.
+
+### Pending-username lease (`20261028090003_registration_username_lease.sql`)
+
+`app.pending_registrations` doubles as a **30-minute lease** on its username:
+
+* Granted by `pending_registration_save` (service_role only, now returns `boolean`) when the name is well-formed, not reserved, not owned by a profile, and not under another user's active lease. Not granted → the row keeps the account type with a NULL username.
+* **Never extended.** A repeat sign-up for the same user and name keeps the original `username_reserved_at`; once that lease has run out the same user cannot take it again by re-submitting (no squatting). A different name starts a new lease and drops the old one. One row per user means at most one active lease per account. Creating more accounts to squat more names is bounded by CAPTCHA, GoTrue's sign-up and email limits, and the 30-minute expiry.
+* **Concurrency** — every lease grant and every final claim takes `pg_advisory_xact_lock` on the normalized name (`app.lock_username`), then checks. Proven with two real sessions (`supabase/tests/registration_username_lease_concurrency_test.sh`).
+* **Final claim stays authoritative** — `profile_set_username` refuses a reserved name, another user's active lease, or a taken name with the same `23505 username is unavailable`; the unique index on `profiles.username_normalized` is still the last word. A successful claim releases the caller's own lease. `username_available` also reads `false` for a leased name (indistinguishable from taken).
+* **Lease lost → choose again** — `pending_registration_consume` returns a NULL username when no active lease backs it; `verifyPasswordSignUp` applies the account type and sends the person to `finish-registration?reason=username_unavailable`. Registration is never restarted.
+* **Compatibility** — additive. Existing profiles and their index are untouched; existing pending rows get `username_reserved_at = created_at` (rows older than 30 minutes simply hold no lease). An old frontend ignores the new boolean return. No grant is widened; the three new `app.*` helpers are callable by no client role (`supabase/permissions/20261028090003.json`).
+
+### Security review
+
+* **Enumeration** — every send answers "if this email has an unfinished registration, we've sent a code". Unknown, unconfirmed and confirmed addresses get the same response, the same cookie and the same 500 ms floor. GoTrue's `resend` answers `{}` 200 for an unknown address (verified locally). The throttle keys on the email whether or not it exists. Lease state reads exactly like "taken".
+* **No secrets at rest or sent to the client** — the password is submitted once, to `signUp()`; the code travels only in the verify POST. Neither is in cookies, URLs, browser storage, logs or staging tables.
+* **Email verification never bypassed** — the session still comes only from `verifyOtp({type:"signup"})`.
+* **Abuse** — CAPTCHA (GoTrue-verified) + app throttle + GoTrue per-address interval + project email limit. The lease cannot be renewed by its holder and blocks nobody after 30 minutes.
+* **Known gap** — the WhatsApp/phone sign-up keeps its pending username in a sealed cookie and does not take a lease; its username is still decided by the final claim. Follow-up.
+
 ## Authoritative password-state tracking (revision 3 — replaces `user_metadata`)
 
 **Problem with revision 2**: `user_metadata` is **user-editable** — any

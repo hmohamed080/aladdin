@@ -54,12 +54,20 @@ export function PasswordSignInForm({
       title={t("authPasswordPreview.signIn.title")}
       subtitle={t("authPasswordPreview.signIn.subtitle")}
       footer={
-        <p>
-          {t("authPasswordPreview.signIn.noAccount")}{" "}
-          <Link href="/auth/sign-up" className="font-semibold text-accent hover:underline">
-            {t("authPasswordPreview.signIn.signUpLink")}
-          </Link>
-        </p>
+        <div className="flex flex-col gap-xs">
+          <p>
+            {t("authPasswordPreview.signIn.noAccount")}{" "}
+            <Link href="/auth/sign-up" className="font-semibold text-accent hover:underline">
+              {t("authPasswordPreview.signIn.signUpLink")}
+            </Link>
+          </p>
+          <p>
+            {t("authPasswordPreview.continueRegistration.entryPrompt")}{" "}
+            <Link href="/auth/continue-registration" className="font-semibold text-accent hover:underline">
+              {t("authPasswordPreview.continueRegistration.entryLink")}
+            </Link>
+          </p>
+        </div>
       }
     >
       <form action={dispatch} className="flex flex-col gap-sm" noValidate>

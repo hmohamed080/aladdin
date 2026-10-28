@@ -133,6 +133,27 @@ const RECOVERY_FLOW_PATH = "/auth/forgot-password";
  * lifetime (and the "may be stale" hint it drives) is an application-level UX target, not a security boundary —
  * the code remains cryptographically valid per Supabase's own expiry until that fires. See docs/frontend/auth-password-preview.md §OTP security. */
 const RECOVERY_COOKIE_MAX_AGE_SECONDS = 600;
+
+/**
+ * Interrupted-registration routing cookie: the EMAIL an unfinished email
+ * registration is waiting on, so a refresh, a closed tab or a later visit to
+ * `/auth/continue-registration` lands straight on the code step. httpOnly,
+ * path-scoped, 30 minutes (the pending-registration/username lease lifetime).
+ * Never the password, the code, or any token; set identically whether or not
+ * an account exists, so it reveals nothing. Cleared on a successful verify.
+ */
+const REGISTRATION_EMAIL_COOKIE = "reg_email";
+const REGISTRATION_COOKIE_PATH = "/auth";
+const REGISTRATION_COOKIE_MAX_AGE_SECONDS = 30 * 60;
+
+async function rememberRegistrationEmail(email: string): Promise<void> {
+  (await cookies()).set(REGISTRATION_EMAIL_COOKIE, email, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: REGISTRATION_COOKIE_PATH,
+    maxAge: REGISTRATION_COOKIE_MAX_AGE_SECONDS,
+  });
+}
 type GoTrueError = { code?: string; status?: number; message?: string };
 
 function isRateLimitError(error: GoTrueError): boolean {
@@ -252,6 +273,16 @@ const FINISH_REGISTRATION_PATH = "/auth/finish-registration";
  * the Postgres error code only — never the name, username, email, password,
  * OTP, session or CAPTCHA token.
  */
+/**
+ * Safe diagnostics for a sign-up code send GoTrue refused for a reason other
+ * than CAPTCHA or a rate limit (typically SMTP: GoTrue answers 500
+ * `unexpected_failure` when the mail server rejects it). Status and GoTrue
+ * error code only — never the email, password, token or GoTrue's message.
+ */
+function logSignUpSendFailure(step: "sign_up" | "resend", error: GoTrueError): void {
+  console.error(`password registration: ${step} send failed (status ${error.status ?? "unknown"}, code ${error.code ?? "unknown"})`);
+}
+
 function logRegistrationStepFailure(step: "account_type" | "username" | "display_name" | "birth_date", error: { code?: string }): void {
   console.error(`password registration: post-OTP ${step} step failed (code ${error.code ?? "unknown"})`);
 }
@@ -377,9 +408,11 @@ export async function requestPasswordSignUp(
     // existing account's id would be a foothold for exactly the enumeration
     // this branch exists to close.
     if (isAccountExistsError(error as GoTrueError)) {
+      await rememberRegistrationEmail(parsed.data.email);
       await padToRegistrationFloor(callStart);
       return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
     }
+    logSignUpSendFailure("sign_up", error as GoTrueError);
     return { ok: false, code: "authPasswordPreview.error.sendFailed", email: parsed.data.email };
   }
 
@@ -389,6 +422,9 @@ export async function requestPasswordSignUp(
   // supabase/migrations/20260924090006_pending_registrations.sql). Never the
   // password. Best-effort: verifyPasswordSignUp falls back to the
   // finish-registration recovery screen if this is ever lost.
+  // The save also takes a 30-minute lease on the username (20261028090003).
+  // Its result never changes this response: a name that could not be leased
+  // is simply asked for again after verification (finish-registration).
   if (data?.user) {
     await savePendingRegistration({
       userId: data.user.id,
@@ -398,6 +434,7 @@ export async function requestPasswordSignUp(
     });
   }
 
+  await rememberRegistrationEmail(parsed.data.email);
   await padToRegistrationFloor(callStart);
   return { ok: true, code: "authPasswordPreview.info.codeSent", email: parsed.data.email };
 }
@@ -424,11 +461,21 @@ export async function resendPasswordSignUpCode(
   formData: FormData,
 ): Promise<PasswordAuthState> {
   if (!authFormWithinLimit(formData)) return { ok: false, code: "authPasswordPreview.error.passwordTooLong" };
-  const email = emailSchema.safeParse(formData.get("email"));
+  // The form's email, else the interrupted-registration cookie (the
+  // continue-registration code step carries no editable email field).
+  const email = emailSchema.safeParse(formData.get("email") ?? (await pendingRegistrationEmail()));
   if (!email.success) return { ok: false, code: "authPasswordPreview.error.invalidEmail" };
 
   const captcha = requireCaptcha(formData);
   if ("code" in captcha) return { ok: false, code: captcha.code, email: email.data };
+
+  // Server-side throttle per email and per IP (HMAC keys only), on top of
+  // GoTrue's own per-address interval and project email limit. Neither
+  // answer depends on whether the email has an account. Fails closed.
+  const limited = await phoneAuthLimit("email-resend", email.data.toLowerCase(), await headers());
+  if (limited !== "allowed") {
+    return { ok: false, code: limited === "limited" ? "authPasswordPreview.error.rateLimited" : "authPasswordPreview.error.sendFailed", email: email.data };
+  }
 
   const supabase = await getServerSupabase();
   const callStart = Date.now();
@@ -444,14 +491,26 @@ export async function resendPasswordSignUpCode(
     if (isRateLimitError(error as GoTrueError)) {
       return { ok: false, code: "authPasswordPreview.error.rateLimited", email: email.data };
     }
-    if (isAccountExistsError(error as GoTrueError)) {
-      await padToRegistrationFloor(callStart);
-      return { ok: true, code: "authPasswordPreview.info.codeSent", email: email.data };
+    if (!isAccountExistsError(error as GoTrueError)) {
+      logSignUpSendFailure("resend", error as GoTrueError);
+      return { ok: false, code: "authPasswordPreview.error.sendFailed", email: email.data };
     }
-    return { ok: false, code: "authPasswordPreview.error.sendFailed", email: email.data };
   }
+  await rememberRegistrationEmail(email.data);
   await padToRegistrationFloor(callStart);
   return { ok: true, code: "authPasswordPreview.info.codeSent", email: email.data };
+}
+
+/** The email an unfinished registration in THIS browser is waiting on, from the httpOnly routing cookie. Never from the URL. */
+export async function pendingRegistrationEmail(): Promise<string | null> {
+  const value = (await cookies()).get(REGISTRATION_EMAIL_COOKIE)?.value;
+  return value && emailSchema.safeParse(value).success ? value : null;
+}
+
+/** "Use a different email" on the continue-registration screen: forget the routing cookie only. Nothing server-side changes. */
+export async function forgetPendingRegistration(): Promise<void> {
+  (await cookies()).delete({ name: REGISTRATION_EMAIL_COOKIE, path: REGISTRATION_COOKIE_PATH });
+  redirect("/auth/continue-registration");
 }
 
 // ---------------------------------------------------------------------------
@@ -466,7 +525,7 @@ export async function verifyPasswordSignUp(
   formData: FormData,
 ): Promise<PasswordAuthState> {
   if (!authFormWithinLimit(formData)) return { ok: false, code: "authPasswordPreview.error.passwordTooLong" };
-  const email = emailSchema.safeParse(formData.get("email"));
+  const email = emailSchema.safeParse(formData.get("email") ?? (await pendingRegistrationEmail()));
   const token = formData.get("token");
   if (!email.success) return { ok: false, code: "authPasswordPreview.error.invalidEmail" };
   if (typeof token !== "string" || !otpSchema.test(token)) {
@@ -491,6 +550,9 @@ export async function verifyPasswordSignUp(
   // reports "already has a password" if this account later reaches the
   // existing-passwordless-user migration page.
   await markPasswordAttachedAuthoritatively(verifyData.user.id);
+
+  // The registration is no longer interrupted: drop the routing cookie.
+  (await cookies()).delete({ name: REGISTRATION_EMAIL_COOKIE, path: REGISTRATION_COOKIE_PATH });
 
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
@@ -552,6 +614,9 @@ export async function verifyPasswordSignUp(
     //     recorded above are kept; nothing else is asked again.
     //   * anything else → safe diagnostics, then the same recovery screen
     //     (state-derived, so it asks only for what is actually missing).
+    // A NULL username means no active lease backed it (expired, or taken /
+    // leased by someone else when it was staged): ask for another name.
+    if (!pendingRow.username) redirect(`${FINISH_REGISTRATION_PATH}?reason=username_unavailable`);
     const { error: usernameError } = await supabase.rpc("profile_set_username", { p_username: pendingRow.username });
     if (usernameError) {
       if (usernameError.code === "23505") redirect(`${FINISH_REGISTRATION_PATH}?reason=username_unavailable`);

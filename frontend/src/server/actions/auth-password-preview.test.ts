@@ -118,6 +118,8 @@ import {
   requestPasswordSignUp,
   resendPasswordSignUpCode,
   verifyPasswordSignUp,
+  pendingRegistrationEmail,
+  forgetPendingRegistration,
   migrationEligibility,
   passwordSignIn,
   requestRecoveryCode,
@@ -737,6 +739,108 @@ describe("resendPasswordSignUpCode — never re-submits the password, never re-r
     const res = await resendPasswordSignUpCode({ ok: false }, withCaptcha({ email: "already-has-account@example.test" }));
     expect(res.ok).toBe(true);
     expect(res.code).toBe("authPasswordPreview.info.codeSent");
+  });
+});
+
+describe("Interrupted registration — resume without the password, without enumeration", () => {
+  it("a sent code remembers the email in an httpOnly, path-scoped cookie — never the password or the code", async () => {
+    signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1" } } });
+    await requestPasswordSignUp({ ok: false }, consented({ email: "person@example.test", password: GOOD_PASSWORD }));
+    expect(cookiesApi.set).toHaveBeenCalledWith("reg_email", "person@example.test", expect.objectContaining({ httpOnly: true, path: "/auth", maxAge: 1800 }));
+    expect(JSON.stringify(cookiesApi.set.mock.calls)).not.toContain(GOOD_PASSWORD);
+    expect(await pendingRegistrationEmail()).toBe("person@example.test");
+  });
+
+  it("an already-confirmed email sets the very same cookie (no enumeration through navigation)", async () => {
+    signUp.mockResolvedValueOnce({ error: { code: "user_already_exists" }, data: { user: null } });
+    const res = await requestPasswordSignUp({ ok: false }, consented({ email: "taken@example.test", password: GOOD_PASSWORD }));
+    expect(res.ok).toBe(true);
+    expect(cookieStore.get("reg_email")).toBe("taken@example.test");
+  });
+
+  it("continue-registration resends from the cookie alone — no email field, no password, never signUp()", async () => {
+    cookieStore.set("reg_email", "person@example.test");
+    resend.mockResolvedValueOnce({ error: null });
+    const res = await resendPasswordSignUpCode({ ok: false }, withCaptcha());
+    expect(res).toMatchObject({ ok: true, code: "authPasswordPreview.info.codeSent", email: "person@example.test" });
+    expect(resend).toHaveBeenCalledWith({ type: "signup", email: "person@example.test", options: { captchaToken: "test-captcha-token" } });
+    expect(signUp).not.toHaveBeenCalled();
+  });
+
+  it("the server throttle runs per email (lowercased) before GoTrue; a limited answer sends nothing", async () => {
+    phoneAuthLimit.mockResolvedValueOnce("limited");
+    const res = await resendPasswordSignUpCode({ ok: false }, withCaptcha({ email: "Person@Example.test" }));
+    expect(phoneAuthLimit).toHaveBeenCalledWith("email-resend", "person@example.test", expect.anything());
+    expect(res.code).toBe("authPasswordPreview.error.rateLimited");
+    expect(resend).not.toHaveBeenCalled();
+  });
+
+  it("an unavailable throttle fails closed (no email sent)", async () => {
+    phoneAuthLimit.mockResolvedValueOnce("unavailable");
+    const res = await resendPasswordSignUpCode({ ok: false }, withCaptcha({ email: "person@example.test" }));
+    expect(res.code).toBe("authPasswordPreview.error.sendFailed");
+    expect(resend).not.toHaveBeenCalled();
+  });
+
+  it("CAPTCHA is checked before the throttle is spent", async () => {
+    const res = await resendPasswordSignUpCode({ ok: false }, fd({ email: "person@example.test" }));
+    expect(res.code).toBe("authPasswordPreview.error.captchaRequired");
+    expect(phoneAuthLimit).not.toHaveBeenCalled();
+  });
+
+  it("an SMTP failure is reported as a neutral sendFailed and logged with status/code only", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    resend.mockResolvedValueOnce({ error: { status: 500, code: "unexpected_failure", message: '535 "Authentication credentials invalid"' } });
+    const res = await resendPasswordSignUpCode({ ok: false }, withCaptcha({ email: "person@example.test" }));
+    expect(res.code).toBe("authPasswordPreview.error.sendFailed");
+    expect(cookieStore.has("reg_email")).toBe(false);
+    const line = String(log.mock.calls[0]![0]);
+    expect(line).toContain("unexpected_failure");
+    expect(line).not.toMatch(/person@example\.test|535|Authentication/);
+    log.mockRestore();
+  });
+
+  it("verify reads the email from the cookie when the step has no email field, and clears the cookie on success", async () => {
+    cookieStore.set("reg_email", "person@example.test");
+    verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test", user_metadata: {} } } });
+    rpc.mockImplementation(async (fn: string) => (fn === "my_registration_state" ? { data: "access_ready", error: null } : { data: null, error: null }));
+    await expect(verifyPasswordSignUp({ ok: false }, fd({ token: "123456" }))).rejects.toThrow(/^REDIRECT:/);
+    expect(verifyOtp).toHaveBeenCalledWith({ email: "person@example.test", token: "123456", type: "signup" });
+    expect(cookieStore.has("reg_email")).toBe(false);
+  });
+
+  it("a wrong code keeps the cookie so the person can try again after a refresh", async () => {
+    cookieStore.set("reg_email", "person@example.test");
+    verifyOtp.mockResolvedValueOnce({ error: { code: "otp_expired" }, data: { user: null } });
+    const res = await verifyPasswordSignUp({ ok: false }, fd({ token: "123456" }));
+    expect(res.code).toBe("authPasswordPreview.error.otpExpired");
+    expect(cookieStore.get("reg_email")).toBe("person@example.test");
+  });
+
+  it("an expired username lease (NULL username) keeps the account type and asks only for a new name", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test", user_metadata: {} } } });
+    rpc.mockImplementation(async (fn: string) =>
+      fn === "pending_registration_consume"
+        ? { data: [{ username: null, audience_kind: "persona_type", audience_value: "engineer" }], error: null }
+        : { data: null, error: null },
+    );
+    await expect(verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456" }))).rejects.toThrow(
+      "REDIRECT:/auth/finish-registration?reason=username_unavailable",
+    );
+    expect(rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "professional", p_account_type: "engineer" });
+    expect(rpc).not.toHaveBeenCalledWith("profile_set_username", expect.anything());
+  });
+
+  it("a malformed cookie value is ignored", async () => {
+    cookieStore.set("reg_email", "not-an-email");
+    expect(await pendingRegistrationEmail()).toBeNull();
+  });
+
+  it("'use a different email' only forgets the cookie", async () => {
+    cookieStore.set("reg_email", "person@example.test");
+    await expect(forgetPendingRegistration()).rejects.toThrow("REDIRECT:/auth/continue-registration");
+    expect(cookieStore.has("reg_email")).toBe(false);
+    expect(resend).not.toHaveBeenCalled();
   });
 });
 

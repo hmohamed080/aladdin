@@ -78,7 +78,8 @@ export function PasswordSignUpForm({
   initialAccountType = "",
   next,
   providers = NO_PROVIDERS,
-}: { initialAccountType?: string; next?: string; providers?: OAuthAvailability } = {}) {
+  hasPendingRegistration = false,
+}: { initialAccountType?: string; next?: string; providers?: OAuthAvailability; hasPendingRegistration?: boolean } = {}) {
   const { t } = useI18n();
   const [sendState, dispatchSend] = useActionState(requestSignUp, initial);
   const [emailResendState, dispatchEmailResend] = useActionState(resendPasswordSignUpCode, initialEmail);
@@ -130,12 +131,20 @@ export function PasswordSignUpForm({
   }, [cooldown]);
 
   const footer = (
-    <p>
-      {t("authPasswordPreview.signUp.haveAccount")}{" "}
-      <Link href="/auth/sign-in" className="font-semibold text-accent hover:underline">
-        {t("authPasswordPreview.signUp.signInLink")}
-      </Link>
-    </p>
+    <div className="flex flex-col gap-xs">
+      <p>
+        {t("authPasswordPreview.signUp.haveAccount")}{" "}
+        <Link href="/auth/sign-in" className="font-semibold text-accent hover:underline">
+          {t("authPasswordPreview.signUp.signInLink")}
+        </Link>
+      </p>
+      <p>
+        {t("authPasswordPreview.continueRegistration.entryPrompt")}{" "}
+        <Link href="/auth/continue-registration" className="font-semibold text-accent hover:underline">
+          {t("authPasswordPreview.continueRegistration.entryLink")}
+        </Link>
+      </p>
+    </div>
   );
   const badge = initialAccountType
     ? `${t("authPasswordPreview.accountTypeLocked")}: ${t(`onboarding.accountType.types.${initialAccountType}`)}`
@@ -213,6 +222,16 @@ export function PasswordSignUpForm({
 
   return (
     <AuthCard centered title={t("authPasswordPreview.signUp.title")} subtitle={t("authPasswordPreview.signUp.subtitle")} badge={badge} footer={footer}>
+      {/* This browser started an email registration and has not verified it
+          yet (refresh, closed tab): offer to pick it up instead of starting over. */}
+      {hasPendingRegistration ? (
+        <p role="status" className="rounded-md border border-strong/70 bg-surface-2/40 px-md py-2.5 text-body text-fg-secondary">
+          {t("authPasswordPreview.continueRegistration.entryPrompt")}{" "}
+          <Link href="/auth/continue-registration" className="font-semibold text-accent hover:underline">
+            {t("authPasswordPreview.continueRegistration.entryLink")}
+          </Link>
+        </p>
+      ) : null}
       {hasOAuthProvider(providers) ? (
         <>
           <EntryOAuthButtons next={next} accountType={initialAccountType || undefined} providers={providers} />
