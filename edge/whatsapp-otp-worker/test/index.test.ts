@@ -6,7 +6,7 @@ const secret = "v1,whsec_" + btoa("A".repeat(32));
 const env = {
   SUPABASE_SEND_SMS_HOOK_SECRET: secret,
   WHATSAPP_ACCESS_TOKEN: { get: async () => "do-not-log" },
-  WHATSAPP_PHONE_NUMBER_ID: "141552388305492",
+  WHATSAPP_PHONE_NUMBER_ID: "1415528588305492",
   WHATSAPP_OTP_TEMPLATE: "aladdin_otp",
   WHATSAPP_OTP_LANGUAGE: "ar",
   WHATSAPP_GRAPH_API_VERSION: "v25.0",
@@ -121,7 +121,7 @@ test("sends copy-code Arabic template once with matching body and button", async
   let calls = 0;
   const result = await handleRequest(await signedRequest(event), { ...env, WHATSAPP_DELIVERY_ENABLED: "true", IDEMPOTENCY_DB: makeReplayDb() }, (async (url, init) => {
     calls++;
-    assert.equal(String(url), "https://graph.facebook.com/v25.0/141552388305492/messages");
+    assert.equal(String(url), "https://graph.facebook.com/v25.0/1415528588305492/messages");
     const sent = JSON.parse(String(init?.body));
     assert.equal(sent.to, "201012345678");
     assert.equal(sent.template.name, "aladdin_otp");
