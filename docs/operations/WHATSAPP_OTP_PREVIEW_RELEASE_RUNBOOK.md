@@ -12,6 +12,12 @@
 - Meta token remains in the account-level Cloudflare Secrets Store (`WHATSAPP_ACCESS_TOKEN`, scope Workers); `await env.WHATSAPP_ACCESS_TOKEN.get()` resolves only on a valid signed request while delivery enabled.
 - Obtain **explicit owner approval** for any first Preview deployment, and a second approval before accepting any signed real OTP traffic. Do not call Supabase Hook creation until after identity review.
 
+## Identity gate (documented, not implemented)
+- The [account identity compatibility investigation](WHATSAPP_OTP_IDENTITY_PILOT.md) confirms current installer/showroom Phone + Password goes through synthetic email aliases; the read-only Acceptance inventory has 0 such user fixtures.
+- The **proposed** first pilot uses signed-in `auth.updateUser({phone})` followed by `verifyOtp({type:"phone_change"})`, preserving user ID. It is NOT approved or implemented, and enabling the hosted Phone Auth provider could affect other flows.
+- Keep Supabase Phone Auth/Send SMS Hook disabled until a local seeded alias fixture and adversarial identity test prove no duplicate user or privilege crossover. A delivery-disabled Worker Preview deployment can be considered separately after explicit authorization, but it does not imply identity approval.
+- Replay retention helper for hashes older than seven days is now implemented and tested locally, capped at 250 rows per call, **but not scheduled or authorized against hosted D1**.
+
 ## Preflight (safe; no remote writes)
 Working directory is repository `edge/whatsapp-otp-worker`; Node.js >=22 and Cloudflare Wrangler v4.
 1. Verify checkout at feature PR SHA; inspect `git diff`, avoid local environment file leaks.
