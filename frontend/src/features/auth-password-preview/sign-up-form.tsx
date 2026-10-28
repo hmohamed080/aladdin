@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { resendPasswordSignUpCode, verifyPasswordSignUp, type PasswordAuthState } from "@/server/actions/auth-password-preview";
 import { requestSignUp, resendPhoneSignUpCode, verifyPhoneSignUp } from "@/server/actions/sign-up";
+import { useUsernameCheck, UsernameStatus } from "./username-check";
 import type { PhoneSignUpState } from "@/server/auth/phone-sign-up";
 import type { OAuthAvailability } from "@/server/auth/entry-oauth";
 import { AuthCard } from "@/features/auth/auth-card";
@@ -97,6 +98,7 @@ export function PasswordSignUpForm({
   const errorField = fieldFor(sendState.ok ? undefined : sendState.code);
   const errorFor = (field: Field) => (errorField === field ? sendState.code : undefined);
   const set = (key: keyof typeof values) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: e.target.value }));
+  const usernameCheck = useUsernameCheck(values.username);
 
   useEffect(() => {
     if (sendState.ok) {
@@ -287,9 +289,14 @@ export function PasswordSignUpForm({
           value={values.username}
           onChange={set("username")}
           placeholder={t("authPasswordPreview.signUp.usernameLabel")}
-          aria-invalid={errorField === "username" || undefined}
+          aria-invalid={errorField === "username" || usernameCheck.status === "taken" || usernameCheck.status === "invalid" || undefined}
+          aria-describedby="usernameStatus"
         />
-        <FieldError code={errorFor("username")} />
+        {errorFor("username") ? (
+          <FieldError code={errorFor("username")} />
+        ) : (
+          <UsernameStatus id="usernameStatus" check={usernameCheck} onPick={(name) => setValues((v) => ({ ...v, username: name }))} />
+        )}
 
         {initialAccountType ? (
           /* Type chosen on the landing page: no selector (the badge names it);

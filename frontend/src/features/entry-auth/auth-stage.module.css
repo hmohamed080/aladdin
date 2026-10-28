@@ -27,6 +27,8 @@
 .description { @apply text-body; @apply mt-xs; color: var(--fg-secondary); line-height: 1.6; }
 .footer { text-align: center; @apply text-body; @apply px-lg py-lg; border: 1px solid var(--auth-rule); @apply rounded-md; }
 .footer a { font-weight: 700; color: var(--muted-terracotta); }
+/* Terms of Service and Privacy Policy stand out in the sign-up agreement line. */
+.content [data-sign-up-agreement] a { font-weight: 700; color: var(--muted-terracotta); text-decoration: underline; text-underline-offset: 3px; }
 .links { display: flex; flex-direction: column; align-items: center; @apply gap-xs; @apply px-lg py-lg; border: 1px solid var(--auth-rule); @apply rounded-md; @apply text-body; color: var(--fg-secondary); text-align: center; }
 .links a:hover { color: var(--fg); text-decoration: underline; }
 /* Compact Instagram-scale fields and a full-width primary button. */
