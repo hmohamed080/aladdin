@@ -55,7 +55,11 @@ test("D1 real SQL engine: concurrent signed Worker handlers atomically claim onc
   });
   try{
     const d1 = await mf.getD1Database("IDEMPOTENCY_DB");
-    await d1.exec(readFileSync(new URL("../migrations/0001_hook_events.sql",import.meta.url),"utf8"));
+    // D1.exec splits by newline; SQL comment-only lines are not valid executable statements.
+    // Keep the exact migration SQL statements, removing just standalone comment lines.
+    const ddl = readFileSync(new URL("../migrations/0001_hook_events.sql",import.meta.url),"utf8")
+      .split(/\r?\n/).filter(line => !line.trim().startsWith("--")).join("\n");
+    await d1.exec(ddl);
     const db=d1 as unknown as ReplayDb;
     const first = await claimEvent(db,"d1-direct-smoke-1");
     const repeat = await claimEvent(db,"d1-direct-smoke-1");
