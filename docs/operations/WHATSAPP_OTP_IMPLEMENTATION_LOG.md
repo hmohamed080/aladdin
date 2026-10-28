@@ -1,0 +1,161 @@
+## Hosted signed-request smoke — 2026-10-28 (PASS)
+- Owner executed a freshly signed Standard Webhooks POST using the password-manager-held Acceptance signing secret, a synthetic Egyptian phone `+201000000000`, and a dummy `000000` OTP (not a real user or OTP). Their PowerShell output showed **`PASS: Valid signature verified; WhatsApp delivery disabled.`**, corresponding to HTTP 503 `delivery_disabled`, not HTTP 401. The secret/signature was never copied to chat or GitHub.
+- A separate `else : The term 'else' is not recognized` PowerShell parsing error appeared **after** the PASS. That is a shell control-flow issue (else submitted as a standalone command), not an indication that the preceding signed HTTP request failed.
+- Independently reconfirmed via Cloudflare API: Preview remains at Version `39b1dc27-8810-46f4-a328-5be1e7182ec5` (100%), `WHATSAPP_DELIVERY_ENABLED=false`, signature Secrets Store binding present, and Acceptance D1 replay claims **0 rows**.
+- Signed hosted read and fail-closed delivery gate are now **PASS**. **Not tested:** WhatsApp send, Supabase Send SMS Hook integration, identity/phone-change contract, active phone Auth or production. Do not enable delivery or Hook without separate approved pilot.
+
+## Hosted unsigned HTTP smoke tests — 2026-10-28 (PASS)
+- Owner executed live HTTP checks against `https://aladdin-whatsapp-otp-preview.bstalent9.workers.dev/hooks/supabase/send-sms` and reported: `GET → 404` **PASS**; `POST text/plain → 415` **PASS**; `POST application/json` unsigned `{} → 401` **PASS**.
+- Independently rechecked Cloudflare deployment API after those tests: deployed Version `39b1dc27-8810-46f4-a328-5be1e7182ec5` (100%), exact Acceptance D1 and two Secrets Store bindings, and `WHATSAPP_DELIVERY_ENABLED=false`. D1 replay journal remains **0 rows**.
+- Scope: unsigned/malformed request rejection **verified**; **valid-signature hosted test remains pending**, and neither signing key material nor a real OTP has been revealed or transmitted. Do not enable Hook, message delivery, or Production.
+
+## First hosted Preview deployment — Cloudflare confirmed (2026-10-28)
+- **Owner-authorized isolated Worker deployed via Wrangler**, without changing existing Workers or Production, at `https://aladdin-whatsapp-otp-preview.bstalent9.workers.dev`.
+- Cloudflare deployment API confirms **Deployment ID** `d919a391-a557-49c3-9b67-9804039e5af9` / **Version ID** `39b1dc27-8810-46f4-a328-5be1e7182ec5`, deployment source `wrangler`, 100% of this Preview Worker version, created `2026-10-28T16:37:12.470301Z`.
+- Verified actual Worker settings: compatibility date `2026-10-01`; **`WHATSAPP_DELIVERY_ENABLED=false`**; D1 binding `IDEMPOTENCY_DB` targeting dedicated Acceptance database `da65d5e4-8344-4078-9c2d-8a4bb4907f79`; both `SUPABASE_SEND_SMS_HOOK_SECRET` and `WHATSAPP_ACCESS_TOKEN` bound to account Secrets Store `acfaa67f391e499db6fde398022f50ce` by name. No secret values retrieved.
+- Cloudflare API confirms workers.dev enabled and the D1 replay journal contains **0 rows** after deployment. No delivery recipient allowlist configured.
+- **HTTP smoke tests NOT YET VERIFIED:** external URL fetch tool could not access endpoint; no claim of 404/415/401/503 yet. Await operator's safe PowerShell HTTP checks or other network-capable verified method. Do not enable Supabase Hook, Phone Auth or Meta delivery on the strength of deployment metadata alone.
+- Deployment was made from the approved local checkout at `439d21d44ab27bb21e7cb30840c9b9bb2b6190b1`; this log commit does not redeploy. PR remains Draft/unmerged, Production untouched.
+
+## Owner authorization and final preflight — 2026-10-28
+- Owner explicitly approved **first isolated Cloudflare Preview Worker deployment only**, with `WHATSAPP_DELIVERY_ENABLED=false`, no Supabase Hook, no live WhatsApp sending, no Merge and no Production changes.
+- Read-only CI verification at commit `a85bb4bb4ade086aeeea1cad1f2e04a858016f17`: [WhatsApp OTP CI](https://github.com/hmohamed080/aladdin/actions/runs/40715681844) **PASS**; [General CI](https://github.com/hmohamed080/aladdin/actions/runs/40715681759) **PASS**; [Supabase RLS](https://github.com/hmohamed080/aladdin/actions/runs/40715682006) **PASS**.
+- Cloudflare read-only verification confirms dedicated D1 `aladdin-whatsapp-otp-acceptance`, replay journal index, **0 journal rows**, and both scoped Secrets Store secret names **active**. Existing deployed Workers list did **not** contain `aladdin-whatsapp-otp-preview`.
+- **Not yet deployed** at this checkpoint: exact tested bundle must be uploaded by Wrangler with verified config and resource bindings. Do not mark deploy complete until Cloudflare lists the Worker and actual runtime HTTP tests pass. Avoid uploading unbundled TypeScript or a different Worker.
+- Next action for operator: create an isolated checkout at the approved commit; validate deploy guard and dry-run, then run a targeted Wrangler Preview deploy with delivery still disabled and capture actual Worker URL and deployment ID without exposing secrets.
+
+
+## Secrets Store signing-key checkpoint — 2026-10-28
+- Operator generated and retained a dedicated `v1,whsec_…` signature secret in a password manager; **the value is not included in repo or conversation**.
+- Cloudflare API confirmed both account secrets `WHATSAPP_ACCESS_TOKEN` and `SUPABASE_SEND_SMS_HOOK_SECRET` are **active** and scoped to Workers in store `acfaa67f391e499db6fde398022f50ce`. Values not fetched.
+- `wrangler.jsonc` now binds **both** via `secrets_store_secrets`. `src/index.ts` reads signing key via async `get()` and returns 503 if missing/throwing. Removed the old per-Worker secret declaration; Preview guard verifies both exact account resources.
+- Miniflare local HTTP cannot emulate account Secrets Store `get()` via a plaintext binding. Its bundle test now explicitly verifies refusal when that binding is unavailable; signed handler/D1 tests inject a fake `get()`. **A hosted Worker smoke test is required to prove the real Cloudflare Secrets Store runtime binding.** Do not claim end-to-end coverage from local mocks.
+- The secret has **not** been entered in the Supabase Acceptance Send SMS Hook. Do not enable/create the Hook yet; the operator must use the identical saved value on the Supabase side at the separately approved activation stage. No Worker deployed, no messages sent, no Production changes.
+# WhatsApp OTP — Implementation & Verification Record
+**Updated:** 2026-10-28 | **Scope:** PR #114, Acceptance-only preparation | **Owner approval:** no merge, production rollout or active OTP traffic authorized
+
+## Continuation checkpoint — 2026-10-28 (after initial ledger)
+- [x] Confirmed that the *initial ledger update* CI runs **OTP #8, General CI #301, RLS #218** all completed **successfully** before further changes.
+- [x] Added `edge/whatsapp-otp-worker/scripts/check-preview-config.mjs`: blocks non-preview Worker names, missing required signing secret, wrong D1/Secrets Store resource, unexpected production routes, changed sender/template, or `WHATSAPP_DELIVERY_ENABLED != false`. Wired into dedicated OTP CI **before** Wrangler dry-run.
+- [x] Updated ADR-0025 and Worker README to distinguish completed D1 provisioning/schema and dry-run tests from the **not-deployed** Worker, absent signing secret and not-enabled Supabase Hook.
+- [x] Created `docs/operations/WHATSAPP_OTP_PREVIEW_RELEASE_RUNBOOK.md` with preflight, secret custody, actual Preview-only deployment preparation, explicit owner approval, zero-delivery runtime smoke checks, error/rollback protocol.
+- [x] Independently reconfirmed Cloudflare: token name/status active, Acceptance D1 exists, replay table empty after smoke-test cleanup, index exists and **no OTP Preview Worker** among deployed Workers.
+- [x] Added seven adversarial Preview config tests at `edge/whatsapp-otp-worker/test/preview-config.test.ts` (real config passes; toggling delivery, production Worker or route, wrong D1, missing hook secret or wrong Secrets Store fails). The guard also accepts a test-fixture file path; actual CI always checks the real config with no arguments.
+- [x] **OTP CI #16 (run `40695164280`) PASS:** configuration guard, Wrangler dry-run, Worker TypeScript check and the entire expanded test suite, including seven negative config tests.
+- [ ] General CI and Supabase RLS final-head status must be rechecked after the latest updates; prior green CI is *not* proof that later commits passed.
+- [ ] No hosted Worker change, signing secret creation, Supabase Hook enablement, real OTP sending, Production change or Merge by this continuation.
+- **Security detail confirmed from Cloudflare docs:** `wrangler secret put` can deploy immediately; for the first controlled release use a reviewed secret-safe deployment mechanism and **never** treat that command as read-only staging.
+- Runbook: [Preview release and rollback](WHATSAPP_OTP_PREVIEW_RELEASE_RUNBOOK.md).
+
+## Continuation checkpoint — 2026-10-28, local Worker/D1 integration (NO DEPLOY)
+- [x] First verified earlier last-head CI: OTP Transport #17, General CI #311 and Supabase RLS #228 **PASS** before the new test changes.
+- [x] Added `test/miniflare-d1.test.ts`: runs the **actual D1 SQL engine** locally with committed migration DDL, verifies atomic event-hash reservations on simultaneous signed requests, accepted replay without second Meta attempt, failed-provider replay denial and signature rejection. Uses dummy phone, dummy OTP and mocked provider; **no real Meta request**.
+- [x] Added a second, **bundled Worker HTTP** test: loads the exact Wrangler dry-run JS bundle into the Miniflare/workerd runtime with delivery OFF and local D1, checks 404 for GET, 415 unsupported media, 401 missing signature, and 503 for correctly signed dummy request with `delivery_disabled`; proves no D1 event is written while disabled. **Does not contact hosted D1 or Cloudflare Worker**.
+- [x] Pinned local test runtime to `miniflare@4.20260730.0`, whose workerd compatibility cap is 2026-08-06. **Only the local HTTP test** uses 2026-08-06; actual `wrangler.jsonc` remains `compatibility_date:2026-10-01`. Bundled Worker is loaded by inline module contents to avoid CI temporary-path sandbox restrictions.
+- [x] Corrected mock sender ID to match the configured Acceptance sender `1415528588305492`.
+- [x] Dedicated [OTP CI run #30](https://github.com/hmohamed080/aladdin/actions/runs/40702455812) **PASS**: guard, Wrangler dry-run, TypeScript, real local D1 signed-handler integration, bundled Worker HTTP runtime and mock unit/security suites.
+- [ ] Full-hosted Worker + **hosted** D1 and Supabase Hook integration still untested; no Preview Worker deployed, no signing secret configured, and no authorized real OTP flow. Production unchanged.
+- [ ] General CI / Supabase RLS on last documentation commit to be checked separately (successful OTP CI on pre-doc commit is verified; do not imply otherwise).
+- **Test debugging record:** initial CI of new D1 integration failed because D1.exec does not accept multiline migration/comments as one statement; fixture switched to prepared DDL statements without altering the actual schema. Bundled Worker test initially failed because the stable Miniflare runtime supports an earlier compatibility date, then because an external absolute bundle path violated the workerd sandbox; both were fixed in test-only options, with no deploy or behavior changes to the production code.
+
+## Continuation checkpoint — 2026-10-28, identity and retention release gates
+- **Latest reviewed prior head** `3323399692c74d8015ae0934cd2d81c481e5ecb9`: dedicated OTP CI run `40702633968`, General CI run `40702633831` and RLS run `40702633915` all completed **SUCCESS**. Later changes need independently passing CI checks.
+- **Read-only Supabase Acceptance Auth inventory:** 6 total users, 0 `@craftsman-login.aladdin.invalid` aliases, 0 nonempty Auth phone identities. This demonstrates a missing hosted fixture, **not** that existing installer/showroom accounts can safely switch to phone OTP. No private user rows returned or copied.
+- Inspected `frontend/src/server/auth/phone-password.ts`, role-specific installer/showroom actions, `craftsman-login-alias.ts` and secondary-phone profile actions. Both user types use synthetic email + password and independent `profiles.phone_e164` claims. Added [identity and first-pilot plan](WHATSAPP_OTP_IDENTITY_PILOT.md) with candidate signed-in `phone_change` protocol, adversarial account-ID/permissions checks, and explicit rejection of generic anonymous `signInWithOtp({phone})` before identity design approval.
+- **Replay retention source prepared, not activated:** `purgeExpiredReplayClaims` can delete at most 250 D1 event hashes per call after seven days. No scheduled trigger or hosted purging exists. The retention threshold and operator cleanup cadence still require review and authorization.
+- Added a local D1 integration test for retention: stale event removed, fresh event retained, missing D1 fails closed. No production or Acceptance D1 deletion executed by this code.
+- **Still no Hosted Preview Worker deployment, no signing secret configured, no Supabase Send SMS Hook activated, no phone-user fixture created, no WhatsApp live sending and no Production change.** PR remains Draft and unmerged.
+- **Next gates:** verify CI on this source head, approve first capability, create controlled local alias fixtures, securely prepare matching signing secret, and separately authorize an isolated delivery-disabled Preview Worker deployment.
+
+## Security correction — 2026-10-28, phone-change destination ambiguity
+- Supabase's official phone-change-hook troubleshooting note references a `new_phone` property, while the generic Send SMS Hook example contains `user.phone`. The hosted exact payload shape has **not** been verified. `phone_change` can target a number different from the existing Auth user's phone.
+- Worker transport changed to **reject any hook event carrying `new_phone`** (top-level, `user` or `sms`) with HTTP 422 before querying Meta. Unit test asserts zero Meta calls when old user phone and proposed new recipient differ.
+- This is a **fail-closed prevention**, not working phone-change delivery. The candidate `phone_change` first pilot remains blocked pending verified payload contract and explicit recipient resolution, account identity safety, and owner sign-off. See [identity compatibility plan](WHATSAPP_OTP_IDENTITY_PILOT.md).
+- No Supabase Hook activation, real OTP, hosted Worker deploy, or Production changes by this correction.
+
+## Architecture & intent
+Aladdin clients (web/future mobile) → Supabase Auth as OTP issuer/verifier and session authority → signed HTTPS **Send SMS Hook** → dedicated Cloudflare `aladdin-whatsapp-otp-preview` Worker → Meta WhatsApp Cloud API → user handset. The Worker does **not** issue, persist or validate credentials. This architecture is a *target*, not an active authentication flow.
+
+Existing installer/showroom **Phone + Password** uses synthetic email aliases, and Supabase Phone Auth is not enabled. Email signups use a separate email OTP. **Never** call phone `signInWithOtp` for existing users until canonical identity mapping, account takeover and duplicate-account implications are resolved. See ADR-0025 and `docs/frontend/entry-auth-methods.md`.
+
+## Chronological implementation log (completed, with evidence)
+| Step | Provider | Completed action | Evidence / exact scope |
+|---|---|---|---|
+| 1 | Meta | Owner created **Aladdin OTP** App in Business Solution and connected WhatsApp API. | Owner dashboard walkthrough; not independently verified through Meta connector |
+| 2 | Meta | Owner sent `hello_world` to a controlled device. | Owner confirmed receipt |
+| 3 | Meta | Owner tested approved Arabic Authentication **Copy Code** template `aladdin_otp` with dummy `123456`; message delivered to controlled handset. | Owner confirmed receipt. **Not** an end-to-end Auth OTP |
+| 4 | Meta | Owner created **Employee** System User `AladdinServer` after Meta rejected whitespace-bearing names; assigned app `Aladdin OTP` and WhatsApp account **Messages** privilege. | Owner screenshots and confirmations; independent Meta asset inspection unavailable |
+| 5 | Meta | Owner issued non-expiring / long-lived System User access token scoped to `whatsapp_business_messaging`. | Owner confirmation; token **never** committed or pasted into PR |
+| 6 | Cloudflare | Owner created account Secrets Store entry `WHATSAPP_ACCESS_TOKEN` with Workers scope. | Read-only Cloudflare API confirms name, **active**, Workers scope; value never queried |
+| 7 | GitHub | Created feature branch `feat/whatsapp-otp-transport-20261028`, and Draft **PR #114**. | GitHub PR metadata (open, draft, unmerged) |
+| 8 | GitHub | Added isolated Worker `edge/whatsapp-otp-worker/src/index.ts`, typecheck, tests, Wrangler config, and architecture ADR. | PR changes. No existing frontend/backend sign-in touched |
+| 9 | GitHub | Connected account-level Secrets Store with async `env.WHATSAPP_ACCESS_TOKEN.get()`; added owner-provided sending phone ID `1415528588305492` as a *nonsecret* Wrangler variable. | `wrangler.jsonc` in PR. Sending ID not independently checked against Meta |
+| 10 | Security | Worker verifies Standard Webhooks signature/timestamp using raw body, accepts bounded Egyptian E.164 phone and 6-digit OTP, uses approved Arabic template/body+copy-button parameters, rejects malformed/unsigned requests, avoids logging OTP/phone/token, disables automatic Meta retries. | Worker and tests |
+| 11 | Security | Added atomic D1 replay journal by SHA-256 of webhook-id, reserve before Meta call, return success for already accepted event without resending and fail closed for pending/failed. Test recipient allowlist blocks all unknown numbers. | Worker, `migrations/0001_hook_events.sql`, test suite. No OTP/phone in D1 |
+| 12 | Cloudflare | Owner created dedicated `aladdin-whatsapp-otp-acceptance` D1 `da65d5e4-8344-4078-9c2d-8a4bb4907f79`. Added `IDEMPOTENCY_DB` binding **in source only**. | Cloudflare D1 GET, GitHub Wrangler config |
+| 13 | Cloudflare | Applied two DDL statements matching committed migration: `whatsapp_hook_events` table and `whatsapp_hook_events_created_at` index. | Cloudflare API query + `sqlite_master` confirmation |
+| 14 | Cloudflare | Ran controlled D1 single-retry and simultaneous duplicate-insert smoke tests using fake 64-char hashes. Exactly one insert (`changes:1`), duplicate ignored (`changes:0`), one row read; test rows deleted. | Real D1 query results in project conversation; NOT a deployed Worker integration test |
+| 15 | GitHub | Added `WhatsApp OTP Transport CI` including Wrangler `deploy --dry-run` bundling, isolated TypeScript check and mocked signature/failure/replay tests. | GitHub run **#7**, ID `40689531760`: **success**, including dry-run |
+| 16 | GitHub | Checked general project CI and Supabase RLS on same reviewed commit. | GitHub CI run `40689531672`: **success**; RLS run `40689531897`: **success** |
+| 17 | Supabase | Owner opened Acceptance Auth → Hooks → Send SMS Hook → HTTPS, inspected configuration fields and **cancelled** without enabling. | Owner confirmation; hosted configuration not modified |
+| 18 | Cloudflare | Rechecked D1 and Secrets Store on 2026-10-28. | D1 exists, no replay rows after cleanup, index exists, token secret metadata active; Workers list has **no** `aladdin-whatsapp-otp-preview` |
+
+## Resource & configuration matrix
+| Component | Value | Hosted state |
+|---|---|---|
+| Meta template | `aladdin_otp` / Arabic / Copy Code | Manually tested by owner |
+| Sender Phone Number ID | `1415528588305492` | Preview Wrangler variable; confirm actual Meta sender before live |
+| Meta permanent token | `WHATSAPP_ACCESS_TOKEN` | Active **Cloudflare Secrets Store**, linked in source; never printed |
+| D1 replay DB | `aladdin-whatsapp-otp-acceptance` | **Provisioned and migrated**; isolated from Supabase DB |
+| `IDEMPOTENCY_DB` | D1 binding in Wrangler | **NOT bound to a deployed Worker** |
+| `SUPABASE_SEND_SMS_HOOK_SECRET` | Standard Webhooks signature secret | **Not generated or installed** |
+| `OTP_ALLOWED_RECIPIENTS` | Acceptance-only owned-number E.164 allowlist | Not configured; missing = deny |
+| `WHATSAPP_DELIVERY_ENABLED` | `false` | In source, no deployed Worker |
+| Cloudflare Worker | `aladdin-whatsapp-otp-preview` | **NOT deployed**; live Workers list does not contain it |
+| Supabase project | `aladdin-r2-acceptance-20261011` (`nxossqhdfltcqdwvbewi`) | ACTIVE_HEALTHY; Send SMS Hook not enabled by this work |
+| Production | Live Aladdin production resources | **Untouched by WhatsApp OTP work** |
+
+## Test matrix / interpretation
+- **PASS, local mock:** invalid signatures, timestamp expiry, malformed phone/OTP, disabled delivery, secret not read if disabled, missing token, valid Arabic Meta template shape, safe provider error handling, duplicate event response, parallel duplicate calls via mocked D1, failed provider no retry, lack of D1/allowlist.
+- **PASS, GitHub:** Wrangler compile-only dry-run, Worker typecheck, Worker mock test suite, general CI and RLS.
+- **PASS, hosted D1 only:** real D1 `INSERT OR IGNORE` prevents sequential and simultaneous double-insert; smoke-test rows cleaned.
+- **NOT TESTED:** real signed HTTP Worker invocation against hosted D1; Secrets Store runtime binding; provider acceptance/delivery via Worker; Supabase phone Auth actual flow; complete registration or recovery and identity preservation; webhook failure and replay cleanup at scale.
+- **Not a claim:** a Meta API message ID indicates *acceptance*, not handset delivery; successful unit tests are not proof of authentication safety or production readiness.
+
+## Security decisions & known limitations
+1. **Fail closed:** missing signing secret, untrusted hook, invalid body, missing D1, unavailable test allowlist, or delivery-disabled all reject. Default delivery flag `false`.
+2. **Durable idempotency:** SQL unique event hash reservation before provider call means no duplicate billable send for the same webhook-id. Different legitimate hook IDs are independently processed and require upstream phone/IP/cooldown throttling.
+3. **Ambiguous provider errors:** don't retry automatically, so a network timeout may leave user without code; future UX must offer controlled fresh OTP.
+4. **No personal data in replay storage:** hashes of opaque webhook event IDs and state only. **Retention purge is not implemented**; choose deletion period longer than provider retry horizon and implement audited cleanup.
+5. **Threats not yet closed:** replay with different event IDs, compromised upstream, OTP brute force, account enumeration, phone recycling/takeover, orphan alias users, phone/Google linking issues, template expiry mismatch, and provider outage.
+6. **Operational security:** Meta access token must remain in Secrets Store; Supabase signing secret must be a separate Worker Secret, never public/GitHub. Restrict test delivery to owned allowlisted numbers.
+
+## Activation gates / exact next steps
+- [x] Meta template and manual delivery proved.
+- [x] Permanent Meta token generated by owner; secret metadata confirmed active.
+- [x] D1 creation, schema migration and database-only replay smoke tests.
+- [x] Wrangler dry-run and GitHub tests passed for reviewed commit.
+- [ ] Verify full CI against final documentation-only updates and test full runtime Worker+D1 on a nonpublic or controlled Preview deployment.
+- [ ] Produce Supabase hook signing secret safely and configure it on both sides; no values in logs/chat.
+- [ ] Provision test-recipient allowlist via protected Worker secret/config.
+- [ ] Deploy isolated Preview Worker with delivery **OFF**; test unsigned/malformed requests and real D1 state. Get **explicit owner approval before hosted deployment**.
+- [ ] Design and adversarially test canonical phone account mapping for existing installer/showroom email-alias users, signup and account recovery.
+- [ ] Set and verify Supabase Phone Auth anti-abuse controls, CAPTCHA, OTP TTL, user/IP rate limits, resend attempts and Meta failure UX.
+- [ ] Activate Send SMS Hook in **Acceptance only** following approval; run owned-number E2E delivery + verifyOtp, preserve canonical user ID, check delivery webhook status where available.
+- [ ] Separate security sign-off and explicit **Production GO** required for merge/config changes. No silent activation.
+
+## Rollback and controls
+- Revert Preview Hook to disabled first; set delivery flag `false`; revoke/rotate token if compromise is suspected.
+- Do not delete D1 replay records during an incident until impact reviewed (helps avoid duplicates).
+- Existing password and email Auth flows remain untouched until migration/compatibility is explicitly approved.
+- Keep production secrets and the active frontend/backend Workers isolated.
+
+## Evidence links
+- [Draft PR #114](https://github.com/hmohamed080/aladdin/pull/114)
+- [OTP CI run #16 — earlier guarded dry-run + expanded suite](https://github.com/hmohamed080/aladdin/actions/runs/40695164280)
+- [OTP CI run #7 — earlier green dry-run](https://github.com/hmohamed080/aladdin/actions/runs/40689531760)
+- [General CI run](https://github.com/hmohamed080/aladdin/actions/runs/40689531672)
+- [RLS CI run](https://github.com/hmohamed080/aladdin/actions/runs/40689531897)
+- [Supabase Send SMS Hook docs](https://supabase.com/docs/guides/auth/auth-hooks/send-sms-hook)
+- [Cloudflare Secrets Store binding docs](https://developers.cloudflare.com/secrets-store/integrations/workers/)
+- [Cloudflare D1 docs](https://developers.cloudflare.com/d1/get-started/)

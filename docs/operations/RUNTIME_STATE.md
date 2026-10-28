@@ -1,5 +1,32 @@
 # Runtime State
 
+## 2026-10-28 — WhatsApp OTP Acceptance D1 provisioned (not deployed)
+
+- Cloudflare D1 database `aladdin-whatsapp-otp-acceptance` (`da65d5e4-8344-4078-9c2d-8a4bb4907f79`) verified in the Aladdin account.
+- Added `IDEMPOTENCY_DB` binding in the isolated preview Worker's `wrangler.jsonc` to that database, without deploying the Worker.
+- Applied the exact two DDL statements from `edge/whatsapp-otp-worker/migrations/0001_hook_events.sql` to the dedicated D1 via Cloudflare API. Confirmed `whatsapp_hook_events` table and `whatsapp_hook_events_created_at` index with a read-only sqlite_master query. No OTP data inserted.
+- Existing `WHATSAPP_DELIVERY_ENABLED=false` remains. No Supabase Hook or Cloudflare Worker deployed, no Meta messages sent; Production untouched.
+- Next gates: remote D1 idempotency smoke test, Wrangler dry-run and CI checks, signed-hook secret creation and retention policy, current-phone-identity compatibility before activation.
+
+
+## 2026-10-28 — WhatsApp OTP replay-security progress (code only)
+
+- On Draft PR #114, isolated Worker now requires a signed Supabase HTTP Hook, a preview-only allowed-recipient list and a D1 `IDEMPOTENCY_DB` with atomic unique event-hash reservation; it records `reserved`/`accepted`/`failed` before/after a single Meta attempt. Duplicate webhook IDs never resend OTP; if storage is absent or unavailable, the request fails closed.
+- D1 migration `edge/whatsapp-otp-worker/migrations/0001_hook_events.sql` committed. **No remote D1 database created or bound, no hook secret set, no Preview Worker deployed.** `WHATSAPP_DELIVERY_ENABLED=false` remains.
+- Dedicated GitHub workflow `WhatsApp OTP Transport CI` completed **successfully** on PR run #2 (`40684963776`), covering typecheck and mocked replay/security tests. This is not a real D1/concurrency or live Meta integration test. General project CI still pending at that checkpoint.
+- Release blockers remain: Acceptance D1 provisioning and migration, verified live D1 tests, account identity compatibility for installer/showroom phone-password aliases, Supabase CAPTCHA/rate limits, controlled end-to-end Acceptance only, separate approval for deployment/activation.
+
+
+## 2026-10-28 — WhatsApp OTP preview-only groundwork (NOT HOSTED)
+
+- Branch `feat/whatsapp-otp-transport-20261028` created from protected `main` at `f823d88cc80e14daebc0fe50949724ee0120bd70`, separate from the live production services.
+- Proposed isolated Worker under `edge/whatsapp-otp-worker/`: signed Supabase HTTP Hook verification, Egyptian E.164 validation, Meta Arabic Copy Code sender, delivery OFF by default (`WHATSAPP_DELIVERY_ENABLED=false`), sanitized failures. Owner-supplied Meta Phone Number ID configured as non-secret preview variable; owner-created Meta System User token remains only in Cloudflare Secrets Store and is referenced by a not-yet-deployed binding. No credentials committed.
+- Local prototype typecheck and seven mock tests passed; repo-wide CI on branch not yet verified.
+- **Blockers:** synthetic email-alias Phone + Password login is not Supabase Phone Auth; no identity migration approved. Durable webhook replay/idempotency guard not yet implemented.
+- Hosted Acceptance `nxossqhdfltcqdwvbewi`, hosted Production `kkpkgjrweysgvhvkhzun`, and all Cloudflare Workers: **no write/deploy/secret/hook changes made by this work**.
+- Meta Arabic `aladdin_otp` was manually tested by owner prior to this branch. English approval and Meta System User token pending.
+
+
 ## Live site on Cloudflare Workers — 2026-10-27
 - `aladdindecore.com`, `www` and `next` are served by Worker `aladdin-frontend-production` (Custom Domains, attached by the owner 17:23–17:40Z). It binds `aladdin-backend-production` and uses the live Supabase project `kkpkgjrweysgvhvkhzun` (193 migrations). R2 and Redis are off in production.
 - DNS: Cloudflare zone `c90ddcdec7bacd2485e1e5bcbac8afce` (nameservers johnathan/mona.ns.cloudflare.com, registrar GoDaddy). Zoho MX/SPF/DKIM unchanged; wildcard `*` still CNAME to Vercel, DNS only. No DMARC.
