@@ -1,4 +1,14 @@
 
+## 2026-10-28 — Engineer profile completion
+
+`/home/profile/complete` is available on the existing local app at port 3350,
+branch `feature/engineer-account`. Four selectable sections reuse owner-scoped
+editors and preserve unsaved inputs between steps. The home completion prompt
+now links here and uses the same canonical completion percentage. Profile view
+also links to the workspace. No migrations or production deployment.
+Twelve focused tests pass; browser checked desktop AR/EN and mobile dark.
+Concurrent auth/settings/shared-shell edits remain outside this task.
+
 ## 2026-10-25 — Engineer RFQ frontend review
 
 Request composition now follows the owner reference: compact architectural hero,

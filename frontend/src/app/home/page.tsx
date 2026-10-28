@@ -108,7 +108,7 @@ export default async function PersonalHomePage() {
   const store = await cookies();
   const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   const t = createTranslator(locale);
-  if (isEngineer(data)) return <EngineerDashboard data={await loadEngineerDashboard()} locale={locale} />;
+  if (isEngineer(data)) return <EngineerDashboard data={await loadEngineerDashboard()} locale={locale} completion={completion} />;
 
   // Only a professional has any of this to read — a consumer holds none of it
   // by construction, since every one of these descends from an assignment,

@@ -66,7 +66,7 @@ export const FIXED_CONCRETE_TYPE: Record<ProfessionalPersona, AccountTypeValue> 
 
 /** 05.2.1 Identity — specialization options, keyed by the CONCRETE account type. */
 export const SPECIALIZATIONS: Record<string, readonly string[]> = {
-  engineer: ["structural", "mep", "site_supervision", "cost_estimation"],
+  engineer: ["architecture", "civil"],
   installer_technician: ["kitchens_doors", "plumbing", "electrical", "hvac", "gypsum_paint"],
   contractor: ["full_finishing", "renovation", "turnkey", "specific_trades"],
   sales: ["showroom_sales", "field_sales", "technical_sales", "key_accounts"],
@@ -74,14 +74,16 @@ export const SPECIALIZATIONS: Record<string, readonly string[]> = {
 
 /** 05.2.2 Services & Skills — core + additional service pools, per concrete type. */
 export const SERVICES: Record<string, readonly string[]> = {
-  engineer: ["design_review", "structural_design", "supervision", "boq"],
+  engineer: ["design_2d", "design_3d", "finishing", "construction", "consultation", "general_contracting"],
   installer_technician: ["kitchen_install", "door_install", "site_measurement"],
   contractor: ["finishing", "renovation", "turnkey_fitout"],
   sales: ["showroom_advice", "quotations", "product_demos"],
 };
 
 export const ADDITIONAL_SERVICES: Record<string, readonly string[]> = {
-  engineer: ["consultation", "feasibility", "permits"],
+  // Engineer software skills use the existing supplemental-skills array.
+  // Namespaced keys keep tools distinct from service keys and retain legacy values.
+  engineer: ["tool_autocad", "tool_3ds_max"],
   installer_technician: ["maintenance", "finishing", "consultation"],
   contractor: ["demolition", "waterproofing", "consultation"],
   sales: ["site_visits", "after_sales", "key_accounts"],

@@ -131,6 +131,9 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
             </div>
           </div>
           <div className="flex flex-col gap-3">
+              <ButtonLink href="/home/profile/complete" variant="accent">
+                {ar ? "استكمال الملف الشخصي" : "Complete profile"}
+              </ButtonLink>
             <ButtonLink href="/home/profile/edit">
               <PencilIcon size={16} />
               {ar ? "تعديل الملف الشخصي" : "Edit profile"}

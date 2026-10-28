@@ -1,5 +1,29 @@
 # Engineer account
 
+## Profile completion — 2026-10-28
+
+The owner requested the installer's full profile-completion experience for the
+engineer. `/home/profile/complete` reuses the existing authenticated engineer
+shell and four guided sections: identity, expertise/services/work areas,
+availability, and portfolio. Only the selected section is visible; moving
+between steps retains unsaved inputs. Each existing editor saves independently.
+The professional editor saves in place in this workspace. Username editing
+continues through account settings. The home banner and workspace both use
+`my_profile_completion()`; browsing steps never increases completion or grants
+verification. The guarded route reads only the caller's identity and assets,
+with short-lived portfolio preview URLs and existing private-by-default uploads.
+No new persistence, schema, sample data or deployment is introduced. Full-stack
+release verification remains deferred until the visual review is approved.
+
+Owner refinement: engineer discipline is a single choice, architecture or civil.
+Services are multiple choice: 2D design, 3D design, finishing, construction,
+consultation and general contracting. Software tools (AutoCAD and 3ds Max) are
+multiple choice under their own label, using namespaced `tool_*` keys in the
+existing supplemental-skills array. Existing stored values are carried through
+until edited; there is no destructive migration. Both onboarding and the editor
+consume the same option catalog. Validate small refinements with focused checks,
+not repeated broad test runs.
+
 ## Purpose and current decision
 
 The owner requested a production engineer account on a new branch on 2026-10-19,

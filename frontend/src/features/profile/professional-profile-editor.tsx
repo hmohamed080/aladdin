@@ -76,15 +76,19 @@ type EditorState = {
 export function ProfessionalProfileEditor({
   answers,
   concreteType,
+  embedded = false,
 }: {
   answers: ProfessionalAnswers;
+  /** Keep the saved editor in the profile-completion workspace. */
+  embedded?: boolean;
   /** The persona this profile belongs to — fixed, and the vocabulary key. */
   concreteType: string;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const [state, setState] = useState<EditorState>({
     headline: answers.headline ?? "",
@@ -117,6 +121,7 @@ export function ProfessionalProfileEditor({
   const save = () =>
     start(async () => {
       setFailed(false);
+      setSaved(false);
       const input: ProfessionalInput = {
         concreteType: concreteType as ProfessionalInput["concreteType"],
         headline: state.headline.trim() || null,
@@ -141,16 +146,17 @@ export function ProfessionalProfileEditor({
       }
       // Back to the hub, which re-reads from the database — so what is shown after
       // a save is what was actually stored, never the form's own optimism.
-      router.push("/home/profile");
+      setSaved(true);
+      if (!embedded) router.push("/home/profile");
       router.refresh();
     });
 
   return (
     <div className="flex flex-col gap-xl" data-testid="profile-editor">
-      <header className="flex flex-col gap-1">
+      {!embedded && <header className="flex flex-col gap-1">
         <h1 className="text-headline text-fg">{t("profile.edit.title")}</h1>
         <p className="max-w-prose text-body text-fg-secondary">{t("profile.edit.body")}</p>
-      </header>
+      </header>}
 
       <Card className="flex flex-col gap-lg">
         <div className="flex flex-col gap-1">
@@ -240,7 +246,7 @@ export function ProfessionalProfileEditor({
         </LabeledField>
 
         <LabeledField
-          label={t("onboarding.professional.services.additionalLabel")}
+          label={t(concreteType === "engineer" ? "onboarding.professional.services.toolsLabel" : "onboarding.professional.services.additionalLabel")}
           htmlFor="add"
           optional={t("common.optional")}
         >
@@ -359,6 +365,7 @@ export function ProfessionalProfileEditor({
           {t("profile.edit.saveFailed")}
         </p>
       ) : null}
+      {embedded && saved ? <p role="status" className="text-label text-success">{locale === "ar" ? "تم حفظ بياناتك." : "Your details have been saved."}</p> : null}
 
       <div className="flex flex-wrap items-center gap-sm">
         <Button type="button" variant="primary" onClick={save} disabled={pending || !isAcceptableEdit(state.bio, answers.bio)}>

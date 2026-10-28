@@ -22,6 +22,7 @@ import { VerificationBadge } from "@/features/home/parts";
 import { createTranslator } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/locales";
 import type { EngineerDashboardData } from "@/server/queries/engineer";
+import type { ProfileCompletion } from "@/server/queries/profile-identity";
 import {
   EngineerSection,
   ShowroomCards,
@@ -33,14 +34,16 @@ import { requestStatusLabel } from "./status";
 export function EngineerDashboard({
   data,
   locale,
+  completion,
 }: {
   data: EngineerDashboardData;
   locale: Locale;
+  completion?: ProfileCompletion | null;
 }) {
   const ar = locale === "ar";
   const samples = useLocalEngineerSamples();
   const t = createTranslator(locale);
-  const progress = data.account.completeness;
+  const progress = completion;
   const actions = [
     {
       label: ar ? "اكتشف المعارض" : "Explore showrooms",
@@ -77,7 +80,7 @@ export function EngineerDashboard({
             : "Illustrative data and images for local design review"}
         </p>
       )}
-      {progress.percent < 100 && (
+      {progress && progress.percent < 100 && (
         <section
           aria-labelledby="complete-profile-heading"
           className="engineer-completion flex flex-wrap items-center gap-md rounded-md border border-strong bg-surface p-md"
@@ -103,14 +106,14 @@ export function EngineerDashboard({
               role="progressbar"
               aria-label={ar ? "اكتمال الملف" : "Profile completeness"}
               aria-valuemin={0}
-              aria-valuemax={progress.total}
-              aria-valuenow={progress.completed}
+              aria-valuemax={100}
+              aria-valuenow={progress.percent}
               className="mt-3 flex max-w-lg gap-1"
             >
-              {Array.from({ length: progress.total }, (_, index) => (
+              {Array.from({ length: 10 }, (_, index) => (
                 <span
                   key={index}
-                  className={`h-1 flex-1 rounded-pill ${index < progress.completed ? "bg-accent-solid" : "bg-surface-2"}`}
+                  className={`h-1 flex-1 rounded-pill ${index < Math.floor(progress.percent / 10) ? "bg-accent-solid" : "bg-surface-2"}`}
                 />
               ))}
             </div>
@@ -118,11 +121,11 @@ export function EngineerDashboard({
           <div className="flex shrink-0 flex-col items-end gap-2">
             <span className="text-label tabular-nums text-fg-secondary">
               <bdi dir="ltr">
-                {progress.completed} / {progress.total}
+                {progress.percent}%
               </bdi>{" "}
               {ar ? "مكتمل" : "complete"}
             </span>
-            <ButtonLink href="/home/profile/edit" variant="accent">
+            <ButtonLink href="/home/profile/complete" variant="accent">
               {ar ? "أكمل ملفك الشخصي الآن" : "Complete your profile now"}
               <ArrowUpRightIcon size={16} />
             </ButtonLink>
@@ -200,7 +203,7 @@ export function EngineerDashboard({
             <div className="mt-md grid grid-cols-3 gap-2 border-t pt-md text-center">
               <div>
                 <strong className="text-title tabular-nums">
-                  {progress.percent}%
+                  {progress ? `${progress.percent}%` : "—"}
                 </strong>
                 <div className="mt-1 text-label text-fg-secondary">
                   {ar ? "اكتمال الملف" : "Profile complete"}

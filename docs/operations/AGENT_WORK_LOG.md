@@ -1,4 +1,22 @@
 
+## 2026-10-28 — Engineer profile completion
+
+- **Request:** reuse the installer's full completion experience for engineers.
+- **Delivered:** guarded `/home/profile/complete`, four sections with existing
+  identity, professional, availability and portfolio editors; saved-data progress,
+  in-place professional save, retained inputs across steps, home/profile entry links.
+- **Boundary:** no schema, hosted data, verification or public-sharing changes.
+  Username still edits in settings; each form has its own save operation.
+- **Owner refinement:** architecture/civil single selection, six multi-select
+  services, and AutoCAD/3ds Max multi-select tools in the existing supplemental
+  skills array. Shared onboarding catalog updated. One targeted save-payload
+  test passed for this refinement; no repeated broad suite.
+- **Validation:** 12 focused component tests pass. Browser checked Arabic and
+  English desktop, selected-only sections, mobile English dark; corrected narrow
+  mobile hero and contrasting text. Typecheck and focused lint run before finish.
+- **Deferred:** full-stack release verification and production deployment remain
+  subject to the existing visual/PR review. Concurrent auth/settings work preserved.
+
 ## 2026-10-25 — Engineer RFQ reference redesign
 
 - **Purpose / scope:** document the owner-reference RFQ page only. Compact
