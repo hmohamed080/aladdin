@@ -1,3 +1,9 @@
+## Hosted signed-request smoke — 2026-10-28 (PASS)
+- Owner executed a freshly signed Standard Webhooks POST using the password-manager-held Acceptance signing secret, a synthetic Egyptian phone `+201000000000`, and a dummy `000000` OTP (not a real user or OTP). Their PowerShell output showed **`PASS: Valid signature verified; WhatsApp delivery disabled.`**, corresponding to HTTP 503 `delivery_disabled`, not HTTP 401. The secret/signature was never copied to chat or GitHub.
+- A separate `else : The term 'else' is not recognized` PowerShell parsing error appeared **after** the PASS. That is a shell control-flow issue (else submitted as a standalone command), not an indication that the preceding signed HTTP request failed.
+- Independently reconfirmed via Cloudflare API: Preview remains at Version `39b1dc27-8810-46f4-a328-5be1e7182ec5` (100%), `WHATSAPP_DELIVERY_ENABLED=false`, signature Secrets Store binding present, and Acceptance D1 replay claims **0 rows**.
+- Signed hosted read and fail-closed delivery gate are now **PASS**. **Not tested:** WhatsApp send, Supabase Send SMS Hook integration, identity/phone-change contract, active phone Auth or production. Do not enable delivery or Hook without separate approved pilot.
+
 ## Hosted unsigned HTTP smoke tests — 2026-10-28 (PASS)
 - Owner executed live HTTP checks against `https://aladdin-whatsapp-otp-preview.bstalent9.workers.dev/hooks/supabase/send-sms` and reported: `GET → 404` **PASS**; `POST text/plain → 415` **PASS**; `POST application/json` unsigned `{} → 401` **PASS**.
 - Independently rechecked Cloudflare deployment API after those tests: deployed Version `39b1dc27-8810-46f4-a328-5be1e7182ec5` (100%), exact Acceptance D1 and two Secrets Store bindings, and `WHATSAPP_DELIVERY_ENABLED=false`. D1 replay journal remains **0 rows**.
