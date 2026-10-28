@@ -4,7 +4,7 @@ import { handleRequest, verifySignature, parseEvent, type ReplayDb } from "../sr
 
 const secret = "v1,whsec_" + btoa("A".repeat(32));
 const env = {
-  SUPABASE_SEND_SMS_HOOK_SECRET: secret,
+  SUPABASE_SEND_SMS_HOOK_SECRET: { get: async () => secret },
   WHATSAPP_ACCESS_TOKEN: { get: async () => "do-not-log" },
   WHATSAPP_PHONE_NUMBER_ID: "1415528588305492",
   WHATSAPP_OTP_TEMPLATE: "aladdin_otp",
@@ -94,7 +94,7 @@ test("delivery disabled is fail-closed even with valid signed request", async ()
   assert.equal(result.status, 503);
   assert.equal(calls, 0);
 });
-test("does not read account secret while delivery is disabled", async () => {
+test("does not read Meta account secret while delivery is disabled", async () => {
   let reads = 0;
   const guarded = {
     ...env,
@@ -103,6 +103,13 @@ test("does not read account secret while delivery is disabled", async () => {
   const result = await handleRequest(await signedRequest(event), guarded);
   assert.equal(result.status, 503);
   assert.equal(reads, 0);
+});
+test("signing secret binding outages fail closed", async () => {
+  const req=await signedRequest(event);
+  let calls=0;
+  const r=await handleRequest(req,{...env,SUPABASE_SEND_SMS_HOOK_SECRET:{get:async()=>{throw new Error("offline");}}},(async()=>{calls++;return new Response();}) as typeof fetch);
+  assert.equal(r.status,503);
+  assert.equal(calls,0);
 });
 test("missing Secrets Store secret refuses to contact Meta", async () => {
   let calls = 0;
