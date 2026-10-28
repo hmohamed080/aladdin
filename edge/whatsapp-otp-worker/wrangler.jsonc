@@ -1,0 +1,18 @@
+{
+  "$schema": "../../frontend/node_modules/wrangler/config-schema.json",
+  "name": "aladdin-whatsapp-otp-preview",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "routes": [],
+  "observability": { "enabled": true },
+  "vars": {
+    "WHATSAPP_OTP_TEMPLATE": "aladdin_otp",
+    "WHATSAPP_OTP_LANGUAGE": "ar",
+    "WHATSAPP_GRAPH_API_VERSION": "v25.0",
+    "WHATSAPP_DELIVERY_ENABLED": "false"
+  },
+  "secrets": {
+    "required": ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "SUPABASE_SEND_SMS_HOOK_SECRET"]
+  }
+}
