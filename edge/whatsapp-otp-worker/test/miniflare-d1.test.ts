@@ -59,7 +59,12 @@ test("D1 real SQL engine: concurrent signed Worker handlers atomically claim onc
     // Keep the exact migration SQL statements, removing just standalone comment lines.
     const ddl = readFileSync(new URL("../migrations/0001_hook_events.sql",import.meta.url),"utf8")
       .split(/\r?\n/).filter(line => !line.trim().startsWith("--")).join("\n");
-    await d1.exec(ddl);
+    // D1.exec treats each newline as a standalone statement; migration SQL is multiline.
+    // Prepare each semicolon-delimited statement instead, matching remote migration execution.
+    for (const stmt of ddl.split(";").map(x => x.trim()).filter(Boolean)) {
+      const result = await d1.prepare(stmt).run();
+      assert.equal(result.success, true);
+    }
     const db=d1 as unknown as ReplayDb;
     const first = await claimEvent(db,"d1-direct-smoke-1");
     const repeat = await claimEvent(db,"d1-direct-smoke-1");
