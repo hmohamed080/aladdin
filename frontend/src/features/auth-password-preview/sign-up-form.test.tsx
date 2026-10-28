@@ -21,7 +21,8 @@ describe("PasswordSignUpForm (Instagram style)", () => {
     expect(contact.autocomplete).toBe("username");
     const form = contact.closest("form")!;
     const order = Array.from(form.querySelectorAll("input:not([type=hidden]), select")).map((el) => (el as HTMLInputElement).name);
-    expect(order).toEqual(["contact", "password", "birthDate", "displayName", "username", "accountType"]);
+    expect(order).toEqual(["contact", "password", "", "", "", "displayName", "username", "accountType"]);
+    expect(form.querySelector('input[type=hidden][name="birthDate"]')).not.toBeNull();
     expect((screen.getByLabelText(en.authPasswordPreview.passwordLabel) as HTMLInputElement).autocomplete).toBe("new-password");
     expect(form.querySelector('input[type=hidden][name="captchaToken"]')).not.toBeNull();
   });
@@ -41,13 +42,22 @@ describe("PasswordSignUpForm (Instagram style)", () => {
     }
   });
 
-  it("takes the birthday as a private date no later than 18 years ago", () => {
+  it("takes the birthday as Month / Day / Year dropdowns, 18+ years only, and submits one YYYY-MM-DD value", () => {
     renderWithI18n(<PasswordSignUpForm />, "en");
-    const birthday = screen.getByLabelText(en.authPasswordPreview.signUp.birthDateLabel) as HTMLInputElement;
-    expect(birthday.type).toBe("date");
-    expect(birthday.required).toBe(true);
-    const max = new Date(birthday.max);
-    expect(new Date().getFullYear() - max.getFullYear()).toBe(18);
+    const month = screen.getByLabelText(en.authPasswordPreview.signUp.birthMonth) as HTMLSelectElement;
+    const day = screen.getByLabelText(en.authPasswordPreview.signUp.birthDay) as HTMLSelectElement;
+    const year = screen.getByLabelText(en.authPasswordPreview.signUp.birthYear) as HTMLSelectElement;
+    for (const select of [month, day, year]) expect(select.required).toBe(true);
+    expect(month.options[1]!.textContent).toBe("January");
+    expect(Number(year.options[1]!.value)).toBe(new Date().getFullYear() - 18);
+    const hidden = document.querySelector('input[type=hidden][name="birthDate"]') as HTMLInputElement;
+    expect(hidden.value).toBe("");
+    fireEvent.change(month, { target: { value: "2" } });
+    expect(day.options).toHaveLength(1 + 29);
+    fireEvent.change(day, { target: { value: "9" } });
+    fireEvent.change(year, { target: { value: "1990" } });
+    expect(hidden.value).toBe("1990-02-09");
+    expect(day.options).toHaveLength(1 + 28);
     expect(screen.getByText(en.authPasswordPreview.signUp.birthDateHint)).toBeInTheDocument();
   });
 

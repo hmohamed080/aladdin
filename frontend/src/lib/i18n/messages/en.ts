@@ -6456,6 +6456,9 @@ export const en = {
     signUp: {
       contactLabel: "Mobile number or email",
       birthDateLabel: "Birthday",
+      birthMonth: "Month",
+      birthDay: "Day",
+      birthYear: "Year",
       birthDateHint: "Your birthday stays private. It's never shown on your profile.",
       usernameLabel: "Username",
       agreementPrefix: "By signing up, you agree to our",

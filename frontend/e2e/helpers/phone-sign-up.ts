@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { createHash, createHmac, randomInt } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
-import { E2E_BIRTH_DATE, E2E_PASSWORD, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline, waitForCaptchaToken } from "./auth";
+import { E2E_PASSWORD, fillBirthDate, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline, waitForCaptchaToken } from "./auth";
 
 /**
  * Mobile-number sign-up (ADR-0025) through the REAL `/auth/sign-up` and server
@@ -50,7 +50,7 @@ export async function requestPhoneSignUp(
   await page.goto(`/auth/sign-up?type=${type}`);
   await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(phone);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
-  await page.locator('input[name="birthDate"]').fill(E2E_BIRTH_DATE);
+  await fillBirthDate(page);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill(name);
   await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
   await waitForCaptchaToken(page);

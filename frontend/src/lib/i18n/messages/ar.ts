@@ -6296,6 +6296,9 @@ export const ar: Messages = {
     signUp: {
       contactLabel: "رقم الموبايل أو البريد الإلكتروني",
       birthDateLabel: "تاريخ الميلاد",
+      birthMonth: "الشهر",
+      birthDay: "اليوم",
+      birthYear: "السنة",
       birthDateHint: "تاريخ ميلادك خاص بك ولا يظهر في ملفك الشخصي.",
       usernameLabel: "اسم المستخدم",
       agreementPrefix: "بالتسجيل، أنت توافق على",

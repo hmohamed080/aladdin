@@ -1,5 +1,5 @@
 import { test, expect, type Page, type APIRequestContext, type BrowserContext } from "@playwright/test";
-import { E2E_BIRTH_DATE, IDENTITIES, messageIdsFor, readNewOtp, selectAccountType, signIn, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline } from "./helpers/auth";
+import { fillBirthDate, IDENTITIES, messageIdsFor, readNewOtp, selectAccountType, signIn, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline } from "./helpers/auth";
 
 // Offline sandboxes only (E2E_STUB_TURNSTILE=1); a no-op in CI, where the real widget runs.
 test.beforeEach(async ({ page }) => {
@@ -54,7 +54,7 @@ async function fillSignUp(page: Page, email: string, username: string, accountTy
   await page.goto("/auth/sign-up");
   await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(email);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-  await page.locator('input[name="birthDate"]').fill(E2E_BIRTH_DATE);
+  await fillBirthDate(page);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
   await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
   await selectAccountType(page, accountType);

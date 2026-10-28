@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { resendPasswordSignUpCode, verifyPasswordSignUp, type PasswordAuthState } from "@/server/actions/auth-password-preview";
@@ -13,7 +13,8 @@ import { Input, SubmitButton, ResendButton, Button, Select } from "@/components/
 import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "./password-input";
 import { TurnstileWidget } from "./turnstile-widget";
-import { DISPLAY_NAME_MAX_LENGTH, MINIMUM_SIGN_UP_AGE } from "./password-policy";
+import { DISPLAY_NAME_MAX_LENGTH } from "./password-policy";
+import { BirthDateSelect } from "./birth-date-select";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
 
 const initial: PhoneSignUpState = { ok: false };
@@ -46,13 +47,6 @@ const PHONE_RESTART_CODES = new Set([
 function FieldError({ code }: { code?: string }) {
   const { t } = useI18n();
   return code ? <p role="alert" className="text-label text-danger">{t(code)}</p> : null;
-}
-
-/** The latest birthday that is old enough, as a date-input `max`. */
-function latestAdultBirthDate(): string {
-  const d = new Date();
-  d.setFullYear(d.getFullYear() - MINIMUM_SIGN_UP_AGE);
-  return d.toISOString().slice(0, 10);
 }
 
 /**
@@ -93,10 +87,9 @@ export function PasswordSignUpForm({
 
   const [editing, setEditing] = useState(false);
   const [cooldown, setCooldown] = useState(0);
-  const [values, setValues] = useState({ contact: "", displayName: "", username: "", birthDate: "", accountType: initialAccountType });
+  const [values, setValues] = useState({ contact: "", displayName: "", username: "", accountType: initialAccountType });
   const [password, setPassword] = useState("");
   const [restartCode, setRestartCode] = useState<string | undefined>();
-  const maxBirthDate = useMemo(() => latestAdultBirthDate(), []);
 
   const codeSent = sendState.ok && !editing;
   const channel = sendState.channel ?? "email";
@@ -259,21 +252,10 @@ export function PasswordSignUpForm({
         />
         <FieldError code={errorFor("password")} />
 
-        <label htmlFor="birthDate" className="mt-xs text-label font-medium text-fg-secondary">
+        <p id="birthDateLabel" className="mt-xs text-label font-medium text-fg-secondary">
           {t("authPasswordPreview.signUp.birthDateLabel")}
-        </label>
-        <Input
-          id="birthDate"
-          name="birthDate"
-          type="date"
-          required
-          min="1900-01-01"
-          max={maxBirthDate}
-          value={values.birthDate}
-          onChange={set("birthDate")}
-          aria-describedby="birthDateHint"
-          aria-invalid={errorField === "birthDate" || undefined}
-        />
+        </p>
+        <BirthDateSelect invalid={errorField === "birthDate"} describedBy="birthDateHint" />
         <p id="birthDateHint" className="text-label text-fg-muted">{t("authPasswordPreview.signUp.birthDateHint")}</p>
         <FieldError code={errorFor("birthDate")} />
 
