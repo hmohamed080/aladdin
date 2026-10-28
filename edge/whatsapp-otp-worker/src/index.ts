@@ -1,5 +1,17 @@
 /** Preview-only signed Supabase Send SMS Hook transport. No OTP authority. */
+/** Minimal Cloudflare D1 interface for atomic, durable replay claims. */
+export interface ReplayDb {
+  prepare(sql: string): {
+    bind(...values: (string | number)[]): {
+      run(): Promise<{ success: boolean; meta?: { changes?: number } }>;
+      first<T>(): Promise<T | null>;
+    };
+  };
+}
+
 export interface Env {
+  IDEMPOTENCY_DB?: ReplayDb;
+  OTP_ALLOWED_RECIPIENTS?: string;
   SUPABASE_SEND_SMS_HOOK_SECRET: string;
   WHATSAPP_ACCESS_TOKEN: { get(): Promise<string> };
   WHATSAPP_PHONE_NUMBER_ID: string;
@@ -38,6 +50,36 @@ export async function verifySignature(body: string, headers: Headers, secret: st
   }
   return false;
 }
+/** Retain only a hash of the opaque webhook-id, never OTP or phone details. */
+async function replayHash(eventId: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(eventId));
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Unique database insert is the concurrency boundary; a failed DB operation must fail closed. */
+export async function claimEvent(db: ReplayDb, eventId: string): Promise<{ outcome: "new" | "accepted" | "blocked" | "error"; idHash: string }> {
+  const idHash = await replayHash(eventId);
+  try {
+    const result = await db.prepare(
+      "INSERT OR IGNORE INTO whatsapp_hook_events (event_hash, created_at, state) VALUES (?1, ?2, 'reserved')"
+    ).bind(idHash, Math.floor(Date.now() / 1000)).run();
+    if (result.success !== true || typeof result.meta?.changes !== "number") return { outcome: "error", idHash };
+    if (result.meta.changes === 1) return { outcome: "new", idHash };
+    const saved = await db.prepare("SELECT state FROM whatsapp_hook_events WHERE event_hash = ?1").bind(idHash).first<{ state: string }>();
+    return { outcome: saved?.state === "accepted" ? "accepted" : "blocked", idHash };
+  } catch {
+    return { outcome: "error", idHash };
+  }
+}
+async function recordOutcome(db: ReplayDb, idHash: string, accepted: boolean): Promise<boolean> {
+  try {
+    const result = await db.prepare(
+      "UPDATE whatsapp_hook_events SET state = ?1 WHERE event_hash = ?2 AND state = 'reserved'"
+    ).bind(accepted ? "accepted" : "failed", idHash).run();
+    return result.success === true && result.meta?.changes === 1;
+  } catch { return false; }
+}
+
 export function parseEvent(body: string): { phone: string; otp: string } | null {
   let event: unknown;
   try { event = JSON.parse(body); } catch { return null; }
@@ -91,8 +133,22 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
   if (!await verifySignature(raw, request.headers, env.SUPABASE_SEND_SMS_HOOK_SECRET)) return answer(401);
   const v = parseEvent(raw);
   if (!v) return answer(422);
-  // Delivery stays OFF until canonical identity and durable replay protection are validated.
+  // An isolated acceptance-only allowlist is mandatory. No allowlist means no send.
   if (env.WHATSAPP_DELIVERY_ENABLED !== "true") return answer(503, { error: "delivery_disabled" });
-  return await submitOtp(v.phone, v.otp, env, fetcher) ? answer(200) : answer(502, { error: "delivery_unavailable" });
+  const allowed = (env.OTP_ALLOWED_RECIPIENTS ?? "").split(",").map(x => x.trim()).filter(Boolean);
+  if (!allowed.includes(v.phone)) return answer(403);
+  const db = env.IDEMPOTENCY_DB;
+  if (!db) return answer(503, { error: "idempotency_unavailable" });
+  const eventId = request.headers.get("webhook-id");
+  if (!eventId) return answer(401);
+  const claim = await claimEvent(db, eventId);
+  if (claim.outcome === "error") return answer(503, { error: "idempotency_unavailable" });
+  if (claim.outcome === "accepted") return answer(200); // same signed event, never re-send
+  if (claim.outcome === "blocked") return answer(503, { error: "already_attempted" });
+  // Reservation is written BEFORE Meta request. Even ambiguous network failures are never retried.
+  const accepted = await submitOtp(v.phone, v.otp, env, fetcher);
+  const saved = await recordOutcome(db, claim.idHash, accepted);
+  if (!saved) return answer(503, { error: "idempotency_unavailable" });
+  return accepted ? answer(200) : answer(502, { error: "delivery_unavailable" });
 }
 export default { fetch(request: Request, env: Env): Promise<Response> { return handleRequest(request, env); } };
