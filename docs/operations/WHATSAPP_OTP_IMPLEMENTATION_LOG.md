@@ -1,3 +1,10 @@
+
+## Secrets Store signing-key checkpoint — 2026-10-28
+- Operator generated and retained a dedicated `v1,whsec_…` signature secret in a password manager; **the value is not included in repo or conversation**.
+- Cloudflare API confirmed both account secrets `WHATSAPP_ACCESS_TOKEN` and `SUPABASE_SEND_SMS_HOOK_SECRET` are **active** and scoped to Workers in store `acfaa67f391e499db6fde398022f50ce`. Values not fetched.
+- `wrangler.jsonc` now binds **both** via `secrets_store_secrets`. `src/index.ts` reads signing key via async `get()` and returns 503 if missing/throwing. Removed the old per-Worker secret declaration; Preview guard verifies both exact account resources.
+- Miniflare local HTTP cannot emulate account Secrets Store `get()` via a plaintext binding. Its bundle test now explicitly verifies refusal when that binding is unavailable; signed handler/D1 tests inject a fake `get()`. **A hosted Worker smoke test is required to prove the real Cloudflare Secrets Store runtime binding.** Do not claim end-to-end coverage from local mocks.
+- The secret has **not** been entered in the Supabase Acceptance Send SMS Hook. Do not enable/create the Hook yet; the operator must use the identical saved value on the Supabase side at the separately approved activation stage. No Worker deployed, no messages sent, no Production changes.
 # WhatsApp OTP — Implementation & Verification Record
 **Updated:** 2026-10-28 | **Scope:** PR #114, Acceptance-only preparation | **Owner approval:** no merge, production rollout or active OTP traffic authorized
 
