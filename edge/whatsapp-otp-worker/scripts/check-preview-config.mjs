@@ -2,8 +2,11 @@
 // Acceptance-only deploy guard. Never call Cloudflare APIs from this script.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
-const config = JSON.parse(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
+// Optional path is for negative fixture tests; CI/deploy calls without arguments.
+const configPath = process.argv[2] ? resolve(process.argv[2]) : fileURLToPath(new URL("../wrangler.jsonc", import.meta.url));
+const config = JSON.parse(readFileSync(configPath, "utf8"));
 const errors = [];
 const must = (predicate, reason) => { if (!predicate) errors.push(reason); };
 must(config.name === "aladdin-whatsapp-otp-preview", "unexpected Worker name");
