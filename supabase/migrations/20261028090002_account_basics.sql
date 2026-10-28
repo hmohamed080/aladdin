@@ -70,7 +70,7 @@ create policy user_specialties_select_self on public.user_specialties
 
 create policy user_specialties_select_platform on public.user_specialties
   for select to authenticated
-  using (app.is_platform('support'));
+  using ((select app.is_platform('support')));
 
 revoke all    on public.user_specialties from anon, authenticated, service_role;
 grant  select on public.user_specialties to   authenticated, service_role;
