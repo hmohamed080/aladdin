@@ -14,6 +14,10 @@ The Worker verifies Standard Webhooks HMAC over the raw body, checks clock skew,
 ## Current product incompatibility (BLOCKER)
 The existing canonical account model is General **Email + Password**, with Email OTP during registration and recovery. Installer/Showroom uses **Phone + Password** with a synthetic email alias; Supabase Phone Auth is disabled and phone identifiers must remain tied to the existing user ID. Enabling Send SMS Hook alone does not add WhatsApp OTP to those flows. A user can already hold one or more organizational roles; never create duplicate users by independently calling `signInWithOtp({phone})` without identity-linking analysis.
 
+**Investigation finding (2026-10-28):** the installer and showroom server actions call the shared `phonePasswordSignIn/Up` implementation, which stores phone in `profiles.phone_e164` while using the internal email alias for Supabase credentials. A read-only Acceptance inventory shows 6 Auth users but no synthetic alias/GoTrue phone identities, so existing-user preservation cannot yet be validated in hosted Acceptance. See `docs/operations/WHATSAPP_OTP_IDENTITY_PILOT.md`.
+
+**Suggested first pilot (not approved):** authenticated phone ownership verification via Supabase `auth.updateUser({phone})` and `verifyOtp({type:"phone_change"})`, with the phone restricted to the signed-in user's already claimed profile phone and the same Auth user ID before/after. This is safer to explore than anonymous phone sign-in but still requires review of global Phone Auth activation, conflicts, current-password step-up and all organizational permissions. The first user-facing feature has **not** been selected or implemented.
+
 The first product flow for WhatsApp (phone verification, installer recovery, phone sign-in, or phone enrollment) must be chosen and security-reviewed; identity migration/account linking is a separate, guarded change and requires adversarial tests.
 
 ## Rationale
@@ -42,6 +46,7 @@ One extra narrowly scoped Worker, one dedicated hosted Acceptance D1 for replay 
 
 ## Related files
 - `edge/whatsapp-otp-worker/`
+- `docs/operations/WHATSAPP_OTP_IDENTITY_PILOT.md`
 - `docs/frontend/installer-phone-auth.md`
 - `docs/frontend/entry-auth-methods.md`
 - `docs/architecture/ARCHITECTURE_GUIDE.md`
