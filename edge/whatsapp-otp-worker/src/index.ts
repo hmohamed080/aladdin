@@ -80,6 +80,28 @@ async function recordOutcome(db: ReplayDb, idHash: string, accepted: boolean): P
   } catch { return false; }
 }
 
+/** Seven-day retention, far beyond the five-minute signature window.
+ * Performs one bounded batch only; no cron trigger is installed on Preview.
+ * Fail closed on storage failure. All stored values are event ID hashes and state.
+ */
+export async function purgeExpiredReplayClaims(
+  db: ReplayDb | undefined,
+  nowSeconds = Math.floor(Date.now() / 1000),
+): Promise<{ success: boolean; deleted: number }> {
+  if (!db || !Number.isSafeInteger(nowSeconds) || nowSeconds < 604800) {
+    return { success: false, deleted: 0 };
+  }
+  try {
+    const result = await db.prepare(
+      "DELETE FROM whatsapp_hook_events WHERE event_hash IN (SELECT event_hash FROM whatsapp_hook_events WHERE created_at < ?1 ORDER BY created_at LIMIT 250)"
+    ).bind(nowSeconds - 604800).run();
+    if (result.success !== true || typeof result.meta?.changes !== "number") return { success: false, deleted: 0 };
+    return { success: true, deleted: result.meta.changes };
+  } catch {
+    return { success: false, deleted: 0 };
+  }
+}
+
 export function parseEvent(body: string): { phone: string; otp: string } | null {
   let event: unknown;
   try { event = JSON.parse(body); } catch { return null; }
