@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   messageIdsFor,
   readNewOtp,
+  reachLanding,
   newMessageSubjectsFor,
   registerWithPassword,
   selectAccountType,
@@ -93,7 +94,8 @@ const TRADESPERSON_APP_LANDING = /\/home(\/|$|\?)/;
 const APP_LANDING_TIMEOUT_MS = 20_000;
 async function expectAppLanding(page: import("@playwright/test").Page): Promise<void> {
   try {
-    await page.waitForURL(TRADESPERSON_APP_LANDING, { waitUntil: "commit", timeout: APP_LANDING_TIMEOUT_MS });
+    // Since ADR-0026 a new account first answers "Complete your account" (phone, location, specialties).
+    await reachLanding(page, TRADESPERSON_APP_LANDING, APP_LANDING_TIMEOUT_MS);
   } catch {
     // Fail fast with the evidence needed to tell the causes apart: an
     // expired/invalid code or a rate limit leaves us on the OTP step with an

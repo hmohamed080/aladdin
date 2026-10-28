@@ -149,7 +149,39 @@ export async function signIn(
 
   // Wait on the URL committing, not the full "load" event — under sustained
   // full-suite load the load event can lag far behind an interactive page.
-  await page.waitForURL(expectedLanding, { waitUntil: "commit" });
+  await reachLanding(page, expectedLanding);
+}
+
+const ACCOUNT_BASICS_URL = /\/onboarding\/basics(\?|$)/;
+
+/**
+ * Waits for `landing`, completing the one-time "Complete your account" screen
+ * (ADR-0026: phone, governorate + town, specialties) through the REAL form if
+ * the account is sent there first. Only the sections the account still misses
+ * are on the page.
+ */
+export async function reachLanding(page: Page, landing: RegExp, timeout = 20_000): Promise<void> {
+  const onBasics = (url: URL) => ACCOUNT_BASICS_URL.test(url.pathname + url.search);
+  await page.waitForURL((url) => onBasics(url) || landing.test(url.href), { waitUntil: "commit", timeout });
+  if (onBasics(new URL(page.url()))) {
+    await completeAccountBasics(page);
+    await page.waitForURL(landing, { waitUntil: "commit", timeout });
+  }
+}
+
+/** Fills whatever the basics screen asks for and continues. */
+export async function completeAccountBasics(page: Page): Promise<void> {
+  await expect(page.getByRole("heading", { name: /complete your account|أكمل حسابك/i })).toBeVisible();
+  const phone = page.locator('input[name="phone"]');
+  if (await phone.count()) await phone.fill(`010${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`);
+  const governorate = page.locator('select[name="governorate"]');
+  if (await governorate.count()) {
+    await governorate.selectOption("cairo");
+    await page.locator("select#city").selectOption("new-cairo");
+  }
+  const chips = page.locator('[aria-labelledby="basics-specialties"][role="group"] button');
+  if (await chips.count()) await chips.first().click();
+  await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
 }
 
 /**
@@ -237,5 +269,5 @@ export async function registerWithPassword(
   const code = await readNewOtp(request, email, seen);
   await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
   await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
-  await page.waitForURL(landing, { waitUntil: "commit", timeout: 20_000 });
+  await reachLanding(page, landing);
 }

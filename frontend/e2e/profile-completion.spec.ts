@@ -1,5 +1,5 @@
 import { test, expect, type Page, type APIRequestContext, type BrowserContext } from "@playwright/test";
-import { fillBirthDate, IDENTITIES, messageIdsFor, readNewOtp, selectAccountType, signIn, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline } from "./helpers/auth";
+import { fillBirthDate, IDENTITIES, reachLanding, messageIdsFor, readNewOtp, selectAccountType, signIn, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline } from "./helpers/auth";
 
 // Offline sandboxes only (E2E_STUB_TURNSTILE=1); a no-op in CI, where the real widget runs.
 test.beforeEach(async ({ page }) => {
@@ -83,7 +83,7 @@ async function register(page: Page, request: APIRequestContext, tag: string, acc
   await fillSignUp(page, email, username, accountType);
   const seen = await submitSignUp(page, request, email);
   await verify(page, request, email, seen);
-  await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
+  await reachLanding(page, /\/home(\/|$|\?)/);
   return { email, username };
 }
 
@@ -217,7 +217,7 @@ test.describe("Direct entry after registration", () => {
 
     // B verifies first and claims the name; A's claim now collides.
     await verify(pageB, request, emailB, seenB);
-    await pageB.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
+    await reachLanding(pageB, /\/home(\/|$|\?)/);
     // Both passed the Step-1 pre-flight (it is not a reservation); the
     // post-OTP claim is the authority, so A — verifying second — collides.
     await verify(pageA, request, emailA, seenA);
@@ -237,7 +237,7 @@ test.describe("Direct entry after registration", () => {
     await expect(pageA.getByLabel(/email address|البريد الإلكتروني/i)).toHaveCount(0);
     await pageA.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("racefix"));
     await pageA.getByRole("button", { name: /continue|متابعة/i }).click();
-    await pageA.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
+    await reachLanding(pageA, /\/home(\/|$|\?)/);
     // Recovery keeps the registration choice: A is still a Tradesperson, so it gets the approved Installer profile page.
     await pageA.goto("/home/profile");
     await expect(pageA.getByTestId("profile-hero")).toBeVisible();
@@ -256,8 +256,10 @@ test.describe("Complete your profile", () => {
     // A fresh Sales Team member: 4 shared items + the 4 professional ones — headline, years, about,
     // and an activity (supabase/migrations/20260924090003 seeds sales_rep and sales_manager, so activities
     // count for this persona) — = 8. The username AND the Full Name entered at sign-up (confirmed through
-    // profile_set_display_name after the OTP) are done — 2/8 = 25%; the phone makes 3/8 = 38%; the photo 4/8 = 50%.
-    await expect(percent).toHaveText("25% complete");
+    // profile_set_display_name after the OTP) are done, and since ADR-0026 the phone and an activity are given on the
+    // "Complete your account" screen right after sign-up — so editing them here moves nothing, and the photo adds one item.
+    await expect(percent).toHaveText(/^\d+% complete$/);
+    const startPercent = parseInt((await percent.textContent()) ?? "0", 10);
     await expect(page.getByText(/preferred language|اللغة المفضّلة/i)).toHaveCount(0);
 
     // Display name: the sign-up Full Name is already the confirmed value, and
@@ -270,7 +272,7 @@ test.describe("Complete your profile", () => {
     await page.reload();
     await expect(page.getByLabel("Display name")).toHaveValue("E2E Tester Renamed");
     await expect(page.getByTestId("display-name-status")).toHaveText("Confirmed");
-    await expect(percent).toHaveText("25% complete");
+    await expect(percent).toHaveText(`${startPercent}% complete`);
 
     // Phone: Egypt is the default, not the only choice.
     await expect(phoneCountry(page)).toContainText("+20");
@@ -284,7 +286,7 @@ test.describe("Complete your profile", () => {
     await page.reload();
     await expect(page.locator("#phone-national")).toHaveValue(national);
     await expect(phoneCountry(page)).toContainText("+20");
-    await expect(percent).toHaveText("38% complete");
+    await expect(percent).toHaveText(`${startPercent}% complete`);
 
     // Avatar: cancel uploads nothing.
     const red = await pngBytes(page, "red");
@@ -312,7 +314,7 @@ test.describe("Complete your profile", () => {
     await page.reload();
     await expect(page.getByTestId("avatar-current")).toBeVisible();
 
-    await expect(percent).toHaveText("50% complete");
+    await expect.poll(async () => parseInt((await percent.textContent()) ?? "0", 10)).toBeGreaterThan(startPercent);
     // Still incomplete, still visible, and it never blocked anything on the page.
     await expect(page.getByTestId("complete-profile-card")).toBeVisible();
     await expect(page.getByTestId("complete-profile-missing").locator("[data-item=avatar]")).toHaveCount(0);

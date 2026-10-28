@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { createHash, createHmac, randomInt } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
-import { E2E_PASSWORD, fillBirthDate, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline, waitForCaptchaToken } from "./auth";
+import { E2E_PASSWORD, fillBirthDate, reachLanding, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline, waitForCaptchaToken } from "./auth";
 
 /**
  * Mobile-number sign-up (ADR-0025) through the REAL `/auth/sign-up` and server
@@ -73,7 +73,7 @@ export async function verifyPhoneSignUp(page: Page, challengeId: string, landing
   await expect(step.locator('input[type="hidden"][name="token"]')).toHaveValue(KNOWN_PHONE_CODE);
   await expect(step.locator("form").first().locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30_000 });
   await step.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
-  await page.waitForURL(landing, { waitUntil: "commit", timeout: 30_000 });
+  await reachLanding(page, landing, 30_000);
 }
 
 /** Full mobile-number registration; leaves the browser signed in. */

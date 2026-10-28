@@ -6417,6 +6417,31 @@ export const en = {
      The namespace keeps its historical name; `auth.*` holds the legacy
      passwordless copy (/auth/verify, /auth/recovery) plus strings the canonical pages share
      (brand panel, installer phone sign-in link). */
+  accountBasics: {
+    title: "Complete your account",
+    subtitle: "Three quick details so the right people can find and reach you.",
+    phoneLabel: "Mobile number",
+    phoneHint: "Used to contact you about your projects and requests.",
+    locationLabel: "Where are you based?",
+    governorateLabel: "Governorate",
+    cityLabel: "Town",
+    cityOther: "Other",
+    cityCustomLabel: "Type your town",
+    specialtiesLabel: "Your specialties",
+    specialtiesHint: "Pick all that apply. The first one you pick is your main specialty.",
+    main: "Main",
+    submit: "Continue",
+    saving: "Saving…",
+    error: {
+      phoneRequired: "Enter your mobile number.",
+      phoneInvalid: "Enter a valid mobile number.",
+      phoneTaken: "This mobile number is already used by another account.",
+      locationRequired: "Choose your governorate and town.",
+      locationInvalid: "Choose your governorate and town from the list, or type your town.",
+      specialtiesRequired: "Pick at least one specialty.",
+      saveFailed: "We couldn't save your details. Please try again.",
+    },
+  },
   authPasswordPreview: {
     showPassword: "Show password",
     hidePassword: "Hide password",

@@ -4696,6 +4696,8 @@ export type Database = {
           available_for_work: boolean
           avatar_media_id: string | null
           bio: string | null
+          city_custom_name: string | null
+          city_key: string | null
           cover_media_id: string | null
           created_at: string
           deleted_at: string | null
@@ -4703,6 +4705,7 @@ export type Database = {
           display_name_ar: string | null
           display_name_confirmed_at: string | null
           display_name_en: string | null
+          governorate_key: string | null
           headline: string | null
           id: string
           languages: string[] | null
@@ -4722,6 +4725,8 @@ export type Database = {
           available_for_work?: boolean
           avatar_media_id?: string | null
           bio?: string | null
+          city_custom_name?: string | null
+          city_key?: string | null
           cover_media_id?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -4729,6 +4734,7 @@ export type Database = {
           display_name_ar?: string | null
           display_name_confirmed_at?: string | null
           display_name_en?: string | null
+          governorate_key?: string | null
           headline?: string | null
           id?: string
           languages?: string[] | null
@@ -4748,6 +4754,8 @@ export type Database = {
           available_for_work?: boolean
           avatar_media_id?: string | null
           bio?: string | null
+          city_custom_name?: string | null
+          city_key?: string | null
           cover_media_id?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -4755,6 +4763,7 @@ export type Database = {
           display_name_ar?: string | null
           display_name_confirmed_at?: string | null
           display_name_en?: string | null
+          governorate_key?: string | null
           headline?: string | null
           id?: string
           languages?: string[] | null
@@ -6184,6 +6193,42 @@ export type Database = {
           },
           {
             foreignKeyName: "user_trade_specialties_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_specialties: {
+        Row: {
+          created_at: string
+          is_primary: boolean
+          trade_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          is_primary?: boolean
+          trade_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          is_primary?: boolean
+          trade_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_specialties_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_specialties_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -7656,6 +7701,15 @@ export type Database = {
       }
     }
     Functions: {
+      account_basics_set: {
+        Args: {
+          p_city: string
+          p_city_custom: string
+          p_governorate: string
+          p_specialties: string[]
+        }
+        Returns: undefined
+      }
       account_entry_allowed: { Args: { p_kind: string }; Returns: boolean }
       account_password_confirm: {
         Args: { p_operation: string; p_password: string; p_target: string }
@@ -8985,6 +9039,7 @@ export type Database = {
         }[]
       }
       my_profile_completion: { Args: never; Returns: Json }
+      my_account_basics: { Args: never; Returns: Json }
       my_registration_state: { Args: never; Returns: string }
       my_review_monthly: {
         Args: { p_months?: number }

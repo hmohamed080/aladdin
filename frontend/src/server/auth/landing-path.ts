@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sanitizeNext } from "@/server/auth/next";
 import { resolveActiveLanding } from "@/server/queries/landing";
+import { accountBasicsPath, needsAccountBasics } from "@/server/queries/account-basics";
 import { hasAppAccess, type RegistrationState } from "@/server/queries/registration";
 import type { Database } from "@/types/database.types";
 
@@ -20,5 +21,7 @@ export async function entryLandingPath(supabase: SupabaseClient<Database>, rawNe
   const { data: state } = await supabase.rpc("my_registration_state");
   if (!hasAppAccess(state as RegistrationState)) return "/onboarding";
   const landing = await resolveActiveLanding(supabase);
-  return next === landing || next.startsWith(`${landing}/`) ? next : landing;
+  const destination = next === landing || next.startsWith(`${landing}/`) ? next : landing;
+  // Phone, location and specialties are asked once, for every account (ADR-0026).
+  return (await needsAccountBasics(supabase)) ? accountBasicsPath(destination) : destination;
 }

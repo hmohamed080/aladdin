@@ -6257,6 +6257,31 @@ export const ar: Messages = {
      The namespace keeps its historical name; `auth.*` holds the legacy
      passwordless copy (/auth/verify, /auth/recovery) plus strings the canonical pages share
      (brand panel, installer phone sign-in link). */
+  accountBasics: {
+    title: "أكمل حسابك",
+    subtitle: "ثلاث معلومات سريعة ليجدك الأشخاص المناسبون ويتواصلوا معك.",
+    phoneLabel: "رقم الموبايل",
+    phoneHint: "نستخدمه للتواصل معك بخصوص مشروعاتك وطلباتك.",
+    locationLabel: "أين مقرك؟",
+    governorateLabel: "المحافظة",
+    cityLabel: "المدينة",
+    cityOther: "أخرى",
+    cityCustomLabel: "اكتب اسم مدينتك",
+    specialtiesLabel: "تخصصاتك",
+    specialtiesHint: "اختر كل ما ينطبق عليك. أول تخصص تختاره هو تخصصك الرئيسي.",
+    main: "رئيسي",
+    submit: "متابعة",
+    saving: "جارٍ الحفظ…",
+    error: {
+      phoneRequired: "أدخل رقم الموبايل.",
+      phoneInvalid: "أدخل رقم موبايل صحيحًا.",
+      phoneTaken: "رقم الموبايل هذا مستخدم في حساب آخر.",
+      locationRequired: "اختر المحافظة والمدينة.",
+      locationInvalid: "اختر المحافظة والمدينة من القائمة، أو اكتب اسم مدينتك.",
+      specialtiesRequired: "اختر تخصصًا واحدًا على الأقل.",
+      saveFailed: "تعذّر حفظ بياناتك. حاول مرة أخرى.",
+    },
+  },
   authPasswordPreview: {
     showPassword: "إظهار كلمة المرور",
     hidePassword: "إخفاء كلمة المرور",

@@ -21,6 +21,7 @@ import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { sanitizeNext } from "@/server/auth/next";
 import { captchaTokenFrom, isCaptchaFailure } from "@/server/auth/captcha";
 import { resolveActiveLanding } from "@/server/queries/landing";
+import { accountBasicsPath, needsAccountBasics } from "@/server/queries/account-basics";
 import { hasAppAccess, type RegistrationState } from "@/server/queries/registration";
 import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 import type { Database } from "@/types/database.types";
@@ -280,6 +281,8 @@ async function postSessionRedirect(supabase: SupabaseClient<Database>, next: str
 
   const landing = await resolveActiveLanding(supabase);
   const destination = next === landing || next.startsWith(`${landing}/`) ? next : landing;
+  // Phone, location and specialties are asked once, for every account (ADR-0026).
+  if (await needsAccountBasics(supabase)) redirect(accountBasicsPath(destination));
   redirect(destination);
 }
 
