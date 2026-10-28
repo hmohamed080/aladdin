@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { Miniflare } from "miniflare";
 import { claimEvent, handleRequest, type ReplayDb } from "../src/index.ts";
 
@@ -108,6 +109,52 @@ test("D1 real SQL engine: concurrent signed Worker handlers atomically claim onc
 
     const rows=await d1.prepare("SELECT COUNT(*) AS n FROM whatsapp_hook_events").first<{n:number}>();
     assert.equal(rows?.n,3);
+  } finally {
+    await mf.dispose();
+  }
+});
+
+test("built Worker runs through Miniflare HTTP with real D1, delivery OFF", async () => {
+  // The source is compiled by the preceding Wrangler dry-run step; never deployed.
+  const bundled = process.env.OTP_WORKER_BUNDLE_DIR ?? "/tmp/otp-worker-bundle";
+  const files = readdirSync(bundled).filter(name => name.endsWith(".js"));
+  assert.equal(files.length, 1, "expected one bundled Worker JS entrypoint");
+  const mf = new Miniflare({
+    modules: [{ type: "ESModule", path: join(bundled, files[0]) }],
+    compatibilityDate: "2026-10-01",
+    d1Databases: { IDEMPOTENCY_DB: "otp-http-workerd-test" },
+    bindings: {
+      SUPABASE_SEND_SMS_HOOK_SECRET: signingSecret,
+      WHATSAPP_PHONE_NUMBER_ID: "1415528588305492",
+      WHATSAPP_OTP_TEMPLATE: "aladdin_otp",
+      WHATSAPP_OTP_LANGUAGE: "ar",
+      WHATSAPP_GRAPH_API_VERSION: "v25.0",
+      WHATSAPP_DELIVERY_ENABLED: "false",
+      OTP_ALLOWED_RECIPIENTS: "",
+    },
+  });
+  try {
+    const db = await mf.getD1Database("IDEMPOTENCY_DB");
+    const ddl = readFileSync(new URL("../migrations/0001_hook_events.sql",import.meta.url),"utf8")
+      .split(/\\r?\\n/).filter(line => !line.trim().startsWith("--")).join("\\n");
+    for (const stmt of ddl.split(";").map(x=>x.trim()).filter(Boolean)) {
+      assert.equal((await db.prepare(stmt).run()).success, true);
+    }
+    assert.equal((await mf.dispatchFetch("https://worker.test/hooks/supabase/send-sms")).status,404);
+    assert.equal((await mf.dispatchFetch("https://worker.test/hooks/supabase/send-sms",{
+      method:"POST",headers:{"content-type":"text/plain"},body:"x",
+    })).status,415);
+    assert.equal((await mf.dispatchFetch("https://worker.test/hooks/supabase/send-sms",{
+      method:"POST",headers:{"content-type":"application/json"},body:fixture,
+    })).status,401);
+    const signed=await signedRequest("workerd-signed-disabled-01");
+    const disabled=await mf.dispatchFetch("https://worker.test/hooks/supabase/send-sms",{
+      method:"POST",headers:Object.fromEntries(signed.headers.entries()),body:fixture,
+    });
+    assert.equal(disabled.status,503);
+    assert.deepEqual(await disabled.json(),{error:"delivery_disabled"});
+    const rows=await db.prepare("SELECT COUNT(*) AS n FROM whatsapp_hook_events").first<{n:number}>();
+    assert.equal(rows?.n,0, "disabled requests must never claim D1 events");
   } finally {
     await mf.dispose();
   }
