@@ -22,6 +22,10 @@ alter table public.users
 comment on column public.users.birth_date is
   'Birthday collected at sign-up. Private (self-only users row, never public). Server-written after verification; 18+ enforced by the application.';
 
+-- The server writes it with the service role, whose write grants on users are
+-- column-scoped (20260804090001); add this one column only.
+grant update (birth_date) on public.users to service_role;
+
 create table public.phone_verification_challenges (
   id           uuid primary key default extensions.gen_random_uuid(),
   purpose      text        not null,
