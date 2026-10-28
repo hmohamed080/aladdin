@@ -1,5 +1,13 @@
 # Runtime State
 
+## 2026-10-28 — WhatsApp OTP replay-security progress (code only)
+
+- On Draft PR #114, isolated Worker now requires a signed Supabase HTTP Hook, a preview-only allowed-recipient list and a D1 `IDEMPOTENCY_DB` with atomic unique event-hash reservation; it records `reserved`/`accepted`/`failed` before/after a single Meta attempt. Duplicate webhook IDs never resend OTP; if storage is absent or unavailable, the request fails closed.
+- D1 migration `edge/whatsapp-otp-worker/migrations/0001_hook_events.sql` committed. **No remote D1 database created or bound, no hook secret set, no Preview Worker deployed.** `WHATSAPP_DELIVERY_ENABLED=false` remains.
+- Dedicated GitHub workflow `WhatsApp OTP Transport CI` completed **successfully** on PR run #2 (`40684963776`), covering typecheck and mocked replay/security tests. This is not a real D1/concurrency or live Meta integration test. General project CI still pending at that checkpoint.
+- Release blockers remain: Acceptance D1 provisioning and migration, verified live D1 tests, account identity compatibility for installer/showroom phone-password aliases, Supabase CAPTCHA/rate limits, controlled end-to-end Acceptance only, separate approval for deployment/activation.
+
+
 ## 2026-10-28 — WhatsApp OTP preview-only groundwork (NOT HOSTED)
 
 - Branch `feat/whatsapp-otp-transport-20261028` created from protected `main` at `f823d88cc80e14daebc0fe50949724ee0120bd70`, separate from the live production services.
