@@ -34,6 +34,12 @@
 - **Still no Hosted Preview Worker deployment, no signing secret configured, no Supabase Send SMS Hook activated, no phone-user fixture created, no WhatsApp live sending and no Production change.** PR remains Draft and unmerged.
 - **Next gates:** verify CI on this source head, approve first capability, create controlled local alias fixtures, securely prepare matching signing secret, and separately authorize an isolated delivery-disabled Preview Worker deployment.
 
+## Security correction — 2026-10-28, phone-change destination ambiguity
+- Supabase's official phone-change-hook troubleshooting note references a `new_phone` property, while the generic Send SMS Hook example contains `user.phone`. The hosted exact payload shape has **not** been verified. `phone_change` can target a number different from the existing Auth user's phone.
+- Worker transport changed to **reject any hook event carrying `new_phone`** (top-level, `user` or `sms`) with HTTP 422 before querying Meta. Unit test asserts zero Meta calls when old user phone and proposed new recipient differ.
+- This is a **fail-closed prevention**, not working phone-change delivery. The candidate `phone_change` first pilot remains blocked pending verified payload contract and explicit recipient resolution, account identity safety, and owner sign-off. See [identity compatibility plan](WHATSAPP_OTP_IDENTITY_PILOT.md).
+- No Supabase Hook activation, real OTP, hosted Worker deploy, or Production changes by this correction.
+
 ## Architecture & intent
 Aladdin clients (web/future mobile) → Supabase Auth as OTP issuer/verifier and session authority → signed HTTPS **Send SMS Hook** → dedicated Cloudflare `aladdin-whatsapp-otp-preview` Worker → Meta WhatsApp Cloud API → user handset. The Worker does **not** issue, persist or validate credentials. This architecture is a *target*, not an active authentication flow.
 
