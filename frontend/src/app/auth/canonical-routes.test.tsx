@@ -21,6 +21,7 @@ vi.mock("@/server/actions/auth-password-preview", () => ({
 // components; stand-ins keep this test about ROUTING, not form rendering.
 vi.mock("@/features/auth-password-preview/sign-up-form", () => ({ PasswordSignUpForm: () => null }));
 vi.mock("@/features/auth-password-preview/sign-in-form", () => ({ PasswordSignInForm: () => null }));
+vi.mock("@/server/auth/entry-oauth", () => ({ oauthAvailability: async () => ({ google: true, facebook: false }) }));
 vi.mock("@/features/auth-password-preview/forgot-password-form", () => ({ ForgotPasswordForm: () => null }));
 vi.mock("@/features/auth-password-preview/recovery-verify-form", () => ({ RecoveryVerifyForm: () => null }));
 vi.mock("@/features/auth-password-preview/recovery-reset-form", () => ({ RecoveryResetForm: () => null }));
@@ -80,22 +81,12 @@ describe("canonical /auth/* routes render the tested password flow", () => {
     expect(hostile.props.next).not.toContain("evil");
   });
 
-  it("/auth/sign-in links installers to /installer/sign-in when there is no next", async () => {
-    expect(element(await SignInPage(params({}))).props.installerSignInHref).toBe("/installer/sign-in");
+  it("/auth/sign-in passes a Google/Facebook error code through, with no separate phone sign-in link", async () => {
+    const page = element(await SignInPage(params({ error: "oauth" })));
+    expect(page.props.oauthError).toBe("oauth");
+    expect(page.props).not.toHaveProperty("installerSignInHref");
+    expect(page.props.providers).toEqual({ google: true, facebook: false });
   });
-
-  it("/auth/sign-in forwards a validated next to the installer link, encoded", async () => {
-    const page = element(await SignInPage(params({ next: "/home/points?tab=open" })));
-    expect(page.props.installerSignInHref).toBe(`/installer/sign-in?next=${encodeURIComponent("/home/points?tab=open")}`);
-  });
-
-  it.each(["https://evil.example", "//evil.example", "/\\evil.example", "javascript:alert(1)", "/settings/elsewhere", ""])(
-    "/auth/sign-in never forwards an unsafe next to the installer link (%s)",
-    async (next) => {
-      const page = element(await SignInPage(params({ next })));
-      expect(page.props.installerSignInHref).toBe("/installer/sign-in");
-    },
-  );
 
   it("/auth/forgot-password → ForgotPasswordForm", () => {
     expect(element(ForgotPasswordPage()).type).toBe(ForgotPasswordForm);

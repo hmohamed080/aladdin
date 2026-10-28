@@ -1,23 +1,16 @@
-import Image, { getImageProps } from "next/image";
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import styles from "./auth-stage.module.css";
 
 /**
- * The one sign-in / sign-up composition for the whole site (showroom, installer,
- * email + password, recovery): photo beside a cream sheet, `.installer-surface`
- * palette. `toolbar` (language / theme switchers) sits at the top of the sheet.
+ * The one sign-in / sign-up composition for the whole site (sign-in, sign-up,
+ * recovery, verification): an Instagram-style centred column with the 2026
+ * logo and the form in a bordered card, and the "Don't have an account?" box
+ * under it. No photo, so nothing heavy loads before the form.
+ * `.installer-surface` palette; `toolbar` (language / theme switchers) sits at
+ * the top of the page.
  */
-// Art direction: a wide crop on phones, the tall one beside the sheet on larger screens.
-// Both go through the image optimizer (a plain <source srcSet> would ship the original).
-const { props: { srcSet: mobilePhoto } } = getImageProps({
-  alt: "", src: "/assets/showroom-auth/showroom-interior-mobile-2026.webp", width: 1651, height: 953, sizes: "100vw",
-});
-const { props: desktopPhoto } = getImageProps({
-  alt: "", src: "/assets/showroom-auth/showroom-interior-2026.webp", width: 1254, height: 1254, sizes: "62vw",
-  loading: "eager", fetchPriority: "high",
-});
-
 export function AuthStage({
   dir = "rtl",
   lang = "ar",
@@ -39,15 +32,13 @@ export function AuthStage({
           <div className={`${styles.inner} ${styles.content}`}>{children}</div>
         </div>
       </section>
-      <div className={styles.photo} aria-hidden="true">
-        <picture>
-          <source media="(max-width: 767px)" srcSet={mobilePhoto} sizes="100vw" />
-          {/* eslint-disable-next-line @next/next/no-img-element -- props come from getImageProps */}
-          <img {...desktopPhoto} alt="" />
-        </picture>
-      </div>
     </main>
   );
+}
+
+/** The bordered card holding the logo, title and form. */
+export function AuthStageCard({ children }: { children: ReactNode }) {
+  return <div className={styles.card}>{children}</div>;
 }
 
 /** Logo, optional account badge, title, subtitle and description, centred. */
@@ -79,7 +70,7 @@ export function AuthStageHeader({
   );
 }
 
-/** "No account? Create one" line between two sand rules. */
+/** "No account? Sign up" box under the card. */
 export function AuthStageFooter({ prompt, linkLabel, href }: { prompt: string; linkLabel: string; href: string }) {
   return (
     <p className={styles.footer}>
@@ -88,7 +79,7 @@ export function AuthStageFooter({ prompt, linkLabel, href }: { prompt: string; l
   );
 }
 
-/** Secondary links (forgot password, other sign-in methods) under the footer. */
+/** The second bordered box under the card ("Don't have an account? Sign up"). */
 export function AuthStageLinks({ children }: { children: ReactNode }) {
   return <div className={styles.links}>{children}</div>;
 }

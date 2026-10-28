@@ -99,8 +99,7 @@ export function LandingHeader({ anchorBase = "", active = "home" }: { anchorBase
                   const soon = CHOICES_BY_KEY[key]?.comingSoon === true;
                   const label = tr(`onboarding.accountType.types.${key}`);
                   const desc = tr(`onboarding.accountType.types.${key}Desc`);
-                  // Tradespeople register with phone + password on their own entry point.
-                  const href = key === "installer_technician" ? "/installer/sign-up" : `/auth/sign-up?type=${key}`;
+                  const href = `/auth/sign-up?type=${key}`;
                   return (
                     <li key={key}>
                       {soon ? (

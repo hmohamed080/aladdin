@@ -7,7 +7,9 @@ import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { markPasswordAttachedAuthoritatively, savePendingRegistration, PASSWORD_SET_FLAG } from "@/lib/supabase/admin-server";
+import { markPasswordAttachedAuthoritatively, resolveSignInEmail, saveVerifiedBirthDate, savePendingRegistration, PASSWORD_SET_FLAG } from "@/lib/supabase/admin-server";
+import { classifySignInIdentifier } from "@/lib/auth/sign-in-identifier";
+import { phoneAuthLimit } from "@/server/auth/phone-auth-limit";
 import { CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
 import {
   createIsolatedAuthClient,
@@ -25,6 +27,7 @@ import type { Database } from "@/types/database.types";
 import {
   displayNameSchema,
   emailSchema,
+  parseBirthDate,
   registrationSchema,
   passwordWithContextSchema,
 } from "@/features/auth-password-preview/password-policy";
@@ -248,7 +251,7 @@ const FINISH_REGISTRATION_PATH = "/auth/finish-registration";
  * the Postgres error code only — never the name, username, email, password,
  * OTP, session or CAPTCHA token.
  */
-function logRegistrationStepFailure(step: "account_type" | "username" | "display_name", error: { code?: string }): void {
+function logRegistrationStepFailure(step: "account_type" | "username" | "display_name" | "birth_date", error: { code?: string }): void {
   console.error(`password registration: post-OTP ${step} step failed (code ${error.code ?? "unknown"})`);
 }
 
@@ -296,7 +299,7 @@ export async function requestPasswordSignUp(
     username: formData.get("username"),
     accountType: formData.get("accountType"),
     password: formData.get("password"),
-    confirmPassword: formData.get("confirmPassword"),
+    birthDate: formData.get("birthDate"),
   });
   if (!parsed.success) {
     const first = parsed.error.issues[0];
@@ -349,7 +352,7 @@ export async function requestPasswordSignUp(
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { data: { display_name: parsed.data.displayName, locale }, captchaToken: captcha.token },
+    options: { data: { display_name: parsed.data.displayName, birth_date: parsed.data.birthDate, locale }, captchaToken: captcha.token },
   });
   if (error) {
     // A failed challenge is judged before any account logic runs, so it says
@@ -506,6 +509,17 @@ export async function verifyPasswordSignUp(
     if (displayNameError) logRegistrationStepFailure("display_name", displayNameError);
   }
 
+  // The birthday rides the same verified metadata and is revalidated the same
+  // way. Best-effort for the same reason; the profile can still collect it.
+  const birthDate = parseBirthDate(verifyData.user.user_metadata?.birth_date);
+  if (birthDate.ok) {
+    try {
+      await saveVerifiedBirthDate(verifyData.user.id, birthDate.value);
+    } catch {
+      logRegistrationStepFailure("birth_date", {});
+    }
+  }
+
   // Consume the pending registration staged at signUp() time (Increment 6).
   // A session now exists (verifyOtp succeeded above), so this reads
   // auth.uid() itself — no user-id parameter, standard pattern. Everything
@@ -597,10 +611,16 @@ export async function passwordSignIn(
   formData: FormData,
 ): Promise<PasswordAuthState> {
   if (!authFormWithinLimit(formData)) return { ok: false, code: "authPasswordPreview.error.passwordTooLong" };
-  const email = emailSchema.safeParse(formData.get("email"));
+  const rawIdentifier = typeof formData.get("identifier") === "string" ? String(formData.get("identifier")) : String(formData.get("email") ?? "");
+  const identifier = classifySignInIdentifier(rawIdentifier);
+  const echo = rawIdentifier.trim();
   const password = formData.get("password");
-  if (!email.success || typeof password !== "string" || !loginPasswordSchema.safeParse(password).success) {
-    return { ok: false, code: "authPasswordPreview.error.invalidCredentials" };
+  if (!identifier || typeof password !== "string" || !loginPasswordSchema.safeParse(password).success) {
+    return { ok: false, code: "authPasswordPreview.error.invalidCredentials", email: echo };
+  }
+  // An internal phone login alias is a key the server derives, never something a person types.
+  if (identifier.kind === "email" && (isCraftsmanLoginAlias(identifier.value) || !emailSchema.safeParse(identifier.value).success)) {
+    return { ok: false, code: "authPasswordPreview.error.invalidCredentials", email: echo };
   }
 
   // GoTrue's password grant is CAPTCHA-protected whenever `[auth.captcha]` is
@@ -608,24 +628,48 @@ export async function passwordSignIn(
   // interaction-only Turnstile widget and the token is forwarded for GoTrue to
   // judge. Brute force is additionally bounded by GoTrue's own rate limits.
   const captcha = requireCaptcha(formData);
-  if ("code" in captcha) return { ok: false, code: captcha.code, email: email.data };
+  if ("code" in captcha) return { ok: false, code: captcha.code, email: echo };
+
+  // A username or mobile number is resolved to the account's auth email on
+  // the server. That lookup is not CAPTCHA- or GoTrue-limited, so it gets the
+  // shared durable limiter, and a miss answers exactly like a wrong password,
+  // after the same minimum delay, so it reveals nothing about who exists.
+  let loginEmail: string | null = identifier.kind === "email" ? identifier.value : null;
+  if (identifier.kind !== "email") {
+    const callStart = Date.now();
+    const key = identifier.kind === "phone" ? identifier.value.e164 : `u:${identifier.value}`;
+    const limited = await phoneAuthLimit("sign-in", key, await headers());
+    if (limited === "limited") return { ok: false, code: "authPasswordPreview.error.rateLimited", email: echo };
+    try {
+      loginEmail =
+        limited === "allowed"
+          ? await resolveSignInEmail(identifier.kind === "phone" ? { phoneE164: identifier.value.e164 } : { username: identifier.value })
+          : null;
+    } catch {
+      loginEmail = null;
+    }
+    if (!loginEmail) {
+      await padToRegistrationFloor(callStart);
+      return { ok: false, code: "authPasswordPreview.error.invalidCredentials", email: echo };
+    }
+  }
 
   const supabase = await getServerSupabase();
   const { error } = await supabase.auth.signInWithPassword({
-    email: email.data,
+    email: loginEmail as string,
     password,
     options: { captchaToken: captcha.token },
   });
   if (error) {
     if (isCaptchaFailure(error as GoTrueError)) {
-      return { ok: false, code: CAPTCHA_REJECTED, email: email.data };
+      return { ok: false, code: CAPTCHA_REJECTED, email: echo };
     }
     if (isRateLimitError(error as GoTrueError)) {
-      return { ok: false, code: "authPasswordPreview.error.rateLimited", email: email.data };
+      return { ok: false, code: "authPasswordPreview.error.rateLimited", email: echo };
     }
     // Deliberately identical for "no such account", "wrong password", "email
     // not confirmed" and "user_banned" — see the module doc comment.
-    return { ok: false, code: "authPasswordPreview.error.invalidCredentials", email: email.data };
+    return { ok: false, code: "authPasswordPreview.error.invalidCredentials", email: echo };
   }
 
   const next = sanitizeNext(formData.get("next"));

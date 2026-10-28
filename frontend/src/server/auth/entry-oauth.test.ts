@@ -15,17 +15,18 @@ const client = { auth: { exchangeCodeForSession: mocks.exchange, signOut: mocks.
 const user = { id: "u1", user_metadata: { full_name: "Mona Adel" } };
 
 /** A registration state machine that advances the way the database does. */
-function database(start: string, allowed = true) {
+function database(start: string) {
   let state = start;
   mocks.rpc.mockImplementation(async (name: string) => {
     if (name === "my_registration_state") return { data: state, error: null };
     if (name === "record_consent") state = "account_type_pending";
     if (name === "onboarding_select_account_type") state = "username_pending";
-    if (name === "profile_set_username") state = "access_ready";
-    if (name === "account_entry_allowed") return { data: allowed, error: null };
     return { data: null, error: null };
   });
 }
+
+const call = (overrides: Partial<Parameters<typeof completeEntryOAuth>[1]> = {}) =>
+  completeEntryOAuth(client, { code: "c", next: null, providerError: null, ...overrides });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -35,73 +36,68 @@ beforeEach(() => {
 });
 
 describe("completeEntryOAuth", () => {
-  it("creates a showroom account for a brand-new Google/Facebook person", async () => {
+  it("records a brand-new person's consent and sends them to finish registration", async () => {
     database("consent_pending");
-    expect(await completeEntryOAuth(client, { code: "c", kind: "showroom", next: null, providerError: null })).toEqual({ path: "/onboarding/business" });
+    expect(await call({ locale: "ar" })).toEqual({ path: "/auth/finish-registration" });
     expect(mocks.exchange).toHaveBeenCalledWith("c");
-    expect(mocks.rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "business", p_account_type: "showroom_dealer" });
+    expect(mocks.rpc).toHaveBeenCalledWith("record_consent", { p_types: ["terms", "privacy", "pilot"], p_locale: "ar" });
     expect(mocks.rpc).toHaveBeenCalledWith("profile_set_display_name", { p_display_name: "Mona Adel" });
-    expect(mocks.rpc.mock.calls.find(([name]) => name === "profile_set_username")?.[1]).toEqual({ p_username: expect.stringMatching(/^showroom\./) });
-    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual([
-      "my_registration_state", "record_consent", "my_registration_state", "onboarding_select_account_type",
-      "my_registration_state", "account_entry_allowed", "profile_set_display_name", "profile_set_username",
-    ]);
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).not.toContain("onboarding_select_account_type");
   });
 
-  it("creates an installer account for a brand-new person on the installer pages", async () => {
+  it("applies an open account type picked on the landing page", async () => {
     database("consent_pending");
-    expect((await completeEntryOAuth(client, { code: "c", kind: "installer", next: null, providerError: null })).path).toBe("/home");
-    expect(mocks.rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "professional", p_account_type: "installer_technician" });
-    expect(mocks.rpc.mock.calls.find(([name]) => name === "profile_set_username")?.[1]).toEqual({ p_username: expect.stringMatching(/^craftsman\./) });
+    expect((await call({ accountType: "showroom_dealer" })).path).toBe("/auth/finish-registration");
+    expect(mocks.rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "business", p_account_type: "showroom_dealer" });
   });
 
-  it("signs an existing account of the right type straight in, keeping its own deep link", async () => {
+  it("ignores a Coming Soon or unknown account type", async () => {
+    database("consent_pending");
+    await call({ accountType: "end_consumer" });
+    await call({ accountType: "owner" });
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).not.toContain("onboarding_select_account_type");
+  });
+
+  it("signs an existing account straight in, keeping its own deep link", async () => {
     database("access_ready");
     mocks.landing.mockResolvedValue("/b2b");
-    expect((await completeEntryOAuth(client, { code: "c", kind: "showroom", next: "/b2b/products", providerError: null })).path).toBe("/b2b/products");
-    expect(mocks.rpc.mock.calls.map(([name]) => name)).not.toContain("onboarding_select_account_type");
+    expect((await call({ next: "/b2b/products" })).path).toBe("/b2b/products");
     expect(mocks.rpc.mock.calls.map(([name]) => name)).not.toContain("record_consent");
-  });
-
-  it("keeps an account of the other type out and clears its session", async () => {
-    database("access_ready", false);
-    expect(await completeEntryOAuth(client, { code: "c", kind: "installer", next: null, providerError: null })).toEqual({ path: "/installer/sign-in?error=wrong_account", signedOut: true });
-    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
   });
 
   it("returns to sign-in when the provider refused or the code is missing or bad", async () => {
     database("access_ready");
-    expect((await completeEntryOAuth(client, { code: "c", kind: "showroom", next: null, providerError: "access_denied" })).path).toBe("/showroom/sign-in?error=oauth");
-    expect((await completeEntryOAuth(client, { code: null, kind: "showroom", next: null, providerError: null })).path).toBe("/showroom/sign-in?error=oauth");
+    expect((await call({ providerError: "access_denied" })).path).toBe("/auth/sign-in?error=oauth");
+    expect((await call({ code: null })).path).toBe("/auth/sign-in?error=oauth");
     mocks.exchange.mockResolvedValue({ data: { user: null }, error: { code: "bad_code_verifier" } });
-    expect((await completeEntryOAuth(client, { code: "c", kind: "installer", next: null, providerError: null })).path).toBe("/installer/sign-in?error=oauth");
+    expect((await call()).path).toBe("/auth/sign-in?error=oauth");
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it("refuses an identity without a confirmed email", async () => {
     database("unverified");
-    expect((await completeEntryOAuth(client, { code: "c", kind: "showroom", next: null, providerError: null })).path).toBe("/showroom/sign-in?error=oauth_email");
-    expect(mocks.signOut).toHaveBeenCalled();
+    expect(await call()).toEqual({ path: "/auth/sign-in?error=oauth_email", signedOut: true });
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
   });
 
   it("sends a suspended account to the suspended page", async () => {
     database("manually_blocked");
-    expect((await completeEntryOAuth(client, { code: "c", kind: "showroom", next: null, providerError: null })).path).toBe("/auth/suspended");
+    expect((await call()).path).toBe("/auth/suspended");
   });
 
-  it("signs out when setting up the new account fails", async () => {
+  it("signs out when the consent cannot be recorded", async () => {
     database("consent_pending");
     const base = mocks.rpc.getMockImplementation()!;
-    mocks.rpc.mockImplementation(async (name: string, args: unknown) => (name === "onboarding_select_account_type" ? { data: null, error: { code: "XX000" } } : base(name, args)));
-    expect((await completeEntryOAuth(client, { code: "c", kind: "showroom", next: null, providerError: null })).path).toBe("/showroom/sign-in?error=oauth");
+    mocks.rpc.mockImplementation(async (name: string, args: unknown) => (name === "record_consent" ? { data: null, error: { code: "XX000" } } : base(name, args)));
+    expect((await call()).path).toBe("/auth/sign-in?error=oauth");
     expect(mocks.signOut).toHaveBeenCalled();
   });
 });
 
 describe("entryCallbackUrl", () => {
-  it("carries only the kind and an allow-listed next", () => {
-    expect(entryCallbackUrl("https://aladdindecore.com", "showroom", "/b2b/products")).toBe("https://aladdindecore.com/auth/callback?entry=showroom&next=%2Fb2b%2Fproducts");
-    expect(entryCallbackUrl("https://aladdindecore.com", "installer", "https://evil.test")).toBe("https://aladdindecore.com/auth/callback?entry=installer");
+  it("carries only an allow-listed next and an open account type", () => {
+    expect(entryCallbackUrl("https://aladdindecore.com", "/b2b/products", "supplier")).toBe("https://aladdindecore.com/auth/callback?next=%2Fb2b%2Fproducts&type=supplier");
+    expect(entryCallbackUrl("https://aladdindecore.com", "https://evil.test", "admin")).toBe("https://aladdindecore.com/auth/callback");
   });
 });
 

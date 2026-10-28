@@ -1,6 +1,7 @@
 import { PasswordSignUpForm } from "@/features/auth-password-preview/sign-up-form";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
 import { sanitizeNext } from "@/server/auth/next";
+import { oauthAvailability } from "@/server/auth/entry-oauth";
 
 export const dynamic = "force-dynamic";
 
@@ -24,5 +25,12 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
       : undefined;
   // Only an employee-invitation return path is honored; everything else is dropped.
   const safe = sanitizeNext(next);
-  return <PasswordSignUpForm initialAccountType={initialAccountType} next={safe.startsWith("/auth/invite/") ? safe : undefined} />;
+  const providers = await oauthAvailability();
+  return (
+    <PasswordSignUpForm
+      initialAccountType={initialAccountType}
+      next={safe.startsWith("/auth/invite/") ? safe : undefined}
+      providers={providers}
+    />
+  );
 }

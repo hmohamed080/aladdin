@@ -29,8 +29,8 @@ const items = [
   { icon: UserIcon, ar: "حساب شخصي", en: "Personal Account", comingSoon: true },
   { icon: BriefcaseIcon, ar: "فريق المبيعات", en: "Sales Team", comingSoon: false },
   // The one tile with its own registration entry: installers/technicians sign
-  // up with phone + password (/installer/sign-up). Every other tile stays text.
-  { icon: WrenchIcon, ar: "الصنايعية والفنيون", en: "Technicians & Installers", comingSoon: false, href: "/installer/sign-up" },
+  // up on the main sign-up with that type chosen. Every other tile stays text.
+  { icon: WrenchIcon, ar: "الصنايعية والفنيون", en: "Technicians & Installers", comingSoon: false, href: "/auth/sign-up?type=installer_technician" },
   { icon: PencilIcon, ar: "المهندسون", en: "Engineers", comingSoon: true },
   { icon: BuildingIcon, ar: "المقاولون", en: "Contractors", comingSoon: true },
   { icon: PackageIcon, ar: "المستوردون", en: "Importers", comingSoon: false },

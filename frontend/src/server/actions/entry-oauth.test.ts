@@ -31,26 +31,25 @@ beforeEach(() => {
 
 describe("startEntryOAuth", () => {
   it("sends the person to the provider with a callback on this site", async () => {
-    expect(await run(() => startEntryOAuth(form({ kind: "showroom", provider: "google", next: "/b2b/offers" })))).toBe("REDIRECT:https://project.supabase.test/auth/v1/authorize?provider=google");
+    expect(await run(() => startEntryOAuth(form({ provider: "google", next: "/b2b/offers" })))).toBe("REDIRECT:https://project.supabase.test/auth/v1/authorize?provider=google");
     expect(mocks.oauth).toHaveBeenCalledWith({
       provider: "google",
-      options: expect.objectContaining({ redirectTo: "https://aladdindecore.com/auth/callback?entry=showroom&next=%2Fb2b%2Foffers", skipBrowserRedirect: true }),
+      options: expect.objectContaining({ redirectTo: "https://aladdindecore.com/auth/callback?next=%2Fb2b%2Foffers", skipBrowserRedirect: true }),
     });
   });
 
-  it("supports Facebook on the installer pages", async () => {
-    await run(() => startEntryOAuth(form({ kind: "installer", provider: "facebook" })));
-    expect(mocks.oauth).toHaveBeenCalledWith({ provider: "facebook", options: expect.objectContaining({ redirectTo: "https://aladdindecore.com/auth/callback?entry=installer" }) });
+  it("supports Facebook and carries an account type chosen on the landing page", async () => {
+    await run(() => startEntryOAuth(form({ provider: "facebook", accountType: "installer_technician" })));
+    expect(mocks.oauth).toHaveBeenCalledWith({ provider: "facebook", options: expect.objectContaining({ redirectTo: "https://aladdindecore.com/auth/callback?type=installer_technician" }) });
   });
 
-  it("refuses an unknown provider or page", async () => {
-    expect(await run(() => startEntryOAuth(form({ kind: "showroom", provider: "github" })))).toBe("REDIRECT:/showroom/sign-in?error=oauth");
-    expect(await run(() => startEntryOAuth(form({ kind: "admin", provider: "google" })))).toBe("REDIRECT:/auth/sign-in");
+  it("refuses an unknown provider", async () => {
+    expect(await run(() => startEntryOAuth(form({ provider: "github" })))).toBe("REDIRECT:/auth/sign-in?error=oauth");
     expect(mocks.oauth).not.toHaveBeenCalled();
   });
 
   it("returns with an error when Supabase cannot start the flow", async () => {
     mocks.oauth.mockResolvedValue({ data: { url: null }, error: { code: "provider_disabled" } });
-    expect(await run(() => startEntryOAuth(form({ kind: "installer", provider: "google" })))).toBe("REDIRECT:/installer/sign-in?error=oauth");
+    expect(await run(() => startEntryOAuth(form({ provider: "google" })))).toBe("REDIRECT:/auth/sign-in?error=oauth");
   });
 });

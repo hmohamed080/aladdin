@@ -78,6 +78,30 @@ export const displayNameSchema = z
   .min(1, { message: "authPasswordPreview.error.fullNameRequired" })
   .max(DISPLAY_NAME_MAX_LENGTH, { message: "authPasswordPreview.error.fullNameTooLong" });
 
+/** Minimum age to hold an account. */
+export const MINIMUM_SIGN_UP_AGE = 18;
+
+/**
+ * The registrant's birthday: a real calendar date (YYYY-MM-DD, the value a
+ * date input submits), at least MINIMUM_SIGN_UP_AGE years ago and not before
+ * 1900. Private account data, never shown on a public profile. `today` is
+ * injectable for tests.
+ */
+export function parseBirthDate(input: unknown, today: Date = new Date()): { ok: true; value: string } | { ok: false; code: string } {
+  const raw = typeof input === "string" ? input.trim() : "";
+  if (!raw) return { ok: false, code: "authPasswordPreview.error.birthDateRequired" };
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (!match) return { ok: false, code: "authPasswordPreview.error.birthDateInvalid" };
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day || year < 1900) {
+    return { ok: false, code: "authPasswordPreview.error.birthDateInvalid" };
+  }
+  const adult = new Date(Date.UTC(today.getUTCFullYear() - MINIMUM_SIGN_UP_AGE, today.getUTCMonth(), today.getUTCDate()));
+  if (date > adult) return { ok: false, code: "authPasswordPreview.error.birthDateTooYoung" };
+  return { ok: true, value: raw };
+}
+
 export const registrationSchema = z
   .object({
     displayName: displayNameSchema,
@@ -88,13 +112,12 @@ export const registrationSchema = z
       .refine((value) => isUsernameWellFormed(value), { message: "registration.error.usernameShape" }),
     accountType: z.string().trim().min(1, { message: "authPasswordPreview.error.accountTypeRequired" }),
     password: passwordSchema,
-    confirmPassword: loginPasswordSchema,
+    birthDate: z.string({ invalid_type_error: "authPasswordPreview.error.birthDateRequired", required_error: "authPasswordPreview.error.birthDateRequired" }).trim(),
   })
   .superRefine((value, ctx) => {
-    if (value.password !== value.confirmPassword) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "authPasswordPreview.error.passwordMismatch", path: ["confirmPassword"] });
-    }
     addWeakPasswordIssues(value.password, [value.email], ["password"], ctx);
+    const birthDate = parseBirthDate(value.birthDate);
+    if (!birthDate.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: birthDate.code, path: ["birthDate"] });
   });
 
 export const resetPasswordSchema = z

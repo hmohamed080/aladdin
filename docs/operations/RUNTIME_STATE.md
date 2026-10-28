@@ -1,5 +1,11 @@
 # Runtime State
 
+## Instagram-style auth (PR #113 branch, not deployed) — 2026-10-28
+- Branch `claude/project-thread-1bi6x0` ([ADR-0025](../decisions/ADR-0025-one-field-sign-in-whatsapp-sign-up.md)): one-field sign-in (mobile number, username or email), centred sign-up with birthday and username, mobile sign-up for every account type verified by a WhatsApp code (Meta Cloud API), Google/Facebook on `/auth`, the installer/showroom phone pages removed (redirects).
+- Migration `20261028090001_sign_up_birthday_and_phone_codes.sql` is in the repo only: **not applied** to Acceptance or Production (owner approval pending). The preview needs it before sign-up works there.
+- Worker secrets `WHATSAPP_ACCESS_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID` are not set yet (owner step); until then mobile sign-up says it is unavailable. `WHATSAPP_OTP_TEMPLATE=aladdin_login_code` is in `wrangler.jsonc`.
+- Acceptance has Google/Facebook switched off, so the preview shows no provider buttons; Production has both on.
+
 ## Live site on Cloudflare Workers — 2026-10-27
 - `aladdindecore.com`, `www` and `next` are served by Worker `aladdin-frontend-production` (Custom Domains, attached by the owner 17:23–17:40Z). It binds `aladdin-backend-production` and uses the live Supabase project `kkpkgjrweysgvhvkhzun` (193 migrations). R2 and Redis are off in production.
 - DNS: Cloudflare zone `c90ddcdec7bacd2485e1e5bcbac8afce` (nameservers johnathan/mona.ns.cloudflare.com, registrar GoDaddy). Zoho MX/SPF/DKIM unchanged; wildcard `*` still CNAME to Vercel, DNS only. No DMARC.

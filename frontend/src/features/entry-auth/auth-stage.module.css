@@ -1,44 +1,38 @@
-/* The approved sign-in / sign-up composition (first built for the showroom pages):
-   a full-height photo beside a cream sheet with soft sand circles, the 2026 logo,
-   an optional account badge and a large title. Palette comes from the scoped
-   `.installer-surface` theme; controls remain the canonical controls. */
-.stage { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(420px, 1fr); min-height: 100dvh; direction: ltr; background: var(--canvas); color: var(--fg); --fg-secondary: color-mix(in srgb, var(--deep-navy) 75%, var(--soft-cream)); --fg-muted: var(--fg-secondary); }
-.photo { position: relative; grid-column: 1; grid-row: 1; min-height: 100dvh; }
-.photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
-.sheet { z-index: 1; position: relative; isolation: isolate; grid-column: 2; grid-row: 1; display: flex; flex-direction: column; overflow: hidden; @apply p-xl; background: var(--canvas); }
-.sheet::before, .sheet::after { content: ""; position: absolute; z-index: -1; width: 100%; aspect-ratio: 1; border-radius: 50%; background: color-mix(in srgb, var(--warm-sand) 18%, transparent); pointer-events: none; }
-.sheet::before { inset-block-start: -35%; inset-inline-start: -50%; }
-.sheet::after { inset-block-end: -45%; inset-inline-end: -45%; }
+/* Instagram-style sign-in / sign-up: a centred column, the 2026 logo and the
+   form in a bordered card, then a second bordered box for "Don't have an
+   account? Sign up". Palette comes from the scoped `.installer-surface` theme;
+   controls remain the canonical controls. No photo. */
+.stage { min-height: 100dvh; background: var(--canvas); color: var(--fg); --fg-secondary: color-mix(in srgb, var(--deep-navy) 75%, var(--soft-cream)); --fg-muted: var(--fg-secondary); --auth-rule: color-mix(in srgb, var(--fg) 14%, var(--canvas)); }
+.sheet { position: relative; display: flex; flex-direction: column; min-height: 100dvh; @apply p-lg; background: var(--canvas); }
 .toolbar { display: flex; justify-content: flex-end; @apply gap-sm; }
-.body { flex: 1; display: flex; align-items: center; }
-.inner { width: 100%; max-width: 480px; margin-inline: auto; @apply py-lg; }
-.header { text-align: center; @apply mb-xl; }
-.brand { display: flex; flex-direction: column; align-items: center; @apply gap-xs; @apply mb-lg; }
-.logo { width: 180px; height: auto; object-fit: contain; }
-.badge { display: inline-flex; align-items: center; @apply gap-sm; @apply py-sm px-lg; @apply rounded-full; background: color-mix(in srgb, var(--warm-sand) 55%, transparent); @apply text-body; color: var(--fg); @apply mb-lg; }
-.header h1 { font-size: clamp(2rem, 3vw, 3rem); line-height: 1.35; font-weight: 700; @apply mb-sm; }
-.subtitle { @apply text-title; @apply mb-sm; }
-.description { @apply text-body; color: var(--fg-secondary); line-height: 1.8; }
-.footer { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; @apply gap-sm; @apply mt-lg; text-align: center; @apply text-body; }
-.footer::before, .footer::after { content: ""; height: 1px; background: var(--warm-sand); flex: 1; @apply min-w-4; }
-.footer a { text-decoration: underline; text-underline-offset: 4px; font-weight: 600; }
-.links { display: flex; flex-direction: column; align-items: center; @apply gap-xs; @apply mt-md; @apply text-body; color: var(--fg-secondary); text-align: center; }
+.body { flex: 1; display: flex; align-items: center; justify-content: center; }
+.inner { width: 100%; max-width: 400px; margin-inline: auto; @apply py-lg; display: flex; flex-direction: column; @apply gap-md; }
+.card { display: flex; flex-direction: column; @apply gap-md; @apply px-xl py-xl; border: 1px solid var(--auth-rule); @apply rounded-md; background: color-mix(in srgb, var(--surface) 55%, var(--canvas)); }
+.header { text-align: center; }
+.brand { display: flex; justify-content: center; @apply mb-md; }
+.logo { width: 160px; height: auto; object-fit: contain; }
+.badge { display: inline-flex; align-items: center; @apply gap-sm; @apply py-xs px-md; @apply rounded-full; background: color-mix(in srgb, var(--warm-sand) 55%, transparent); @apply text-label; color: var(--fg); @apply mb-sm; }
+.header h1 { font-size: 1.25rem; line-height: 1.4; font-weight: 700; }
+.subtitle { @apply text-body; @apply mt-xs; color: var(--fg-secondary); }
+.description { @apply text-body; @apply mt-xs; color: var(--fg-secondary); line-height: 1.6; }
+.footer { text-align: center; @apply text-body; @apply px-lg py-lg; border: 1px solid var(--auth-rule); @apply rounded-md; }
+.footer a { font-weight: 700; color: var(--muted-terracotta); }
+.links { display: flex; flex-direction: column; align-items: center; @apply gap-xs; @apply px-lg py-lg; border: 1px solid var(--auth-rule); @apply rounded-md; @apply text-body; color: var(--fg-secondary); text-align: center; }
 .links a:hover { color: var(--fg); text-decoration: underline; }
-/* The generic email + password forms get the same field and button scale. */
-.content form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), .content form select { min-height: 52px; background-color: color-mix(in srgb, var(--surface) 75%, transparent); border-color: color-mix(in srgb, var(--fg) 50%, var(--surface)); }
+/* Compact Instagram-scale fields and a full-width primary button. */
+.content form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), .content form select { min-height: 44px; background-color: color-mix(in srgb, var(--surface) 75%, transparent); border-color: var(--auth-rule); }
 .content form input::placeholder { color: var(--fg-muted); opacity: 1; }
-.content form button[type="submit"] { width: 100%; min-height: 56px; @apply text-title; @apply rounded-md; background: var(--muted-terracotta); color: var(--soft-cream); font-weight: 700; box-shadow: none; }
-.content form button[type="submit"]:hover { background: color-mix(in srgb, var(--muted-terracotta) 88%, var(--deep-navy)); }
-:global(.dark) .sheet { background: var(--deep-navy); }
+.content form button[type="submit"]:not([data-oauth-provider]) { width: 100%; min-height: 40px; @apply text-body; @apply rounded-md; background: var(--muted-terracotta); color: var(--soft-cream); font-weight: 700; box-shadow: none; }
+.content form button[type="submit"]:not([data-oauth-provider]):hover { background: color-mix(in srgb, var(--muted-terracotta) 88%, var(--deep-navy)); }
+:global(.dark) .sheet, :global(.dark) .stage { background: var(--deep-navy); }
+:global(.dark) .card { background: color-mix(in srgb, var(--warm-sand) 5%, var(--deep-navy)); }
 :global(.dark) .badge { background: color-mix(in srgb, var(--warm-sand) 12%, var(--deep-navy)); }
-:global(.dark) .stage { --fg-secondary: var(--warm-sand); --fg-muted: var(--warm-sand); }
+:global(.dark) .stage { --fg-secondary: var(--warm-sand); --fg-muted: var(--warm-sand); --auth-rule: color-mix(in srgb, var(--warm-sand) 22%, var(--deep-navy)); }
 :global(.dark) .logo { filter: brightness(0) invert(93%) sepia(13%) saturate(374%); }
-@media (max-width: 767px) {
-  .stage { display: flex; flex-direction: column-reverse; }
-  .photo { height: calc(57.7vw + 24px); min-height: 0; }
-  .sheet { margin-block-start: -24px; border-start-start-radius: 28px; border-start-end-radius: 28px; @apply p-lg; }
-  .inner { @apply py-md; }
-  .brand { @apply mb-md; }
-  .header { @apply mb-lg; }
-  .header h1 { font-size: 2rem; }
+@media (max-width: 479px) {
+  /* Phones: no card chrome, like Instagram's mobile app. */
+  .sheet { @apply p-md; }
+  .inner { @apply py-sm; }
+  .card { border: 0; background: transparent; @apply px-0 py-md; }
+  .footer, .links { border-inline: 0; border-radius: 0; @apply px-0; }
 }

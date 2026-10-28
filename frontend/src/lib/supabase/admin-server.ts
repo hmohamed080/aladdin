@@ -183,13 +183,18 @@ export async function createShowroomPasswordUser(params: { loginAlias: string; p
   return createPhonePasswordUser(params, "temporary_showroom_password_flow");
 }
 
-async function createPhonePasswordUser(params: { loginAlias: string; password: string; fullName: string }, source: string): Promise<CraftsmanUserCreation> {
+/** The mobile-number sign-up on /auth/sign-up (any account type), after its WhatsApp code was verified. */
+export async function createPhoneSignUpUser(params: { loginAlias: string; password: string; fullName: string; locale: "en" | "ar" }): Promise<CraftsmanUserCreation> {
+  return createPhonePasswordUser(params, "phone_whatsapp_sign_up");
+}
+
+async function createPhonePasswordUser(params: { loginAlias: string; password: string; fullName: string; locale?: "en" | "ar" }, source: string): Promise<CraftsmanUserCreation> {
   const admin = getAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
     email: params.loginAlias,
     password: params.password,
     email_confirm: true,
-    user_metadata: { full_name: params.fullName, locale: "ar" },
+    user_metadata: { full_name: params.fullName, locale: params.locale ?? "ar" },
     app_metadata: { registration_source: source, [PASSWORD_SET_FLAG]: true },
   });
   if (error || !data.user) {
@@ -226,4 +231,109 @@ export async function consumePhoneAuthLimit(action: "sign-in" | "sign-up", ipKey
   });
   if (error) throw new Error("phone auth limiter unavailable");
   return data === true;
+}
+
+/**
+ * The auth email behind a username or mobile number typed on the sign-in page,
+ * so the password grant can run against it. For a phone-registered account
+ * this is its internal login alias. Null when nothing matches; the caller
+ * answers exactly as for a wrong password, so this never reveals which
+ * usernames or numbers exist. Throws on a lookup failure (never guesses).
+ */
+export async function resolveSignInEmail(lookup: { username: string } | { phoneE164: string }): Promise<string | null> {
+  const admin = getAdminClient();
+  const query = admin.from("profiles").select("user_id").is("deleted_at", null).limit(1);
+  const { data, error } = await ("username" in lookup
+    ? query.eq("username_normalized", lookup.username.trim().toLowerCase())
+    : query.eq("phone_e164", lookup.phoneE164));
+  if (error) throw new Error(`sign-in identifier lookup failed (code ${error.code ?? "unknown"})`);
+  const userId = data?.[0]?.user_id;
+  if (!userId) return null;
+  const { data: user, error: userError } = await admin.auth.admin.getUserById(userId);
+  if (userError) throw new Error(`sign-in identifier lookup failed (code ${(userError as { code?: string }).code ?? "unknown"})`);
+  return user.user?.email ?? null;
+}
+
+/**
+ * Stores the birthday collected at sign-up on `public.users.birth_date` — the
+ * self-only row (RLS `users_select_self`), never the public profile. Called
+ * only right after the account proved its email or mobile number, with a value
+ * the caller has already validated (parseBirthDate). Throws on failure.
+ */
+export async function saveVerifiedBirthDate(userId: string, birthDate: string): Promise<void> {
+  const { error } = await getAdminClient().from("users").update({ birth_date: birthDate }).eq("id", userId);
+  if (error) throw new Error(`birth date save failed (code ${error.code ?? "unknown"})`);
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp verification codes (public.phone_verification_challenges,
+// service_role only). Only an HMAC of the code is ever stored.
+// ---------------------------------------------------------------------------
+export type PhoneChallenge = { id: string; phoneE164: string; codeHash: string; attempts: number; expiresAt: string; consumedAt: string | null };
+
+/** How many sign-up codes this number was sent since `sinceIso`. Throws on a lookup failure. */
+export async function countRecentPhoneChallenges(e164: string, sinceIso: string): Promise<number> {
+  const { count, error } = await getAdminClient()
+    .from("phone_verification_challenges")
+    .select("id", { count: "exact", head: true })
+    .eq("phone_e164", e164)
+    .gte("created_at", sinceIso);
+  if (error) throw new Error(`phone challenge count failed (code ${error.code ?? "unknown"})`);
+  return count ?? 0;
+}
+
+export async function insertPhoneChallenge(row: { id: string; phoneE164: string; codeHash: string; expiresAt: string }): Promise<void> {
+  const { error } = await getAdminClient().from("phone_verification_challenges").insert({
+    id: row.id,
+    purpose: "sign_up",
+    phone_e164: row.phoneE164,
+    code_hash: row.codeHash,
+    expires_at: row.expiresAt,
+  });
+  if (error) throw new Error(`phone challenge insert failed (code ${error.code ?? "unknown"})`);
+}
+
+export async function deletePhoneChallenge(id: string): Promise<void> {
+  await getAdminClient().from("phone_verification_challenges").delete().eq("id", id);
+}
+
+export async function loadPhoneChallenge(id: string): Promise<PhoneChallenge | null> {
+  const { data, error } = await getAdminClient()
+    .from("phone_verification_challenges")
+    .select("id, phone_e164, code_hash, attempts, expires_at, consumed_at")
+    .eq("id", id)
+    .eq("purpose", "sign_up")
+    .maybeSingle();
+  if (error) throw new Error(`phone challenge load failed (code ${error.code ?? "unknown"})`);
+  if (!data) return null;
+  return { id: data.id, phoneE164: data.phone_e164, codeHash: data.code_hash, attempts: data.attempts, expiresAt: data.expires_at, consumedAt: data.consumed_at };
+}
+
+/**
+ * Counts one guess BEFORE it is checked, as a compare-and-set on the attempt
+ * number read, so two concurrent guesses can never share one attempt. False
+ * when another request got there first (the caller treats it as a miss).
+ */
+export async function recordPhoneChallengeAttempt(id: string, seenAttempts: number): Promise<boolean> {
+  const { data, error } = await getAdminClient()
+    .from("phone_verification_challenges")
+    .update({ attempts: seenAttempts + 1 })
+    .eq("id", id)
+    .eq("attempts", seenAttempts)
+    .is("consumed_at", null)
+    .select("id");
+  if (error) throw new Error(`phone challenge attempt failed (code ${error.code ?? "unknown"})`);
+  return (data ?? []).length === 1;
+}
+
+/** Marks a code used, once. False when it was already used. */
+export async function consumePhoneChallenge(id: string): Promise<boolean> {
+  const { data, error } = await getAdminClient()
+    .from("phone_verification_challenges")
+    .update({ consumed_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("consumed_at", null)
+    .select("id");
+  if (error) throw new Error(`phone challenge consume failed (code ${error.code ?? "unknown"})`);
+  return (data ?? []).length === 1;
 }

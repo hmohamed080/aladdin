@@ -4,12 +4,15 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { passwordSignIn, type PasswordAuthState } from "@/server/actions/auth-password-preview";
+import type { OAuthAvailability } from "@/server/auth/entry-oauth";
 import { AuthCard } from "@/features/auth/auth-card";
-import { Input, LabeledField, SubmitButton } from "@/components/ui/controls";
+import { EntryOAuthButtons, OrDivider, hasOAuthProvider } from "@/features/entry-auth/oauth-buttons";
+import { Input, SubmitButton } from "@/components/ui/controls";
 import { PasswordInput } from "./password-input";
 import { TurnstileWidget } from "./turnstile-widget";
 
 const initial: PasswordAuthState = { ok: false };
+const NO_PROVIDERS: OAuthAvailability = { google: false, facebook: false };
 
 const GENERIC_ERROR_CODES = new Set([
   "authPasswordPreview.error.invalidCredentials",
@@ -19,85 +22,106 @@ const GENERIC_ERROR_CODES = new Set([
   "authPasswordPreview.error.captchaUnavailable",
 ]);
 
+/** OAuth round-trip failures the callback reports back here (`?error=`). */
+const OAUTH_ERRORS: Record<string, string> = {
+  oauth: "entryAuth.error.oauth",
+  oauth_email: "entryAuth.error.oauthEmail",
+};
+
 /**
- * Canonical sign in — email + password. Every failure that isn't a rate limit
- * renders the SAME generic message (`passwordSignIn` never distinguishes
- * "no such account" from "wrong password" from "unconfirmed"/"disabled") —
- * see the server action's doc comment for why.
- *
- * A secondary link sends installer/technician accounts, which sign in with
- * phone + password, to `/installer/sign-in`; the page passes a href carrying
- * only a validated `next` (app/auth/sign-in/installer-sign-in-href.ts).
+ * Canonical sign in, Instagram style: ONE field that takes a mobile number, a
+ * username or an email, then the password. The server works out which it is
+ * (lib/auth/sign-in-identifier.ts) and every failure that isn't a rate limit
+ * renders the SAME generic message — `passwordSignIn` never distinguishes "no
+ * such account" from "wrong password" from "unconfirmed"/"disabled". Google /
+ * Facebook sit under an "OR" rule when Supabase has them switched on.
  */
 export function PasswordSignInForm({
   next,
-  installerSignInHref = "/installer/sign-in",
+  providers = NO_PROVIDERS,
+  oauthError,
 }: {
   next: string;
-  installerSignInHref?: string;
+  providers?: OAuthAvailability;
+  oauthError?: string;
 }) {
   const { t } = useI18n();
   const [state, dispatch] = useActionState(passwordSignIn, initial);
+  const oauthMessage = oauthError ? OAUTH_ERRORS[oauthError] : undefined;
 
   return (
     <AuthCard
       title={t("authPasswordPreview.signIn.title")}
       subtitle={t("authPasswordPreview.signIn.subtitle")}
       footer={
-        <div className="flex flex-col gap-1.5">
-          <p>
-            {t("authPasswordPreview.signIn.noAccount")}{" "}
-            <Link href="/auth/sign-up" className="font-medium text-accent hover:underline">
-              {t("authPasswordPreview.signIn.signUpLink")}
-            </Link>
-          </p>
-          <p>
-            <Link href="/auth/forgot-password" className="text-fg-muted hover:text-fg hover:underline">
-              {t("authPasswordPreview.signIn.forgotPassword")}
-            </Link>
-          </p>
-          <p>
-            <Link href={installerSignInHref} className="text-fg-muted hover:text-fg hover:underline">
-              {t("auth.installerPhoneSignIn")}
-            </Link>
-          </p>
-          <p><Link href={`/showroom/sign-in?next=${encodeURIComponent(next)}`} className="text-fg-muted hover:text-fg hover:underline">{t("showroomAuth.phoneSignIn")}</Link></p>
-        </div>
+        <p>
+          {t("authPasswordPreview.signIn.noAccount")}{" "}
+          <Link href="/auth/sign-up" className="font-semibold text-accent hover:underline">
+            {t("authPasswordPreview.signIn.signUpLink")}
+          </Link>
+        </p>
       }
     >
-      <form action={dispatch} className="flex flex-col gap-md" noValidate>
+      <form action={dispatch} className="flex flex-col gap-sm" noValidate>
         <input type="hidden" name="next" value={next} />
         {state.code && GENERIC_ERROR_CODES.has(state.code) ? (
           <p role="alert" className="rounded-md border border-danger/40 bg-danger/10 px-md py-2.5 text-body text-danger">
             {t(state.code)}
           </p>
+        ) : oauthMessage ? (
+          <p role="alert" className="rounded-md border border-danger/40 bg-danger/10 px-md py-2.5 text-body text-danger">
+            {t(oauthMessage)}
+          </p>
         ) : null}
-        <LabeledField label={t("authPasswordPreview.emailLabel")} htmlFor="email">
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            required
-            defaultValue={state.email ?? ""}
-            placeholder={t("authPasswordPreview.emailPlaceholder")}
-            aria-invalid={Boolean(state.code) || undefined}
-          />
-        </LabeledField>
-
-        <LabeledField label={t("authPasswordPreview.passwordLabel")} htmlFor="password">
-          <PasswordInput id="password" name="password" autoComplete="current-password" required aria-invalid={Boolean(state.code) || undefined} />
-        </LabeledField>
+        <label htmlFor="identifier" className="sr-only">
+          {t("authPasswordPreview.signIn.identifierLabel")}
+        </label>
+        <Input
+          id="identifier"
+          name="identifier"
+          type="text"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          dir="ltr"
+          required
+          defaultValue={state.email ?? ""}
+          placeholder={t("authPasswordPreview.signIn.identifierLabel")}
+          aria-invalid={Boolean(state.code) || undefined}
+        />
+        <label htmlFor="password" className="sr-only">
+          {t("authPasswordPreview.passwordLabel")}
+        </label>
+        <PasswordInput
+          id="password"
+          name="password"
+          autoComplete="current-password"
+          required
+          placeholder={t("authPasswordPreview.passwordLabel")}
+          aria-invalid={Boolean(state.code) || undefined}
+        />
 
         {/* GoTrue protects the password grant with CAPTCHA: an interaction-only
             challenge (shown only if Cloudflare needs the person to act). */}
         <TurnstileWidget name="captchaToken" action="sign-in" appearance="interaction-only" resetKey={state} />
 
-        <SubmitButton className="w-full" pendingLabel={t("authPasswordPreview.signIn.submitting")}>
+        <SubmitButton className="mt-xs w-full" pendingLabel={t("authPasswordPreview.signIn.submitting")}>
           {t("authPasswordPreview.signIn.submit")}
         </SubmitButton>
       </form>
+
+      {hasOAuthProvider(providers) ? (
+        <>
+          <OrDivider label={t("authPasswordPreview.signIn.or")} />
+          <EntryOAuthButtons next={next} providers={providers} />
+        </>
+      ) : null}
+
+      <p className="text-center text-body">
+        <Link href="/auth/forgot-password" className="text-fg-secondary hover:text-fg hover:underline">
+          {t("authPasswordPreview.signIn.forgotPassword")}
+        </Link>
+      </p>
     </AuthCard>
   );
 }

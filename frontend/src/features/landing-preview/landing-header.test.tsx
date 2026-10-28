@@ -40,7 +40,7 @@ describe("landing header: account type menu", () => {
     expect(links).toHaveLength(open.length);
     const hrefs = links.map((a) => a.getAttribute("href"));
     expect(hrefs).toContain("/auth/sign-up?type=showroom_dealer");
-    expect(hrefs).toContain("/installer/sign-up");
+    expect(hrefs).toContain("/auth/sign-up?type=installer_technician");
     expect(hrefs).not.toContain("/auth/sign-up");
     const soon = REGISTRATION_CHOICE_ORDER.filter((k) => CHOICES_BY_KEY[k]?.comingSoon);
     expect(menu.querySelectorAll('[aria-disabled="true"]')).toHaveLength(soon.length);

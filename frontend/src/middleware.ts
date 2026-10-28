@@ -17,9 +17,10 @@ import {
  * with no session, and bounces a signed-in caller away from the sign-in page.
  */
 export async function middleware(request: NextRequest) {
-  const phoneAuthRoute = /^\/(installer|showroom)\/sign-(in|up)$/.test(request.nextUrl.pathname);
+  // Sign-in / sign-up server actions never need a large body; refuse one before any work.
+  const authEntryRoute = /^\/auth\/sign-(in|up)$/.test(request.nextUrl.pathname);
   const contentLength = request.headers.get("content-length");
-  if (phoneAuthRoute && request.method === "POST" && contentLength && Number(contentLength) > 65536) {
+  if (authEntryRoute && request.method === "POST" && contentLength && Number(contentLength) > 65536) {
     return new NextResponse("Request too large", { status: 413 });
   }
   let response = NextResponse.next({ request });
@@ -131,8 +132,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // A signed-in caller never needs Sign In / Sign Up (shared email pages or the
-  // installer phone pages) — send them through the resume
+  // A signed-in caller never needs Sign In / Sign Up — send them through the resume
   // funnel (/onboarding forwards active users on to the workspace). Recovery,
   // support, verify, and invitation entry stay reachable while signed in.
   if (isSignedOutEntryPath(path) && userId) {

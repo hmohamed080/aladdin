@@ -62,7 +62,23 @@ export const serverEnvSchema = z.object({
   // The public origin emailed links point at (e.g. "https://aladdindecore.com"). Never taken from a request header
   // outside local development, so a forged Host cannot redirect a verification link.
   APP_PUBLIC_ORIGIN: z.string().url().optional(),
+  // Meta WhatsApp Cloud API, for the sign-up verification code (server/auth/whatsapp-otp.ts). The access token is a
+  // permanent System User token with whatsapp_business_messaging (a secret). The phone number ID is the sending number's
+  // ID from WhatsApp Manager › API Setup. The template is an approved Authentication template with a copy-code button.
+  // Optional: locally an unset token logs the code to the server console; in staging/production it fails closed.
+  WHATSAPP_ACCESS_TOKEN: z.string().trim().min(1).optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().trim().regex(/^[0-9]{5,32}$/).optional(),
+  WHATSAPP_OTP_TEMPLATE: z.string().trim().regex(/^[a-z0-9_]{1,512}$/).optional(),
 });
+
+/** Server-only WhatsApp Cloud API configuration (sign-up verification codes). */
+export function readWhatsAppEnv(): Pick<ServerEnv, "WHATSAPP_ACCESS_TOKEN" | "WHATSAPP_PHONE_NUMBER_ID" | "WHATSAPP_OTP_TEMPLATE"> {
+  return parseServerEnv({
+    WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN,
+    WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID,
+    WHATSAPP_OTP_TEMPLATE: process.env.WHATSAPP_OTP_TEMPLATE,
+  });
+}
 
 /** Server-only email configuration (contact-email verification links). */
 export function readEmailEnv(): Pick<ServerEnv, "RESEND_API_KEY" | "EMAIL_FROM" | "APP_PUBLIC_ORIGIN"> {

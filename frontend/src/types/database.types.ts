@@ -3812,6 +3812,39 @@ export type Database = {
           },
         ]
       }
+      phone_verification_challenges: {
+        Row: {
+          attempts: number
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          phone_e164: string
+          purpose: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          phone_e164: string
+          purpose: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone_e164?: string
+          purpose?: string
+        }
+        Relationships: []
+      }
       platform_flags: {
         Row: {
           enabled: boolean
@@ -6196,6 +6229,7 @@ export type Database = {
       }
       users: {
         Row: {
+          birth_date: string | null
           created_at: string
           id: string
           is_verified: boolean
@@ -6207,6 +6241,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          birth_date?: string | null
           created_at?: string
           id: string
           is_verified?: boolean
@@ -6218,6 +6253,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          birth_date?: string | null
           created_at?: string
           id?: string
           is_verified?: boolean
