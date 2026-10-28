@@ -1,6 +1,12 @@
 
 ## 2026-10-28 — Engineer profile completion
 
+Reference correction: embedded services, tools and languages now use rectangular
+multi-choice disclosures; availability uses icon cards. Inputs, biography and
+listbox triggers share the cream canvas. The approved progress navigator stays
+unchanged. Focused save-payload test passed (one test, nine skipped), ESLint passed,
+and the live browser confirmed the updated controls and backgrounds.
+
 Follow-up: unified engineer edit links and legacy edit route with the completion
 workspace. Preserved the owner-approved progress navigator; restyled only the
 inner form canvas to the installer reference. Focused ESLint passed; browser

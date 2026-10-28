@@ -65,10 +65,10 @@ describe("ProfessionalProfileEditor", () => {
     renderWithI18n(<ProfessionalProfileEditor answers={{ ...answers, specialization: null, services: [], additionalServices: [] }} concreteType="engineer" embedded />, "en");
     fireEvent.click(screen.getByRole("button", { name: "Architectural engineer" }));
     fireEvent.click(screen.getByRole("button", { name: "Civil engineer" }));
-    fireEvent.click(screen.getByRole("button", { name: "2D design" }));
-    fireEvent.click(screen.getByRole("button", { name: "3D design" }));
-    fireEvent.click(screen.getByRole("button", { name: "AutoCAD" }));
-    fireEvent.click(screen.getByRole("button", { name: "3ds Max" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "2D design", hidden: true }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "3D design", hidden: true }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "AutoCAD", hidden: true }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "3ds Max", hidden: true }));
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(saveProfessional).toHaveBeenCalled());
     expect(saveProfessional.mock.calls[0]![0]).toMatchObject({ specialization: "civil", services: ["design_2d", "design_3d"], additionalServices: ["tool_autocad", "tool_3ds_max"] });

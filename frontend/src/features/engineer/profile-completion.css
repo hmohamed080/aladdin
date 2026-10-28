@@ -32,19 +32,69 @@
 }
 
 /* Existing forms keep their save/error behavior; the section provides the frame. */
-.engineer-edit-content .engineer-edit-section .shadow-card {
+.engineer-surface .engineer-edit-content .engineer-edit-section .shadow-card {
   background: transparent;
   box-shadow: none;
   border: 0;
   padding: 0;
 }
 
-.engineer-edit-section input:not([type="checkbox"]):not([type="file"]),
-.engineer-edit-section select,
-.engineer-edit-section textarea {
-  background: var(--surface);
+.engineer-surface .engineer-edit-content input:not([type="checkbox"]):not([type="file"]),
+.engineer-surface .engineer-edit-content select,
+.engineer-surface .engineer-edit-content button[aria-haspopup="listbox"],
+.engineer-surface .engineer-edit-content textarea {
+  background: var(--surface-2);
   border-color: color-mix(in srgb, var(--accent-solid) 50%, var(--border));
 }
+
+.engineer-multi-select {
+  border: 1px solid color-mix(in srgb, var(--accent-solid) 50%, var(--border));
+  border-radius: .65rem;
+  background: var(--surface-2);
+}
+.engineer-multi-select summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2.75rem;
+  padding: .65rem .85rem;
+  cursor: pointer;
+  list-style: none;
+}
+.engineer-multi-select summary::-webkit-details-marker { display: none; }
+.engineer-multi-select summary svg { flex-shrink: 0; }
+.engineer-multi-select[open] summary { border-bottom: 1px solid var(--border-strong); }
+.engineer-multi-options { display: grid; gap: .25rem; padding: .5rem; }
+.engineer-multi-options label {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  min-height: 2.75rem;
+  padding: .5rem;
+  cursor: pointer;
+  border-radius: .4rem;
+}
+.engineer-multi-options label:hover { background: var(--surface-hover); }
+.engineer-multi-options input { accent-color: var(--accent-solid); width: 1rem; height: 1rem; }
+.engineer-availability-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .75rem;
+  min-height: 6rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent-solid) 50%, var(--border));
+  border-radius: .65rem;
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.engineer-availability-choice svg { color: var(--accent); }
+.engineer-availability-choice[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
+.engineer-availability-choice[aria-pressed="true"] svg { color: inherit; }
+.engineer-availability-choice:focus-visible,
+.engineer-multi-select summary:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 3px; }
 
 .engineer-edit-section textarea { min-height: 7rem; }
 .engineer-edit-section [data-testid="profile-editor"] { gap: 1.25rem; }

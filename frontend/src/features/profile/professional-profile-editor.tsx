@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { Input, Select, LabeledField, Checkbox, Button } from "@/components/ui/controls";
+import { CalendarIcon, InfinityIcon, ChevronDownIcon } from "@/components/ui/icons";
 import { CountedTextarea } from "@/components/ui/counted-textarea";
 import { DESCRIPTION_MAX_CHARS, isAcceptableEdit } from "@/lib/text/description-limit";
 import { Badge, Card } from "@/components/ui/primitives";
@@ -233,6 +234,7 @@ export function ProfessionalProfileEditor({
 
       <Card className="flex flex-col gap-lg">
         <LabeledField label={t("onboarding.professional.services.coreLabel")} htmlFor="core">
+          {embedded ? <ProfileMultiSelect id="core" options={serviceOptions} selected={state.services} label={(key) => t(`onboarding.professional.serviceItems.${key}`)} onToggle={(key) => toggle("services", key)} placeholder={locale === "ar" ? "اختر كل ما ينطبق عليك" : "Choose all that apply"} /> : (
           <div id="core" className="flex flex-wrap gap-2">
             {serviceOptions.map((k) => (
               <ChoiceChip
@@ -243,6 +245,7 @@ export function ProfessionalProfileEditor({
               />
             ))}
           </div>
+          )}
         </LabeledField>
 
         <LabeledField
@@ -250,6 +253,7 @@ export function ProfessionalProfileEditor({
           htmlFor="add"
           optional={t("common.optional")}
         >
+          {embedded ? <ProfileMultiSelect id="add" options={addServiceOptions} selected={state.additionalServices} label={(key) => t(`onboarding.professional.serviceItems.${key}`)} onToggle={(key) => toggle("additionalServices", key)} placeholder={locale === "ar" ? "اختر كل ما ينطبق عليك" : "Choose all that apply"} /> : (
           <div id="add" className="flex flex-wrap gap-2">
             {addServiceOptions.map((k) => (
               <ChoiceChip
@@ -260,6 +264,7 @@ export function ProfessionalProfileEditor({
               />
             ))}
           </div>
+          )}
         </LabeledField>
 
         <LabeledField
@@ -267,6 +272,7 @@ export function ProfessionalProfileEditor({
           htmlFor="langs"
           optional={t("common.optional")}
         >
+          {embedded ? <ProfileMultiSelect id="langs" options={LANGUAGES} selected={state.languages} label={(key) => t(`onboarding.professional.languages.${key}`)} onToggle={(key) => toggle("languages", key)} placeholder={locale === "ar" ? "اختر كل ما ينطبق عليك" : "Choose all that apply"} /> : (
           <div id="langs" className="flex flex-wrap gap-2">
             {LANGUAGES.map((k) => (
               <ChoiceChip
@@ -277,6 +283,7 @@ export function ProfessionalProfileEditor({
               />
             ))}
           </div>
+          )}
         </LabeledField>
 
         <LabeledField
@@ -285,7 +292,12 @@ export function ProfessionalProfileEditor({
           optional={t("common.optional")}
         >
           <div id="avail" className="grid gap-2.5 tablet:grid-cols-3">
-            {AVAILABILITIES.map((k) => (
+            {AVAILABILITIES.map((k) => embedded ? (
+              <button key={k} type="button" aria-pressed={state.availability === k} className="engineer-availability-choice" onClick={() => set({ availability: state.availability === k ? null : k })}>
+                {k === "flexible" ? <InfinityIcon size={24} /> : <CalendarIcon size={24} />}
+                <span>{t(`onboarding.professional.availabilities.${k}`)}</span>
+              </button>
+            ) : (
               <ChoiceCard
                 key={k}
                 selected={state.availability === k}
@@ -379,4 +391,21 @@ export function ProfessionalProfileEditor({
       </div>
     </div>
   );
+}
+
+
+function ProfileMultiSelect({ id, options, selected, label, onToggle, placeholder }: {
+  id: string; options: readonly string[]; selected: string[];
+  label: (key: string) => string; onToggle: (key: string) => void; placeholder: string;
+}) {
+  const chosen = options.filter((key) => selected.includes(key));
+  return <details className="engineer-multi-select">
+    <summary id={id}><span>{chosen.length ? chosen.map(label).join("، ") : placeholder}</span><ChevronDownIcon size={18} /></summary>
+    <div className="engineer-multi-options">
+      {options.map((key) => <label key={key}>
+        <input type="checkbox" checked={selected.includes(key)} onChange={() => onToggle(key)} />
+        <span>{label(key)}</span>
+      </label>)}
+    </div>
+  </details>;
 }
