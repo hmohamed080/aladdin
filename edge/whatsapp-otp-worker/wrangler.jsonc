@@ -12,7 +12,14 @@
     "WHATSAPP_GRAPH_API_VERSION": "v25.0",
     "WHATSAPP_DELIVERY_ENABLED": "false"
   },
+  "secrets_store_secrets": [
+    {
+      "binding": "WHATSAPP_ACCESS_TOKEN",
+      "store_id": "acfaa67f391e499db6fde398022f50ce",
+      "secret_name": "WHATSAPP_ACCESS_TOKEN"
+    }
+  ],
   "secrets": {
-    "required": ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "SUPABASE_SEND_SMS_HOOK_SECRET"]
+    "required": ["WHATSAPP_PHONE_NUMBER_ID", "SUPABASE_SEND_SMS_HOOK_SECRET"]
   }
 }
