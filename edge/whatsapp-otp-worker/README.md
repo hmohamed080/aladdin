@@ -10,7 +10,7 @@ This Worker is a transport, not a credential authority. Only Supabase can issue/
 ## Runtime settings
 Never commit secrets, paste them into a chat, or put them in NEXT_PUBLIC variables.
 - Cloudflare **Secrets Store**: owner-created `WHATSAPP_ACCESS_TOKEN` (Meta System User token) lives in account store `default_secrets_store`; Wrangler declares an isolated `secrets_store_secrets` binding named `WHATSAPP_ACCESS_TOKEN` and code retrieves it with `await env.WHATSAPP_ACCESS_TOKEN.get()` only after a signed, enabled request. The value is never committed or read into the frontend.
-- Per-Worker runtime secret: `SUPABASE_SEND_SMS_HOOK_SECRET` (Standard Webhooks secret, `v1,whsec_...`; **not created or installed yet**).
+- Cloudflare account-level Secrets Store secret: `SUPABASE_SEND_SMS_HOOK_SECRET` (Standard Webhooks `v1,whsec_...`). The owner created it and Cloudflare confirms it active. The Worker reads via `await env.SUPABASE_SEND_SMS_HOOK_SECRET.get()`. The matching secret is **not yet configured in Supabase Auth Hook**, which remains disabled.
 - Preview-only secret `OTP_ALLOWED_RECIPIENTS`: comma-separated owned/test E.164 Egyptian mobile numbers, example `+2010XXXXXXXX` (no personal numbers in source control); if empty, all sends are denied.
 - **D1 binding** `IDEMPOTENCY_DB`: an isolated Acceptance D1 database with migration `migrations/0001_hook_events.sql`. The dedicated Acceptance database exists and the migration's DDL was applied and inspected. No OTP or telephone value is written to this table. Local Worker/D1 integration passed. A bounded seven-day cleanup helper now exists in source but has **no scheduled trigger**; hosted Worker/D1 integration, cron configuration, retention approval and monitoring remain required.
 - Non-secret preview vars: `WHATSAPP_PHONE_NUMBER_ID=1415528588305492` (owner-supplied Meta sender Phone Number ID; verify against Meta before live rollout), `WHATSAPP_OTP_TEMPLATE=aladdin_otp`, `WHATSAPP_OTP_LANGUAGE=ar`, `WHATSAPP_GRAPH_API_VERSION=v25.0`, `WHATSAPP_DELIVERY_ENABLED=false`.
@@ -20,7 +20,7 @@ Never commit secrets, paste them into a chat, or put them in NEXT_PUBLIC variabl
 
 ## Preview deployment preflight (NOT an authorization to deploy)
 - Run `node scripts/check-preview-config.mjs` and `npx wrangler deploy --dry-run`; the preview guard refuses Production routes, mismatched D1 or an enabled delivery flag.
-- `SUPABASE_SEND_SMS_HOOK_SECRET` has not been generated. Do not use the Meta token as that secret. Generate and transfer it using operator-owned dashboard or protected secret storage, never chat or Git.
+- `SUPABASE_SEND_SMS_HOOK_SECRET` is already present in Cloudflare account-level Secrets Store, and kept in the operator's Password Manager. Never paste its value in chat, Git, or frontend. It still needs separate configuration in Supabase Acceptance when Hook activation is approved.
 - `OTP_ALLOWED_RECIPIENTS` is empty/missing and all sends are denied, even if someone toggles delivery.
 - A Preview Worker deployment needs explicit owner approval and a runtime health/test plan; successful bundling is **not** a live integration test.
 
@@ -41,6 +41,7 @@ Never commit secrets, paste them into a chat, or put them in NEXT_PUBLIC variabl
 - The local D1 integration test also checks bounded seven-day replay expiry: old hash removed, fresh hash preserved; no hosted purge configured.
 - A separate Miniflare test loads Wrangler's **built JS bundle** and sends real local HTTP requests with `WHATSAPP_DELIVERY_ENABLED=false`. Verifies GET `404`, unsupported content `415`, unsigned JSON `401`, signed dummy OTP `503` and **zero D1 writes**.
 - `npm run test:unit` covers mock security/failure logic and negative preview-config checks. GitHub OTP CI executes these as separate steps after a Wrangler dry-run.
+- The local bundled Worker test fails closed when async Secrets Store binding is absent. Miniflare plain bindings cannot impersonate that async secret: test the actual `get()` in hosted Preview after approved deployment.
 - Pinned stable Miniflare's local workerd supports only compatibility date `2026-08-06`; the **test-only HTTP runtime** uses that date, while the real Worker config remains `2026-10-01`. A hosted smoke test on the target date is still required.
 
 **Verification status (2026-10-28):** dedicated OTP CI PASS (including Wrangler dry-run, typecheck and mocked security tests); general CI and RLS PASS. The dedicated remote D1 passed sequential and parallel replay duplicate-insert tests with fake hashes, and all test rows were deleted. The `aladdin-whatsapp-otp-preview` Worker is **not deployed**, Secrets Store runtime access is untested, and no Supabase Hook or real Auth integration has been activated. See `docs/operations/WHATSAPP_OTP_IMPLEMENTATION_LOG.md`.
