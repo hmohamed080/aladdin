@@ -6,7 +6,7 @@
 ## Scope and invariants
 - Deploy only `aladdin-whatsapp-otp-preview` (`workers.dev`), never existing backend/frontend Workers or the `aladdindecore.com` zone.
 - `WHATSAPP_DELIVERY_ENABLED=false` at all times in this release. No real message sending.
-- `SUPABASE_SEND_SMS_HOOK_SECRET` is a separate Standard Webhooks secret, NEVER the Meta access token. Generate/enter on owner-controlled devices and protected provider UIs; never GitHub, chat or command history.
+- `SUPABASE_SEND_SMS_HOOK_SECRET` is a separate Standard Webhooks secret, NEVER the Meta access token. **Operator created it and Cloudflare Secrets Store shows active; the value is retained only in the owner's password manager.** Both are bound by `secrets_store_secrets`, loaded with async `get()`. No secret value in GitHub, chat or command history.
 - `OTP_ALLOWED_RECIPIENTS` is intentionally unset during this zero-delivery release.
 - D1 database `aladdin-whatsapp-otp-acceptance` and table `whatsapp_hook_events` already exist.
 - Meta token remains in the account-level Cloudflare Secrets Store (`WHATSAPP_ACCESS_TOKEN`, scope Workers); `await env.WHATSAPP_ACCESS_TOKEN.get()` resolves only on a valid signed request while delivery enabled.
@@ -28,11 +28,11 @@ Working directory is repository `edge/whatsapp-otp-worker`; Node.js >=22 and Clo
 6. Verify Cloudflare account and D1 UUID `da65d5e4-8344-4078-9c2d-8a4bb4907f79`; verify no `aladdin-whatsapp-otp-preview` Worker currently exists (avoid unexpected replacement).
 7. Verify the Meta sender ID in Meta API Setup independently; a matching configuration string in the repository is not enough.
 
-## Secret preparation (owner action; NOT DONE)
-- Obtain a valid 32+ byte high-entropy `v1,whsec_<base64>` signing secret under the owner's control and plan to use *the identical value* for Supabase Acceptance Send SMS Hook and the Cloudflare Worker.
+## Secret preparation (Cloudflare completed; Supabase NOT DONE)
+- Owner has generated a dedicated 32-byte high-entropy `v1,whsec_<base64>` signing secret and saved it in a password manager. Same value has been entered in the account Secrets Store, scoped Workers; **not** yet entered in Supabase.
 - If Supabase Dashboard generates a secret during hook creation, coordinate initial disabled Preview Worker deployment separately; do not invent a value or reuse the Meta token. Record only that both sides match, never the value.
-- Cloudflare Wrangler `secrets.required` declares `SUPABASE_SEND_SMS_HOOK_SECRET`. Its absence blocks a normal deploy. Per Cloudflare docs, `wrangler secret put` **immediately deploys a new Worker version** and therefore is NOT a harmless preparation step.
-- Use the verified `wrangler deploy --secrets-file <path>` approach (temporary owner-readable local file, containing only the signing key, removed securely after). Before use, confirm your Wrangler version supports supplying secrets with the initial deployment.
+- **Current source now declares both credentials as account-level `secrets_store_secrets` bindings**; it no longer declares a per-Worker `secrets.required`. Confirm this current state when reviewing. Never run `wrangler secret put` as harmless preparation: it immediately deploys a Worker version.
+- **No secret upload via `--secrets-file` is required for this architecture.** Bind both existing account-level secrets in Wrangler and verify those bindings at first separately approved Preview deployment. Do not duplicate the secret as an untracked Worker-level secret.
 - Avoid putting the secret in `wrangler.jsonc`, `.dev.vars` tracked by Git, any `NEXT_PUBLIC_*` variable, GitHub PR comments, terminal command lines or shell history. The signed hook remains disabled at Supabase.
 - Do not configure test recipient numbers until a separate explicitly approved end-to-end test; then keep them only in protected Worker secret storage.
 
@@ -67,3 +67,10 @@ Only use the actual deployed Worker URL once available. All cases below must res
 - [Cloudflare secrets deployment semantics](https://developers.cloudflare.com/workers/configuration/secrets/)
 - [Cloudflare Secrets Store Worker bindings](https://developers.cloudflare.com/secrets-store/integrations/workers/)
 - [Supabase Send SMS Hook](https://supabase.com/docs/guides/auth/auth-hooks/send-sms-hook)
+
+## Secrets Store signing-key checkpoint — 2026-10-28
+- Operator generated and retained a dedicated `v1,whsec_…` signature secret in a password manager; **the value is not included in repo or conversation**.
+- Cloudflare API confirmed both account secrets `WHATSAPP_ACCESS_TOKEN` and `SUPABASE_SEND_SMS_HOOK_SECRET` are **active** and scoped to Workers in store `acfaa67f391e499db6fde398022f50ce`. Values not fetched.
+- `wrangler.jsonc` now binds **both** via `secrets_store_secrets`. `src/index.ts` reads signing key via async `get()` and returns 503 if missing/throwing. Removed the old per-Worker secret declaration; Preview guard verifies both exact account resources.
+- Miniflare local HTTP cannot emulate account Secrets Store `get()` via a plaintext binding. Its bundle test now explicitly verifies refusal when that binding is unavailable; signed handler/D1 tests inject a fake `get()`. **A hosted Worker smoke test is required to prove the real Cloudflare Secrets Store runtime binding.** Do not claim end-to-end coverage from local mocks.
+- The secret has **not** been entered in the Supabase Acceptance Send SMS Hook. Do not enable/create the Hook yet; the operator must use the identical saved value on the Supabase side at the separately approved activation stage. No Worker deployed, no messages sent, no Production changes.
