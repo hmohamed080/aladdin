@@ -3,7 +3,7 @@ import { strict as assert } from "node:assert";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { Miniflare } from "miniflare";
-import { claimEvent, handleRequest, type ReplayDb } from "../src/index.ts";
+import { claimEvent, handleRequest, purgeExpiredReplayClaims, type ReplayDb } from "../src/index.ts";
 
 const signingSecret = "v1,whsec_" + btoa("Z".repeat(32));
 const fixture = JSON.stringify({user:{phone:"+201012345678"},sms:{otp:"123456"}});
@@ -158,6 +158,35 @@ test("built Worker runs through Miniflare HTTP with real D1, delivery OFF", asyn
     assert.deepEqual(await disabled.json(),{error:"delivery_disabled"});
     const rows=await db.prepare("SELECT COUNT(*) AS n FROM whatsapp_hook_events").first<{n:number}>();
     assert.equal(rows?.n,0, "disabled requests must never claim D1 events");
+  } finally {
+    await mf.dispose();
+  }
+});
+
+test("D1 replay cleanup retains fresh events, deletes stale claims in limited batches", async () => {
+  const mf = new Miniflare({
+    modules: true,
+    script: 'export default { async fetch() { return new Response("local"); } };',
+    d1Databases: { IDEMPOTENCY_DB: "otp-retention-local-test" },
+  });
+  try {
+    const d1=await mf.getD1Database("IDEMPOTENCY_DB");
+    const ddl = readFileSync(new URL("../migrations/0001_hook_events.sql",import.meta.url),"utf8")
+      .split(/\r?\n/).filter(line=>!line.trim().startsWith("--")).join(" ");
+    for(const statement of ddl.split(";").map(v=>v.trim()).filter(Boolean)) {
+      assert.equal((await d1.prepare(statement).run()).success,true);
+    }
+    const now=1793190000;
+    await d1.prepare("INSERT INTO whatsapp_hook_events(event_hash, created_at,state) VALUES(?1,?2,'accepted')").bind("a".repeat(64),now-604801).run();
+    await d1.prepare("INSERT INTO whatsapp_hook_events(event_hash, created_at,state) VALUES(?1,?2,'reserved')").bind("b".repeat(64),now-604799).run();
+    const first=await purgeExpiredReplayClaims(d1 as unknown as ReplayDb,now);
+    assert.deepEqual(first,{success:true,deleted:1});
+    const second=await purgeExpiredReplayClaims(d1 as unknown as ReplayDb,now);
+    assert.deepEqual(second,{success:true,deleted:0});
+    assert.deepEqual(await purgeExpiredReplayClaims(undefined,now),{success:false,deleted:0});
+    const rest=await d1.prepare("SELECT event_hash,state FROM whatsapp_hook_events").all<{event_hash:string;state:string}>();
+    assert.equal(rest.results.length,1);
+    assert.equal(rest.results[0].event_hash,"b".repeat(64));
   } finally {
     await mf.dispose();
   }
