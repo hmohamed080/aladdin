@@ -1,9 +1,19 @@
-/* Instagram-style sign-in / sign-up: a centred column, the 2026 logo and the
-   form in a bordered card, then a second bordered box for "Don't have an
-   account? Sign up". Palette comes from the scoped `.installer-surface` theme;
-   controls remain the canonical controls. No photo. */
-.stage { min-height: 100dvh; background: var(--canvas); color: var(--fg); --fg-secondary: color-mix(in srgb, var(--deep-navy) 75%, var(--soft-cream)); --fg-muted: var(--fg-secondary); --auth-rule: color-mix(in srgb, var(--fg) 14%, var(--canvas)); }
-.sheet { position: relative; display: flex; flex-direction: column; min-height: 100dvh; @apply p-lg; background: var(--canvas); }
+/* Sign-in and the other /auth pages: the full-height photo beside a cream
+   sheet, with the Instagram-style column inside it (the 2026 logo and the
+   form in a bordered card, then a second box for "Don't have an account?").
+   Sign-up marks itself `data-auth-centered`: no photo, the column centred on
+   the page. Palette comes from the scoped `.installer-surface` theme;
+   controls remain the canonical controls. */
+.stage { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(420px, 1fr); min-height: 100dvh; direction: ltr; background: var(--canvas); color: var(--fg); --fg-secondary: color-mix(in srgb, var(--deep-navy) 75%, var(--soft-cream)); --fg-muted: var(--fg-secondary); --auth-rule: color-mix(in srgb, var(--fg) 14%, var(--canvas)); }
+.photo { position: relative; grid-column: 1; grid-row: 1; min-height: 100dvh; }
+.photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.sheet { z-index: 1; position: relative; isolation: isolate; grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-height: 100dvh; overflow: hidden; @apply p-lg; background: var(--canvas); }
+.sheet::before, .sheet::after { content: ""; position: absolute; z-index: -1; width: 100%; aspect-ratio: 1; border-radius: 50%; background: color-mix(in srgb, var(--warm-sand) 18%, transparent); pointer-events: none; }
+.sheet::before { inset-block-start: -35%; inset-inline-start: -50%; }
+.sheet::after { inset-block-end: -45%; inset-inline-end: -45%; }
+.stage:has([data-auth-centered]) { display: block; }
+.stage:has([data-auth-centered]) .photo { display: none; }
+.stage:has([data-auth-centered]) .sheet::before, .stage:has([data-auth-centered]) .sheet::after { display: none; }
 .toolbar { display: flex; justify-content: flex-end; @apply gap-sm; }
 .body { flex: 1; display: flex; align-items: center; justify-content: center; }
 .inner { width: 100%; max-width: 400px; margin-inline: auto; @apply py-lg; display: flex; flex-direction: column; @apply gap-md; }
@@ -29,6 +39,12 @@
 :global(.dark) .badge { background: color-mix(in srgb, var(--warm-sand) 12%, var(--deep-navy)); }
 :global(.dark) .stage { --fg-secondary: var(--warm-sand); --fg-muted: var(--warm-sand); --auth-rule: color-mix(in srgb, var(--warm-sand) 22%, var(--deep-navy)); }
 :global(.dark) .logo { filter: brightness(0) invert(93%) sepia(13%) saturate(374%); }
+@media (max-width: 767px) {
+  .stage { display: flex; flex-direction: column-reverse; }
+  .photo { height: calc(57.7vw + 24px); min-height: 0; }
+  .sheet { min-height: 0; margin-block-start: -24px; border-start-start-radius: 28px; border-start-end-radius: 28px; }
+  .stage:has([data-auth-centered]) .sheet { min-height: 100dvh; margin-block-start: 0; border-radius: 0; }
+}
 @media (max-width: 479px) {
   /* Phones: no card chrome, like Instagram's mobile app. */
   .sheet { @apply p-md; }

@@ -7,6 +7,7 @@ import { AuthStageCard, AuthStageHeader, AuthStageLinks } from "@/features/entry
  * Sign Up, Recovery, Verify). It renders inside the `AuthStage` composition that
  * `app/auth/layout.tsx` provides: the 2026 logo, an optional account badge, the title
  * and the form in one bordered card, then the links in a second box (Instagram style).
+ * `centered` drops the photo for this page (sign-up).
  */
 export function AuthCard({
   title,
@@ -14,6 +15,7 @@ export function AuthCard({
   badge,
   children,
   footer,
+  centered = false,
 }: {
   title: string;
   subtitle: string;
@@ -21,11 +23,13 @@ export function AuthCard({
   badge?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  /** No photo: the column is centred on the page (sign-up). */
+  centered?: boolean;
 }) {
   const { t } = useI18n();
   return (
     <>
-      <AuthStageCard>
+      <AuthStageCard centered={centered}>
         <AuthStageHeader appName={t("common.appName")} badge={badge} title={title} description={subtitle} />
         {children}
       </AuthStageCard>

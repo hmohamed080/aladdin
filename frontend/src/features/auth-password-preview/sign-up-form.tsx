@@ -149,6 +149,7 @@ export function PasswordSignUpForm({
   if (codeSent) {
     return (
       <AuthCard
+        centered
         title={t(channel === "phone" ? "authPasswordPreview.signUp.codeStepPhoneTitle" : "authPasswordPreview.signUp.codeStepTitle")}
         subtitle={channel === "phone" ? t("authPasswordPreview.signUp.codeStepPhone", { phone: contact }) : t("authPasswordPreview.signUp.codeStepSubtitle", { email: contact })}
         badge={badge}
@@ -216,7 +217,7 @@ export function PasswordSignUpForm({
   }
 
   return (
-    <AuthCard title={t("authPasswordPreview.signUp.title")} subtitle={t("authPasswordPreview.signUp.subtitle")} badge={badge} footer={footer}>
+    <AuthCard centered title={t("authPasswordPreview.signUp.title")} subtitle={t("authPasswordPreview.signUp.subtitle")} badge={badge} footer={footer}>
       {hasOAuthProvider(providers) ? (
         <>
           <EntryOAuthButtons next={next} accountType={initialAccountType || undefined} providers={providers} />
