@@ -5,7 +5,9 @@
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
   "routes": [],
-  "observability": { "enabled": true },
+  "observability": {
+    "enabled": true
+  },
   "vars": {
     "WHATSAPP_PHONE_NUMBER_ID": "1415528588305492",
     "WHATSAPP_OTP_TEMPLATE": "aladdin_otp",
@@ -21,6 +23,16 @@
     }
   ],
   "secrets": {
-    "required": ["SUPABASE_SEND_SMS_HOOK_SECRET"]
-  }
+    "required": [
+      "SUPABASE_SEND_SMS_HOOK_SECRET"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "IDEMPOTENCY_DB",
+      "database_name": "aladdin-whatsapp-otp-acceptance",
+      "database_id": "da65d5e4-8344-4078-9c2d-8a4bb4907f79",
+      "migrations_dir": "migrations"
+    }
+  ]
 }
