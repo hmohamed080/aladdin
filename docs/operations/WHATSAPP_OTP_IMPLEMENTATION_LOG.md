@@ -1,3 +1,8 @@
+## Hosted unsigned HTTP smoke tests — 2026-10-28 (PASS)
+- Owner executed live HTTP checks against `https://aladdin-whatsapp-otp-preview.bstalent9.workers.dev/hooks/supabase/send-sms` and reported: `GET → 404` **PASS**; `POST text/plain → 415` **PASS**; `POST application/json` unsigned `{} → 401` **PASS**.
+- Independently rechecked Cloudflare deployment API after those tests: deployed Version `39b1dc27-8810-46f4-a328-5be1e7182ec5` (100%), exact Acceptance D1 and two Secrets Store bindings, and `WHATSAPP_DELIVERY_ENABLED=false`. D1 replay journal remains **0 rows**.
+- Scope: unsigned/malformed request rejection **verified**; **valid-signature hosted test remains pending**, and neither signing key material nor a real OTP has been revealed or transmitted. Do not enable Hook, message delivery, or Production.
+
 ## First hosted Preview deployment — Cloudflare confirmed (2026-10-28)
 - **Owner-authorized isolated Worker deployed via Wrangler**, without changing existing Workers or Production, at `https://aladdin-whatsapp-otp-preview.bstalent9.workers.dev`.
 - Cloudflare deployment API confirms **Deployment ID** `d919a391-a557-49c3-9b67-9804039e5af9` / **Version ID** `39b1dc27-8810-46f4-a328-5be1e7182ec5`, deployment source `wrangler`, 100% of this Preview Worker version, created `2026-10-28T16:37:12.470301Z`.
