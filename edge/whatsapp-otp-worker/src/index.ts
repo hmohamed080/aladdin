@@ -1,7 +1,7 @@
 /** Preview-only signed Supabase Send SMS Hook transport. No OTP authority. */
 export interface Env {
   SUPABASE_SEND_SMS_HOOK_SECRET: string;
-  WHATSAPP_ACCESS_TOKEN: string;
+  WHATSAPP_ACCESS_TOKEN: { get(): Promise<string> };
   WHATSAPP_PHONE_NUMBER_ID: string;
   WHATSAPP_OTP_TEMPLATE: string;
   WHATSAPP_OTP_LANGUAGE: string;
@@ -53,7 +53,7 @@ export async function submitOtp(phone: string, otp: string, env: Env, fetcher: t
   if (!/^\d{5,30}$/.test(env.WHATSAPP_PHONE_NUMBER_ID)) return false;
   if (!/^[a-z][a-z0-9_]{0,511}$/.test(env.WHATSAPP_OTP_TEMPLATE)) return false;
   if (!/^v\d{1,2}\.\d$/.test(env.WHATSAPP_GRAPH_API_VERSION)) return false;
-  if (env.WHATSAPP_OTP_LANGUAGE !== "ar" || !env.WHATSAPP_ACCESS_TOKEN) return false;
+  if (env.WHATSAPP_OTP_LANGUAGE !== "ar") return false;
   const uri = "https://graph.facebook.com/" + env.WHATSAPP_GRAPH_API_VERSION + "/" + env.WHATSAPP_PHONE_NUMBER_ID + "/messages";
   const payload = {
     messaging_product: "whatsapp", to: phone.slice(1), type: "template",
@@ -67,9 +67,12 @@ export async function submitOtp(phone: string, otp: string, env: Env, fetcher: t
     },
   };
   try {
+    // Resolve the account-level Secret only after signature validation and the delivery gate.
+    const token = await env.WHATSAPP_ACCESS_TOKEN.get();
+    if (!token) return false;
     const r = await fetcher(uri, {
       method: "POST",
-      headers: { authorization: "Bearer " + env.WHATSAPP_ACCESS_TOKEN, "content-type": "application/json" },
+      headers: { authorization: "Bearer " + token, "content-type": "application/json" },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(9000),
     });
