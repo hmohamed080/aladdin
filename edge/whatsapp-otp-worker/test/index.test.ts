@@ -5,7 +5,7 @@ import { handleRequest, verifySignature, parseEvent } from "../src/index.ts";
 const secret = "v1,whsec_" + btoa("A".repeat(32));
 const env = {
   SUPABASE_SEND_SMS_HOOK_SECRET: secret,
-  WHATSAPP_ACCESS_TOKEN: "do-not-log",
+  WHATSAPP_ACCESS_TOKEN: { get: async () => "do-not-log" },
   WHATSAPP_PHONE_NUMBER_ID: "141552388305492",
   WHATSAPP_OTP_TEMPLATE: "aladdin_otp",
   WHATSAPP_OTP_LANGUAGE: "ar",
@@ -55,6 +55,28 @@ test("delivery disabled is fail-closed even with valid signed request", async ()
     calls++; return new Response();
   }) as typeof fetch);
   assert.equal(result.status, 503);
+  assert.equal(calls, 0);
+});
+test("does not read account secret while delivery is disabled", async () => {
+  let reads = 0;
+  const guarded = {
+    ...env,
+    WHATSAPP_ACCESS_TOKEN: { get: async () => { reads++; return "unexpected"; } },
+  };
+  const result = await handleRequest(await signedRequest(event), guarded);
+  assert.equal(result.status, 503);
+  assert.equal(reads, 0);
+});
+test("missing Secrets Store secret refuses to contact Meta", async () => {
+  let calls = 0;
+  const guarded = {
+    ...env, WHATSAPP_DELIVERY_ENABLED: "true",
+    WHATSAPP_ACCESS_TOKEN: { get: async () => "" },
+  };
+  const result = await handleRequest(await signedRequest(event), guarded, (async () => {
+    calls++; return new Response(JSON.stringify({ messages: [{ id: "wrong" }] }), { status: 200 });
+  }) as typeof fetch);
+  assert.equal(result.status, 502);
   assert.equal(calls, 0);
 });
 test("sends copy-code Arabic template once with matching body and button", async () => {
