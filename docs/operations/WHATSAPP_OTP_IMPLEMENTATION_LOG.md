@@ -1,3 +1,10 @@
+## Owner authorization and final preflight — 2026-10-28
+- Owner explicitly approved **first isolated Cloudflare Preview Worker deployment only**, with `WHATSAPP_DELIVERY_ENABLED=false`, no Supabase Hook, no live WhatsApp sending, no Merge and no Production changes.
+- Read-only CI verification at commit `a85bb4bb4ade086aeeea1cad1f2e04a858016f17`: [WhatsApp OTP CI](https://github.com/hmohamed080/aladdin/actions/runs/40715681844) **PASS**; [General CI](https://github.com/hmohamed080/aladdin/actions/runs/40715681759) **PASS**; [Supabase RLS](https://github.com/hmohamed080/aladdin/actions/runs/40715682006) **PASS**.
+- Cloudflare read-only verification confirms dedicated D1 `aladdin-whatsapp-otp-acceptance`, replay journal index, **0 journal rows**, and both scoped Secrets Store secret names **active**. Existing deployed Workers list did **not** contain `aladdin-whatsapp-otp-preview`.
+- **Not yet deployed** at this checkpoint: exact tested bundle must be uploaded by Wrangler with verified config and resource bindings. Do not mark deploy complete until Cloudflare lists the Worker and actual runtime HTTP tests pass. Avoid uploading unbundled TypeScript or a different Worker.
+- Next action for operator: create an isolated checkout at the approved commit; validate deploy guard and dry-run, then run a targeted Wrangler Preview deploy with delivery still disabled and capture actual Worker URL and deployment ID without exposing secrets.
+
 
 ## Secrets Store signing-key checkpoint — 2026-10-28
 - Operator generated and retained a dedicated `v1,whsec_…` signature secret in a password manager; **the value is not included in repo or conversation**.
