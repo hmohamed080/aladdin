@@ -139,6 +139,24 @@ test("rejects wrong phone and malformed OTP", () => {
   assert.equal(parseEvent(JSON.stringify({ user: { phone: "+201012345678" }, sms: { otp: "12345" } })), null);
   assert.equal(parseEvent("bad json"), null);
 });
+test("phone_change new_phone recipient is not silently replaced with user.phone", async () => {
+  const change={
+    user:{phone:"+201012345678"},
+    new_phone:"+201112345678",
+    sms:{otp:"123456"},
+  };
+  assert.equal(parseEvent(JSON.stringify(change)),null);
+  assert.equal(parseEvent(JSON.stringify({...change,new_phone:undefined,sms:{...change.sms,new_phone:"+201112345678"}})),null);
+  assert.equal(parseEvent(JSON.stringify({...change,new_phone:undefined,user:{...change.user,new_phone:"+201112345678"}})),null);
+  let sends=0;
+  const r=await handleRequest(
+    await signedRequest(JSON.stringify(change)),
+    {...env,WHATSAPP_DELIVERY_ENABLED:"true",IDEMPOTENCY_DB:makeReplayDb()},
+    (async()=>{sends++;return new Response("{}",{status:200})}) as typeof fetch
+  );
+  assert.equal(r.status,422);
+  assert.equal(sends,0);
+});
 test("identical accepted event returns 200 but sends only once", async () => {
   const replayDb = makeReplayDb();
   const e = { ...env, WHATSAPP_DELIVERY_ENABLED: "true", IDEMPOTENCY_DB: replayDb };
