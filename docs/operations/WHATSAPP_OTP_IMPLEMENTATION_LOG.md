@@ -7,7 +7,9 @@
 - [x] Updated ADR-0025 and Worker README to distinguish completed D1 provisioning/schema and dry-run tests from the **not-deployed** Worker, absent signing secret and not-enabled Supabase Hook.
 - [x] Created `docs/operations/WHATSAPP_OTP_PREVIEW_RELEASE_RUNBOOK.md` with preflight, secret custody, actual Preview-only deployment preparation, explicit owner approval, zero-delivery runtime smoke checks, error/rollback protocol.
 - [x] Independently reconfirmed Cloudflare: token name/status active, Acceptance D1 exists, replay table empty after smoke-test cleanup, index exists and **no OTP Preview Worker** among deployed Workers.
-- [ ] New CI run after the guard and documentation commits: verify final head before any deploy claim. Prior green CI is *not* proof that later commits already passed.
+- [x] Added seven adversarial Preview config tests at `edge/whatsapp-otp-worker/test/preview-config.test.ts` (real config passes; toggling delivery, production Worker or route, wrong D1, missing hook secret or wrong Secrets Store fails). The guard also accepts a test-fixture file path; actual CI always checks the real config with no arguments.
+- [x] **OTP CI #16 (run `40695164280`) PASS:** configuration guard, Wrangler dry-run, Worker TypeScript check and the entire expanded test suite, including seven negative config tests.
+- [ ] General CI and Supabase RLS final-head status must be rechecked after the latest updates; prior green CI is *not* proof that later commits passed.
 - [ ] No hosted Worker change, signing secret creation, Supabase Hook enablement, real OTP sending, Production change or Merge by this continuation.
 - **Security detail confirmed from Cloudflare docs:** `wrangler secret put` can deploy immediately; for the first controlled release use a reviewed secret-safe deployment mechanism and **never** treat that command as read-only staging.
 - Runbook: [Preview release and rollback](WHATSAPP_OTP_PREVIEW_RELEASE_RUNBOOK.md).
@@ -91,7 +93,8 @@ Existing installer/showroom **Phone + Password** uses synthetic email aliases, a
 
 ## Evidence links
 - [Draft PR #114](https://github.com/hmohamed080/aladdin/pull/114)
-- [OTP CI run #7](https://github.com/hmohamed080/aladdin/actions/runs/40689531760)
+- [OTP CI run #16 — current guarded dry-run + expanded suite](https://github.com/hmohamed080/aladdin/actions/runs/40695164280)
+- [OTP CI run #7 — earlier green dry-run](https://github.com/hmohamed080/aladdin/actions/runs/40689531760)
 - [General CI run](https://github.com/hmohamed080/aladdin/actions/runs/40689531672)
 - [RLS CI run](https://github.com/hmohamed080/aladdin/actions/runs/40689531897)
 - [Supabase Send SMS Hook docs](https://supabase.com/docs/guides/auth/auth-hooks/send-sms-hook)
