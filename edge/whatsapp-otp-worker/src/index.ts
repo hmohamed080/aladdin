@@ -12,7 +12,7 @@ export interface ReplayDb {
 export interface Env {
   IDEMPOTENCY_DB?: ReplayDb;
   OTP_ALLOWED_RECIPIENTS?: string;
-  SUPABASE_SEND_SMS_HOOK_SECRET: string;
+  SUPABASE_SEND_SMS_HOOK_SECRET: { get(): Promise<string> };
   WHATSAPP_ACCESS_TOKEN: { get(): Promise<string> };
   WHATSAPP_PHONE_NUMBER_ID: string;
   WHATSAPP_OTP_TEMPLATE: string;
@@ -157,10 +157,17 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
   if (request.method !== "POST" || new URL(request.url).pathname !== PATH) return answer(404);
   if (request.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") return answer(415);
   if (Number(request.headers.get("content-length") ?? 0) > 16384) return answer(413);
-  if (!env.SUPABASE_SEND_SMS_HOOK_SECRET) return answer(503);
+  // The signing key is an account-level Secrets Store binding, not a plaintext var.
+  // Resolve it only for candidate signed requests; fail closed on missing/error.
+  if (!env.SUPABASE_SEND_SMS_HOOK_SECRET?.get) return answer(503);
   const raw = await request.text();
   if (new TextEncoder().encode(raw).length > 16384) return answer(413);
-  if (!await verifySignature(raw, request.headers, env.SUPABASE_SEND_SMS_HOOK_SECRET)) return answer(401);
+  let signingSecret: string;
+  try {
+    signingSecret = await env.SUPABASE_SEND_SMS_HOOK_SECRET.get();
+  } catch { return answer(503); }
+  if (!signingSecret) return answer(503);
+  if (!await verifySignature(raw, request.headers, signingSecret)) return answer(401);
   const v = parseEvent(raw);
   if (!v) return answer(422);
   // An isolated acceptance-only allowlist is mandatory. No allowlist means no send.
