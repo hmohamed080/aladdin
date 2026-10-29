@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createPortal } from "react-dom";
+import { FloatingMenu } from "@/components/ui/floating-menu";
+import { menuItemClass } from "@/components/ui/menu";
 import { useI18n } from "@/lib/i18n/context";
 import { Input, Select, LabeledField, Checkbox, Button } from "@/components/ui/controls";
-import { CalendarIcon, InfinityIcon, ChevronDownIcon } from "@/components/ui/icons";
+import { CalendarIcon, InfinityIcon, ChevronDownIcon, CheckIcon, PlusIcon, MinusCircleIcon, MapPinIcon, BuildingIcon } from "@/components/ui/icons";
 import { CountedTextarea } from "@/components/ui/counted-textarea";
 import { DESCRIPTION_MAX_CHARS, isAcceptableEdit } from "@/lib/text/description-limit";
 import { Badge, Card } from "@/components/ui/primitives";
@@ -53,10 +56,8 @@ import {
  * a profile form; offering it here would let someone rewrite a claim the platform
  * had already reviewed.
  *
- * `city` is CARRIED, not edited. The professional flow collects a governorate and
- * service areas and never a base city, but the column exists and may hold a value
- * from elsewhere — passing it back unchanged stops an edit of the headline from
- * silently erasing it.
+ * Base city is editable in the embedded basic-information panel; other editors
+ * preserve the saved value. All sections share one state and save payload.
  */
 
 type EditorState = {
@@ -71,6 +72,7 @@ type EditorState = {
   serviceAreas: string[];
   offersRemote: boolean;
   governorate: string | null;
+  city: string | null;
   maxTravelKm: number | null;
 };
 
@@ -103,8 +105,12 @@ export function ProfessionalProfileEditor({
     serviceAreas: answers.serviceAreas,
     offersRemote: answers.offersRemote,
     governorate: answers.governorate,
+    city: answers.city,
     maxTravelKm: answers.maxTravelKm,
   });
+
+  const [baseline, setBaseline] = useState(() => JSON.stringify(state));
+  const dirty = JSON.stringify(state) !== baseline;
 
   const specOptions = SPECIALIZATIONS[concreteType] ?? [];
   const serviceOptions = SERVICES[concreteType] ?? [];
@@ -136,8 +142,7 @@ export function ProfessionalProfileEditor({
         serviceAreas: state.serviceAreas,
         offersRemote: state.offersRemote,
         governorate: state.governorate,
-        // Carried through untouched — see the note above.
-        city: answers.city,
+        city: state.city,
         maxTravelKm: state.maxTravelKm,
       };
       const result = await saveProfessional(input);
@@ -147,6 +152,7 @@ export function ProfessionalProfileEditor({
       }
       // Back to the hub, which re-reads from the database — so what is shown after
       // a save is what was actually stored, never the form's own optimism.
+      setBaseline(JSON.stringify(state));
       setSaved(true);
       if (!embedded) router.push("/home/profile");
       router.refresh();
@@ -181,7 +187,11 @@ export function ProfessionalProfileEditor({
         </LabeledField>
 
         <LabeledField label={t("onboarding.professional.identity.yearsLabel")} htmlFor="years">
-          <Input
+          {embedded ? <div className="grid min-h-11 grid-cols-3 overflow-hidden rounded-md border border-strong bg-canvas">
+            <button type="button" aria-label={locale === "ar" ? "تقليل سنوات الخبرة" : "Decrease years"} disabled={(state.yearsExperience ?? 0) === 0} onClick={() => set({ yearsExperience: Math.max(0, (state.yearsExperience ?? 0) - 1) })} className="grid place-items-center border-e disabled:opacity-40"><MinusCircleIcon size={20} /></button>
+            <output id="years" className="grid place-items-center font-semibold tabular-nums">{state.yearsExperience ?? 0}</output>
+            <button type="button" aria-label={locale === "ar" ? "زيادة سنوات الخبرة" : "Increase years"} disabled={state.yearsExperience === 70} onClick={() => set({ yearsExperience: Math.min(70, (state.yearsExperience ?? 0) + 1) })} className="grid place-items-center border-s disabled:opacity-40"><PlusIcon size={20} /></button>
+          </div> : (          <Input
             id="years"
             type="number"
             min={0}
@@ -194,7 +204,7 @@ export function ProfessionalProfileEditor({
                   e.target.value === "" ? null : Math.max(0, Math.min(70, Number(e.target.value))),
               })
             }
-          />
+          />) }
         </LabeledField>
 
         {specOptions.length ? (
@@ -286,7 +296,7 @@ export function ProfessionalProfileEditor({
           )}
         </LabeledField>
 
-        <LabeledField
+        <EditorSlot enabled={embedded} target="engineer-availability-slot">        <LabeledField
           label={t("onboarding.professional.services.availabilityLabel")}
           htmlFor="avail"
           optional={t("common.optional")}
@@ -295,7 +305,7 @@ export function ProfessionalProfileEditor({
             {AVAILABILITIES.map((k) => embedded ? (
               <button key={k} type="button" aria-pressed={state.availability === k} className="engineer-availability-choice" onClick={() => set({ availability: state.availability === k ? null : k })}>
                 {k === "flexible" ? <InfinityIcon size={24} /> : <CalendarIcon size={24} />}
-                <span>{t(`onboarding.professional.availabilities.${k}`)}</span>
+                <span>{k === "flexible" ? (locale === "ar" ? "حسب الطلب" : "On demand") : t(`onboarding.professional.availabilities.${k}`)}</span>
               </button>
             ) : (
               <ChoiceCard
@@ -307,14 +317,15 @@ export function ProfessionalProfileEditor({
             ))}
           </div>
         </LabeledField>
+        </EditorSlot>
       </Card>
 
       <Card className="flex flex-col gap-lg">
-        <LabeledField label={t("onboarding.professional.location.governorateLabel")} htmlFor="gov">
-          <Select
+        <EditorSlot enabled={embedded} target="engineer-location-slot"><div className="grid gap-md tablet:grid-cols-2 mt-md">        <LabeledField label={t("onboarding.professional.location.governorateLabel")} htmlFor="gov">
+          <div className="relative"><MapPinIcon size={19} className="pointer-events-none absolute start-3 top-3 z-10" /><Select className="ps-10"
             id="gov"
             value={state.governorate ?? ""}
-            onChange={(e) => set({ governorate: e.target.value || null, serviceAreas: [] })}
+            onChange={(e) => set({ governorate: e.target.value || null, serviceAreas: [], city: null })}
           >
             <option value="">{t("onboarding.professional.location.choose")}</option>
             {GOVERNORATES.map((g) => (
@@ -322,10 +333,25 @@ export function ProfessionalProfileEditor({
                 {t(`onboarding.consumer.governorates.${g}`)}
               </option>
             ))}
-          </Select>
+          </Select></div>
         </LabeledField>
 
-        {areaCities.length ? (
+        {embedded && <LabeledField label={locale === "ar" ? "المدينة" : "City"} htmlFor="engineer-city">
+          <div className="relative"><BuildingIcon size={19} className="pointer-events-none absolute start-3 top-3 z-10" /><Select id="engineer-city" className="ps-10" disabled={!state.governorate} value={state.city ?? ""} onChange={(e) => set({ city: e.target.value || null })}>
+            <option value="">{t("onboarding.professional.location.choose")}</option>
+            {state.city && !areaCities.includes(state.city) && <option value={state.city}>{state.city}</option>}
+            {areaCities.map(city => <option key={city} value={city}>{t(`onboarding.consumer.cities.${city}`)}</option>)}
+          </Select></div>
+        </LabeledField>}
+</div></EditorSlot>
+        {embedded ? <div className="space-y-md">
+          <div><h3 className="font-semibold">{locale === "ar" ? "نطاق العمل" : "Work coverage"}</h3><p className="text-label text-fg-secondary">{locale === "ar" ? "هل تعمل في محافظات أخرى؟" : "Do you work in other governorates?"}</p></div>
+          <div className="flex items-center justify-between gap-md rounded-md border border-strong p-md">
+            <span id="coverage-label">{locale === "ar" ? "أعمل في محافظات أخرى" : "I work in other governorates"}</span>
+            <button type="button" role="switch" aria-labelledby="coverage-label" aria-checked={(state.maxTravelKm ?? 0) > 0} className="engineer-coverage-switch" onClick={() => set({ maxTravelKm: (state.maxTravelKm ?? 0) > 0 ? 0 : 50 })}><span /></button>
+          </div>
+          {(state.maxTravelKm ?? 0) > 0 && <LabeledField label={t("onboarding.professional.location.maxTravelLabel")} htmlFor="travel"><Select id="travel" value={state.maxTravelKm ?? ""} onChange={e => set({ maxTravelKm: Number(e.target.value) })}>{MAX_TRAVEL_KM.filter(km => km > 0).map(km => <option key={km} value={km}>{km} {t("onboarding.professional.location.km")}</option>)}</Select></LabeledField>}
+        </div> : <>        {areaCities.length ? (
           <LabeledField label={t("onboarding.professional.location.areasLabel")} htmlFor="areas">
             <div id="areas" className="flex flex-wrap gap-2">
               {areaCities.map((c) => (
@@ -369,43 +395,59 @@ export function ProfessionalProfileEditor({
               <option key={km} value={km}>{`${km} ${t("onboarding.professional.location.km")}`}</option>
             ))}
           </Select>
-        </LabeledField>
+        </LabeledField></>}
+
       </Card>
 
-      {failed ? (
+      <EditorSlot enabled={embedded} target="engineer-save-slot">
+      {embedded && saved && !dirty && <p role="status" className="text-label text-success">{locale === "ar" ? "تم حفظ بياناتك." : "Your details have been saved."}</p>}
+      {(!embedded || dirty || failed) && <>      {failed ? (
         <p role="alert" className="text-body text-danger">
           {t("profile.edit.saveFailed")}
         </p>
       ) : null}
-      {embedded && saved ? <p role="status" className="text-label text-success">{locale === "ar" ? "تم حفظ بياناتك." : "Your details have been saved."}</p> : null}
 
-      <div className="flex flex-wrap items-center gap-sm">
+      <div className={embedded ? "engineer-profile-savebar flex flex-wrap items-center gap-sm" : "flex flex-wrap items-center gap-sm"}>
+        {embedded && <span className="me-auto">{locale === "ar" ? "لديك تغييرات غير محفوظة" : "You have unsaved changes"}</span>}
         <Button type="button" variant="primary" onClick={save} disabled={pending || !isAcceptableEdit(state.bio, answers.bio)}>
           {pending ? t("profile.edit.saving") : t("profile.edit.save")}
         </Button>
-        <Link href="/home/profile">
+        {!embedded && <Link href="/home/profile">
           <Button type="button" variant="ghost">
             {t("profile.edit.cancel")}
           </Button>
-        </Link>
-      </div>
+        </Link>}
+      </div></>}
+      </EditorSlot>
     </div>
   );
 }
 
 
+function EditorSlot({ enabled, target, children }: { enabled: boolean; target: string; children: ReactNode }) {
+  const [container, setContainer] = useState<HTMLElement | null>(null);
+  useEffect(() => { if (enabled) setContainer(document.getElementById(target)); }, [enabled, target]);
+  return enabled && container ? createPortal(children, container) : children;
+}
+
 function ProfileMultiSelect({ id, options, selected, label, onToggle, placeholder }: {
   id: string; options: readonly string[]; selected: string[];
   label: (key: string) => string; onToggle: (key: string) => void; placeholder: string;
 }) {
-  const chosen = options.filter((key) => selected.includes(key));
-  return <details className="engineer-multi-select">
-    <summary id={id}><span>{chosen.length ? chosen.map(label).join("، ") : placeholder}</span><ChevronDownIcon size={18} /></summary>
-    <div className="engineer-multi-options">
-      {options.map((key) => <label key={key}>
-        <input type="checkbox" checked={selected.includes(key)} onChange={() => onToggle(key)} />
-        <span>{label(key)}</span>
-      </label>)}
-    </div>
-  </details>;
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const chosen = options.filter(key => selected.includes(key));
+  return <div>
+    <button id={id} ref={trigger} type="button" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)} className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-md border border-strong bg-canvas p-1.5 text-start">
+      <span className="flex min-w-0 flex-1 flex-wrap gap-1.5">{chosen.length ? chosen.map(key => <span key={key} className="rounded-pill border bg-surface-2 px-2.5 py-1 text-label font-medium">{label(key)}</span>) : <span className="px-2 text-label text-fg-secondary">{placeholder}</span>}</span>
+      <ChevronDownIcon size={18} className="mx-2 shrink-0" />
+    </button>
+    <FloatingMenu open={open} onClose={() => setOpen(false)} anchorRef={trigger} role="dialog" placement="bottom-start" matchAnchorWidth>
+      <div className="grid max-h-64 gap-1 overflow-y-auto p-2 tablet:grid-cols-2">
+        {options.map(key => <button key={key} type="button" data-menu-item role="checkbox" aria-checked={selected.includes(key)} onClick={() => onToggle(key)} className={menuItemClass(selected.includes(key), "min-h-10 rounded-sm text-label")}>
+          <span className={`grid size-5 shrink-0 place-items-center rounded-xs border border-strong ${selected.includes(key) ? "bg-accent-solid text-on-accent" : ""}`}>{selected.includes(key) && <CheckIcon size={13} />}</span>{label(key)}
+        </button>)}
+      </div>
+    </FloatingMenu>
+  </div>;
 }

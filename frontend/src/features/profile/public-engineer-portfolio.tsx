@@ -8,15 +8,15 @@ import { createTranslator } from "@/lib/i18n/translate";
 import { specializationLabel, tradeLabel } from "@/lib/i18n/trade-label";
 import { summarizeReviews } from "@/lib/reviews/summary";
 import { I18nProvider } from "@/lib/i18n/context";
-import { LanguageSwitch, ThemeSwitch } from "@/components/layout/switchers";
-import { BriefcaseIcon, StarIcon, MapPinIcon, BuildingIcon, PencilIcon, PackageIcon, UsersIcon, HomeIcon, MonitorIcon, ArrowUpRightIcon, HeartIcon } from "@/components/ui/icons";
+import { LandingHeader } from "@/features/landing-preview/landing-header";
+import { BriefcaseIcon, StarIcon, MapPinIcon, BuildingIcon, PencilIcon, PackageIcon, HomeIcon, MonitorIcon, ArrowUpRightIcon } from "@/components/ui/icons";
 import { PublicShare } from "./public-share";
 import { portfolioSampleContent } from "./public-portfolio-samples";
-import { PortfolioRail, PortfolioSearch, PortfolioSampleActions } from "./portfolio-controls";
-import { PublicPortfolioTabs, PublicTabJump } from "./public-portfolio-tabs";
+import { PortfolioRail, PortfolioSampleActions } from "./portfolio-controls";
+import { PublicPortfolioTabs } from "./public-portfolio-tabs";
 import "./public-engineer-portfolio.css";
 
-export function PublicEngineerPortfolio({profile, portfolio, reviews, locale, theme, sample = false}: {
+export function PublicEngineerPortfolio({profile, portfolio, reviews, locale, sample = false}: {
   profile: PublicProfile; portfolio: PublicPortfolioItem[]; reviews: Review[]; locale: Locale; theme: "light" | "dark"; sample?: boolean;
 }) {
   const ar = locale === "ar", t = createTranslator(locale);
@@ -31,11 +31,7 @@ export function PublicEngineerPortfolio({profile, portfolio, reviews, locale, th
   const heading = (title: string, subtitle?: string, target?: string, linkLabel?: string) => <div className="portfolio-section-heading"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{target && <a className="portfolio-small-link" href={target}>{linkLabel}<ArrowUpRightIcon size={15} /></a>}</div>;
   return <I18nProvider locale={locale} dir={ar ? "rtl" : "ltr"}><div className="public-engineer" data-testid="public-engineer-portfolio" dir={ar ? "rtl" : "ltr"}>
     <a href="#main" className="sr-only focus:not-sr-only">{ar ? "انتقل للمحتوى" : "Skip to content"}</a>
-    <header className="public-engineer-topbar">
-      <Link href="/" className="public-engineer-brand"><Image src="/brand/aladdin-mark.png" width={32} height={32} alt="" />{ar ? "علاء الدين" : "Aladdin"}</Link>
-      <nav aria-label={ar ? "التنقل الرئيسي" : "Main navigation"}><Link href="/">{ar ? "الرئيسية" : "Home"}</Link><Link href="/home/engineer/professionals">{ar ? "المهندسين والمكاتب" : "Professionals"}</Link>{projects.length > 0 && <PublicTabJump id="projects">{ar ? "المشاريع" : "Projects"}</PublicTabJump>}{services.length > 0 && <PublicTabJump id="services">{ar ? "الخدمات" : "Services"}</PublicTabJump>}</nav>
-      <PortfolioSearch ar={ar} /><div className="public-engineer-tools"><LanguageSwitch /><ThemeSwitch current={theme} /><Link href="/home/engineer/saved" aria-label={ar ? "المفضلة" : "Favorites"}><HeartIcon /></Link><Link className="portfolio-account-link" href="/home/profile" aria-label={ar ? "حسابي" : "My account"}><UsersIcon /></Link></div>
-    </header>
+    <LandingHeader linkToLanding />
     {demo && <aside className="portfolio-sample-notice">{ar ? "بيانات وصور توضيحية محلية لمراجعة التصميم — ليست أعمالاً أو تقييمات حقيقية لهذا الحساب." : "Local illustrative data for design review — not this account’s real projects or reviews."}</aside>}
     <div className="public-engineer-breadcrumb"><Link href="/">{ar ? "الرئيسية" : "Home"}</Link><span aria-hidden="true">‹</span><Link href="/home/engineer/professionals">{ar ? "المهندسين والمكاتب" : "Professionals"}</Link><span aria-hidden="true">‹</span><bdi>{name}</bdi></div>
     <main id="main">

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { EngineerProfileCompletion } from "./profile-completion";
 
@@ -13,6 +13,13 @@ function renderWorkspace(completion: { percent: number; missing: [] } | null = {
 }
 
 describe("engineer profile completion", () => {
+  beforeEach(() => window.history.replaceState(null, "", "/home/profile/complete"));
+  it("restores the selected step after remount", () => {
+    window.history.replaceState(null, "", "/home/profile/complete?step=2");
+    renderWorkspace();
+    expect(screen.getByText("Availability editor")).toBeVisible();
+    expect(screen.queryByRole("textbox", { name: "Display name" })).toBeNull();
+  });
   it("shows one step and keeps unfinished edits while moving between steps", () => {
     renderWorkspace();
     fireEvent.change(screen.getByRole("textbox", { name: "Display name" }), { target: { value: "Nadia Salem" } });

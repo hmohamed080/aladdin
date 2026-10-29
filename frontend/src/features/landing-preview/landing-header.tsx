@@ -31,7 +31,7 @@ const content = {
   },
 } as const;
 
-export function LandingHeader() {
+export function LandingHeader({ linkToLanding = false }: { linkToLanding?: boolean }) {
   const { locale, dir } = useI18n();
   const t = content[locale];
   const [open, setOpen] = useState(false);
@@ -43,14 +43,14 @@ export function LandingHeader() {
       if (faq.current?.open) { faq.current.open = false; faq.current.querySelector("summary")?.focus(); }
       else if (open) { setOpen(false); menu.current?.focus(); }
     }}>
-      <a className={styles.brand} href="#landing-top" aria-label="Aladdin">
+      <a className={styles.brand} href={linkToLanding ? "/#landing-top" : "#landing-top"} aria-label="Aladdin">
         <Image src="/preview/landing/aladdin-logo.png" alt="" width={684} height={643} priority />
       </a>
       <Button ref={menu} className={styles.menu} variant="ghost" aria-label={t.menu} aria-expanded={open} aria-controls="preview-navigation" onClick={() => setOpen(!open)}>
         {open ? <XIcon size={20} /> : <MenuIcon size={20} />}<span>{t.menu}</span>
       </Button>
       <nav id="preview-navigation" className={styles.navigation} data-open={open} dir={dir} aria-label={t.navigation}>
-        {t.links.map(([label, href], index) => <a key={href} href={href} className={index === 0 ? styles.home : undefined} onClick={() => setOpen(false)}>{label}</a>)}
+        {t.links.map(([label, href], index) => <a key={href} href={linkToLanding ? `/${href}` : href} className={index === 0 ? styles.home : undefined} onClick={() => setOpen(false)}>{label}</a>)}
         <details ref={faq} className={styles.faq}>
           <summary>{t.faq}</summary>
           <div className={styles.answers}>

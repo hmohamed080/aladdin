@@ -1,3 +1,11 @@
+## 2026-10-29 — Engineer profile editor refinement
+
+- Reused installer-style service menus and experience stepper; removed the duplicate activity selector.
+- Base governorate/city render in Basic information; availability renders in Work availability, with “On demand / حسب الطلب”. A coverage switch uses the existing travel-distance field (off = 0, on = configurable distance); remote-consultation data is preserved.
+- Professional sections share one draft/save payload across mounted step slots. Dirty professional and identity edits expose save notices; failure does not clear dirty state. Step selection persists in the URL without a refresh per click.
+- Cream palette also follows portaled menus. The approved navigator structure is preserved. Public portfolio reuses LandingHeader with landing-target links; account settings label shortened.
+- Validation: typecheck and focused ESLint passed; 14 editor/navigation tests passed after updating the status-message assertion for the new experience output. Browser confirmed current step after reload and dirty-save notice. No production deployment or migration.
+
 
 ## 2026-10-28 — Engineer profile completion
 

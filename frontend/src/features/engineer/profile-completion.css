@@ -47,36 +47,6 @@
   border-color: color-mix(in srgb, var(--accent-solid) 50%, var(--border));
 }
 
-.engineer-multi-select {
-  border: 1px solid color-mix(in srgb, var(--accent-solid) 50%, var(--border));
-  border-radius: .65rem;
-  background: var(--surface-2);
-}
-.engineer-multi-select summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 2.75rem;
-  padding: .65rem .85rem;
-  cursor: pointer;
-  list-style: none;
-}
-.engineer-multi-select summary::-webkit-details-marker { display: none; }
-.engineer-multi-select summary svg { flex-shrink: 0; }
-.engineer-multi-select[open] summary { border-bottom: 1px solid var(--border-strong); }
-.engineer-multi-options { display: grid; gap: .25rem; padding: .5rem; }
-.engineer-multi-options label {
-  display: flex;
-  align-items: center;
-  gap: .65rem;
-  min-height: 2.75rem;
-  padding: .5rem;
-  cursor: pointer;
-  border-radius: .4rem;
-}
-.engineer-multi-options label:hover { background: var(--surface-hover); }
-.engineer-multi-options input { accent-color: var(--accent-solid); width: 1rem; height: 1rem; }
 .engineer-availability-choice {
   display: flex;
   flex-direction: column;
@@ -93,8 +63,7 @@
 .engineer-availability-choice svg { color: var(--accent); }
 .engineer-availability-choice[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
 .engineer-availability-choice[aria-pressed="true"] svg { color: inherit; }
-.engineer-availability-choice:focus-visible,
-.engineer-multi-select summary:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 3px; }
+.engineer-availability-choice:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 3px; }
 
 .engineer-edit-section textarea { min-height: 7rem; }
 .engineer-edit-section [data-testid="profile-editor"] { gap: 1.25rem; }
@@ -147,3 +116,34 @@
   .engineer-edit-hero { min-height: 0; }
 }
 
+
+/* Match the installer cream canvas without changing the navigator geometry. */
+.engineer-surface.engineer-completion-overlay,
+.engineer-surface:has(.engineer-completion-workspace) {
+  --canvas: var(--engineer-cream);
+  --surface: var(--engineer-cream);
+  --surface-2: var(--engineer-cream);
+  --workspace: var(--engineer-cream);
+}
+.dark .engineer-surface.engineer-completion-overlay,
+.dark .engineer-surface:has(.engineer-completion-workspace) {
+  --canvas: var(--engineer-navy);
+  --surface: var(--engineer-navy);
+  --surface-2: var(--engineer-navy);
+  --workspace: var(--engineer-navy);
+}
+.engineer-profile-savebar {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 20;
+  padding: 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: .75rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+}
+#engineer-save-slot { position: sticky; bottom: 1rem; z-index: 20; }
+.engineer-coverage-switch { width: 2.75rem; height: 1.5rem; padding: .15rem; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--engineer-sand); }
+.engineer-coverage-switch span { display: block; width: 1.1rem; height: 1.1rem; border-radius: 999px; background: var(--engineer-cream); }
+.engineer-coverage-switch[aria-checked="true"] { background: var(--accent-solid); }
+.engineer-coverage-switch[aria-checked="true"] span { margin-inline-start: auto; }

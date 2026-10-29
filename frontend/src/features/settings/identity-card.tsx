@@ -3,7 +3,7 @@
 import { useActionState, useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { Card, InlineError, InlineSuccess } from "@/components/ui/primitives";
-import { Input, LabeledField, SubmitButton } from "@/components/ui/controls";
+import { Input, LabeledField, SubmitButton, Button } from "@/components/ui/controls";
 import { PhoneField } from "@/components/ui/phone-field";
 import type { CanonicalPhone } from "@/lib/contact/phone";
 import { setDisplayNameAction, setPhoneAction, type IdentityFieldState } from "@/server/actions/profile-identity";
@@ -22,10 +22,21 @@ const INITIAL: IdentityFieldState = { ok: false };
  * account-creation trigger filled in automatically is shown, but flagged as
  * not yet confirmed.
  */
-export function IdentityCard({ identity, compact = false, afterName }: { identity: MyIdentity; compact?: boolean; /** Rendered between the display-name and phone forms (compact layouts). */ afterName?: ReactNode }) {
-  const { t } = useI18n();
-  const [nameState, submitName] = useActionState(setDisplayNameAction, INITIAL);
-  const [phoneState, submitPhone] = useActionState(setPhoneAction, INITIAL);
+export function IdentityCard({ identity, compact = false, afterName, showSaveBar = false }: { identity: MyIdentity; compact?: boolean; showSaveBar?: boolean; /** Rendered between the display-name and phone forms (compact layouts). */ afterName?: ReactNode }) {
+  const { t, locale } = useI18n();
+  const [name, setName] = useState(identity.displayName);
+  const [savedName, setSavedName] = useState(identity.displayName);
+  const [savedPhone, setSavedPhone] = useState(`${identity.phoneCountryIso2 ?? ""}:${identity.phoneNational ?? ""}`);
+  const [nameState, submitName] = useActionState(async (previous: IdentityFieldState, data: FormData) => {
+    const result = await setDisplayNameAction(previous, data);
+    if (result.ok) setSavedName(String(data.get("displayName")));
+    return result;
+  }, INITIAL);
+  const [phoneState, submitPhone] = useActionState(async (previous: IdentityFieldState, data: FormData) => {
+    const result = await setPhoneAction(previous, data);
+    if (result.ok) setSavedPhone(`${data.get("countryIso2")}:${data.get("national")}`);
+    return result;
+  }, INITIAL);
   const [phone, setPhone] = useState<CanonicalPhone | null>(null);
 
   return (
@@ -46,7 +57,8 @@ export function IdentityCard({ identity, compact = false, afterName }: { identit
               name="displayName"
               required
               maxLength={80}
-              defaultValue={identity.displayName}
+              value={name}
+              onChange={event => setName(event.target.value)}
               autoComplete="name"
             />
           </LabeledField>
@@ -89,6 +101,13 @@ export function IdentityCard({ identity, compact = false, afterName }: { identit
           </div>
         </form>
         )}
+        {showSaveBar && (name !== savedName || (phone && `${phone.countryIso2}:${phone.national}` !== savedPhone)) && <div className="engineer-profile-savebar flex flex-wrap items-center gap-sm" role="status">
+          <span className="me-auto">{locale === "ar" ? "لديك تغييرات غير محفوظة" : "You have unsaved changes"}</span>
+          <Button type="button" onClick={() => {
+            if (name !== savedName) (document.getElementById("display-name") as HTMLFormElement)?.requestSubmit();
+            if (phone && `${phone.countryIso2}:${phone.national}` !== savedPhone) (document.getElementById("phone") as HTMLFormElement)?.requestSubmit();
+          }}>{locale === "ar" ? "حفظ التغييرات" : "Save changes"}</Button>
+        </div>}
       </div>
     </Card>
   );

@@ -65,8 +65,10 @@ describe("ProfessionalProfileEditor", () => {
     renderWithI18n(<ProfessionalProfileEditor answers={{ ...answers, specialization: null, services: [], additionalServices: [] }} concreteType="engineer" embedded />, "en");
     fireEvent.click(screen.getByRole("button", { name: "Architectural engineer" }));
     fireEvent.click(screen.getByRole("button", { name: "Civil engineer" }));
+    fireEvent.click(document.getElementById("core")!);
     fireEvent.click(screen.getByRole("checkbox", { name: "2D design", hidden: true }));
     fireEvent.click(screen.getByRole("checkbox", { name: "3D design", hidden: true }));
+    fireEvent.click(document.getElementById("add")!);
     fireEvent.click(screen.getByRole("checkbox", { name: "AutoCAD", hidden: true }));
     fireEvent.click(screen.getByRole("checkbox", { name: "3ds Max", hidden: true }));
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
@@ -75,10 +77,11 @@ describe("ProfessionalProfileEditor", () => {
   });
   it("saves in place when embedded in profile completion", async () => {
     renderWithI18n(<ProfessionalProfileEditor answers={answers} concreteType="engineer" embedded />, "en");
+    fireEvent.change(screen.getByLabelText(/headline/i), { target: { value: "Updated headline" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(push).not.toHaveBeenCalled();
-    expect(screen.getByRole("status")).toHaveTextContent("Your details have been saved.");
+    expect(screen.getByText("Your details have been saved.")).toHaveAttribute("role", "status");
   });
   it("renders an editable form — the read-only fallback is gone", () => {
     renderWithI18n(

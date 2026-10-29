@@ -137,8 +137,8 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
             </ButtonLink>
             <ButtonLink href="/home/settings" variant="outline">
               {ar
-                ? "التوفر وإعدادات الحساب"
-                : "Availability and account settings"}
+                ? "إعدادات الحساب"
+                : "Account settings"}
             </ButtonLink>
             {publication.listed && publication.profileId && (
               <ButtonLink

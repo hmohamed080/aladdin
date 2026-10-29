@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, type ReactNode } from "react";
+
 import { Button, ButtonLink } from "@/components/ui/controls";
 import { ProgressMeter } from "@/components/ui/primitives";
 import { UserIcon, BriefcaseIcon, CalendarIcon, LayersIcon, ArrowUpRightIcon } from "@/components/ui/icons";
@@ -22,11 +22,24 @@ export function EngineerProfileCompletion({ name, avatar, completion, panels }: 
 }) {
   const { locale } = useI18n();
   const ar = locale === "ar";
-  const router = useRouter();
   const [active, setActive] = useState(0);
-  const select = (index: number) => { setActive(index); router.refresh(); };
+  useEffect(() => {
+    const restore = () => {
+      const step = Number(new URLSearchParams(window.location.search).get("step"));
+      setActive(Number.isInteger(step) && step >= 0 && step < steps.length ? step : 0);
+    };
+    restore();
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+  const select = (index: number) => {
+    setActive(index);
+    const url = new URL(window.location.href);
+    url.searchParams.set("step", String(index));
+    window.history.replaceState(null, "", url);
+  };
   return (
-    <div className="flex min-w-0 flex-col gap-lg">
+    <div className="engineer-completion-workspace flex min-w-0 flex-col gap-lg">
       <header className="engineer-edit-hero relative isolate overflow-hidden rounded-lg bg-shell text-shell-fg">
         <Image src="/assets/engineer/hero-living-room.webp" alt="" fill sizes="(min-width: 1024px) 75vw, 100vw" className="object-cover opacity-30" />
         <div className="relative flex flex-col items-start gap-md p-lg tablet:flex-row tablet:flex-wrap tablet:items-center tablet:gap-lg tablet:p-xl">
@@ -63,7 +76,9 @@ export function EngineerProfileCompletion({ name, avatar, completion, panels }: 
               <span className="grid size-8 shrink-0 place-items-center rounded-pill bg-primary text-label font-semibold text-primary-foreground">{index + 1}</span>
               <div><h2 id={`completion-step-${index}`} className="text-title font-semibold">{ar ? step.ar : step.en}</h2><p className="mt-1 text-label text-fg-secondary">{ar ? step.hintAr : step.hintEn}</p></div>
             </div>
+            {index === 2 && <div id="engineer-availability-slot" className="mb-lg" />}
             {panels[index]}
+            {index === 0 && <div id="engineer-location-slot" />}
           </section>)}
           <div className="engineer-edit-footer mt-lg flex flex-wrap items-center justify-between gap-sm border-t pt-md">
             <Button variant="outline" disabled={active === 0} onClick={() => select(active - 1)}>{ar ? "السابق" : "Previous"}</Button>
@@ -71,6 +86,7 @@ export function EngineerProfileCompletion({ name, avatar, completion, panels }: 
           </div>
         </div>
       </div>
+      <div id="engineer-save-slot" />
     </div>
   );
 }
