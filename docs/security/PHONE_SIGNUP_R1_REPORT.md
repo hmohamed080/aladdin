@@ -54,7 +54,7 @@ Extra executable rows added: D4b, D6b (creation alone verifies nothing), D7 (5 w
 | pgTAP `120_phone_signup_authority_test.sql` | **103 / 103** (surface, dormant state, happy path, replay/expiry/attempts, cross-purpose, limits, no existence oracle, guard off/observe/enforce, forged/foreign/expired/replayed/anonymous grants, attach binding, retention) |
 | Full pgTAP, **CI toolchain**, clean replay of 195 migrations | **145 files / 6,551 tests PASS** (B1 had 144 / 6,448) |
 | Full pgTAP, **local toolchain**, clean replay | **145 files / 6,551 tests PASS** |
-| Frontend unit (phone verification + env) | 82 pass; `tsc --noEmit` and ESLint clean |
+| Frontend unit (phone verification + env) | 83 pass; `tsc --noEmit` and ESLint clean |
 | Real-database integration (B1 service 10 + R1 signup service through the **outbox** 6) | **16 / 16** on a clean database |
 | Concurrency + deadlock stress (24 parallel sign-ups; 6×5 creation/attach races; 6×6 verify races; 8 parallel starts for one number; 12 parallel guesses) | **9 / 9**; `pg_stat_database.deadlocks` 0 → 0; no user consumed two grants; no duplicate alias; no orphan |
 | Existing committing concurrency script (`installer_phone_change_concurrency_test.sh`) | pass on both toolchains |
@@ -71,7 +71,7 @@ Honest notes on the evidence: the first local verification run recorded two harn
 ## 4. Design as built (differences from the PR #122 proposal)
 * **One table, two lifecycles.** `app.phone_verification_challenges.user_id` is nullable; `purpose in ('primary_proof','signup_proof')`; the subject check makes the lifecycles disjoint (`primary_proof` ⇒ user, no registration; `signup_proof` ⇒ registration, no user). One open signup challenge per **registration** (not per number), so nobody can kill a victim's code by starting their own for the same number; per-number hourly cap (5), per-registration cooldown and cap, per-IP bucket (an HMAC, the database never sees an address).
 * **MAC context** `otp1|challenge|subject|purpose|code`: the purpose is in the MAC, so a primary code can never verify a signup challenge even with the same UUID in the subject slot (unit test).
-* **No existence oracle at start.** A number that already belongs to an account gets a row that is born closed (`suppressed`) and `deliver:false`, with the same reply and the same limits; the server sends nothing. Verify then fails like any wrong code.
+* **No existence oracle at start.** A number that already belongs to an account gets a row that is born closed (`suppressed`) and `deliver:false`, with the same reply and the same limits; the server sends nothing. Verify then fails like any wrong code. **Same latency too:** an automated security review of the first commit pointed out that awaiting the network send only when a number is free would let response time reveal whether a number is registered. Delivery therefore runs *after* the reply (`defer`: Next `after()` / Workers `waitUntil` in production, a collected task in tests); a delivery failure is invisible in the reply and closes the challenge in the background (`delivery_failed`). Unit tests prove the reply returns while the send is still pending and that failure and success replies have the same shape; the real-database test proves the background invalidation.
 * **Grant** = (alias, canonical phone, intent `phone_signup`, registration, challenge — unique, ≤30 min lifetime, default 10). The guard consumes it at COMMIT of the Auth transaction; `attach` requires that the **same Auth user** consumed it, that the Auth e-mail is the alias, that the profile holds the proven number, that the attach window (15 min) is open and that it was never attached, then sets `phone_verified_at` under the profile row lock with the same `WHERE phone = … AND phone_verified_at IS NULL` rule as B1. An existing identity guard (`guard_phone_password_identity`) already prevents an alias account's profile number from drifting; pgTAP asserts that protection stays and disables it only inside the test to prove `attach` re-checks on its own.
 * **Lock order** (documented in the migration header, stress-verified): signup start/verify/invalidate: registration advisory lock → phone advisory lock (start) → challenge row → IP bucket; attach: per-user advisory lock → profile row → grant row; the guard touches only the grant row at COMMIT.
 * **Why the guard is a *deferred constraint trigger*** (PR #122 evidence): GoTrue's Admin API applies `app_metadata` by a later UPDATE in the same transaction, so only a COMMIT-time re-read can see it, and a public body cannot set it.
@@ -83,7 +83,19 @@ One interface (`PhoneOtpTransport.send`, throws a message with no number or code
 `PHONE_SIGNUP_R1_MIGRATION_AND_ACTIVATION_PLAN.md`: 8 stages (inspect → apply dormant → deploy app OFF → observe → provision/approve delivery → enable signup → enforce), each with an evidence gate and a one-statement rollback; `enforce` is tied to retiring the old no-grant creators (SEC-C5), i.e. to #113; structural rollback script; observation attribution query.
 
 ## 7. #113 registration E2E workflows
-E2E_RESULTS_PLACEHOLDER
+One root cause, not two (this corrects PR #122's first draft, which said the auth spec never completes the basics step: it does, through the same helper). #113's commit `58b63e7e` replaced the specialty chips with `<select id="specialtyAdd">`; `completeAccountBasics()` still clicked the chips, nothing was picked, the real form answered "Pick at least one specialty", the page stayed on `/onboarding/basics` and every caller of `reachLanding()` timed out.
+
+**What I did.** I read the source, reproduced the failure locally, fixed the helper through the real dropdown (and asserted the real form shows the chosen specialty, so the onboarding step is exercised, not bypassed), then ran both workflows' exact commands on an isolated stack with the repo-pinned CLI (2.110.0, Postgres 17.6.1.143, production `next build` + `next start`, real Turnstile widget and Siteverify for the CAPTCHA workflow). While I was doing so the #113 author pushed four commits including an equivalent fix, so I re-ran everything on the new head.
+
+| Workflow | CI on #113 `58b63e7e` | local, `58b63e7e` + my fix | local, **current head `03f59733`** (author's own fix) + the SQL-helper PR |
+|---|---|---|---|
+| Showroom RC2 E2E | 49 failed | 38 + 11 passed, 2 skipped by design; 1 test hits a hard-coded `127.0.0.1:54321` (my stack is on another port) and **passed** through a port forward | 38 + 11 passed, 2 skipped; the same 1 test passed through the forward |
+| Auth CAPTCHA E2E | 18 failed, 16 passed | 34 passed, 0 failed (first run 32 + 1 flaky + 1 Windows-only helper failure, see below) | **33 passed, 0 failed**, 1 flaky that passed on retry (`auth-password-preview.spec.ts:739`) |
+| Before/after on one spec | – | `orders-projects.spec.ts`: 4/4 fail with the CI's `waitForURL` timeout without the fix, pass with it | – |
+
+* **PR #124** (Draft, base = #113's branch, #113 untouched): `sqlValue()` in `e2e/helpers/phone-sign-up.ts` built `docker exec … -F '|'` as a shell string, which `cmd.exe` treats as a pipe: the phone sign-up spec failed on Windows only. `execFileSync` fixes it. My first PR (#123) carried the specialty fix too, conflicted with the author's equivalent commit, and was closed in favour of #124; no history was rewritten.
+* The flaky tests differ from run to run and pass on retry; the machine ran about 60 containers while the real widget loaded, so timing noise is expected. **Not run:** `gotrue-direct` (green in CI), the mobile projects, and a GitHub-hosted run of either workflow.
+* These suites test #113 *without* the R1 authority. After #113 is rebuilt on the authority (§8) its E2E must be re-run with the outbox transport and the switches from the integration document.
 
 ## 8. Required changes in #113, #116, #114, #121
 `PHONE_SIGNUP_R1_REGISTRATION_INTEGRATION.md`. Headlines: #113 replaces its own challenge table, hashing and Meta call with the authority + transport, creates the Auth user with `signupCreateUserPayload`, calls `attach`, deletes `whatsapp-otp.ts`, and drops the no-grant creators; #116 only needs the retarget and a contract regeneration; #114 gets an application route and per-request language, stays disabled; #121 is the base and gains two allow-list entries (tests 104, 119).
@@ -95,7 +107,7 @@ The read-only tooling is built and self-tested. **Required to run it** (nothing 
 | Risk | State |
 |---|---|
 | **V1 stays open on hosted until the guard is enforced** (enforce is tied to #113 + delivery approval) | by design; severity depends on stage-1 measurements (§9); interim options in the activation plan §6 |
-| GoTrue version on hosted unknown | suite passes on v2.193.0 and v2.197.0; confirm the hosted version in stage 1 |
+| **The guard depends on GoTrue writing the Admin API's `app_metadata` in the SAME transaction as the user INSERT** (measured on v2.193.0 and v2.197.0; SEC-B6c in the PR #122 probe). If a hosted GoTrue version split them, `enforce` would refuse legitimate creations (fail-closed) | hosted GoTrue version unknown: confirm it in stage 1, and let **`observe` prove it on the hosted version** before `enforce` (a legitimate creation with `had_grant = false` in the observation query is the symptom) |
 | Guard refusal surfaces as GoTrue `500 unexpected_failure` | the registration code must map it to a neutral message (integration doc) |
 | Phone-number existence oracle in GoTrue's own sign-up answer (200 obfuscated vs 422, varies by mode and run) | not fixable in the database; edge CAPTCHA/rate limits; recorded as evidence (SEC-A11), not gated |
 | Delivery, HMAC key provisioning, purge scheduling, edge rate limiting on start/verify | not built/approved here; activation stage 5 |
@@ -107,3 +119,14 @@ The read-only tooling is built and self-tested. **Required to run it** (nothing 
 **GO** to review and to merge R1 *as dormant code* (default behaviour unchanged; proven by the `shipped` cells and the full pgTAP).
 **NO-GO** to any hosted activation until: the hosted read-only inspection is done and archived; #113 is rebuilt on this authority (§8) with its E2E green; the old no-grant creators are retired; the permission contract is regenerated on the merged tree with a decision on the 13; delivery (Worker + Meta) is separately approved; HMAC keys, purge schedule and edge limits are provisioned; the activation stages 4 → 7 are executed in order with their gates.
 **Do not merge #113 before** the guard + authority integration in §8 passes its own tests: this report only proves the database and server halves.
+
+## 12. Reproduce (all local, isolated stacks; nothing is sent)
+```
+# stack: this worktree's UNCOMMITTED supabase/config.toml uses project_id aladdin_sec (ports 515xx)
+bash supabase/tests/sec/verify_local_toolchain.sh                  # reset, contract, full pgTAP, unit, integration, stress, matrix, concurrency
+R1_TOOLCHAIN=ci110 bash supabase/tests/sec/run_r1.sh               # matrix on the CI toolchain (npx supabase@2.110.0, scratch project outside the repo)
+bash supabase/tests/sec/verify_ci_toolchain.sh                     # CI parity: reset, strict contract, lint, full pgTAP, concurrency (GEN=1 regenerates the contract)
+SEC_MODE=confirm-off SEC_POSTURE=enforce DB_CONTAINER=supabase_db_aladdin_sec node supabase/tests/sec/signup_authority.test.mjs   # one cell
+node --test scripts/hosted-db/inspect-auth-security.test.mjs       # hosted-inspection self-tests (no network)
+```
+The runners refuse any project other than the isolated ones, restore the local config on exit, and fail on any FAIL, XPASS, missing summary line or missing success marker.

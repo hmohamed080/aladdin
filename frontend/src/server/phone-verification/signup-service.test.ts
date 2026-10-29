@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { computeMac, parseKeyring } from "./otp";
 import type { PhoneVerificationDb } from "./service";
 import { createPhoneSignupService, signupCreateUserPayload } from "./signup-service";
-import { createFakeTransport } from "./transport";
+import { createFakeTransport, type PhoneOtpTransport } from "./transport";
 
 const REG = "33333333-3333-4333-8333-333333333333";
 const CH = "11111111-1111-4111-8111-111111111111";
@@ -13,7 +13,8 @@ const PHONE = "+201000000077";
 const keyring = parseKeyring(JSON.stringify({ current: "k2", keys: { k2: randomBytes(32).toString("base64"), k1: randomBytes(32).toString("base64") } }));
 
 type Responder = unknown | ((args: Record<string, unknown>) => { data: unknown; error: null });
-function harness(responses: Record<string, Responder>, opts: { enabled?: boolean; failTransport?: boolean } = {}) {
+function harness(responses: Record<string, Responder>, opts: { enabled?: boolean; failTransport?: boolean; transport?: PhoneOtpTransport } = {}) {
+  const tasks: Promise<void>[] = [];
   const calls: { fn: string; args: Record<string, unknown> }[] = [];
   const db: PhoneVerificationDb = {
     async rpc(fn, args) {
@@ -23,8 +24,9 @@ function harness(responses: Record<string, Responder>, opts: { enabled?: boolean
     },
   };
   const fake = createFakeTransport(opts.failTransport ? { failWith: new Error(`upstream rejected ${PHONE}`) } : {});
-  const service = createPhoneSignupService({ db, transport: fake.transport, keyring, enabled: opts.enabled ?? true });
-  return { service, calls, fake };
+  const service = createPhoneSignupService({ db, transport: opts.transport ?? fake.transport, keyring, enabled: opts.enabled ?? true, defer: (t) => { tasks.push(t); } });
+  const flush = async () => { await Promise.all(tasks.splice(0)); };
+  return { service, calls, fake, flush };
 }
 const created = (deliver: boolean) => (args: Record<string, unknown>) => ({
   data: { status: "challenge_created", challenge_id: args.p_challenge_id, expires_at: "2026-10-30T10:05:00Z", resend_available_at: "2026-10-30T10:01:00Z", deliver, phone_e164: PHONE },
@@ -42,9 +44,10 @@ describe("signup service", () => {
   });
 
   it("start: the database gets a MAC bound to the REGISTRATION, never the code or the address; the code goes to the adapter only", async () => {
-    const { service, calls, fake } = harness({ phone_signup_start: created(true) });
+    const { service, calls, fake, flush } = harness({ phone_signup_start: created(true) });
     const out = await service.start(REG, PHONE, "203.0.113.9");
     expect(out.status).toBe("sent");
+    await flush();
     expect(fake.sent).toHaveLength(1);
     const { code, to, purpose } = fake.sent[0]!;
     expect(to).toBe(PHONE);
@@ -60,6 +63,8 @@ describe("signup service", () => {
     const free = harness({ phone_signup_start: created(true) });
     const a = await taken.service.start(REG, PHONE, null);
     const b = await free.service.start(REG, PHONE, null);
+    await taken.flush();
+    await free.flush();
     expect(Object.keys(a).sort()).toEqual(Object.keys(b).sort());
     expect(a.status).toBe("sent");
     expect(taken.fake.sent).toHaveLength(0);
@@ -74,11 +79,28 @@ describe("signup service", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("start: a delivery failure closes the challenge, leaks nothing, and reports unavailable", async () => {
-    const { service, calls } = harness({ phone_signup_start: created(true), phone_signup_invalidate: true }, { failTransport: true });
-    expect(await service.start(REG, PHONE, null)).toEqual({ status: "unavailable" });
-    expect(calls.map((c) => c.fn)).toEqual(["phone_signup_start", "phone_signup_invalidate"]);
-    expect(JSON.stringify(calls[1]!.args)).toContain("delivery_failed");
+  it("start: a delivery failure is INVISIBLE in the reply (same as success), closes the challenge afterwards, and leaks nothing", async () => {
+    const ok = harness({ phone_signup_start: created(true) });
+    const bad = harness({ phone_signup_start: created(true), phone_signup_invalidate: true }, { failTransport: true });
+    const replyOk = await ok.service.start(REG, PHONE, null);
+    const replyBad = await bad.service.start(REG, PHONE, null);
+    expect(Object.keys(replyBad).sort()).toEqual(Object.keys(replyOk).sort());
+    expect(replyBad.status).toBe("sent");
+    await bad.flush();
+    expect(bad.calls.map((c) => c.fn)).toEqual(["phone_signup_start", "phone_signup_invalidate"]);
+    expect(JSON.stringify(bad.calls[1]!.args)).toContain("delivery_failed");
+    expect(JSON.stringify(replyBad)).not.toContain(PHONE);
+  });
+
+  it("start: the reply does NOT wait for delivery, so response time cannot tell a taken number from a free one", async () => {
+    let release: () => void = () => undefined;
+    const slow: PhoneOtpTransport = { send: () => new Promise<void>((resolve) => { release = resolve; }) };
+    const { service, fake, flush } = harness({ phone_signup_start: created(true) }, { transport: slow });
+    const started = await Promise.race([service.start(REG, PHONE, null), new Promise<"blocked">((r) => setTimeout(() => r("blocked"), 500))]);
+    expect(started).not.toBe("blocked");   // returned although the send has not completed
+    release();
+    await flush();
+    expect(fake.sent).toHaveLength(0);      // (the slow transport records nothing; the point is only that start() did not wait)
   });
 
   it("start: rate limiting and database errors map to coarse outcomes", async () => {

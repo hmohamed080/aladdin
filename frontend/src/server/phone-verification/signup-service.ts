@@ -29,7 +29,19 @@ export type SignupVerifyOutcome =
   | { status: "unavailable" };
 export type SignupAttachOutcome = { status: "attached" } | { status: "invalid" } | { status: "unavailable" };
 
-type Deps = { db: PhoneVerificationDb; transport: PhoneOtpTransport; keyring: Keyring; enabled: boolean };
+type Deps = {
+  db: PhoneVerificationDb;
+  transport: PhoneOtpTransport;
+  keyring: Keyring;
+  enabled: boolean;
+  /**
+   * Runs the delivery AFTER the reply has been decided. Pass the platform's post-response hook (Next.js `after`, Workers `ctx.waitUntil`) in
+   * production. The default is fire-and-forget, which is what tests use (they collect the tasks to await them).
+   * Why it exists: if the reply waited for the network send only when a number is free, the response time would tell a caller whether a
+   * number already has an account. With deferral both cases return right after the database call, in the same shape.
+   */
+  defer?: (task: Promise<void>) => void;
+};
 
 const UNAVAILABLE = { status: "unavailable" } as const;
 const CODE = /^[0-9]{6}$/;
@@ -46,6 +58,7 @@ function retryAfter(row: Record<string, unknown>): number {
 
 export function createPhoneSignupService(deps: Deps) {
   const { db, transport, keyring } = deps;
+  const defer = deps.defer ?? ((task: Promise<void>) => { void task; });
 
   async function start(registrationId: string, e164: string, clientIp: string | null, locale: "en" | "ar" = "ar"): Promise<SignupStartOutcome> {
     if (!deps.enabled) return UNAVAILABLE;
@@ -64,15 +77,19 @@ export function createPhoneSignupService(deps: Deps) {
     if (row.status !== "challenge_created") return UNAVAILABLE;
 
     const reply = { status: "sent" as const, challengeId, expiresAt: String(row.expires_at), resendAvailableAt: String(row.resend_available_at) };
-    // A number that already belongs to an account gets the identical reply and NO message (no existence oracle).
-    if (row.deliver !== true) return reply;
-
-    try {
-      await transport.send({ to: e164, code, ttlSeconds: 300, purpose: "signup_proof", locale });
-    } catch {
-      await db.rpc("phone_signup_invalidate", { p_registration_id: registrationId, p_challenge_id: challengeId, p_reason: "delivery_failed" });
-      return UNAVAILABLE;
-    }
+    // The reply never depends on delivery: a number that already belongs to an account gets the identical reply (and no message), and a
+    // delivery failure is not visible in it either. Delivery runs after the reply (see Deps.defer); a failure closes the challenge there.
+    const deliver = row.deliver === true;
+    defer((async () => {
+      if (!deliver) return;
+      try {
+        await transport.send({ to: e164, code, ttlSeconds: 300, purpose: "signup_proof", locale });
+      } catch {
+        try {
+          await db.rpc("phone_signup_invalidate", { p_registration_id: registrationId, p_challenge_id: challengeId, p_reason: "delivery_failed" });
+        } catch { /* nothing more can be done; the challenge expires on its own */ }
+      }
+    })());
     return reply;
   }
 

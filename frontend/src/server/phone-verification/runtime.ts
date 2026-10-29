@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
+import { after } from "next/server";
 import { parseServerEnv, readPublicEnv } from "@/lib/env";
 import { readPhoneVerificationEnv } from "@/lib/env/phone-verification";
 import { parseDeliveryMode, selectTransport } from "./delivery";
@@ -38,5 +39,9 @@ export function getPhoneVerificationService(): PhoneVerificationService | null {
 export function getPhoneSignupService(): PhoneSignupService | null {
   if (!readPhoneVerificationEnv().signupEnabled) return null;
   const { env, keyring, db, transport } = build();
-  return createPhoneSignupService({ db, transport, keyring, enabled: env.signupEnabled });
+  // Delivery runs after the response (Next `after` -> waitUntil on Workers), so the reply cannot reveal whether a number is already registered.
+  const defer = (task: Promise<void>) => {
+    try { after(task); } catch { void task; }
+  };
+  return createPhoneSignupService({ db, transport, keyring, enabled: env.signupEnabled, defer });
 }

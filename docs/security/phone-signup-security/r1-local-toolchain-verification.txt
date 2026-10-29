@@ -25,3 +25,11 @@ frontend unit  Tests 82 passed | 16 skipped (98) -> ok
 tsc --noEmit -> ok
 real-database integration (B1 service + R1 signup service via outbox)  Tests 16 passed (16) -> ok
 RESULT [reset unit integration]: PASS
+--- re-run of: reset unit integration (harness fix: integration files run one after another because both switch the shared posture)
+toolchain: Supabase CLI 2.122.0; Postgres 
+(stack stopped)
+db reset (195 migrations from scratch) -> ok
+frontend unit  Tests 83 passed | 16 skipped (99) -> ok
+tsc --noEmit -> ok
+real-database integration (B1 service + R1 signup service via outbox)  Tests 16 passed (16) -> ok
+RESULT [reset unit integration]: PASS

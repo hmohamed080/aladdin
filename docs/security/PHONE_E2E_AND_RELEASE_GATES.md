@@ -15,7 +15,10 @@ Both jobs fail for the **same underlying reason: the E2E harness was not updated
 
 Why it appeared now: the specialty UI changed in #113's own recent commits (`ec035c76` "Onboarding for every account: phone, governorate and town, specialties", then `700146f0` "Account basics review: … persona-matched specialties"), and `e2e/helpers/auth.ts` was last touched before the combobox landed.
 
-### Minimal fix (belongs in #113; **not** made on this branch)
+### Outcome (R1): root cause confirmed, fixed independently by #113, both workflows reproduced green locally
+See `PHONE_SIGNUP_R1_REPORT.md` §7: the fix described below was prepared and verified on `58b63e7e`; #113's own later commits landed an equivalent change (`select#specialtyAdd`); on #113's current head `03f59733` the Showroom workflow passes (38 + 11) and the CAPTCHA workflow passes (33, 1 flaky on retry). The remaining Windows-only helper bug is PR #124.
+
+### Minimal fix (as originally proposed in PR #122; superseded by #113's own commit)
 1. Update `completeAccountBasics()` to open the specialty combobox and choose the first option (role-based locators, not the old chip selector).
 2. In `auth-password-preview.spec.ts` complete the basics step (reuse the helper) before asserting the landing, or assert `/onboarding/basics` as the new post-OTP destination.
 3. Re-run both workflows; they must be green before #113 merges.

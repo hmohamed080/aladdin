@@ -29,7 +29,11 @@ describe.skipIf(!target)("signup proof - real service + outbox + GoTrue + PostgR
   const tag = randomBytes(3).toString("hex");
   const outboxDir = mkdtempSync(join(tmpdir(), "r1-outbox-"));
   const keyring = parseKeyring(JSON.stringify({ current: "k2", keys: { k2: randomBytes(32).toString("base64"), k1: randomBytes(32).toString("base64") } }));
-  const svc = createPhoneSignupService({ db: http.serviceDb(), transport: createOutboxTransport({ dir: outboxDir, nodeEnv: "test" }), keyring, enabled: true });
+  // Delivery is deferred past the reply (see signup-service.ts); the test collects the tasks and awaits them where a person would wait for the message.
+  const tasks: Promise<void>[] = [];
+  const defer = (t: Promise<void>) => { tasks.push(t); };
+  const flush = async () => { await Promise.all(tasks.splice(0)); };
+  const svc = createPhoneSignupService({ db: http.serviceDb(), transport: createOutboxTransport({ dir: outboxDir, nodeEnv: "test" }), keyring, enabled: true, defer });
   const created: string[] = [];
   let seq = 0;
   const phone = () => {
@@ -68,6 +72,7 @@ describe.skipIf(!target)("signup proof - real service + outbox + GoTrue + PostgR
     const reg = randomUUID();
     const started = await svc.start(reg, p.e164, ip());
     expect(started.status).toBe("sent");
+    await flush();
     const code = latestOutboxCode(outboxDir, p.e164, "signup_proof");
     expect(code).toMatch(/^[0-9]{6}$/);
     const files = readdirSync(outboxDir);
@@ -81,6 +86,7 @@ describe.skipIf(!target)("signup proof - real service + outbox + GoTrue + PostgR
     const reg = randomUUID();
     const started = await svc.start(reg, p.e164, ip());
     if (started.status !== "sent") throw new Error(`start: ${started.status}`);
+    await flush();
     const code = latestOutboxCode(outboxDir, p.e164, "signup_proof")!;
     expect((await svc.verify(reg, started.challengeId, code === "000000" ? "000001" : "000000", ip())).status).toBe("invalid");
     const v = await svc.verify(reg, started.challengeId, code, ip());
@@ -114,14 +120,18 @@ describe.skipIf(!target)("signup proof - real service + outbox + GoTrue + PostgR
     expect(existing).toMatch(/^\+/);
     const out = await svc.start(randomUUID(), existing, ip());
     expect(out.status).toBe("sent");
+    await flush();
     expect(readdirSync(outboxDir).length).toBe(before);
   });
 
-  it("a delivery failure closes the challenge and reports only 'unavailable'", async () => {
-    const failing = createPhoneSignupService({ db: http.serviceDb(), transport: createFakeTransport({ failWith: new Error("upstream said +201000000000 123456") }).transport, keyring, enabled: true });
+  it("a delivery failure is invisible in the reply, then closes the challenge", async () => {
+    const own: Promise<void>[] = [];
+    const failing = createPhoneSignupService({ db: http.serviceDb(), transport: createFakeTransport({ failWith: new Error("upstream said +201000000000 123456") }).transport, keyring, enabled: true, defer: (t) => { own.push(t); } });
     const p = phone();
     const reg = randomUUID();
-    expect(await failing.start(reg, p.e164, ip())).toEqual({ status: "unavailable" });
+    const reply = await failing.start(reg, p.e164, ip());
+    expect(reply.status).toBe("sent");
+    await Promise.all(own);
     expect(sql(`select invalidated_why from app.phone_verification_challenges where registration_id = '${reg}';`)).toBe("delivery_failed");
   });
 

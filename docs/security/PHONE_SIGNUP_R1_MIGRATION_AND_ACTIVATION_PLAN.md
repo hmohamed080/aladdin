@@ -48,6 +48,14 @@ select coalesce(u.raw_app_meta_data ->> 'registration_source', '(none: public si
 * `(none: public sign-up)` = an anonymous GoTrue sign-up on an alias, i.e. the attack (or a bug). These are the cases enforce removes.
 * `phone_whatsapp_sign_up` with `had_grant = false` = the new flow forgot the grant: **a blocker for stage 7**.
 
+Delivery health (stage 6 onward): a rising share of `delivery_failed` is the only visible trace of a transport problem, because the sign-up reply deliberately does not depend on delivery.
+```sql
+select date_trunc('hour', created_at) as hour, count(*) filter (where invalidated_why = 'delivery_failed') as failed, count(*) as started
+  from app.phone_verification_challenges where purpose = 'signup_proof' and created_at > now() - interval '24 hours' group by 1 order by 1;
+```
+
+Stage 4 also proves the guard's one external assumption on the hosted GoTrue version: legitimate application creations must be seen **with** their grant (`had_grant = true` never appears as an observation, because observe records only what enforce would refuse; so run one rehearsal sign-up with the grant flow on Acceptance in observe mode and confirm it produces **no** observation row and a consumed grant). A legitimate creation that appears as `had_grant = false` means GoTrue did not apply `app_metadata` in the insert's transaction on that version: stop, do not enforce.
+
 Gate for stage 7: the only sources left are `(none: public sign-up)` and retired ones with a zero trend.
 
 ## 3. Rollback
