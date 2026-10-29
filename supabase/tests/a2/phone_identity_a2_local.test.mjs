@@ -326,7 +326,7 @@ try {
   rec.check("A2-CON-3", "concurrency", "One account reserving 4 numbers simultaneously ends with exactly one active reservation", db.sql(`select count(*) from public.secondary_phone_reservations where user_id='${solo.id}' and status='active';`) === "1" && serial.filter((r) => out(r) === "ok").length === 1);
 
   // ------------------------------------------------------------------------------------ 6. candidate authority prototype
-  db.sql(readFileSync(resolve(here, "proposal/phone_verification_authority.proto.sql"), "utf8"));
+  db.sql(readFileSync(resolve(here, "proposal/phone_verification_authority.proto.sql.txt"), "utf8"));
   proto = true;
   const V = {};
   for (const l of ["V1", "V2", "V3", "V4", "V5"]) V[l] = await account(l, { withPhone: phone() });

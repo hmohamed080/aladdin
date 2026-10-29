@@ -1,5 +1,5 @@
 -- ===========================================================================
--- PHASE A2 PROTOTYPE - candidate "database-native verification authority" (NOT A MIGRATION).
+-- PHASE A2 PROTOTYPE (stored as .sql.txt on purpose: `supabase test db` executes every *.sql under supabase/tests) - candidate "database-native verification authority" (NOT A MIGRATION).
 --
 -- This file is loaded by supabase/tests/a2/phone_identity_a2_local.test.mjs into a SCRATCH schema (a2_proto)
 -- of the isolated local stack and dropped again at the end of the run. It is never placed under

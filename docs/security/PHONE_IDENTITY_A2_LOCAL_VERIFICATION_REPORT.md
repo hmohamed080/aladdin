@@ -23,7 +23,7 @@ Machine-readable evidence: `docs/security/phone-identity-a2/evidence.json` (reda
 | --- | --- |
 | `supabase/tests/a2/phone_identity_a2_local.test.mjs` | The suite. Zero dependencies (Node `fetch` + `docker exec psql`). |
 | `supabase/tests/a2/lib.mjs` | Local-only guards, HTTP/DB helpers, PASS/FAIL/GAP/EVAL recorder with redaction. |
-| `supabase/tests/a2/proposal/phone_verification_authority.proto.sql` | Candidate verification authority, loaded into a **scratch schema** (`a2_proto`) and dropped at the end of each run. |
+| `supabase/tests/a2/proposal/phone_verification_authority.proto.sql.txt` | Candidate verification authority, loaded into a **scratch schema** (`a2_proto`) and dropped at the end of each run. |
 | `supabase/tests/a2/run_a2.sh` | Guard → reset the isolated stack → suite → existing pgTAP → existing concurrency script. |
 
 Fixtures are created through **the real signup path** (Admin API `createUser` → password sign-in → `record_consent` → `onboarding_select_account_type` → `profile_set_phone` → `profile_set_username` → `business_draft_save_v2/submit_v2`), never by hand-writing identity rows:
@@ -80,7 +80,7 @@ Conclusion: native phone flows cannot be the proof authority without breaking id
 
 ### C2 — Database-native challenge authority — **recommended (prototype passes)**
 
-`phone_verification_authority.proto.sql` binds a challenge to *account + E.164 + purpose + claim* (the primary value, or a specific reservation id), stores only a salted hash, re-validates against the **live** claim at verification, returns one generic `invalid` for every failure, and consumes with a single atomic `UPDATE … WHERE consumed_at IS NULL`.
+`phone_verification_authority.proto.sql.txt` binds a challenge to *account + E.164 + purpose + claim* (the primary value, or a specific reservation id), stores only a salted hash, re-validates against the **live** claim at verification, returns one generic `invalid` for every failure, and consumes with a single atomic `UPDATE … WHERE consumed_at IS NULL`.
 
 | Scenario | Result |
 | --- | --- |
