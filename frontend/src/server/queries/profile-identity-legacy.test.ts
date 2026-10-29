@@ -76,7 +76,8 @@ describe("legacy phone identity — no OTP, no writes", () => {
     expect(identity).not.toHaveProperty("email");
     expect(identity).not.toHaveProperty("userId");
     expect(db.eq).toHaveBeenCalledWith("user_id", INSTALLER_ID);
-    expect(db.rpc).toHaveBeenCalledExactlyOnceWith("my_secondary_phone");
+    expect(db.rpc).toHaveBeenCalledTimes(1);
+    expect(db.rpc).toHaveBeenCalledWith("my_secondary_phone");
   });
 
   it("a verified primary gets its status ONLY from phone_verified_at", async () => {
