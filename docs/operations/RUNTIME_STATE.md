@@ -3,7 +3,7 @@
 ## Backups and IDs-only R2 keys (code only, not active hosted) — 2026-10-29
 - Branch `claude/project-thread-yjnwej`. Production still has no automated backup: the last one is the manual 2026-10-25 "Phase A" in `aladdin-production-db-backups/phase-a/`. Supabase Free has no daily backups, and database dumps never hold Storage bytes.
 - `ops/backups/` is the tested source of the private repo `aladdin-backups` (not created yet). Activation order: owner setup (age keys, bucket lock + lifecycle, two R2 tokens, environments), an Acceptance run and restore test, then a separate Production GO (`PRODUCTION_BACKUP_ENABLED=true`).
-- Migration `20261029090001_media_id_storage_keys.sql` (ids-only `u/`/`o/` keys for new R2 uploads, [ADR-0025](../decisions/ADR-0025-r2-id-keys-and-backups.md)) is applied nowhere hosted. Production media stays on Supabase Storage (`R2_STORAGE_ENABLED=false`), so it changes nothing there until R2 is switched on.
+- Migration `20261029090002_media_id_storage_keys.sql` (ids-only `u/`/`o/` keys for new R2 uploads, [ADR-0027](../decisions/ADR-0027-r2-id-keys-and-backups.md)) is applied nowhere hosted. Production media stays on Supabase Storage (`R2_STORAGE_ENABLED=false`), so it changes nothing there until R2 is switched on.
 
 ## Live site on Cloudflare Workers — 2026-10-27
 - `aladdindecore.com`, `www` and `next` are served by Worker `aladdin-frontend-production` (Custom Domains, attached by the owner 17:23–17:40Z). It binds `aladdin-backend-production` and uses the live Supabase project `kkpkgjrweysgvhvkhzun` (193 migrations). R2 and Redis are off in production.

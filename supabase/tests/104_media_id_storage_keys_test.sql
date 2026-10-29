@@ -1,4 +1,4 @@
--- Ids-only physical keys for new R2 uploads (20261029090001). Every new key holds only
+-- Ids-only physical keys for new R2 uploads (20261029090002). Every new key holds only
 -- stable ids under u/<user> or o/<organization>; existing and migrated rows keep their
 -- legacy key; the key is immutable; and authorization is still decided by the resolvers.
 create extension if not exists pgtap;

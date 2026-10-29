@@ -105,7 +105,7 @@ bash ops/backups/selftest.sh                                 # needs age, psql, 
 
 `s3/s3.json` holds one identity with keys `testkey` / `testsecret`. Every script refuses a hosted target under `BACKUP_LABEL=local-test`, and refuses a local target under a hosted label.
 
-Last run (2026-10-29, with migration `20261029090001` included):
+Last run (2026-10-29, with migration `20261029090002` included):
 - 17 of 17 checks passed, both from this checkout and from the built `aladdin-backups` layout.
 - The restore was exact: schema fingerprint and all 151 tables, 2,687 rows, and 2 of 2 media files with the recorded sha256.
 - A corrupted copy, a wrong key, a replaced object and every target mix-up were refused.

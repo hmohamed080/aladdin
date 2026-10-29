@@ -1,4 +1,4 @@
-# ADR-0025 — IDs-only R2 keys for new uploads, and independent encrypted backups
+# ADR-0027 — IDs-only R2 keys for new uploads, and independent encrypted backups
 
 **Status:** Accepted (code) · 2026-10-29 · owner decisions ("Start Phase 1"; "Use stable IDs only, with separate user (`u/`) and organization (`o/`) namespaces", 2026-10-29). Nothing is active on a hosted project yet: each needs its own owner GO.
 
@@ -22,7 +22,7 @@
    | organization | `o/<org>/profile/<media id>/original.<ext>` |
 
    Variants: `<same folder>/v/<thumb|card|full>.webp`. Upload stage: `pending/<key>`. No account type, business name, username or display text ever enters a key.
-2. **The database mints and records the key.** `media_storage_locations.storage_key` (migration `20261029090001`) is set by a trigger when the backend reserves a new R2 upload, checked against the ids-only shape, unique, and immutable. The logical identity `(namespace, object_key)` and every resolver are unchanged: **authorization is still decided by the database, never by the path.** The app reads the key through the service-role-only `media_storage_object`; the edge grant (`app.media_edge_grant`) returns it; the media Worker accepts it only in the folder that belongs to the ticket's namespace.
+2. **The database mints and records the key.** `media_storage_locations.storage_key` (migration `20261029090002`) is set by a trigger when the backend reserves a new R2 upload, checked against the ids-only shape, unique, and immutable. The logical identity `(namespace, object_key)` and every resolver are unchanged: **authorization is still decided by the database, never by the path.** The app reads the key through the service-role-only `media_storage_object`; the edge grant (`app.media_edge_grant`) returns it; the media Worker accepts it only in the folder that belongs to the ticket's namespace.
 3. **Existing keys stay valid.** `storage_key` is NULL for every existing row and for rows the Supabase-to-R2 migration tool writes; they keep `<namespace>/<object_key>`. Nothing is moved, copied or deleted.
 4. **Backups run outside the main repo** (private repo `aladdin-backups`, built from `ops/backups/`): a daily encrypted database dump and a copy of every Supabase Storage file into `aladdin-production-db-backups`, encrypted with age to an offline owner key and a restore-test key, written with If-None-Match and protected by R2 bucket locks (14 days daily, 8 weeks weekly, 12 months monthly, 35 days media). A monthly job restores the newest backup into a throwaway stack and checks schema, row counts and media sha256; a daily job alarms on a stale or shrunken backup.
 

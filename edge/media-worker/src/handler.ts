@@ -33,7 +33,7 @@ function log(reason: string, mode: string) {
   console.log(JSON.stringify({ event: "media.denied", reason, mode }));
 }
 
-// Ids-only keys of uploads made from 2026-10-29 (migration 20261029090001), per namespace:
+// Ids-only keys of uploads made from 2026-10-29 (migration 20261029090002), per namespace:
 // <u|o>/<owner id>/<folder>/[<product id>/]<media id>/(original.<ext> | v/<variant>.webp).
 const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const ID_KEY_FOLDERS: Record<string, string> = {
