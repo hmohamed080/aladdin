@@ -10,15 +10,23 @@ on:
         type: choice
         options: [production, acceptance]
         default: production
+      backup_key:
+        description: "Optional: a specific retained snapshot (db/<label>/.../<name>.tar.age) instead of the newest"
+        type: string
+        required: false
+        default: ""
 permissions:
   contents: read
 jobs:
   restore:
+    # Scheduled runs restore Production only once it is activated; a manual run restores what it is asked to.
+    if: github.event_name == 'workflow_dispatch' || vars.PRODUCTION_BACKUP_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     environment: restore-test
     env:
-      BACKUP_LABEL: ${{ github.event.inputs.label || 'production' }}
+      BACKUP_LABEL: ${{ inputs.label || 'production' }}
+      BACKUP_KEY: ${{ inputs.backup_key }}
       BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
       R2_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_READ_KEY_ID }}
@@ -32,6 +40,7 @@ jobs:
       - name: Restore and verify
         run: |
           umask 077; printf '%s\n' "$AGE_IDENTITY" > "$RUNNER_TEMP/restore.key"
+          [ -n "$BACKUP_KEY" ] || unset BACKUP_KEY
           AGE_IDENTITY_FILE="$RUNNER_TEMP/restore.key" bash backup/restore-test.sh
       - name: Report (counts and hashes only)
         if: always()

@@ -7093,3 +7093,14 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Local testing note: the selftest seeds two Storage files and removes them on exit; files left in local Storage break `100_historical_media_purge_test.sql` test 48.
 - **Unfinished / owner steps:** review and merge the PR; the backup setup steps in `ops/backups/README.md`; Acceptance run; then a separate Production GO. Push `20261029090002` to Acceptance, then Production, before R2 uploads are switched on anywhere. Follow-ups: video keys under `u/`/`o/` if video ships; an R2 source for the media copy once Production media is on R2.
 
+
+- 2026-10-29 17:22Z follow-up (owner review of #118):
+  - **Numbering.** Renumbered to migration `20261029090002` and ADR-0027, because #113 holds `20261029090001` (applied to Acceptance) and ADR-0025/0026. The WhatsApp OTP branch also uses ADR-0025; that branch needs its own renumbering.
+  - **Permissions.** New permission contract `20261029090002.json` with exactly three reviewed additions. Once #113 merges, merge `main` into #118 and regenerate this contract from the combined replay, because the gate reads only the newest contract.
+  - **Workflows.** Rebuilt around `plan.sh`/`plan-test.sh`:
+    - a matrix decided by a plan job (`matrix` is not available in a job-level `if`);
+    - a Production switch plus a typed confirmation, checked again in the scripts;
+    - two cron firings for Cairo daylight saving.
+  - **Labels.** Each label is pinned to its project ref, database host, Supabase URL, service-key claim and bucket.
+  - **Snapshots.** Each snapshot's media inventory comes from its own dump and is stored next to it (same lock and expiry). Media copies are locked 365 days and never expired. The restore test checks inventory coverage, and freshness fails on an incomplete media step and, for Production, on uncovered R2 media.
+  - **CI.** A new `backup-kit` CI job runs actionlint 1.7.7, shellcheck and the plan tests. actionlint could not be downloaded in the session container, so CI is the evidence.

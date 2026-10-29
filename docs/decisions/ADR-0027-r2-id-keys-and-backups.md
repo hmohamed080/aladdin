@@ -24,12 +24,24 @@
    Variants: `<same folder>/v/<thumb|card|full>.webp`. Upload stage: `pending/<key>`. No account type, business name, username or display text ever enters a key.
 2. **The database mints and records the key.** `media_storage_locations.storage_key` (migration `20261029090002`) is set by a trigger when the backend reserves a new R2 upload, checked against the ids-only shape, unique, and immutable. The logical identity `(namespace, object_key)` and every resolver are unchanged: **authorization is still decided by the database, never by the path.** The app reads the key through the service-role-only `media_storage_object`; the edge grant (`app.media_edge_grant`) returns it; the media Worker accepts it only in the folder that belongs to the ticket's namespace.
 3. **Existing keys stay valid.** `storage_key` is NULL for every existing row and for rows the Supabase-to-R2 migration tool writes; they keep `<namespace>/<object_key>`. Nothing is moved, copied or deleted.
-4. **Backups run outside the main repo** (private repo `aladdin-backups`, built from `ops/backups/`): a daily encrypted database dump and a copy of every Supabase Storage file into `aladdin-production-db-backups`, encrypted with age to an offline owner key and a restore-test key, written with If-None-Match and protected by R2 bucket locks (14 days daily, 8 weeks weekly, 12 months monthly, 35 days media). A monthly job restores the newest backup into a throwaway stack and checks schema, row counts and media sha256; a daily job alarms on a stale or shrunken backup.
+4. **Backups run outside the main repo** (private repo `aladdin-backups`, built from `ops/backups/`). The kit:
+   - takes a daily encrypted database dump and copies every Supabase Storage file into `aladdin-production-db-backups`;
+   - encrypts with age to an offline owner key and a restore-test key;
+   - writes with If-None-Match, and R2 bucket locks protect the objects;
+   - keeps database snapshots 14 days (daily), 8 weeks (weekly) and 12 months (monthly). Each snapshot's media inventory, built from the dump itself, sits next to it with the same lock and expiry. Media copies are locked 365 days and never expired, so every retained snapshot can restore its files, deleted ones included;
+   - runs a monthly restore test into a throwaway stack (schema, row counts, inventory coverage, media sha256);
+   - runs a daily freshness alarm that also fails on an incomplete media step.
+5. **Guards** (revised 2026-10-29 after the owner's review of PR #118):
+   - Each label is pinned to its project ref, database host form, Supabase URL, service-key `ref` claim and bucket.
+   - Production runs only with `PRODUCTION_BACKUP_ENABLED=true`, a manual Production run also needs a typed confirmation, and the scripts check the switch again.
+   - Two cron firings and a Cairo-hour window keep the backup at 01:30 Cairo across daylight-saving changes.
+6. **R2-hosted media needs its own independent backup before Production media moves to R2.** That means a second bucket, account or provider, a copy job driven by `media_storage_locations`, and restore tests. Until it exists, every snapshot records the R2 media it does not cover, and the freshness alarm fails for Production if that number is above 0.
 
 ## Not covered
 
 - Video keys stay `video/<video id>/...` (ids only already; video is off and no video exists). Moving them under `u/`/`o/` is a follow-up if video ships.
-- Backing up R2 media itself: Production media is on Supabase Storage today. When Production moves to R2, the media copy job gains an R2 source.
+- Backing up R2 media itself (decision 6). Production media is on Supabase Storage today.
+- Pruning media copies that no retained snapshot references (storage grows with every file version; about 42 MB today).
 
 ## Consequences
 

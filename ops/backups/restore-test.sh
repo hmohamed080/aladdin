@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Monthly restore test. Touches NO hosted project: it downloads the newest daily backup, checks its hashes,
-# decrypts it, restores it into a throwaway local Supabase stack on this machine and proves the restore is
-# exact (schema fingerprint and the row count of every table equal what the dump holds). Then it restores up to
-# MEDIA_SAMPLE media copies and checks each file's sha256. Writes REPORT.txt (counts and hashes, no row data).
+# Monthly restore test. Touches NO hosted project: it downloads the newest daily backup (or BACKUP_KEY, any
+# retained snapshot), checks its hashes and that it is the label's own project, decrypts it, restores it into a
+# throwaway local Supabase stack on this machine and proves the restore is exact (schema fingerprint and the row
+# count of every table equal what the dump holds). Then it proves the snapshot's media inventory lists exactly the
+# files the restored database references, each with a stored copy, and restores up to MEDIA_SAMPLE of them
+# (files deleted after the snapshot included) checking size and sha256. Writes REPORT.txt (counts, no row data).
 #
 #   BACKUP_LABEL=production BACKUP_BUCKET=... R2_ENDPOINT=... AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
 #   AGE_IDENTITY_FILE=<restore-test private key file>  bash restore-test.sh
@@ -27,8 +29,12 @@ OUT="${OUT:-$(mktemp -d)/restore-test}"; mkdir -p "$OUT"; W="$OUT/work"; mkdir -
 fails=()
 
 # 1. Fetch and check the backup.
-KEY="${BACKUP_KEY:-$(newest_key "db/$BACKUP_LABEL/daily/")}"
-case "$KEY" in *.tar.age) ;; "") die "no daily backup found";; *) KEY="${KEY%.json}.tar.age";; esac
+newest_backup() {
+  s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "db/$BACKUP_LABEL/daily/" \
+    --query "sort_by(Contents[?ends_with(Key, '.tar.age')] || \`[]\`, &LastModified)[-1].Key" --output text | sed 's/^None$//'
+}
+KEY="${BACKUP_KEY:-$(newest_backup)}"
+case "$KEY" in db/"$BACKUP_LABEL"/*.tar.age) ;; "") die "no daily backup found";; *) die "BACKUP_KEY must be a $BACKUP_LABEL .tar.age backup";; esac
 log "restore test of $KEY"
 s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$KEY" "$W/b.tar.age" > "$W/head.json"
 s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "${KEY%.tar.age}.json" "$W/manifest.json" >/dev/null
@@ -36,6 +42,8 @@ SUM="$(sha256 "$W/b.tar.age")"
 grep -q "\"sha256\":\"$SUM\"" "$W/manifest.json" || fails+=("download sha256 $SUM is not the manifest's")
 grep -q "\"sha256\": *\"$SUM\"" "$W/head.json" || fails+=("download sha256 is not the object's stored metadata")
 AGE_TS="$(sed -n 's/.*"taken_utc":"\([^"]*\)".*/\1/p' "$W/manifest.json")"
+grep -q "\"label\":\"$BACKUP_LABEL\"" "$W/manifest.json" || fails+=("the manifest is not a $BACKUP_LABEL backup")
+[ "$BACKUP_LABEL" = local-test ] || grep -q "\"project_ref\":\"$(expected_ref)\"" "$W/manifest.json" || fails+=("the backup is not of the $BACKUP_LABEL project")
 age -d -i "$AGE_IDENTITY_FILE" -o "$W/b.tar" "$W/b.tar.age" || die "cannot decrypt with the restore-test key"
 grep -q "\"tar_sha256\":\"$(sha256 "$W/b.tar")\"" "$W/manifest.json" || fails+=("decrypted archive hash is not the manifest's")
 tar -C "$W" -xf "$W/b.tar"; B="$(find "$W" -mindepth 1 -maxdepth 1 -type d -name 'aladdin-*' | head -1)"
@@ -101,18 +109,35 @@ SCHEMA=exact; diff -q "$B/fingerprint.txt" "$OUT/fingerprint-restored.txt" >/dev
 join -t: -a1 -e MISSING -o 0,1.2,2.2 <(sort "$OUT/rowcounts-restored.txt") <(sort "$B/rowcounts.txt") | awk -F: '$2!=$3' > "$OUT/rowcount-diff.txt" || true
 ROWS=exact; [ ! -s "$OUT/rowcount-diff.txt" ] || { ROWS="DIFFER in $(wc -l < "$OUT/rowcount-diff.txt") tables"; fails+=("row counts differ (rowcount-diff.txt)"); }
 
-# 6. Media copies: restore a random sample and check every file's sha256 against the hash recorded at copy time.
-MEDIA="none stored"; N=0; BAD=0
-s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "media/$BACKUP_LABEL/supabase/objects/" --query 'Contents[].Key' --output text \
-  | tr '\t' '\n' | grep -v '^None$' | shuf -n "${MEDIA_SAMPLE:-20}" > "$W/media-sample.txt" || true
-while read -r k; do
-  [ -n "$k" ] || continue; N=$((N+1))
-  s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$k" "$W/m.age" > "$W/m.json"
-  want="$(sed -n 's/.*"sha256": *"\([0-9a-f]\{64\}\)".*/\1/p' "$W/m.json")"
-  age -d -i "$AGE_IDENTITY_FILE" -o "$W/m" "$W/m.age" 2>/dev/null && [ "$(sha256 "$W/m")" = "$want" ] || BAD=$((BAD+1))
-done < "$W/media-sample.txt"
-[ "$N" -eq 0 ] || MEDIA="$((N-BAD)) of $N sampled files restored with the recorded sha256"
-[ "$BAD" -eq 0 ] || fails+=("$BAD sampled media files did not restore exactly")
+# 6. Media: this snapshot's own inventory must list exactly the files the restored database references, each
+# with a stored copy; then a random sample is restored and checked (size and the sha256 recorded at copy time).
+MEDIA="not checked"; N=0; BAD=0; base="${KEY%.tar.age}"
+if ! s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$base.media.json" "$W/media.json" >/dev/null 2>&1 \
+   || ! s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$base.media.tsv.age" "$W/inv.age" >/dev/null 2>&1; then
+  MEDIA="NO INVENTORY for this snapshot"; fails+=("the snapshot has no media inventory (media step did not finish)")
+elif ! age -d -i "$AGE_IDENTITY_FILE" -o "$W/inv.tsv" "$W/inv.age" 2>/dev/null; then
+  MEDIA="inventory cannot be decrypted"; fails+=("the media inventory cannot be decrypted")
+else
+  grep -q "\"inventory_sha256\":\"$(sha256 "$W/inv.tsv")\"" "$W/media.json" || fails+=("the media inventory hash is not its manifest's")
+  grep -q '"complete":true' "$W/media.json" || fails+=("the media step marked this snapshot incomplete")
+  echo "select id from storage.objects where coalesce((metadata->>'size')::bigint,0)>0 order by 1;" > "$W/obj.sql"
+  lq "$W/obj.sql" > "$W/db-ids.txt"
+  cut -f1 "$W/inv.tsv" | sort > "$W/inv-ids.txt"
+  awk -F'\t' '$6!="ok"' "$W/inv.tsv" | wc -l | tr -d ' ' > "$W/inv-missing.txt"
+  COVER=exact; cmp -s "$W/db-ids.txt" "$W/inv-ids.txt" || { COVER=DIFFERS; fails+=("the media inventory does not list exactly the restored storage.objects rows"); }
+  [ "$(cat "$W/inv-missing.txt")" = 0 ] || fails+=("$(cat "$W/inv-missing.txt") files of the snapshot have no stored copy")
+  shuf -n "${MEDIA_SAMPLE:-20}" "$W/inv.tsv" > "$W/media-sample.tsv" || true
+  while IFS=$'\t' read -r _ _ _ size k _; do
+    [ -n "$k" ] || continue; N=$((N+1))
+    if s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$k" "$W/m.age" > "$W/m.json" 2>/dev/null; then
+      want="$(sed -n 's/.*"sha256": *"\([0-9a-f]\{64\}\)".*/\1/p' "$W/m.json")"
+      age -d -i "$AGE_IDENTITY_FILE" -o "$W/m" "$W/m.age" 2>/dev/null && [ "$(sha256 "$W/m")" = "$want" ] \
+        && [ "$(wc -c < "$W/m" | tr -d ' ')" = "$size" ] || BAD=$((BAD+1))
+    else BAD=$((BAD+1)); fi
+  done < "$W/media-sample.tsv"
+  MEDIA="inventory $COVER ($(wc -l < "$W/inv-ids.txt" | tr -d ' ') files); $((N-BAD)) of $N sampled files restored with the recorded size and sha256"
+  [ "$BAD" -eq 0 ] || fails+=("$BAD sampled media files did not restore exactly")
+fi
 
 {
   echo "Restore test $(date -u +%FT%TZ) of $KEY"

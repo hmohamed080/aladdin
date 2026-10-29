@@ -7,12 +7,12 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; ROOT="$(cd "$HERE/../.." && pwd)"
 DEST="${1:?usage: build-repo.sh <folder for the aladdin-backups repo>}"; mkdir -p "$DEST"; DEST="$(cd "$DEST" && pwd)"
-if [ -n "$(ls -A "$DEST" | grep -v '^\.git$')" ] && [ ! -f "$DEST/SOURCE" ]; then
+if [ -n "$(find "$DEST" -mindepth 1 -maxdepth 1 ! -name .git -print -quit)" ] && [ ! -f "$DEST/SOURCE" ]; then
   echo "$DEST is not empty and was not built by this script: stopping"; exit 1
 fi
 rm -rf "$DEST/backup" "$DEST/.github/workflows" "$DEST/supabase"
 mkdir -p "$DEST/backup/kit" "$DEST/.github/workflows" "$DEST/supabase" "$DEST/r2"
-cp "$HERE"/{lib,db-backup,media-backup,restore-test,freshness,selftest}.sh "$DEST/backup/"
+cp "$HERE"/{lib,plan,plan-test,db-backup,media-backup,restore-test,freshness,selftest}.sh "$HERE/snapshot-objects.py" "$DEST/backup/"
 cp "$ROOT"/scripts/hosted-db/{security-tail,schema-fingerprint,rowcounts,auth-storage-columns,local-only-roles-cleanup,local-default-privileges-reset}.sql "$DEST/backup/kit/"
 cp "$HERE"/workflows/*.yml "$DEST/.github/workflows/"
 cp "$HERE"/r2/*.json "$DEST/r2/"

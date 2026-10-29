@@ -33,7 +33,7 @@
       "prefix": "media/production/",
       "condition": {
         "type": "Age",
-        "maxAgeSeconds": 3024000
+        "maxAgeSeconds": 31536000
       }
     },
     {
@@ -69,7 +69,7 @@
       "prefix": "media/acceptance/",
       "condition": {
         "type": "Age",
-        "maxAgeSeconds": 3024000
+        "maxAgeSeconds": 31536000
       }
     }
   ]

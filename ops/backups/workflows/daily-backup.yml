@@ -1,9 +1,15 @@
 # Daily backups. Lives in the separate private repo `aladdin-backups` (copied there by ops/backups/build-repo.sh).
 # Read-only on the databases; writes only new, locked objects to the backup bucket.
+# Which projects a run covers is decided by backup/plan.sh (tested offline by backup/plan-test.sh):
+#   - Production only when the repository variable PRODUCTION_BACKUP_ENABLED is exactly "true" (the owner's
+#     activation GO); a manual Production run also needs the typed confirmation "back up production".
+#   - Acceptance by ACCEPTANCE_BACKUP_SCHEDULE: off (default), daily (the trial) or weekly (Sundays, Cairo).
 name: Daily backup
 on:
   schedule:
-    - cron: "30 23 * * *"      # 01:30 Cairo
+    # 01:30 Cairo all year: 23:30 UTC in winter (UTC+2), 22:30 UTC in summer (UTC+3). plan.sh keeps the right one.
+    - cron: "30 22 * * *"
+    - cron: "30 23 * * *"
   workflow_dispatch:
     inputs:
       label:
@@ -11,25 +17,45 @@ on:
         type: choice
         options: [acceptance, production]
         default: acceptance
+      confirm:
+        description: 'Production only: type "back up production"'
+        type: string
+        required: false
+        default: ""
 permissions:
   contents: read
 concurrency:
-  group: backup-${{ github.event.inputs.label || 'scheduled' }}
+  group: daily-backup
   cancel-in-progress: false
 jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      labels: ${{ steps.plan.outputs.labels }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_LABEL: ${{ inputs.label }}
+          INPUT_CONFIRM: ${{ inputs.confirm }}
+          PRODUCTION_BACKUP_ENABLED: ${{ vars.PRODUCTION_BACKUP_ENABLED }}
+          ACCEPTANCE_BACKUP_SCHEDULE: ${{ vars.ACCEPTANCE_BACKUP_SCHEDULE }}
+        run: |
+          labels="$(bash backup/plan.sh backup)"
+          echo "labels=$labels" >> "$GITHUB_OUTPUT"
+          echo "Projects in this run: $labels" >> "$GITHUB_STEP_SUMMARY"
+
   backup:
+    needs: plan
+    if: needs.plan.outputs.labels != '[]'
     strategy:
       fail-fast: false
       matrix:
-        label: [acceptance, production]
+        label: ${{ fromJSON(needs.plan.outputs.labels) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    # Manual runs back up only the chosen project. Scheduled runs back up Acceptance every Sunday and
-    # Production every day once the owner sets the repository variable PRODUCTION_BACKUP_ENABLED=true.
-    if: >-
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.label == matrix.label) ||
-      (github.event_name == 'schedule' && matrix.label == 'production' && vars.PRODUCTION_BACKUP_ENABLED == 'true') ||
-      (github.event_name == 'schedule' && matrix.label == 'acceptance')
     environment: backup-${{ matrix.label }}
     env:
       BACKUP_LABEL: ${{ matrix.label }}
@@ -41,23 +67,18 @@ jobs:
       BACKUP_DB_URL: ${{ secrets.BACKUP_DB_URL }}
       SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PRODUCTION_BACKUP_ENABLED: ${{ vars.PRODUCTION_BACKUP_ENABLED }}
+      BACKUP_STATE_DIR: ${{ runner.temp }}/backup-state
+      SKIP_IF_TAKEN: ${{ github.event_name == 'schedule' && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
-      - name: Skip Acceptance on weekdays
-        id: gate
-        run: |
-          if [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$BACKUP_LABEL" = acceptance ] && [ "$(TZ=Africa/Cairo date +%u)" != 7 ]; then
-            echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
       - name: Install age and the Postgres 17 client
-        if: steps.gate.outputs.run == 'true'
         run: |
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
           sudo apt-get update -qq && sudo apt-get install -y -qq age postgresql-client-17 >/dev/null
       - name: Database backup
-        if: steps.gate.outputs.run == 'true'
         run: bash backup/db-backup.sh
-      - name: Media backup (files in Supabase Storage)
-        if: steps.gate.outputs.run == 'true'
+      - name: Media backup (this snapshot's files in Supabase Storage)
         run: bash backup/media-backup.sh

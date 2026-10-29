@@ -157,6 +157,25 @@ jobs:
           fi
           echo "no conflict markers"
 
+  # The backup kit that the private aladdin-backups repo runs (ops/backups/). Workflows are linted with the
+  # pinned actionlint (Go module, built by the official setup-go action; shellcheck is preinstalled on the
+  # runner), and the run-planning and target checks are tested offline. Touches no hosted resource.
+  backup-kit:
+    name: backup-kit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: false
+      - name: actionlint (backup workflows)
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -color ops/backups/workflows/*.yml
+      - name: shellcheck (backup scripts)
+        run: shellcheck -S warning ops/backups/*.sh
+      - name: Schedule, Production gate and target checks (offline)
+        run: bash ops/backups/plan-test.sh
+
   # Pull requests only. A review aid for `supabase/migrations`: see scripts/migration-policy.mjs and the
   # expand/contract rules in docs/operations/staging-deployment-runbook.md. It also runs the unit tests of the
   # migration-history guard and the other repository scripts.
