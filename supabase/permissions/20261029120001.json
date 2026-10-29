@@ -1,5 +1,5 @@
 {
- "version": "20261029090002",
+ "version": "20261029120001",
  "source": "local supabase/postgres:17 replay of every migration through this version (claude/project-thread-yjnwej). Reviewed additions: app.media_storage_key_assign() and app.media_storage_key_for(...) executable by no client role; public.media_storage_object(text,text) service_role only.",
  "publicRPCs": [
   "public.invitation_lookup(text)",
