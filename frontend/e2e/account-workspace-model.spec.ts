@@ -100,9 +100,13 @@ async function signOutFromAccountMenu(page: Page) {
 }
 const workplaceMenu = (page: Page) => page.locator('[data-testid="workplace-menu"]:visible').first();
 
+// A press that lands before hydration does nothing, so press again until the menu opens.
 async function openSwitcher(page: Page) {
-  await switcher(page).click();
-  await expect(page.locator('[data-testid="workspace-menu"]:visible').first()).toBeVisible();
+  const menu = page.locator('[data-testid="workspace-menu"]:visible').first();
+  await expect(async () => {
+    if (!(await menu.isVisible())) await switcher(page).click();
+    await expect(menu).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
 }
 
 test.describe("1 — new business registration", () => {
