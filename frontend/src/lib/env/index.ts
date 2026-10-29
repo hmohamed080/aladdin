@@ -62,7 +62,21 @@ export const serverEnvSchema = z.object({
   // The public origin emailed links point at (e.g. "https://aladdindecore.com"). Never taken from a request header
   // outside local development, so a forged Host cannot redirect a verification link.
   APP_PUBLIC_ORIGIN: z.string().url().optional(),
+  // Phone verification authority (Phase B1). Ships OFF: anything other than the literal "true" is off.
+  PHONE_VERIFICATION_ENABLED: z.enum(["true", "false"]).optional(),
+  // {"current":"<kid>","keys":{"<kid>":"<base64, >= 32 bytes>"}} - at most 3 keys (current + previous during rotation).
+  // Parsed and validated by server/phone-verification/otp.ts; the database never receives it.
+  PHONE_OTP_HMAC_KEYS: z.string().trim().min(20).optional(),
 });
+
+/** Server-only phone verification configuration. Disabled unless PHONE_VERIFICATION_ENABLED is exactly "true". */
+export function readPhoneVerificationEnv(): { enabled: boolean; hmacKeys: string | undefined } {
+  const env = parseServerEnv({
+    PHONE_VERIFICATION_ENABLED: process.env.PHONE_VERIFICATION_ENABLED,
+    PHONE_OTP_HMAC_KEYS: process.env.PHONE_OTP_HMAC_KEYS,
+  });
+  return { enabled: env.PHONE_VERIFICATION_ENABLED === "true", hmacKeys: env.PHONE_OTP_HMAC_KEYS };
+}
 
 /** Server-only email configuration (contact-email verification links). */
 export function readEmailEnv(): Pick<ServerEnv, "RESEND_API_KEY" | "EMAIL_FROM" | "APP_PUBLIC_ORIGIN"> {
