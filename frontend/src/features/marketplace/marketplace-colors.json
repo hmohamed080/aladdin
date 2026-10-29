@@ -1,0 +1,21 @@
+[
+  { "key": "white", "name": { "ar": "أبيض", "en": "White" }, "hex": "#ffffff" },
+  { "key": "off_white", "name": { "ar": "أوف وايت", "en": "Off-white" }, "hex": "#f5f2ea" },
+  { "key": "cream", "name": { "ar": "كريمي", "en": "Cream" }, "hex": "#efe6cf" },
+  { "key": "beige", "name": { "ar": "بيج", "en": "Beige" }, "hex": "#d9c7a5" },
+  { "key": "light_grey", "name": { "ar": "رمادي فاتح", "en": "Light grey" }, "hex": "#c9c9c7" },
+  { "key": "dark_grey", "name": { "ar": "رمادي غامق", "en": "Dark grey" }, "hex": "#5b5d60" },
+  { "key": "black", "name": { "ar": "أسود", "en": "Black" }, "hex": "#1b1b1c" },
+  { "key": "light_brown", "name": { "ar": "بني فاتح", "en": "Light brown" }, "hex": "#a97c50" },
+  { "key": "dark_brown", "name": { "ar": "بني غامق", "en": "Dark brown" }, "hex": "#4a2f1d" },
+  { "key": "walnut", "name": { "ar": "جوز", "en": "Walnut" }, "hex": "#5d4030" },
+  { "key": "oak", "name": { "ar": "بلوط", "en": "Oak" }, "hex": "#b98a54" },
+  { "key": "gold", "name": { "ar": "ذهبي", "en": "Gold" }, "hex": "#c9a24a" },
+  { "key": "silver", "name": { "ar": "فضي", "en": "Silver" }, "hex": "#bfc3c7" },
+  { "key": "bronze", "name": { "ar": "برونزي", "en": "Bronze" }, "hex": "#8c6a3b" },
+  { "key": "copper", "name": { "ar": "نحاسي", "en": "Copper" }, "hex": "#b4683c" },
+  { "key": "green", "name": { "ar": "أخضر", "en": "Green" }, "hex": "#5f8a5a" },
+  { "key": "blue", "name": { "ar": "أزرق", "en": "Blue" }, "hex": "#4f7aa8" },
+  { "key": "pink", "name": { "ar": "وردي", "en": "Pink" }, "hex": "#e4a7b5" },
+  { "key": "multi", "name": { "ar": "متعدد الألوان", "en": "Multicolour" }, "hex": "#d8d0c4" }
+]

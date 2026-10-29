@@ -15,6 +15,8 @@ import { describe, expect, it } from "vitest";
  *   /home/work                installer-my-work-preview/installer-my-work-view.tsx       yes      grid
  *   /preview/installer-reviews installer-reviews-preview/installer-reviews-preview.tsx   yes      grid
  *   /home/reviews (Installer) installer-reviews/installer-reviews.tsx                   yes      grid
+ *   /marketplace              marketplace/live/live-catalog.tsx                          yes      grid
+ *   /marketplace (preview)    marketplace/marketplace-browser.tsx                        yes      grid
  *   every other route         (no Grid / List toggle)                                     no       n/a
  */
 
@@ -46,6 +48,8 @@ describe("Grid is the default wherever Grid and List both exist", () => {
       "features/installer-my-work-preview/installer-my-work-view.tsx",
       "features/installer-reviews-preview/installer-reviews-preview.tsx",
       "features/installer-reviews/installer-reviews.tsx",
+      "features/marketplace/live/live-catalog.tsx",
+      "features/marketplace/marketplace-browser.tsx",
     ]);
   });
 

@@ -28,6 +28,27 @@ const ARABIC = /[؀-ۿ]/;
 // Values that are intentionally identical technical samples in both locales
 // (neutral placeholders), so they carry Latin/digits and no Arabic script.
 const LATIN_IN_ARABIC_WHITELIST = new Set<string>([
+  // "SKU" is the stock-keeping-unit code sellers type and search by; it stays
+  // in Latin in the Arabic UI, as on their own spreadsheets and labels.
+  "marketplaceSeller.searchPlaceholder",
+  "marketplaceSeller.col.sku",
+  "marketplaceSeller.form.sku",
+  "marketplaceSeller.form.variantsHint",
+  "marketplaceSeller.error.duplicate_sku_in_form",
+  "marketplaceSeller.error.sku_invalid",
+  "marketplaceSeller.error.sku_taken",
+  // Image file formats (JPG / PNG / WebP) are named as the seller sees them on their files.
+  "marketplaceSeller.image.hint",
+  "marketplaceSeller.error.image_type_invalid",
+  // Bulk import: the spreadsheet / archive / image FORMAT names (CSV, ZIP, JPG, PNG, WebP).
+  "marketplaceSeller.imports.step1Hint",
+  // attribute keys (key=value, attr:<key>) are the machine keys the seller types
+  "marketplaceSeller.imports.fixedAttributesHint",
+  "marketplaceSeller.imports.attrColumns",
+  "marketplaceSeller.imports.step4Hint",
+  "marketplaceSeller.imports.chooseImages",
+  "marketplaceSeller.imports.errors.format",
+  "marketplaceSeller.imports.errors.unreadable",
   // Showroom/Installer entry pages: the provider brand names (Google, Facebook)
   // stay as the providers write them, and the email sample is a literal address.
   "entryAuth.continueWithGoogle",

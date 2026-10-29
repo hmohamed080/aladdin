@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/controls";
-import { ArrowUpRightIcon, GlobeIcon, MenuIcon, XIcon } from "@/components/ui/icons";
+import { ArrowUpRightIcon, GlobeIcon, MenuIcon, ShoppingBagIcon, XIcon } from "@/components/ui/icons";
 import { LanguageSwitch } from "@/components/layout/switchers";
 import { useI18n } from "@/lib/i18n/context";
 import { CHOICES_BY_KEY, REGISTRATION_CHOICE_ORDER } from "@/lib/onboarding/account-types";
@@ -11,7 +11,7 @@ import styles from "./landing-header.module.css";
 
 const content = {
   ar: {
-    navigation: "التنقل الرئيسي", menu: "القائمة", signIn: "تسجيل الدخول", register: "إنشاء حساب", registerTitle: "اختر نوع حسابك", soon: "قريبًا", marketplace: "السوق",
+    navigation: "التنقل الرئيسي", menu: "القائمة", signIn: "تسجيل الدخول", register: "إنشاء حساب", registerTitle: "اختر نوع حسابك", soon: "قريبًا", cart: "السلة", marketplace: "السوق",
     links: [["الرئيسية", "#landing-top"], ["عن المنصة", "#how-it-works"], ["المميزات", "#audience"], ["الشركاء", "#brands"], ["فيديوهات ومنتجات", "#platform"]],
     faq: "الأسئلة الشائعة", contact: "تواصل معنا",
     answers: [
@@ -21,7 +21,7 @@ const content = {
     ],
   },
   en: {
-    navigation: "Primary navigation", menu: "Menu", signIn: "Sign in", register: "Create account", registerTitle: "Choose your account type", soon: "Coming soon", marketplace: "Marketplace",
+    navigation: "Primary navigation", menu: "Menu", signIn: "Sign in", register: "Create account", registerTitle: "Choose your account type", soon: "Coming soon", cart: "Cart", marketplace: "Marketplace",
     links: [["Home", "#landing-top"], ["About", "#how-it-works"], ["Features", "#audience"], ["Partners", "#brands"], ["Videos & products", "#platform"]],
     faq: "FAQ", contact: "Contact us",
     answers: [
@@ -36,7 +36,7 @@ const content = {
  * `anchorBase` lets other pages (e.g. the /marketplace coming-soon page) reuse the
  * same navigation: the in-page anchors become `/#section` links back to the home page.
  */
-export function LandingHeader({ anchorBase = "", active = "home" }: { anchorBase?: string; active?: "home" | "marketplace" } = {}) {
+export function LandingHeader({ anchorBase = "", showCart = false, cartCount = 0, active = "home" }: { anchorBase?: string; showCart?: boolean; cartCount?: number; active?: "home" | "marketplace" } = {}) {
   const { locale, dir, t: tr } = useI18n();
   const t = content[locale];
   // The Marketplace link opens the coming-soon page until the Marketplace ships; absolute paths are never prefixed.
@@ -85,6 +85,13 @@ export function LandingHeader({ anchorBase = "", active = "home" }: { anchorBase
         <a href="/auth/support">{t.contact}</a>
       </nav>
       <div className={styles.actions}>
+        {/* The open Marketplace (release flag on) shows its cart; the landing page never does. */}
+        {showCart ? (
+          <a className={styles.cart} href="/marketplace/cart" aria-label={cartCount > 0 ? `${t.cart} (${cartCount})` : t.cart}>
+            <ShoppingBagIcon size={20} aria-hidden="true" />
+            {cartCount > 0 ? <span className={styles.cartBadge} aria-hidden="true">{cartCount > 99 ? "99+" : cartCount}</span> : null}
+          </a>
+        ) : null}
         <span className={styles.language}><LanguageSwitch /><GlobeIcon size={14} aria-hidden="true" /></span>
         <a className={styles.signIn} href="/auth/sign-in" dir={dir}>{t.signIn}</a>
         <div className={styles.registerWrap} ref={signup}>

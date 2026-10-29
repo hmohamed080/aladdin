@@ -21,6 +21,9 @@
 .home::after { content: ""; position: absolute; bottom: 0; inset-inline: 0; height: 2px; background: var(--lumen); box-shadow: 0 0 0 1px var(--accent-edge); }
 .actions { display: flex; align-items: center; gap: 16px; }
 .language { display: inline-flex; align-items: center; gap: 4px; padding-inline-end: 8px; border-inline-end: 1px solid var(--line-light); }
+.cart { position: relative; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--ink); cursor: pointer; }
+.cartBadge { position: absolute; inset-block-start: 2px; inset-inline-end: 0; display: grid; place-items: center; min-width: 18px; height: 18px; padding-inline: 4px; border-radius: 999px; background: var(--brand-terracotta); color: var(--plaster); font-size: .6875rem; font-weight: 700; line-height: 1; }
+.cart:hover { color: var(--brand-terracotta); }
 .language button { padding: 0; min-height: 44px; color: var(--ink); }
 .register { min-height: 44px; padding: 8px; gap: 8px; border-radius: 999px; background: var(--lumen); box-shadow: 0 0 0 1px var(--accent-edge); color: var(--basalt); white-space: nowrap; }
 .arrow { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: var(--plaster); color: var(--ink); }
