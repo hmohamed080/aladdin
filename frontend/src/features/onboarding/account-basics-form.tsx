@@ -78,7 +78,8 @@ export function AccountBasicsForm({ missing, source, next }: { missing: MissingB
         <input type="hidden" name="next" value={next} />
 
         {missing.phone ? (
-          <section hidden={current !== "phone"} className="flex flex-col gap-xs">
+          // No display class on the sections: a `flex` class would beat the hidden attribute.
+          <section hidden={current !== "phone"}>
             <PhoneField
               id="phone"
               name="phone"
