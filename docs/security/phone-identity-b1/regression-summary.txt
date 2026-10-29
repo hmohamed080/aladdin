@@ -1,11 +1,11 @@
 db reset: ok (194 migrations applied from scratch, incl. 20261030090001)
 function permission contract: ACCEPTED-FOR-B1-ONLY: 13 functions (explicit flag; this is not a review approval of those permissions) PASS 698 exact function permission contracts (20261030090001)  -> ok
-pgTAP focused (19 files): Files=19, Tests=790,  5 wallclock secs ( 0.22 usr  0.10 sys +  0.43 cusr  0.33 csys =  1.08 CPU) Result: PASS  -> ok
-frontend unit:  Tests 66 passed | 10 skipped (76) -> ok
+pgTAP focused (19 files): Files=19, Tests=790,  5 wallclock secs ( 0.25 usr  0.08 sys +  0.44 cusr  0.33 csys =  1.10 CPU) Result: PASS  -> ok
+frontend unit:  Tests 69 passed | 10 skipped (79) -> ok
 real-database integration:  Tests 10 passed (10) -> ok
 RESULT [contract focused unit integration]: PASS
 db reset: ok (194 migrations applied from scratch, incl. 20261030090001)
-pgTAP FULL repository: Files=144, Tests=6448, 62 wallclock secs ( 1.68 usr  0.73 sys +  3.07 cusr  3.12 csys =  8.60 CPU) Result: PASS  -> ok
+pgTAP FULL repository: Files=144, Tests=6448, 62 wallclock secs ( 1.72 usr  0.63 sys +  3.28 cusr  3.07 csys =  8.70 CPU) Result: PASS  -> ok
 RESULT [full]: PASS
 db reset: ok (194 migrations applied from scratch, incl. 20261030090001)
 installer phone-change concurrency (existing): installer phone change concurrency proof passed -> ok

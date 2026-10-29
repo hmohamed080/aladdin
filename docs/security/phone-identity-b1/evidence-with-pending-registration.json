@@ -316,8 +316,32 @@
   },
   "invariance": {
     "before": {
+      "EmailSignup": {
+        "user_id": "0a99933d",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": false,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": null
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": true,
+          "phone_verified": false
+        },
+        "memberships": [],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      },
       "OrgContactOnly": {
-        "user_id": "0f08531d",
+        "user_id": "2111056d",
         "registration_state": "active_personal",
         "signin_user_matches": true,
         "auth": {
@@ -346,56 +370,8 @@
         "consents": 3,
         "secondary_reservations": 0
       },
-      "EmailSignup": {
-        "user_id": "12432384",
-        "registration_state": "access_ready",
-        "signin_user_matches": true,
-        "auth": {
-          "alias_login": false,
-          "auth_phone_set": false,
-          "role": "authenticated",
-          "source": null
-        },
-        "identities": 1,
-        "mfa_factors": 0,
-        "profile": {
-          "has_phone": true,
-          "phone_verified": false
-        },
-        "memberships": [],
-        "points": {
-          "total": 0,
-          "entries": 0
-        },
-        "consents": 3,
-        "secondary_reservations": 0
-      },
-      "LegacyInstaller": {
-        "user_id": "8dfbcf09",
-        "registration_state": "access_ready",
-        "signin_user_matches": true,
-        "auth": {
-          "alias_login": true,
-          "auth_phone_set": false,
-          "role": "authenticated",
-          "source": "temporary_craftsman_password_flow"
-        },
-        "identities": 1,
-        "mfa_factors": 0,
-        "profile": {
-          "has_phone": true,
-          "phone_verified": false
-        },
-        "memberships": [],
-        "points": {
-          "total": 0,
-          "entries": 0
-        },
-        "consents": 3,
-        "secondary_reservations": 0
-      },
       "LegacyShowroom": {
-        "user_id": "b825b3e4",
+        "user_id": "58a435a9",
         "registration_state": "active_personal",
         "signin_user_matches": true,
         "auth": {
@@ -417,6 +393,30 @@
             "capabilities": 31
           }
         ],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      },
+      "LegacyInstaller": {
+        "user_id": "58b3882e",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": "temporary_craftsman_password_flow"
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": true,
+          "phone_verified": false
+        },
+        "memberships": [],
         "points": {
           "total": 0,
           "entries": 0
@@ -426,8 +426,32 @@
       }
     },
     "after": {
+      "EmailSignup": {
+        "user_id": "0a99933d",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": false,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": null
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": true,
+          "phone_verified": true
+        },
+        "memberships": [],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      },
       "OrgContactOnly": {
-        "user_id": "0f08531d",
+        "user_id": "2111056d",
         "registration_state": "active_personal",
         "signin_user_matches": true,
         "auth": {
@@ -456,56 +480,8 @@
         "consents": 3,
         "secondary_reservations": 0
       },
-      "EmailSignup": {
-        "user_id": "12432384",
-        "registration_state": "access_ready",
-        "signin_user_matches": true,
-        "auth": {
-          "alias_login": false,
-          "auth_phone_set": false,
-          "role": "authenticated",
-          "source": null
-        },
-        "identities": 1,
-        "mfa_factors": 0,
-        "profile": {
-          "has_phone": true,
-          "phone_verified": true
-        },
-        "memberships": [],
-        "points": {
-          "total": 0,
-          "entries": 0
-        },
-        "consents": 3,
-        "secondary_reservations": 0
-      },
-      "LegacyInstaller": {
-        "user_id": "8dfbcf09",
-        "registration_state": "access_ready",
-        "signin_user_matches": true,
-        "auth": {
-          "alias_login": true,
-          "auth_phone_set": false,
-          "role": "authenticated",
-          "source": "temporary_craftsman_password_flow"
-        },
-        "identities": 1,
-        "mfa_factors": 0,
-        "profile": {
-          "has_phone": true,
-          "phone_verified": true
-        },
-        "memberships": [],
-        "points": {
-          "total": 0,
-          "entries": 0
-        },
-        "consents": 3,
-        "secondary_reservations": 0
-      },
       "LegacyShowroom": {
-        "user_id": "b825b3e4",
+        "user_id": "58a435a9",
         "registration_state": "active_personal",
         "signin_user_matches": true,
         "auth": {
@@ -527,6 +503,30 @@
             "capabilities": 31
           }
         ],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      },
+      "LegacyInstaller": {
+        "user_id": "58b3882e",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": "temporary_craftsman_password_flow"
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": true,
+          "phone_verified": true
+        },
+        "memberships": [],
         "points": {
           "total": 0,
           "entries": 0

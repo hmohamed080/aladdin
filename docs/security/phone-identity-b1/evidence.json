@@ -316,8 +316,32 @@
   },
   "invariance": {
     "before": {
+      "EmailSignup": {
+        "user_id": "33d7324c",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": false,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": null
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": true,
+          "phone_verified": false
+        },
+        "memberships": [],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      },
       "OrgContactOnly": {
-        "user_id": "4071cc39",
+        "user_id": "79c6ef74",
         "registration_state": "active_personal",
         "signin_user_matches": true,
         "auth": {
@@ -347,7 +371,7 @@
         "secondary_reservations": 0
       },
       "LegacyShowroom": {
-        "user_id": "89cbdecc",
+        "user_id": "c7badf6a",
         "registration_state": "active_personal",
         "signin_user_matches": true,
         "auth": {
@@ -377,7 +401,7 @@
         "secondary_reservations": 0
       },
       "LegacyInstaller": {
-        "user_id": "9fcff103",
+        "user_id": "f076a7df",
         "registration_state": "access_ready",
         "signin_user_matches": true,
         "auth": {
@@ -385,30 +409,6 @@
           "auth_phone_set": false,
           "role": "authenticated",
           "source": "temporary_craftsman_password_flow"
-        },
-        "identities": 1,
-        "mfa_factors": 0,
-        "profile": {
-          "has_phone": true,
-          "phone_verified": false
-        },
-        "memberships": [],
-        "points": {
-          "total": 0,
-          "entries": 0
-        },
-        "consents": 3,
-        "secondary_reservations": 0
-      },
-      "EmailSignup": {
-        "user_id": "e818e06c",
-        "registration_state": "access_ready",
-        "signin_user_matches": true,
-        "auth": {
-          "alias_login": false,
-          "auth_phone_set": false,
-          "role": "authenticated",
-          "source": null
         },
         "identities": 1,
         "mfa_factors": 0,
@@ -426,8 +426,32 @@
       }
     },
     "after": {
+      "EmailSignup": {
+        "user_id": "33d7324c",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": false,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": null
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": true,
+          "phone_verified": true
+        },
+        "memberships": [],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      },
       "OrgContactOnly": {
-        "user_id": "4071cc39",
+        "user_id": "79c6ef74",
         "registration_state": "active_personal",
         "signin_user_matches": true,
         "auth": {
@@ -457,7 +481,7 @@
         "secondary_reservations": 0
       },
       "LegacyShowroom": {
-        "user_id": "89cbdecc",
+        "user_id": "c7badf6a",
         "registration_state": "active_personal",
         "signin_user_matches": true,
         "auth": {
@@ -487,7 +511,7 @@
         "secondary_reservations": 0
       },
       "LegacyInstaller": {
-        "user_id": "9fcff103",
+        "user_id": "f076a7df",
         "registration_state": "access_ready",
         "signin_user_matches": true,
         "auth": {
@@ -495,30 +519,6 @@
           "auth_phone_set": false,
           "role": "authenticated",
           "source": "temporary_craftsman_password_flow"
-        },
-        "identities": 1,
-        "mfa_factors": 0,
-        "profile": {
-          "has_phone": true,
-          "phone_verified": true
-        },
-        "memberships": [],
-        "points": {
-          "total": 0,
-          "entries": 0
-        },
-        "consents": 3,
-        "secondary_reservations": 0
-      },
-      "EmailSignup": {
-        "user_id": "e818e06c",
-        "registration_state": "access_ready",
-        "signin_user_matches": true,
-        "auth": {
-          "alias_login": false,
-          "auth_phone_set": false,
-          "role": "authenticated",
-          "source": null
         },
         "identities": 1,
         "mfa_factors": 0,

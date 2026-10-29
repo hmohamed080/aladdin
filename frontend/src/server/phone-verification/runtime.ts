@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
-import { parseServerEnv, readPhoneVerificationEnv, readPublicEnv } from "@/lib/env";
+import { parseServerEnv, readPublicEnv } from "@/lib/env";
+import { readPhoneVerificationEnv } from "@/lib/env/phone-verification";
 import { parseKeyring } from "./otp";
 import { createPhoneVerificationService, type PhoneVerificationDb, type PhoneVerificationService } from "./service";
 import { disabledTransport } from "./transport";
