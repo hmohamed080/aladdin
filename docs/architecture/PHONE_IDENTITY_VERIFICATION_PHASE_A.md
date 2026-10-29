@@ -24,7 +24,7 @@
 | Primary phone replacement | Verification evidence must bind to the **new exact E.164**, current account ID and change operation; keep the existing journal / alias recovery protections. Evaluate verify-before-switch so the old login is not abandoned on an unreachable new number. |
 | WhatsApp proof | A completed OTP proves current access to the WhatsApp account on that number **at verification time**, not permanent deliverability or marketing consent. Track channel and time. |
 | MFA | Native TOTP/Authenticator is the initial no-add-on-cost candidate. WhatsApp Phone MFA (paid Supabase add-on + Meta messages), any custom WhatsApp MFA, email-as-MFA, passkeys and recovery-code design are **future separately reviewed work**. |
-| Paid boundary | No Meta Authentication template sends; no Supabase Advanced Phone MFA activation; no billable email/SMS/provider upgrade; no billable hosted resource provisioning for this phase. |
+| Cost boundary | Meta WhatsApp OTP per-message fees are **accepted in principle** for a separately approved real-delivery stage; actual sends remain OFF throughout Phase A. No Supabase Advanced Phone MFA add-on activation, no new paid hosted resources or provider upgrades in Phase A. |
 
 When a verification is legitimately completed, associate evidence with **account ID + normalized phone + purpose + challenge ID**, and update status only in an authorized server-controlled transaction. Never let a client assert `verified=true` or write `phone_verified_at` directly. A change to the phone invalidates its old verification proof. Treat all existing `NULL` verification values as unknown/unverified, not necessarily evidence of fraud.
 
