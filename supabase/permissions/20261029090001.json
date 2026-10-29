@@ -1,5 +1,5 @@
 {
- "version": "20261028090002",
+ "version": "20261029090001",
  "source": "20261026090001 contract plus the two account-basics RPCs, declared exactly like public.profile_set_phone (security definer, search_path='', execute for authenticated only); verified by the supabase-rls CI replay",
  "publicRPCs": [
   "public.invitation_lookup(text)",

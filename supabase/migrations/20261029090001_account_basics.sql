@@ -26,6 +26,23 @@
 --    public.my_account_basics — what the caller already holds, for the screen
 --    and for the "is anything missing?" check. Phone stays on the existing
 --    public.profile_set_phone path.
+--
+-- Review rules (2026-10-29):
+--   * Location already given elsewhere counts, in this order: the profile;
+--     a professional's primary service area (governorate + a town listed in
+--     it, from user_service_areas, catalogue keys); then, for OWNERS only, a
+--     branch. Free-text onboarding fields are not catalogue keys and do not
+--     count.
+--   * Location fallback to an organization branch is for OWNERS only (an
+--     active membership holding org.manage): the business location an owner
+--     gave in business onboarding counts (the owner membership's assigned
+--     branch, which business creation sets to the primary branch). An
+--     employee's employer branch is
+--     never treated as their own location. With several owned organizations
+--     the oldest ownership wins, deterministically (created_at, id).
+--   * Specialties are read from the table that matches the CURRENT persona
+--     only (professional → user_trades, everyone else → user_specialties), so
+--     rows left over from an earlier persona never satisfy the requirement.
 -- ===========================================================================
 
 alter table public.profiles
@@ -172,8 +189,10 @@ grant  execute on function public.account_basics_set(text, text, text, text[]) t
 -- public.my_account_basics
 -- ---------------------------------------------------------------------------
 -- What the caller already holds. Location falls back to the primary branch of
--- an organization the caller is an active member of, so a business that gave
--- its location in business onboarding is not asked again.
+-- an organization the caller OWNS (active membership with org.manage), so an
+-- owner who gave the business location in business onboarding is not asked
+-- again; employees are always asked for their own. Specialties come from the
+-- table of the caller's current persona only.
 create or replace function public.my_account_basics()
 returns jsonb
 language plpgsql
@@ -182,40 +201,55 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_uid    uuid := (select auth.uid());
-  v_result jsonb;
+  v_uid          uuid := (select auth.uid());
+  v_professional boolean;
+  v_result       jsonb;
 begin
   if v_uid is null then
     raise exception 'authentication required' using errcode = '42501';
   end if;
+  v_professional := app.is_professional_persona(v_uid);
 
   select jsonb_build_object(
     'phone', p.phone_e164,
-    'governorate', coalesce(p.governorate_key, b.governorate_key),
-    'city', case when p.governorate_key is not null then p.city_key else b.city_key end,
-    'cityCustom', case when p.governorate_key is not null then p.city_custom_name else b.city_custom_name end,
+    'governorate', coalesce(p.governorate_key, sa.governorate_key, b.governorate_key),
+    'city', case when p.governorate_key is not null then p.city_key
+                 when sa.governorate_key is not null then sa.city_key
+                 else b.city_key end,
+    'cityCustom', case when p.governorate_key is not null then p.city_custom_name
+                       when sa.governorate_key is not null then null
+                       else b.city_custom_name end,
     'specialties', coalesce((
-      select jsonb_agg(s.key order by s.is_primary desc, s.sort_order, s.key)
+      select jsonb_agg(t.key order by x.is_primary desc, t.sort_order, t.key)
       from (
-        select t.key, bool_or(x.is_primary) as is_primary, min(t.sort_order) as sort_order
-        from (
-          select ut.trade_id, ut.is_primary from public.user_trades ut where ut.user_id = v_uid
-          union all
-          select us.trade_id, us.is_primary from public.user_specialties us where us.user_id = v_uid
-        ) x
-        join public.trades t on t.id = x.trade_id and t.is_active
-        group by t.key
-      ) s
+        select ut.trade_id, ut.is_primary from public.user_trades ut
+         where v_professional and ut.user_id = v_uid
+        union all
+        select us.trade_id, us.is_primary from public.user_specialties us
+         where not v_professional and us.user_id = v_uid
+      ) x
+      join public.trades t on t.id = x.trade_id and t.is_active
     ), '[]'::jsonb)
   )
   into v_result
   from public.profiles p
   left join lateral (
+    -- A professional's declared base: the primary service-area governorate and
+    -- the first town they listed inside it.
+    select g.governorate_key, (
+      select c.city_key from public.user_service_areas c
+       where c.user_id = v_uid and c.governorate_key = g.governorate_key and c.city_key is not null
+       order by c.created_at, c.id limit 1) as city_key
+    from public.user_service_areas g
+    where g.user_id = v_uid and g.is_primary
+  ) sa on true
+  left join lateral (
     select br.governorate_key, br.city_key, br.city_custom_name
     from public.memberships m
+    join public.membership_capabilities c on c.membership_id = m.id and c.capability_key = 'org.manage'
     join public.branches br on br.id = m.primary_branch_id and br.deleted_at is null
     where m.user_id = v_uid and m.status = 'active' and br.governorate_key is not null
-    order by m.created_at
+    order by m.created_at, m.id
     limit 1
   ) b on true
   where p.user_id = v_uid and p.deleted_at is null;
@@ -225,7 +259,7 @@ end;
 $$;
 
 comment on function public.my_account_basics() is
-  'The caller''s onboarding basics (ADR-0026): phone, location (profile, else the primary branch of an active membership) and active specialty keys (user_trades and user_specialties, primary first). Null when the caller has no profile.';
+  'The caller''s onboarding basics (ADR-0026): phone, location (profile, else the primary service area with a town in it, else the assigned branch of the oldest organization the caller owns via org.manage) and active specialty keys from the table of the current persona (user_trades for professionals, user_specialties otherwise; primary first). Null when the caller has no profile.';
 
 revoke execute on function public.my_account_basics() from public, anon, service_role;
 grant  execute on function public.my_account_basics() to authenticated;

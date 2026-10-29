@@ -6,8 +6,9 @@ import type { Database } from "@/types/database.types";
 /**
  * Account basics (ADR-0026): the phone, location (governorate + town) and
  * specialties every account gives once. `my_account_basics` already counts
- * what the account holds elsewhere (a professional's trades, a business's
- * primary-branch location), so nothing is asked twice.
+ * what the account holds elsewhere (a professional's trades, the business
+ * location an owner gave in business onboarding; never an employer's branch,
+ * never another persona's specialties), so nothing is asked twice.
  */
 export const ACCOUNT_BASICS_PATH = "/onboarding/basics";
 
