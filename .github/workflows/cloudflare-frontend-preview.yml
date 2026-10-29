@@ -2,7 +2,7 @@
 #
 # Manual only. Builds the app with OpenNext for the `preview` environment in frontend/wrangler.jsonc
 # (Worker `aladdin-frontend-preview`, workers.dev, no custom domain) and uploads it. It never touches
-# Vercel, DNS, aladdindecore.com, the live Supabase project or any Production resource.
+# DNS, aladdindecore.com, the live Supabase project or any Production resource.
 #
 # SAFE BY DEFAULT: nothing is uploaded unless the GitHub Environment `cloudflare-preview` has the variable
 # CLOUDFLARE_PREVIEW_ENABLED set to exactly "true". Without it the run builds and bundles only.

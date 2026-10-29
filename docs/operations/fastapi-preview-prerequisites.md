@@ -22,7 +22,7 @@ Production (`kkpkgjrweysgvhvkhzun`) is out of scope until an owner-approved cuto
 5. In `frontend/wrangler.jsonc` `env.preview.services`, add `{ "binding": "BACKEND", "service": "aladdin-backend-preview" }` and redeploy the frontend preview through GitHub Actions.
 6. Checks on the frontend preview: `GET /api/backend/health` returns `{"status":"ok","env":"staging"}`; cold and warm latency; an authenticated call with a real Acceptance session; a signed-out or revoked session is refused.
 
-**Rollback:** remove the binding and redeploy the frontend (traffic returns to `BACKEND_ORIGIN`, Vercel); `wrangler delete --env preview` removes the backend Worker. Neither touches data.
+**Rollback:** remove the binding and redeploy the frontend (traffic returns to `BACKEND_ORIGIN`, if set); `wrangler delete --env preview` removes the backend Worker. Neither touches data.
 
 ## Expected cost of the preview
 

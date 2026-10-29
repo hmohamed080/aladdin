@@ -1,7 +1,8 @@
 # Aladdin - Cloudflare PRODUCTION Workers (ADR-0021, ADR-0022), Phase D of the release plan.
 #
-# Manual only, from `main` only, one stage per run. Deploys the `production` environments with NO public
-# address: no route, no custom domain, no workers.dev. It never touches Vercel, DNS or aladdindecore.com.
+# Manual only, from `main` only, one stage per run. Deploys the `production` environments. Their public
+# hostnames (Custom Domains aladdindecore.com and www on the frontend, since the 2026-10-27 cutover) are managed
+# in the Cloudflare dashboard, not here; the Workers declare no route and no workers.dev. It never touches DNS.
 #
 #   stage = check     builds and bundles both Workers (dry run). Uploads nothing. The default.
 #   stage = backend   deploys `aladdin-backend-production` (FastAPI in a Container). Run first.
@@ -25,8 +26,8 @@
 # AUTH_PASSWORD_PREVIEW_GRANT_SECRET are set by the owner with `wrangler secret put <NAME> --env production`
 # (never in GitHub); `wrangler deploy` refuses the frontend until all three exist.
 #
-# Rollback: `wrangler rollback --env production` or `wrangler delete --env production` per Worker. No traffic
-# reaches either Worker until a hostname is attached in a later, separately approved step.
+# Rollback: `wrangler rollback --env production` per Worker, or roll back to an earlier version in the
+# dashboard (Deployments). Never `wrangler delete` the frontend: it serves the live site.
 
 name: Cloudflare production
 

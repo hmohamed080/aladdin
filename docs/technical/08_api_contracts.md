@@ -271,7 +271,7 @@ thread they could not open. No dedupe, grouping or digest in the Pilot.
 
 ## 13. FastAPI service endpoints (internal, server-to-server)
 
-Base: **`/api/backend`** — same origin as the web app, routed by the root `vercel.json` to the `backend` Vercel Service ([ADR-0009](../decisions/ADR-0009-vercel-services-deployment.md)), so no absolute base URL is configured per environment. Every request carries the caller's **Supabase JWT**; the service verifies it and derives identity. Reached only via the web BFF, never the browser — same origin does not change that boundary.
+Base: **`/api/backend`** — same origin as the web app, forwarded by the web app's Worker through its `BACKEND` binding to the FastAPI container ([ADR-0022](../decisions/ADR-0022-fastapi-cloudflare-containers.md)), so no absolute base URL is configured per environment. Every request carries the caller's **Supabase JWT**; the service verifies it and derives identity. Reached only via the web BFF, never the browser — same origin does not change that boundary.
 
 | Method | URL | Auth | Input | Output |
 |---|---|---|---|---|

@@ -1,37 +1,39 @@
 import type { ReactNode } from "react";
-import { Card } from "@/components/ui/primitives";
-import { Brand } from "@/components/layout/brand";
 import { useI18n } from "@/lib/i18n/context";
+import { AuthStageCard, AuthStageHeader, AuthStageLinks } from "@/features/entry-auth/auth-stage";
 
 /**
- * The shared card shell for every account-access surface (Sign In, Sign Up,
- * Recovery, Verify). Keeps the real Aladdin mark + headline hierarchy identical
- * across routes so the flows read as one system; the caller supplies the body
- * and an optional footer (links row).
+ * The shared header + body + links block for every account-access surface (Sign In,
+ * Sign Up, Recovery, Verify). It renders inside the `AuthStage` composition that
+ * `app/auth/layout.tsx` provides: the 2026 logo, an optional account badge, the title
+ * and the form in one bordered card, then the links in a second box (Instagram style).
+ * `centered` drops the photo for this page (sign-up).
  */
 export function AuthCard({
   title,
   subtitle,
+  badge,
   children,
   footer,
+  centered = false,
 }: {
   title: string;
   subtitle: string;
+  /** e.g. the account type chosen on the landing page. */
+  badge?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  /** No photo: the column is centred on the page (sign-up). */
+  centered?: boolean;
 }) {
   const { t } = useI18n();
   return (
-    <Card className="flex flex-col gap-lg p-lg tablet:p-xl">
-      <div className="flex flex-col gap-md">
-        <Brand name={t("common.appName")} size="sm" wordmark={false} />
-        <div className="flex flex-col gap-1">
-          <h1 className="font-display-ar text-headline text-fg">{title}</h1>
-          <p className="text-body-lg text-fg-secondary">{subtitle}</p>
-        </div>
-      </div>
-      {children}
-      {footer ? <div className="border-t pt-md text-center text-body text-fg-secondary">{footer}</div> : null}
-    </Card>
+    <>
+      <AuthStageCard centered={centered}>
+        <AuthStageHeader appName={t("common.appName")} badge={badge} title={title} description={subtitle} />
+        {children}
+      </AuthStageCard>
+      {footer ? <AuthStageLinks>{footer}</AuthStageLinks> : null}
+    </>
   );
 }

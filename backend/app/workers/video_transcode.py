@@ -23,7 +23,7 @@ The purge (``--purge``) removes deleted and expired videos: it aborts any
 unfinished multipart upload, deletes every object under ``video/<id>/`` and
 marks the row purged. It is the ONLY path that deletes video bytes.
 
-Bytes never pass through Supabase or Vercel: R2 to this worker, and R2 to the
+Bytes never pass through Supabase or the web app: R2 to this worker, and R2 to the
 viewer through the media Worker. Redis only wakes the worker sooner; the
 database decides which job runs.
 

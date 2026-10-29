@@ -56,7 +56,7 @@ async function fixtures() {
 
 /** The contract both engines must keep: identical verification and variant results. */
 const engines: Array<[string, () => ImageProcessor]> = [
-  ["sharp (Node / Vercel)", () => sharpImageProcessor],
+  ["sharp (Node)", () => sharpImageProcessor],
   ["Cloudflare Images (Workers)", () => createCloudflareImageProcessor(fakeImagesBinding().binding)],
 ];
 

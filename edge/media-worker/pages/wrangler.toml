@@ -1,4 +1,5 @@
-# TEMPLATE ONLY (Option B: media.aladdindecore.com while DNS stays on Vercel).
+# TEMPLATE ONLY, OBSOLETE (Option B: media.aladdindecore.com while DNS was on Vercel;
+# the zone is on Cloudflare since 2026-10-27, so use the Workers Custom Domain).
 # A Cloudflare Pages project in advanced mode runs the SAME Worker bundle, and a
 # Pages custom domain works with a plain CNAME at an external DNS provider,
 # which Workers custom domains do not (they need a Cloudflare zone).

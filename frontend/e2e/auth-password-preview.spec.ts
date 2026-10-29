@@ -4,9 +4,15 @@ import path from "node:path";
 import {
   messageIdsFor,
   readNewOtp,
+  reachLanding,
   newMessageSubjectsFor,
   registerWithPassword,
   selectAccountType,
+  fillBirthDate,
+  SIGN_IN_BUTTON,
+  SIGN_IN_IDENTIFIER_LABEL,
+  SIGN_UP_BUTTON,
+  SIGN_UP_CONTACT_LABEL,
   stubTurnstileWhenOffline,
   waitForCaptchaToken,
 } from "./helpers/auth";
@@ -48,6 +54,19 @@ function uniqueUsername(tag: string): string {
 
 const STRONG_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
 
+/** Fills the one sign-up form (ADR-0025): contact, password, birthday, name, username, account type. Consents are one agreement line, not checkboxes. */
+async function fillSignUp(
+  page: import("@playwright/test").Page,
+  { email, username, password }: { email: string; username: string; password: string },
+): Promise<void> {
+  await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(email);
+  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
+  await fillBirthDate(page);
+  await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
+  await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
+  await selectAccountType(page);
+}
+
 /** The neutral Step-2 copy (§Account enumeration) — deliberately never an unconditional "we sent a code to X". */
 const NEXT_STEP_TEXT = /next step|الخطوة التالية/i;
 
@@ -75,7 +94,8 @@ const TRADESPERSON_APP_LANDING = /\/home(\/|$|\?)/;
 const APP_LANDING_TIMEOUT_MS = 20_000;
 async function expectAppLanding(page: import("@playwright/test").Page): Promise<void> {
   try {
-    await page.waitForURL(TRADESPERSON_APP_LANDING, { waitUntil: "commit", timeout: APP_LANDING_TIMEOUT_MS });
+    // Since ADR-0026 a new account first answers "Complete your account" (phone, location, specialties).
+    await reachLanding(page, TRADESPERSON_APP_LANDING, APP_LANDING_TIMEOUT_MS);
   } catch {
     // Fail fast with the evidence needed to tell the causes apart: an
     // expired/invalid code or a rate limit leaves us on the OTP step with an
@@ -131,19 +151,11 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
   test("weak password is rejected in place (no signUp sent, fields preserved)", async ({ page, request }) => {
     const email = uniqueEmail("weakpw");
     await page.goto("/auth/sign-up");
-    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("weakpw"));
-    await selectAccountType(page);
-    await page.getByLabel(/^password$|^كلمة المرور$/i).fill("qwerty12345");
-    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill("qwerty12345");
-    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await fillSignUp(page, { email: email, username: uniqueUsername("weakpw"), password: "qwerty12345" });
 
     const seen = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
 
     // Weak-password rejection keeps the caller on step 1 — never calls signUp().
     // (The full weak-password decision matrix — common / sequential /
@@ -162,19 +174,11 @@ test.describe("Password registration — golden path (Architecture B: signUp() s
       if (f === page.mainFrame()) visited.push(new URL(f.url()).pathname);
     });
     await page.goto("/auth/sign-up");
-    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("signup"));
-    await selectAccountType(page);
-    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await fillSignUp(page, { email: email, username: uniqueUsername("signup"), password: STRONG_PASSWORD });
 
     const seen = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
 
     await expectSignUpStep2(page);
 
@@ -228,17 +232,9 @@ test.describe("Username availability is checked BEFORE signUp() (entered once; n
 
   async function submitWithUsername(page: import("@playwright/test").Page, email: string, username: string) {
     await page.goto("/auth/sign-up");
-    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
-    await selectAccountType(page);
-    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await fillSignUp(page, { email: email, username: username, password: STRONG_PASSWORD });
     await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
   }
 
   async function expectStillOnStep1(page: import("@playwright/test").Page, request: import("@playwright/test").APIRequestContext, email: string, username: string) {
@@ -248,7 +244,7 @@ test.describe("Username availability is checked BEFORE signUp() (entered once; n
     await expect(page.getByText(NEXT_STEP_TEXT)).toHaveCount(0);
     await expect(page.locator('input[autocomplete="one-time-code"]')).toHaveCount(0);
     // The user's values are still there to correct.
-    await expect(page.getByLabel(/email address|البريد الإلكتروني/i)).toHaveValue(email);
+    await expect(page.getByLabel(SIGN_UP_CONTACT_LABEL)).toHaveValue(email);
     await expect(page.getByLabel(/^username$|^اسم المستخدم$/i)).toHaveValue(username);
     // signUp() never ran: no confirmation email exists for this address.
     expect(await messageIdsFor(request, email)).toEqual(new Set());
@@ -294,29 +290,13 @@ test.describe("CAPTCHA — required on Create Account and Forgot Password, verif
     // : undefined`, which happened to cover the new codes for free.
     await page.route("https://challenges.cloudflare.com/**", (route) => route.abort());
     await page.goto("/auth/sign-up");
-    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("nocaptcha"));
-    await selectAccountType(page);
-    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
-    // Explicit, auto-retrying confirmation the three consents actually
-    // registered in React state before submitting — guards against a
-    // checkbox toggling at the native-DOM level microseconds before
-    // hydration attaches its handler, which a bare `.check()` call alone
-    // would not catch (the click "succeeds" but React never sees it).
-    await expect(page.getByLabel(/terms of service|شروط الخدمة/i)).toBeChecked();
-    await expect(page.getByLabel(/privacy policy|سياسة الخصوصية/i)).toBeChecked();
-    await expect(page.getByLabel(/pilot release|إصدار تجريبي/i)).toBeChecked();
+    await fillSignUp(page, { email: email, username: uniqueUsername("nocaptcha"), password: STRONG_PASSWORD });
 
     // Never a token to wait for — the script itself never loaded.
     await expect(page.locator('input[name="captchaToken"]')).toHaveValue("");
 
     const seen = await messageIdsFor(request, email);
-    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
 
     // "before continuing" / "قبل المتابعة" only appear in the captchaRequired
     // ERROR text, not in the widget's always-present sr-only label ("Human
@@ -347,18 +327,10 @@ test.describe("CAPTCHA — required on Create Account and Forgot Password, verif
 async function registerAccount(page: import("@playwright/test").Page, request: import("@playwright/test").APIRequestContext, tag: string): Promise<string> {
   const email = uniqueEmail(tag);
   await page.goto("/auth/sign-up");
-  await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-  await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-  await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername(tag));
-  await selectAccountType(page);
-  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-  await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-  await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+  await fillSignUp(page, { email: email, username: uniqueUsername(tag), password: STRONG_PASSWORD });
   const seen = await messageIdsFor(request, email);
   await waitForCaptchaToken(page);
-  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+  await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
   await expectSignUpStep2(page);
   const code = await readNewOtp(request, email, seen);
   await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
@@ -374,17 +346,9 @@ test.describe("Account enumeration normalization (§Account enumeration)", () =>
     await page.waitForURL(/\/sign-in/, { waitUntil: "commit" });
 
     await page.goto("/auth/sign-up");
-    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(existingEmail);
-    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("enum-resubmit"));
-    await selectAccountType(page);
-    await page.getByLabel(/^password$|^كلمة المرور$/i).fill("SomeOtherStrongPassword9!");
-    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill("SomeOtherStrongPassword9!");
-    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await fillSignUp(page, { email: existingEmail, username: uniqueUsername("enum-resubmit"), password: "SomeOtherStrongPassword9!" });
     await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
 
     // Identical UI outcome to a genuine new signup — the neutral Step-2
     // screen, never "user already exists" / "email already registered" or
@@ -394,11 +358,11 @@ test.describe("Account enumeration normalization (§Account enumeration)", () =>
 
     // §5 — the neutral "no code hint" + a real way out (Forgot password) is
     // visible right there, rather than leaving the caller waiting forever.
-    await expect(page.getByRole("link", { name: /forgot your password|هل نسيت كلمة المرور/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /forgot password|نسيت كلمة المرور/i })).toBeVisible();
 
     // The original account's password is UNCHANGED — this never silently
     // overwrote it or created a second identity.
-    await page.getByRole("link", { name: /forgot your password|هل نسيت كلمة المرور/i }).click();
+    await page.getByRole("link", { name: /forgot password|نسيت كلمة المرور/i }).click();
     await page.waitForURL(/\/forgot-password$/, { waitUntil: "commit" });
   });
 });
@@ -407,18 +371,10 @@ test.describe("Resend signup code (never re-submits the password, never re-regis
   test("resend delivers a fresh, working code without ever asking for the password again", async ({ page, request }) => {
     const email = uniqueEmail("resend");
     await page.goto("/auth/sign-up");
-    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("resend"));
-    await selectAccountType(page);
-    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await fillSignUp(page, { email: email, username: uniqueUsername("resend"), password: STRONG_PASSWORD });
     const seenAtSignup = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
     // Wait for the first confirmation email to actually land (a
     // synchronization point, not a code this test intends to use) before
@@ -444,17 +400,9 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
   test("after signUp() but before verifying, protected routes are denied exactly like a signed-out caller; after verifying, they resolve normally", async ({ page, request, context }) => {
     const email = uniqueEmail("session-guarantee");
     await page.goto("/auth/sign-up");
-    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("session1"));
-    await selectAccountType(page);
-    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await fillSignUp(page, { email: email, username: uniqueUsername("session1"), password: STRONG_PASSWORD });
     await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
 
     // BEFORE verifying: no real SESSION cookie exists yet. `@supabase/ssr`'s
@@ -484,18 +432,10 @@ test.describe("Session creation guarantee (§Session creation) — no session ex
     // actually generates, not whichever of two pending messages happens to
     // sort first.
     await page.goto("/auth/sign-up");
-    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("session2"));
-    await selectAccountType(page);
-    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await fillSignUp(page, { email: email, username: uniqueUsername("session2"), password: STRONG_PASSWORD });
     const seenBeforeRetry = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
     const code = await readNewOtp(request, email, seenBeforeRetry);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
@@ -512,17 +452,9 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
   test("refreshing on the OTP step returns to Step 1 with no crash and no password anywhere in storage — resubmitting proceeds normally", async ({ page, request }) => {
     const email = uniqueEmail("refresh");
     await page.goto("/auth/sign-up");
-    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("refresh1"));
-    await selectAccountType(page);
-    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await fillSignUp(page, { email: email, username: uniqueUsername("refresh1"), password: STRONG_PASSWORD });
     await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
 
     // No password ever reaches localStorage/sessionStorage at any point.
@@ -539,24 +471,16 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
     // Wait for the reloaded page to finish loading: fields typed into the server-rendered HTML before React
     // hydrates are reset by hydration, which made this resubmission flaky (empty name and email).
     await page.reload({ waitUntil: "load" });
-    await expect(page.getByLabel(/email address|البريد الإلكتروني/i)).toBeVisible();
+    await expect(page.getByLabel(SIGN_UP_CONTACT_LABEL)).toBeVisible();
     await expect(page.getByLabel(/one-time code|الرمز لمرة واحدة/i)).toHaveCount(0);
 
     // Resubmitting the SAME email (still unconfirmed from the first attempt)
     // is exactly GoTrue's own obfuscated re-signup case — succeeds again,
     // re-sending a new usable code, no corruption.
-    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("refresh2"));
-    await selectAccountType(page);
-    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await fillSignUp(page, { email: email, username: uniqueUsername("refresh2"), password: STRONG_PASSWORD });
     const seenBeforeResubmit = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
 
     const code = await readNewOtp(request, email, seenBeforeResubmit);
@@ -568,18 +492,10 @@ test.describe("Refresh / interruption behavior (§Refresh, back, interruption)",
   test("a wrong/garbage code is rejected and the valid code can still be entered from the same screen", async ({ page, request }) => {
     const email = uniqueEmail("badcode");
     await page.goto("/auth/sign-up");
-    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
-    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("badcode"));
-    await selectAccountType(page);
-    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await fillSignUp(page, { email: email, username: uniqueUsername("badcode"), password: STRONG_PASSWORD });
     const seen = await messageIdsFor(request, email);
     await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
 
     await enterOtp(page, "000000");
@@ -614,18 +530,10 @@ test.describe("Password-changed notification is absent on initial registration (
     const target = uniqueEmail("no-pwchanged-check");
     const seenFromStart = await messageIdsFor(request, target);
     await page.goto("/auth/sign-up");
-    await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill("E2E Tester");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(target);
-    await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(uniqueUsername("pwchanged"));
-    await selectAccountType(page);
-    await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(STRONG_PASSWORD);
-    await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-    await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-    await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
+    await fillSignUp(page, { email: target, username: uniqueUsername("pwchanged"), password: STRONG_PASSWORD });
     const seenAtStart = await messageIdsFor(request, target);
     await waitForCaptchaToken(page);
-    await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
+    await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
     await expectSignUpStep2(page);
     const code = await readNewOtp(request, target, seenAtStart);
     await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
@@ -648,10 +556,10 @@ test.describe("Sign In carries no CAPTCHA (application-scoped CAPTCHA, Supabase 
     });
     await page.goto("/auth/sign-in");
     await expect(page.locator('input[name="captchaToken"]')).toHaveCount(0);
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(`no-such-account-${Date.now()}@example.test`);
+    await page.getByLabel(SIGN_IN_IDENTIFIER_LABEL).fill(`no-such-account-${Date.now()}@example.test`);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill("definitely-not-a-real-password");
-    await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
-    await expect(page.getByText(/don't match|لا يتطابق/i)).toBeVisible();
+    await page.getByRole("button", { name: SIGN_IN_BUTTON }).click();
+    await expect(page.getByText(/don't match|غير متطابقة/i)).toBeVisible();
     expect(cloudflare).toEqual([]);
   });
 });
@@ -664,13 +572,13 @@ test.describe("Password sign-in", () => {
     await signOutViaAccountMenu(page);
     await page.goto("/auth/sign-in");
 
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(SIGN_IN_IDENTIFIER_LABEL).fill(email);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill("definitely-the-wrong-one");
-    await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
-    await expect(page.getByText(/don't match|لا يتطابق/i)).toBeVisible();
+    await page.getByRole("button", { name: SIGN_IN_BUTTON }).click();
+    await expect(page.getByText(/don't match|غير متطابقة/i)).toBeVisible();
 
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(STRONG_PASSWORD);
-    await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
+    await page.getByRole("button", { name: SIGN_IN_BUTTON }).click();
     // A registered (access_ready) Tradesperson lands straight in the app —
     // there is no mandatory onboarding to pass through any more.
     await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
@@ -714,9 +622,9 @@ test.describe("Forgot password — full 4-screen journey", () => {
     // fresh Email + Password sign-in with the NEW password is required.
     await page.getByRole("link", { name: /^sign in$|^تسجيل الدخول$/i }).click();
     await page.waitForURL(/\/sign-in$/, { waitUntil: "commit" });
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(SIGN_IN_IDENTIFIER_LABEL).fill(email);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(newPassword);
-    await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
+    await page.getByRole("button", { name: SIGN_IN_BUTTON }).click();
     // The resolved authenticated landing for this access_ready account.
     await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
   });
@@ -875,9 +783,9 @@ test.describe("Existing-passwordless-user migration — real E2E against a genui
     // covered by the other tests in this file that do click a real button.
     await context.clearCookies();
     await page.goto("/auth/sign-in");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(SIGN_IN_IDENTIFIER_LABEL).fill(email);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(newPassword);
-    await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
+    await page.getByRole("button", { name: SIGN_IN_BUTTON }).click();
 
     // Correct canonical landing: reaches an authenticated route, not back at sign-in.
     await page.waitForURL((url) => !/sign-in/.test(url.pathname), { waitUntil: "commit" });
@@ -929,9 +837,9 @@ test.describe("Existing-passwordless-user migration — real E2E against a genui
     // this page's layout — clearing cookies is the pragmatic equivalent.
     await context.clearCookies();
     await page.goto("/auth/sign-in");
-    await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+    await page.getByLabel(SIGN_IN_IDENTIFIER_LABEL).fill(email);
     await page.getByLabel(/^password$|^كلمة المرور$/i).fill(newPassword);
-    await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
+    await page.getByRole("button", { name: SIGN_IN_BUTTON }).click();
     await page.waitForURL((url) => !/sign-in/.test(url.pathname), { waitUntil: "commit" });
   });
 });

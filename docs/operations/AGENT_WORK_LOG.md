@@ -7084,3 +7084,41 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Stage 12 on owner GO (17:40Z): Custom Domains `aladdindecore.com` and `www` on `aladdin-frontend-production`; the apex CNAME to `cc39f6c51d632b81.vercel-dns-017.com` was deleted to allow it. Owner reports no errors after ~35 min. Routes are not listed in `wrangler.jsonc` (the deploy token has no zone permission; wrangler leaves dashboard domains alone).
 - Team preview: `aladdin-frontend-preview.bstalent9.workers.dev` behind Cloudflare Access (All traffic; policies `Aladdin team` Allow by email, `GitHub preview smoke` Service Auth). The preview smoke check sends `CF_ACCESS_CLIENT_ID/SECRET` (environment `cloudflare-preview`).
 - **Unfinished / owner steps:** add the One-time PIN login method so teammates without a Cloudflare account can sign in; monitor (stage 13, proposed 7 days) before any Vercel change; the stage 12 rollback (detach domains, re-add the apex CNAME DNS only) stays ready; DMARC record is a separate later task; merge PR #110.
+
+## 2026-10-28 — Vercel retired, Resend live, hosted CAPTCHA on
+
+- Owner chose to retire Vercel at once (ADR-0024). #110 and #111 merged; the owner deleted the Vercel project, uninstalled its GitHub app and removed its DNS rows. Rollback is a Cloudflare Worker version rollback only.
+- Resend: domain `aladdindecore.com` verified (DKIM, SPF, MX). Worker secret `RESEND_API_KEY` plus `EMAIL_FROM` and `APP_PUBLIC_ORIGIN` on both Workers (also in `wrangler.jsonc`). A test email was delivered, and the installer contact-email verification flow worked on aladdindecore.com. Dashboard variable edits only upload a version: they go live after **Promote version**.
+- `next.aladdindecore.com` removed (Worker domain, Turnstile, Supabase redirect, repo). Cloudflare DMARC Management enabled (`p=none`).
+- Supabase Auth CAPTCHA protection (Turnstile) turned ON by the owner on Acceptance and Production. Checked: a token-less or fake-token password grant answers `captcha_failed` on both; the owner's browser smoke test (email sign-in, installer sign-in, forgot password) passed. Rollback: switch it off in the dashboard.
+- Follow-up (same day, PR #113): `backend/app/config.py` no longer reads `VERCEL_ENV`; comments, env examples, current guides and the privacy policy (Cloudflare + Resend named) updated; historical records keep their Vercel mentions.
+- **Unfinished:** DMARC can tighten after a few weeks of clean reports.
+
+### 2026-10-28 — Landing page 2026 and one sign-in design (branch `feat/landing-2026`, from `main` 586389e)
+
+- Context: PR #99 (public Marketplace) was closed after conflicts and dropped. The owner restarted from `main` and asked to bring back **only** the landing page work from that branch, with every Marketplace link showing "coming soon".
+- Landing: 2026 logo; four-colour palette scoped to the landing (`styles/brand-2026.module.css`, `tokens.css` untouched, so #93 stays the separate site-wide palette change); header account-type menu → `/auth/sign-up?type=<key>`; Marketplace navbar link; home Marketplace section on sample data (labelled preview); `/marketplace` is a coming-soon page. Not ported: cart, Marketplace pages, DB, favicon, `/sign-in` showroom route.
+- Sign-in / sign-up: the showroom page composition became `features/entry-auth/auth-stage`, now used by the `/auth` layout, the showroom pages and the installer pages. `?type=` only pre-selects an open account type (shown as the badge); the server action still validates it. `CraftsmanAuthShell` is no longer mounted.
+- `next` redirect check: every entry page and server action passes `next` through `sanitizeNext` (internal allowlisted paths only, no `//host`), so `?next=%2Fb2b` cannot redirect off-site.
+- Release order (owner rule): acceptance Supabase + Cloudflare preview first; Production only after verification and an explicit owner GO.
+- **Unfinished:** preview/acceptance check of this branch; decide whether to close #93; installer pages lost their worksite imagery (owner may want a per-type photo).
+
+### 2026-10-28 — Instagram-style sign-in and sign-up (branch `claude/project-thread-1bi6x0`, PR #113)
+
+- Owner asked: sign-in like Instagram ("Mobile number, username or email"), centred Instagram-like sign-up without the photo, birthday and username, no password-rule list or consent checkboxes, Google/Facebook visible, and the "Craftsman? / Showroom phone sign-in" links and routes removed. Owner decisions: mobile sign-up for **every** account type, verified by WhatsApp; provider **Meta WhatsApp Cloud API**.
+- Built ([ADR-0025](../decisions/ADR-0025-one-field-sign-in-whatsapp-sign-up.md)): `lib/auth/sign-in-identifier.ts`, server-side username/phone → auth email (`resolveSignInEmail`) behind the phone limiter; `server/auth/phone-sign-up.ts` + `whatsapp-otp.ts` (HMAC codes in `public.phone_verification_challenges`, sealed cookie, account created only after the code); `users.birth_date` (18+, private); general Google/Facebook callback; auth pages restyled with an Instagram-style card (sign-in keeps the photo; sign-up is centred without it, owner correction); four phone routes deleted with permanent redirects; sign-out always to `/auth/sign-in`; privacy policy names WhatsApp and the birthday.
+- Assumption sent to the owner: birthday required, 18+, private.
+- **Unfinished:** apply the migration to Acceptance (approval asked), owner adds the WhatsApp template and two Worker secrets, owner enables Google/Facebook on Acceptance, preview check, then merge #113 and production on the owner's GO (migration first). Google/Facebook sign-ups have no birthday yet (finish-registration could ask). Phone Forgot Password still deferred.
+
+### 2026-10-28 — "Complete your account" onboarding (same branch, PR #113)
+
+- Owner asked for onboarding for every account collecting phone, location (governorate, town) and category, reusing what existing onboarding already holds. Owner clarified category = the installer specialties list (`public.trades`), for all accounts.
+- Built ([ADR-0026](../decisions/ADR-0026-account-basics-onboarding.md)): migration `20261028090002_account_basics.sql` (profile location columns, `public.user_specialties`, `account_basics_set`, `my_account_basics`), permission contract, pgTAP `117_account_basics_test.sql`, `/onboarding/basics` page and form, redirects in `postSessionRedirect`, `entryLandingPath` and `/onboarding`, E2E helpers complete the screen automatically.
+- **Unfinished:** pgTAP not run locally (no Docker; CI runs it); migration needs the Acceptance approval; phone collected here is unverified.
+
+### 2026-10-29 — Onboarding steps and a specialty list per account type (PR #113, migration `20261029090002`)
+
+- Owner, from Preview testing: specialties from a dropdown; phone / location / specialties as onboarding steps, not a separate page ("Steps inside onboarding"); a Showroom must not see the installer specialties; then gave the lists per account type.
+- Built ([ADR-0026 amendment](../decisions/ADR-0026-account-basics-onboarding.md)): step wizard for `/onboarding/basics`; business registrations answer inside business setup (phone step when missing, business activity for every business type with a list); Engineer list Civil engineer / Architect in `public.activities`; `user_specialties` dropped; a professional's first location seeds their service area; refused saves no longer clear the governorate; sign-up never shows a raw validator message.
+- Local: pgTAP 145 files pass, permission gate PASS 694, migration policy clean (reviewed drop), vitest all pass, tsc and lint clean (warnings only, pre-existing).
+- **Unfinished:** apply `20261029090002` to Acceptance (needs the owner's own-words approval; device runs `supabase db push --linked`), redeploy Preview and re-test; lists for Sales Team, Contractor and Personal later; clean up test accounts +t1/+t2/+t3.

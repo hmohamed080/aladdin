@@ -4,7 +4,7 @@
 **Current decision:** one Free database, used by Preview first and Production second. The owner's database `alert-bedbug-148148.upstash.io` already exists, so use it rather than creating another. The code ships with `REDIS_CACHE_ENABLED=false`.
 
 **Transport:** two, chosen by configuration ([ADR-0019, Workers runtime](../decisions/ADR-0019-redis-cache-and-rate-limits.md#revision-2026-10-20-workers-runtime)):
-- **TCP + TLS** with `REDIS_URL` (`rediss://…:6379`): the web app on Vercel/Node, and the backend (job locks, video job queue).
+- **TCP + TLS** with `REDIS_URL` (`rediss://…:6379`): the web app on Node (local development), and the backend (job locks, video job queue).
 - **HTTPS REST** with `REDIS_REST_URL` + `REDIS_REST_TOKEN`: the web app on **Cloudflare Workers**, where a TCP connection cannot be kept between requests. When both are set, REST wins. On Workers with only `REDIS_URL`, the app does not use Redis at all (logs `cache.redis_tcp_unsupported` once; caches read Postgres, limits count in memory). See [REST transport](#rest-transport-cloudflare-workers).
 **Scope:** the web app (`frontend/`) and, optionally, the backend job lock. It does not cover Upstash QStash, Vector or the REST SDK, none of which the app uses.
 
@@ -28,7 +28,7 @@ Use the account and the database you already have (`alert-bedbug-148148`). Do no
 1. Sign in at [console.upstash.com](https://console.upstash.com) and open **Redis → alert-bedbug-148148**.
 2. Check the settings below. If one differs, fix it there, or tell the coding agent.
    - Plan: **Free**.
-   - Region: the one closest to Paris, where the Vercel functions (`cdg1`) and Supabase (`eu-west-3`) run. Pick **Paris (eu-west-3)** if offered, otherwise **Frankfurt (eu-central-1)**, London or Ireland. Upstash cannot move a database between regions. If this one is far from Paris (for example in the US), create a new Free one in the right region and delete the old one.
+   - Region: the one closest to Paris, where Supabase (`eu-west-3`) and the backend container (Western Europe) run. Pick **Paris (eu-west-3)** if offered, otherwise **Frankfurt (eu-central-1)**, London or Ireland. Upstash cannot move a database between regions. If this one is far from Paris (for example in the US), create a new Free one in the right region and delete the old one.
    - No read replicas: each replica multiplies write commands.
    - **TLS on** and **Eviction off**. The app sets a TTL on every key, so nothing piles up.
 
@@ -44,7 +44,7 @@ rediss://default:<password>@alert-bedbug-148148.upstash.io:6379
 
 - Use `rediss://` (two s, TLS). The app refuses a plain `redis://` URL outside local development.
 - Do **not** append a database number (`/1`): Upstash only has database 0.
-- This is the URL for Vercel and the backend. For Cloudflare Workers, copy the REST pair instead ([step 2b](#2b-rest-url-and-token-cloudflare-workers-only)).
+- This is the URL for the backend and local development. For Cloudflare Workers, copy the REST pair instead ([step 2b](#2b-rest-url-and-token-cloudflare-workers-only)).
 - The URL contains the password. Treat it as a secret: never paste it in chat, an issue, a PR, or a `NEXT_PUBLIC_` variable.
 
 ## 2b. REST URL and token (Cloudflare Workers only)
@@ -61,24 +61,25 @@ The app refuses an `http://` REST URL outside local development, and a URL with 
 
 ## 3. Add the secrets, Preview first
 
-### Vercel (web app and backend; one project)
+### Cloudflare Workers (web app)
 
-Vercel → Project → Settings → Environment Variables. Add, for **Preview** only at first:
+The web app on Workers uses the REST pair ([step 2b](#2b-rest-url-and-token-cloudflare-workers-only)). Set per Worker, **preview** first:
 
-| Name | Value | Sensitive |
+| Name | Where | Value |
 |---|---|---|
-| `REDIS_URL` | the `rediss://…` URL | Yes |
-| `REDIS_KEY_ENV` | `preview` | No |
-| `REDIS_CACHE_ENABLED` | `true` | No |
-| `REDIS_MONTHLY_COMMAND_BUDGET` | `500000` (optional; this is the default) | No |
+| `REDIS_REST_URL` | variable in `frontend/wrangler.jsonc` | the `https://…upstash.io` REST URL |
+| `REDIS_REST_TOKEN` | Worker secret (`wrangler secret put REDIS_REST_TOKEN --env <env>`) | the REST token |
+| `REDIS_KEY_ENV` | variable | `cf-preview` on preview, `production` on production |
+| `REDIS_CACHE_ENABLED` | variable | `true` |
+| `REDIS_MONTHLY_COMMAND_BUDGET` | variable, optional | `500000` (the default) |
 
-Redeploy a Preview deployment so it picks up the variables.
+Variables belong in `frontend/wrangler.jsonc` so a workflow deploy keeps them. A variable added in the dashboard only goes live after **Promote version**, and the next workflow deploy drops it unless it is in the file too.
 
-After Preview has run cleanly for a few days (step 5), add the same names for **Production**, with `REDIS_KEY_ENV=production`. Preview and Production then share the one Free database, kept apart by the key prefix (`aladdin:preview:…` and `aladdin:production:…`), and share its 500,000 commands.
+After the preview has run cleanly for a few days (step 5), turn it on for production. Preview and Production then share the one Free database, kept apart by the key prefix, and share its 500,000 commands.
 
 The backend reads the same `REDIS_CACHE_ENABLED`, `REDIS_URL` and `REDIS_KEY_ENV` for job locks and the video queue wake-up. With the switch off, `REDIS_URL` unset, or Redis unreachable, background jobs run without a cross-process lock (one `job_lock.redis_unavailable` log line) and the video worker polls.
 
-`REDIS_KEY_ENV` is **required** in every deployed environment while Redis is on (the web app's and the backend's settings both refuse the configuration without it), so two deployments that both count as `staging` (Vercel Preview and the Workers preview, `cf-preview`) never share keys.
+`REDIS_KEY_ENV` is **required** in every deployed environment while Redis is on (the web app's and the backend's settings both refuse the configuration without it), so two deployments that share the database never share keys.
 
 ### This cloud coding environment
 
@@ -95,7 +96,7 @@ Never put the URL or token in `.env.local` files that could be committed, and ne
    { "status": "ok", "cache": "ok", "cacheMetrics": { "usage": { "connects": 1, ... }, ... } }
    ```
    - `"cache": "disabled"`: `REDIS_CACHE_ENABLED` is not `true` in that environment, or the deployment predates the variable.
-   - `"cache": "unavailable"`: the URL, password, TLS or network is wrong. Check the Vercel runtime logs for `cache.redis_unavailable`; its `error` field names the failure (for example `connect:ECONNREFUSED`). The site keeps working meanwhile.
+   - `"cache": "unavailable"`: the URL, password, TLS or network is wrong. Check the Worker logs (Worker → Observability) for `cache.redis_unavailable`; its `error` field names the failure (for example `connect:ECONNREFUSED`). The site keeps working meanwhile.
 2. Sign in as a business user and open **Jobs → New job** twice (it shows the trade vocabularies). The second open is served from Redis: `cacheMetrics.namespaces.ref.hits` goes up on that instance. Health counters are per server instance, so a request may land on a different one.
 3. Upstash console → the database → **Data Browser**: keys look like `aladdin:preview:v1:ref:global:<hash>` and `aladdin:preview:v1:rl:u-<user uuid>:<hash>`. Values are JSON lists of vocabulary rows or small counters, never bytes.
 4. Read-only live check from the cloud coding environment (REST; the proxy adds the token):
@@ -112,7 +113,7 @@ Two sources, and the Upstash one is authoritative:
 
 - **Upstash console → database → Usage / Metrics.** Shows monthly commands against the plan limit, daily commands, storage, bandwidth and connections. Under **Account → Billing** (paid plans) set a **budget**; at the cap Upstash rate-limits the database instead of billing more.
 - **Monthly budget control (owner setting).** On Free nothing is billed: at 500,000 commands Upstash refuses commands and the app falls back as in an outage. If the database ever moves to pay-as-you-go, set the database's **monthly budget to $5** first (about 2.5M commands at $0.20 per 100K, enough for 5,000 page views a day with edge delivery off), and set `REDIS_MONTHLY_COMMAND_BUDGET` to the same command count so the app's 50% / 80% warnings measure against it. Raising either needs owner approval.
-- **App logs (Vercel → Logs), per server instance:**
+- **App logs (Worker → Observability), per server instance:**
   - `cache.redis_budget` with `thresholdPercent` 50 or 80: this one instance, extrapolated from at least 15 minutes of traffic, would use that share of `REDIS_MONTHLY_COMMAND_BUDGET` on its own. Several instances run at once, so the real total is higher: open the Upstash dashboard when you see it.
   - `cache.redis_unavailable`: Redis failed twice in a row, or a connection could not be opened. The app falls back for 5 seconds and tries again. One line per outage, not per request.
   - `/api/health` → `cacheMetrics`: per-instance `commands`, `connects`, `projectedMonthly`, hits/misses/errors and `rl.fallback` (requests limited in memory because Redis was unavailable).
@@ -157,14 +158,14 @@ Upstash serves every command over HTTPS: `POST` the command as a JSON array to t
 
 - **Why on Workers.** A socket opened in one request cannot be used by a later request there, and `@redis/client` does not notice: it waits for a reply that never comes. Opening a TCP connection per request does work, but each one costs an extra billed `AUTH` and several round trips (TCP, TLS, AUTH) before the command. REST has neither: no connection, no `AUTH`.
 - **Billing.** One REST request = one command, the same as over TCP; the app's command counter and budget warnings are unchanged. `connects` stays 0 on REST.
-- **On Vercel** either transport works; TCP stays the default there (one warm connection, about one round trip per command). If both are set, REST is used.
+- **On Node** (local development) either transport works; TCP stays the default there (one warm connection, about one round trip per command). If both are set, REST is used.
 - **Verify on Workers:** `/api/health` → `"cache": "ok"` and `cacheMetrics.transport: "rest"`. `cache.redis_unavailable` with `error: "rest:401"` means a wrong or read-only token; `rest:timeout` means slow or unreachable.
 
 ## 6. Roll back
 
 Any one of these, in order of preference:
 
-1. Set `REDIS_CACHE_ENABLED=false` in that Vercel environment and redeploy. Pages read Postgres; rate limits continue in memory. No data migration; nothing is lost.
+1. Set `REDIS_CACHE_ENABLED=false` on that Worker (in `frontend/wrangler.jsonc`, or in the dashboard and **Promote version**). Pages read Postgres; rate limits continue in memory. No data migration; nothing is lost.
 2. Remove `REDIS_URL` as well if the password may have leaked, then in Upstash **Reset Password** (rotates the credential; old URLs stop working).
 3. Deleting the Upstash database is safe at any time: it holds only caches, counters and locks.
 

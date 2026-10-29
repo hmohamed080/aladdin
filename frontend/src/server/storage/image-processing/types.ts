@@ -18,8 +18,8 @@ export type ImageVariant = {
 };
 
 /**
- * The one seam between media storage and an image engine. Node (Vercel, the
- * rollback path) uses sharp; the Cloudflare Workers build uses the Images
+ * The one seam between media storage and an image engine. Node (local
+ * development and tests) uses sharp; the Cloudflare Workers build uses the Images
  * binding (sharp is native and cannot load in workerd). Selected at BUILD time
  * by `runtime.ts` / `runtime.workers.ts`, so neither bundle carries the other.
  */

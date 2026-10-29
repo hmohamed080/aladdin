@@ -1,5 +1,7 @@
 # Canonical password authentication (historical name: password authentication preview)
 
+> **Update 2026-10-28 (ADR-0025):** sign-in takes one "Mobile number, username or email" field; sign-up drops Confirm Password, adds Birthday (18+, private) and accepts a mobile number verified by WhatsApp code. See [ADR-0025](../decisions/ADR-0025-one-field-sign-in-whatsapp-sign-up.md).
+
 > **Status (2026-09-28): LIVE.** Merged to `main` (PR #66) and smoke-tested
 > on Production — see *Post-rollout audit* below.
 >

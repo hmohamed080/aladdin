@@ -1,8 +1,9 @@
 /**
  * Trusted forwarding headers on the Cloudflare-hosted frontend (ADR-0021).
  *
- * The app reads the client IP and the public host from headers that Vercel's
- * edge overwrites on every request: `x-vercel-forwarded-for` (phone sign-in /
+ * The app reads the client IP and the public host from headers it expects the
+ * host's edge to overwrite on every request (a contract kept from the Vercel
+ * era, header names included): `x-vercel-forwarded-for` (phone sign-in /
  * sign-up throttle), `x-forwarded-for` / `x-real-ip` (Turnstile `remoteip`),
  * `x-forwarded-host` / `x-forwarded-proto` (Turnstile hostname fallback, OAuth
  * and email callback URLs, the video same-origin check). Cloudflare does not:
@@ -12,7 +13,7 @@
  * honest caller would share one "unknown" IP bucket.
  *
  * The Worker entry runs this before the app, so the app sees the same contract
- * on both hosts: each header is rebuilt from what Cloudflare itself guarantees
+ * it was written for: each header is rebuilt from what Cloudflare itself guarantees
  * (`cf-connecting-ip`, which Cloudflare always overwrites, and the URL the
  * request was actually addressed to), and a client-sent value never survives.
  */

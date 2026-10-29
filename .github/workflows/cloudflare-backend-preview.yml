@@ -3,7 +3,7 @@
 # Builds backend/Dockerfile and deploys edge/backend-worker's `preview` environment: Worker
 # `aladdin-backend-preview`, no workers.dev address and no route, container `basic` in WEUR, at most
 # 2 instances. It talks to the isolated acceptance Supabase project only (nxossqhdfltcqdwvbewi) and never
-# touches Vercel, DNS, aladdindecore.com, the live Supabase project or any Production resource.
+# touches DNS, aladdindecore.com, the live Supabase project or any Production resource.
 #
 # SAFE BY DEFAULT: nothing is deployed unless the GitHub Environment `cloudflare-preview` has the variable
 # CLOUDFLARE_BACKEND_PREVIEW_ENABLED set to exactly "true". Without it the run builds and bundles only.

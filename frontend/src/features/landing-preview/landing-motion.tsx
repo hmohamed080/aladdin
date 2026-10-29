@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import styles from "./landing-motion.module.css";
 import widthStyles from "./landing-hero-width.module.css";
+import brand from "@/styles/brand-2026.module.css";
 
 /** Progressive enhancement: content is visible before JS and without motion. */
 export function LandingMotion({ children }: { children: ReactNode }) {
@@ -49,5 +50,5 @@ export function LandingMotion({ children }: { children: ReactNode }) {
     preference.addEventListener("change", start);
     return () => { stop(); preference.removeEventListener("change", start); };
   }, []);
-  return <main ref={root} className={`${widthStyles.page} ${styles.page} flex flex-col overflow-x-hidden bg-brand-plaster`}>{children}</main>;
+  return <main ref={root} className={`${brand.brand} ${widthStyles.page} ${styles.page} flex flex-col overflow-x-hidden bg-brand-plaster`}>{children}</main>;
 }

@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getRegistrationState } from "@/server/queries/registration";
 import { activeLandingPath } from "@/server/queries/landing";
 import { OnboardingPanel } from "@/features/onboarding/onboarding-panel";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { ACCOUNT_BASICS_PATH, needsAccountBasics } from "@/server/queries/account-basics";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,8 @@ export default async function OnboardingPage() {
       redirect("/auth/sign-in");
     case "active_personal":
     case "access_ready":
+      // Phone, location and specialties are asked once, for every account (ADR-0026).
+      if (await needsAccountBasics(await getServerSupabase())) redirect(ACCOUNT_BASICS_PATH);
       redirect(await activeLandingPath());
     case "account_type_pending":
       redirect("/onboarding/account-type");

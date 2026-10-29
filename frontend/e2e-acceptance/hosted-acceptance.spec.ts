@@ -54,13 +54,13 @@ async function signIn(context: BrowserContext, email: string, password: string, 
   const page = await context.newPage();
   try {
     await page.goto("/auth/sign-in", { waitUntil: "domcontentloaded" });
-    await page.getByLabel(/^email address$/i).fill(email);
+    await page.getByLabel(/^mobile number, username or email$/i).fill(email);
     // A failed fill must never echo the value into the log or the uploaded report.
     await page.getByLabel(/^password$/i).fill(password).catch(() => {
       throw new Error(`The ${who} password field could not be filled on /auth/sign-in.`);
     });
     await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30_000 });
-    await page.getByRole("button", { name: /^sign in$/i }).click();
+    await page.getByRole("button", { name: /^log in$/i }).click();
     await page.waitForURL((url) => !/\/sign-in(\/|$)/.test(url.pathname), { timeout: 45_000 }).catch(async () => {
       const alert = (await page.getByRole("alert").allInnerTexts().catch(() => [])).join(" | ").slice(0, 200);
       throw new Error(`Sign-in as the ${who} did not complete (still on the sign-in page). Message: ${alert || "none"}`);

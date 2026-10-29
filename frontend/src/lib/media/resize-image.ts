@@ -10,7 +10,7 @@
  *
  * WHY HERE: the server keeps reading only small, bounded files (the per-bucket
  * caps stay unchanged in SQL and in `server/storage`), so nothing large passes
- * through Vercel or Supabase and server decode memory stays bounded. A 48 MP /
+ * through the web app or Supabase and server decode memory stays bounded. A 48 MP /
  * 20 MB phone photo becomes a 2560 px derivative of a few MB here.
  *
  * NOT AUTHORITY. The server still reads the stored bytes, decodes them fully and

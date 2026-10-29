@@ -1,6 +1,6 @@
 {
   // Cloudflare Workers host for the Next.js frontend (ADR-0021). Built with
-  // `pnpm cf:build` (OpenNext); Vercel stays the live host until cutover.
+  // `pnpm cf:build` (OpenNext). The live host since the 2026-10-27 cutover.
   // Secrets are never written here: set them with `wrangler secret put` per
   // environment (see docs/guides/cloudflare-frontend.md).
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -45,7 +45,10 @@
         // Contact-email links point back at the preview, never at production.
         // RESEND_API_KEY is a Worker secret.
         "EMAIL_FROM": "Aladdin <no-reply@aladdindecore.com>",
-        "APP_PUBLIC_ORIGIN": "https://aladdin-frontend-preview.bstalent9.workers.dev"
+        "APP_PUBLIC_ORIGIN": "https://aladdin-frontend-preview.bstalent9.workers.dev",
+        // Approved Meta Authentication template for sign-up codes. WHATSAPP_ACCESS_TOKEN
+        // and WHATSAPP_PHONE_NUMBER_ID are Worker secrets.
+        "WHATSAPP_OTP_TEMPLATE": "aladdin_login_code"
       }
     },
     // Production: deployed only after the owner approves the cutover. Routes
@@ -70,6 +73,9 @@
         // aladdindecore.com domain. RESEND_API_KEY is a Worker secret.
         "EMAIL_FROM": "Aladdin <no-reply@aladdindecore.com>",
         "APP_PUBLIC_ORIGIN": "https://aladdindecore.com",
+        // Sign-up codes over WhatsApp. WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID
+        // are Worker secrets; until they are set, mobile-number sign-up says it is unavailable.
+        "WHATSAPP_OTP_TEMPLATE": "aladdin_login_code",
         // First cutover: media stays on Supabase Storage and Redis stays off. Each one
         // is turned on later by its own approval.
         "R2_STORAGE_ENABLED": "false",

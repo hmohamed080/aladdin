@@ -7,7 +7,8 @@ export async function phoneAuthLimit(action: "sign-in" | "sign-up", phone: strin
     get(name: string): string | null;
 }): Promise<"allowed" | "limited" | "unavailable"> {
     try {
-        // Vercel overwrites this header at the trusted edge. Never trust arbitrary client XFF in hosted environments.
+        // The Worker entry rebuilds this header from cf-connecting-ip on every request (lib/cloudflare/forwarded-headers.ts;
+        // the name is kept from the Vercel era). Never trust arbitrary client XFF in hosted environments.
         const ip = readPublicEnv().NEXT_PUBLIC_APP_ENV === "local"
             ? clientIpFrom(name => headers.get(name))
             : clientIpFrom(name => name === "x-forwarded-for" ? headers.get("x-vercel-forwarded-for") : null);
