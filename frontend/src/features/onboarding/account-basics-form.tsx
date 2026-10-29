@@ -5,7 +5,6 @@ import { useI18n } from "@/lib/i18n/context";
 import { Card, InlineError } from "@/components/ui/primitives";
 import { Input, Select, SubmitButton } from "@/components/ui/controls";
 import { PhoneField } from "@/components/ui/phone-field";
-import { ChoiceChip } from "@/features/onboarding/wizard";
 import { GOVERNORATE_OPTIONS, type LocationOption } from "@/lib/installer/location-data";
 import { businessCitiesOf, CUSTOM_CITY_MAX } from "@/lib/location/business-location";
 import { tradeLabel } from "@/lib/i18n/trade-label";
@@ -19,8 +18,9 @@ const OTHER = "__other__";
 /**
  * One short screen, three questions in the order a person answers them
  * fastest: how to reach you, where you are, what you do. Sections the account
- * already completed are not rendered at all. Specialties are chips: the first
- * one picked is the main one (marked), as on the Craftsman profile.
+ * already completed are not rendered at all. Specialties are picked from a
+ * dropdown and listed below it; the first one picked is the main one (marked),
+ * as on the Craftsman profile, and each can be removed.
  */
 export function AccountBasicsForm({ missing, tradeKeys, next }: { missing: MissingBasics; tradeKeys: string[]; next: string }) {
   const { t, locale } = useI18n();
@@ -35,7 +35,6 @@ export function AccountBasicsForm({ missing, tradeKeys, next }: { missing: Missi
   const governorates = [...GOVERNORATE_OPTIONS].sort(byLabel);
   const cities = businessCitiesOf(governorate).sort(byLabel);
   const errorFor = (field: AccountBasicsState["field"]) => (state.field === field && state.code ? t(state.code) : undefined);
-  const toggle = (key: string) => setPicked((p) => (p.includes(key) ? p.filter((k) => k !== key) : [...p, key]));
 
   return (
     <Card className="flex flex-col gap-lg p-lg">
@@ -116,16 +115,40 @@ export function AccountBasicsForm({ missing, tradeKeys, next }: { missing: Missi
           <section className="flex flex-col gap-xs" aria-labelledby="basics-specialties">
             <p id="basics-specialties" className="text-label font-semibold text-fg">{t("accountBasics.specialtiesLabel")}</p>
             <p className="text-label text-fg-muted">{t("accountBasics.specialtiesHint")}</p>
-            <div className="flex flex-wrap gap-xs" role="group" aria-labelledby="basics-specialties">
-              {tradeKeys.map((key) => (
-                <ChoiceChip
-                  key={key}
-                  selected={picked.includes(key)}
-                  label={picked[0] === key ? `${tradeLabel(t, key)} · ${t("accountBasics.main")}` : tradeLabel(t, key)}
-                  onToggle={() => toggle(key)}
-                />
-              ))}
-            </div>
+            <Select
+              id="specialtyAdd"
+              aria-label={t("accountBasics.specialtiesAdd")}
+              value=""
+              disabled={picked.length === tradeKeys.length}
+              onChange={(e) => {
+                const key = e.target.value;
+                if (key) setPicked((p) => (p.includes(key) ? p : [...p, key]));
+              }}
+            >
+              <option value="" disabled>{t("accountBasics.specialtiesAdd")}</option>
+              {tradeKeys
+                .filter((key) => !picked.includes(key))
+                .map((key) => (
+                  <option key={key} value={key}>{tradeLabel(t, key)}</option>
+                ))}
+            </Select>
+            {picked.length ? (
+              <ul className="flex flex-wrap gap-xs" aria-labelledby="basics-specialties">
+                {picked.map((key, i) => (
+                  <li key={key} className="inline-flex items-center gap-1 rounded-pill border border-accent bg-accent-solid/15 py-1 ps-3.5 pe-1 text-label font-medium text-fg">
+                    <span>{i === 0 ? `${tradeLabel(t, key)} · ${t("accountBasics.main")}` : tradeLabel(t, key)}</span>
+                    <button
+                      type="button"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-pill text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                      aria-label={t("accountBasics.specialtiesRemove", { name: tradeLabel(t, key) })}
+                      onClick={() => setPicked((p) => p.filter((k) => k !== key))}
+                    >
+                      <span aria-hidden="true">×</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {picked.map((key) => (
               <input key={key} type="hidden" name="specialties" value={key} />
             ))}

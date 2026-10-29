@@ -6269,6 +6269,8 @@ export const ar: Messages = {
     cityCustomLabel: "اكتب اسم مدينتك",
     specialtiesLabel: "تخصصاتك",
     specialtiesHint: "اختر كل ما ينطبق عليك. أول تخصص تختاره هو تخصصك الرئيسي.",
+    specialtiesAdd: "أضف تخصصًا",
+    specialtiesRemove: "إزالة {name}",
     main: "رئيسي",
     submit: "متابعة",
     saving: "جارٍ الحفظ…",
