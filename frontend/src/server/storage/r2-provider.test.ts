@@ -87,4 +87,17 @@ describe("R2 immutable promotion", () => {
     expect(keys).toEqual(["product/o/p/i.webp", "pending/product/o/p/i.webp",
       "v/product/o/p/i.webp/thumb.webp", "v/product/o/p/i.webp/card.webp", "v/product/o/p/i.webp/full.webp"]);
   });
+  it("keeps a new upload's original, upload stage and variants under its ids-only key", async () => {
+    const object = "o/10000000-0000-4000-8000-000000000001/products/20000000-0000-4000-8000-000000000002/30000000-0000-4000-8000-000000000003/original.png";
+    const provider = new CloudflareR2StorageProvider("product", "private", object);
+    const grant = await provider.createUploadUrl("ignored.png", "image/png", 93);
+    expect(grant.provider === "r2" && new URL(grant.url).pathname).toBe(`/isolated-private/pending/${object}`);
+    await provider.commitVerifiedObject("ignored.png", new Uint8Array([1]), "image/png");
+    await provider.putVariant("ignored.png", "card", new Uint8Array([9]));
+    send.mockClear();
+    await provider.deleteObject("ignored.png");
+    const folder = object.replace("/original.png", "");
+    expect(send.mock.calls.map((call) => call[0].input.Key)).toEqual([object, `pending/${object}`,
+      `${folder}/v/thumb.webp`, `${folder}/v/card.webp`, `${folder}/v/full.webp`]);
+  });
 });

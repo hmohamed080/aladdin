@@ -24,7 +24,7 @@ export async function deliverMedia(client: SupabaseClient, namespace: MediaNames
     const before = await resolveMedia(client, namespace, key, "read", workspace);
     const types: readonly string[] = mediaPolicy(namespace).types;
     if (before.state !== "ready" || !types.includes(before.contentType)) return mediaNotFound();
-    const provider = mediaProvider(before.provider === "supabase" ? privilegedStorageClient() : client, namespace, before.provider);
+    const provider = await mediaProvider(before.provider === "supabase" ? privilegedStorageClient() : client, namespace, before.provider, key);
     const url = await provider.getReadAccess(key, 30);
     // "manual", not "error": Workers throws on redirect "error". A 3xx is not ok, so it is never followed or served.
     upstream = await fetch(url, { cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(30_000) });

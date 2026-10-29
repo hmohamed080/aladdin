@@ -12,12 +12,16 @@ vi.mock("@/server/cache/rate-limit", () => ({ consumeRateLimit: limiter.consume 
 vi.mock("@/server/auth/session", () => ({ readSessionIdentity: limiter.identity }));
 const r2Upload = vi.hoisted(() => vi.fn());
 const r2 = vi.hoisted(() => ({ readObject: vi.fn(), commitVerifiedObject: vi.fn(), putVariant: vi.fn() }));
+const r2Keys = vi.hoisted(() => [] as unknown[][]);
 vi.mock("./r2-provider", () => ({ CloudflareR2StorageProvider: class {
+  constructor(...args: unknown[]) { r2Keys.push(args); }
   createUploadUrl = r2Upload; readObject = r2.readObject; commitVerifiedObject = r2.commitVerifiedObject; putVariant = r2.putVariant;
 } }));
 import { authorizeMediaUpload, readMediaUrl, removeMedia, verifyPendingMedia } from "./media";
 
 const OWNER = "70000009-0000-4000-8000-000000000009";
+const OBJECT = `u/${OWNER}/portfolio/70000009-0000-4000-8000-0000000000aa/original.png`;
+const writes = () => adminRpc.mock.calls.map((c) => c[0]).filter((name) => name !== "media_storage_object");
 const rpc = vi.fn(); const sign = vi.fn(); const remove = vi.fn(); const upload = vi.fn();
 // Controlled caller-scoped client: no network or shared data.
 const client = { rpc, storage: { from: () => ({ createSignedUrl: sign, remove, createSignedUploadUrl: upload }) } } as unknown as ReturnType<typeof createClient>;
@@ -26,7 +30,8 @@ beforeEach(() => {
   vi.clearAllMocks(); settings.R2_STORAGE_ENABLED = false;
   rpc.mockResolvedValue({ data: pending, error: null });
   sign.mockResolvedValue({ data: { signedUrl: "https://test.invalid/image" }, error: null });
-  adminRpc.mockResolvedValue({ error: null });
+  r2Keys.length = 0;
+  adminRpc.mockImplementation(async (name: string) => name === "media_storage_object" ? { data: OBJECT, error: null } : { error: null });
   limiter.identity.mockResolvedValue({ id: OWNER });
   limiter.consume.mockResolvedValue({ outcome: "allowed", source: "memory" });
 });
@@ -76,7 +81,10 @@ describe("mixed-provider authorization and finalization", () => {
     rpc.mockResolvedValue({ data: { ...pending, provider: "r2" }, error: null });
     r2Upload.mockResolvedValue({ provider: "r2", url: "https://r2.test/pending" });
     expect((await authorizeMediaUpload(client, "portfolio", "key.png", 93)).provider).toBe("r2");
-    expect(adminRpc).not.toHaveBeenCalled();
+    expect(writes()).toEqual([]);
+    // The signed upload targets the physical key the database recorded, not one derived from the path.
+    expect(adminRpc).toHaveBeenCalledWith("media_storage_object", { p_namespace: "portfolio", p_key: "key.png" });
+    expect(r2Keys.at(-1)).toEqual(["portfolio", "private", OBJECT]);
   });
   it("writes thumb/card/full variants from the verified R2 bytes before the receipt", async () => {
     rpc.mockResolvedValue({ data: { ...pending, provider: "r2" }, error: null });
@@ -87,9 +95,11 @@ describe("mixed-provider authorization and finalization", () => {
     expect(r2.putVariant.mock.calls.every((c) => c[0] === "key.png")).toBe(true);
     expect(manifest?.full).toMatchObject({ width: 1600, height: 800 });
     expect(r2.commitVerifiedObject.mock.invocationCallOrder[0]!).toBeLessThan(r2.putVariant.mock.invocationCallOrder[0]!);
-    expect(r2.putVariant.mock.invocationCallOrder[2]!).toBeLessThan(adminRpc.mock.invocationCallOrder[0]!);
+    const attest = adminRpc.mock.calls.findIndex((c) => c[0] === "media_storage_attest");
+    expect(r2.putVariant.mock.invocationCallOrder[2]!).toBeLessThan(adminRpc.mock.invocationCallOrder[attest]!);
     // The manifest is recorded on the receipt AFTER attestation (the RPC requires a verified R2 row).
-    expect(adminRpc.mock.calls.map((c) => c[0])).toEqual(["media_storage_attest", "media_storage_record_variants"]);
+    expect(writes()).toEqual(["media_storage_attest", "media_storage_record_variants"]);
+    expect(r2Keys.at(-1)).toEqual(["portfolio", "private", OBJECT]);
     expect(adminRpc).toHaveBeenLastCalledWith("media_storage_record_variants", { p_namespace: "portfolio", p_key: "key.png", p_owner: pending.owner, p_variants: manifest });
   });
   it("never fails a verified upload because a variant could not be written", async () => {
@@ -107,6 +117,12 @@ describe("mixed-provider authorization and finalization", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(bytes))));
     expect(await verifyPendingMedia(client, "portfolio", "key.png")).toBeNull();
     expect(r2.putVariant).not.toHaveBeenCalled();
+  });
+  it("refuses an R2 operation when the database names no stored object", async () => {
+    rpc.mockResolvedValue({ data: { ...pending, provider: "r2", state: "ready" }, error: null });
+    adminRpc.mockImplementation(async () => ({ data: null, error: null }));
+    await expect(removeMedia(client, "portfolio", "key.png")).rejects.toThrow("unavailable");
+    expect(r2Keys).toEqual([]);
   });
   it("does not reverify legacy ready objects on an idempotent retry", async () => {
     rpc.mockResolvedValue({ data: { ...pending, state: "ready" }, error: null });
