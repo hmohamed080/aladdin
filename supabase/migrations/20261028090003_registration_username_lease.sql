@@ -1,3 +1,5 @@
+-- migration-policy: out-of-order-reviewed - already applied to Acceptance on 2026-10-28 before 20261029090001 existed; no database has 20261029090001, so every target applies 20261028090003 first
+-- migration-policy: destructive-reviewed - pending_registration_save keeps its exact name, arguments and service_role-only grant; only the return type changes (void to boolean) in one transaction, and the old app ignores the result, so it keeps working until the new app is promoted
 -- ===========================================================================
 -- Registration resume + pending-username lease
 --
