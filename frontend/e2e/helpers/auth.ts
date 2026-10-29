@@ -179,8 +179,14 @@ export async function completeAccountBasics(page: Page): Promise<void> {
     await governorate.selectOption("cairo");
     await page.locator("select#city").selectOption("new-cairo");
   }
-  const chips = page.locator('[aria-labelledby="basics-specialties"][role="group"] button');
-  if (await chips.count()) await chips.first().click();
+  // Specialties are picked from a dropdown (select#specialtyAdd, account-basics-form.tsx); option 0 is the disabled placeholder, so
+  // index 1 is the first real trade. The picked trade shows up as a removable item in the list below the dropdown, which proves the
+  // REAL form accepted the choice (the first one is the main specialty) before we submit.
+  const specialty = page.locator("select#specialtyAdd");
+  if (await specialty.count()) {
+    await specialty.selectOption({ index: 1 });
+    await expect(page.locator('ul[aria-labelledby="basics-specialties"] li')).toHaveCount(1);
+  }
   await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
 }
 
