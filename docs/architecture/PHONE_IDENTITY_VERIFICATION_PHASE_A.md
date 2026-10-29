@@ -3,7 +3,7 @@
 **Date:** 2026-10-29  
 **Status:** implementation contract and acceptance gates; **no production behavior changes in this PR**.  
 **Applies to:** Installer, Showroom, and eventually other Aladdin roles.  
-**Explicit owner direction:** reuse current implementations, preserve all existing users, defer any paid service or actual paid WhatsApp OTP sends. Supabase Phone MFA add-on must remain OFF. Cloudflare `aladdin-whatsapp-otp-preview` must keep `WHATSAPP_DELIVERY_ENABLED=false`, Send SMS Hook OFF.
+**Explicit owner direction (updated 2026-10-29):** reuse current implementations and preserve existing users. **Meta's per-message WhatsApp OTP charges are acceptable** when a separately approved real-delivery pilot/launch starts. **Do not activate the Supabase Advanced Phone MFA paid add-on** (approximately $75/month for the first project); it is explicitly deferred. Phase A remains local/mock with no paid sends; Cloudflare `aladdin-whatsapp-otp-preview` keeps `WHATSAPP_DELIVERY_ENABLED=false` and Send SMS Hook OFF until an explicit controlled activation.
 
 ## 1. Existing implementation; do not rebuild
 
@@ -75,7 +75,7 @@ No production or hosted changes. Build fixtures in **local Supabase**, and mock 
 
 **A1 — foundation / this PR:** document actual existing contracts and test matrix, isolate from WhatsApp Worker PR #114. No code path or hosted settings changed.
 
-**A2 — local only:** add read-only invariant/fixture tests for legacy accounts, phone reservation and existing verified state. Select proof authority with evidence; design minimal schema delta. Do not modify `phone_verified_at` or an Auth user until identity tests are green.
+**A2 — local only:** add read-only invariant/fixture tests for legacy accounts, phone reservation and existing verified state. Select proof authority with evidence; design minimal schema delta. Do not modify `phone_verified_at` or an Auth user until identity tests are green. **Registration integration must account for stacked PR #116 on #113**; do not duplicate or overwrite the continue-registration/username-lease changes. Wait for a stable merged base before touching those flows.
 
 **B — phone signup & primary verification:** implement backend + UI behind feature flag, mock delivery; protect full access at server/DB. Existing accounts remain grandfathered/unverified pending voluntary proof.
 
@@ -83,7 +83,7 @@ No production or hosted changes. Build fixtures in **local Supabase**, and mock 
 
 **D — TOTP MFA:** only after identity flow, use native Supabase TOTP and AAL protections; no Phone MFA paid add-on.
 
-**E — paid activation gate:** cost calculation, Meta delivery opt-in, hosted Acceptance hook, sender/payload tests, rollout/rollback **only after separate explicit owner approval**. **No launch of mandatory WhatsApp signup verification without a working, approved delivery channel**, or new-user signups would be blocked.
+**E — Meta messaging activation gate:** Meta OTP per-message cost is **approved in principle**, not yet permission to flip a live Worker switch. Do an isolated hosted Acceptance pilot, sender/payload/allowlist tests, spend limits, rollout and rollback **after separate explicit deployment/activation approval**. Keep paid Supabase Phone MFA disabled. **No launch of mandatory WhatsApp signup verification without a working tested delivery channel**, or new-user signups would be blocked.
 
 ## 7. Evidence/source paths
 
