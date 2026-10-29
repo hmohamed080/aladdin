@@ -138,3 +138,19 @@ export const resetPasswordSchema = z
 export function passwordWithContextSchema(context: readonly string[]) {
   return passwordSchema.superRefine((password, ctx) => addWeakPasswordIssues(password, context, [], ctx));
 }
+
+/** The message key a registration refusal shows: the schema's own key, else the field's plain one. */
+const REGISTRATION_FIELD_CODES: Record<string, string> = {
+  displayName: "authPasswordPreview.error.fullNameRequired",
+  email: "authPasswordPreview.error.invalidEmail",
+  username: "registration.error.usernameShape",
+  accountType: "authPasswordPreview.error.accountTypeRequired",
+  password: "authPasswordPreview.error.passwordTooShort",
+  birthDate: "authPasswordPreview.error.birthDateRequired",
+};
+
+export function registrationIssueCode(issue: { message?: string; path?: (string | number)[] } | undefined): string {
+  const message = issue?.message ?? "";
+  if (/^[A-Za-z]+(\.[A-Za-z0-9]+)+$/.test(message)) return message;
+  return REGISTRATION_FIELD_CODES[String(issue?.path?.[0] ?? "")] ?? "authPasswordPreview.error.invalidEmail";
+}

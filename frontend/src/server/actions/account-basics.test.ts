@@ -13,8 +13,8 @@ vi.mock("@/server/queries/landing", () => ({ resolveActiveLanding: vi.fn(async (
 
 import { saveAccountBasics } from "./account-basics";
 
-type Basics = { phone: string | null; governorate: string | null; city: string | null; cityCustom: string | null; specialties: string[] };
-const NOTHING: Basics = { phone: null, governorate: null, city: null, cityCustom: null, specialties: [] };
+type Basics = { phone: string | null; governorate: string | null; city: string | null; cityCustom: string | null; specialtyKind?: string; specialties: string[] };
+const NOTHING: Basics = { phone: null, governorate: null, city: null, cityCustom: null, specialtyKind: "trades", specialties: [] };
 
 function withBasics(basics: Basics, writes: Record<string, { error: unknown }> = {}) {
   rpc.mockImplementation(async (name: string) => (name === "my_account_basics" ? { data: basics, error: null } : (writes[name] ?? { error: null })));

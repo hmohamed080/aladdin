@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import type { CountryCode } from "libphonenumber-js";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { toCanonicalPhone, DEFAULT_PHONE_COUNTRY } from "@/lib/contact/phone";
+import { toCanonicalPhone, splitE164, DEFAULT_PHONE_COUNTRY } from "@/lib/contact/phone";
 import { validateBusinessLocation } from "@/lib/location/business-location";
 import { readSessionIdentity } from "@/server/auth/session";
 import { sanitizeNext } from "@/server/auth/next";
@@ -63,6 +63,19 @@ export async function saveAccountBasics(_prev: AccountBasicsState, formData: For
     if (specialties.length === 0) return error("specialties", "specialtiesRequired");
   }
 
+  const written = await writeBasics(supabase, phone, location, specialties);
+  if (!written.ok) return written;
+
+  const landing = await resolveActiveLanding(supabase);
+  const next = sanitizeNext(formData.get("next"));
+  redirect(next === landing || next.startsWith(`${landing}/`) ? next : landing);
+}
+
+type Client = Awaited<ReturnType<typeof getServerSupabase>>;
+type Location = { governorate: string; city: string | null; cityCustomName: string | null } | null;
+
+/** Writes what was given: the phone through profile_set_phone, location and specialties through account_basics_set. */
+async function writeBasics(supabase: Client, phone: ReturnType<typeof toCanonicalPhone>, location: Location, specialties: string[] | null): Promise<AccountBasicsState> {
   if (phone) {
     const { error: phoneError } = await supabase.rpc("profile_set_phone", {
       p_country_iso2: phone.countryIso2,
@@ -91,7 +104,37 @@ export async function saveAccountBasics(_prev: AccountBasicsState, formData: For
     }
   }
 
-  const landing = await resolveActiveLanding(supabase);
-  const next = sanitizeNext(formData.get("next"));
-  redirect(next === landing || next.startsWith(`${landing}/`) ? next : landing);
+  return { ok: true };
+}
+
+/**
+ * The basics step inside business setup (owner decision 2026-10-29): the
+ * owner's mobile number (and a personal specialty list, when the account has one), when still missing.
+ * The location comes from the business itself (my_account_basics reads an
+ * owner's primary branch), so it is never asked here. Saves only what the
+ * account still lacks; the database re-checks everything.
+ */
+export async function saveBusinessBasicsStep(input: { phone: string | null; specialties: string[] }): Promise<AccountBasicsState> {
+  const supabase = await getServerSupabase();
+  const user = await readSessionIdentity(supabase);
+  if (!user) redirect("/auth/sign-in");
+
+  const basics = await loadAccountBasics(supabase).catch(() => null);
+  if (!basics) return error(undefined, "saveFailed");
+  const missing = missingBasics(basics);
+
+  let phone: ReturnType<typeof toCanonicalPhone> = null;
+  if (missing.phone) {
+    const split = splitE164(input.phone);
+    phone = split ? toCanonicalPhone(split.national, split.countryIso2) : null;
+    if (!phone) return error("phone", input.phone ? "phoneInvalid" : "phoneRequired");
+  }
+
+  let specialties: string[] | null = null;
+  if (missing.specialties) {
+    specialties = input.specialties.map((v) => v.trim()).filter(Boolean);
+    if (specialties.length === 0) return error("specialties", "specialtiesRequired");
+  }
+
+  return writeBasics(supabase, phone, null, specialties);
 }

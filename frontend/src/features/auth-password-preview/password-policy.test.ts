@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseBirthDate, passwordSchema, registrationSchema, resetPasswordSchema, PASSWORD_MIN_LENGTH, PASSWORD_MAX_BYTES, passwordByteLength } from "./password-policy";
+import { parseBirthDate, registrationIssueCode, passwordSchema, registrationSchema, resetPasswordSchema, PASSWORD_MIN_LENGTH, PASSWORD_MAX_BYTES, passwordByteLength } from "./password-policy";
 
 describe("passwordSchema", () => {
   it("rejects a password shorter than the minimum", () => {
@@ -94,5 +94,22 @@ describe("resetPasswordSchema", () => {
       confirmPassword: "a-very-long-passphrase-1",
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("registrationIssueCode", () => {
+  it("never shows a raw validator message", () => {
+    expect(registrationIssueCode({ message: "Expected string, received null", path: ["birthDate"] })).toBe("authPasswordPreview.error.birthDateRequired");
+    expect(registrationIssueCode({ message: "Expected string, received null", path: ["accountType"] })).toBe("authPasswordPreview.error.accountTypeRequired");
+    expect(registrationIssueCode({ message: "Invalid email", path: ["email"] })).toBe("authPasswordPreview.error.invalidEmail");
+  });
+
+  it("keeps the schema's own message key", () => {
+    expect(registrationIssueCode({ message: "authPasswordPreview.error.birthDateTooYoung", path: ["birthDate"] })).toBe("authPasswordPreview.error.birthDateTooYoung");
+  });
+
+  it("a missing birthday is asked for by name", () => {
+    const parsed = registrationSchema.safeParse({ displayName: "Mona Adel", email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: "a-very-long-passphrase-1", birthDate: "" });
+    expect(parsed.success || registrationIssueCode(parsed.error.issues[0])).toBe("authPasswordPreview.error.birthDateRequired");
   });
 });

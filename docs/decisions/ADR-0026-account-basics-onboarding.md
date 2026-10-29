@@ -24,3 +24,19 @@
 - Every account now carries a location and at least one specialty, usable later for matching and discovery.
 - The phone collected here is not verified; a WhatsApp check can be added later with the ADR-0025 code flow.
 - Non-professional specialties live in a separate table; reads should use `my_account_basics()` (or union both tables) rather than `user_trades` alone.
+
+## Amendment 2026-10-29 — steps inside onboarding, a list per account type (migration `20261029090002`)
+
+Owner decisions in the project thread: phone, location and specialties are **steps inside onboarding**, not a separate page; and each account type sees **its own** specialty list (owner lists of 2026-10-29). The lists are the platform's existing vocabularies, so nothing new is invented:
+
+| Account | List | Where it is asked | Stored in |
+|---|---|---|---|
+| Craftsmen | the 14 active `public.trades` | `/onboarding/basics`, one step per missing item | `public.user_trades` (`user_trades_set`) |
+| Engineer | `public.activities` persona `engineer`: Civil engineer, Architect (`finishing` retired) | `/onboarding/basics` | `public.user_activities` |
+| Showroom, Supplier, Manufacturer, Importer | `public.activities` of the organization type (Showroom 4, Supplier 2, Manufacturer 2, Importer 2) | business setup ("Business activity"), now for every business type with a list | `public.organization_activities` |
+| Sales Team, Contractor, Personal | none yet (owner: later) | not asked | — |
+
+- A business account's list belongs to the **business** (business classification is the organization's), so it is never stored on the person. While the first business is outstanding, `/onboarding/basics` redirects to business setup, which also asks the owner's phone when it is missing; the business location counts as theirs once the business exists.
+- `app.account_specialty_kind(uuid)` names the personal list: `trades | engineer | none`, from the current persona only.
+- A professional's first location also becomes their primary service area (`user_service_areas_set`) when they have none, so the profile does not ask for it again.
+- `public.user_specialties` (installer trades offered to businesses) is dropped; it never reached Production.

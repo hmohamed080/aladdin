@@ -7123,3 +7123,10 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Built: migration `20261028090003_registration_username_lease.sql` (30-minute non-renewable username lease on `app.pending_registrations`, per-name advisory lock shared with `profile_set_username`, `username_available` honours leases, `email-resend` limiter action) + permission contract; `/auth/continue-registration`; `reg_email` httpOnly routing cookie; server throttle on resend; entry links on sign-in/sign-up.
 - Tests: pgTAP `118_registration_username_lease_test.sql` (44/44 locally), two-session `registration_username_lease_concurrency_test.sh` (PASS locally, added to CI), Vitest action + component tests.
 - **Unfinished:** the WhatsApp/phone sign-up does not take a lease; Acceptance is missing PR #113's `20261028090002` too (ordering note for whoever pushes migrations).
+
+### 2026-10-29 — Onboarding steps and a specialty list per account type (PR #113, migration `20261029090002`)
+
+- Owner, from Preview testing: specialties from a dropdown; phone / location / specialties as onboarding steps, not a separate page ("Steps inside onboarding"); a Showroom must not see the installer specialties; then gave the lists per account type.
+- Built ([ADR-0026 amendment](../decisions/ADR-0026-account-basics-onboarding.md)): step wizard for `/onboarding/basics`; business registrations answer inside business setup (phone step when missing, business activity for every business type with a list); Engineer list Civil engineer / Architect in `public.activities`; `user_specialties` dropped; a professional's first location seeds their service area; refused saves no longer clear the governorate; sign-up never shows a raw validator message.
+- Local: pgTAP 145 files pass, permission gate PASS 694, migration policy clean (reviewed drop), vitest all pass, tsc and lint clean (warnings only, pre-existing).
+- **Unfinished:** apply `20261029090002` to Acceptance (needs the owner's own-words approval; device runs `supabase db push --linked`), redeploy Preview and re-test; lists for Sales Team, Contractor and Personal later; clean up test accounts +t1/+t2/+t3.

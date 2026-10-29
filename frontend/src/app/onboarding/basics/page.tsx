@@ -3,21 +3,24 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getRegistrationState, hasAppAccess } from "@/server/queries/registration";
 import { activeLandingPath } from "@/server/queries/landing";
 import { hasMissingBasics, loadAccountBasics, missingBasics } from "@/server/queries/account-basics";
-import { loadTradeCatalog } from "@/server/queries/trades";
+import { loadSpecialtySource } from "@/server/queries/specialty-source";
+import { loadMandatoryBusinessSetup } from "@/server/queries/business-setup";
+import { MANDATORY_BUSINESS_SETUP_PATH } from "@/lib/onboarding/mandatory-business-setup";
 import { sanitizeNext } from "@/server/auth/next";
 import { AccountBasicsForm } from "@/features/onboarding/account-basics-form";
 
 export const dynamic = "force-dynamic";
 
 /**
- * "Complete your account" (ADR-0026): phone, governorate + town and
- * specialties, asked once for every account type. Only what is still missing
- * is shown; an account that already holds all three goes straight on.
+ * Onboarding steps for phone, governorate + town and specialties (ADR-0026),
+ * one per step, only the ones still missing. A business registration answers
+ * them inside its business setup instead, so it is sent there.
  */
 export default async function AccountBasicsPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const state = await getRegistrationState();
   if (state === "unverified") redirect("/auth/sign-in");
   if (!hasAppAccess(state)) redirect("/onboarding");
+  if ((await loadMandatoryBusinessSetup()).required) redirect(MANDATORY_BUSINESS_SETUP_PATH);
 
   const supabase = await getServerSupabase();
   const basics = await loadAccountBasics(supabase).catch(() => null);
@@ -26,6 +29,6 @@ export default async function AccountBasicsPage({ searchParams }: { searchParams
   if (!hasMissingBasics(missing)) redirect(await activeLandingPath());
 
   const { next } = await searchParams;
-  const trades = missing.specialties ? await loadTradeCatalog() : [];
-  return <AccountBasicsForm missing={missing} tradeKeys={trades.map((t) => t.key)} next={sanitizeNext(next)} />;
+  const source = missing.specialties ? await loadSpecialtySource(basics.specialtyKind) : null;
+  return <AccountBasicsForm missing={missing} source={source} next={sanitizeNext(next)} />;
 }

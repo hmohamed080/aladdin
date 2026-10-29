@@ -8,7 +8,7 @@ type Rpc = (name: string) => Promise<{ data: unknown; error: { code?: string } |
 const client = (rpc: Rpc) => ({ rpc }) as unknown as Parameters<typeof loadAccountBasics>[0];
 const returning = (data: unknown) => client(async () => ({ data, error: null }));
 
-const COMPLETE = { phone: "+201012345678", governorate: "cairo", city: "new-cairo", cityCustom: null, specialties: ["wallpaper_installation"] };
+const COMPLETE = { phone: "+201012345678", governorate: "cairo", city: "new-cairo", cityCustom: null, specialtyKind: "trades", specialties: ["wallpaper_installation"] };
 
 describe("existing-data detection", () => {
   it("an account holding all three owes nothing", async () => {
@@ -25,6 +25,20 @@ describe("existing-data detection", () => {
   it("asks only for what is missing", async () => {
     const basics = await loadAccountBasics(returning({ ...COMPLETE, phone: null, specialties: [] }));
     expect(missingBasics(basics!)).toEqual({ phone: true, location: false, specialties: true });
+  });
+
+  it("an account with no specialty list (business, Sales Team, Personal) is never asked for specialties", async () => {
+    for (const kind of ["none", undefined, "categories"]) {
+      const basics = await loadAccountBasics(returning({ ...COMPLETE, specialtyKind: kind, specialties: [] }));
+      expect(basics!.specialtyKind).toBe("none");
+      expect(missingBasics(basics!).specialties).toBe(false);
+    }
+  });
+
+  it("an Engineer answers the Engineer list", async () => {
+    const basics = await loadAccountBasics(returning({ ...COMPLETE, specialtyKind: "engineer", specialties: [] }));
+    expect(basics!.specialtyKind).toBe("engineer");
+    expect(missingBasics(basics!).specialties).toBe(true);
   });
 
   it("a governorate without a town is still missing a location", async () => {

@@ -29,6 +29,7 @@ import {
   displayNameSchema,
   emailSchema,
   parseBirthDate,
+  registrationIssueCode,
   registrationSchema,
   passwordWithContextSchema,
 } from "@/features/auth-password-preview/password-policy";
@@ -327,18 +328,18 @@ export async function requestPasswordSignUp(
   formData: FormData,
 ): Promise<PasswordAuthState> {
   if (!authFormWithinLimit(formData)) return { ok: false, code: "authPasswordPreview.error.passwordTooLong" };
+  // A field the browser did not send at all is an empty answer, never a raw
+  // validator message such as "Expected string, received null".
+  const field = (name: string) => formData.get(name) ?? "";
   const parsed = registrationSchema.safeParse({
-    displayName: formData.get("displayName"),
-    email: formData.get("email"),
-    username: formData.get("username"),
-    accountType: formData.get("accountType"),
-    password: formData.get("password"),
-    birthDate: formData.get("birthDate"),
+    displayName: field("displayName"),
+    email: field("email"),
+    username: field("username"),
+    accountType: field("accountType"),
+    password: field("password"),
+    birthDate: field("birthDate"),
   });
-  if (!parsed.success) {
-    const first = parsed.error.issues[0];
-    return { ok: false, code: (first?.message as string) ?? "authPasswordPreview.error.invalidEmail" };
-  }
+  if (!parsed.success) return { ok: false, code: registrationIssueCode(parsed.error.issues[0]) };
 
   // Server-side authority for the account-type choice — the client-supplied
   // key is never trusted beyond looking it up here. A comingSoon/transitional

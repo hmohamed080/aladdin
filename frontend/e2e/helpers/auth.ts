@@ -169,19 +169,50 @@ export async function reachLanding(page: Page, landing: RegExp, timeout = 20_000
   }
 }
 
-/** Fills whatever the basics screen asks for and continues. */
+/**
+ * Answers the basics steps (ADR-0026: one step per missing item - phone, then
+ * governorate + town, then specialties) through the REAL form. Only the steps
+ * the account still misses are shown; the last Continue saves and leaves.
+ */
 export async function completeAccountBasics(page: Page): Promise<void> {
-  await expect(page.getByRole("heading", { name: /complete your account|أكمل حسابك/i })).toBeVisible();
-  const phone = page.locator('input[name="phone"]');
-  if (await phone.count()) await phone.fill(`010${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`);
-  const governorate = page.locator('select[name="governorate"]');
-  if (await governorate.count()) {
-    await governorate.selectOption("cairo");
-    await page.locator("select#city").selectOption("new-cairo");
+  await expect(page.getByText(/complete your account|أكمل حسابك/i).first()).toBeVisible();
+  const sections = page.locator("form section");
+  for (let step = 0; step < 3 && ACCOUNT_BASICS_URL.test(new URL(page.url()).pathname + new URL(page.url()).search); step++) {
+    const index = await sections.evaluateAll((els) => els.findIndex((el) => !(el as HTMLElement).hidden));
+    if (index < 0) break;
+    const current = sections.nth(index);
+    const phone = current.locator('input[name="phone"]');
+    if (await phone.count()) await phone.fill(`010${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`);
+    const governorate = current.locator('select[name="governorate"]');
+    if (await governorate.count()) {
+      await governorate.selectOption("cairo");
+      await current.locator("select#city").selectOption("new-cairo");
+    }
+    const specialty = current.locator("select#specialtyAdd");
+    if (await specialty.count()) await specialty.selectOption({ index: 1 });
+    await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
+    // The answered step hides (or the page leaves once the last one saves).
+    await expect(current).toBeHidden();
   }
-  const chips = page.locator('[aria-labelledby="basics-specialties"][role="group"] button');
-  if (await chips.count()) await chips.first().click();
+}
+
+/** Business setup: picks the first activity of the business type's own list, when this step asks for it. */
+export async function pickBusinessActivity(page: Page): Promise<void> {
+  const activity = page.locator("#bactivity");
+  if (!(await activity.count())) return;
+  await activity.selectOption({ index: 1 });
+}
+
+/** Business setup: answers the owner's own mobile number step, when a first business registration still owes it. */
+export async function answerBusinessContactIfAsked(page: Page): Promise<void> {
+  const heading = page.getByRole("heading", { name: /^how to reach you$|^كيف نتواصل معك$/i });
+  const branch = page.getByRole("heading", { name: /your primary branch/i });
+  await expect(heading.or(branch)).toBeVisible();
+  if (!(await heading.isVisible())) return;
+  const phone = page.locator("#ownerPhone");
+  if (await phone.count()) await phone.fill(`10${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`);
   await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
+  await expect(branch).toBeVisible();
 }
 
 /**
