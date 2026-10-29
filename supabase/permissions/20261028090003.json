@@ -1,6 +1,6 @@
 {
  "version": "20261028090003",
- "source": "20261028090002 contract plus the three registration username-lease helpers (app.lock_username, app.username_lease_interval, app.username_leased_by_other): owner postgres, no client grants (only the definer functions that call them may run them); public.pending_registration_save keeps its exact service_role-only grant with a boolean return; verified by the supabase-rls CI replay",
+ "source": "20261026090001 contract plus the three registration username-lease helpers (app.lock_username, app.username_lease_interval, app.username_leased_by_other): owner postgres, no client grants (only the definer functions that call them may run them); public.pending_registration_save keeps its exact service_role-only grant with a boolean return; verified by the supabase-rls CI replay",
  "publicRPCs": [
   "public.invitation_lookup(text)",
   "public.media_storage_resolve(text,text,text)",
@@ -11489,43 +11489,6 @@
     "supabase_auth_admin": false,
     "supabase_storage_admin": false
    },
-   "signature": "public.account_basics_set(text,text,text,text[])",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": true,
-    "authenticated": true,
-    "authenticator": true,
-    "dashboard_user": true,
-    "supabase_auth_admin": true,
-    "supabase_storage_admin": true
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
-     "role": "authenticated",
-     "grantable": false
-    },
-    {
-     "role": "postgres",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": false,
-    "authenticated": true,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
    "signature": "public.account_entry_allowed(text)",
    "schemaUsage": {
     "anon": true,
@@ -18140,43 +18103,6 @@
     "supabase_storage_admin": false
    },
    "signature": "public.membership_suspend(uuid)",
-   "schemaUsage": {
-    "anon": true,
-    "service_role": true,
-    "authenticated": true,
-    "authenticator": true,
-    "dashboard_user": true,
-    "supabase_auth_admin": true,
-    "supabase_storage_admin": true
-   }
-  },
-  {
-   "kind": "f",
-   "owner": "postgres",
-   "config": [
-    "search_path=\"\""
-   ],
-   "grants": [
-    {
-     "role": "authenticated",
-     "grantable": false
-    },
-    {
-     "role": "postgres",
-     "grantable": false
-    }
-   ],
-   "definer": true,
-   "effective": {
-    "anon": false,
-    "service_role": false,
-    "authenticated": true,
-    "authenticator": false,
-    "dashboard_user": false,
-    "supabase_auth_admin": false,
-    "supabase_storage_admin": false
-   },
-   "signature": "public.my_account_basics()",
    "schemaUsage": {
     "anon": true,
     "service_role": true,
