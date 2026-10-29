@@ -1,3 +1,12 @@
+## 2026-10-29 — Engineer location, coverage and initial-step correction
+
+- Completion initializes its selected step from server searchParams; portaled location/availability fields stay hidden until placed in their correct sections, preventing first-load misplaced fields.
+- Matched installer ProfileSelect and coverage controls from fetched origin/main: full Egypt catalog, custom city entry and additional governorate chips. Removed embedded travel-distance UI while preserving stored travel/remote data. Coverage uses existing owner-scoped service-area action.
+- Professional saves invalidate the home layout. Profile reads real location, named coverage, tools and availability; removed sample fallbacks from editable biography/details.
+- Engineer semantic palette now mirrors installer palette, including portaled menus; completion retains cream sections. Coverage thumb has contrasting primary ink and sand off-track.
+- Checks: typecheck and focused lint passed before the last small portal/thumb changes; 17 focused tests passed; editor's 12 tests passed again after hiding unplaced portals. Local browser save confirmed Cairo/Nasr City and header update; reload retained expertise step. Additional Giza save was initiated, but not subsequently verified after user requested manual-only page testing.
+- User preference: do not perform page-experience/browser tests. Provide concise manual steps and await their report. Keep code checks narrow. No production deployment.
+
 ## 2026-10-29 — Engineer profile editor refinement
 
 - Reused installer-style service menus and experience stepper; removed the duplicate activity selector.

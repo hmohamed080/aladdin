@@ -1,3 +1,5 @@
+import { loadMyServiceAreas } from "@/server/queries/service-areas";
+import { GOVERNORATE_OPTIONS, CITIES_BY_GOVERNORATE } from "@/lib/installer/location-data";
 import Image from "next/image";
 import { ProfileTabs } from "./profile-tabs";
 import { SamplePhoto, useLocalEngineerSamples as localEngineerSamples } from "./sample-content";
@@ -47,7 +49,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
   const ar = locale === "ar";
   const samples = localEngineerSamples();
   const t = createTranslator(locale);
-  const [identity, publication, portfolio, reviews, network, assignments] =
+  const [identity, publication, portfolio, reviews, network, assignments, coverage] =
     await Promise.all([
       loadMyIdentity(),
       loadProfilePublication(),
@@ -55,6 +57,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
       listMyReviews(),
       listMyNetworkOrganizations(supabase),
       listMyAssignments(supabase),
+      loadMyServiceAreas(),
     ]);
   const photos = await Promise.all(
     portfolio.slice(0, 3).map(async (p) => {
@@ -73,7 +76,11 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
   );
   const completed = countAssignmentsByStatus(assignments).completed;
   const p = account.professional;
+  const governorateLabel = (key: string) => GOVERNORATE_OPTIONS.find(option => option.value === key)?.[locale] ?? key;
+  const cityLabel = (CITIES_BY_GOVERNORATE[p.governorate ?? ""] ?? []).find(option => option.value === p.city)?.[locale] ?? p.city;
   const fields = [
+    [ar ? "الأدوات" : "Tools", p.additionalServices.map(key => t(`onboarding.professional.serviceItems.${key}`)).join(" · ")],
+    [ar ? "إتاحة العمل" : "Work availability", p.availability === "flexible" ? (ar ? "حسب الطلب" : "On demand") : p.availability ? t(`onboarding.professional.availabilities.${p.availability}`) : null],
     [
       ar ? "التخصص" : "Specialization",
       p.specialization ? specializationLabel(t, p.specialization) : null,
@@ -81,8 +88,8 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
     [ar ? "سنوات الخبرة" : "Years of experience", p.yearsExperience],
     [
       ar ? "مناطق العمل" : "Service areas",
-      p.serviceAreas
-        .map((area) => t(`onboarding.consumer.cities.${area}`))
+      [...new Set([p.governorate, ...coverage.others.map(area => area.governorateKey)].filter((key): key is string => Boolean(key)))]
+        .map(governorateLabel)
         .join(" · "),
     ],
     [
@@ -124,7 +131,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
                 />
                 <span className="flex items-center gap-1 text-label">
                   <MapPinIcon size={15} />
-                  {[p.city, p.governorate].filter(Boolean).join(" · ") ||
+                  {[cityLabel, p.governorate ? governorateLabel(p.governorate) : null].filter(Boolean).join(" · ") ||
                     (ar ? "لم يحدد الموقع" : "Location not set")}
                 </span>
               </div>
@@ -159,7 +166,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
           <Card>
             <div className="mb-md flex items-center justify-between gap-3"><h2 className="text-title">{ar ? "نبذة عني" : "About me"}</h2><ButtonLink href="/home/profile/complete" variant="ghost" size="sm"><PencilIcon size={14} />{ar ? "تعديل" : "Edit"}</ButtonLink></div>
             <p className="whitespace-pre-wrap text-body-lg leading-relaxed text-fg-secondary">
-              {p.bio || (samples ? (ar ? "مهندس معماري متخصص في التصميم الداخلي والخارجي للمشاريع السكنية والتجارية والإدارية. أهتم بتصميم مساحات عملية وجمالية تعكس احتياجات العميل وتناسب أسلوب حياته." : "Architect focused on residential, commercial and workplace interiors. Thoughtful spaces combine practical planning with a personal sense of place.") : null) ||
+              {p.bio ||
                 (ar
                   ? "أضف نبذة عن خبراتك وأسلوب عملك."
                   : "Introduce your experience and approach to your work.")}
@@ -172,7 +179,7 @@ export async function EngineerProfile({ locale }: { locale: Locale }) {
                 >
                   <dt className="text-fg-secondary">{label}</dt>
                   <dd className="text-end">
-                    {value === null || value === "" ? (samples ? (ar ? ["تصميم معماري · تصميم داخلي", "٨ سنوات", "القاهرة · التجمع الخامس · الشيخ زايد", "العربية · الإنجليزية"][fields.findIndex(f => f[0] === label)] : ["Architecture · Interior design", "8 years", "Cairo · New Cairo · Sheikh Zayed", "Arabic · English"][fields.findIndex(f => f[0] === label)]) : "—") : value}
+                    {value === null || value === "" ? "—" : value}
                   </dd>
                 </div>
               ))}

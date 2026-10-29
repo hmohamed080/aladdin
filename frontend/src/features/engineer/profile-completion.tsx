@@ -17,18 +17,17 @@ const steps = [
   { ar: "سابقة الأعمال", en: "Work history", Icon: LayersIcon, hintAr: "أضف أعمالك الحقيقية واختر ما تريد نشره في ملفك العام.", hintEn: "Add your own work and choose what to publish on your public profile." },
 ] as const;
 
-export function EngineerProfileCompletion({ name, avatar, completion, panels }: {
-  name: string; avatar: string | null; completion: ProfileCompletion | null; panels: ReactNode[];
+export function EngineerProfileCompletion({ name, avatar, completion, panels, initialStep = 0 }: {
+  name: string; avatar: string | null; completion: ProfileCompletion | null; panels: ReactNode[]; initialStep?: number;
 }) {
   const { locale } = useI18n();
   const ar = locale === "ar";
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useState(initialStep);
   useEffect(() => {
     const restore = () => {
       const step = Number(new URLSearchParams(window.location.search).get("step"));
       setActive(Number.isInteger(step) && step >= 0 && step < steps.length ? step : 0);
     };
-    restore();
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
   }, []);

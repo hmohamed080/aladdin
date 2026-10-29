@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -116,6 +117,7 @@ export async function saveProfessional(input: ProfessionalInput): Promise<Indivi
     p_max_travel_km: v.maxTravelKm ?? undefined,
   });
   if (error) return { ok: false, code: error.code === "22023" && /description/i.test(error.message) ? "onboarding.error.descriptionTooLong" : "onboarding.error.saveFailed" };
+  revalidatePath("/home", "layout");
   return OK;
 }
 

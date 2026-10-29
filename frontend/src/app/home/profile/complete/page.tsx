@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { requireEngineer } from "@/server/queries/engineer";
 import { loadMyIdentity, loadMyProfileCompletion } from "@/server/queries/profile-identity";
 import { getIndividualOnboardingData } from "@/server/queries/onboarding";
-import { loadMyAvailabilityWindows } from "@/server/queries/service-areas";
+import { loadMyAvailabilityWindows, loadMyServiceAreas } from "@/server/queries/service-areas";
 import { listMyPortfolio } from "@/server/queries/portfolio";
 import { createAssetReadUrl } from "@/server/actions/professional-assets";
 import { resolveLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
@@ -17,11 +17,13 @@ import { ButtonLink } from "@/components/ui/controls";
 
 export const dynamic = "force-dynamic";
 
-export default async function CompleteEngineerProfilePage() {
+export default async function CompleteEngineerProfilePage({ searchParams }: { searchParams: Promise<{ step?: string }> }) {
+  const step = Number((await searchParams).step ?? 0);
+  const initialStep = Number.isInteger(step) && step >= 0 && step < 4 ? step : 0;
   const { account } = await requireEngineer();
-  const [identity, completion, individual, windows, portfolio, store] = await Promise.all([
+  const [identity, completion, individual, windows, portfolio, store, serviceAreas] = await Promise.all([
     loadMyIdentity(), loadMyProfileCompletion(), getIndividualOnboardingData(),
-    loadMyAvailabilityWindows(), listMyPortfolio(), cookies(),
+    loadMyAvailabilityWindows(), listMyPortfolio(), cookies(), loadMyServiceAreas(),
   ]);
   if (!identity || !individual) redirect("/auth/sign-in");
   const ar = resolveLocale(store.get(LOCALE_COOKIE)?.value) === "ar";
@@ -29,7 +31,7 @@ export default async function CompleteEngineerProfilePage() {
     const url = item.pending ? null : await createAssetReadUrl("portfolio", item.objectKey);
     return { ...item, previewUrl: url?.ok ? url.url : null };
   }));
-  return <EngineerProfileCompletion name={identity.displayName} avatar={identity.avatarUrl} completion={completion} panels={[
+  return <EngineerProfileCompletion initialStep={initialStep} name={identity.displayName} avatar={identity.avatarUrl} completion={completion} panels={[
     <div key="identity" className="space-y-md">
       <IdentityCard identity={identity} showSaveBar />
       <div className="engineer-edit-username flex flex-wrap items-center justify-between gap-md rounded-md border bg-surface p-lg">
@@ -38,7 +40,7 @@ export default async function CompleteEngineerProfilePage() {
       </div>
     </div>,
     <div key="expertise" className="space-y-lg">
-      <ProfessionalProfileEditor answers={individual.professional} concreteType="engineer" embedded />
+      <ProfessionalProfileEditor answers={individual.professional} concreteType="engineer" otherGovernorates={serviceAreas.others.map(area => area.governorateKey)} embedded />
     </div>,
     <div key="availability" className="space-y-lg"><AvailabilityControl availability={account.availability} /><AvailabilityWindows windows={windows} /></div>,
     <PortfolioManager key="portfolio" items={cards} />,

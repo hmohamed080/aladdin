@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useTransition, useEffect, useRef, type ReactNode } from "react";
+import { ProfileSelect, CoverageSection } from "@/features/engineer/profile-location-controls";
+import { GOVERNORATE_OPTIONS, CITIES_BY_GOVERNORATE as INSTALLER_CITIES } from "@/lib/installer/location-data";
+import { setServiceAreasAction } from "@/server/actions/service-areas";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createPortal } from "react-dom";
@@ -74,16 +77,20 @@ type EditorState = {
   governorate: string | null;
   city: string | null;
   maxTravelKm: number | null;
+  otherGovernorates: string[];
+  worksElsewhere: boolean;
 };
 
 export function ProfessionalProfileEditor({
   answers,
   concreteType,
   embedded = false,
+  otherGovernorates = [],
 }: {
   answers: ProfessionalAnswers;
   /** Keep the saved editor in the profile-completion workspace. */
   embedded?: boolean;
+  otherGovernorates?: string[];
   /** The persona this profile belongs to — fixed, and the vocabulary key. */
   concreteType: string;
 }) {
@@ -107,7 +114,14 @@ export function ProfessionalProfileEditor({
     governorate: answers.governorate,
     city: answers.city,
     maxTravelKm: answers.maxTravelKm,
+    otherGovernorates,
+    worksElsewhere: otherGovernorates.length > 0,
   });
+
+  const [customCityMode, setCustomCityMode] = useState(false);
+  const cityOptions = INSTALLER_CITIES[state.governorate ?? ""] ?? [];
+  const knownCity = cityOptions.some(option => option.value === state.city && option.value !== "other");
+  const customCity = customCityMode || Boolean(state.city && !knownCity);
 
   const [baseline, setBaseline] = useState(() => JSON.stringify(state));
   const dirty = JSON.stringify(state) !== baseline;
@@ -129,6 +143,7 @@ export function ProfessionalProfileEditor({
     start(async () => {
       setFailed(false);
       setSaved(false);
+      if (embedded && state.worksElsewhere && !state.governorate) { setFailed(true); return; }
       const input: ProfessionalInput = {
         concreteType: concreteType as ProfessionalInput["concreteType"],
         headline: state.headline.trim() || null,
@@ -149,6 +164,16 @@ export function ProfessionalProfileEditor({
       if (!result.ok) {
         setFailed(true);
         return;
+      }
+      if (embedded && state.governorate) {
+        const data = new FormData();
+        data.set("primary", state.governorate);
+        data.set("areas", JSON.stringify([
+          { governorateKey: state.governorate, cityKey: knownCity ? state.city : null },
+          ...(state.worksElsewhere ? state.otherGovernorates : []).filter(g => g !== state.governorate).map(governorateKey => ({ governorateKey, cityKey: null })),
+        ]));
+        const coverage = await setServiceAreasAction({ ok: false }, data);
+        if (!coverage.ok) { setFailed(true); return; }
       }
       // Back to the hub, which re-reads from the database — so what is shown after
       // a save is what was actually stored, never the form's own optimism.
@@ -321,37 +346,21 @@ export function ProfessionalProfileEditor({
       </Card>
 
       <Card className="flex flex-col gap-lg">
-        <EditorSlot enabled={embedded} target="engineer-location-slot"><div className="grid gap-md tablet:grid-cols-2 mt-md">        <LabeledField label={t("onboarding.professional.location.governorateLabel")} htmlFor="gov">
-          <div className="relative"><MapPinIcon size={19} className="pointer-events-none absolute start-3 top-3 z-10" /><Select className="ps-10"
-            id="gov"
-            value={state.governorate ?? ""}
-            onChange={(e) => set({ governorate: e.target.value || null, serviceAreas: [], city: null })}
-          >
-            <option value="">{t("onboarding.professional.location.choose")}</option>
-            {GOVERNORATES.map((g) => (
-              <option key={g} value={g}>
-                {t(`onboarding.consumer.governorates.${g}`)}
-              </option>
-            ))}
-          </Select></div>
-        </LabeledField>
-
-        {embedded && <LabeledField label={locale === "ar" ? "المدينة" : "City"} htmlFor="engineer-city">
-          <div className="relative"><BuildingIcon size={19} className="pointer-events-none absolute start-3 top-3 z-10" /><Select id="engineer-city" className="ps-10" disabled={!state.governorate} value={state.city ?? ""} onChange={(e) => set({ city: e.target.value || null })}>
-            <option value="">{t("onboarding.professional.location.choose")}</option>
-            {state.city && !areaCities.includes(state.city) && <option value={state.city}>{state.city}</option>}
-            {areaCities.map(city => <option key={city} value={city}>{t(`onboarding.consumer.cities.${city}`)}</option>)}
-          </Select></div>
-        </LabeledField>}
-</div></EditorSlot>
-        {embedded ? <div className="space-y-md">
-          <div><h3 className="font-semibold">{locale === "ar" ? "نطاق العمل" : "Work coverage"}</h3><p className="text-label text-fg-secondary">{locale === "ar" ? "هل تعمل في محافظات أخرى؟" : "Do you work in other governorates?"}</p></div>
-          <div className="flex items-center justify-between gap-md rounded-md border border-strong p-md">
-            <span id="coverage-label">{locale === "ar" ? "أعمل في محافظات أخرى" : "I work in other governorates"}</span>
-            <button type="button" role="switch" aria-labelledby="coverage-label" aria-checked={(state.maxTravelKm ?? 0) > 0} className="engineer-coverage-switch" onClick={() => set({ maxTravelKm: (state.maxTravelKm ?? 0) > 0 ? 0 : 50 })}><span /></button>
+        <EditorSlot enabled={embedded} target="engineer-location-slot">
+          <div className="grid gap-md tablet:grid-cols-2 mt-md">
+            {embedded ? <>
+              <ProfileSelect id="gov" label={locale === "ar" ? "المحافظة" : "Governorate"} value={state.governorate ?? ""} placeholder={locale === "ar" ? "اختر المحافظة" : "Choose a governorate"} icon={<MapPinIcon size={18} />} options={GOVERNORATE_OPTIONS.map(option => ({ value: option.value, label: option[locale] }))} onChange={value => { setCustomCityMode(false); set({ governorate: value, city: null, otherGovernorates: state.otherGovernorates.filter(g => g !== value) }); }} />
+              <ProfileSelect id="engineer-city" label={locale === "ar" ? "المدينة" : "City"} value={customCity ? "other" : state.city ?? ""} placeholder={locale === "ar" ? "اختر المدينة" : "Choose a city"} icon={<BuildingIcon size={18} />} options={cityOptions.map(option => ({ value: option.value, label: option[locale] }))} onChange={value => { setCustomCityMode(value === "other"); set({ city: value === "other" ? "" : value }); }} customEntry={{ optionValue: "other", value: customCity ? state.city ?? "" : "", onChange: value => set({ city: value }), inputLabel: locale === "ar" ? "اسم المدينة" : "City name", placeholder: locale === "ar" ? "اكتب اسم المدينة" : "Enter your city", confirmLabel: locale === "ar" ? "تأكيد" : "Confirm" }} />
+            </> : <LabeledField label={t("onboarding.professional.location.governorateLabel")} htmlFor="gov"><Select id="gov" value={state.governorate ?? ""} onChange={e => set({ governorate: e.target.value || null, serviceAreas: [], city: null })}><option value="">{t("onboarding.professional.location.choose")}</option>{GOVERNORATES.map(g => <option key={g} value={g}>{t(`onboarding.consumer.governorates.${g}`)}</option>)}</Select></LabeledField>}
           </div>
-          {(state.maxTravelKm ?? 0) > 0 && <LabeledField label={t("onboarding.professional.location.maxTravelLabel")} htmlFor="travel"><Select id="travel" value={state.maxTravelKm ?? ""} onChange={e => set({ maxTravelKm: Number(e.target.value) })}>{MAX_TRAVEL_KM.filter(km => km > 0).map(km => <option key={km} value={km}>{km} {t("onboarding.professional.location.km")}</option>)}</Select></LabeledField>}
-        </div> : <>        {areaCities.length ? (
+        </EditorSlot>
+        {embedded ? <CoverageSection locale={locale} form={{ governorate: state.governorate ?? "", otherAreas: state.worksElsewhere, areas: state.otherGovernorates }} set={(key, value) => {
+          setState(previous => {
+            const old = { governorate: previous.governorate ?? "", otherAreas: previous.worksElsewhere, areas: previous.otherGovernorates };
+            const next = { ...old, [key]: typeof value === "function" ? value(old[key]) : value };
+            return { ...previous, governorate: next.governorate, worksElsewhere: next.otherAreas, otherGovernorates: next.areas };
+          });
+        }} /> : <>        {areaCities.length ? (
           <LabeledField label={t("onboarding.professional.location.areasLabel")} htmlFor="areas">
             <div id="areas" className="flex flex-wrap gap-2">
               {areaCities.map((c) => (
@@ -427,7 +436,7 @@ export function ProfessionalProfileEditor({
 function EditorSlot({ enabled, target, children }: { enabled: boolean; target: string; children: ReactNode }) {
   const [container, setContainer] = useState<HTMLElement | null>(null);
   useEffect(() => { if (enabled) setContainer(document.getElementById(target)); }, [enabled, target]);
-  return enabled && container ? createPortal(children, container) : children;
+  return enabled ? (container ? createPortal(children, container) : null) : children;
 }
 
 function ProfileMultiSelect({ id, options, selected, label, onToggle, placeholder }: {

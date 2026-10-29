@@ -21,6 +21,8 @@ import type { ProfessionalAnswers } from "@/server/queries/onboarding";
 type Input = Record<string, unknown>;
 type ActionState = { ok: boolean; code?: string };
 const saveProfessional = vi.fn<(input: Input) => Promise<ActionState>>();
+const saveAreas = vi.fn().mockResolvedValue({ ok: true });
+vi.mock("@/server/actions/service-areas", () => ({ setServiceAreasAction: (...args: unknown[]) => saveAreas(...args) }));
 const push = vi.fn();
 const refresh = vi.fn();
 
@@ -54,6 +56,14 @@ const answers: ProfessionalAnswers = {
 };
 
 beforeEach(() => {
+  for (const id of ["engineer-save-slot", "engineer-location-slot", "engineer-availability-slot"]) {
+    document.getElementById(id)?.remove();
+    const slot = document.createElement("div");
+    slot.id = id;
+    document.body.append(slot);
+  }
+  saveAreas.mockClear();
+  saveAreas.mockResolvedValue({ ok: true });
   saveProfessional.mockClear();
   saveProfessional.mockResolvedValue({ ok: true });
   push.mockClear();
@@ -82,6 +92,25 @@ describe("ProfessionalProfileEditor", () => {
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(push).not.toHaveBeenCalled();
     expect(screen.getByText("Your details have been saved.")).toHaveAttribute("role", "status");
+  });
+  it("saves named coverage and removes coverage without changing the legacy travel value", async () => {
+    renderWithI18n(<ProfessionalProfileEditor answers={{ ...answers, city: "nasr-city", maxTravelKm: 50 }} otherGovernorates={["giza"]} concreteType="engineer" embedded />, "en");
+    expect(screen.queryByLabelText(/maximum travel/i)).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: "I work in other governorates" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(saveProfessional.mock.calls[0]![0]).toMatchObject({ governorate: "cairo", city: "nasr-city", maxTravelKm: 50 });
+    const payload = saveAreas.mock.calls[0]![1] as FormData;
+    expect(JSON.parse(String(payload.get("areas")))).toEqual([{ governorateKey: "cairo", cityKey: "nasr-city" }]);
+  });
+  it("keeps unsaved status when saving coverage fails", async () => {
+    saveAreas.mockResolvedValue({ ok: false });
+    renderWithI18n(<ProfessionalProfileEditor answers={answers} concreteType="engineer" embedded />, "en");
+    fireEvent.change(screen.getByLabelText(/headline/i), { target: { value: "Updated headline" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeVisible());
+    expect(screen.getByText("You have unsaved changes")).toBeVisible();
+    expect(refresh).not.toHaveBeenCalled();
   });
   it("renders an editable form — the read-only fallback is gone", () => {
     renderWithI18n(

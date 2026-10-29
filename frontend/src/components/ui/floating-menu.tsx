@@ -110,7 +110,7 @@ export function FloatingMenu({
 }) {
   const typed = useRef<{ text: string; at: number }>({ text: "", at: 0 });
   const [mounted, setMounted] = useState(false);
-  const [scope, setScope] = useState<{ installer: boolean; engineerCompletion?: boolean; theme?: string; dir: "ltr" | "rtl" }>({ installer: false, dir: "ltr" });
+  const [scope, setScope] = useState<{ installer: boolean; engineer?: boolean; engineerCompletion?: boolean; theme?: string; dir: "ltr" | "rtl" }>({ installer: false, dir: "ltr" });
   const floatingEl = useRef<HTMLDivElement | null>(null);
 
   const { refs, floatingStyles, update, placement: resolvedPlacement } = useFloating({
@@ -147,6 +147,7 @@ export function FloatingMenu({
     const surface = anchor?.closest<HTMLElement>(".installer-surface") ?? null;
     setScope({
       installer: Boolean(surface),
+      engineer: Boolean(anchor?.closest(".engineer-surface")),
       engineerCompletion: Boolean(anchor?.closest(".engineer-completion-workspace")),
       theme: surface?.dataset.installerTheme,
       // The nearest explicit `dir` (the document, or an installer wrapper) wins; the computed direction is the fallback.
@@ -241,7 +242,7 @@ export function FloatingMenu({
   };
 
   return createPortal(
-    <div className={cn("contents", scope.installer && "installer-surface", scope.engineerCompletion && "engineer-surface engineer-completion-overlay")} data-installer-theme={scope.theme} dir={scope.dir}>
+    <div className={cn("contents", scope.installer && "installer-surface", scope.engineer && "engineer-surface", scope.engineerCompletion && "engineer-completion-overlay")} data-installer-theme={scope.theme} dir={scope.dir}>
       <div
         ref={setFloating}
         id={id}

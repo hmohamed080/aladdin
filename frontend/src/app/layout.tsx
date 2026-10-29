@@ -6,6 +6,7 @@ import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { THEME_COOKIE, THEME_BOOTSTRAP, resolveThemePreference } from "@/lib/theme/config";
 import { ThemeSync } from "@/components/layout/theme-sync";
 import "./globals.css";
+import "@/styles/engineer-palette.css";
 
 // Bilingual (AR + EN) product-UI workhorse — the default body font.
 const readex = Readex_Pro({ subsets: ["arabic", "latin"], variable: "--font-readex", display: "swap" });
