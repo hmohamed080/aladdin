@@ -1,0 +1,63 @@
+# Daily backups. Lives in the separate private repo `aladdin-backups` (copied there by ops/backups/build-repo.sh).
+# Read-only on the databases; writes only new, locked objects to the backup bucket.
+name: Daily backup
+on:
+  schedule:
+    - cron: "30 23 * * *"      # 01:30 Cairo
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "Which project to back up"
+        type: choice
+        options: [acceptance, production]
+        default: acceptance
+permissions:
+  contents: read
+concurrency:
+  group: backup-${{ github.event.inputs.label || 'scheduled' }}
+  cancel-in-progress: false
+jobs:
+  backup:
+    strategy:
+      fail-fast: false
+      matrix:
+        label: [acceptance, production]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    # Manual runs back up only the chosen project. Scheduled runs back up Acceptance every Sunday and
+    # Production every day once the owner sets the repository variable PRODUCTION_BACKUP_ENABLED=true.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.label == matrix.label) ||
+      (github.event_name == 'schedule' && matrix.label == 'production' && vars.PRODUCTION_BACKUP_ENABLED == 'true') ||
+      (github.event_name == 'schedule' && matrix.label == 'acceptance')
+    environment: backup-${{ matrix.label }}
+    env:
+      BACKUP_LABEL: ${{ matrix.label }}
+      BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
+      R2_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_WRITE_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_WRITE_SECRET }}
+      AGE_RECIPIENTS: ${{ vars.AGE_RECIPIENTS }}
+      BACKUP_DB_URL: ${{ secrets.BACKUP_DB_URL }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip Acceptance on weekdays
+        id: gate
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$BACKUP_LABEL" = acceptance ] && [ "$(TZ=Africa/Cairo date +%u)" != 7 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
+      - name: Install age and the Postgres 17 client
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq age postgresql-client-17 >/dev/null
+      - name: Database backup
+        if: steps.gate.outputs.run == 'true'
+        run: bash backup/db-backup.sh
+      - name: Media backup (files in Supabase Storage)
+        if: steps.gate.outputs.run == 'true'
+        run: bash backup/media-backup.sh

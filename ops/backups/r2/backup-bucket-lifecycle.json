@@ -1,0 +1,121 @@
+{
+  "rules": [
+    {
+      "id": "expire-production-db-daily",
+      "enabled": true,
+      "conditions": {
+        "prefix": "db/production/daily/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 1296000
+        }
+      }
+    },
+    {
+      "id": "expire-production-db-weekly",
+      "enabled": true,
+      "conditions": {
+        "prefix": "db/production/weekly/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 4924800
+        }
+      }
+    },
+    {
+      "id": "expire-production-db-monthly",
+      "enabled": true,
+      "conditions": {
+        "prefix": "db/production/monthly/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 31622400
+        }
+      }
+    },
+    {
+      "id": "expire-production-media-inventory",
+      "enabled": true,
+      "conditions": {
+        "prefix": "media/production/supabase/inventory/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 7776000
+        }
+      }
+    },
+    {
+      "id": "expire-acceptance-db-daily",
+      "enabled": true,
+      "conditions": {
+        "prefix": "db/acceptance/daily/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 1296000
+        }
+      }
+    },
+    {
+      "id": "expire-acceptance-db-weekly",
+      "enabled": true,
+      "conditions": {
+        "prefix": "db/acceptance/weekly/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 4924800
+        }
+      }
+    },
+    {
+      "id": "expire-acceptance-db-monthly",
+      "enabled": true,
+      "conditions": {
+        "prefix": "db/acceptance/monthly/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 31622400
+        }
+      }
+    },
+    {
+      "id": "expire-acceptance-media-inventory",
+      "enabled": true,
+      "conditions": {
+        "prefix": "media/acceptance/supabase/inventory/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 7776000
+        }
+      }
+    },
+    {
+      "id": "abort-incomplete-multipart",
+      "enabled": true,
+      "conditions": {
+        "prefix": ""
+      },
+      "abortMultipartUploadsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 604800
+        }
+      }
+    }
+  ]
+}
