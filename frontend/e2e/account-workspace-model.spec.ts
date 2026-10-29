@@ -1,5 +1,5 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
-import { registerWithPassword, signIn, IDENTITIES } from "./helpers/auth";
+import { answerBusinessContactIfAsked, pickBusinessActivity, registerWithPassword, signIn, IDENTITIES } from "./helpers/auth";
 
 /**
  * Pilot Account & Workspace Model — targeted acceptance.
@@ -64,15 +64,19 @@ async function createBusiness(page: Page, name: string, branch: string, opts: { 
     await page.locator("#bactivity").selectOption("decor_showroom");
     await page.locator("#bphone").fill(`10${String(Date.now()).slice(-8)}`);
   }
+  if (!opts.showroom) await pickBusinessActivity(page);
   await next();
   if (opts.orgType) {
     await expect(page.getByRole("heading", { name: /what kind of business/i })).toBeVisible();
     await page.getByText(opts.orgType).first().click();
+    // Each business type answers its own activity list.
+    await pickBusinessActivity(page);
     await next();
   }
   await page.locator("#bgov").selectOption("cairo");
   await page.locator("#bcity").selectOption("maadi");
   await next();
+  await answerBusinessContactIfAsked(page);
   await page.locator("#bbranch").fill(branch);
   await next();
   await expect(page.getByRole("heading", { name: /review and create/i })).toBeVisible();
