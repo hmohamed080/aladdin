@@ -68,10 +68,11 @@ jobs:
       SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       PRODUCTION_BACKUP_ENABLED: ${{ vars.PRODUCTION_BACKUP_ENABLED }}
-      BACKUP_STATE_DIR: ${{ runner.temp }}/backup-state
       SKIP_IF_TAKEN: ${{ github.event_name == 'schedule' && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Hand-off folder between the two backup steps
+        run: echo "BACKUP_STATE_DIR=$RUNNER_TEMP/backup-state" >> "$GITHUB_ENV"
       - name: Install age and the Postgres 17 client
         run: |
           sudo install -d /usr/share/postgresql-common/pgdg

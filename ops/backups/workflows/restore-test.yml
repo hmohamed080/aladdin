@@ -33,9 +33,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_READ_SECRET }}
       AGE_IDENTITY: ${{ secrets.AGE_RESTORE_TEST_IDENTITY }}
       REPO_ROOT: ${{ github.workspace }}
-      OUT: ${{ runner.temp }}/restore-test
     steps:
       - uses: actions/checkout@v4
+      - name: Work folder on the runner
+        run: echo "OUT=$RUNNER_TEMP/restore-test" >> "$GITHUB_ENV"
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq age >/dev/null
       - name: Restore and verify
         run: |
