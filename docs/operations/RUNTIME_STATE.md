@@ -1,3 +1,10 @@
+## 2026-10-29 — Contact WhatsApp verification explicitly deferred
+
+- Owner approved deferring the WhatsApp OTP integration while the shared integration is being prepared.
+- Deployment handoff: [engineer contact WhatsApp handoff](./engineer-contact-whatsapp-handoff.md). Reuse the other accounts' canonical verification flow and enforce disclosure only to signed-in parties after work starts.
+- This documentation change does not implement OTP or contact disclosure. New numbers must not be considered verified merely because they were saved.
+- Existing profile-completion revisions in the working tree remain unfinished, including completion calculation, cover/media and availability changes. They are outside this documentation-only commit.
+- Validation: documentation diff and referenced-path checks only; no browser tests or deployment.
 ## 2026-10-29 — Engineer location, coverage and initial-step correction
 
 - Completion initializes its selected step from server searchParams; portaled location/availability fields stay hidden until placed in their correct sections, preventing first-load misplaced fields.
