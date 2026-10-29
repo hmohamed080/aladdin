@@ -1,0 +1,7 @@
+== mode confirm-on
+confirm-on: [sec] confirm-on: {"suite":"phone-signup-security","mode":"confirm-on","email_confirmations":true,"gotrue_image":"public.ecr.aws/supabase/gotrue:v2.197.0","cli":"2.122.0","PASS":30,"FAIL":0,"XFAIL":9,"XPASS":0,"EVAL":9,"N/A":4,"total":52}
+== mode confirm-off
+confirm-off: [sec] confirm-off: {"suite":"phone-signup-security","mode":"confirm-off","email_confirmations":false,"gotrue_image":"public.ecr.aws/supabase/gotrue:v2.197.0","cli":"2.122.0","PASS":29,"FAIL":0,"XFAIL":12,"XPASS":0,"EVAL":10,"N/A":2,"total":53}
+== mode hook
+hook: [sec] hook: {"suite":"phone-signup-security","mode":"hook","email_confirmations":true,"gotrue_image":"public.ecr.aws/supabase/gotrue:v2.197.0","cli":"2.122.0","PASS":33,"FAIL":0,"XFAIL":9,"XPASS":0,"EVAL":11,"N/A":2,"total":55}
+RESULT: all modes clean (expected failures only)

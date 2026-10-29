@@ -2,6 +2,8 @@
 
 **Status:** open · **Not caused by B1, not fixed by B1, not approved by B1.** Recorded here so it cannot be lost inside a feature PR, and so nobody reads a green B1 run as a review of these permissions.
 
+> **Update (tests-first security branch, 2026-10-29):** the open question below is answered in [`PHONE_PERMISSION_DISCREPANCY_RECONCILIATION.md`](PHONE_PERMISSION_DISCREPANCY_RECONCILIATION.md). The same migrations replayed under CI's toolchain (Supabase CLI 2.110.0, Postgres 17.6.1.143) match the contract exactly; the 13 differences come from the newer local CLI/image (2.122.0 / 17.11.0.006), which starts with default `EXECUTE` for `service_role` on new `public` functions. The *hosted* state is still unverified, and the discrepancy stays open. Nothing here was changed.
+
 ## What was found
 
 The repository's reviewed contract `supabase/permissions/20261026090001.json` lists, per function, who may `EXECUTE` it. On a **clean local replay of `main` + #119 + A2 with the B1 migration absent**, 13 existing functions do not match that contract in the same way: the database lets **`service_role`** execute them, the reviewed contract says it must not.
