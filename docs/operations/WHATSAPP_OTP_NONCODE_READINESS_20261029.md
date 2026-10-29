@@ -4,6 +4,17 @@
 **Scope:** product UX, operational readiness, risk and test planning only. No code, database, account setting or Worker deployment changes.  
 **GitHub dependencies:** #113 must stabilize first, then #116 is retargeted/tested before signup integration. #117 is a separate draft planning PR. #114 is the isolated delivery-disabled Preview transport PR.
 
+## 2026-10-29 owner-provided Meta Manager visual checks (read-only)
+
+The owner supplied screenshots from WhatsApp Manager. **Screenshot evidence only; no live Meta API verification or billing transaction evidence was performed here.** Do not put the full sender phone or payment instrument into a public PR.
+
+- Sender (masked): Egyptian WhatsApp business number ending **5339**, status **Connected**, number quality **High**; display name shown as **Business Solution**, status **In review**. Connected and display name review are distinct.
+- Template `aladdin_otp`: **Authentication**, **Arabic**, status **Active – Quality pending** (approved/sendable; quality feedback pending); the visual preview shows Copy Code and 5-minute expiry. Recheck current status immediately before actual sends.
+- Insights → Message pricing, filter **All phone numbers**, **All countries**, **23–29 October 2026**: **2 sent; 2 delivered; 2 paid**; breakdown **1 Utility / 1 Authentication**, no Marketing and no free messages. Approximate total charges **10.43 ARS**, approximately **5.22 ARS per category**. This is **ARS (Argentine peso), NOT USD** as displayed. Counts refer to this selected reporting period and may differ from other cards.
+- **Billing unresolved:** Insights is expressly approximate; it cannot prove invoice amount, balance due or paid amount. Meta business payment configuration previously appeared labelled **India**, while sender is Egypt and pricing dashboard showed **ARS**; check actual Billing & Payments invoice currency, entity, credit line and any payment obligations before inferring anything or enabling delivery.
+- **Worker sender linkage remains unverified:** visually seeing a connected Egyptian phone does not prove that its **Phone Number ID** equals Worker config `1415528588305492`. Owner should navigate WhatsApp Manager → Phone numbers → number details or Developers → WhatsApp → API Setup and compare IDs **without sharing tokens**.
+- This evidence does **not** authorize activating Worker delivery, Supabase SMS Hook, phone MFA add-on, or Production. PR #116 registration changes remain independently in progress.
+
 ## 1) Already established (do not repeat)
 
 - Cloudflare Preview `aladdin-whatsapp-otp-preview` deployed with `WHATSAPP_DELIVERY_ENABLED=false`, signing binding tested with signed dummy HTTP request, no D1 replay entries after tests.
