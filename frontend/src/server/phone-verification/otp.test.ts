@@ -98,3 +98,23 @@ describe("ipBucketKey", () => {
     expect(ipBucketKey(r, "123456")).not.toBe(computeMac(r.keys.get("k2")!, ctx, "123456"));
   });
 });
+
+describe("signup_proof context", () => {
+  const REG = "33333333-3333-4333-8333-333333333333";
+  const sctx = { challengeId: "11111111-1111-4111-8111-111111111111", registrationId: REG, purpose: "signup_proof" as const };
+  const key = Buffer.alloc(32, 7);
+  it("is domain-separated from primary_proof even when the subject uuid is identical", () => {
+    const primary = computeMac(key, { challengeId: sctx.challengeId, userId: REG, purpose: "primary_proof" }, "123456");
+    expect(computeMac(key, sctx, "123456")).not.toBe(primary);
+  });
+  it("binds the registration, the challenge and the code", () => {
+    const base = computeMac(key, sctx, "123456");
+    expect(computeMac(key, { ...sctx, registrationId: "44444444-4444-4444-8444-444444444444" }, "123456")).not.toBe(base);
+    expect(computeMac(key, { ...sctx, challengeId: "55555555-5555-4555-8555-555555555555" }, "123456")).not.toBe(base);
+    expect(computeMac(key, sctx, "123457")).not.toBe(base);
+  });
+  it("rejects non-UUID subjects and unknown purposes (injective encoding)", () => {
+    expect(() => computeMac(key, { ...sctx, registrationId: "a|b" }, "123456")).toThrow("invalid MAC context");
+    expect(() => computeMac(key, { ...sctx, purpose: "other" as "signup_proof" }, "123456")).toThrow("invalid MAC context");
+  });
+});

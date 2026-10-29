@@ -5,7 +5,18 @@
  *
  * B1 ships only two implementations: a transport that refuses to send, and an in-memory fake for tests.
  */
-export type OtpMessage = { to: string; code: string; ttlSeconds: number };
+export type OtpMessage = {
+  to: string;
+  code: string;
+  ttlSeconds: number;
+  /** Which proof this code belongs to (an adapter may choose a template or an audit tag from it). */
+  purpose?: "primary_proof" | "signup_proof";
+  locale?: "en" | "ar";
+};
+/*
+ * Contract for EVERY implementation (see delivery.ts for the selectable ones): send() throws on any failure, the thrown message
+ * never contains the destination or the code, and nothing in a transport may log either of them.
+ */
 
 export interface PhoneOtpTransport {
   send(message: OtpMessage): Promise<void>;

@@ -1,3 +1,7 @@
+// DESIGN-EVIDENCE PROBE (kept from PR #122). Runs against a stack whose alias guard is OFF (the migration default). It records WHY the
+// R1 guard is a deferred constraint trigger (scratch BEFORE INSERT / deferred / hook candidates). The behaviour of the real guard and the
+// signup authority is tested by signup_authority.test.mjs.
+//
 // Phone-signup security regression suite (TESTS FIRST; no registration implementation is changed by this branch).
 //
 //   SEC_MODE=confirm-on|confirm-off|hook DB_CONTAINER=supabase_db_<isolated> node supabase/tests/sec/phone_signup_security.test.mjs
@@ -391,17 +395,7 @@ try {
     db.sql("update sec_probe.cfg set reject = false;");
   } else rec.na("SEC-H1", "candidate-hook", "Rejecting before_user_created hook", "only evaluated in SEC_MODE=hook");
 
-  // ================================================================================================ 5. D: signup proof binding (PROPOSED contract; see docs and signup_proof_contract.test.mjs)
-  const proposed = ["phone_signup_start", "phone_signup_verify", "phone_signup_attach"];
-  const present = proposed.map((fn) => db.sql(`select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = '${fn}';`) !== "0");
-  for (const [id, text] of [
-    ["SEC-D1", "A verified signup challenge is bound to the NEW Auth user and sets profiles.phone_verified_at for exactly the verified number"],
-    ["SEC-D2", "Replaying a consumed signup proof (same code, same challenge) is refused and attaches nothing"],
-    ["SEC-D3", "An expired proof cannot be attached"],
-    ["SEC-D4", "A proof for number A cannot verify an account whose profile number is B (wrong-account / wrong-number)"],
-    ["SEC-D5", "Two concurrent attach attempts for one proof: exactly one account is verified"],
-    ["SEC-D6", "Alias account creation without an attached proof is refused at the database (OTP cannot be skipped through GoTrue)"],
-  ]) rec.expectFail(id, "signup-proof", text, false, `proposed contract not implemented: ${proposed.filter((_, i) => !present[i]).join(", ") || "(present: run signup_proof_contract.test.mjs)"}`);
+  rec.na("SEC-D*", "signup-proof", "Signup proof binding", "implemented in R1: see signup_authority.test.mjs (this file is the PR #122 design-evidence probe and is run against a stack whose guard is OFF)");
 
   // ================================================================================================ 6. E: legacy identity preservation after everything above
   const after = snapshot(legacy);
@@ -414,7 +408,7 @@ try {
   try { db.sql("drop trigger if exists sec_probe_cap on auth.users; drop trigger if exists sec_probe_cap_upd on auth.users; drop trigger if exists sec_probe_guard on auth.users; drop trigger if exists sec_probe_deferred on auth.users; drop function if exists public.sec_probe_hook(jsonb); drop schema if exists sec_probe cascade;"); } catch (e) { console.error("[sec] probe cleanup failed", String(e).slice(0, 200)); }
   for (const id of [...created]) { try { await forget(id); } catch { /* audited fixtures remain; the runner resets the isolated DB */ } }
   const summary = rec.summary();
-  const dir = resolve(here, "../../../docs/security/phone-signup-security");
+  const dir = resolve(here, "../../../docs/security/phone-signup-security/design-probe");
   mkdirSync(dir, { recursive: true });
   writeFileSync(resolve(dir, `evidence-${MODE}.json`), `${JSON.stringify({ summary, results: rec.results }, null, 1)}\n`);
   console.log(`\n[sec] ${MODE}: ${JSON.stringify(summary)}`);

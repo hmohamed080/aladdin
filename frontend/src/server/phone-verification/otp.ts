@@ -14,7 +14,18 @@ const MAX_KEYS = 3;
 const MIN_KEY_BYTES = 32;
 
 export type Keyring = { current: string; keys: ReadonlyMap<string, Buffer> };
-export type ChallengeContext = { challengeId: string; userId: string; purpose: "primary_proof" };
+/**
+ * What a challenge is bound to. `primary_proof` proves an EXISTING user's primary phone (subject = the user id); `signup_proof`
+ * proves a phone for a registration that has no Auth user yet (subject = the registration id kept in the sealed sign-up cookie).
+ * The subject sits in the MAC, so a code issued to one subject can never verify for another.
+ */
+export type ChallengeContext =
+  | { challengeId: string; purpose: "primary_proof"; userId: string }
+  | { challengeId: string; purpose: "signup_proof"; registrationId: string };
+
+function subjectOf(ctx: ChallengeContext): string {
+  return ctx.purpose === "primary_proof" ? ctx.userId : ctx.registrationId;
+}
 
 /**
  * Parses PHONE_OTP_HMAC_KEYS: {"current":"k2","keys":{"k2":"<base64>","k1":"<base64>"}}.
@@ -65,11 +76,13 @@ const DIGITS = /^[0-9]{1,12}$/;
  * throws. That makes the encoding injective without relying on callers having validated first.
  */
 export function computeMac(key: Buffer, ctx: ChallengeContext, code: string): string {
-  if (!UUID.test(ctx.challengeId) || !UUID.test(ctx.userId) || ctx.purpose !== "primary_proof" || !DIGITS.test(code)) {
+  const purposeOk = ctx.purpose === "primary_proof" || ctx.purpose === "signup_proof";
+  const subject = purposeOk ? subjectOf(ctx) : "";
+  if (!purposeOk || !UUID.test(ctx.challengeId) || !UUID.test(subject) || !DIGITS.test(code)) {
     throw new Error("invalid MAC context");
   }
   return createHmac("sha256", subkey(key, "aladdin.phone-otp.v1"))
-    .update(`otp1|${ctx.challengeId}|${ctx.userId}|${ctx.purpose}|${code}`)
+    .update(`otp1|${ctx.challengeId}|${subject}|${ctx.purpose}|${code}`)
     .digest("hex");
 }
 

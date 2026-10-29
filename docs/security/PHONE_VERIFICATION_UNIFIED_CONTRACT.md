@@ -1,6 +1,8 @@
 # Unified phone-verification contract (design for owner review)
 
-**Status:** proposal. Nothing here is implemented; this branch is tests-first. The executable evidence behind every statement is in
+**Status (updated in R1): IMPLEMENTED, dormant.** The authority below was built in `supabase/migrations/20261030090002_phone_signup_authority.sql` and the server half in `frontend/src/server/phone-verification/` (see `PHONE_SIGNUP_R1_REPORT.md`). Where the built version differs from the PR #122 proposal, the report §4 says so: the guard is the deferred constraint trigger (V2) with a registration-bound grant; `phone_signup_start` takes `(registration, phone, challenge, kid, mac, ip)` and returns `deliver:false` for a taken number; a grant is minted by `verify` and consumed by the guard; `attach` also requires the consuming user, the alias e-mail and the attach window. The original proposal text follows unchanged for traceability.
+
+~~**Status:** proposal. Nothing here is implemented; this branch is tests-first.~~ The executable evidence behind every statement is in
 `supabase/tests/sec/phone_signup_security.test.mjs` (row ids in brackets) and `docs/security/phone-signup-security/`.
 
 ## 1. Two lifecycles, one authority

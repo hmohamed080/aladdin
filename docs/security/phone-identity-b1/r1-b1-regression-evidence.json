@@ -1,0 +1,539 @@
+{
+  "suite": "phone-verification-b1-local-integration",
+  "run": "2026-10-29",
+  "summary": {
+    "PASS": 42,
+    "FAIL": 0,
+    "total": 42
+  },
+  "redaction": "phones masked, aliases masked, user ids shortened, MACs masked; no tokens, passwords, raw codes or key material recorded",
+  "results": [
+    {
+      "id": "B1-OFF-1",
+      "area": "flag",
+      "title": "DB flag OFF: start is 'unavailable', nothing delivered, no challenge written",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-OFF-2",
+      "area": "flag",
+      "title": "Server flag OFF: no database call is even attempted",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-installer-1",
+      "area": "legacy",
+      "title": "LegacyInstaller: code is delivered to the account's own current number only; the browser-facing result carries no number or code",
+      "status": "PASS",
+      "evidence": "sent=1 kid=k2"
+    },
+    {
+      "id": "B1-installer-2",
+      "area": "failure",
+      "title": "LegacyInstaller: two wrong codes are 'invalid' and identity is untouched",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-installer-3",
+      "area": "failure",
+      "title": "LegacyInstaller: another account holding the CORRECT code and the challenge id is 'invalid' and cannot burn attempts",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-installer-4",
+      "area": "failure",
+      "title": "LegacyInstaller: an expired challenge with the right code is 'invalid'; identity untouched",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-installer-5",
+      "area": "success",
+      "title": "LegacyInstaller: success writes ONLY profile.phone_verified_at - every other identity field, role, membership, capability, point, consent and the alias is unchanged",
+      "status": "PASS",
+      "evidence": "changed paths: profile.verified_at only"
+    },
+    {
+      "id": "B1-installer-6",
+      "area": "replay",
+      "title": "LegacyInstaller: replaying the consumed code is 'invalid' and changes nothing (verified timestamp stable)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-installer-7",
+      "area": "authority",
+      "title": "LegacyInstaller: a verified account cannot start again (already_verified) and gains no login/recovery/MFA path",
+      "status": "PASS",
+      "evidence": "native phone OTP refused; auth.users.phone NULL; no MFA factor"
+    },
+    {
+      "id": "B1-showroom-1",
+      "area": "legacy",
+      "title": "LegacyShowroom: code is delivered to the account's own current number only; the browser-facing result carries no number or code",
+      "status": "PASS",
+      "evidence": "sent=1 kid=k2"
+    },
+    {
+      "id": "B1-showroom-2",
+      "area": "failure",
+      "title": "LegacyShowroom: two wrong codes are 'invalid' and identity is untouched",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-showroom-3",
+      "area": "failure",
+      "title": "LegacyShowroom: another account holding the CORRECT code and the challenge id is 'invalid' and cannot burn attempts",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-showroom-4",
+      "area": "failure",
+      "title": "LegacyShowroom: an expired challenge with the right code is 'invalid'; identity untouched",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-showroom-5",
+      "area": "success",
+      "title": "LegacyShowroom: success writes ONLY profile.phone_verified_at - every other identity field, role, membership, capability, point, consent and the alias is unchanged",
+      "status": "PASS",
+      "evidence": "changed paths: profile.verified_at only"
+    },
+    {
+      "id": "B1-showroom-6",
+      "area": "replay",
+      "title": "LegacyShowroom: replaying the consumed code is 'invalid' and changes nothing (verified timestamp stable)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-showroom-7",
+      "area": "authority",
+      "title": "LegacyShowroom: a verified account cannot start again (already_verified) and gains no login/recovery/MFA path",
+      "status": "PASS",
+      "evidence": "native phone OTP refused; auth.users.phone NULL; no MFA factor"
+    },
+    {
+      "id": "B1-email-1",
+      "area": "legacy",
+      "title": "EmailSignup: code is delivered to the account's own current number only; the browser-facing result carries no number or code",
+      "status": "PASS",
+      "evidence": "sent=1 kid=k2"
+    },
+    {
+      "id": "B1-email-2",
+      "area": "failure",
+      "title": "EmailSignup: two wrong codes are 'invalid' and identity is untouched",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-email-3",
+      "area": "failure",
+      "title": "EmailSignup: another account holding the CORRECT code and the challenge id is 'invalid' and cannot burn attempts",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-email-4",
+      "area": "failure",
+      "title": "EmailSignup: an expired challenge with the right code is 'invalid'; identity untouched",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-email-5",
+      "area": "success",
+      "title": "EmailSignup: success writes ONLY profile.phone_verified_at - every other identity field, role, membership, capability, point, consent and the alias is unchanged",
+      "status": "PASS",
+      "evidence": "changed paths: profile.verified_at only"
+    },
+    {
+      "id": "B1-email-6",
+      "area": "replay",
+      "title": "EmailSignup: replaying the consumed code is 'invalid' and changes nothing (verified timestamp stable)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-email-7",
+      "area": "authority",
+      "title": "EmailSignup: a verified account cannot start again (already_verified) and gains no login/recovery/MFA path",
+      "status": "PASS",
+      "evidence": "native phone OTP refused; auth.users.phone NULL; no MFA factor"
+    },
+    {
+      "id": "B1-org-1",
+      "area": "legacy",
+      "title": "OrgContactOnly: start is 'unavailable' (an org contact number is never a verifiable credential); identity untouched",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-rot-1",
+      "area": "rotation",
+      "title": "A challenge issued under k1 verifies after rotation while k1 is still accepted",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-rot-2",
+      "area": "rotation",
+      "title": "Once k1 is retired, an outstanding k1 challenge fails closed (and counts an attempt)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-rot-3",
+      "area": "rotation",
+      "title": "New challenges are issued under the current key (k2)",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-del-1",
+      "area": "delivery",
+      "title": "A transport failure closes the challenge (delivery_failed), reveals nothing, and still spends the resend budget",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-lim-1",
+      "area": "limits",
+      "title": "Resend cooldown, per-account hourly cap and supersede through the real service",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-lim-2",
+      "area": "limits",
+      "title": "Per-IP failure budget: after the cap even a correct code from that IP key is refused without burning an attempt",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-con-1",
+      "area": "concurrency",
+      "title": "8 simultaneous verifications of one correct code: exactly one 'verified'",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-con-2",
+      "area": "concurrency",
+      "title": "8 simultaneous starts for one account (distinct challenge ids): exactly one challenge, the rest rate limited",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-con-3",
+      "area": "concurrency",
+      "title": "Verify racing a phone change (14 trials, both orders): verified_at is never set for a number the account does not hold",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-con-4",
+      "area": "concurrency",
+      "title": "Verify racing an unrelated profile update and a same-number re-save: verification still lands, no lost update",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-con-5",
+      "area": "concurrency",
+      "title": "Start racing a phone change (8 trials): any open challenge is for the number the account holds now",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-con-6",
+      "area": "concurrency",
+      "title": "Verify racing a re-start (supersede) (6 trials): never both verified and an open challenge",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-con-7",
+      "area": "concurrency",
+      "title": "No deadlocks across all concurrent scenarios",
+      "status": "PASS",
+      "evidence": "deadlock_delta=0"
+    },
+    {
+      "id": "B1-inv-1",
+      "area": "invariance",
+      "title": "After everything: the only change to ANY legacy fixture is phone_verified_at on the three that were verified",
+      "status": "PASS",
+      "evidence": "profile.verified_at x3; all else identical incl. user ids, aliases, password digests, roles, memberships, capabilities, points, consents, registration state"
+    },
+    {
+      "id": "B1-inv-2",
+      "area": "invariance",
+      "title": "No Auth user was created for a phone, none has a phone, no non-email identity, no MFA factor, anywhere in the database",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-inv-3",
+      "area": "invariance",
+      "title": "Every verified profile is for a number that profile currently holds, and has exactly one completion audit event",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-priv-1",
+      "area": "privacy",
+      "title": "Audit rows written by the authority contain no phone number, code or MAC",
+      "status": "PASS",
+      "evidence": ""
+    },
+    {
+      "id": "B1-priv-2",
+      "area": "privacy",
+      "title": "Raw codes and MACs never appear in GoTrue, PostgREST, gateway or database logs; non-alias numbers don't either",
+      "status": "PASS",
+      "evidence": ""
+    }
+  ],
+  "race_outcomes": {
+    "verify_won_then_reset_by_change_or_noop": 8,
+    "change_won_verify_refused": 6
+  },
+  "log_scan": {
+    "codes_checked": 58,
+    "codes_found": 0,
+    "mac_lines": 0,
+    "non_alias_numbers_checked": 67,
+    "non_alias_numbers_found": 0
+  },
+  "invariance": {
+    "before": {
+      "LegacyInstaller": {
+        "user_id": "0d9ffab4",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": "temporary_craftsman_password_flow"
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": true,
+          "phone_verified": false
+        },
+        "memberships": [],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      },
+      "LegacyShowroom": {
+        "user_id": "17d25b8c",
+        "registration_state": "active_personal",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": "temporary_craftsman_password_flow"
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": true,
+          "phone_verified": false
+        },
+        "memberships": [
+          {
+            "org_type": "showroom_dealer",
+            "status": "active",
+            "capabilities": 31
+          }
+        ],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      },
+      "EmailSignup": {
+        "user_id": "3d343e92",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": false,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": null
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": true,
+          "phone_verified": false
+        },
+        "memberships": [],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      },
+      "OrgContactOnly": {
+        "user_id": "58fe09fe",
+        "registration_state": "active_personal",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": false,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": null
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": false,
+          "phone_verified": false
+        },
+        "memberships": [
+          {
+            "org_type": "showroom_dealer",
+            "status": "active",
+            "capabilities": 31
+          }
+        ],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      }
+    },
+    "after": {
+      "LegacyInstaller": {
+        "user_id": "0d9ffab4",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": "temporary_craftsman_password_flow"
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": true,
+          "phone_verified": true
+        },
+        "memberships": [],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      },
+      "LegacyShowroom": {
+        "user_id": "17d25b8c",
+        "registration_state": "active_personal",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": true,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": "temporary_craftsman_password_flow"
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": true,
+          "phone_verified": true
+        },
+        "memberships": [
+          {
+            "org_type": "showroom_dealer",
+            "status": "active",
+            "capabilities": 31
+          }
+        ],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      },
+      "EmailSignup": {
+        "user_id": "3d343e92",
+        "registration_state": "access_ready",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": false,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": null
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": true,
+          "phone_verified": true
+        },
+        "memberships": [],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      },
+      "OrgContactOnly": {
+        "user_id": "58fe09fe",
+        "registration_state": "active_personal",
+        "signin_user_matches": true,
+        "auth": {
+          "alias_login": false,
+          "auth_phone_set": false,
+          "role": "authenticated",
+          "source": null
+        },
+        "identities": 1,
+        "mfa_factors": 0,
+        "profile": {
+          "has_phone": false,
+          "phone_verified": false
+        },
+        "memberships": [
+          {
+            "org_type": "showroom_dealer",
+            "status": "active",
+            "capabilities": 31
+          }
+        ],
+        "points": {
+          "total": 0,
+          "entries": 0
+        },
+        "consents": 3,
+        "secondary_reservations": 0
+      }
+    }
+  }
+}
