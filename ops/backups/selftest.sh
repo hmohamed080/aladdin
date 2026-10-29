@@ -11,7 +11,22 @@ export BACKUP_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres SUP
 export SUPABASE_CLI="${SUPABASE_CLI:-pnpm --dir $ROOT exec supabase}"
 SUPABASE_SERVICE_ROLE_KEY="$($SUPABASE_CLI status -o json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["SERVICE_ROLE_KEY"])')"
 export SUPABASE_SERVICE_ROLE_KEY
-T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
+T="$(mktemp -d)"
+# Two throwaway media files in local Storage, removed again on exit, so the media copy and restore have real bytes.
+FIXTURES=("avatars/$(python3 -c 'import uuid; print(uuid.uuid4())').png" "professional-portfolio/$(python3 -c 'import uuid; print(uuid.uuid4())').png")
+storage() { curl -fsS -X "$1" "$SUPABASE_URL/storage/v1/object/$2" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" "${@:3}" >/dev/null; }
+cleanup() {
+  for f in "${FIXTURES[@]}"; do storage DELETE "${f%%/*}" -H 'content-type: application/json' -d "{\"prefixes\":[\"${f#*/}\"]}" || true; done
+  rm -rf "$T"
+}
+trap cleanup EXIT
+for f in "${FIXTURES[@]}"; do
+  python3 -c 'import os,sys,zlib,struct
+def chunk(t,d): return struct.pack(">I",len(d))+t+d+struct.pack(">I",zlib.crc32(t+d))
+raw=b"".join(b"\0"+os.urandom(48) for _ in range(16))
+open(sys.argv[1],"wb").write(b"\x89PNG\r\n\x1a\n"+chunk(b"IHDR",struct.pack(">IIBBBBB",16,16,8,2,0,0,0))+chunk(b"IDAT",zlib.compress(raw))+chunk(b"IEND",b""))' "$T/fixture.png"
+  storage POST "$f" -H 'content-type: image/png' --data-binary "@$T/fixture.png" || { echo "could not seed local Storage"; exit 1; }
+done
 age-keygen -o "$T/owner.key" 2>/dev/null; age-keygen -o "$T/restore.key" 2>/dev/null; age-keygen -o "$T/other.key" 2>/dev/null
 export AGE_RECIPIENTS="$(age-keygen -y "$T/owner.key") $(age-keygen -y "$T/restore.key")"
 s3() { aws --endpoint-url "$R2_ENDPOINT" "$@"; }
