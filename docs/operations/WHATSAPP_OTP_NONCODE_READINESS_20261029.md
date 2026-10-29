@@ -8,10 +8,10 @@
 
 The owner supplied screenshots from WhatsApp Manager. **Screenshot evidence only; no live Meta API verification or billing transaction evidence was performed here.** Do not put the full sender phone or payment instrument into a public PR.
 
-- Sender (masked): Egyptian WhatsApp business number ending **5339**, status **Connected**, number quality **High**; display name shown as **Business Solution**, status **In review**. Connected and display name review are distinct.
+- Sender (masked): Egyptian WhatsApp business number ending **5339**, status **Connected**, number quality **High**; display name shown as **Business Solution**, and a subsequent owner screenshot explicitly shows **Approved** (2026-10-29). Connected and name approval are separately confirmed by screenshots.
 - Template `aladdin_otp`: **Authentication**, **Arabic**, status **Active – Quality pending** (approved/sendable; quality feedback pending); the visual preview shows Copy Code and 5-minute expiry. Recheck current status immediately before actual sends.
 - Insights → Message pricing, filter **All phone numbers**, **All countries**, **23–29 October 2026**: **2 sent; 2 delivered; 2 paid**; breakdown **1 Utility / 1 Authentication**, no Marketing and no free messages. Approximate total charges **10.43 ARS**, approximately **5.22 ARS per category**. This is **ARS (Argentine peso), NOT USD** as displayed. Counts refer to this selected reporting period and may differ from other cards.
-- **Billing unresolved:** Insights is expressly approximate; it cannot prove invoice amount, balance due or paid amount. Meta business payment configuration previously appeared labelled **India**, while sender is Egypt and pricing dashboard showed **ARS**; check actual Billing & Payments invoice currency, entity, credit line and any payment obligations before inferring anything or enabling delivery.
+- **Historical test charges; detailed billing review deliberately deferred by owner:** the owner confirms the two delivered messages were early manual tests **before any WhatsApp OTP PR**. Insights remains an approximate usage report, not evidence of invoice due/paid. Do not attribute this activity to the deployed OTP Preview Worker. Do not spend time on invoice reconciliation now; check applicable pricing/spend controls before broad launch.
 - **Worker sender linkage remains unverified:** visually seeing a connected Egyptian phone does not prove that its **Phone Number ID** equals Worker config `1415528588305492`. Owner should navigate WhatsApp Manager → Phone numbers → number details or Developers → WhatsApp → API Setup and compare IDs **without sharing tokens**.
 - This evidence does **not** authorize activating Worker delivery, Supabase SMS Hook, phone MFA add-on, or Production. PR #116 registration changes remain independently in progress.
 
@@ -20,7 +20,7 @@ The owner supplied screenshots from WhatsApp Manager. **Screenshot evidence only
 - Cloudflare Preview `aladdin-whatsapp-otp-preview` deployed with `WHATSAPP_DELIVERY_ENABLED=false`, signing binding tested with signed dummy HTTP request, no D1 replay entries after tests.
 - Existing account primary verification field `profiles.phone_verified_at`; Installer Settings badge already reports verified/unverified.
 - Existing secondary unverified phone reservations: 7 days + 7-day single renewal, global uniqueness, 30-day cooldown on expiry/cancellation, password reauth for changes.
-- Meta Arabic Authentication / Copy Code template `aladdin_otp` was manually tested by owner in preparation; **current approved status, production sender/WABA eligibility and correct Phone Number ID need a fresh dashboard check before live use**.
+- Meta Arabic Authentication / Copy Code template `aladdin_otp` was manually tested by owner in preparation; **template Active status and display name Approved confirmed from owner screenshots; exact real sender Phone Number ID still needs comparison to Worker config before a live send**.
 - Owner **accepts Meta per-message OTP costs** but explicitly defers the Supabase Advanced Phone MFA recurring add-on.
 - Existing alias-account identity must remain unchanged; no direct `signInWithOtp({phone})` conversion.
 
@@ -70,8 +70,8 @@ The owner supplied screenshots from WhatsApp Manager. **Screenshot evidence only
 - [x] Owner agrees in principle to paying Meta WhatsApp Authentication delivery fees.
 - [x] Isolated Preview Worker with delivery OFF and valid signing binding; three unsigned and one signed fail-closed HTTP smoke tests succeeded.
 - [ ] In Meta Business / WhatsApp Manager **verify currently active WABA**; ensure real sender is approved/connected, and Phone Number ID `1415528588305492` is the intended sender for *real* deliveries (not merely a test asset). Record status only; keep token secret.
-- [ ] Reconfirm `aladdin_otp` template is **APPROVED** in the intended WABA, Authentication category, `ar` language and Copy Code button. Record approved status without editing the template.
-- [ ] Verify Meta billing account/payment method, allowed destination region, sending-quality/limits, alert/usage reporting, and exact domestic-vs-international authentication rate for the actual business country. Confirm the current price in the official dashboard/rate card, not an assumed number.
+- [x] Owner screenshot confirms `aladdin_otp` template **Active – Quality pending**, Authentication, Arabic and Copy Code. Recheck live status in the intended WABA before sending; do not edit the template.
+- [ ] Ahead of live rollout, check Meta send limits/alert thresholds and actual Authentication message rate for intended destinations. Detailed reconciliation of the two historical test charges is intentionally postponed on owner request.
 - [ ] Select **one owner-controlled WhatsApp-enabled test number**, separately entered as an environment secret/recipient allowlist; don't post it in public issues, PR comments or chat. Verify opt-in specifically for authentication messaging.
 - [ ] Define a tiny pilot message budget, per-number and per-IP caps and alert threshold; default recommendation is a handful of owner test deliveries, not general signup traffic. Actual throttles require later code/security approval.
 - [ ] Prepare a negative-test recipient with **no WhatsApp account** to confirm fail-safe messaging UX without resorting to a silent unverified registration activation.
