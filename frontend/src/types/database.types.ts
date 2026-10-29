@@ -6200,42 +6200,6 @@ export type Database = {
           },
         ]
       }
-      user_specialties: {
-        Row: {
-          created_at: string
-          is_primary: boolean
-          trade_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          is_primary?: boolean
-          trade_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          is_primary?: boolean
-          trade_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_specialties_trade_id_fkey"
-            columns: ["trade_id"]
-            isOneToOne: false
-            referencedRelation: "trades"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_specialties_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_trades: {
         Row: {
           created_at: string

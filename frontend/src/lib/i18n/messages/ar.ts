@@ -2729,6 +2729,8 @@ export const ar: Messages = {
       decor_manufacturer: "مصنع ديكور",
       decor_supplies_importer: "مستلزمات ديكور",
       paint_importer: "دهانات",
+      civil_engineer: "مهندس مدني",
+      architect: "مهندس معماري",
       finishing: "تشطيبات",
       sales_rep: "مندوب مبيعات",
       sales_manager: "مدير مبيعات",
@@ -3072,8 +3074,15 @@ export const ar: Messages = {
       },
     },
     business: {
- activities: {decor_showroom: "معرض ديكور", paint_showroom: "معرض دهانات", decor_and_paint_showroom: "معرض ديكور ودهانات", building_and_finishing_supplies_retailer: "موان"},
-      step: { identity: "النشاط", type: "النوع", location: "الموقع", branch: "الفرع", review: "المراجعة" },
+ activities: {decor_showroom: "معرض ديكور", paint_showroom: "معرض دهانات", decor_and_paint_showroom: "معرض ديكور ودهانات", building_and_finishing_supplies_retailer: "موان", distributor: "موزع", wholesaler: "تاجر جملة", paint_manufacturer: "مصنع دهانات", decor_manufacturer: "مصنع ديكور", decor_supplies_importer: "مستلزمات ديكور", paint_importer: "دهانات"},
+      step: { identity: "النشاط", type: "النوع", location: "الموقع", basics: "التواصل", branch: "الفرع", review: "المراجعة" },
+      basics: {
+        title: "كيف نتواصل معك",
+        subtitle: "رقم موبايلك الشخصي، لنتواصل معك بخصوص الطلبات.",
+        phoneLabel: "رقم موبايلك",
+        specialtiesLabel: "تخصصاتك",
+      },
+
       identity: {
  informationSection: "معلومات النشاط التجاري",
  contactSection: "بيانات التواصل الخاصة بالمعرض",

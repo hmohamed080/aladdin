@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { businessDetailsSchema, showroomIdentityError, validBusinessPhone } from "@/lib/onboarding/business-details";
+import { businessActivityError, businessDetailsSchema, showroomIdentityError, validBusinessPhone } from "@/lib/onboarding/business-details";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { loadBusinessCreationAccess } from "@/server/queries/business-creation-access";
 import { loadMandatoryBusinessSetup } from "@/server/queries/business-setup";
@@ -100,6 +100,8 @@ export async function saveBusiness(input: BusinessInput): Promise<BusinessAction
   if (v.step === "identity" && (v.displayName?.trim().length ?? 0) < 2) return { ok: false, code: "onboarding.error.businessNameRequired" };
   if (v.step === "identity" && legalNameMissing(v.legalName)) return { ok: false, code: "onboarding.error.legalNameRequired" };
   if (orgType === "showroom_dealer" && v.step === "identity") { const error = showroomIdentityError(v); if (error) return { ok: false, code: error }; }
+  // Another business type's activity is never stored for this one.
+  if (v.activityType && businessActivityError(orgType, v.activityType)) return { ok: false, code: "onboarding.error.activityRequired" };
   if (v.step === "location" && (!v.governorate || !(v.city || v.cityCustomName))) return { ok: false, code: "onboarding.error.locationRequired" };
 
   // Governorate / city / custom city must be canonical (catalogue governorate, a city of THAT governorate, or a custom city).

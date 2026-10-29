@@ -2796,6 +2796,8 @@ export const en = {
       decor_manufacturer: "Decor manufacturer",
       decor_supplies_importer: "Decor supplies",
       paint_importer: "Paints",
+      civil_engineer: "Civil engineer",
+      architect: "Architect",
       finishing: "Finishing",
       sales_rep: "Sales representative",
       sales_manager: "Sales manager",
@@ -3145,8 +3147,15 @@ export const en = {
       },
     },
     business: {
- activities: {decor_showroom: "Decor showroom", paint_showroom: "Paint showroom", decor_and_paint_showroom: "Decor and paint showroom", building_and_finishing_supplies_retailer: "Mawan"},
-      step: { identity: "Business", type: "Type", location: "Location", branch: "Branch", review: "Review" },
+ activities: {decor_showroom: "Decor showroom", paint_showroom: "Paint showroom", decor_and_paint_showroom: "Decor & paint showroom", building_and_finishing_supplies_retailer: "Building & finishing supplies retailer", distributor: "Distributor", wholesaler: "Wholesaler", paint_manufacturer: "Paint factory", decor_manufacturer: "Decor factory", decor_supplies_importer: "Decor supplies", paint_importer: "Paints"},
+      step: { identity: "Business", type: "Type", location: "Location", basics: "Contact", branch: "Branch", review: "Review" },
+      basics: {
+        title: "How to reach you",
+        subtitle: "Your own mobile number, so we can reach you about requests.",
+        phoneLabel: "Your mobile number",
+        specialtiesLabel: "Your specialties",
+      },
+
       identity: {
  informationSection: "Business information",
  contactSection: "Showroom contact information",

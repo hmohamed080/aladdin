@@ -1,166 +1,117 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { Card, InlineError } from "@/components/ui/primitives";
-import { Input, Select, SubmitButton } from "@/components/ui/controls";
+import { InlineError } from "@/components/ui/primitives";
 import { PhoneField } from "@/components/ui/phone-field";
-import { GOVERNORATE_OPTIONS, type LocationOption } from "@/lib/installer/location-data";
-import { businessCitiesOf, CUSTOM_CITY_MAX } from "@/lib/location/business-location";
-import { tradeLabel } from "@/lib/i18n/trade-label";
+import { WizardShell, WizardProgress, FlowActions } from "@/features/onboarding/wizard";
+import {
+  BasicsLocationFields,
+  BasicsSpecialtiesField,
+  basicsLocationDone,
+  type BasicsLocation,
+  type SpecialtySource,
+  useSpecialtyOptions,
+} from "@/features/onboarding/basics-fields";
 import { saveAccountBasics, type AccountBasicsState } from "@/server/actions/account-basics";
 import type { MissingBasics } from "@/server/queries/account-basics";
 
 const INITIAL: AccountBasicsState = { ok: false };
-/** "Other" in the town list: a UI control only, never sent as a town. */
-const OTHER = "__other__";
+type Step = "phone" | "location" | "specialties";
 
 /**
- * One short screen, three questions in the order a person answers them
- * fastest: how to reach you, where you are, what you do. Sections the account
- * already completed are not rendered at all. Specialties are picked from a
- * dropdown and listed below it; the first one picked is the main one (marked),
- * as on the Craftsman profile, and each can be removed.
+ * Onboarding steps for the basics (owner decision 2026-10-29): one question
+ * per step, in the order a person answers fastest (how to reach you, where you
+ * are, what you do), with the usual onboarding progress. Steps the account
+ * already completed are left out entirely. One form spans the steps (hidden
+ * steps stay mounted so their fields submit), and the last step saves; a
+ * server error jumps back to the step it belongs to.
  */
-export function AccountBasicsForm({ missing, tradeKeys, next }: { missing: MissingBasics; tradeKeys: string[]; next: string }) {
-  const { t, locale } = useI18n();
-  const [state, dispatch] = useActionState(saveAccountBasics, INITIAL);
-  const [governorate, setGovernorate] = useState("");
-  const [city, setCity] = useState("");
-  const [cityCustom, setCityCustom] = useState("");
+export function AccountBasicsForm({ missing, source, next }: { missing: MissingBasics; source: SpecialtySource | null; next: string }) {
+  const { t } = useI18n();
+  const options = useSpecialtyOptions(source);
+  const [state, dispatch, pending] = useActionState(saveAccountBasics, INITIAL);
+  const steps: Step[] = (["phone", "location", "specialties"] as const).filter((s) => missing[s]);
+  const [step, setStep] = useState(0);
+  const [phoneOk, setPhoneOk] = useState(false);
+  const [location, setLocation] = useState<BasicsLocation>({ governorate: "", city: "", cityCustom: "" });
   const [picked, setPicked] = useState<string[]>([]);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [, startTransition] = useTransition();
+  // Submitted without the form action prop, so React never resets the form:
+  // after a refused save every answer (the governorate included) is still there.
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    startTransition(() => dispatch(data));
+  };
 
-  const label = (o: LocationOption) => (locale === "ar" ? o.ar : o.en);
-  const byLabel = (a: LocationOption, b: LocationOption) => label(a).localeCompare(label(b), locale);
-  const governorates = [...GOVERNORATE_OPTIONS].sort(byLabel);
-  const cities = businessCitiesOf(governorate).sort(byLabel);
-  const errorFor = (field: AccountBasicsState["field"]) => (state.field === field && state.code ? t(state.code) : undefined);
+  // A rejected save returns to the step the error belongs to.
+  useEffect(() => {
+    if (state.field) setStep(Math.max(steps.indexOf(state.field), 0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to a new server answer only
+  }, [state]);
+
+  const current: Step = steps[step] ?? steps[0] ?? "phone";
+  const last = step === steps.length - 1;
+  const errorFor = (field: Step) => (state.field === field && state.code ? t(state.code) : undefined);
+  const done = current === "phone" ? phoneOk : current === "location" ? basicsLocationDone(location) : picked.length > 0;
+
+  const titles: Record<Step, string> = {
+    phone: t("accountBasics.phoneLabel"),
+    location: t("accountBasics.locationLabel"),
+    specialties: t("accountBasics.specialtiesLabel"),
+  };
+  const hints: Record<Step, string> = {
+    phone: t("accountBasics.phoneHint"),
+    location: t("accountBasics.subtitle"),
+    specialties: t("accountBasics.specialtiesHint"),
+  };
 
   return (
-    <Card className="flex flex-col gap-lg p-lg">
-      <header className="flex flex-col gap-xs">
-        <h1 className="text-title font-bold text-fg">{t("accountBasics.title")}</h1>
-        <p className="text-body text-fg-secondary">{t("accountBasics.subtitle")}</p>
-      </header>
-
-      <form action={dispatch} className="flex flex-col gap-lg" noValidate>
+    <WizardShell
+      progress={<WizardProgress current={step} total={steps.length} label={t("accountBasics.title")} />}
+      title={titles[current]}
+      subtitle={hints[current]}
+    >
+      <form ref={formRef} onSubmit={submit} className="flex flex-col gap-lg" noValidate>
         <input type="hidden" name="next" value={next} />
 
         {missing.phone ? (
-          <section className="flex flex-col gap-xs" aria-labelledby="basics-phone">
-            <label id="basics-phone" htmlFor="phone" className="text-label font-semibold text-fg">
-              {t("accountBasics.phoneLabel")}
-            </label>
-            <PhoneField id="phone" name="phone" countryName="phoneCountry" joined onChange={() => {}} error={errorFor("phone")} />
-            <p className="text-label text-fg-muted">{t("accountBasics.phoneHint")}</p>
+          <section hidden={current !== "phone"} className="flex flex-col gap-xs">
+            <PhoneField
+              id="phone"
+              name="phone"
+              countryName="phoneCountry"
+              joined
+              placeholder={t("accountBasics.phoneLabel")}
+              onChange={(value) => setPhoneOk(Boolean(value))}
+              error={errorFor("phone")}
+            />
           </section>
         ) : null}
 
         {missing.location ? (
-          <section className="flex flex-col gap-xs" aria-labelledby="basics-location">
-            <p id="basics-location" className="text-label font-semibold text-fg">{t("accountBasics.locationLabel")}</p>
-            <div className="grid gap-sm sm:grid-cols-2">
-              <Select
-                id="governorate"
-                name="governorate"
-                required
-                aria-label={t("accountBasics.governorateLabel")}
-                value={governorate}
-                onChange={(e) => {
-                  setGovernorate(e.target.value);
-                  setCity("");
-                  setCityCustom("");
-                }}
-              >
-                <option value="" disabled>{t("accountBasics.governorateLabel")}</option>
-                {governorates.map((g) => (
-                  <option key={g.value} value={g.value}>{label(g)}</option>
-                ))}
-              </Select>
-              <Select
-                id="city"
-                required
-                disabled={!governorate}
-                aria-label={t("accountBasics.cityLabel")}
-                value={city}
-                onChange={(e) => {
-                  setCity(e.target.value);
-                  if (e.target.value !== OTHER) setCityCustom("");
-                }}
-              >
-                <option value="" disabled>{t("accountBasics.cityLabel")}</option>
-                {cities.map((c) => (
-                  <option key={c.value} value={c.value}>{label(c)}</option>
-                ))}
-                <option value={OTHER}>{t("accountBasics.cityOther")}</option>
-              </Select>
-            </div>
-            {city === OTHER ? (
-              <Input
-                id="cityCustom"
-                name="cityCustom"
-                value={cityCustom}
-                maxLength={CUSTOM_CITY_MAX}
-                aria-label={t("accountBasics.cityCustomLabel")}
-                placeholder={t("accountBasics.cityCustomLabel")}
-                onChange={(e) => setCityCustom(e.target.value)}
-              />
-            ) : null}
-            <input type="hidden" name="city" value={city === OTHER ? "" : city} />
-            {errorFor("location") ? <InlineError>{errorFor("location")}</InlineError> : null}
+          <section hidden={current !== "location"}>
+            <BasicsLocationFields value={location} onChange={setLocation} error={errorFor("location")} />
           </section>
         ) : null}
 
         {missing.specialties ? (
-          <section className="flex flex-col gap-xs" aria-labelledby="basics-specialties">
-            <p id="basics-specialties" className="text-label font-semibold text-fg">{t("accountBasics.specialtiesLabel")}</p>
-            <p className="text-label text-fg-muted">{t("accountBasics.specialtiesHint")}</p>
-            <Select
-              id="specialtyAdd"
-              aria-label={t("accountBasics.specialtiesAdd")}
-              value=""
-              disabled={picked.length === tradeKeys.length}
-              onChange={(e) => {
-                const key = e.target.value;
-                if (key) setPicked((p) => (p.includes(key) ? p : [...p, key]));
-              }}
-            >
-              <option value="" disabled>{t("accountBasics.specialtiesAdd")}</option>
-              {tradeKeys
-                .filter((key) => !picked.includes(key))
-                .map((key) => (
-                  <option key={key} value={key}>{tradeLabel(t, key)}</option>
-                ))}
-            </Select>
-            {picked.length ? (
-              <ul className="flex flex-wrap gap-xs" aria-labelledby="basics-specialties">
-                {picked.map((key, i) => (
-                  <li key={key} className="inline-flex items-center gap-1 rounded-pill border border-accent bg-accent-solid/15 py-1 ps-3.5 pe-1 text-label font-medium text-fg">
-                    <span>{i === 0 ? `${tradeLabel(t, key)} · ${t("accountBasics.main")}` : tradeLabel(t, key)}</span>
-                    <button
-                      type="button"
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-pill text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                      aria-label={t("accountBasics.specialtiesRemove", { name: tradeLabel(t, key) })}
-                      onClick={() => setPicked((p) => p.filter((k) => k !== key))}
-                    >
-                      <span aria-hidden="true">×</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {picked.map((key) => (
-              <input key={key} type="hidden" name="specialties" value={key} />
-            ))}
-            {errorFor("specialties") ? <InlineError>{errorFor("specialties")}</InlineError> : null}
+          <section hidden={current !== "specialties"}>
+            <BasicsSpecialtiesField options={options} picked={picked} onChange={setPicked} error={errorFor("specialties")} />
           </section>
         ) : null}
 
         {state.code && !state.field ? <InlineError>{t(state.code)}</InlineError> : null}
-        <SubmitButton className="w-full" pendingLabel={t("accountBasics.saving")}>
-          {t("accountBasics.submit")}
-        </SubmitButton>
+        <FlowActions
+          onBack={step > 0 ? () => setStep(step - 1) : undefined}
+          onPrimary={() => (last ? formRef.current?.requestSubmit() : setStep(step + 1))}
+          primaryLabel={t("accountBasics.submit")}
+          primaryDisabled={!done}
+          pending={pending}
+        />
       </form>
-    </Card>
+    </WizardShell>
   );
 }

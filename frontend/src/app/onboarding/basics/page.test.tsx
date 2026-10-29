@@ -15,6 +15,8 @@ const rpc = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: vi.fn(async () => ({ rpc })) }));
 const trades = vi.fn(async () => [{ key: "wallpaper_installation" }, { key: "door_installation" }]);
 vi.mock("@/server/queries/trades", () => ({ loadTradeCatalog: () => trades() }));
+const mandatory = vi.fn(async () => ({ required: false, orgType: null }));
+vi.mock("@/server/queries/business-setup", () => ({ loadMandatoryBusinessSetup: () => mandatory() }));
 vi.mock("@/features/onboarding/account-basics-form", () => ({ AccountBasicsForm: (props: unknown) => ({ props }) }));
 
 import AccountBasicsPage from "./page";
@@ -31,20 +33,31 @@ beforeEach(() => {
 
 describe("/onboarding/basics", () => {
   it("shows only the missing sections, with the trade list when specialties are missing", async () => {
-    basics({ phone: "+201012345678", governorate: null, city: null, cityCustom: null, specialties: [] });
+    basics({ phone: "+201012345678", governorate: null, city: null, cityCustom: null, specialtyKind: "trades", specialties: [] });
     const element = await page("/home/jobs");
     expect(element.props).toMatchObject({
       missing: { phone: false, location: true, specialties: true },
-      tradeKeys: ["wallpaper_installation", "door_installation"],
+      source: { kind: "trades", keys: ["wallpaper_installation", "door_installation"] },
       next: "/home/jobs",
     });
   });
 
   it("does not load the trade list when specialties are already there", async () => {
-    basics({ phone: null, governorate: "cairo", city: "maadi", cityCustom: null, specialties: ["painting"] });
+    basics({ phone: null, governorate: "cairo", city: "maadi", cityCustom: null, specialtyKind: "trades", specialties: ["painting"] });
     const element = await page();
-    expect(element.props.tradeKeys).toEqual([]);
+    expect(element.props.source).toBeNull();
     expect(trades).not.toHaveBeenCalled();
+  });
+
+  it("never asks a business account for specialties (its activity is asked in business setup)", async () => {
+    basics({ phone: null, governorate: "cairo", city: "maadi", cityCustom: null, specialtyKind: "none", specialties: [] });
+    const element = await page();
+    expect(element.props).toMatchObject({ missing: { phone: true, location: false, specialties: false }, source: null });
+  });
+
+  it("sends a business registration to business setup instead", async () => {
+    mandatory.mockResolvedValueOnce({ required: true, orgType: "showroom_dealer" } as never);
+    await expect(page()).rejects.toThrow("REDIRECT:/onboarding/business");
   });
 
   it("sends a complete account straight on", async () => {
