@@ -2,7 +2,9 @@
 
 Evidence: GitHub Actions run logs for the head of #113 (`58b63e7e`), workflow runs `40882460563` (Auth CAPTCHA E2E) and `40882460423` (Showroom RC2 E2E). I did **not** reproduce these locally (they need a Next.js build, Playwright and Turnstile test keys); the causes below are read from the failing runs' error text and ARIA snapshots.
 
-## 1. Root causes
+> **CORRECTION (R1, after reading #113's source):** there is ONE root cause, not two. PR #122's first draft said the Auth CAPTCHA spec "never completes the basics step". It does: `expectAppLanding` calls `reachLanding`, which calls `completeAccountBasics()`. What fails is that helper's **specialty step**: #113's commit `58b63e7e` ("Complete your account: specialties from a dropdown", 2026-10-29) replaced the chip buttons with `<select id="specialtyAdd">`, while the helper still clicks `[aria-labelledby="basics-specialties"][role="group"] button`. Nothing is picked, the form answers "Pick at least one specialty", the page stays on `/onboarding/basics`, and every caller times out. The auth spec's message ("the page is at /onboarding/basics") and the Showroom suite's `waitForURL` timeout are the same failure seen from two callers. The fix is one block in `frontend/e2e/helpers/auth.ts`; it is prepared and run in `docs/security/PHONE_SIGNUP_R1_REPORT.md` §7 and delivered as a separate Draft PR against #113's branch, leaving #113 itself untouched.
+
+## 1. Root causes (original analysis; read the correction above)
 
 Both jobs fail for the **same underlying reason: the E2E harness was not updated for the new "Complete your account" step that #113 inserts after registration.** The product behaves as designed (it requires a specialty); the tests do not satisfy it.
 

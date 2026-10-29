@@ -1,0 +1,173 @@
+#!/usr/bin/env node
+// READ-ONLY inspection of the hosted Auth/phone security posture (Acceptance and/or Production). It changes nothing and prints no secret.
+//
+//   SUPABASE_ACCESS_TOKEN=<personal access token with READ access to the project> \
+//   SUPABASE_REF_ACCEPTANCE=<ref> SUPABASE_REF_PRODUCTION=<ref> \
+//   [CLOUDFLARE_API_TOKEN=<token with Workers Scripts:Read> CF_ACCOUNT_ID=<id> CF_WORKER_ACCEPTANCE=<name> CF_WORKER_PRODUCTION=<name>] \
+//   node scripts/hosted-db/inspect-auth-security.mjs --env acceptance|production|both
+//
+// WHAT IT REPORTS (booleans / enums / counts only):
+//   * e-mail confirmation required, sign-up availability, CAPTCHA protection, phone provider, Send-SMS hook, Phone MFA, anonymous sign-ins
+//   * whether WhatsApp delivery secrets EXIST on the Worker (names only, never values)
+//   * effective EXECUTE rights of service_role / anon / authenticated on the 13 disputed functions
+//   * whether the phone authority / alias guard migrations are applied, their switches, and a COUNT of alias-domain Auth users that never
+//     confirmed (possible squats) - no address, no number
+//
+// SAFETY, enforced in code and covered by inspect-auth-security.test.mjs:
+//   * the only network calls are: GET Supabase /config/auth, POST Supabase /database/query/read-only (SELECT/WITH only, single statement),
+//     GET Cloudflare .../secrets. Everything else is refused before it leaves the process.
+//   * only allow-listed auth keys are copied into the report; any key that looks like a secret is dropped even if someone adds it.
+//   * tokens are read from the environment, never printed, never written to disk.
+//   * with no token the script prints exactly what authorisation is needed and exits 3 without calling anything.
+import { pathToFileURL } from "node:url";
+
+export const DISPUTED_FUNCTIONS = [
+  "account_entry_allowed", "account_password_confirm", "admin_phone_cooldown_override", "admin_phone_cooldown_status", "admin_users_directory",
+  "branch_location_set", "my_secondary_phone", "organization_legal_name_set", "secondary_phone_cancel", "secondary_phone_change",
+  "secondary_phone_make_primary", "secondary_phone_renew", "secondary_phone_reserve",
+];
+
+export const ALLOWED_AUTH_KEYS = [
+  "mailer_autoconfirm", "disable_signup", "external_email_enabled", "external_phone_enabled", "phone_autoconfirm", "sms_provider",
+  "hook_send_sms_enabled", "hook_before_user_created_enabled", "hook_mfa_verification_attempt_enabled",
+  "security_captcha_enabled", "security_captcha_provider", "security_manual_linking_enabled",
+  "mfa_phone_enroll_enabled", "mfa_phone_verify_enabled", "mfa_totp_enroll_enabled", "mfa_totp_verify_enabled", "mfa_max_enrolled_factors",
+  "mailer_secure_email_change_enabled", "external_anonymous_users_enabled", "external_google_enabled", "external_facebook_enabled",
+  "rate_limit_email_sent", "rate_limit_sms_sent", "rate_limit_otp", "rate_limit_anonymous_users",
+];
+const SECRETISH = /(secret|token|password|passwd|pass$|_key$|key_|jwt|credential|private|signing|sid$|auth_token|smtp_user|smtp_pass)/i;
+
+export const WORKER_SECRET_NAMES = ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "SUPABASE_SEND_SMS_HOOK_SECRET", "AUTH_PASSWORD_PREVIEW_GRANT_SECRET", "PHONE_OTP_HMAC_KEYS"];
+
+const FORBIDDEN_SQL = /\b(insert|update|delete|alter|create|drop|grant|revoke|truncate|copy|call|do|execute|vacuum|reindex|comment|lock|set|reset|listen|notify|merge|refresh|reassign|security|import|load)\b/i;
+export function assertReadOnlySql(sql) {
+  const s = String(sql).trim().replace(/;\s*$/, "");
+  if (!/^(select|with)\b/i.test(s)) throw new Error("inspection SQL must start with SELECT or WITH");
+  if (s.includes(";")) throw new Error("inspection SQL must be a single statement");
+  if (/--|\/\*/.test(s)) throw new Error("inspection SQL must not contain comments");
+  if (FORBIDDEN_SQL.test(s.replace(/'[^']*'/g, "''"))) throw new Error("inspection SQL contains a forbidden keyword");
+  return s;
+}
+
+const fnList = DISPUTED_FUNCTIONS.map((f) => `'${f}'`).join(",");
+export const QUERIES = {
+  disputed_function_rights: `select p.oid::regprocedure::text as fn, has_function_privilege('service_role', p.oid, 'execute') as service_role_exec, has_function_privilege('anon', p.oid, 'execute') as anon_exec, has_function_privilege('authenticated', p.oid, 'execute') as authenticated_exec from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in (${fnList}) order by 1`,
+  alias_census: `select count(*) as alias_users, count(*) filter (where email_confirmed_at is null) as unconfirmed_alias_users, count(*) filter (where email_confirmed_at is null and not exists (select 1 from public.profiles p where p.user_id = u.id)) as unconfirmed_without_profile from auth.users u where lower(u.email) like 'p%@craftsman-login.aladdin.invalid'`,
+  migrations: `select count(*) as applied, max(version) as latest from supabase_migrations.schema_migrations`,
+  authority_objects: `select to_regclass('app.phone_verification_config') is not null as phone_authority_applied, to_regclass('app.phone_signup_grants') is not null as signup_authority_applied, exists (select 1 from pg_trigger t where t.tgname = 'phone_alias_guard' and not t.tgisinternal) as alias_guard_installed`,
+  default_function_privileges: `select pg_get_userbyid(d.defaclrole) as creator, d.defaclacl::text as acl from pg_default_acl d join pg_namespace n on n.oid = d.defaclnamespace where n.nspname = 'public' and d.defaclobjtype = 'f' order by 1`,
+  phone_flags: `select count(*) filter (where phone_e164 is not null) as profiles_with_phone, count(*) filter (where phone_verified_at is not null) as profiles_verified from public.profiles`,
+  authority_switches: `select enabled, signup_enabled, alias_guard_mode from app.phone_verification_config`,
+};
+
+// ---- network guard -------------------------------------------------------------------------------------------------------------------
+const ALLOWED_CALLS = [
+  { method: "GET", pattern: /^https:\/\/api\.supabase\.com\/v1\/projects\/[a-z0-9]{10,40}\/config\/auth$/ },
+  { method: "POST", pattern: /^https:\/\/api\.supabase\.com\/v1\/projects\/[a-z0-9]{10,40}\/database\/query\/read-only$/, readOnlySql: true },
+  { method: "GET", pattern: /^https:\/\/api\.cloudflare\.com\/client\/v4\/accounts\/[a-f0-9]{32}\/workers\/scripts\/[A-Za-z0-9_-]{1,64}\/secrets$/ },
+];
+export function makeGuardedFetch(fetchImpl, tokens) {
+  return async function guardedFetch(method, url, body) {
+    const rule = ALLOWED_CALLS.find((r) => r.method === method && r.pattern.test(url));
+    if (!rule) throw new Error(`REFUSED: ${method} ${url.replace(/[a-z0-9]{20,}/gi, "<id>")} is not an allowed read-only call`);
+    if (rule.readOnlySql) assertReadOnlySql(body?.query);
+    const token = url.includes("cloudflare.com") ? tokens.cloudflare : tokens.supabase;
+    if (!token) throw new Error("REFUSED: missing token for this call");
+    const res = await fetchImpl(url, {
+      method,
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json", accept: "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+    return { status: res.status, data };
+  };
+}
+
+// ---- report building (pure) ----------------------------------------------------------------------------------------------------------
+export function redactAuthConfig(raw) {
+  const out = {};
+  for (const key of ALLOWED_AUTH_KEYS) {
+    if (SECRETISH.test(key) || !(key in (raw ?? {}))) continue;
+    const v = raw[key];
+    out[key] = typeof v === "string" ? v.slice(0, 40) : typeof v === "number" || typeof v === "boolean" || v === null ? v : "[object]";
+  }
+  return out;
+}
+export function interpretAuth(cfg) {
+  const yes = (v) => v === true;
+  return {
+    email_confirmation_required: cfg.mailer_autoconfirm === false ? true : cfg.mailer_autoconfirm === true ? false : "unknown",
+    public_signup_open: cfg.disable_signup === false ? true : cfg.disable_signup === true ? false : "unknown",
+    captcha_protection_on: yes(cfg.security_captcha_enabled),
+    captcha_provider: cfg.security_captcha_provider ?? null,
+    phone_provider_enabled: yes(cfg.external_phone_enabled),
+    phone_autoconfirm: yes(cfg.phone_autoconfirm),
+    sms_provider: cfg.sms_provider ?? null,
+    send_sms_hook_enabled: yes(cfg.hook_send_sms_enabled),
+    before_user_created_hook_enabled: yes(cfg.hook_before_user_created_enabled),
+    phone_mfa_enabled: yes(cfg.mfa_phone_enroll_enabled) || yes(cfg.mfa_phone_verify_enabled),
+    anonymous_sign_ins: yes(cfg.external_anonymous_users_enabled),
+  };
+}
+export function workerSecretPresence(secretsResult) {
+  const names = new Set((Array.isArray(secretsResult) ? secretsResult : []).map((s) => String(s?.name ?? "")));
+  return Object.fromEntries(WORKER_SECRET_NAMES.map((n) => [n, names.has(n)]));
+}
+const rowsOf = (r) => (r.status >= 200 && r.status < 300 && Array.isArray(r.data) ? r.data : null);
+export async function inspectProject({ label, ref, guardedFetch, cf }) {
+  const report = { environment: label, project_ref_suffix: ref.slice(-4), auth: null, auth_interpretation: null, database: {}, whatsapp_delivery_secrets: null, errors: [] };
+  const cfg = await guardedFetch("GET", `https://api.supabase.com/v1/projects/${ref}/config/auth`);
+  if (cfg.status === 200 && cfg.data) {
+    report.auth = redactAuthConfig(cfg.data);
+    report.auth_interpretation = interpretAuth(report.auth);
+  } else report.errors.push(`auth config: HTTP ${cfg.status}`);
+  for (const [name, sql] of Object.entries(QUERIES)) {
+    const r = await guardedFetch("POST", `https://api.supabase.com/v1/projects/${ref}/database/query/read-only`, { query: sql });
+    const rows = rowsOf(r);
+    if (rows) report.database[name] = rows;
+    else report.database[name] = null, report.errors.push(`${name}: HTTP ${r.status}`);
+  }
+  const disputed = report.database.disputed_function_rights;
+  if (disputed) report.disputed_functions_summary = { found: disputed.length, expected: DISPUTED_FUNCTIONS.length, with_service_role_execute: disputed.filter((f) => f.service_role_exec).length, with_anon_execute: disputed.filter((f) => f.anon_exec).length };
+  if (cf) {
+    const s = await guardedFetch("GET", `https://api.cloudflare.com/client/v4/accounts/${cf.account}/workers/scripts/${cf.script}/secrets`);
+    if (s.status === 200) report.whatsapp_delivery_secrets = workerSecretPresence(s.data?.result);
+    else report.errors.push(`worker secrets: HTTP ${s.status}`);
+  } else report.errors.push("worker secrets: not requested (no CLOUDFLARE_API_TOKEN / CF_ACCOUNT_ID / worker name)");
+  return report;
+}
+
+export function requirements(env) {
+  const need = [];
+  if (!env.SUPABASE_ACCESS_TOKEN) need.push("SUPABASE_ACCESS_TOKEN - a Supabase personal access token with READ access to the project(s) (Management API: config/auth + read-only database query)");
+  return need;
+}
+
+export async function main(argv, env, fetchImpl = fetch, log = console.log) {
+  const which = argv.includes("--env") ? argv[argv.indexOf("--env") + 1] : "both";
+  if (!["acceptance", "production", "both"].includes(which)) { log("usage: --env acceptance|production|both"); return 2; }
+  const wanted = which === "both" ? ["acceptance", "production"] : [which];
+  const missing = requirements(env);
+  const refs = Object.fromEntries(wanted.map((w) => [w, env[`SUPABASE_REF_${w.toUpperCase()}`]]));
+  for (const w of wanted) if (!refs[w]) missing.push(`SUPABASE_REF_${w.toUpperCase()} - the ${w} project reference (not stored in the repository)`);
+  if (missing.length) {
+    log("NOT RUN - authorisation / connector access is required. Nothing was called.\n  - " + missing.join("\n  - ") +
+      "\n  Optional (WhatsApp secret presence): CLOUDFLARE_API_TOKEN (Workers Scripts:Read), CF_ACCOUNT_ID, CF_WORKER_ACCEPTANCE, CF_WORKER_PRODUCTION.\n  This script only issues GET /config/auth, POST /database/query/read-only (SELECT only) and GET .../secrets (names only).");
+    return 3;
+  }
+  const guardedFetch = makeGuardedFetch(fetchImpl, { supabase: env.SUPABASE_ACCESS_TOKEN, cloudflare: env.CLOUDFLARE_API_TOKEN });
+  const reports = [];
+  for (const w of wanted) {
+    const script = env[`CF_WORKER_${w.toUpperCase()}`];
+    const cf = env.CLOUDFLARE_API_TOKEN && env.CF_ACCOUNT_ID && script ? { account: env.CF_ACCOUNT_ID, script } : null;
+    reports.push(await inspectProject({ label: w, ref: refs[w], guardedFetch, cf }));
+  }
+  log(JSON.stringify({ generated_at: new Date().toISOString(), read_only: true, reports }, null, 2));
+  return reports.some((r) => r.errors.some((e) => /^(auth config|disputed_function_rights)/.test(e))) ? 1 : 0;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main(process.argv.slice(2), process.env).then((code) => { process.exitCode = code; }, (e) => { console.error(String(e?.message ?? e).slice(0, 300)); process.exitCode = 1; });
+}

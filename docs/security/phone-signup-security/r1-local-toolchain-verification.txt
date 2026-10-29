@@ -1,0 +1,27 @@
+toolchain: Supabase CLI 2.122.0; Postgres 
+(stack stopped)
+db reset (195 migrations from scratch) -> ok
+permission contract (local toolchain: 13 functions differ - must stay the 13 pre-existing ones) -> ok
+pgTAP FULL repository (145 files) Files=145, Tests=6551, 64 wallclock secs ( 1.91 usr  0.60 sys +  3.20 cusr  3.13 csys =  8.84 CPU) Result: PASS  -> ok
+frontend unit  Tests 82 passed | 16 skipped (98) -> ok
+tsc --noEmit -> FAILED: exit 0 but no success marker /^$|^/
+real-database integration (B1 service + R1 signup service via outbox) ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ Tests 3 failed | 3 passed | 10 skipped (16) -> FAILED exit=1
+concurrency + deadlock stress "PASS":9,"FAIL":0 -> ok
+posture x GoTrue-mode matrix (local toolchain), 6 cells -> ok
+installer phone-change concurrency (existing) -> ok
+RESULT [reset contract pgtap unit integration stress matrix concurrency]: FAIL (see /d/projects/aladdin-phone-sec/.sec-logs)
+--- re-run of: unit integration (harness fix: integration files run one after another because both switch the shared posture)
+toolchain: Supabase CLI 2.122.0; Postgres public.ecr.aws/supabase/postgres:17.11.0.006
+frontend unit  Tests 82 passed | 16 skipped (98) -> ok
+tsc --noEmit -> ok
+real-database integration (B1 service + R1 signup service via outbox) ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+ Tests 8 failed | 8 passed (16) -> FAILED exit=1
+RESULT [unit integration]: FAIL (see /d/projects/aladdin-phone-sec/.sec-logs)
+--- re-run of: reset unit integration (harness fix: integration files run one after another because both switch the shared posture)
+toolchain: Supabase CLI 2.122.0; Postgres public.ecr.aws/supabase/postgres:17.11.0.006
+db reset (195 migrations from scratch) -> ok
+frontend unit  Tests 82 passed | 16 skipped (98) -> ok
+tsc --noEmit -> ok
+real-database integration (B1 service + R1 signup service via outbox)  Tests 16 passed (16) -> ok
+RESULT [reset unit integration]: PASS
