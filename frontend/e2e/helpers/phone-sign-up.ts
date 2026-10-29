@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { createHash, createHmac, randomInt } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
 import { E2E_PASSWORD, fillBirthDate, reachLanding, SIGN_UP_BUTTON, SIGN_UP_CONTACT_LABEL, stubTurnstileWhenOffline, waitForCaptchaToken } from "./auth";
@@ -17,7 +17,8 @@ const DB = process.env.E2E_DB_CONTAINER ?? "supabase_db_aladdin";
 export const KNOWN_PHONE_CODE = "246810";
 
 export function sqlValue(query: string): string {
-  return execSync(`docker exec -i ${DB} psql -U postgres -d postgres -At -F '|'`, { input: query }).toString().trim();
+  // No shell: a quoted `-F '|'` is parsed differently by cmd.exe (a pipe), which broke this helper for anyone developing on Windows.
+  return execFileSync("docker", ["exec", "-i", DB, "psql", "-U", "postgres", "-d", "postgres", "-At", "-F", "|"], { input: query }).toString().trim();
 }
 
 /** A valid Egyptian mobile (010 + 8 digits), unique per run. */
