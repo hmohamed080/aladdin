@@ -37,10 +37,21 @@ describe("AccountBasicsForm", () => {
     expect(screen.getByLabelText(en.accountBasics.cityCustomLabel)).toBeInTheDocument();
     expect((document.querySelector('input[type=hidden][name="city"]') as HTMLInputElement).value).toBe("");
 
-    fireEvent.click(screen.getByRole("button", { name: en.onboarding.professional.specializations.door_installation }));
-    fireEvent.click(screen.getByRole("button", { name: en.onboarding.professional.specializations.wallpaper_installation }));
-    const picked = Array.from(document.querySelectorAll('input[type=hidden][name="specialties"]')).map((i) => (i as HTMLInputElement).value);
-    expect(picked).toEqual(["door_installation", "wallpaper_installation"]);
-    expect(screen.getByRole("button", { name: new RegExp(`${en.accountBasics.main}$`) })).toHaveAttribute("aria-pressed", "true");
+    const add = screen.getByLabelText(en.accountBasics.specialtiesAdd) as HTMLSelectElement;
+    fireEvent.change(add, { target: { value: "door_installation" } });
+    fireEvent.change(add, { target: { value: "wallpaper_installation" } });
+    const picked = () => Array.from(document.querySelectorAll('input[type=hidden][name="specialties"]')).map((i) => (i as HTMLInputElement).value);
+    expect(picked()).toEqual(["door_installation", "wallpaper_installation"]);
+    const door = en.onboarding.professional.specializations.door_installation;
+    expect(screen.getByText(`${door} · ${en.accountBasics.main}`)).toBeInTheDocument();
+    // A picked specialty leaves the dropdown; when all are picked it is disabled.
+    expect(Array.from(add.options).map((o) => o.value)).toEqual([""]);
+    expect(add.disabled).toBe(true);
+
+    // Removing the main one makes the next one main.
+    fireEvent.click(screen.getByRole("button", { name: en.accountBasics.specialtiesRemove.replace("{name}", door) }));
+    expect(picked()).toEqual(["wallpaper_installation"]);
+    expect(screen.getByText(`${en.onboarding.professional.specializations.wallpaper_installation} · ${en.accountBasics.main}`)).toBeInTheDocument();
+    expect(add.disabled).toBe(false);
   });
 });

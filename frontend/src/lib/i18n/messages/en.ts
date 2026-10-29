@@ -6429,6 +6429,8 @@ export const en = {
     cityCustomLabel: "Type your town",
     specialtiesLabel: "Your specialties",
     specialtiesHint: "Pick all that apply. The first one you pick is your main specialty.",
+    specialtiesAdd: "Add a specialty",
+    specialtiesRemove: "Remove {name}",
     main: "Main",
     submit: "Continue",
     saving: "Saving…",
