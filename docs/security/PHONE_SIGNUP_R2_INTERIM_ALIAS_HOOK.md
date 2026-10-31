@@ -88,3 +88,29 @@ Consequences:
 | Alternatives considered | a trigger on `auth.users` (cannot tell Admin from public creation, measured in #122); enforcing the R1 guard now (breaks today's grant-less legacy creation until the app that mints grants is deployed); disabling public sign-up (breaks e-mail registration); Turnstile (already ON, not a barrier to a targeted attacker); an edge rule (Supabase's API host is not behind this project's Cloudflare zone) |
 
 **Recommendation:** worth doing as a stop-gap **if** the merge → apply → deploy → activate path for R1/R2 will take more than a short time, because it is small, reversible with one switch, independent of every PR, and removes the public exposure that the hosted audit confirmed. **GO for implementing it on Acceptance after owner approval; Production only after a clean Acceptance period.** This is a separate decision from merging dormant code or enabling registration (`PHONE_SIGNUP_R2_INTEGRATION.md` §10).
+
+## 8. Acceptance-first rollout: checklist, monitoring, rollback drill, approval request (prepared; nothing applied)
+
+**Rollback drill (done locally, `bash supabase/tests/r2/hook_rollback_drill.sh`, 13/13):** with the hook on, an alias sign-up is refused and creates nothing → **rollback = disable the hook, keep the function** → e-mail sign-up and e-mail OTP sign-up work, the existing legacy alias account signs in, Admin creation works, and an alias sign-up is accepted again (the exposure is back — that is what "rolled back" means) → re-enabling refuses the alias again → **the wrong order** (drop the function while the hook is still enabled) makes *every* public sign-up fail with 500. The order is therefore part of the procedure, not a preference.
+
+**Preconditions (all read-only, before the first change):** (1) hosted GoTrue version of Acceptance (public `/auth/v1/health`) compared with the two tested versions; (2) plan supports Auth Hooks; (3) `--only migrations` history confirmed (the function arrives as a normal migration, so the history must be known); (4) alias census (`database.alias_census`) recorded as the "before"; (5) owner names the window and the person who holds the disable switch.
+
+**Acceptance steps (each only after the owner's approval in their own words):**
+1. Apply the migration (function + grants only; the hook stays **off**). Check: `select public.hook_before_user_created(<alias event>)` returns the 403 object; a Google-shaped event, an empty and a null event return `{}`; `EXECUTE` is held by `supabase_auth_admin` only.
+2. Enable the hook (`hook_before_user_created_enabled=true`, `hook_before_user_created_uri=pg-functions://postgres/public/hook_before_user_created`).
+3. Verify with synthetic data within minutes: anonymous alias `/signup` → **403 and no row** (if a row appears the hook is not active: delete that one row through the Admin API, **disable**, investigate); normal e-mail sign-up works; password recovery works; one real Google and one real Facebook sign-up work; a legacy-style Admin-created alias account signs in.
+4. Observe for the agreed period.
+
+**Monitoring (what to watch, where):**
+
+| Signal | Source | Meaning | Action |
+|---|---|---|---|
+| `POST /auth/v1/signup`, `/otp`, `/magiclink` answering **500** | Supabase Auth logs (dashboard Logs → Auth), or the Management API logs endpoint | hook unhealthy (function missing, raising, no `EXECUTE`) — **all** public sign-up is failing | **disable the hook first**, then investigate |
+| same routes answering **403** with the generic message | Auth logs | blocked alias sign-ups (squat attempts); a few are expected | none; a sudden burst is worth a look |
+| public sign-up success rate vs the previous week | Auth logs / `auth.users` created per hour (read-only count) | a drop that is not 403s means the hook is hurting real sign-ups | disable, investigate |
+| `delivery`-unrelated: Admin creations (`registration_source`) continuing | read-only count of recent `auth.users` with the trusted sources | confirms trusted creation is untouched | none |
+The function writes no log or table on purpose (a write would be one more way for it to fail); Auth logs are the monitor. A synthetic probe is *not* recommended on Production: its only safe form is an alias sign-up that must answer 403 (it creates nothing when the hook works and a squat row when it does not).
+
+**Promotion to Production** only after Acceptance has run clean for the agreed period with: zero 500s attributable to the hook, at least one blocked attempt or a deliberate negative test, the real Google/Facebook checks done, and the same preconditions repeated for Production (version, plan, exact history, census, window, switch holder).
+
+**Approval request (verbatim scope, nothing here is approved):** *(a)* apply a migration that adds one function `public.hook_before_user_created(jsonb)` with `EXECUTE` for `supabase_auth_admin` only, to **Acceptance**; *(b)* then set the two Auth hook settings on **Acceptance**; *(c)* the disable-first rollback above. **Not requested:** any Production change; any change to the R1 guard; any deletion of existing alias accounts.
