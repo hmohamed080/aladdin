@@ -1,5 +1,29 @@
 ## 2026-10-26 — Owner Sales delegation capabilities (Stage 6 finding, Option A)
 
+## 2026-10-28 — WhatsApp OTP security hardening on Draft PR #114
+
+**Changes:** Added D1 atomic webhook-id claim journal (SHA-256 event hashes only, no OTP or phone storage), no-retry provider semantics, fail-closed DB failure handling and mandatory Acceptance phone allowlist. Added migration SQL and GitHub security test workflow. Kept Meta Token in owner-created Cloudflare Secrets Store and sender ID as non-secret preview var.
+
+**Evidence:** Dedicated `WhatsApp OTP Transport CI` workflow run #2 `40684963776` succeeded for TypeScript and mocked test suite; no live D1/Meta verification performed. Full project CI remains unverified.
+
+**Hosted state:** Acceptance & Production Supabase unchanged; no Send SMS Hook; no Cloudflare D1 provisioned, no Worker deployed; delivery flag stays false; no messages sent in this work session.
+
+**Next gate:** Owner-provisioned isolated Acceptance D1 (no Production), migration applied and bind configured, real D1 replay tests, identity strategy review. Owner approval required for any deployment, Hook activation or live send.
+
+
+## 2026-10-28 — WhatsApp OTP transport preparation (draft, unmerged)
+
+**Goal:** Prepare Supabase Auth → signed HTTP Hook → isolated Cloudflare transport → Meta WhatsApp without altering existing auth flows or production.
+
+**Read-only inventory:** Verified Production and Acceptance Supabase projects and Cloudflare frontend/backend preview workers. GitHub connected repo `hmohamed080/aladdin`. Current General = Email + Password with Email OTP; installer/showroom Phone + Password uses synthetic alias and Supabase Phone Auth off.
+
+**Changes (feature branch only):** Created `feat/whatsapp-otp-transport-20261028`. Added isolated `edge/whatsapp-otp-worker/` (signature verification, bounded validation, Arabic Meta Copy Code send, delivery OFF) and proposed ADR-0025.
+
+**Validation:** Local Worker prototype `tsc --noEmit` PASS and 7 mock tests PASS; GitHub branch full CI not yet run. No real provider sends during preparation.
+
+**Open gates:** Meta System User credential, verified phone identity/enrollment plan, durable replay/idempotency, QA auth rate limits/CAPTCHA, English template as needed, Preview deployment approval, hosted Hook activation approval. **No Production modifications, no Hook enabled.**
+
+
 - Finding (Stage 6 Step 2, Acceptance): a showroom owner created by `app.organization_create_owned` holds `org.manage` and the pilot `sales.opportunity.*` keys but not `sales.read/write/assign/manage`, so `membership_set_capabilities` (no-escalation) refuses the Sales Rep and Sales Manager presets (`frontend/src/lib/org/roles.ts`).
 - Owner decision 2026-10-26: permanent product fix, no one-off DB grant.
 - Migration `20261026090001_owner_sales_delegation_capabilities.sql`:

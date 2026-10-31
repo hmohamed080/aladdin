@@ -1,0 +1,38 @@
+{
+  "$schema": "../../frontend/node_modules/wrangler/config-schema.json",
+  "name": "aladdin-whatsapp-otp-preview",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "routes": [],
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "WHATSAPP_PHONE_NUMBER_ID": "1415528588305492",
+    "WHATSAPP_OTP_TEMPLATE": "aladdin_otp",
+    "WHATSAPP_OTP_LANGUAGE": "ar",
+    "WHATSAPP_GRAPH_API_VERSION": "v25.0",
+    "WHATSAPP_DELIVERY_ENABLED": "false"
+  },
+  "secrets_store_secrets": [
+    {
+      "binding": "WHATSAPP_ACCESS_TOKEN",
+      "store_id": "acfaa67f391e499db6fde398022f50ce",
+      "secret_name": "WHATSAPP_ACCESS_TOKEN"
+    },
+    {
+      "binding": "SUPABASE_SEND_SMS_HOOK_SECRET",
+      "store_id": "acfaa67f391e499db6fde398022f50ce",
+      "secret_name": "SUPABASE_SEND_SMS_HOOK_SECRET"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "IDEMPOTENCY_DB",
+      "database_name": "aladdin-whatsapp-otp-acceptance",
+      "database_id": "da65d5e4-8344-4078-9c2d-8a4bb4907f79",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
