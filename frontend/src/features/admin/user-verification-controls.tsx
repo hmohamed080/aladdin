@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { LabeledField, Textarea } from "@/components/ui/controls";
+import { Checkbox, LabeledField, Textarea } from "@/components/ui/controls";
 import { CheckIcon, XIcon } from "@/components/ui/icons";
 import { approveVerificationAction, rejectVerificationAction } from "@/server/actions/admin-forms";
 import type { PendingUserVerification } from "@/server/queries/admin-directory";
@@ -32,6 +33,10 @@ export function UserVerificationControls({
   compact?: boolean;
 }) {
   const { t } = useI18n();
+  // Public listing is the reviewer's explicit choice (ADR-0007 D14), only meaningful for a professional upgrade.
+  // Ticked by default = the Verifications queue's behaviour; the dialog says what it does and nothing is hidden.
+  const [listPublicly, setListPublicly] = useState(true);
+  const offersListing = pending?.verificationType === "professional";
 
   if (!pending) {
     const cls = compact
@@ -66,6 +71,15 @@ export function UserVerificationControls({
         formAction={approveVerificationAction}
       >
         {hidden}
+        {offersListing ? (
+          <>
+            <input type="hidden" name="listingChoice" value="1" />
+            <Checkbox id={`list-publicly-${userId}`} name="grantListing" checked={listPublicly} onChange={setListPublicly}>
+              {t("admin.review.listPublicly")}
+            </Checkbox>
+            <p className="text-label text-fg-muted">{t("admin.review.listPubliclyHint")}</p>
+          </>
+        ) : null}
       </ConfirmDialog>
       <ConfirmDialog
         trigger={t("admin.review.reject")}
