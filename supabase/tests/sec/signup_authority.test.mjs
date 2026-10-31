@@ -405,7 +405,7 @@ try {
   try { setPosture("shipped"); } catch (e) { console.error("[sec] posture reset failed", String(e).slice(0, 160)); exit = 1; }
   for (const id of [...created]) { try { await forget(id); } catch { /* audited fixtures remain; the runner resets the isolated DB */ } }
   const summary = rec.summary();
-  const dir = resolve(here, "../../../docs/security/phone-signup-security");
+  const dir = process.env.SEC_EVIDENCE_DIR ? resolve(process.env.SEC_EVIDENCE_DIR) : resolve(here, "../../../docs/security/phone-signup-security");
   mkdirSync(dir, { recursive: true });
   writeFileSync(resolve(dir, `r1-evidence-${process.env.SEC_TOOLCHAIN ?? "local"}-${MODE}-${POSTURE}.json`), `${JSON.stringify({ summary, results: rec.results }, null, 1)}\n`);
   console.log(`\n[sec] ${MODE}/${POSTURE}: ${JSON.stringify(summary)}`);

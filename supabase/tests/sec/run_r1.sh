@@ -20,8 +20,9 @@ cd "${repo}"
 toolchain="${R1_TOOLCHAIN:-local}"
 modes="${R1_MODES:-confirm-on confirm-off}"
 postures="${R1_POSTURES:-shipped observe enforce}"
-logs="${R1_LOG_DIR:-${repo}/.sec-logs}"; mkdir -p "${logs}" docs/security/phone-signup-security
-summary="docs/security/phone-signup-security/r1-run-summary-${toolchain}.txt"; : > "${summary}"
+evidence_dir="${SEC_EVIDENCE_DIR:-docs/security/phone-signup-security}"; export SEC_EVIDENCE_DIR="${evidence_dir}"   # default = R1's committed evidence directory
+logs="${R1_LOG_DIR:-${repo}/.sec-logs}"; mkdir -p "${logs}" "${evidence_dir}"
+summary="${evidence_dir}/r1-run-summary-${toolchain}.txt"; : > "${summary}"
 note() { echo "$*" | tee -a "${summary}"; }
 
 case "${toolchain}" in

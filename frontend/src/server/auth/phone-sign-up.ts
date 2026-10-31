@@ -18,7 +18,7 @@ import { phoneAuthLimit } from "@/server/auth/phone-auth-limit";
 import { captchaTokenFrom, isCaptchaFailure } from "@/server/auth/captcha";
 import { clientIpFrom, turnstileHostnamesFrom, verifyTurnstileToken } from "@/server/auth/turnstile";
 import { getPhoneSignupService } from "@/server/phone-verification/runtime";
-import type { SignupGrant } from "@/server/phone-verification/signup-service";
+import type { PhoneSignupService, SignupGrant } from "@/server/phone-verification/signup-service";
 import type { Database } from "@/types/database.types";
 
 /**
@@ -228,7 +228,7 @@ class InitializationError extends Error {
   }
 }
 
-async function initializeAccount(supabase: Client, userId: string, pending: Pending, grant: SignupGrant): Promise<void> {
+async function initializeAccount(supabase: Client, userId: string, pending: Pending, grant: SignupGrant, service: PhoneSignupService): Promise<void> {
   const step = async (name: string, call: PromiseLike<{ error: { code?: string } | null }>) => {
     const { error } = await call;
     if (!error) return;
@@ -259,9 +259,8 @@ async function initializeAccount(supabase: Client, userId: string, pending: Pend
   }
   // Last: the profile now holds exactly the proven number, so the authority can stamp phone_verified_at for it. Anything but a clean
   // "attached" (grant expired, wrong user, wrong number, feature switched off meanwhile) fails the whole sign-up and rolls it back.
-  const service = getPhoneSignupService();
-  const attached = service ? await service.attach(userId, grant.id) : null;
-  if (attached?.status !== "attached") {
+  const attached = await service.attach(userId, grant.id);
+  if (attached.status !== "attached") {
     logStepFailure("attach", null);
     throw new InitializationError("failed");
   }
@@ -336,7 +335,7 @@ export async function verifyPhoneSignUp(formData: FormData): Promise<PhoneSignUp
       logStepFailure("session", error as { code?: string });
       throw new InitializationError(isCaptchaFailure(error as { code?: string; message?: string }) ? "captcha" : "failed");
     }
-    await initializeAccount(supabase, created.userId, pending, grant);
+    await initializeAccount(supabase, created.userId, pending, grant, service);
   } catch (error) {
     try { await supabase.auth.signOut({ scope: "global" }); } catch { logStepFailure("session_revoke", null); }
     try { await deleteCraftsmanPasswordUser(created.userId); } catch { logStepFailure("rollback", null); }
