@@ -30,4 +30,13 @@ describe("phone verification env", () => {
     expect(message).toContain("PHONE_OTP_HMAC_KEYS");
     expect(message).not.toContain("short");
   });
+  it("carries the sign-up cookie secret through, rejects a short one without echoing it", () => {
+    const secret = "c".repeat(48);
+    expect(parsePhoneVerificationEnv({}).signupCookieSecret).toBeUndefined();
+    expect(parsePhoneVerificationEnv({ PHONE_SIGNUP_COOKIE_SECRET: secret }).signupCookieSecret).toBe(secret);
+    let message = "";
+    try { parsePhoneVerificationEnv({ PHONE_SIGNUP_COOKIE_SECRET: "tooshort-secret" }); } catch (e) { message = (e as Error).message; }
+    expect(message).toContain("PHONE_SIGNUP_COOKIE_SECRET");
+    expect(message).not.toContain("tooshort-secret");
+  });
 });

@@ -1,7 +1,7 @@
--- Sign-up birthday stays private and the registration flow keeps no WhatsApp code table (R2).
+-- Sign-up birthday stays private and WhatsApp verification codes are service_role only.
 create extension if not exists pgtap;
 begin;
-select plan(5);
+select plan(7);
 
 select ok(
   not has_column_privilege('authenticated', 'public.users', 'birth_date', 'UPDATE')
@@ -19,15 +19,23 @@ select is(
   'a birthday before 1900 is rejected');
 
 select ok(
-  to_regclass('public.phone_verification_challenges') is null,
-  'the registration flow keeps no code table of its own (R2: the phone verification authority is the only one)');
+  (select relrowsecurity from pg_class where oid = 'public.phone_verification_challenges'::regclass),
+  'verification codes have RLS on');
+
+select is(
+  (select count(*)::int from pg_policy where polrelid = 'public.phone_verification_challenges'::regclass),
+  0, 'no client policy exists on verification codes');
 
 select ok(
-  to_regclass('app.phone_verification_challenges') is not null
-  and not has_table_privilege('service_role', 'app.phone_verification_challenges', 'SELECT,INSERT,UPDATE,DELETE')
-  and not has_table_privilege('anon', 'app.phone_verification_challenges', 'SELECT')
-  and not has_table_privilege('authenticated', 'app.phone_verification_challenges', 'SELECT'),
-  'the authority table exists and no client role, not even service_role, can touch it directly');
+  not has_table_privilege('anon', 'public.phone_verification_challenges', 'SELECT,INSERT,UPDATE,DELETE')
+  and not has_table_privilege('authenticated', 'public.phone_verification_challenges', 'SELECT,INSERT,UPDATE,DELETE')
+  and has_table_privilege('service_role', 'public.phone_verification_challenges', 'SELECT,INSERT,UPDATE,DELETE'),
+  'only service_role reaches verification codes');
+
+select throws_ok(
+  $$ insert into public.phone_verification_challenges (purpose, phone_e164, code_hash, expires_at)
+     values ('sign_up', '+201012345678', repeat('a', 64), now() + interval '2 hours') $$,
+  '23514', null, 'a code cannot live longer than 30 minutes');
 
 select * from finish();
 rollback;

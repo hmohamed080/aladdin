@@ -7,7 +7,7 @@ import { isAuthSessionMissingError, type SupabaseClient } from "@supabase/supaba
 import { authFormWithinLimit } from "@/lib/auth/form-limits";
 import { craftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 import type { CanonicalPhone } from "@/lib/contact/phone";
-import { readAuthIdentifierSecret } from "@/lib/env";
+import { readPhoneVerificationEnv } from "@/lib/env/phone-verification";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
 import { isUsernameWellFormed } from "@/lib/identity/username";
@@ -69,13 +69,19 @@ type Pending = {
   exp: number;
 };
 
-function key(purpose: string): Buffer {
-  return createHash("sha256").update(`${purpose}:${readAuthIdentifierSecret()}`).digest();
+// The pending-sign-up cookie holds the password for at most 10 minutes, so it gets its OWN secret (PHONE_SIGNUP_COOKIE_SECRET): neither the code
+// keyring nor the shared auth secret can open it. The ciphertext is also bound to this purpose with AEAD associated data.
+const COOKIE_AAD = Buffer.from("aladdin/phone-sign-up/psu/v1");
+function cookieKey(): Buffer {
+  const secret = readPhoneVerificationEnv().signupCookieSecret;
+  if (!secret || secret.length < 32) throw new Error("PHONE_SIGNUP_COOKIE_SECRET is not configured");
+  return createHash("sha256").update(`phone-sign-up-cookie:${secret}`).digest();
 }
 
 function seal(value: Pending): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key("phone-sign-up-cookie"), iv);
+  const cipher = createCipheriv("aes-256-gcm", cookieKey(), iv);
+  cipher.setAAD(COOKIE_AAD);
   const body = Buffer.concat([cipher.update(JSON.stringify(value), "utf8"), cipher.final()]);
   return Buffer.concat([iv, cipher.getAuthTag(), body]).toString("base64url");
 }
@@ -84,7 +90,8 @@ function unseal(token: string | undefined): Pending | null {
   if (!token) return null;
   try {
     const raw = Buffer.from(token, "base64url");
-    const decipher = createDecipheriv("aes-256-gcm", key("phone-sign-up-cookie"), raw.subarray(0, 12));
+    const decipher = createDecipheriv("aes-256-gcm", cookieKey(), raw.subarray(0, 12));
+    decipher.setAAD(COOKIE_AAD);
     decipher.setAuthTag(raw.subarray(12, 28));
     const value = JSON.parse(Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString("utf8")) as Pending;
     if (typeof value.exp !== "number" || value.exp < Date.now()) return null;
@@ -185,6 +192,14 @@ export async function requestPhoneSignUp(formData: FormData, phone: CanonicalPho
   const { data: available, error: availabilityError } = await supabase.rpc("username_available", { p_username: username });
   if (availabilityError || typeof available !== "boolean") return fail(E("sendFailed"));
   if (!available) return fail("registration.error.usernameUnavailable");
+
+  // Fail closed BEFORE a code is requested: without the cookie secret the pending sign-up cannot be kept, so no message may be sent.
+  try {
+    cookieKey();
+  } catch {
+    logStepFailure("cookie_key", null);
+    return fail(E("whatsappUnavailable"));
+  }
 
   const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value) as Locale;
   const rid = randomUUID();
@@ -325,6 +340,9 @@ export async function verifyPhoneSignUp(formData: FormData): Promise<PhoneSignUp
     await clearCookie();
     if (created.reason === "exists") return fail(E("phoneExists"));
     if (created.reason === "rate_limited") return fail(E("rateLimited"));
+    // Auth refused the password (for example a breached one when leaked-password protection is on). The Auth user was never created, so the
+    // grant is unspent; the cookie holding the refused password is already gone, so the person starts again with another one.
+    if (created.reason === "rejected") return fail(E("passwordRejected"));
     return fail(E("verifyFailed"));
   }
 

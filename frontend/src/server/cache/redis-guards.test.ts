@@ -28,7 +28,7 @@ function sources(dir: string): string[] {
   });
 }
 
-const files = sources(SRC).map((path) => ({ path: relative(SRC, path), text: readFileSync(path, "utf8") }));
+const files = sources(SRC).map((path) => ({ path: relative(SRC, path).split("\\").join("/"), text: readFileSync(path, "utf8") }));
 
 describe("Redis use stays inside ADR-0019", () => {
   it("is reached only from the reviewed callers", () => {

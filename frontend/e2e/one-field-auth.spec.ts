@@ -162,6 +162,8 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     await other.route("**/*", (route) => route.continue({ headers: { ...route.request().headers(), "x-forwarded-for": ip } }));
     const since = await requestPhoneSignUp(other, { phone, name: "Someone Else", username: uniqueUsername() });
     expect(await readSignUpCode(e164, since, 4_000), "a registered number must receive no code").toBeNull();
+    // The code step always offers the way out for people who already have an account - for every number, so it reveals nothing.
+    await expect(other.locator('[data-sign-up-step="phone-code"]').locator('xpath=ancestor::main').getByRole("link", { name: /^(sign in|تسجيل الدخول)$/i }).first()).toHaveAttribute("href", "/auth/sign-in");
 
     // Any code fails and still no second account appears.
     await submitPhoneCode(other, "123456");

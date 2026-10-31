@@ -6358,7 +6358,7 @@ export const ar: Messages = {
       noCodeHint: "لم يصلك رمز؟ قد يكون لديك حساب بالفعل.",
       verify: "تحقق وتابع",
       verifying: "جارٍ التحقق…",
-      haveAccount: "لديك حساب؟",
+      haveAccount: "لديك حساب بالفعل؟",
       signInLink: "تسجيل الدخول",
     },
     signIn: {

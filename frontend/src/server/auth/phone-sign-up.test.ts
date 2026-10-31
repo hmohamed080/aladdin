@@ -10,7 +10,8 @@ vi.mock("next/headers", () => ({
   })),
   headers: vi.fn(async () => ({ get: () => null })),
 }));
-vi.mock("@/lib/env", () => ({ readAuthIdentifierSecret: () => "test-secret-test-secret-test-secret-00" }));
+const envState = vi.hoisted(() => ({ secret: "cookie-secret-cookie-secret-cookie-secret-00" as string | undefined }));
+vi.mock("@/lib/env/phone-verification", () => ({ readPhoneVerificationEnv: () => ({ signupCookieSecret: envState.secret }) }));
 
 const RID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const CID = "11111111-1111-4111-8111-111111111111";
@@ -87,6 +88,7 @@ const registrationId = () => m.start.mock.calls.at(0)?.[0] as string;
 beforeEach(() => {
   vi.clearAllMocks();
   cookieJar.clear();
+  envState.secret = "cookie-secret-cookie-secret-cookie-secret-00";
   m.order.length = 0;
   m.getUser.mockResolvedValue({ data: { user: null }, error: null });
   m.siteverify.mockResolvedValue({ ok: true });
@@ -170,6 +172,30 @@ describe("requestPhoneSignUp", () => {
     expect(cookieJar.has("psu")).toBe(false);
   });
 
+  it("fails closed - before any challenge is requested - when the cookie secret is missing or short", async () => {
+    for (const bad of [undefined, "short"]) {
+      envState.secret = bad;
+      expect((await requestPhoneSignUp(form(), PHONE)).code).toBe("authPasswordPreview.error.whatsappUnavailable");
+    }
+    expect(m.start).not.toHaveBeenCalled();
+    expect(cookieJar.has("psu")).toBe(false);
+  });
+
+  it("seals the pending sign-up so it is useless without the cookie secret and without this cookie's purpose", async () => {
+    await startSignUp();
+    const sealed = cookieJar.get("psu")!;
+    envState.secret = "another-secret-another-secret-another-secret-0";
+    cookieJar.set("psu", sealed);
+    expect((await verifyPhoneSignUp(verifyForm("246810"))).code).toBe("authPasswordPreview.error.phoneCodeExpired");
+    expect(m.verify).not.toHaveBeenCalled();
+    // tampering with one byte is refused too
+    envState.secret = "cookie-secret-cookie-secret-cookie-secret-00";
+    const raw = Buffer.from(sealed, "base64url");
+    raw[raw.length - 1] = (raw[raw.length - 1] ?? 0) ^ 1;
+    cookieJar.set("psu", raw.toString("base64url"));
+    expect((await verifyPhoneSignUp(verifyForm("246810"))).code).toBe("authPasswordPreview.error.phoneCodeExpired");
+  });
+
   it("never creates a second account for a signed-in person", async () => {
     m.getUser.mockResolvedValueOnce({ data: { user: { id: "someone" } }, error: null });
     expect(await run(() => requestPhoneSignUp(form(), PHONE))).toBe("REDIRECT:/onboarding");
@@ -232,6 +258,15 @@ describe("verifyPhoneSignUp", () => {
     m.rpc.mockImplementation(async (name: string) => (name === "profile_set_username" ? { data: null, error: { code: "23505" } } : { data: null, error: null }));
     expect((await verifyPhoneSignUp(verifyForm("246810"))).code).toBe("registration.error.usernameUnavailable");
     expect(m.deleteUser).toHaveBeenCalledWith("u-new");
+    expect(m.attach).not.toHaveBeenCalled();
+    expect(cookieJar.has("psu")).toBe(false);
+  });
+
+  it("tells the person to choose another password when Auth refuses it, leaving no account and no cookie (the grant stays unspent)", async () => {
+    await startSignUp();
+    m.createUser.mockResolvedValueOnce({ ok: false, reason: "rejected" });
+    expect((await verifyPhoneSignUp(verifyForm("246810"))).code).toBe("authPasswordPreview.error.passwordRejected");
+    expect(m.signInWithPassword).not.toHaveBeenCalled();
     expect(m.attach).not.toHaveBeenCalled();
     expect(cookieJar.has("psu")).toBe(false);
   });

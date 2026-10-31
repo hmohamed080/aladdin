@@ -18,7 +18,7 @@ set -a
 . "${_r2_work}/.stack.env"
 set +a
 case "${API_URL}" in http://127.0.0.1:*|http://localhost:*) ;; *) echo "REFUSED: API_URL is not loopback" >&2; return 2 2>/dev/null || exit 2;; esac
-export NEXT_PUBLIC_SUPABASE_URL="${API_URL}" NEXT_PUBLIC_SUPABASE_ANON_KEY="${ANON_KEY}" SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}"
+export SUPABASE_URL="${API_URL}" NEXT_PUBLIC_SUPABASE_URL="${API_URL}" NEXT_PUBLIC_SUPABASE_ANON_KEY="${ANON_KEY}" SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}"
 export NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_APP_ENV=local
 export NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 export TURNSTILE_ALLOWED_HOSTNAMES=127.0.0.1,localhost E2E_STUB_TURNSTILE=1 E2E_TURNSTILE_STUB=1
@@ -27,6 +27,7 @@ AUTH_PASSWORD_PREVIEW_GRANT_SECRET="$(node -e "process.stdout.write(require('cry
 if [[ "${1:-}" == "phone" ]]; then
   export PHONE_VERIFICATION_ENABLED=true PHONE_SIGNUP_VERIFICATION_ENABLED=true PHONE_OTP_DELIVERY=outbox
   PHONE_OTP_HMAC_KEYS="$(node -e "process.stdout.write(JSON.stringify({current:'r2e2e',keys:{r2e2e:require('crypto').randomBytes(32).toString('base64')}}))")"; export PHONE_OTP_HMAC_KEYS
+  PHONE_SIGNUP_COOKIE_SECRET="$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))")"; export PHONE_SIGNUP_COOKIE_SECRET
   export PHONE_OTP_OUTBOX_DIR="${_r2_repo}/frontend/.local/phone-otp-outbox"
   mkdir -p "${PHONE_OTP_OUTBOX_DIR}"
   export E2E_ALIAS_GUARD="${E2E_ALIAS_GUARD:-enforce}"

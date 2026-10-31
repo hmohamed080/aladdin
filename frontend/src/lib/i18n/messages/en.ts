@@ -6518,8 +6518,8 @@ export const en = {
       noCodeHint: "No code arriving? You may already have an account.",
       verify: "Verify and continue",
       verifying: "Verifying…",
-      haveAccount: "Have an account?",
-      signInLink: "Log in",
+      haveAccount: "Already have an account?",
+      signInLink: "Sign in",
     },
     signIn: {
       identifierLabel: "Mobile number, username or email",
