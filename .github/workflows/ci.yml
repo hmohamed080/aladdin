@@ -175,6 +175,8 @@ jobs:
         run: shellcheck -S warning ops/backups/*.sh
       - name: Schedule, Production gate and target checks (offline)
         run: bash ops/backups/plan-test.sh
+      - name: Media record validator (fail-closed rules)
+        run: python3 ops/backups/media-record-test.py
 
   # Pull requests only. A review aid for `supabase/migrations`: see scripts/migration-policy.mjs and the
   # expand/contract rules in docs/operations/staging-deployment-runbook.md. It also runs the unit tests of the

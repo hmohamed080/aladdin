@@ -130,15 +130,23 @@ cairo_day() {
 # Where the copy of one Supabase Storage object (id, bucket, etag) lives. The key holds only the random id.
 media_copy_key() { echo "media/$BACKUP_LABEL/supabase/objects/$2/$1-${3:-noetag}.age"; }
 
+# Where the copy of one R2-hosted original lives: <generation>/<content hash> only (no owner, page or name), so the
+# same bytes are stored once per generation. The generation is the Cairo month: every month the whole live set is
+# copied afresh and a bucket lifecycle rule expires a generation after R2_MEDIA_RETENTION_DAYS (90), so what a user
+# removed leaves the backup within that time. Written once, never replaced.
+r2_generation() { local y m; read -r y m _ < <(cairo_day); echo "$y$m"; }
+r2_copy_key() { echo "media/$BACKUP_LABEL/r2/${2:-$(r2_generation)}/objects/$1.age"; }
+
 # Findings about one stored snapshot's media step in one prefix, as "P|A|W text" lines (see media-record.py).
 # Fails CLOSED: a missing, unreadable, malformed or incomplete record, or a missing inventory, is a "P" line.
+# $3 is the record kind: "media" (Supabase Storage files, default) or "r2media" (originals hosted in R2).
 media_findings() {
-  local prefix="$1" name="$2" tmp len out; tmp="$(mktemp)"
-  if ! s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.media.json" "$tmp" >/dev/null 2>&1; then
-    rm -f "$tmp"; echo "P no readable media record for $name in $prefix (its media step did not finish)"; return 0
+  local prefix="$1" name="$2" kind="${3:-media}" tmp len out; tmp="$(mktemp)"
+  if ! s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.$kind.json" "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"; echo "P no readable $kind record for $name in $prefix (its $kind step did not finish)"; return 0
   fi
-  len="$(s3 s3api head-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.media.tsv.age" --query ContentLength --output text 2>/dev/null || true)"
-  case "$len" in ''|*[!0-9]*|0) echo "P no media inventory for $name in $prefix";; esac
+  len="$(s3 s3api head-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.$kind.tsv.age" --query ContentLength --output text 2>/dev/null || true)"
+  case "$len" in ''|*[!0-9]*) echo "P no $kind inventory for $name in $prefix";; 0) [ "$kind" = r2media ] || echo "P no $kind inventory for $name in $prefix";; esac
   if out="$(python3 "$LIB_DIR/media-record.py" "$tmp" "$BACKUP_LABEL" "$name" "$BACKUP_LABEL")"; then
     [ -z "$out" ] || echo "$out"
   else
@@ -153,8 +161,14 @@ snapshot_done() {
   local name="$1" p found; shift
   for p in "$@"; do
     s3 s3api head-object --bucket "$BACKUP_BUCKET" --key "$p/$name.tar.age" >/dev/null 2>&1 || return 1
-    found="$(media_findings "$p" "$name")"
-    if grep -q '^P ' <<< "$found"; then return 1; fi
+    if [ "${LEGACY_MEDIA_BACKUP:-0}" = 1 ]; then
+      found="$(media_findings "$p" "$name")"
+      if grep -q '^P ' <<< "$found"; then return 1; fi
+    fi
+    if [ "${R2_MEDIA_BACKUP:-0}" = 1 ]; then
+      found="$(media_findings "$p" "$name" r2media)"
+      if grep -q '^P ' <<< "$found"; then return 1; fi
+    fi
   done
   return 0
 }

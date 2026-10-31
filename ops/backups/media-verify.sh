@@ -11,6 +11,9 @@
 #   BACKUP_LABEL=... BACKUP_BUCKET=... R2_ENDPOINT=... AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
 #   KEY=db/<label>/.../<snapshot>.tar.age  AGE_IDENTITY_FILE=<private key file>  OUT=<report folder>
 #   MEDIA_DB_CONTAINER=<docker container of the restored database> | MEDIA_DB_URL=postgresql://...
+# MEDIA_KIND=r2 verifies the R2-hosted originals instead (record <snapshot>.r2media.*, database rows
+# public.media_storage_locations provider r2, compared on physical key, sha256 and size; the sample is also checked
+# against the sha256 the database recorded, not only against the sha256 stored with the copy).
 # Optional: MEDIA_SAMPLE (20), MEDIA_HEAD_LIMIT (2000: how many copies get their stored metadata read).
 # Writes $OUT/media-summary.txt (one line) and $OUT/media-fails.txt (one finding per line); exit 1 on any finding.
 set -euo pipefail
@@ -21,6 +24,8 @@ require_env KEY AGE_IDENTITY_FILE OUT
 case "$KEY" in db/"$BACKUP_LABEL"/*.tar.age) ;; *) die "KEY must be a $BACKUP_LABEL .tar.age snapshot";; esac
 umask 077
 mkdir -p "$OUT"; W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
+KIND="${MEDIA_KIND:-supabase}"
+case "$KIND" in supabase) REC=media;; r2) REC=r2media;; *) die "MEDIA_KIND must be supabase or r2";; esac
 prefix="${KEY%/*}"; name="$(basename "$KEY" .tar.age)"
 fails=(); summary=""
 finish() {
@@ -37,14 +42,14 @@ dbq() {
     psql "$MEDIA_DB_URL" -X -q -At -F $'\t' -v ON_ERROR_STOP=1
   fi
 }
-copy_prefix="media/$BACKUP_LABEL/supabase/objects/"
+copy_prefix="media/$BACKUP_LABEL/supabase/objects/"; [ "$KIND" != r2 ] || copy_prefix="media/$BACKUP_LABEL/r2/"
 
 # 1. The record and the inventory.
-found="$(media_findings "$prefix" "$name")"
+found="$(media_findings "$prefix" "$name" "$REC")"
 while IFS= read -r line; do case "$line" in "P "*) fails+=("${line#P }");; esac; done <<< "$found"
 if [ "${#fails[@]}" -gt 0 ]; then summary="NO VALID MEDIA RECORD for this snapshot"; finish; fi
-s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.media.json" "$W/media.json" >/dev/null
-s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.media.tsv.age" "$W/inv.age" >/dev/null
+s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.$REC.json" "$W/media.json" >/dev/null
+s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.$REC.tsv.age" "$W/inv.age" >/dev/null
 if ! age -d -i "$AGE_IDENTITY_FILE" "$W/inv.age" > "$W/inv.tsv" 2>/dev/null; then
   fails+=("the media inventory cannot be decrypted with this key"); summary="inventory cannot be decrypted"; finish
 fi
@@ -54,11 +59,20 @@ records="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["obje
 [ "$(wc -l < "$W/inv.tsv" | tr -d ' ')" = "$records" ] || fails+=("the inventory has $(wc -l < "$W/inv.tsv" | tr -d ' ') entries but its record says $records")
 
 # 2. The inventory against the database: id, bucket, complete path, size, copy key, state.
-dbq > "$W/db.tsv" <<'SQL'
+if [ "$KIND" = r2 ]; then
+  dbq > "$W/db.tsv" <<'SQL'
+select sha256, size_bytes, coalesce(to_jsonb(l)->>'storage_key', namespace||'/'||object_key)
+from public.media_storage_locations l where provider = 'r2' and cleaned_at is null and verified_at is not null order by 3;
+SQL
+  CMP="$HERE/r2-inventory-compare.py"
+else
+  dbq > "$W/db.tsv" <<'SQL'
 select id, bucket_id, name, (metadata->>'size')::bigint, regexp_replace(coalesce(metadata->>'eTag',''), '[^0-9A-Za-z]', '', 'g')
 from storage.objects where coalesce((metadata->>'size')::bigint, 0) > 0 order by id;
 SQL
-python3 "$HERE/inventory-compare.py" "$W/inv.tsv" "$W/db.tsv" "$BACKUP_LABEL" > "$W/compare.txt" || fails+=("the inventory comparison itself failed")
+  CMP="$HERE/inventory-compare.py"
+fi
+python3 "$CMP" "$W/inv.tsv" "$W/db.tsv" "$BACKUP_LABEL" > "$W/compare.txt" || fails+=("the inventory comparison itself failed")
 while IFS= read -r line; do case "$line" in "P "*) fails+=("${line#P }");; esac; done < "$W/compare.txt"
 FILES="$(wc -l < "$W/db.tsv" | tr -d ' ')"
 
@@ -88,14 +102,14 @@ while IFS=$'\t' read -r id _ _ size k _; do
   if s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$k" "$W/m.age" > "$W/m.json" 2>/dev/null; then
     rec="$(sed -n 's/.*"sha256": *"\([0-9a-f]\{64\}\)".*/\1/p' "$W/m.json")"
     if age -d -i "$AGE_IDENTITY_FILE" -o "$W/m" "$W/m.age" 2>/dev/null && [ -n "$rec" ] && [ "$(sha256 "$W/m")" = "$rec" ] \
-       && [ "$(wc -c < "$W/m" | tr -d ' ')" = "$size" ]; then :; else BAD=$((BAD+1)); echo "sampled copy of $id failed" >> "$W/bad.txt"; fi
+       && [ "$(wc -c < "$W/m" | tr -d ' ')" = "$size" ] && { [ "$KIND" != r2 ] || [ "$rec" = "$id" ]; }; then :; else BAD=$((BAD+1)); echo "sampled copy of $id failed" >> "$W/bad.txt"; fi
   else BAD=$((BAD+1)); echo "sampled copy of $id could not be read" >> "$W/bad.txt"; fi
   rm -f "$W/m" "$W/m.age"
 done < "$W/sample.tsv"
 [ "$BAD" -eq 0 ] || fails+=("$BAD of $N sampled files did not restore exactly: $(head -3 "$W/bad.txt" | tr '\n' ';')")
 
 if [ "${#fails[@]}" -eq 0 ]; then
-  summary="inventory exact ($FILES files: id, bucket, full path, size and copy key equal the restored database); all $FILES copies exist with the recorded size; $((N-BAD)) of $N sampled files restored with the recorded sha256 and size"
+  summary="[$KIND] inventory exact ($FILES files: identity, size and copy key equal the restored database); all $FILES copies exist with the recorded size; $((N-BAD)) of $N sampled files restored with the recorded sha256 and size"
 else
   summary="MEDIA CHECK FAILED ($FILES files in the restored database; $((N-BAD)) of $N sampled files restored exactly)"
 fi

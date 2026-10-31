@@ -72,6 +72,14 @@ jobs:
       SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       PRODUCTION_BACKUP_ENABLED: ${{ vars.PRODUCTION_BACKUP_ENABLED }}
+      # Legacy Supabase-Storage copy: OFF unless a documented, time-boxed recovery need switches it on (variable).
+      LEGACY_MEDIA_BACKUP: ${{ vars.LEGACY_MEDIA_BACKUP }}
+      # Independent copy of the R2-hosted originals (separate bucket, read-only source token, 90-day generations).
+      R2_MEDIA_BACKUP: ${{ vars.R2_MEDIA_BACKUP }}
+      R2_SOURCE_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      R2_SOURCE_BUCKET: ${{ vars.R2_MEDIA_SOURCE_BUCKET }}
+      R2_SOURCE_ACCESS_KEY_ID: ${{ secrets.R2_MEDIA_READ_KEY_ID }}
+      R2_SOURCE_SECRET_ACCESS_KEY: ${{ secrets.R2_MEDIA_READ_SECRET }}
       SKIP_IF_TAKEN: ${{ github.event_name == 'schedule' && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
@@ -85,5 +93,8 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq age postgresql-client-17 >/dev/null
       - name: Database backup
         run: bash backup/db-backup.sh
-      - name: Media backup (this snapshot's files in Supabase Storage)
+      - name: Legacy media backup (files in Supabase Storage; opt-in, being retired)
         run: bash backup/media-backup.sh
+      - name: R2 media backup (originals hosted in R2, independent bucket)
+        if: env.R2_MEDIA_BACKUP == '1'
+        run: bash backup/r2-media-backup.sh

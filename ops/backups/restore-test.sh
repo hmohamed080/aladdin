@@ -31,11 +31,18 @@ fails=()
 # 1. Fetch and check the backup. By default the newest snapshot WITH A COMPLETE MEDIA RECORD: a newer one whose
 # media step failed or was interrupted is skipped (and reported), because it cannot be restored with its files.
 SKIPPED_NEWER=0
+KINDS=()
+[ "${LEGACY_MEDIA_BACKUP:-0}" != 1 ] || KINDS+=(media)
+[ "${R2_MEDIA_BACKUP:-0}" != 1 ] || KINDS+=(r2media)
 pick_snapshot() {
   local k
   for k in $(s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "db/$BACKUP_LABEL/daily/" \
       --query "reverse(sort_by(Contents[?ends_with(Key, '.tar.age')] || \`[]\`, &LastModified))[:15].Key" --output text | tr '\t' '\n' | grep -v '^None$'); do
-    if ! grep -q '^P ' <<< "$(media_findings "${k%/*}" "$(basename "$k" .tar.age)")"; then KEY="$k"; return 0; fi
+    ok=1
+    for kind in "${KINDS[@]}"; do
+      if grep -q '^P ' <<< "$(media_findings "${k%/*}" "$(basename "$k" .tar.age)" "$kind")"; then ok=0; fi
+    done
+    if [ "$ok" = 1 ]; then KEY="$k"; return 0; fi
     SKIPPED_NEWER=$((SKIPPED_NEWER+1))
   done
   KEY=""
@@ -118,10 +125,17 @@ ROWS=exact; [ ! -s "$OUT/rowcount-diff.txt" ] || { ROWS="DIFFER in $(wc -l < "$O
 
 # 6. Media: media-verify.sh proves this snapshot's inventory against the restored database (object id, bucket,
 # complete path, size, copy key), that every copy exists with its recorded size, and a sample by sha256.
-env MEDIA_DB_CONTAINER="$C" KEY="$KEY" OUT="$OUT" bash "$HERE/media-verify.sh" > "$OUT/media-verify.log" 2>&1 || true
-MEDIA="$(cat "$OUT/media-summary.txt" 2>/dev/null || true)"
-if [ -z "$MEDIA" ]; then MEDIA="media check did not run"; fails+=("the media check did not finish (see media-verify.log)"); fi
-if [ -s "$OUT/media-fails.txt" ]; then while IFS= read -r l; do fails+=("$l"); done < "$OUT/media-fails.txt"; fi
+MEDIA=""
+for kind in "${KINDS[@]}"; do
+  case "$kind" in media) mk=supabase;; r2media) mk=r2;; esac
+  mkdir -p "$OUT/media-$mk"
+  env MEDIA_KIND="$mk" MEDIA_DB_CONTAINER="$C" KEY="$KEY" OUT="$OUT/media-$mk" bash "$HERE/media-verify.sh" > "$OUT/media-$mk/verify.log" 2>&1 || true
+  one="$(cat "$OUT/media-$mk/media-summary.txt" 2>/dev/null || true)"
+  if [ -z "$one" ]; then one="check did not run"; fails+=("the $mk media check did not finish (see media-$mk/verify.log)"); fi
+  MEDIA="${MEDIA:+$MEDIA | }$one"
+  if [ -s "$OUT/media-$mk/media-fails.txt" ]; then while IFS= read -r l; do fails+=("$l"); done < "$OUT/media-$mk/media-fails.txt"; fi
+done
+[ -n "$MEDIA" ] || MEDIA="no media backup is switched on for this restore test"
 
 {
   echo "Restore test $(date -u +%FT%TZ) of $KEY"

@@ -32,6 +32,8 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_READ_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_READ_SECRET }}
       AGE_IDENTITY: ${{ secrets.AGE_RESTORE_TEST_IDENTITY }}
+      LEGACY_MEDIA_BACKUP: ${{ vars.LEGACY_MEDIA_BACKUP }}
+      R2_MEDIA_BACKUP: ${{ vars.R2_MEDIA_BACKUP }}
       REPO_ROOT: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4

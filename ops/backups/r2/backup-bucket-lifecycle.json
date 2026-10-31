@@ -79,6 +79,58 @@
       }
     },
     {
+      "id": "expire-production-media-r2",
+      "enabled": true,
+      "conditions": {
+        "prefix": "media/production/r2/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 7776000
+        }
+      }
+    },
+    {
+      "id": "expire-production-media-legacy-supabase",
+      "enabled": true,
+      "conditions": {
+        "prefix": "media/production/supabase/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 2592000
+        }
+      }
+    },
+    {
+      "id": "expire-acceptance-media-r2",
+      "enabled": true,
+      "conditions": {
+        "prefix": "media/acceptance/r2/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 7776000
+        }
+      }
+    },
+    {
+      "id": "expire-acceptance-media-legacy-supabase",
+      "enabled": true,
+      "conditions": {
+        "prefix": "media/acceptance/supabase/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 2592000
+        }
+      }
+    },
+    {
       "id": "abort-incomplete-multipart",
       "enabled": true,
       "conditions": {

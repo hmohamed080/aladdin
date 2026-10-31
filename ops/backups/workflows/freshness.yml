@@ -40,7 +40,8 @@ jobs:
       R2_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_READ_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_READ_SECRET }}
-      CHECK_MEDIA: "1"
+      LEGACY_MEDIA_BACKUP: ${{ vars.LEGACY_MEDIA_BACKUP }}
+      R2_MEDIA_BACKUP: ${{ vars.R2_MEDIA_BACKUP }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
     steps:

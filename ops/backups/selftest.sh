@@ -9,6 +9,7 @@ export LC_ALL=C AWS_ACCESS_KEY_ID=testkey AWS_SECRET_ACCESS_KEY=testsecret AWS_D
 BACKUP_BUCKET="selftest-$(date +%s)"
 export R2_ENDPOINT=http://127.0.0.1:8333 BACKUP_LABEL=local-test BACKUP_BUCKET
 export BACKUP_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres SUPABASE_URL=http://127.0.0.1:54321
+export LEGACY_MEDIA_BACKUP=1   # the legacy Supabase-Storage copy is opt-in; these scenarios cover it
 export SUPABASE_CLI="${SUPABASE_CLI:-pnpm --dir $ROOT exec supabase}"
 SUPABASE_SERVICE_ROLE_KEY="$($SUPABASE_CLI status -o json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["SERVICE_ROLE_KEY"])')"
 export SUPABASE_SERVICE_ROLE_KEY
@@ -18,10 +19,12 @@ uid() { python3 -c 'import uuid; print(uuid.uuid4())'; }
 FIXTURES=("avatars/$(uid).png" "professional-portfolio/$(uid).png")
 LATE="avatars/$(uid).png"   # uploaded later, for the incomplete-run case
 EXTRA=("avatars/$(uid).png" "avatars/$(uid).png")   # two files no copy exists of yet, for the interrupted-run cases
+psql_db() { docker exec -i supabase_db_aladdin psql -U postgres -d postgres -X -q -At -v ON_ERROR_STOP=1 -c "$1"; }
 storage() { curl -fsS -X "$1" "$SUPABASE_URL/storage/v1/object/$2" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" "${@:3}" >/dev/null; }
 cleanup() {
   for f in "${FIXTURES[@]}" "$LATE" "${EXTRA[@]}"; do storage DELETE "${f%%/*}" -H 'content-type: application/json' -d "{\"prefixes\":[\"${f#*/}\"]}" || true; done
-  for b in "$BACKUP_BUCKET" "empty-$BACKUP_BUCKET"; do aws --endpoint-url "$R2_ENDPOINT" s3 rb "s3://$b" --force >/dev/null 2>&1 || true; done
+  psql_db "delete from public.media_storage_locations where provider = 'r2' and object_key like 'selftest-%'" >/dev/null 2>&1 || true
+  for b in "$BACKUP_BUCKET" "empty-$BACKUP_BUCKET" "src-$BACKUP_BUCKET"; do aws --endpoint-url "$R2_ENDPOINT" s3 rb "s3://$b" --force >/dev/null 2>&1 || true; done
   rm -rf "$T"
 }
 trap cleanup EXIT
@@ -225,6 +228,61 @@ AGE_IDENTITY_FILE="$T/restore.key" OUT="$T/rt4" bash "$HERE/restore-test.sh" > "
 LAST="$(newest_daily)"; grep -q "of $LAST\$" "$T/rt4/REPORT.txt"; same=$?
 [ "$rc" = 0 ] && [ "$same" != 0 ] && grep -q "Newer snapshots skipped because their media backup is not complete: 1" "$T/rt4/REPORT.txt"
 ok $? "the restore test skips the newest snapshot because its media backup is incomplete, and restores the newest complete one: $(grep -E '^(Restore test|Newer)' "$T/rt4/REPORT.txt" 2>/dev/null | sed 's/^Restore test [^ ]* of //' | tr '\n' ' ')"
+
+
+# ---- R2-hosted media: an independent, bounded-retention copy in a different bucket ----
+SRC="src-$BACKUP_BUCKET"; s3 s3api create-bucket --bucket "$SRC" >/dev/null
+export R2_SOURCE_ENDPOINT="$R2_ENDPOINT" R2_SOURCE_BUCKET="$SRC" R2_SOURCE_ACCESS_KEY_ID=testkey R2_SOURCE_SECRET_ACCESS_KEY=testsecret
+OWNER="$(psql_db "select id from public.users limit 1")"
+if [ -z "$OWNER" ]; then echo "SKIP  no local user to own R2 media rows"; else
+r2put() { # <physical key> <namespace> <object key> [wrong-sha]
+  head -c 4096 /dev/urandom > "$T/r2.bin"; local sum; sum="$(sha256sum "$T/r2.bin" | cut -d' ' -f1)"
+  s3 s3api put-object --bucket "$SRC" --key "$1" --body "$T/r2.bin" >/dev/null
+  [ -z "${4:-}" ] || sum="$(printf 'x' | sha256sum | cut -d' ' -f1)"
+  psql_db "set session_replication_role = replica; insert into public.media_storage_locations(namespace,object_key,owner_user_id,provider,content_type,size_bytes,sha256,verified_at,storage_key)
+    values ('$2','$3','$OWNER','r2','image/png',4096,'$sum',now(),$([ "$2/$3" = "$1" ] && echo null || echo "'$1'")) on conflict do nothing" >/dev/null
+}
+R2A="u/$OWNER/profile/$(uid)/original.png"; R2B="o/$OWNER/portfolio/$(uid)/original.png"
+r2put "$R2A" avatar "selftest-$(uid)"; r2put "$R2B" portfolio "selftest-$(uid)"
+LEG="selftest-legacy-$(uid)"; r2put "avatar/$LEG" avatar "$LEG"   # a pre-ids-only original: its key is namespace/object_key, storage_key null
+r2sched() { # <now> [VAR=value ...]: db step, legacy step, R2 step; exit status of the R2 step
+  local now="$1"; shift; rm -rf "$T/state-r"
+  env BACKUP_NOW="$now" SKIP_IF_TAKEN=1 R2_MEDIA_BACKUP=1 BACKUP_STATE_DIR="$T/state-r" bash "$HERE/db-backup.sh" > "$T/r-db.log" 2>&1 || return 99
+  env R2_MEDIA_BACKUP=1 BACKUP_STATE_DIR="$T/state-r" bash "$HERE/media-backup.sh" > "$T/r-media.log" 2>&1 || return 98
+  env R2_MEDIA_BACKUP=1 BACKUP_NOW="$now" BACKUP_STATE_DIR="$T/state-r" "$@" bash "$HERE/r2-media-backup.sh" > "$T/r-r2.log" 2>&1
+}
+s3cat() { s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$1" "$T/cat.tmp" >/dev/null && cat "$T/cat.tmp"; }
+r2copies() { s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "media/local-test/r2/$1/objects/" --query 'length(Contents || `[]`)' --output text; }
+NOWR=2027-02-10T12:00:00Z; DR=db/local-test/daily/2027/02/10/
+r2sched $NOWR; ok $? "R2 originals are copied to the backup bucket: $(tail -1 "$T/r-r2.log" | sed 's/^\[[^]]*\] //')"
+[ "$(r2copies 202702)" = 3 ]; ok $? "each original has one encrypted copy, named by hash in its month's generation"
+R1="$(newest_daily "$DR")"; exists "${R1%.tar.age}.r2media.json" && exists "${R1%.tar.age}.r2media.tsv.age"; ok $? "the snapshot has its R2 media record and inventory"
+s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix media/local-test/r2/ --query 'Contents[].Key' --output text | grep -q "$OWNER"; ok "$(not $?)" "copy keys hold no user or organization id"
+R2_MEDIA_BACKUP=1 CHECK_MEDIA=1 bash "$HERE/freshness.sh" > "$T/fr2.log" 2>&1; ok $? "the freshness check passes with both records"
+AGE_IDENTITY_FILE="$T/restore.key" BACKUP_KEY="$R1" R2_MEDIA_BACKUP=1 OUT="$T/rt5" bash "$HERE/restore-test.sh" > "$T/rt5.log" 2>&1; rc=$?
+[ "$rc" = 0 ] && grep -q "\[r2\] inventory exact (3 files" "$T/rt5/REPORT.txt" && grep -q "\[supabase\] inventory exact" "$T/rt5/REPORT.txt"; ok $? "restore test verifies the R2 inventory against the restored database: $(grep '^Media' "$T/rt5/REPORT.txt" | cut -c1-150)"
+r2verify() { # <snapshot key> <name> -> exit status
+  MEDIA_KIND=r2 MEDIA_DB_CONTAINER=supabase_db_aladdin KEY="$1" AGE_IDENTITY_FILE="$T/restore.key" OUT="$T/r2v-$2" MEDIA_SAMPLE=100 bash "$HERE/media-verify.sh" > "$T/r2v-$2.log" 2>&1
+}
+r2verify "$R1" ok; ok $? "R2 media-verify passes"
+RC1="$(r2_key_of() { age -d -i "$T/restore.key" <(s3cat "${R1%.tar.age}.r2media.tsv.age") ; }; r2_key_of | head -1 | cut -f5)"
+s3 s3api copy-object --bucket "$BACKUP_BUCKET" --copy-source "$BACKUP_BUCKET/$RC1" --key "$RC1.bak" >/dev/null; s3 s3api delete-object --bucket "$BACKUP_BUCKET" --key "$RC1" >/dev/null
+r2verify "$R1" gone; rc=$?; [ "$rc" -ne 0 ] && grep -q "no stored copy" "$T/r2v-gone/media-fails.txt"; ok $? "R2 media-verify refuses a snapshot whose copy has vanished"
+s3 s3api copy-object --bucket "$BACKUP_BUCKET" --copy-source "$BACKUP_BUCKET/$RC1.bak" --key "$RC1" >/dev/null; s3 s3api delete-object --bucket "$BACKUP_BUCKET" --key "$RC1.bak" >/dev/null
+# A source file that no longer hashes to what the database recorded is never stored, and the run says so.
+R2C="u/$OWNER/profile/$(uid)/original.png"; r2put "$R2C" avatar "selftest-$(uid)" wrong x
+NOWR2=2027-02-11T12:00:00Z; C0="$(r2copies 202702)"
+r2sched $NOWR2; rc=$?
+[ "$rc" -ne 0 ] && [ "$rc" -lt 98 ] && [ "$(r2copies 202702)" = "$C0" ]; ok $? "a source file that differs from its recorded sha256 is refused and nothing is stored for it (exit $rc)"
+R3="$(newest_daily db/local-test/daily/2027/02/11/)"; exists "${R3%.tar.age}.r2media.json" && grep -q '"complete":false' <(s3cat "${R3%.tar.age}.r2media.json"); ok $? "its record says incomplete"
+R2_MEDIA_BACKUP=1 CHECK_MEDIA=1 bash "$HERE/freshness.sh" > "$T/fr3.log" 2>&1; ok "$(not $?)" "the freshness check raises the alarm: $(grep -m1 incomplete "$T/fr3.log" | sed 's/^ *//')"
+psql_db "delete from public.media_storage_locations where storage_key = '$R2C'" >/dev/null
+# A new month copies the whole live set afresh into its own generation (so old months can expire).
+r2sched 2027-03-02T12:00:00Z; ok $? "the next month's run succeeds: $(tail -1 "$T/r-r2.log" | sed 's/^\[[^]]*\] //')"
+[ "$(r2copies 202703)" = 3 ]; ok $? "...and writes the live originals into the new month's generation"
+# Not switched on: Production would alarm; any other label only warns.
+CHECK_R2_MEDIA=0 R2_MEDIA_BACKUP=0 bash "$HERE/freshness.sh" > "$T/fr4.log" 2>&1; ok $? "without the R2 backup switched on, non-production only warns about R2 media records: $(grep -m1 -i 'warning' "$T/fr4.log" | cut -c1-120)"
+fi
 
 echo "selftest: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

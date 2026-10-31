@@ -86,7 +86,7 @@ awk '/^COPY /{t=$2; gsub(/"/,"",t); n=0; on=1; next} on && /^\\\.\r?$/ {print t"
 [ -s "$B/rowcounts.txt" ] || die "the data dump holds no tables"
 grep -q '^public\.users:' "$B/rowcounts.txt" || die "the data dump has no public.users table"
 # The media list of this exact snapshot, for the media step (it holds only public keys, so it cannot read the archive).
-R2_ROWS="$(python3 "$HERE/snapshot-objects.py" "$B/data.sql" "$WORK/objects.tsv")" || die "cannot read the media list from the dump"
+R2_ROWS="$(python3 "$HERE/snapshot-objects.py" "$B/data.sql" "$WORK/objects.tsv" "$WORK/r2-objects.tsv")" || die "cannot read the media list from the dump"
 SNAP_OBJECTS="$(wc -l < "$WORK/objects.tsv" | tr -d ' ')"
 DRIFT="$(join -t: -a1 -e0 -o 0,1.2,2.2 <(sort "$B/rowcounts-live.txt") "$B/rowcounts.txt" | awk -F: '$2!=$3' | wc -l | tr -d ' ')"
 ( cd "$B" && sha256sum -- * > SHA256SUMS )
@@ -110,6 +110,6 @@ upload() {
   log "stored $prefix/$NAME.tar.age ($BYTES bytes)"
 }
 for p in $PREFIXES; do upload "$p"; done
-cp "$WORK/objects.tsv" "$STATE/objects.tsv"
+cp "$WORK/objects.tsv" "$STATE/objects.tsv"; cp "$WORK/r2-objects.tsv" "$STATE/r2-objects.tsv"
 printf 'SKIPPED=0\nNAME=%s\nPREFIXES="%s"\nR2_ROWS=%s\n' "$NAME" "$PREFIXES" "$R2_ROWS" > "$STATE/db.env"
 log "done: $TABLES tables, $ROWS rows, $(wc -l < "$B/history.txt" | tr -d ' ') migrations, sha256 $SUM"

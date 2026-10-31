@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Media step of the daily backup: runs right after db-backup.sh in the same job and makes that database snapshot
 # restorable with its files. READ-ONLY on the project: one SELECT on storage.objects and authenticated GETs.
-# Nothing is deleted anywhere: a file removed from Storage stays in the backup (never expired; locked 365 days),
-# so every retained snapshot, the 12-month monthly ones included, can get back the files it references.
+# LEGACY AND OPT-IN. Aladdin is moving all media to R2 and the owner has decided to delete the legacy user media
+# from Supabase Storage for good, so this step is OFF unless LEGACY_MEDIA_BACKUP=1. Switch it on only for a
+# documented, time-boxed recovery need, and keep its prefix on a SHORT lifecycle expiry (30 days), never a
+# year-long lock. Nothing is deleted by this kit itself.
 # Database backups never contain these bytes, only their storage.objects rows.
 #
 #   BACKUP_STATE_DIR=<the folder db-backup.sh wrote>  BACKUP_DB_URL=... SUPABASE_URL=https://<ref>.supabase.co
@@ -20,6 +22,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"
 check_target
 require_production_go
+[ "${LEGACY_MEDIA_BACKUP:-0}" = 1 ] || { log "legacy Supabase media backup is off (LEGACY_MEDIA_BACKUP is not 1): nothing to do"; exit 0; }
 require_env BACKUP_STATE_DIR BACKUP_DB_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY AGE_RECIPIENTS
 check_db_url "$BACKUP_DB_URL"; check_supabase_url "$SUPABASE_URL"; check_service_key "$SUPABASE_SERVICE_ROLE_KEY"
 [ -s "$BACKUP_STATE_DIR/db.env" ] || die "run db-backup.sh first: no snapshot in $BACKUP_STATE_DIR"
@@ -68,10 +71,12 @@ while IFS=$'\t' read -r id bucket name size etag; do
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$bucket" "$name" "$size" "$key" "$state" >> "$WORK/inventory.tsv"
 done < "$BACKUP_STATE_DIR/objects.tsv"
 TOTAL="$(wc -l < "$WORK/inventory.tsv" | tr -d ' ')"
+# R2-hosted originals are copied by r2-media-backup.sh (its own record); uncovered only when that step is off.
+UNCOVERED="${R2_ROWS:-0}"; [ "${R2_MEDIA_BACKUP:-0}" != 1 ] || UNCOVERED=0
 COMPLETE=true; [ "$MISSING" -eq 0 ] && [ "$FAILED" -eq 0 ] || COMPLETE=false
 cat > "$WORK/media.json" <<JSON
 {"snapshot":"$NAME","label":"$BACKUP_LABEL","objects":$TOTAL,"backed_up":$((TOTAL-MISSING)),"missing":$MISSING,"copy_failures":$FAILED,
- "complete":$COMPLETE,"r2_media_records_not_covered":${R2_ROWS:-0},"inventory_sha256":"$(sha256 "$WORK/inventory.tsv")"}
+ "complete":$COMPLETE,"r2_media_records_not_covered":$UNCOVERED,"inventory_sha256":"$(sha256 "$WORK/inventory.tsv")"}
 JSON
 age_encrypt "$WORK/inventory.tsv" "$WORK/inventory.tsv.age"
 # Inventories first, records last: a record in a prefix means its inventory is there too. Each object is written
@@ -80,5 +85,5 @@ age_encrypt "$WORK/inventory.tsv" "$WORK/inventory.tsv.age"
 for prefix in $PREFIXES; do put_once "$WORK/inventory.tsv.age" "$prefix/$NAME.media.tsv.age" application/octet-stream; done
 for prefix in $PREFIXES; do put_once "$WORK/media.json" "$prefix/$NAME.media.json" application/json; done
 log "media: snapshot $TOTAL files, $((TOTAL-MISSING)) backed up, $MISSING missing; $COPIED new copied ($BYTES bytes), $FAILED failed"
-[ "${R2_ROWS:-0}" -eq 0 ] || log "WARNING: $R2_ROWS media records live in R2, which this job does not copy (see README, R2 media)"
+[ "$UNCOVERED" -eq 0 ] || log "WARNING: $R2_ROWS media records live in R2, which this job does not copy (see README, R2 media)"
 [ "$COMPLETE" = true ] || die "the media backup of $NAME is incomplete (marked so in its .media.json); the next scheduled run takes a new snapshot"

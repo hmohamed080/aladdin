@@ -52,14 +52,32 @@ db/<label>/daily/YYYY/MM/DD/aladdin-<label>-<UTC stamp>.tar.age     kept 15 days
 db/<label>/weekly/YYYY/...                                          Sundays, kept 57 days (locked 56)
 db/<label>/monthly/YYYY/...                                         the 1st, kept 366 days (locked 365)
   <same name>.json          manifest: label, project ref, sha256, sizes, migrations, row and media counts; no row data
-  <same name>.media.tsv.age this snapshot's media: every storage object it references -> its backup copy (encrypted)
-  <same name>.media.json    complete true/false, counts, R2 records not covered; no names
-media/<label>/supabase/objects/<bucket>/<object id>-<etag>.age      every file version once, encrypted; sha256 and size
-                                                                    in object metadata; locked 365 days, never expired
+  <same name>.r2media.tsv.age / .r2media.json    the same for the R2-hosted originals (independent media backup)
+  <same name>.media.tsv.age / .media.json        LEGACY, opt-in: Supabase Storage files (LEGACY_MEDIA_BACKUP=1)
+media/<label>/r2/<YYYYMM>/objects/<sha256>.age   R2 originals, encrypted, named by hash only; a monthly generation,
+                                                 EXPIRES after 90 days (no long lock)
+media/<label>/supabase/objects/<bucket>/<id>-<etag>.age   LEGACY copies, only if switched on; EXPIRE after 30 days
 phase-a/                                                            the manual 2026-10-25 backup, untouched (no rule covers it)
 ```
 
-The media inventory of a snapshot sits next to its database backup, so it lives exactly as long. Media copies are never expired, so any retained snapshot can restore its files, including files deleted afterwards. The selftest proves this.
+The media inventories of a snapshot sit next to its database backup, so they live as long as it does; the media COPIES live shorter (below).
+
+### Two media backups, and why their retention differs
+
+User photos and videos are personal data, and the owner decided to delete the legacy user media from Supabase Storage for good. So:
+
+| | R2 media backup (new, independent) | Legacy Supabase-Storage media backup |
+|---|---|---|
+| Switch | `R2_MEDIA_BACKUP=1` (variable) | `LEGACY_MEDIA_BACKUP=1`, **off by default** |
+| Covers | verified originals in the R2 media bucket (`media_storage_locations`, provider r2) | `storage.objects` files with bytes |
+| Source access | a **read-only** token on the media bucket, different from the write token of the backup bucket | the project's service role (read) |
+| Retention | monthly generation, expires after **90 days**; a user's removed original leaves the backup within about 90 days | **30 days** at most, and only for a documented, time-boxed recovery need |
+| Lock | none (a lock would keep deleted personal media) | none |
+| Existing retention | the pre-existing `phase-a/` archive (database only, no media) is untouched and not covered by any rule; database snapshots keep their own 14 d / 8 w / 12 m locks | no legacy media was ever backed up, so there is nothing long-lived to unwind |
+
+The source bytes must hash to the sha256 the database recorded at upload verification, or the file is a failure and nothing is stored for it. Derivatives (thumb/card/full) are regenerated from originals, and `pending/` uploads are unverified, so neither is copied. If you need a deleted original back after 90 days, it is not recoverable by design.
+
+Restore verification (`media-verify.sh`, run by the restore test for each switched-on kind) compares the inventory with the restored database on identity (object id, bucket and path for legacy; physical key and sha256 for R2), size and copy key, checks that every copy exists with its recorded size, and decrypts a sample and compares its sha256.
 
 The inventory is built from the dump itself (`snapshot-objects.py` reads the `storage.objects` rows in `data.sql`), so it matches that exact snapshot.
 
@@ -113,7 +131,7 @@ Part A is read-only preparation and changes nothing hosted. Part B changes hoste
    pnpm exec wrangler r2 bucket lock set aladdin-production-db-backups --file r2/backup-bucket-lock.json
    pnpm exec wrangler r2 bucket lifecycle set aladdin-production-db-backups --file r2/backup-bucket-lifecycle.json
    ```
-   Once a lock is on, nobody can delete or overwrite a locked object until it expires, not even you. A media copy stays undeletable for a year. The rules cover only `db/` and `media/`; `phase-a/` is left as it is.
+   Once a lock is on, nobody can delete or overwrite a locked object until it expires, not even you. The rules lock only the database snapshots; media copies are deliberately not locked and expire (R2 90 days, legacy 30 days). `phase-a/` is left as it is. The current bucket has no lock rules and only the default 7-day multipart-abort rule, which the lifecycle file repeats.
 5. **Two R2 API tokens** (dashboard: R2, Manage API tokens), both limited to the bucket `aladdin-production-db-backups`:
    - `aladdin-backup-write`: *Object Read & Write*. It becomes `R2_BACKUP_WRITE_KEY_ID` / `R2_BACKUP_WRITE_SECRET`.
    - `aladdin-backup-read`: *Object Read only*. It becomes `R2_BACKUP_READ_KEY_ID` / `R2_BACKUP_READ_SECRET`.
@@ -133,7 +151,10 @@ Part A is read-only preparation and changes nothing hosted. Part B changes hoste
    | | `ALERT_EMAIL` | where alerts go |
    | | `PRODUCTION_BACKUP_ENABLED` | `false` |
    | | `ACCEPTANCE_BACKUP_SCHEDULE` | `daily` for the trial (`off` stops it) |
-   | Environment `backup-acceptance` | secrets `BACKUP_DB_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `R2_BACKUP_WRITE_KEY_ID`, `R2_BACKUP_WRITE_SECRET`; variable `SUPABASE_URL` = `https://nxossqhdfltcqdwvbewi.supabase.co` | Acceptance values |
+   | | `R2_MEDIA_BACKUP` | `1` once the Acceptance R2 media bucket exists (unset = off) |
+   | | `R2_MEDIA_SOURCE_BUCKET` | the R2 media bucket to copy from (never the backup bucket) |
+   | | `LEGACY_MEDIA_BACKUP` | leave unset (off) |
+   | Environment `backup-acceptance` | secrets `BACKUP_DB_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `R2_BACKUP_WRITE_KEY_ID`, `R2_BACKUP_WRITE_SECRET`; variable `SUPABASE_URL` = `https://nxossqhdfltcqdwvbewi.supabase.co`; for the R2 media backup also secrets `R2_MEDIA_READ_KEY_ID`, `R2_MEDIA_READ_SECRET` (an Object **Read-only** token limited to the media bucket) | Acceptance values |
    | Environment `backup-check` | secrets `R2_BACKUP_READ_KEY_ID`, `R2_BACKUP_READ_SECRET`, `RESEND_API_KEY` | |
    | Environment `restore-test` | secrets `R2_BACKUP_READ_KEY_ID`, `R2_BACKUP_READ_SECRET`, `AGE_RESTORE_TEST_IDENTITY` (the whole restore-test key file) | |
 
@@ -158,7 +179,7 @@ Each check below must pass:
 
 Rollback: set `ACCEPTANCE_BACKUP_SCHEDULE=off`. Nothing else runs on its own.
 - The backups never write to Acceptance. Turning them off leaves nothing to undo there.
-- Objects already written stay until their lock and expiry pass. Daily copies go after about 15 days. Media copies stay at least a year, because they never expire; they can be deleted by hand once their lock passes.
+- Objects already written stay until their lock and expiry pass. Daily copies go after about 15 days. Media copies are not locked and expire on their own (R2 generations after 90 days, legacy copies after 30).
 - If the lock or lifecycle rules have to go, `wrangler r2 bucket lock set` and `lifecycle set` with an empty rule list remove them. Objects that are already locked stay locked until their own expiry.
 - Revoke the two tokens to cut all access.
 
