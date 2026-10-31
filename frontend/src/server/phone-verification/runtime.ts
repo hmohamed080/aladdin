@@ -40,8 +40,15 @@ export function getPhoneSignupService(): PhoneSignupService | null {
   if (!readPhoneVerificationEnv().signupEnabled) return null;
   const { env, keyring, db, transport } = build();
   // Delivery runs after the response (Next `after` -> waitUntil on Workers), so the reply cannot reveal whether a number is already registered.
+  // If the hook is unavailable (called outside a request), the task still runs, but on Workers an un-registered task is cancelled when the
+  // response ends and the person would never get a code. Say so, once per occurrence, with nothing that identifies a number or a code.
   const defer = (task: Promise<void>) => {
-    try { after(task); } catch { void task; }
+    try {
+      after(task);
+    } catch {
+      console.error("phone verification: post-response hook unavailable; delivery runs unprotected");
+      void task;
+    }
   };
   return createPhoneSignupService({ db, transport, keyring, enabled: env.signupEnabled, defer });
 }

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  ALLOWED_AUTH_KEYS, DISPUTED_FUNCTIONS, QUERIES, assertReadOnlySql, interpretAuth, main, makeGuardedFetch, redactAuthConfig, workerSecretPresence,
+  ALLOWED_AUTH_KEYS, DISPUTED_FUNCTIONS, PASSWORD_POLICY_KEYS, QUERIES, assertReadOnlySql, interpretAuth, main, makeGuardedFetch, redactAuthConfig, workerSecretPresence,
 } from "./inspect-auth-security.mjs";
 
 const REF = "abcdefghijklmnopqrst";
@@ -53,12 +53,13 @@ describe("redaction", () => {
     const raw = { mailer_autoconfirm: false, disable_signup: false, security_captcha_enabled: true, security_captcha_provider: "turnstile", security_captcha_secret: "SECRET-1",
       smtp_pass: "SECRET-2", smtp_user: "u", jwt_secret: "SECRET-3", external_google_secret: "SECRET-4", hook_send_sms_secrets: "SECRET-5", site_url: "https://x", sms_twilio_auth_token: "SECRET-6", sms_provider: "twilio" };
     const out = redactAuthConfig(raw);
-    assert.deepEqual(Object.keys(out).sort(), ["disable_signup", "mailer_autoconfirm", "security_captcha_enabled", "security_captcha_provider", "sms_provider"]);
+    assert.deepEqual(Object.keys(out).sort(), ["disable_signup", "mailer_autoconfirm", "security_captcha_enabled", "security_captcha_provider", "site_url", "sms_provider"]);
     assert.ok(!JSON.stringify(out).includes("SECRET"));
   });
   it("no allow-listed key looks like a secret", () => {
     const secretish = /(secret|token|password|jwt|credential|private|signing)/i;
-    for (const k of ALLOWED_AUTH_KEYS) assert.ok(!secretish.test(k), k);
+    for (const k of ALLOWED_AUTH_KEYS.filter((key) => !PASSWORD_POLICY_KEYS.includes(key))) assert.ok(!secretish.test(k), k);
+    assert.deepEqual(PASSWORD_POLICY_KEYS.filter((k) => !ALLOWED_AUTH_KEYS.includes(k)), []);
   });
   it("worker secrets are reported as presence booleans only", () => {
     const p = workerSecretPresence([{ name: "WHATSAPP_ACCESS_TOKEN", type: "secret_text" }, { name: "OTHER" }]);
@@ -103,7 +104,7 @@ describe("main", () => {
 });
 
 // ---- R2 additions: migration history, permission diff, legacy table, Worker switches ------------------------------------------------------
-import { PERMISSION_INVENTORY_SQL, contractVersionFor, migrationDiff, normalizeSignature, permissionDiff, repoMigrationVersions, workerSettingsSummary } from "./inspect-auth-security.mjs";
+import { redirectAllowlistFindings, PERMISSION_INVENTORY_SQL, contractVersionFor, migrationDiff, normalizeSignature, permissionDiff, repoMigrationVersions, workerSettingsSummary } from "./inspect-auth-security.mjs";
 
 describe("R2: migration history difference", () => {
   const repo = ["20261028090001", "20261029090001", "20261030090001", "20261031090001"];
@@ -156,5 +157,31 @@ describe("R2: Worker settings", () => {
     assert.equal((await gf("GET", `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/aladdin-web/settings`)).status, 200);
     await assert.rejects(() => gf("PATCH", `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/aladdin-web/settings`, {}), /REFUSED/);
     await assert.rejects(() => gf("PUT", `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/aladdin-web/secrets`, {}), /REFUSED/);
+  });
+});
+
+describe("R2: leaked-password protection and redirect allow-list", () => {
+  it("reads password_hibp_enabled and never reports an unknown value as ON", () => {
+    assert.equal(interpretAuth({ password_hibp_enabled: false }).leaked_password_protection_on, false);
+    assert.equal(interpretAuth({ password_hibp_enabled: true }).leaked_password_protection_on, true);
+    assert.equal(interpretAuth({}).leaked_password_protection_on, "unknown");
+  });
+  it("classifies stale Vercel, local, insecure, broad, workers.dev and duplicate redirect entries and keeps the clean ones out", () => {
+    const f = redirectAllowlistFindings("https://aladdindecore.com", [
+      "https://aladdindecore.com/**", "https://www.aladdindecore.com/**", "https://aladdin-old.vercel.app/**", "https://*.vercel.app/**",
+      "http://localhost:3000/**", "http://insecure.example.com/**", "https://*", "https://aladdin-frontend-preview.bstalent9.workers.dev/**", "https://aladdindecore.com/**",
+    ].join(","));
+    assert.deepEqual(f.stale_vercel, ["https://aladdin-old.vercel.app/**", "https://*.vercel.app/**"]);
+    assert.deepEqual(f.local, ["http://localhost:3000/**"]);
+    assert.deepEqual(f.insecure, ["http://insecure.example.com/**"]);
+    assert.deepEqual(f.broad, ["https://*.vercel.app/**", "https://*"]);
+    assert.deepEqual(f.workers_dev, ["https://aladdin-frontend-preview.bstalent9.workers.dev/**"]);
+    assert.deepEqual(f.duplicates, ["https://aladdindecore.com/**"]);
+    assert.equal(f.entries, 9);
+  });
+  it("passes the new keys through redaction (URLs / booleans only)", () => {
+    const r = redactAuthConfig({ password_hibp_enabled: false, site_url: "https://aladdindecore.com", uri_allow_list: "https://a/**", smtp_pass: "x" });
+    assert.equal(r.password_hibp_enabled, false);
+    assert.ok(!("smtp_pass" in r));
   });
 });

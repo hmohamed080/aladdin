@@ -42,7 +42,11 @@ export const ALLOWED_AUTH_KEYS = [
   "mfa_phone_enroll_enabled", "mfa_phone_verify_enabled", "mfa_totp_enroll_enabled", "mfa_totp_verify_enabled", "mfa_max_enrolled_factors",
   "mailer_secure_email_change_enabled", "external_anonymous_users_enabled", "external_google_enabled", "external_facebook_enabled",
   "rate_limit_email_sent", "rate_limit_sms_sent", "rate_limit_otp", "rate_limit_anonymous_users",
+  // R2: leaked-password protection and the redirect allow-list (URLs and booleans, not secrets)
+  "password_hibp_enabled", "password_min_length", "password_required_characters", "site_url", "uri_allow_list",
 ];
+// Password POLICY settings (a boolean and two numbers/strings of character classes) contain the word "password" but are not credentials.
+export const PASSWORD_POLICY_KEYS = ["password_hibp_enabled", "password_min_length", "password_required_characters"];
 const SECRETISH = /(secret|token|password|passwd|pass$|_key$|key_|jwt|credential|private|signing|sid$|auth_token|smtp_user|smtp_pass)/i;
 
 export const WORKER_SECRET_NAMES = ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "SUPABASE_SEND_SMS_HOOK_SECRET", "AUTH_PASSWORD_PREVIEW_GRANT_SECRET", "PHONE_OTP_HMAC_KEYS"];
@@ -104,9 +108,9 @@ export function makeGuardedFetch(fetchImpl, tokens) {
 export function redactAuthConfig(raw) {
   const out = {};
   for (const key of ALLOWED_AUTH_KEYS) {
-    if (SECRETISH.test(key) || !(key in (raw ?? {}))) continue;
+    if ((SECRETISH.test(key) && !PASSWORD_POLICY_KEYS.includes(key)) || !(key in (raw ?? {}))) continue;
     const v = raw[key];
-    out[key] = typeof v === "string" ? v.slice(0, 40) : typeof v === "number" || typeof v === "boolean" || v === null ? v : "[object]";
+    out[key] = typeof v === "string" ? v.slice(0, key === "uri_allow_list" ? 4000 : 40) : typeof v === "number" || typeof v === "boolean" || v === null ? v : "[object]";
   }
   return out;
 }
@@ -124,7 +128,32 @@ export function interpretAuth(cfg) {
     before_user_created_hook_enabled: yes(cfg.hook_before_user_created_enabled),
     phone_mfa_enabled: yes(cfg.mfa_phone_enroll_enabled) || yes(cfg.mfa_phone_verify_enabled),
     anonymous_sign_ins: yes(cfg.external_anonymous_users_enabled),
+    leaked_password_protection_on: cfg.password_hibp_enabled === true ? true : cfg.password_hibp_enabled === false ? false : "unknown",
+    password_min_length: cfg.password_min_length ?? null,
+    redirect_allowlist: redirectAllowlistFindings(cfg.site_url, cfg.uri_allow_list),
   };
+}
+
+/**
+ * Classifies the redirect allow-list (comma separated URLs). Reports entries only; nothing here is a secret. "stale" = a host that this
+ * project no longer serves (Vercel was retired, ADR-0024); "local" = loopback/dev; "insecure" = plain http that is not loopback;
+ * "broad" = a wildcard that matches any host or a whole shared platform domain.
+ */
+export function redirectAllowlistFindings(siteUrl, allowList) {
+  const entries = String(allowList ?? "").split(",").map((e) => e.trim()).filter(Boolean);
+  const host = (e) => { try { return new URL(e.replace(/\*+/g, "x")).hostname; } catch { return ""; } };
+  const isLocal = (e) => /^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/.test(host(e)) || /(^|\/\/)(localhost|127\.0\.0\.1)/.test(e);
+  const out = { site_url: siteUrl ?? null, entries: entries.length, stale_vercel: [], local: [], insecure: [], broad: [], duplicates: [], workers_dev: [] };
+  const seen = new Set();
+  for (const e of entries) {
+    if (seen.has(e.toLowerCase())) out.duplicates.push(e); else seen.add(e.toLowerCase());
+    if (/vercel\.(app|com)/i.test(e)) out.stale_vercel.push(e);
+    if (isLocal(e)) out.local.push(e);
+    else if (/^http:\/\//i.test(e)) out.insecure.push(e);
+    if (/^\*+$/.test(e) || /^https?:\/\/\*+(\/.*)?$/i.test(e) || /^https?:\/\/\*\.(vercel\.app|workers\.dev|pages\.dev)/i.test(e)) out.broad.push(e);
+    if (/workers\.dev/i.test(e)) out.workers_dev.push(e);
+  }
+  return out;
 }
 export function workerSecretPresence(secretsResult) {
   const names = new Set((Array.isArray(secretsResult) ? secretsResult : []).map((s) => String(s?.name ?? "")));

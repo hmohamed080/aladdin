@@ -33,11 +33,12 @@ case "${toolchain}" in
     cfg="${repo}/supabase/config.toml"
     ;;
   ci110)
-    project_id="aladdin_r1ci"; work="$(cd "${repo}/.." && pwd)/aladdin-r1ci"
+    # Overridable so a second checkout (e.g. the R2 integration worktree) never reuses another run's scratch project, containers or ports.
+    project_id="${R1_PROJECT:-aladdin_r1ci}"; work="${R1_WORK_DIR:-$(cd "${repo}/.." && pwd)/aladdin-r1ci}"; port_prefix="${R1_PORT_PREFIX:-520}"; inspector_port="${R1_INSPECTOR_PORT:-53583}"
     cli=(npx -y supabase@2.110.0); cli_label="$(npx -y supabase@2.110.0 --version)"
     rm -rf "${work}"; mkdir -p "${work}/supabase"
     cp -r supabase/migrations supabase/templates "${work}/supabase/"; cp supabase/seed*.sql "${work}/supabase/"
-    git show HEAD:supabase/config.toml | sed -e "s/^project_id = .*/project_id = \"${project_id}\"/" -e 's/\b543\([0-9][0-9]\)\b/520\1/g' -e 's/\b8083\b/53583/' > "${work}/supabase/base.toml"
+    git show HEAD:supabase/config.toml | sed -e "s/^project_id = .*/project_id = \"${project_id}\"/" -e "s/\b543\([0-9][0-9]\)\b/${port_prefix}\1/g" -e "s/\b8083\b/${inspector_port}/" > "${work}/supabase/base.toml"
     base="${work}/supabase/base.toml"; cfg="${work}/supabase/config.toml"
     ;;
   *) echo "[r1] unknown toolchain '${toolchain}'" >&2; exit 2;;
