@@ -5,6 +5,8 @@
 //   SUPABASE_REF_ACCEPTANCE=<ref> SUPABASE_REF_PRODUCTION=<ref> \
 //   [CLOUDFLARE_API_TOKEN=<token with Workers Scripts:Read> CF_ACCOUNT_ID=<id> CF_WORKER_ACCEPTANCE=<name> CF_WORKER_PRODUCTION=<name>] \
 //   node scripts/hosted-db/inspect-auth-security.mjs --env acceptance|production|both
+//       [--only migrations]            narrowest access: one SELECT of the applied migration versions, diffed against this checkout
+//       [--expected <file.json>]       exact redirect allow-list comparison against an owner-confirmed list (see docs/security/hosted/)
 //
 // WHAT IT REPORTS (booleans / enums / counts only):
 //   * e-mail confirmation required, sign-up availability, CAPTCHA protection, phone provider, Send-SMS hook, Phone MFA, anonymous sign-ins
@@ -114,7 +116,7 @@ export function redactAuthConfig(raw) {
   }
   return out;
 }
-export function interpretAuth(cfg) {
+export function interpretAuth(cfg, expected) {
   const yes = (v) => v === true;
   return {
     email_confirmation_required: cfg.mailer_autoconfirm === false ? true : cfg.mailer_autoconfirm === true ? false : "unknown",
@@ -130,7 +132,28 @@ export function interpretAuth(cfg) {
     anonymous_sign_ins: yes(cfg.external_anonymous_users_enabled),
     leaked_password_protection_on: cfg.password_hibp_enabled === true ? true : cfg.password_hibp_enabled === false ? false : "unknown",
     password_min_length: cfg.password_min_length ?? null,
-    redirect_allowlist: redirectAllowlistFindings(cfg.site_url, cfg.uri_allow_list),
+    redirect_allowlist: { ...redirectAllowlistFindings(cfg.site_url, cfg.uri_allow_list), ...(expected ? { exact_comparison: exactAllowlistDiff(cfg.site_url, cfg.uri_allow_list, expected) } : {}) },
+  };
+}
+
+/**
+ * EXACT comparison of the hosted redirect allow-list with an owner-confirmed expected list (a file in the repository). Entries are compared as
+ * literal strings (trimmed, case-sensitive: GoTrue matches the pattern text), so a near-miss such as a trailing slash or `http` vs `https` is
+ * reported as one unexpected plus one missing entry. `unexpected` = on the project but not expected (candidates for removal); `missing` =
+ * expected but absent (would break a flow if removed by mistake). Pure: nothing is read from or written to the project here.
+ */
+export function exactAllowlistDiff(siteUrl, allowList, expected) {
+  const hosted = String(allowList ?? "").split(",").map((e) => e.trim()).filter(Boolean);
+  const want = (expected?.uri_allow_list ?? []).map((e) => String(e).trim());
+  const hostedSet = new Set(hosted), wantSet = new Set(want);
+  const unexpected = [...new Set(hosted.filter((e) => !wantSet.has(e)))];
+  const missing = want.filter((e) => !hostedSet.has(e));
+  const siteUrlMatches = expected?.site_url === undefined ? null : String(siteUrl ?? "") === String(expected.site_url);
+  return {
+    expected_confirmed_by_owner: expected?.confirmed === true,
+    site_url_matches: siteUrlMatches,
+    unexpected, missing,
+    exact: unexpected.length === 0 && missing.length === 0 && siteUrlMatches !== false,
   };
 }
 
@@ -217,12 +240,18 @@ export function workerSettingsSummary(settingsResult) {
   return { secret_names: names("secret_text"), plain_var_names: names("plain_text"), switches, legacy_app_whatsapp_bindings_present: legacy };
 }
 const rowsOf = (r) => (r.status >= 200 && r.status < 300 && Array.isArray(r.data) ? r.data : null);
-export async function inspectProject({ label, ref, guardedFetch, cf, repo }) {
+export async function inspectProject({ label, ref, guardedFetch, cf, repo, expected, only }) {
+  if (only === "migrations") {
+    // Narrowest access: ONE read-only SELECT of the applied migration versions. No Auth config, no function inventory, no Worker call.
+    const r = await guardedFetch("POST", `https://api.supabase.com/v1/projects/${ref}/database/query/read-only`, { query: QUERIES.migrations });
+    const rows = rowsOf(r);
+    return { environment: label, project_ref_suffix: ref.slice(-4), scope: "migrations-only", migration_diff: rows ? migrationDiff(rows, repo?.migrations ?? repoMigrationVersions()) : null, errors: rows ? [] : [`migrations: HTTP ${r.status}`] };
+  }
   const report = { environment: label, project_ref_suffix: ref.slice(-4), auth: null, auth_interpretation: null, database: {}, whatsapp_delivery_secrets: null, errors: [] };
   const cfg = await guardedFetch("GET", `https://api.supabase.com/v1/projects/${ref}/config/auth`);
   if (cfg.status === 200 && cfg.data) {
     report.auth = redactAuthConfig(cfg.data);
-    report.auth_interpretation = interpretAuth(report.auth);
+    report.auth_interpretation = interpretAuth(report.auth, expected);
   } else report.errors.push(`auth config: HTTP ${cfg.status}`);
   for (const [name, sql] of Object.entries(QUERIES)) {
     const r = await guardedFetch("POST", `https://api.supabase.com/v1/projects/${ref}/database/query/read-only`, { query: sql });
@@ -264,6 +293,12 @@ export async function main(argv, env, fetchImpl = fetch, log = console.log) {
   const which = argv.includes("--env") ? argv[argv.indexOf("--env") + 1] : "both";
   if (!["acceptance", "production", "both"].includes(which)) { log("usage: --env acceptance|production|both"); return 2; }
   const wanted = which === "both" ? ["acceptance", "production"] : [which];
+  const only = argv.includes("--only") ? argv[argv.indexOf("--only") + 1] : undefined;
+  if (only !== undefined && only !== "migrations") { log("usage: --only migrations"); return 2; }
+  let expectedFile = null;
+  if (argv.includes("--expected")) {
+    try { expectedFile = JSON.parse(fs.readFileSync(argv[argv.indexOf("--expected") + 1], "utf8")); } catch { log("--expected: the file could not be read as JSON"); return 2; }
+  }
   const missing = requirements(env);
   const refs = Object.fromEntries(wanted.map((w) => [w, env[`SUPABASE_REF_${w.toUpperCase()}`]]));
   for (const w of wanted) if (!refs[w]) missing.push(`SUPABASE_REF_${w.toUpperCase()} - the ${w} project reference (not stored in the repository)`);
@@ -277,10 +312,10 @@ export async function main(argv, env, fetchImpl = fetch, log = console.log) {
   for (const w of wanted) {
     const script = env[`CF_WORKER_${w.toUpperCase()}`];
     const cf = env.CLOUDFLARE_API_TOKEN && env.CF_ACCOUNT_ID && script ? { account: env.CF_ACCOUNT_ID, script } : null;
-    reports.push(await inspectProject({ label: w, ref: refs[w], guardedFetch, cf }));
+    reports.push(await inspectProject({ label: w, ref: refs[w], guardedFetch, cf: only ? null : cf, expected: expectedFile?.[w], only }));
   }
   log(JSON.stringify({ generated_at: new Date().toISOString(), read_only: true, reports }, null, 2));
-  return reports.some((r) => r.errors.some((e) => /^(auth config|disputed_function_rights)/.test(e))) ? 1 : 0;
+  return reports.some((r) => r.errors.some((e) => /^(auth config|disputed_function_rights|migrations)/.test(e))) ? 1 : 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

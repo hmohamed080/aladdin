@@ -1,0 +1,175 @@
+# Aladdin - phone sign-up (R2) on GitHub runners: the outbox-driven phone E2E, the R1 security matrix and the interim-hook probe.
+#
+# Why a separate workflow: the existing E2E workflows run a production build, and the local delivery outbox is refused under NODE_ENV=production on
+# purpose, so the mobile-number sign-up specs skip themselves there. This job runs them on `next dev` (bound to 127.0.0.1) against a runner-local
+# Supabase stack with phone verification switched on ONLY in that stack. Nothing is sent: delivery is the local outbox. No hosted project, no
+# repository secret; Cloudflare's PUBLIC Turnstile test keys with the E2E stub (like showroom-rc2-e2e.yml).
+#
+# Triggers: the existing workflows only react to pull requests that target `main`, so a stacked branch needs its own. Manual, push to the R2
+# integration branch, and pull requests into the registration branch. Remove the branch filter (or retarget) when R2 is merged.
+name: Phone sign-up security (R2)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [integration/unified-registration-r2-20261031]
+  pull_request:
+    branches: [claude/registration-resume]
+
+concurrency:
+  group: phone-signup-security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  phone-e2e:
+    name: phone-e2e (outbox, guard enforce)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      PLAYWRIGHT_HTML_OPEN: never
+      NEXT_PUBLIC_APP_ENV: local
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
+      TURNSTILE_ALLOWED_HOSTNAMES: 127.0.0.1,localhost
+      E2E_STUB_TURNSTILE: "1"
+      E2E_TURNSTILE_STUB: "1"
+      E2E_DB_CONTAINER: supabase_db_aladdin
+      MAILPIT_URL: http://127.0.0.1:54324
+      PHONE_VERIFICATION_ENABLED: "true"
+      PHONE_SIGNUP_VERIFICATION_ENABLED: "true"
+      PHONE_OTP_DELIVERY: outbox
+      E2E_NEXT_MODE: dev
+      E2E_ALIAS_GUARD: enforce
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+          pnpm install --frozen-lockfile
+          pnpm --filter frontend exec playwright install --with-deps chromium
+      - name: Start local Supabase and replay migrations + seeds
+        run: |
+          set -o pipefail
+          pnpm exec supabase start --exclude studio,postgres-meta,edge-runtime,logflare,vector,supavisor > "$RUNNER_TEMP/stack.log" 2>&1
+          pnpm exec supabase db reset >> "$RUNNER_TEMP/stack.log" 2>&1
+          pnpm exec supabase status -o json > "$RUNNER_TEMP/status.json"
+      - name: Point the app at the runner-local stack and generate throwaway secrets
+        run: |
+          status=$(jq 'if type == "array" then .[0] else . end' "$RUNNER_TEMP/status.json")
+          api_url=$(jq -r '.API_URL // empty' <<<"$status")
+          anon=$(jq -r '.ANON_KEY // empty' <<<"$status")
+          service=$(jq -r '.SERVICE_ROLE_KEY // empty' <<<"$status")
+          test "$api_url" = "http://127.0.0.1:54321" || { echo "Unexpected local API URL"; exit 1; }
+          test -n "$anon" && test -n "$service" || { echo "Local stack keys missing from supabase status"; exit 1; }
+          grant=$(openssl rand -hex 32)
+          cookie=$(openssl rand -hex 32)
+          keyring=$(node -e "process.stdout.write(JSON.stringify({current:'ci',keys:{ci:require('crypto').randomBytes(32).toString('base64')}}))")
+          for value in "$anon" "$service" "$grant" "$cookie" "$keyring"; do echo "::add-mask::$value"; done
+          {
+            echo "SUPABASE_URL=$api_url"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$api_url"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$service"
+            echo "AUTH_PASSWORD_PREVIEW_GRANT_SECRET=$grant"
+            echo "PHONE_SIGNUP_COOKIE_SECRET=$cookie"
+            echo "PHONE_OTP_HMAC_KEYS=$keyring"
+            echo "PHONE_OTP_OUTBOX_DIR=${{ github.workspace }}/frontend/.local/phone-otp-outbox"
+          } >> "$GITHUB_ENV"
+      - name: Phone sign-up specs (desktop and mobile)
+        working-directory: frontend
+        run: |
+          set -o pipefail
+          mkdir -p ../.artifacts/phone-e2e
+          pnpm exec playwright test --retries=0 --reporter=list --project=chromium-desktop --project=chromium-mobile \
+            e2e/one-field-auth.spec.ts e2e/installer-profile-completion.spec.ts 2>&1 | tee ../.artifacts/phone-e2e/playwright.log
+      - name: Print the error contexts (ARIA snapshot of each failure)
+        if: failure()
+        working-directory: frontend
+        run: |
+          find test-results -name error-context.md 2>/dev/null | sort | while read -r f; do
+            echo "::group::$f"; head -c 8000 "$f"; echo; echo "::endgroup::"
+          done
+      - name: Keep the text log (no traces, no outbox files)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phone-e2e-${{ github.sha }}
+          path: |
+            .artifacts/phone-e2e/
+            frontend/test-results/**/error-context.md
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Stop the stack
+        if: always()
+        run: timeout 90s pnpm exec supabase stop --no-backup || true
+
+  r1-security-matrix:
+    name: r1-security-matrix (CI toolchain, both confirmation modes x 3 postures)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+          pnpm install --frozen-lockfile
+      - name: R1 matrix on the combined tree
+        env:
+          R1_TOOLCHAIN: ci110
+          SEC_EVIDENCE_DIR: ${{ github.workspace }}/.artifacts/r1-matrix
+        run: bash supabase/tests/sec/run_r1.sh
+      - name: Keep the summary and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r1-matrix-${{ github.sha }}
+          path: |
+            .artifacts/r1-matrix/
+            .sec-logs/
+          retention-days: 14
+          if-no-files-found: warn
+
+  hook-probe:
+    name: hook-probe (before_user_created, CI toolchain, confirmations on/off)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+          pnpm install --frozen-lockfile
+      - name: Probe the proposed hook (nothing is deployed anywhere)
+        env:
+          R2_TOOLCHAINS: ci110
+        run: bash supabase/tests/r2/run_hook_probe.sh
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hook-probe-${{ github.sha }}
+          path: docs/security/hook-probe/
+          retention-days: 14
+          if-no-files-found: warn

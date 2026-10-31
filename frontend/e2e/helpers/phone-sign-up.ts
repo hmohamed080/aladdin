@@ -33,7 +33,9 @@ export function sqlValue(query: string): string {
  * refuses signup_enabled with the guard "off" (ck_config_signup_needs_guard: guard first, then sign-up), so only observe/enforce exist here.
  */
 export function enablePhoneSignupSwitches(guard: "observe" | "enforce" = "enforce"): void {
-  if (/^supabase_db_aladdin$/.test(DB)) throw new Error("REFUSED: pass E2E_DB_CONTAINER=supabase_db_<isolated project>");
+  // Locally the default container name may be a developer's shared stack, so an explicit isolated name is required; on a GitHub runner the
+  // default stack is the ephemeral one this job just created.
+  if (/^supabase_db_aladdin$/.test(DB) && process.env.CI !== "true") throw new Error("REFUSED: pass E2E_DB_CONTAINER=supabase_db_<isolated project>");
   sqlValue(`update app.phone_verification_config set enabled = true, signup_enabled = true, alias_guard_mode = '${guard}';`);
 }
 

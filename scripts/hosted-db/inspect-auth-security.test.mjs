@@ -116,7 +116,11 @@ describe("R2: migration history difference", () => {
     assert.equal(d.r2_markers["20261031090001"], false);
     assert.equal(d.latest_applied, "20261029090001");
   });
-  it("sees this checkout's migrations, including the R2 drop migration", () => assert.ok(repoMigrationVersions().includes("20261031090001")));
+  it("sees this checkout's migrations; the legacy-table DROP is a proposal, NOT a migration, until the contract-step conditions are met", () => {
+    const v = repoMigrationVersions();
+    assert.ok(v.includes("20261030090002"));
+    assert.ok(!v.includes("20261031090001"), "the contract step must not ride `supabase db push` ahead of the compatible app");
+  });
 });
 
 describe("R2: permission inventory against the reviewed contract", () => {
@@ -183,5 +187,49 @@ describe("R2: leaked-password protection and redirect allow-list", () => {
     const r = redactAuthConfig({ password_hibp_enabled: false, site_url: "https://aladdindecore.com", uri_allow_list: "https://a/**", smtp_pass: "x" });
     assert.equal(r.password_hibp_enabled, false);
     assert.ok(!("smtp_pass" in r));
+  });
+});
+
+// ---- R2 round 2: exact allow-list comparison and the migrations-only mode ------------------------------------------------------------------
+import { exactAllowlistDiff, inspectProject } from "./inspect-auth-security.mjs";
+
+describe("R2: exact redirect allow-list comparison", () => {
+  const expected = { confirmed: true, site_url: "https://aladdindecore.com", uri_allow_list: ["https://aladdindecore.com/**", "https://www.aladdindecore.com/**"] };
+  it("is exact only when site_url and every entry match literally", () => {
+    const ok = exactAllowlistDiff("https://aladdindecore.com", "https://aladdindecore.com/**, https://www.aladdindecore.com/**", expected);
+    assert.deepEqual([ok.exact, ok.unexpected, ok.missing, ok.site_url_matches, ok.expected_confirmed_by_owner], [true, [], [], true, true]);
+  });
+  it("reports unexpected (stale) and missing entries, and treats a near-miss as one of each", () => {
+    const d = exactAllowlistDiff("https://aladdindecore.com", "https://aladdindecore.com/**,https://old.vercel.app/**,http://www.aladdindecore.com/**,https://aladdindecore.com/**", expected);
+    assert.deepEqual(d.unexpected, ["https://old.vercel.app/**", "http://www.aladdindecore.com/**"]);
+    assert.deepEqual(d.missing, ["https://www.aladdindecore.com/**"]);
+    assert.equal(d.exact, false);
+  });
+  it("a wrong site_url alone makes it inexact, and an unconfirmed expected file says so", () => {
+    const d = exactAllowlistDiff("https://other.example", "https://aladdindecore.com/**,https://www.aladdindecore.com/**", { ...expected, confirmed: false });
+    assert.deepEqual([d.exact, d.site_url_matches, d.expected_confirmed_by_owner], [false, false, false]);
+  });
+  it("interpretAuth carries the comparison only when an expected list is given", () => {
+    assert.equal("exact_comparison" in interpretAuth({ uri_allow_list: "https://a/**" }).redirect_allowlist, false);
+    assert.equal(interpretAuth({ site_url: "https://aladdindecore.com", uri_allow_list: "https://x/**" }, expected).redirect_allowlist.exact_comparison.exact, false);
+  });
+});
+
+describe("R2: --only migrations", () => {
+  it("issues exactly ONE read-only SELECT (no Auth config, no inventory, no Worker call) and returns only the migration diff", async () => {
+    const calls = [];
+    const guardedFetch = async (method, url, body) => { calls.push({ method, url: url.replace(/[a-z0-9]{20}/, "<ref>"), query: body?.query }); return { status: 200, data: [{ version: "20261028090001" }, { version: "20261029090001" }] }; };
+    const r = await inspectProject({ label: "acceptance", ref: REF, guardedFetch, only: "migrations", repo: { migrations: ["20261028090001", "20261029090001", "20261030090001"] } });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].method, "POST");
+    assert.match(calls[0].query, /^select version from supabase_migrations\.schema_migrations/);
+    assert.equal(r.scope, "migrations-only");
+    assert.deepEqual(r.migration_diff.repo_not_applied, ["20261030090001"]);
+    assert.equal(r.auth, undefined);
+  });
+  it("main rejects an unknown --only value and prints usage without calling anything", async () => {
+    let called = 0; const out = [];
+    const code = await main(["--only", "everything"], { SUPABASE_ACCESS_TOKEN: TOKEN, SUPABASE_REF_ACCEPTANCE: REF, SUPABASE_REF_PRODUCTION: REF }, async () => { called += 1; return new Response("[]"); }, (l) => out.push(l));
+    assert.equal(code, 2); assert.equal(called, 0);
   });
 });
