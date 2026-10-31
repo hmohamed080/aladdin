@@ -22,21 +22,21 @@ must(
 );
 must(
   config.secrets_store_secrets?.length === 2 &&
-  ["WHATSAPP_ACCESS_TOKEN", "SUPABASE_SEND_SMS_HOOK_SECRET"].every((name) =>
-    config.secrets_store_secrets.some((binding) =>
-      binding.binding === name &&
-      binding.secret_name === name &&
-      binding.store_id === "acfaa67f391e499db6fde398022f50ce"
-    )
+  [["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_ACCESS_TOKEN"], ["OTP_SIGNING_SECRET", "PHONE_OTP_WORKER_SECRET"]].every(([binding, secretName]) =>
+    config.secrets_store_secrets.some((b) => b.binding === binding && b.secret_name === secretName && b.store_id === "acfaa67f391e499db6fde398022f50ce")
   ),
-  "both Meta token and Supabase signing key must use the pre-verified account Secrets Store"
+  "the Meta token and the app<->Worker signing secret must be the two pre-verified account Secrets Store bindings"
 );
+must(!JSON.stringify(config).includes("SUPABASE_SEND_SMS_HOOK_SECRET"), "the Supabase Send-SMS-hook secret must not be bound: Supabase Phone Auth is never activated for this flow");
+must(config.vars?.OTP_ENVIRONMENT === "acceptance" && config.vars?.OTP_RECIPIENT_MODE === "allowlist", "the Acceptance Worker must be environment=acceptance with the recipient allowlist enforced");
+must(!("OTP_ALLOWED_RECIPIENTS" in (config.vars ?? {})) && !JSON.stringify(config.vars ?? {}).includes("+20"), "the recipient allowlist (phone numbers) must be set in the Worker dashboard, never in the repository");
+must(!("WHATSAPP_GRAPH_BASE_URL" in (config.vars ?? {})), "the Graph URL override is for local rigs only");
 must(!config.secrets?.required?.length, "do not require an unprovisioned per-Worker signing secret");
 must(config.vars?.WHATSAPP_PHONE_NUMBER_ID === "1415528588305492", "unexpected WhatsApp sender");
-must(config.vars?.WHATSAPP_OTP_TEMPLATE === "aladdin_otp" && config.vars?.WHATSAPP_OTP_LANGUAGE === "ar", "unapproved template");
+must(config.vars?.WHATSAPP_OTP_TEMPLATE === "aladdin_otp" && config.vars?.WHATSAPP_OTP_LANGUAGES === "ar", "unapproved template");
 must(!JSON.stringify(config.vars ?? {}).includes("whsec_") && !JSON.stringify(config.vars ?? {}).includes("Bearer "), "credentials must not be in plaintext vars");
 if (errors.length) {
   console.error("OTP Preview configuration BLOCKED:\n" + errors.map(s => "- " + s).join("\n"));
   process.exit(1);
 }
-console.log("OTP Preview configuration PASS: isolated Worker, Acceptance D1, approved Secrets Store binding, delivery disabled");
+console.log("OTP Preview configuration PASS: isolated Worker, Acceptance D1, Secrets Store bindings (Meta token + R2 signing secret), allowlist mode, delivery disabled");

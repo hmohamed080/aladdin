@@ -11,7 +11,9 @@
   "vars": {
     "WHATSAPP_PHONE_NUMBER_ID": "1415528588305492",
     "WHATSAPP_OTP_TEMPLATE": "aladdin_otp",
-    "WHATSAPP_OTP_LANGUAGE": "ar",
+    "WHATSAPP_OTP_LANGUAGES": "ar",
+    "OTP_ENVIRONMENT": "acceptance",
+    "OTP_RECIPIENT_MODE": "allowlist",
     "WHATSAPP_GRAPH_API_VERSION": "v25.0",
     "WHATSAPP_DELIVERY_ENABLED": "false"
   },
@@ -22,9 +24,9 @@
       "secret_name": "WHATSAPP_ACCESS_TOKEN"
     },
     {
-      "binding": "SUPABASE_SEND_SMS_HOOK_SECRET",
+      "binding": "OTP_SIGNING_SECRET",
       "store_id": "acfaa67f391e499db6fde398022f50ce",
-      "secret_name": "SUPABASE_SEND_SMS_HOOK_SECRET"
+      "secret_name": "PHONE_OTP_WORKER_SECRET"
     }
   ],
   "d1_databases": [
