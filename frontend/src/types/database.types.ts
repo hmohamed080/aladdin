@@ -9444,7 +9444,7 @@ export type Database = {
         Returns: {
           audience_kind: Database["public"]["Enums"]["activity_audience_kind"]
           audience_value: string
-          username: string
+          username: string | null
         }[]
       }
       pending_registration_save: {
@@ -9455,7 +9455,7 @@ export type Database = {
           p_user_id: string
           p_username: string
         }
-        Returns: undefined
+        Returns: boolean
       }
       phone_auth_consume_limit: {
         Args: { p_action: string; p_ip_key: string; p_phone_key: string }

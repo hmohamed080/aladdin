@@ -92,9 +92,9 @@ export async function savePendingRegistration(params: {
   username: string;
   audienceKind: "organization_type" | "persona_type";
   audienceValue: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const admin = getAdminClient();
-  const { error } = await admin.rpc("pending_registration_save", {
+  const { data, error } = await admin.rpc("pending_registration_save", {
     p_user_id: params.userId,
     p_username: params.username,
     p_audience_kind: params.audienceKind,
@@ -102,7 +102,11 @@ export async function savePendingRegistration(params: {
   });
   if (error) {
     console.error(`Failed to stage pending registration for ${params.userId}: ${error.message}`);
+    return false;
   }
+  // true = the 30-minute username lease is held (20261028090003). false never
+  // changes the caller's response: the name is re-asked after verification.
+  return data === true;
 }
 
 /**
@@ -225,7 +229,7 @@ export async function deleteCraftsmanPasswordUser(userId: string): Promise<boole
 }
 
 /** Durable shared phone-auth limiter. Only service_role can consume buckets. */
-export async function consumePhoneAuthLimit(action: "sign-in" | "sign-up", ipKey: string, phoneKey: string): Promise<boolean> {
+export async function consumePhoneAuthLimit(action: "sign-in" | "sign-up" | "email-resend", ipKey: string, phoneKey: string): Promise<boolean> {
   const { data, error } = await getAdminClient().rpc("phone_auth_consume_limit", {
     p_action: action, p_ip_key: ipKey, p_phone_key: phoneKey,
   });

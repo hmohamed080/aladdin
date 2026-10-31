@@ -2633,6 +2633,7 @@ export const en = {
       usernameRequired: "Enter a username.",
       usernameShape: "Username may contain only letters, numbers, \".\" and \"_\", must start with a letter, and can't start, end, or double up on separators.",
       usernameUnavailable: "That username isn't available. Try another.",
+      usernameHeld: "That username may be held by your unfinished sign-up. Use \"Continue registration\" to finish it, or try another.",
     },
   },
   phoneField: {
@@ -6536,6 +6537,20 @@ export const en = {
       subtitle: "Enter the email address on your account and we'll send you a code.",
       submit: "Send code",
       submitting: "Sending…",
+      backToSignIn: "Back to sign in",
+    },
+    continueRegistration: {
+      title: "Continue your registration",
+      subtitle: "Started signing up but didn't finish? Enter your email and we'll send a new code.",
+      emailLabel: "Email",
+      submit: "Send code",
+      submitting: "Sending…",
+      codeTitle: "Enter your code",
+      codeSubtitle: "If this email has an unfinished registration, enter the 6-digit code we emailed to {email}, or send a new one below.",
+      passwordNote: "After verifying, sign in with the password you chose when you first signed up.",
+      useAnotherEmail: "Use a different email",
+      entryPrompt: "Didn't finish signing up?",
+      entryLink: "Continue registration",
       backToSignIn: "Back to sign in",
     },
     recoveryVerify: {
