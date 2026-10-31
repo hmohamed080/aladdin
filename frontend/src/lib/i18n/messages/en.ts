@@ -1131,7 +1131,7 @@ export const en = {
       liveBannerTitle: "Live — changes here are real",
       liveBannerBody: "This area is connected to Admin Core: every change is saved immediately, enforced on the server and recorded in the audit log. Other Preview areas are unchanged.",
       liveReadBannerTitle: "Live — changes here are saved",
-      liveReadBannerBody: "Rows, details and history are read live. Suspend and restore, notes, follow-ups, internal cases and duplicate links are saved immediately, checked on the server and recorded in the audit log. Verify and Reject here are still Preview — decide verifications in Verifications.",
+      liveReadBannerBody: "Rows, details and history are read live. Suspend and restore, notes, follow-ups, internal cases and duplicate links are saved immediately, checked on the server and recorded in the audit log. Approve and Reject on an account with a pending verification request are real decisions, made through the same review process as Verifications and recorded in the audit log.",
       ops: {
         error: {
           lastSuperAdmin: "This is the last active Super Admin — the account cannot be suspended.",

@@ -110,7 +110,7 @@ describe("approveVerificationAction", () => {
       fn === "review_approve" ? { data: null, error: { message: "only the assigned reviewer may confirm approval" } } : { data: null, error: null },
     );
     const res = await approveVerificationAction(initial, form({ id: ID }));
-    expect(res.ok).toBe(false);
+    expect(res).toEqual({ ok: false, code: "admin.review.error.otherReviewer" });
     expect(calls()).toEqual(["review_approve"]);
   });
 
@@ -158,6 +158,7 @@ describe("approveVerificationAction", () => {
     ["platform authority required", "admin.review.error.notAuthorized"],
     ["cannot review your own verification", "admin.review.error.ownReview"],
     ["owned by another reviewer", "admin.review.error.otherReviewer"],
+    ["only the assigned reviewer may approve", "admin.review.error.otherReviewer"],
   ])("maps the RPC refusal %j to a key and stops before approving or applying", async (message, key) => {
     target("submitted");
     rpc.mockResolvedValueOnce({ data: null, error: { message } });
