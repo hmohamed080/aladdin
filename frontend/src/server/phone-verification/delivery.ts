@@ -8,7 +8,7 @@ import { disabledTransport, type OtpMessage, type PhoneOtpTransport } from "./tr
  *   outbox  a LOCAL fake: writes a small JSON file under a git-ignored directory instead of sending. Refused when
  *           NODE_ENV is "production". Tests read the code from the file; nothing is ever printed.
  *   worker  the future Cloudflare Worker adapter (signed request, the Worker keeps the Meta token). Implemented and unit-tested
- *           here against an injected fetch, but NOT selectable at runtime in R1 (WORKER_WIRED = false): real delivery
+ *           here against an injected fetch; selectable only with a Worker URL AND secret (WORKER_WIRED): real delivery
  *           needs separate owner approval.
  *
  * Hard rules: no function here writes the destination number or the code to a log or console, and the switch is a server-only
@@ -17,7 +17,7 @@ import { disabledTransport, type OtpMessage, type PhoneOtpTransport } from "./tr
 export type DeliveryMode = "off" | "outbox" | "worker";
 
 /** Real delivery is intentionally not reachable through configuration in R1. */
-export const WORKER_WIRED = false;
+export const WORKER_WIRED = true;
 
 export function parseDeliveryMode(raw: string | undefined, nodeEnv: string | undefined): DeliveryMode {
   const v = (raw ?? "").trim();
@@ -70,9 +70,11 @@ export type WorkerConfig = {
 };
 
 /**
- * FUTURE real adapter. Signs `${id}.${timestamp}.${body}` with HMAC-SHA256 exactly as the Worker's verifySignature (PR #114)
- * expects, posts it, and treats anything but a 2xx as failure. The Worker keeps its own switch (WHATSAPP_DELIVERY_ENABLED) and
- * recipient allow-list, so two independent switches must be on before anything is sent.
+ * The real adapter. Posts the application's request to the delivery Worker (edge/whatsapp-otp-worker, route POST /v1/otp/send), signed as
+ * `${id}.${timestamp}.${body}` with HMAC-SHA256 (Standard Webhooks style, the format the Worker verifies). The request id is derived from the
+ * DELIVERY identity (the challenge id) - never a fresh random value - so the Worker's replay journal makes one challenge deliver at most once.
+ * Anything but a 2xx is a failure. The Worker keeps its own switches (WHATSAPP_DELIVERY_ENABLED, recipient allow-list), so independent
+ * switches on both sides must be on before anything is sent. The Meta access token exists only on the Worker.
  */
 export function createWorkerTransport(config: WorkerConfig): PhoneOtpTransport {
   const url = new URL(config.url);
@@ -84,14 +86,17 @@ export function createWorkerTransport(config: WorkerConfig): PhoneOtpTransport {
   const doFetch = config.fetchImpl ?? fetch;
   return {
     async send(message: OtpMessage) {
+      // No delivery identity, no send: an un-keyed request could not be made idempotent.
+      if (!message.deliveryId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.deliveryId)) throw new Error("phone OTP delivery failed");
       const body = JSON.stringify({
         to: message.to,
         code: message.code,
         purpose: message.purpose ?? "primary_proof",
         locale: message.locale ?? "ar",
         ttl_seconds: message.ttlSeconds,
+        delivery_id: message.deliveryId.toLowerCase(),
       });
-      const id = `msg_${randomUUID()}`;
+      const id = `otp_${message.deliveryId.toLowerCase()}`;
       const stamp = String(Math.floor((config.now ?? Date.now)() / 1000));
       const signature = createHmac("sha256", keyBytes).update(`${id}.${stamp}.${body}`).digest("base64");
       let ok = false;
@@ -112,9 +117,12 @@ export function createWorkerTransport(config: WorkerConfig): PhoneOtpTransport {
   };
 }
 
-/** The only place a mode becomes a transport. */
-export function selectTransport(options: { mode: DeliveryMode; outboxDir?: string; nodeEnv?: string }): PhoneOtpTransport {
+/** The only place a mode becomes a transport. "worker" needs BOTH a URL and a secret: a half-configured worker mode fails loudly, never silently off. */
+export function selectTransport(options: { mode: DeliveryMode; outboxDir?: string; nodeEnv?: string; workerUrl?: string; workerSecret?: string; fetchImpl?: typeof fetch }): PhoneOtpTransport {
   if (options.mode === "outbox") return createOutboxTransport({ dir: options.outboxDir ?? ".local/phone-otp-outbox", nodeEnv: options.nodeEnv });
-  // "off", and "worker" while WORKER_WIRED is false.
+  if (options.mode === "worker") {
+    if (!WORKER_WIRED || !options.workerUrl || !options.workerSecret) throw new Error("PHONE_OTP_DELIVERY=worker needs PHONE_OTP_WORKER_URL and PHONE_OTP_WORKER_SECRET");
+    return createWorkerTransport({ url: options.workerUrl, secret: options.workerSecret, fetchImpl: options.fetchImpl });
+  }
   return disabledTransport;
 }

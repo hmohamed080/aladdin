@@ -12,6 +12,11 @@ export type OtpMessage = {
   /** Which proof this code belongs to (an adapter may choose a template or an audit tag from it). */
   purpose?: "primary_proof" | "signup_proof";
   locale?: "en" | "ar";
+  /**
+   * The identity of THIS delivery: the challenge id. The worker adapter signs it as the request id and the Worker's replay journal is keyed on it,
+   * so one challenge can never produce a second provider message even if the same delivery is attempted twice. Required by the worker adapter.
+   */
+  deliveryId?: string;
 };
 /*
  * Contract for EVERY implementation (see delivery.ts for the selectable ones): send() throws on any failure, the thrown message

@@ -13,6 +13,7 @@ import { z } from "zod";
  *   Cloudflare Worker adapter, NOT wired in R1). Anything else - including a typo or a missing value - means "off". This is a
  *   server-only switch; it is never derived from NEXT_PUBLIC_APP_ENV, which is public and also selects test keys.
  * - PHONE_OTP_OUTBOX_DIR: where the local outbox writes (default .local/phone-otp-outbox, git-ignored).
+ * - PHONE_OTP_WORKER_URL / PHONE_OTP_WORKER_SECRET: where the "worker" delivery mode posts, and the whsec_ key that signs it. Server-only.
  * - PHONE_SIGNUP_COOKIE_SECRET: >= 32 characters, server-only. Keys ONLY the sealed pending-sign-up cookie (it holds the password for <= 10
  *   minutes). Separate from the code keyring and from AUTH_PASSWORD_PREVIEW_GRANT_SECRET so that no other secret's exposure opens this cookie.
  *   Required whenever phone sign-up is enabled (the sign-up action refuses to request a code without it).
@@ -24,6 +25,8 @@ export const phoneVerificationEnvSchema = z.object({
   PHONE_OTP_DELIVERY: z.string().trim().max(32).optional(),
   PHONE_OTP_OUTBOX_DIR: z.string().trim().max(300).optional(),
   PHONE_SIGNUP_COOKIE_SECRET: z.string().trim().min(32).max(512).optional(),
+  PHONE_OTP_WORKER_URL: z.string().trim().url().max(300).optional(),
+  PHONE_OTP_WORKER_SECRET: z.string().trim().regex(/^whsec_[A-Za-z0-9+/=]{43,200}$/).optional(),
 });
 
 export type PhoneVerificationEnv = {
@@ -34,6 +37,10 @@ export type PhoneVerificationEnv = {
   delivery: string | undefined;
   outboxDir: string | undefined;
   signupCookieSecret: string | undefined;
+  /** Full URL of the delivery Worker's send route (https; loopback http only for local rigs). Used only when PHONE_OTP_DELIVERY=worker. */
+  workerUrl: string | undefined;
+  /** "whsec_" + base64 (>= 32 bytes): signs requests to the Worker. The Worker holds the same value in its Secrets Store. Never the Meta token. */
+  workerSecret: string | undefined;
 };
 
 export function parsePhoneVerificationEnv(source: Record<string, string | undefined>): PhoneVerificationEnv {
@@ -51,6 +58,8 @@ export function parsePhoneVerificationEnv(source: Record<string, string | undefi
     delivery: result.data.PHONE_OTP_DELIVERY,
     outboxDir: result.data.PHONE_OTP_OUTBOX_DIR,
     signupCookieSecret: result.data.PHONE_SIGNUP_COOKIE_SECRET,
+    workerUrl: result.data.PHONE_OTP_WORKER_URL,
+    workerSecret: result.data.PHONE_OTP_WORKER_SECRET,
   };
 }
 
@@ -62,5 +71,7 @@ export function readPhoneVerificationEnv(): PhoneVerificationEnv {
     PHONE_OTP_DELIVERY: process.env.PHONE_OTP_DELIVERY,
     PHONE_OTP_OUTBOX_DIR: process.env.PHONE_OTP_OUTBOX_DIR,
     PHONE_SIGNUP_COOKIE_SECRET: process.env.PHONE_SIGNUP_COOKIE_SECRET,
+    PHONE_OTP_WORKER_URL: process.env.PHONE_OTP_WORKER_URL,
+    PHONE_OTP_WORKER_SECRET: process.env.PHONE_OTP_WORKER_SECRET,
   });
 }
