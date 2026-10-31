@@ -84,7 +84,10 @@ export default defineConfig({
     // window.__salesRealtime adapter the scoped-realtime E2E relies on). The
     // `env` below applies to this whole command — both `build` and `start` — so the
     // flag is present at build time without any cross-platform env-prefix shim.
-    command: `pnpm build && pnpm exec next start --port ${PORT}`,
+    // E2E_NEXT_MODE=dev runs `next dev` instead. Needed ONLY by the mobile-number sign-up specs: they read the code from the local
+    // outbox (PHONE_OTP_DELIVERY=outbox), which the app refuses under NODE_ENV=production on purpose (a production build can never be
+    // switched to write codes to disk). Every other suite keeps the deterministic production build.
+    command: process.env.E2E_NEXT_MODE === "dev" ? `pnpm exec next dev --webpack --port ${PORT}` : `pnpm build && pnpm exec next start --port ${PORT}`,
     url: BASE_URL,
     // Never silently reuse a stray dev server — the gate must always run against a
     // fresh production build.

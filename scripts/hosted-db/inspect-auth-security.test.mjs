@@ -101,3 +101,60 @@ describe("main", () => {
   });
   it("lists the 13 disputed functions exactly", () => { assert.equal(DISPUTED_FUNCTIONS.length, 13); assert.equal(new Set(DISPUTED_FUNCTIONS).size, 13); });
 });
+
+// ---- R2 additions: migration history, permission diff, legacy table, Worker switches ------------------------------------------------------
+import { PERMISSION_INVENTORY_SQL, contractVersionFor, migrationDiff, normalizeSignature, permissionDiff, repoMigrationVersions, workerSettingsSummary } from "./inspect-auth-security.mjs";
+
+describe("R2: migration history difference", () => {
+  const repo = ["20261028090001", "20261029090001", "20261030090001", "20261031090001"];
+  it("reports which repo migrations are applied, missing, or unknown to the repo, and the R2 markers", () => {
+    const d = migrationDiff([{ version: "20261028090001" }, { version: "20261029090001" }, { version: "20261015000000" }], repo);
+    assert.deepEqual(d.applied_not_in_repo, ["20261015000000"]);
+    assert.deepEqual(d.repo_not_applied, ["20261030090001", "20261031090001"]);
+    assert.equal(d.r2_markers["20261028090001"], true);
+    assert.equal(d.r2_markers["20261031090001"], false);
+    assert.equal(d.latest_applied, "20261029090001");
+  });
+  it("sees this checkout's migrations, including the R2 drop migration", () => assert.ok(repoMigrationVersions().includes("20261031090001")));
+});
+
+describe("R2: permission inventory against the reviewed contract", () => {
+  it("is a single read-only SELECT with no SET line", () => { assert.doesNotThrow(() => assertReadOnlySql(PERMISSION_INVENTORY_SQL)); assert.ok(!/set local/i.test(PERMISSION_INVENTORY_SQL)); });
+  it("qualifies unqualified signatures with public and leaves app.* alone", () => {
+    assert.equal(normalizeSignature("fn(uuid)"), "public.fn(uuid)");
+    assert.equal(normalizeSignature("app.fn(uuid)"), "app.fn(uuid)");
+  });
+  it("picks the newest contract at or below the hosted version", () => assert.equal(contractVersionFor("20261029090009", ["20261026090001", "20261029090002", "20261030090001"]), "20261029090002"));
+  const fn = (signature, anon) => ({ signature, kind: "f", owner: "postgres", definer: true, config: ["search_path="], grants: [{ role: "service_role", grantable: false }], effective: { anon, authenticated: false, service_role: true } });
+  const contract = { version: "20261030090002", functions: [fn("public.a()", false), fn("public.b()", false)] };
+  it("flags an extra function, a missing one and a widened EXECUTE right, and stays empty when identical", () => {
+    assert.equal(permissionDiff([fn("a()", false), fn("b()", false)], contract).differences, 0);
+    const d = permissionDiff([fn("a()", true), fn("c()", false)], contract);
+    const issues = d.listed.map((x) => `${x.fn}:${x.issue}`);
+    assert.ok(issues.includes("public.a():effective differs"));
+    assert.ok(issues.includes("public.c():not in the reviewed contract"));
+    assert.ok(issues.includes("public.b():in the reviewed contract but missing on the hosted database"));
+  });
+});
+
+describe("R2: Worker settings", () => {
+  it("reports binding names, shows ONLY allow-listed non-secret switch values, and flags legacy app WhatsApp bindings", () => {
+    const s = workerSettingsSummary({ bindings: [
+      { type: "secret_text", name: "PHONE_OTP_HMAC_KEYS" },
+      { type: "plain_text", name: "PHONE_OTP_DELIVERY", text: "off" },
+      { type: "plain_text", name: "PHONE_SIGNUP_VERIFICATION_ENABLED", text: "false" },
+      { type: "plain_text", name: "SOME_OTHER_VALUE", text: "must-not-appear-in-report" },
+      { type: "plain_text", name: "WHATSAPP_OTP_TEMPLATE", text: "aladdin_login_code" },
+    ] });
+    assert.deepEqual(s.switches, { PHONE_OTP_DELIVERY: "off", PHONE_SIGNUP_VERIFICATION_ENABLED: "false" });
+    assert.deepEqual(s.legacy_app_whatsapp_bindings_present, ["WHATSAPP_OTP_TEMPLATE"]);
+    assert.ok(!JSON.stringify(s).includes("must-not-appear-in-report"));
+    assert.ok(!JSON.stringify(s).includes("aladdin_login_code"));
+  });
+  it("the guard allows GET .../settings and still refuses any write to it", async () => {
+    const gf = makeGuardedFetch(async () => new Response("{}", { status: 200 }), { supabase: TOKEN, cloudflare: CF_TOKEN });
+    assert.equal((await gf("GET", `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/aladdin-web/settings`)).status, 200);
+    await assert.rejects(() => gf("PATCH", `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/aladdin-web/settings`, {}), /REFUSED/);
+    await assert.rejects(() => gf("PUT", `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/aladdin-web/secrets`, {}), /REFUSED/);
+  });
+});

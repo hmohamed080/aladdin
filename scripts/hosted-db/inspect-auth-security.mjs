@@ -12,6 +12,10 @@
 //   * effective EXECUTE rights of service_role / anon / authenticated on the 13 disputed functions
 //   * whether the phone authority / alias guard migrations are applied, their switches, and a COUNT of alias-domain Auth users that never
 //     confirmed (possible squats) - no address, no number
+//   * R2: the exact migration-history difference against this checkout (which repo migrations are applied / missing, which applied ones the
+//     repo does not have - e.g. is 20261028090001 applied before the R2 drop migration 20261031090001), the FULL function-permission
+//     inventory compared with the reviewed contract for the hosted version (permission_diff), the legacy registration challenge table
+//     (name + approximate row count only), and the NON-SECRET phone switches on the Worker (PHONE_* values; secrets by name only)
 //
 // SAFETY, enforced in code and covered by inspect-auth-security.test.mjs:
 //   * the only network calls are: GET Supabase /config/auth, POST Supabase /database/query/read-only (SELECT/WITH only, single statement),
@@ -19,7 +23,11 @@
 //   * only allow-listed auth keys are copied into the report; any key that looks like a secret is dropped even if someone adds it.
 //   * tokens are read from the environment, never printed, never written to disk.
 //   * with no token the script prints exactly what authorisation is needed and exits 3 without calling anything.
-import { pathToFileURL } from "node:url";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 export const DISPUTED_FUNCTIONS = [
   "account_entry_allowed", "account_password_confirm", "admin_phone_cooldown_override", "admin_phone_cooldown_status", "admin_users_directory",
@@ -49,11 +57,17 @@ export function assertReadOnlySql(sql) {
   return s;
 }
 
+// The repo's own function-permission inventory (scripts/function-permissions.sql) as ONE read-only SELECT: the `set local search_path` line
+// is dropped because the read-only endpoint refuses SET; signatures are normalised in normalizeSignature() instead.
+export const PERMISSION_INVENTORY_SQL = fs.readFileSync(path.join(REPO, "scripts/function-permissions.sql"), "utf8").replace(/^\s*set local[^;]*;\s*/i, "").trim().replace(/;\s*$/, "");
+
 const fnList = DISPUTED_FUNCTIONS.map((f) => `'${f}'`).join(",");
 export const QUERIES = {
   disputed_function_rights: `select p.oid::regprocedure::text as fn, has_function_privilege('service_role', p.oid, 'execute') as service_role_exec, has_function_privilege('anon', p.oid, 'execute') as anon_exec, has_function_privilege('authenticated', p.oid, 'execute') as authenticated_exec from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in (${fnList}) order by 1`,
   alias_census: `select count(*) as alias_users, count(*) filter (where email_confirmed_at is null) as unconfirmed_alias_users, count(*) filter (where email_confirmed_at is null and not exists (select 1 from public.profiles p where p.user_id = u.id)) as unconfirmed_without_profile from auth.users u where lower(u.email) like 'p%@craftsman-login.aladdin.invalid'`,
-  migrations: `select count(*) as applied, max(version) as latest from supabase_migrations.schema_migrations`,
+  migrations: `select version from supabase_migrations.schema_migrations order by 1`,
+  legacy_challenge_table: `select c.relname as table_name, s.n_live_tup as approx_rows from pg_class c join pg_namespace n on n.oid = c.relnamespace left join pg_stat_user_tables s on s.relid = c.oid where n.nspname = 'public' and c.relname = 'phone_verification_challenges'`,
+  permission_inventory: PERMISSION_INVENTORY_SQL,
   authority_objects: `select to_regclass('app.phone_verification_config') is not null as phone_authority_applied, to_regclass('app.phone_signup_grants') is not null as signup_authority_applied, exists (select 1 from pg_trigger t where t.tgname = 'phone_alias_guard' and not t.tgisinternal) as alias_guard_installed`,
   default_function_privileges: `select pg_get_userbyid(d.defaclrole) as creator, d.defaclacl::text as acl from pg_default_acl d join pg_namespace n on n.oid = d.defaclnamespace where n.nspname = 'public' and d.defaclobjtype = 'f' order by 1`,
   phone_flags: `select count(*) filter (where phone_e164 is not null) as profiles_with_phone, count(*) filter (where phone_verified_at is not null) as profiles_verified from public.profiles`,
@@ -65,6 +79,7 @@ const ALLOWED_CALLS = [
   { method: "GET", pattern: /^https:\/\/api\.supabase\.com\/v1\/projects\/[a-z0-9]{10,40}\/config\/auth$/ },
   { method: "POST", pattern: /^https:\/\/api\.supabase\.com\/v1\/projects\/[a-z0-9]{10,40}\/database\/query\/read-only$/, readOnlySql: true },
   { method: "GET", pattern: /^https:\/\/api\.cloudflare\.com\/client\/v4\/accounts\/[a-f0-9]{32}\/workers\/scripts\/[A-Za-z0-9_-]{1,64}\/secrets$/ },
+  { method: "GET", pattern: /^https:\/\/api\.cloudflare\.com\/client\/v4\/accounts\/[a-f0-9]{32}\/workers\/scripts\/[A-Za-z0-9_-]{1,64}\/settings$/ },
 ];
 export function makeGuardedFetch(fetchImpl, tokens) {
   return async function guardedFetch(method, url, body) {
@@ -115,8 +130,65 @@ export function workerSecretPresence(secretsResult) {
   const names = new Set((Array.isArray(secretsResult) ? secretsResult : []).map((s) => String(s?.name ?? "")));
   return Object.fromEntries(WORKER_SECRET_NAMES.map((n) => [n, names.has(n)]));
 }
+
+// ---- offline comparisons against this checkout (pure; tested) ----------------------------------------------------------------------------
+export function repoMigrationVersions(dir = path.join(REPO, "supabase/migrations")) {
+  return fs.readdirSync(dir).filter((f) => /^\d{14}_.+\.sql$/.test(f)).map((f) => f.slice(0, 14)).sort();
+}
+export const R2_MARKER_MIGRATIONS = ["20261028090001", "20261030090001", "20261030090002", "20261031090001"];
+export function migrationDiff(appliedRows, repoVersions) {
+  const applied = (appliedRows ?? []).map((r) => String(r.version)).sort();
+  const a = new Set(applied), r = new Set(repoVersions);
+  return {
+    applied_count: applied.length,
+    repo_count: repoVersions.length,
+    latest_applied: applied.at(-1) ?? null,
+    applied_not_in_repo: applied.filter((v) => !r.has(v)),
+    repo_not_applied: repoVersions.filter((v) => !a.has(v)),
+    r2_markers: Object.fromEntries(R2_MARKER_MIGRATIONS.map((v) => [v, a.has(v)])),
+  };
+}
+/** pg prints a function unqualified when its schema is on the search_path; the reviewed contract is always schema-qualified. */
+export function normalizeSignature(sig) {
+  const head = String(sig).split("(")[0];
+  return head.includes(".") ? String(sig) : `public.${sig}`;
+}
+export function contractVersionFor(latestApplied, versions) {
+  return versions.filter((v) => v <= String(latestApplied ?? "")).at(-1) ?? null;
+}
+export function loadReviewedContract(latestApplied, dir = path.join(REPO, "supabase/permissions")) {
+  const versions = fs.readdirSync(dir).filter((f) => /^\d{14}\.json$/.test(f)).map((f) => f.slice(0, 14)).sort();
+  const version = contractVersionFor(latestApplied, versions);
+  if (!version) return null;
+  const value = JSON.parse(fs.readFileSync(path.join(dir, `${version}.json`), "utf8"));
+  return { version, functions: value.functions };
+}
+const stable = (v) => JSON.stringify(v, (_, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x));
+/** Compares the hosted inventory with the reviewed contract: signature-level, definer/config and EXECUTE-right differences, capped. */
+export function permissionDiff(hostedPermissions, contract, cap = 60) {
+  const live = new Map((hostedPermissions ?? []).map((f) => [normalizeSignature(f.signature), f]));
+  const want = new Map(contract.functions.map((f) => [f.signature, f]));
+  const problems = [];
+  for (const [sig, f] of live) {
+    const e = want.get(sig);
+    if (!e) { problems.push({ fn: sig, issue: "not in the reviewed contract" }); continue; }
+    for (const k of ["definer", "config", "grants", "effective"]) if (stable(f[k]) !== stable(e[k])) problems.push({ fn: sig, issue: `${k} differs`, hosted: f[k], reviewed: e[k] });
+  }
+  for (const sig of want.keys()) if (!live.has(sig)) problems.push({ fn: sig, issue: "in the reviewed contract but missing on the hosted database" });
+  return { contract_version: contract.version, hosted_functions: live.size, contract_functions: want.size, differences: problems.length, listed: problems.slice(0, cap), truncated: problems.length > cap };
+}
+export const WORKER_PLAIN_VARS = ["PHONE_VERIFICATION_ENABLED", "PHONE_SIGNUP_VERIFICATION_ENABLED", "PHONE_OTP_DELIVERY", "NEXT_PUBLIC_APP_ENV", "WHATSAPP_DELIVERY_ENABLED"];
+/** Binding NAMES by type, plus the VALUE only of allow-listed non-secret switches (never any other value). */
+export function workerSettingsSummary(settingsResult) {
+  const bindings = Array.isArray(settingsResult?.bindings) ? settingsResult.bindings : [];
+  const names = (t) => bindings.filter((b) => b?.type === t).map((b) => String(b.name));
+  const switches = {};
+  for (const b of bindings) if (b?.type === "plain_text" && WORKER_PLAIN_VARS.includes(b.name)) switches[b.name] = String(b.text).slice(0, 40);
+  const legacy = ["WHATSAPP_OTP_TEMPLATE", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"].filter((n) => bindings.some((b) => b?.name === n));
+  return { secret_names: names("secret_text"), plain_var_names: names("plain_text"), switches, legacy_app_whatsapp_bindings_present: legacy };
+}
 const rowsOf = (r) => (r.status >= 200 && r.status < 300 && Array.isArray(r.data) ? r.data : null);
-export async function inspectProject({ label, ref, guardedFetch, cf }) {
+export async function inspectProject({ label, ref, guardedFetch, cf, repo }) {
   const report = { environment: label, project_ref_suffix: ref.slice(-4), auth: null, auth_interpretation: null, database: {}, whatsapp_delivery_secrets: null, errors: [] };
   const cfg = await guardedFetch("GET", `https://api.supabase.com/v1/projects/${ref}/config/auth`);
   if (cfg.status === 200 && cfg.data) {
@@ -129,12 +201,26 @@ export async function inspectProject({ label, ref, guardedFetch, cf }) {
     if (rows) report.database[name] = rows;
     else report.database[name] = null, report.errors.push(`${name}: HTTP ${r.status}`);
   }
+  const migrationRows = report.database.migrations;
+  if (migrationRows) {
+    report.migration_diff = migrationDiff(migrationRows, repo?.migrations ?? repoMigrationVersions());
+    delete report.database.migrations; // the full version list is in migration_diff; keep the report small
+  }
+  const inventoryRows = report.database.permission_inventory;
+  if (inventoryRows?.[0]?.permissions) {
+    const contract = repo?.contract ?? loadReviewedContract(report.migration_diff?.latest_applied);
+    report.permission_diff = contract ? permissionDiff(inventoryRows[0].permissions, contract) : { error: "no reviewed contract at or below the hosted migration version" };
+    delete report.database.permission_inventory;
+  }
   const disputed = report.database.disputed_function_rights;
   if (disputed) report.disputed_functions_summary = { found: disputed.length, expected: DISPUTED_FUNCTIONS.length, with_service_role_execute: disputed.filter((f) => f.service_role_exec).length, with_anon_execute: disputed.filter((f) => f.anon_exec).length };
   if (cf) {
     const s = await guardedFetch("GET", `https://api.cloudflare.com/client/v4/accounts/${cf.account}/workers/scripts/${cf.script}/secrets`);
     if (s.status === 200) report.whatsapp_delivery_secrets = workerSecretPresence(s.data?.result);
     else report.errors.push(`worker secrets: HTTP ${s.status}`);
+    const st = await guardedFetch("GET", `https://api.cloudflare.com/client/v4/accounts/${cf.account}/workers/scripts/${cf.script}/settings`);
+    if (st.status === 200) report.worker_settings = workerSettingsSummary(st.data?.result);
+    else report.errors.push(`worker settings: HTTP ${st.status}`);
   } else report.errors.push("worker secrets: not requested (no CLOUDFLARE_API_TOKEN / CF_ACCOUNT_ID / worker name)");
   return report;
 }
