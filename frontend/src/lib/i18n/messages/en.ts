@@ -6546,7 +6546,7 @@ export const en = {
       submit: "Send code",
       submitting: "Sending…",
       codeTitle: "Enter your code",
-      codeSubtitle: "If this email has an unfinished registration, we've sent a new 6-digit code to {email}.",
+      codeSubtitle: "If this email has an unfinished registration, enter the 6-digit code we emailed to {email}, or send a new one below.",
       passwordNote: "After verifying, sign in with the password you chose when you first signed up.",
       useAnotherEmail: "Use a different email",
       entryPrompt: "Didn't finish signing up?",

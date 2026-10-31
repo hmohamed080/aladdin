@@ -30,6 +30,8 @@ describe("ContinueRegistrationForm", () => {
     expect(screen.getByText(copy.passwordNote, { exact: false })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: en.authPasswordPreview.signIn.forgotPassword })).toHaveAttribute("href", "/auth/forgot-password");
     expect(screen.getByRole("button", { name: copy.useAnotherEmail })).toBeInTheDocument();
+    // Arriving from the cookie sends nothing, so the copy must not claim a new code was sent.
+    expect(document.body.textContent).not.toMatch(/we've sent a new/i);
   });
 
   it("has no nested <form>", () => {

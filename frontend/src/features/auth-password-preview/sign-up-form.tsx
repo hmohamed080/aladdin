@@ -171,12 +171,12 @@ export function PasswordSignUpForm({
                 {t("authPasswordPreview.signUp.verify")}
               </SubmitButton>
             </form>
-            <div className="flex items-center justify-between gap-sm border-t pt-md">
-              <form action={dispatchPhoneResend} className="flex items-center gap-sm">
+            <div className="flex flex-wrap items-center justify-between gap-sm border-t pt-md">
+              <form action={dispatchPhoneResend} className="flex flex-wrap items-center gap-sm">
                 <TurnstileWidget action="sign-up-resend" appearance="interaction-only" resetKey={phoneResendState} />
                 <ResendButton cooldown={cooldown} />
               </form>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
+              <Button type="button" variant="ghost" size="sm" className="whitespace-nowrap" onClick={() => setEditing(true)}>
                 {t("authPasswordPreview.signUp.startOver")}
               </Button>
             </div>
@@ -196,13 +196,13 @@ export function PasswordSignUpForm({
                 {t("authPasswordPreview.signUp.verify")}
               </SubmitButton>
             </form>
-            <div className="flex items-center justify-between gap-sm border-t pt-md">
-              <form action={dispatchEmailResend} className="flex items-center gap-sm">
+            <div className="flex flex-wrap items-center justify-between gap-sm border-t pt-md">
+              <form action={dispatchEmailResend} className="flex flex-wrap items-center gap-sm">
                 <input type="hidden" name="email" value={contact} />
                 <TurnstileWidget action="sign-up-resend" resetKey={emailResendState} />
                 <ResendButton cooldown={cooldown} />
               </form>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
+              <Button type="button" variant="ghost" size="sm" className="whitespace-nowrap" onClick={() => setEditing(true)}>
                 {t("authPasswordPreview.changeEmail")}
               </Button>
             </div>
