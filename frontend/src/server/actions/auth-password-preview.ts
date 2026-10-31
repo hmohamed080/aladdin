@@ -374,7 +374,10 @@ export async function requestPasswordSignUp(
     return { ok: false, code: "authPasswordPreview.error.sendFailed", email: parsed.data.email };
   }
   if (!usernameAvailable) {
-    return { ok: false, code: "registration.error.usernameUnavailable", email: parsed.data.email };
+    // This browser already started a registration with this email: the name may be that
+    // registration's own lease (30 minutes), so point at the way to finish it.
+    const held = (await pendingRegistrationEmail()) === parsed.data.email;
+    return { ok: false, code: held ? "registration.error.usernameHeld" : "registration.error.usernameUnavailable", email: parsed.data.email };
   }
 
   // The Full Name rides in user METADATA (raw_user_meta_data), which

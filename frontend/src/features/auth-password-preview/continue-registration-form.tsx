@@ -114,8 +114,8 @@ export function ContinueRegistrationForm({ pendingEmail }: { pendingEmail: strin
             {t("authPasswordPreview.signIn.forgotPassword")}
           </Link>
         </p>
-        <div className="flex items-center justify-between gap-sm border-t pt-md">
-          <form action={dispatchResend} className="flex items-center gap-sm">
+        <div className="flex flex-wrap items-center justify-between gap-sm border-t pt-md">
+          <form action={dispatchResend} className="flex flex-wrap items-center gap-sm">
             <TurnstileWidget action="sign-up-resend" appearance="interaction-only" resetKey={resendState} />
             <ResendButton cooldown={cooldown} />
           </form>

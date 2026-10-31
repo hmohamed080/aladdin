@@ -471,6 +471,23 @@ describe("requestPasswordSignUp — username pre-flight BEFORE signUp() (no Auth
     expect(savePendingRegistration).not.toHaveBeenCalled();
   });
 
+  it("the same browser's own unfinished sign-up (same email) is pointed at Continue registration", async () => {
+    availability({ data: false, error: null });
+    cookieStore.set("reg_email", "new-person@example.test");
+    const res = await submit("mylease");
+    cookieStore.delete("reg_email");
+    expect(res).toEqual({ ok: false, code: "registration.error.usernameHeld", email: "new-person@example.test" });
+    expect(signUp).not.toHaveBeenCalled();
+  });
+
+  it("another email's unfinished sign-up in this browser does not change the answer", async () => {
+    availability({ data: false, error: null });
+    cookieStore.set("reg_email", "someone-else@example.test");
+    const res = await submit("takenname");
+    cookieStore.delete("reg_email");
+    expect(res.code).toBe("registration.error.usernameUnavailable");
+  });
+
   it("reserved and taken usernames get the IDENTICAL response (the RPC answers false for both)", async () => {
     availability({ data: false, error: null });
     const reserved = await submit("admin");

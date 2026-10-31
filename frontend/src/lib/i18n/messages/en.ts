@@ -2633,6 +2633,7 @@ export const en = {
       usernameRequired: "Enter a username.",
       usernameShape: "Username may contain only letters, numbers, \".\" and \"_\", must start with a letter, and can't start, end, or double up on separators.",
       usernameUnavailable: "That username isn't available. Try another.",
+      usernameHeld: "That username may be held by your unfinished sign-up. Use \"Continue registration\" to finish it, or try another.",
     },
   },
   phoneField: {
@@ -6546,7 +6547,7 @@ export const en = {
       submitting: "Sending…",
       codeTitle: "Enter your code",
       codeSubtitle: "If this email has an unfinished registration, we've sent a new 6-digit code to {email}.",
-      passwordNote: "After verifying, sign in with the password you chose when you first signed up. Forgot it? You can reset it.",
+      passwordNote: "After verifying, sign in with the password you chose when you first signed up.",
       useAnotherEmail: "Use a different email",
       entryPrompt: "Didn't finish signing up?",
       entryLink: "Continue registration",
