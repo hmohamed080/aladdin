@@ -7104,3 +7104,11 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
   - **Labels.** Each label is pinned to its project ref, database host, Supabase URL, service-key claim and bucket.
   - **Snapshots.** Each snapshot's media inventory comes from its own dump and is stored next to it (same lock and expiry). Media copies are locked 365 days and never expired. The restore test checks inventory coverage, and freshness fails on an incomplete media step and, for Production, on uncovered R2 media.
   - **CI.** A new `backup-kit` CI job runs actionlint 1.7.7, shellcheck and the plan tests. actionlint could not be downloaded in the session container, so CI is the evidence.
+
+### 2026-10-31 — Backup consolidation (PR #118 stays the source; branch `claude/project-thread-yjnwej`)
+
+- Owner asks: use the new private repo `hmohamed080/aladdin-backups` (empty, inactive code only), no shared backup bucket, resolve the 90-day versus 366-day retention mismatch, reuse the Acceptance R2 media buckets, separate GitHub environments per project.
+- `lib.sh`: the hardcoded shared bucket is gone. `expected_bucket` pins Production to `aladdin-production-db-backups` and Acceptance to `aladdin-acceptance-backups`; each is refused under the other label. R2 rules are now per bucket (`r2/production/{lifecycle,lock}.json`, `r2/acceptance/lifecycle.json`); workflows use per-project environments (`backup-<label>`, `backup-check-<label>`, `restore-test-<label>`).
+- Retention: database 366 days, R2 media copies 90 days after they are written. A copy can be up to 31 days older than a snapshot that uses it, so the **guaranteed full-restore window is 59 days**; older snapshots are database-only and `media-verify.sh` reports `DATABASE-ONLY` instead of failing on expired copies. `retention-test.sh` (offline, in CI) fails if rules, constants and README drift.
+- `build-repo.sh` builds INACTIVE by default (no `schedule:` trigger); `--scheduled` is for the activation GO.
+- **Not done / owner steps:** nothing hosted was created or changed. `aladdin-acceptance-backups`, its tokens, the GitHub environments and the `--scheduled` build await the Acceptance GO. ADR-0027 is also used by the WhatsApp OTP worker branch (#127): renumber that one.

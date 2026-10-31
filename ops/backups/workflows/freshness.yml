@@ -32,7 +32,7 @@ jobs:
         target: ${{ fromJSON(needs.plan.outputs.targets) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    environment: backup-check
+    environment: backup-check-${{ matrix.target.label }}
     env:
       BACKUP_LABEL: ${{ matrix.target.label }}
       MAX_AGE_HOURS: ${{ matrix.target.max_age_hours }}

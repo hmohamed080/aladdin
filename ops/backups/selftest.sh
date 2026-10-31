@@ -155,6 +155,8 @@ CK="$(age -d -i "$T/restore.key" "$T/t2.age" 2>/dev/null | head -1 | cut -f5)"
 s3 s3api copy-object --bucket "$BACKUP_BUCKET" --copy-source "$BACKUP_BUCKET/$CK" --key "$CK.bak" >/dev/null
 s3 s3api delete-object --bucket "$BACKUP_BUCKET" --key "$CK" >/dev/null
 verify "$KEY2" nocopy; rc=$?; [ "$rc" -ne 0 ] && grep -q "no stored copy" "$T/mv-nocopy/media-fails.txt"; ok $? "media-verify refuses a snapshot whose stored copy has vanished"
+VERIFY_NOW=2099-01-01T00:00:00Z verify "$KEY2" expired; rc=$?; [ "$rc" -eq 0 ] && grep -q "DATABASE-ONLY" "$T/mv-expired/media-summary.txt"
+ok $? "media-verify: the same missing copy is expected, and reported as a database-only restore, once the snapshot is past the guaranteed window"
 SHA_REC="$(s3 s3api head-object --bucket "$BACKUP_BUCKET" --key "$CK.bak" --query 'Metadata.sha256' --output text)"; SZ_REC="$(s3 s3api head-object --bucket "$BACKUP_BUCKET" --key "$CK.bak" --query 'Metadata.size' --output text)"
 head -c "$SZ_REC" /dev/urandom > "$T/junk"; age -r "$(age-keygen -y "$T/owner.key")" -o "$T/junk.age" "$T/junk"
 s3 s3api put-object --bucket "$BACKUP_BUCKET" --key "$CK" --body "$T/junk.age" --metadata "sha256=$SHA_REC,size=$SZ_REC" >/dev/null

@@ -1,5 +1,5 @@
 # Monthly restore test into a throwaway local Supabase stack on the runner. Touches no hosted project.
-# The restore-test private key lives only in the `restore-test` environment, never next to the write token.
+# The restore-test private key lives only in the per-project `restore-test-<label>` environment, never next to the write token.
 name: Monthly restore test
 on:
   schedule:
@@ -23,7 +23,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || vars.PRODUCTION_BACKUP_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    environment: restore-test
+    environment: restore-test-${{ inputs.label || 'production' }}
     env:
       BACKUP_LABEL: ${{ inputs.label || 'production' }}
       BACKUP_KEY: ${{ inputs.backup_key }}

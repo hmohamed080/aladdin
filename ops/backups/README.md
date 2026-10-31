@@ -42,10 +42,10 @@ Each label is pinned to its project in `lib.sh`. Production is `kkpkgjrweysgvhvk
 - **Database URL:** user `postgres.<ref>` on `*.pooler.supabase.com:5432`, or `db.<ref>.supabase.co`. The transaction pooler (6543) is refused.
 - **`SUPABASE_URL`:** exactly `https://<ref>.supabase.co`.
 - **Service-role key:** a JWT key must name the same `ref` and role `service_role`. A newer `sb_secret_` key carries no project, so it is bound by the URL check.
-- **Bucket:** exactly `aladdin-production-db-backups`, with an R2 endpoint.
+- **Bucket:** each label has its own, checked in `lib.sh` (`expected_bucket`): Production `aladdin-production-db-backups`, Acceptance `aladdin-acceptance-backups`, with an R2 endpoint. Acceptance and Production share no bucket, token, rule file or GitHub environment.
 - **Manifests:** every manifest records `label` and `project_ref`. The restore test refuses a backup of another label or project.
 
-## What is stored (bucket `aladdin-production-db-backups`)
+## What is stored (one bucket per project: Production `aladdin-production-db-backups`, Acceptance `aladdin-acceptance-backups`; same layout in both)
 
 ```
 db/<label>/daily/YYYY/MM/DD/aladdin-<label>-<UTC stamp>.tar.age     kept 15 days (locked 14)
@@ -61,6 +61,17 @@ phase-a/                                                            the manual 2
 ```
 
 The media inventories of a snapshot sit next to its database backup, so they live as long as it does; the media COPIES live shorter (below).
+
+### Retention: database 366 days, media copies 90, guaranteed full restore 59
+
+| Part of a snapshot | Lives | Why |
+|---|---|---|
+| Database (`.tar.age`, `.json`) | daily 15 d, weekly 57 d, monthly 366 d | locks 14 / 56 / 365 days |
+| Inventory (`*.tsv.age`, `*.json`) | as long as its snapshot | tiny; proves what existed |
+| R2 media copies | 90 days **after the copy is written** | bounded on purpose: removed personal media leaves the backup |
+| Legacy Supabase copies (opt-in) | 30 days after written | time-boxed recovery only |
+
+A copy is written at the first run that needs it in its monthly generation, so a snapshot can rely on a copy up to 31 days older than itself. The **guaranteed full restore window (database plus files) is therefore 59 days** for R2 media (90 minus 31), and for legacy copies there is none beyond the day of the snapshot. A weekly (57 d) snapshot is always inside it; **a monthly snapshot older than 59 days is a database-only restore**: its inventory is still compared with the restored database exactly, and `media-verify.sh` reports `DATABASE-ONLY` and counts the copies that already expired instead of failing, while every copy that still exists must be intact. `retention-test.sh` fails if the rule files, the constants in `lib.sh` and this section disagree.
 
 ### Two media backups, and why their retention differs
 
@@ -92,16 +103,18 @@ This is the same method as `scripts/hosted-db/production-rehearsal.sh`, whose re
 
 Keys never contain names. Database files are named by label and time, and media files by Storage's random object id.
 
-### Not covered: media in R2
+### Media in R2, and website assets
 
-These jobs copy Supabase Storage only. Production media is all there today (`R2_STORAGE_ENABLED=false`).
+R2's durability is not a second copy: a deleted or overwritten object is gone. `r2-media-backup.sh` therefore copies every verified R2 original (`media_storage_locations`, provider r2) into the project's own backup bucket, a different bucket from the media bucket, read through a read-only token (`R2_MEDIA_BACKUP=1`). Until it is switched on, every snapshot records `r2_media_records_not_covered`; the freshness alarm fails for Production when that number is above 0 and only warns for Acceptance.
 
-**Before Production media moves to R2, an independent backup of the R2 media must exist.** R2's durability is not a second copy: a deleted or overwritten object is gone. That backup needs a second bucket, or another account or provider, plus a copy job that reads `media_storage_locations` (provider r2), and restore tests that include it. It is a separate approval.
+Source-of-truth for what must be recoverable, and where its independent copy comes from:
 
-Until then:
-- every snapshot records `r2_media_records_not_covered`;
-- the freshness alarm fails for Production when that number is above 0;
-- for Acceptance it only warns. Acceptance already holds 9 R2 images from earlier tests.
+| Content | Primary | Independent recovery source |
+|---|---|---|
+| Landing videos `1.mp4`-`5.mp4` and thumbnails `1.jpg`-`5.jpg`, website static assets | public bucket, served by CDN | the git repository (`frontend/public/preview/landing/videos/`, deleted from the tree only after R2 playback is verified) plus the media backup if the assets are registered in the Asset Registry |
+| Certificates, verification evidence, business documents | private media bucket | the encrypted R2 media backup above (90-day generations; see the window rules) |
+| User photos and videos (new, R2) | private media bucket | the same media backup |
+| Legacy user photos and videos in Supabase Storage | scheduled for deletion | **none, on purpose**; `LEGACY_MEDIA_BACKUP` stays off |
 
 ## One-time setup (owner)
 
@@ -115,48 +128,47 @@ Part A is read-only preparation and changes nothing hosted. Part B changes hoste
    age-keygen -o aladdin-backup-restore-test.key # its private part goes ONLY into the restore-test environment
    ```
    The two `# public key: age1...` lines, space separated, become `AGE_RECIPIENTS`. Every backup is encrypted to both keys, so losing one of them is survivable.
-2. **Read the current bucket settings** and send me the output:
+2. **Read the current bucket settings** (read-only) of `aladdin-production-db-backups` and send me the output; `aladdin-acceptance-backups` does not exist yet:
    ```sh
    pnpm exec wrangler r2 bucket lock list aladdin-production-db-backups
    pnpm exec wrangler r2 bucket lifecycle list aladdin-production-db-backups
    pnpm exec wrangler r2 bucket dev-url get aladdin-production-db-backups
    pnpm exec wrangler r2 object list aladdin-production-db-backups --prefix phase-a/   # or the R2 dashboard
    ```
+   Already confirmed by the owner (2026-10-31): no lock rules, only the default 7-day multipart-abort rule, r2.dev disabled, `phase-a/` holds the encrypted rehearsal archive and its SHA256 sidecar.
 3. **Find the Acceptance database URL**: Supabase dashboard, Acceptance project, Connect, **Session pooler** (port 5432, IPv4): `postgresql://postgres.nxossqhdfltcqdwvbewi:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`. The scripts open every query session read-only, and `pg_dump` only reads.
 
 ### B. Hosted changes for the Acceptance trial (after the Acceptance GO)
 
-4. **Lock and lifecycle rules** on `aladdin-production-db-backups`. `set` replaces every existing rule, so compare with step 2 first:
+4. **Create the Acceptance backup bucket, then rules** (one file set per bucket; `set` replaces every existing rule, so compare with step 2 first):
    ```sh
-   pnpm exec wrangler r2 bucket lock set aladdin-production-db-backups --file r2/backup-bucket-lock.json
-   pnpm exec wrangler r2 bucket lifecycle set aladdin-production-db-backups --file r2/backup-bucket-lifecycle.json
+   pnpm exec wrangler r2 bucket create aladdin-acceptance-backups                 # Acceptance only; new, private, no public access
+   pnpm exec wrangler r2 bucket lifecycle set aladdin-acceptance-backups --file r2/acceptance/lifecycle.json
+   # Production bucket: only at the Production GO
+   pnpm exec wrangler r2 bucket lock set aladdin-production-db-backups --file r2/production/lock.json
+   pnpm exec wrangler r2 bucket lifecycle set aladdin-production-db-backups --file r2/production/lifecycle.json
    ```
-   Once a lock is on, nobody can delete or overwrite a locked object until it expires, not even you. The rules lock only the database snapshots; media copies are deliberately not locked and expire (R2 90 days, legacy 30 days). `phase-a/` is left as it is. The current bucket has no lock rules and only the default 7-day multipart-abort rule, which the lifecycle file repeats.
-5. **Two R2 API tokens** (dashboard: R2, Manage API tokens), both limited to the bucket `aladdin-production-db-backups`:
-   - `aladdin-backup-write`: *Object Read & Write*. It becomes `R2_BACKUP_WRITE_KEY_ID` / `R2_BACKUP_WRITE_SECRET`.
-   - `aladdin-backup-read`: *Object Read only*. It becomes `R2_BACKUP_READ_KEY_ID` / `R2_BACKUP_READ_SECRET`.
-6. **Create the private repo** `aladdin-backups` (GitHub, New, Private, no template), then build its contents and push:
+   Once a lock is on, nobody can delete or overwrite a locked object until it expires, not even you. Only Production database snapshots are locked; the Acceptance trial bucket has no lock (it is disposable), and media copies are never locked (R2 90 days, legacy 30). `phase-a/` is left as it is. The Production bucket has no lock rules and only the default 7-day multipart-abort rule, which its lifecycle file repeats.
+5. **R2 API tokens, per project** (dashboard: R2, Manage API tokens). Each token is limited to ONE backup bucket; create the Acceptance pair first and the Production pair only at the Production GO:
+   - `aladdin-acceptance-backup-write` / `-read` on `aladdin-acceptance-backups`, and `aladdin-production-backup-write` / `-read` on `aladdin-production-db-backups`. *Write* is Object Read & Write, *read* is Object Read only. They become `R2_BACKUP_WRITE_KEY_ID` / `R2_BACKUP_WRITE_SECRET` and `R2_BACKUP_READ_KEY_ID` / `R2_BACKUP_READ_SECRET` in that project's environments only.
+   - `R2_MEDIA_READ_*`: *Object Read only* on that project's media bucket (Acceptance: `aladdin-r2-acceptance-20261011-private`). Never the backup bucket.
+6. **The private repo** `hmohamed080/aladdin-backups` exists. Its contents are built from this folder, which stays the only source (never edit the built repo by hand):
    ```sh
-   bash ops/backups/build-repo.sh ~/aladdin-backups
-   cd ~/aladdin-backups && git init -b main && git add -A && git commit -m "Backup kit" \
-     && git remote add origin https://github.com/hmohamed080/aladdin-backups.git && git push -u origin main
+   bash ops/backups/build-repo.sh ~/aladdin-backups              # inactive build: no schedule trigger in any workflow
+   cd ~/aladdin-backups && git add -A && git commit -m "Backup kit" && git push -u origin main
    ```
-7. **Settings in `aladdin-backups`.** Under Settings, Environments, limit each environment to the `main` branch. If your plan allows it, add yourself as a *required reviewer* on `backup-production`.
+   At the activation GO, rebuild with `--scheduled` to turn the nightly, freshness and monthly triggers on.
+7. **Settings in `aladdin-backups`.** Under Settings, Environments, limit each environment to the `main` branch. If your plan allows it, add yourself as a *required reviewer* on `backup-production`. Everything project-specific lives in **per-project environments**, so a workflow for one project cannot read the other's values; the repo level only holds the two switches the planner reads.
 
    | Where | Name | Value |
    |---|---|---|
-   | Repo variables | `BACKUP_BUCKET` | `aladdin-production-db-backups` |
-   | | `R2_ACCOUNT_ID` | your Cloudflare account id |
-   | | `AGE_RECIPIENTS` | the two public keys from step 1 |
-   | | `ALERT_EMAIL` | where alerts go |
-   | | `PRODUCTION_BACKUP_ENABLED` | `false` |
+   | Repo variables | `PRODUCTION_BACKUP_ENABLED` | `false` |
    | | `ACCEPTANCE_BACKUP_SCHEDULE` | `daily` for the trial (`off` stops it) |
-   | | `R2_MEDIA_BACKUP` | `1` once the Acceptance R2 media bucket exists (unset = off) |
-   | | `R2_MEDIA_SOURCE_BUCKET` | the R2 media bucket to copy from (never the backup bucket) |
-   | | `LEGACY_MEDIA_BACKUP` | leave unset (off) |
-   | Environment `backup-acceptance` | secrets `BACKUP_DB_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `R2_BACKUP_WRITE_KEY_ID`, `R2_BACKUP_WRITE_SECRET`; variable `SUPABASE_URL` = `https://nxossqhdfltcqdwvbewi.supabase.co`; for the R2 media backup also secrets `R2_MEDIA_READ_KEY_ID`, `R2_MEDIA_READ_SECRET` (an Object **Read-only** token limited to the media bucket) | Acceptance values |
-   | Environment `backup-check` | secrets `R2_BACKUP_READ_KEY_ID`, `R2_BACKUP_READ_SECRET`, `RESEND_API_KEY` | |
-   | Environment `restore-test` | secrets `R2_BACKUP_READ_KEY_ID`, `R2_BACKUP_READ_SECRET`, `AGE_RESTORE_TEST_IDENTITY` (the whole restore-test key file) | |
+   | Environment `backup-acceptance` | variables `BACKUP_BUCKET` = `aladdin-acceptance-backups`, `R2_ACCOUNT_ID`, `AGE_RECIPIENTS` (the two public keys from step 1), `SUPABASE_URL` = `https://nxossqhdfltcqdwvbewi.supabase.co`, `R2_MEDIA_BACKUP` = `1` once the media backup is wanted, `R2_MEDIA_SOURCE_BUCKET` = `aladdin-r2-acceptance-20261011-private`; `LEGACY_MEDIA_BACKUP` unset (off) | Acceptance only |
+   | | secrets `BACKUP_DB_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `R2_BACKUP_WRITE_KEY_ID`, `R2_BACKUP_WRITE_SECRET`, `R2_MEDIA_READ_KEY_ID`, `R2_MEDIA_READ_SECRET` | |
+   | Environment `backup-check-acceptance` | variables `BACKUP_BUCKET`, `R2_ACCOUNT_ID`, `ALERT_EMAIL`, `R2_MEDIA_BACKUP`; secrets `R2_BACKUP_READ_KEY_ID`, `R2_BACKUP_READ_SECRET`, `RESEND_API_KEY` | |
+   | Environment `restore-test-acceptance` | variables `BACKUP_BUCKET`, `R2_ACCOUNT_ID`, `R2_MEDIA_BACKUP`; secrets `R2_BACKUP_READ_KEY_ID`, `R2_BACKUP_READ_SECRET`, `AGE_RESTORE_TEST_IDENTITY` (the whole restore-test key file) | |
+   | The same three environments for Production | `backup-production`, `backup-check-production`, `restore-test-production`, with the Production bucket, Production `SUPABASE_URL`, Production tokens and a **different** restore-test key | created only at the Production GO |
 
 8. **Acceptance trial** (7 nights), in this order:
    - Run *Daily backup* manually with label `acceptance`, then *Backup freshness*, then *Monthly restore test* with label `acceptance`. Each run summary must end with `RESULT: PASS`.
@@ -164,7 +176,7 @@ Part A is read-only preparation and changes nothing hosted. Part B changes hoste
 
 ### C. Production (only after the separate Production GO)
 
-9. Fill the `backup-production` environment (the same four secrets and `SUPABASE_URL` = `https://kkpkgjrweysgvhvkhzun.supabase.co`), then set `PRODUCTION_BACKUP_ENABLED=true`.
+9. Create the three Production environments from the table above (`SUPABASE_URL` = `https://kkpkgjrweysgvhvkhzun.supabase.co`, bucket `aladdin-production-db-backups`), apply the Production lock and lifecycle rules, then set `PRODUCTION_BACKUP_ENABLED=true`.
 10. Run *Daily backup* with label `production` and the confirmation `back up production`.
 11. Run the restore test with label `production`.
 
@@ -202,7 +214,7 @@ The restore test is a rehearsal of exactly this, run every month.
 **Limits:**
 - Data written after the chosen snapshot is lost. The worst case is about one day, because backups are daily.
 - Media uploaded and deleted within the same day may never have been copied.
-- Media in R2 is not covered yet (see above).
+- A snapshot older than 59 days restores the database only; its media copies may have expired (see Retention).
 - Auth users' sessions do not survive a restore; people sign in again.
 
 ## Local test
@@ -212,6 +224,7 @@ pnpm exec supabase start                                     # a local stack wit
 docker run -d --name backup-s3 -p 8333:8333 -v "$PWD/s3:/etc/s3" chrislusf/seaweedfs server -s3 -s3.config=/etc/s3/s3.json -volume.max=200
 bash ops/backups/selftest.sh                                 # needs age, psql, aws (pip install awscli)
 bash ops/backups/plan-test.sh                                # offline: schedule, Production gate, target checks
+bash ops/backups/retention-test.sh                           # offline: rules, constants, buckets and the 59-day window agree
 ```
 
 `s3/s3.json` holds one identity with keys `testkey` / `testsecret`. Every script refuses a hosted target under `BACKUP_LABEL=local-test`, and refuses a local target under a hosted label. The selftest uploads small throwaway files to local Storage and removes them on exit.

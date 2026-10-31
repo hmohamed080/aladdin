@@ -26,33 +26,6 @@
         "type": "Age",
         "maxAgeSeconds": 31536000
       }
-    },
-    {
-      "id": "lock-acceptance-db-daily",
-      "enabled": true,
-      "prefix": "db/acceptance/daily/",
-      "condition": {
-        "type": "Age",
-        "maxAgeSeconds": 1209600
-      }
-    },
-    {
-      "id": "lock-acceptance-db-weekly",
-      "enabled": true,
-      "prefix": "db/acceptance/weekly/",
-      "condition": {
-        "type": "Age",
-        "maxAgeSeconds": 4838400
-      }
-    },
-    {
-      "id": "lock-acceptance-db-monthly",
-      "enabled": true,
-      "prefix": "db/acceptance/monthly/",
-      "condition": {
-        "type": "Age",
-        "maxAgeSeconds": 31536000
-      }
     }
   ]
 }

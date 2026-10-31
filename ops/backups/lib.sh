@@ -4,7 +4,8 @@
 #
 # Required in the environment of every script:
 #   BACKUP_LABEL     production | acceptance | local-test (which project this backup is of)
-#   BACKUP_BUCKET    the R2 bucket, e.g. aladdin-production-db-backups
+#   BACKUP_BUCKET    the R2 bucket of that label ONLY: production -> aladdin-production-db-backups,
+#                    acceptance -> aladdin-acceptance-backups (see expected_bucket; no bucket is shared)
 #   R2_ENDPOINT      https://<account id>.r2.cloudflarestorage.com (local-test: http://127.0.0.1:<port>)
 #   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY   an R2 token scoped to BACKUP_BUCKET only
 export LC_ALL=C AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_PAGER=""
@@ -17,7 +18,6 @@ require_env() { local v; for v in "$@"; do [ -n "${!v:-}" ] || die "$v is not se
 
 # The only hosted targets. Project refs are not secrets; pinning them here means a credential of the other
 # project fails closed instead of producing a backup filed under the wrong label.
-HOSTED_BUCKET=aladdin-production-db-backups
 expected_ref() {
   case "$BACKUP_LABEL" in
     production) echo kkpkgjrweysgvhvkhzun;;
@@ -26,6 +26,56 @@ expected_ref() {
   esac
 }
 
+# Each hosted label has its OWN backup bucket: Acceptance and Production never share storage, tokens or rules.
+expected_bucket() {
+  case "$BACKUP_LABEL" in
+    production) echo aladdin-production-db-backups;;
+    acceptance) echo aladdin-acceptance-backups;;
+    *) echo "";;
+  esac
+}
+
+# Retention windows, in days. r2/*-lifecycle.json must say the same (retention-test.sh fails if they drift).
+#   DB_MONTHLY_RETENTION_DAYS    the longest a database snapshot lives (monthly: locked 365, expires at 366)
+#   R2_MEDIA_RETENTION_DAYS      an R2 media copy expires this long after it was WRITTEN
+#   R2_GENERATION_DAYS           a generation is one Cairo month: a copy is written at the first run that needs it
+#                                in that generation, so it can already be up to 31 days old when a later snapshot of
+#                                the same month relies on it
+#   LEGACY_MEDIA_RETENTION_DAYS  a legacy Supabase-Storage copy (opt-in) expires this long after it was written
+# A snapshot is a FULL restore (database + files) only while ALL its media copies exist. Because copies age from
+# when they were written, not from the snapshot, the GUARANTEED full-restore window is
+#   R2 media:    90 - 31 = 59 days after the snapshot (copies may be gone from day 59, are all gone by day 90)
+#   legacy:      none beyond the day of the snapshot (a long-lived file's copy can expire at any time and is re-copied
+#                by the next run)
+# Database snapshots outlive that (366 days for monthly): an older snapshot is a database-only restore. Its
+# inventory still proves what existed and media-verify.sh reports it as such instead of failing on expired copies.
+# shellcheck disable=SC2034  # read by retention-test.sh
+DB_MONTHLY_RETENTION_DAYS=366
+R2_MEDIA_RETENTION_DAYS=90
+R2_GENERATION_DAYS=31
+LEGACY_MEDIA_RETENTION_DAYS=30
+media_retention_days() { case "$1" in r2) echo "$R2_MEDIA_RETENTION_DAYS";; supabase) echo "$LEGACY_MEDIA_RETENTION_DAYS";; *) die "unknown media kind $1";; esac; }
+media_guarantee_days() { case "$1" in r2) echo $((R2_MEDIA_RETENTION_DAYS - R2_GENERATION_DAYS));; supabase) echo 1;; *) die "unknown media kind $1";; esac; }
+
+# "20261031T013000Z" (snapshot stamp) or any date(1)-readable UTC time -> epoch seconds.
+epoch_of() {
+  local t="$1"
+  if [[ "$t" =~ ^([0-9]{4})([0-9]{2})([0-9]{2})T([0-9]{2})([0-9]{2})([0-9]{2})Z$ ]]; then
+    t="${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}T${BASH_REMATCH[4]}:${BASH_REMATCH[5]}:${BASH_REMATCH[6]}Z"
+  fi
+  date -u -d "$t" +%s 2>/dev/null || die "'$1' is not a date"
+}
+
+# Whole days since the snapshot. VERIFY_NOW pins the clock for tests; a hosted label refuses it.
+snapshot_age_days() {
+  local now
+  if [ -n "${VERIFY_NOW:-}" ]; then [ "$BACKUP_LABEL" = local-test ] || die "VERIFY_NOW is only for local tests"; now="$(epoch_of "$VERIFY_NOW")"; else now="$(date -u +%s)"; fi
+  echo $(( (now - $(epoch_of "$1")) / 86400 ))
+}
+
+# 0 when media copies of kind $1 for a snapshot taken at $2 are no longer guaranteed to all exist.
+outside_media_guarantee() { [ "$(snapshot_age_days "$2")" -ge "$(media_guarantee_days "$1")" ]; }
+
 # Fail closed on a label/target mix-up: a local test never reaches a hosted bucket or database,
 # and a hosted label never runs against a local one.
 check_target() {
@@ -33,7 +83,7 @@ check_target() {
   case "$BACKUP_LABEL" in
     production|acceptance)
       case "$R2_ENDPOINT" in https://[0-9a-f]*.r2.cloudflarestorage.com) ;; *) die "a hosted backup must go to R2 ($R2_ENDPOINT)";; esac
-      [ "$BACKUP_BUCKET" = "$HOSTED_BUCKET" ] || die "a hosted backup must use the bucket $HOSTED_BUCKET";;
+      [ "$BACKUP_BUCKET" = "$(expected_bucket)" ] || die "a $BACKUP_LABEL backup must use its own bucket $(expected_bucket), not $BACKUP_BUCKET";;
     local-test)
       case "$R2_ENDPOINT" in http://127.0.0.1:*) ;; *) die "local-test only writes to a local S3 endpoint";; esac ;;
     *) die "BACKUP_LABEL must be production, acceptance or local-test";;
@@ -132,7 +182,7 @@ media_copy_key() { echo "media/$BACKUP_LABEL/supabase/objects/$2/$1-${3:-noetag}
 
 # Where the copy of one R2-hosted original lives: <generation>/<content hash> only (no owner, page or name), so the
 # same bytes are stored once per generation. The generation is the Cairo month: every month the whole live set is
-# copied afresh and a bucket lifecycle rule expires a generation after R2_MEDIA_RETENTION_DAYS (90), so what a user
+# copied afresh and a bucket lifecycle rule expires a generation after R2_MEDIA_RETENTION_DAYS, so what a user
 # removed leaves the backup within that time. Written once, never replaced.
 r2_generation() { local y m; read -r y m _ < <(cairo_day); echo "$y$m"; }
 r2_copy_key() { echo "media/$BACKUP_LABEL/r2/${2:-$(r2_generation)}/objects/$1.age"; }

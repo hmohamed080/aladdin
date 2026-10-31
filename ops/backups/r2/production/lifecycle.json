@@ -40,45 +40,6 @@
       }
     },
     {
-      "id": "expire-acceptance-db-daily",
-      "enabled": true,
-      "conditions": {
-        "prefix": "db/acceptance/daily/"
-      },
-      "deleteObjectsTransition": {
-        "condition": {
-          "type": "Age",
-          "maxAge": 1296000
-        }
-      }
-    },
-    {
-      "id": "expire-acceptance-db-weekly",
-      "enabled": true,
-      "conditions": {
-        "prefix": "db/acceptance/weekly/"
-      },
-      "deleteObjectsTransition": {
-        "condition": {
-          "type": "Age",
-          "maxAge": 4924800
-        }
-      }
-    },
-    {
-      "id": "expire-acceptance-db-monthly",
-      "enabled": true,
-      "conditions": {
-        "prefix": "db/acceptance/monthly/"
-      },
-      "deleteObjectsTransition": {
-        "condition": {
-          "type": "Age",
-          "maxAge": 31622400
-        }
-      }
-    },
-    {
       "id": "expire-production-media-r2",
       "enabled": true,
       "conditions": {
@@ -96,32 +57,6 @@
       "enabled": true,
       "conditions": {
         "prefix": "media/production/supabase/"
-      },
-      "deleteObjectsTransition": {
-        "condition": {
-          "type": "Age",
-          "maxAge": 2592000
-        }
-      }
-    },
-    {
-      "id": "expire-acceptance-media-r2",
-      "enabled": true,
-      "conditions": {
-        "prefix": "media/acceptance/r2/"
-      },
-      "deleteObjectsTransition": {
-        "condition": {
-          "type": "Age",
-          "maxAge": 7776000
-        }
-      }
-    },
-    {
-      "id": "expire-acceptance-media-legacy-supabase",
-      "enabled": true,
-      "conditions": {
-        "prefix": "media/acceptance/supabase/"
       },
       "deleteObjectsTransition": {
         "condition": {

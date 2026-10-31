@@ -59,7 +59,7 @@ check "freshness: weekly Acceptance allows 8 days" "$(fresh EVENT=schedule ACCEP
   '[{"label":"acceptance","max_age_hours":194},{"label":"production","max_age_hours":26}]'
 
 # Target checks: a credential or URL of the other project, or a wrong bucket, is refused before any request.
-lib() { ( export BACKUP_LABEL="$1" BACKUP_BUCKET="${4:-aladdin-production-db-backups}" R2_ENDPOINT=https://0123abcd.r2.cloudflarestorage.com \
+lib() { ( export BACKUP_LABEL="$1" BACKUP_BUCKET="${4:-$(case "$1" in acceptance) echo aladdin-acceptance-backups;; *) echo aladdin-production-db-backups;; esac)}" R2_ENDPOINT=https://0123abcd.r2.cloudflarestorage.com \
   AWS_ACCESS_KEY_ID=x AWS_SECRET_ACCESS_KEY=x; . "$HERE/lib.sh"; check_target && $2 "$3" ) >/dev/null 2>&1 && echo ok || echo refused; }
 jwt() { python3 -c 'import base64,json,sys; e=lambda d: base64.urlsafe_b64encode(json.dumps(d).encode()).decode().rstrip("="); print(e({"alg":"HS256"})+"."+e({"ref":sys.argv[1],"role":sys.argv[2]})+".sig")' "$1" "$2"; }
 PROD=kkpkgjrweysgvhvkhzun; ACC=nxossqhdfltcqdwvbewi

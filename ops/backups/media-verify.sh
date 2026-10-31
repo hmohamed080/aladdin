@@ -14,6 +14,10 @@
 # MEDIA_KIND=r2 verifies the R2-hosted originals instead (record <snapshot>.r2media.*, database rows
 # public.media_storage_locations provider r2, compared on physical key, sha256 and size; the sample is also checked
 # against the sha256 the database recorded, not only against the sha256 stored with the copy).
+# Snapshots older than the kind's guaranteed full-restore window (lib.sh: 59 days for R2 media, because a copy ages
+# from when it was written and may be 31 days older than the snapshot) are DATABASE-ONLY restores: the inventory is
+# still compared with the database exactly, but copies that already expired are counted and reported, not failed.
+# Every copy that still exists must be intact. VERIFY_NOW pins the clock in local tests.
 # Optional: MEDIA_SAMPLE (20), MEDIA_HEAD_LIMIT (2000: how many copies get their stored metadata read).
 # Writes $OUT/media-summary.txt (one line) and $OUT/media-fails.txt (one finding per line); exit 1 on any finding.
 set -euo pipefail
@@ -26,6 +30,10 @@ umask 077
 mkdir -p "$OUT"; W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
 KIND="${MEDIA_KIND:-supabase}"
 case "$KIND" in supabase) REC=media;; r2) REC=r2media;; *) die "MEDIA_KIND must be supabase or r2";; esac
+s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "${KEY%.tar.age}.json" "$W/snap-manifest.json" >/dev/null 2>&1 || die "the snapshot manifest cannot be read"
+TAKEN="$(sed -n 's/.*"taken_utc":"\([^"]*\)".*/\1/p' "$W/snap-manifest.json" | head -1)"
+[ -n "$TAKEN" ] || die "the snapshot manifest has no taken_utc"
+OUTSIDE=0; outside_media_guarantee "$([ "$KIND" = r2 ] && echo r2 || echo supabase)" "$TAKEN" && OUTSIDE=1
 prefix="${KEY%/*}"; name="$(basename "$KEY" .tar.age)"
 fails=(); summary=""
 finish() {
@@ -79,11 +87,17 @@ FILES="$(wc -l < "$W/db.tsv" | tr -d ' ')"
 # 3. Every copy exists, with at least the plain file's size (encryption only adds), and its recorded size.
 s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "$copy_prefix" --query 'Contents[].[Key,Size]' --output text \
   | grep -v '^None$' > "$W/have.tsv" || true
-awk -F'\t' 'FILENAME==ARGV[1] {sz[$1]=$2; next} !($5 in sz) {gone++; if (gone<=3) print "G " $1; next} sz[$5] < $4 {small++; if (small<=3) print "S " $1}
-  END {if (gone) print "X " gone; if (small) print "Y " small}' "$W/have.tsv" "$W/inv.tsv" > "$W/exist.txt"
+awk -F'\t' 'FILENAME==ARGV[1] {sz[$1]=$2; next} !($5 in sz) {gone++; if (gone<=3) print "G " $1; next} sz[$5] < $4 {small++; if (small<=3) print "S " $1; next} {print "H " $0 > "/dev/stderr"}
+  END {if (gone) print "X " gone; if (small) print "Y " small}' "$W/have.tsv" "$W/inv.tsv" > "$W/exist.txt" 2>"$W/present.txt"
+EXPIRED=0
 while IFS=' ' read -r kind a; do
-  case "$kind" in X) fails+=("$a files have no stored copy in the backup bucket");; Y) fails+=("$a stored copies are smaller than the file they back up");; esac
+  case "$kind" in
+    X) if [ "$OUTSIDE" = 1 ]; then EXPIRED="$a"; else fails+=("$a files have no stored copy in the backup bucket"); fi;;
+    Y) fails+=("$a stored copies are smaller than the file they back up");;
+  esac
 done < "$W/exist.txt"
+# Only copies that still exist are checked below; outside the guaranteed window the expired ones are not failures.
+if [ "$OUTSIDE" = 1 ]; then sed -n 's/^H //p' "$W/present.txt" > "$W/inv-present.tsv"; else cp "$W/inv.tsv" "$W/inv-present.tsv"; fi
 HEAD_LIMIT="${MEDIA_HEAD_LIMIT:-2000}"; BADMETA=0; HEADED=0
 while IFS=$'\t' read -r id _ _ size k _; do
   [ -n "$k" ] || continue
@@ -91,11 +105,11 @@ while IFS=$'\t' read -r id _ _ size k _; do
   meta="$(s3 s3api head-object --bucket "$BACKUP_BUCKET" --key "$k" --query '[Metadata.size,Metadata.sha256]' --output text 2>/dev/null || true)"
   m_size="${meta%%$'\t'*}"; m_sha="${meta#*$'\t'}"
   if [ "$m_size" != "$size" ] || ! [[ "$m_sha" =~ ^[0-9a-f]{64}$ ]]; then BADMETA=$((BADMETA+1)); fi
-done < "$W/inv.tsv"
+done < "$W/inv-present.tsv"
 [ "$BADMETA" -eq 0 ] || fails+=("$BADMETA stored copies do not carry the recorded size and a sha256")
 
 # 4. Decrypt a sample and compare with what was recorded at copy time.
-{ shuf -n "${MEDIA_SAMPLE:-20}" "$W/inv.tsv" || true; awk -F'\t' '$4+0 > m {m=$4+0; l=$0} END {if (l != "") print l}' "$W/inv.tsv"; } | sort -u > "$W/sample.tsv"
+{ shuf -n "${MEDIA_SAMPLE:-20}" "$W/inv-present.tsv" || true; awk -F'\t' '$4+0 > m {m=$4+0; l=$0} END {if (l != "") print l}' "$W/inv-present.tsv"; } | sort -u > "$W/sample.tsv"
 N=0; BAD=0
 while IFS=$'\t' read -r id _ _ size k _; do
   [ -n "$k" ] || continue; N=$((N+1))
@@ -109,7 +123,11 @@ done < "$W/sample.tsv"
 [ "$BAD" -eq 0 ] || fails+=("$BAD of $N sampled files did not restore exactly: $(head -3 "$W/bad.txt" | tr '\n' ';')")
 
 if [ "${#fails[@]}" -eq 0 ]; then
-  summary="[$KIND] inventory exact ($FILES files: identity, size and copy key equal the restored database); all $FILES copies exist with the recorded size; $((N-BAD)) of $N sampled files restored with the recorded sha256 and size"
+  if [ "$OUTSIDE" = 1 ]; then
+    summary="[$KIND] DATABASE-ONLY restore (snapshot older than the $(media_guarantee_days "$([ "$KIND" = r2 ] && echo r2 || echo supabase)")-day guaranteed full-restore window): inventory exact ($FILES files); $EXPIRED copies already expired (expected), every remaining copy has the recorded size; $((N-BAD)) of $N sampled files restored with the recorded sha256 and size"
+  else
+    summary="[$KIND] inventory exact ($FILES files: identity, size and copy key equal the restored database); all $FILES copies exist with the recorded size; $((N-BAD)) of $N sampled files restored with the recorded sha256 and size"
+  fi
 else
   summary="MEDIA CHECK FAILED ($FILES files in the restored database; $((N-BAD)) of $N sampled files restored exactly)"
 fi
