@@ -28,12 +28,30 @@ function mapReviewError(message: string | undefined): string {
   return "states.genericRetry";
 }
 
-/** Ensure the verification is claimed by the caller before a decision. */
-async function ensureStarted(
-  supabase: Awaited<ReturnType<typeof getServerSupabase>>,
+type Supa = Awaited<ReturnType<typeof getServerSupabase>>;
+
+/**
+ * The decision is made on what the DATABASE says the request is — never on `status` / `verificationType`
+ * echoed back by the browser. A stale tab or a tampered field could otherwise skip the apply step or claim
+ * the wrong state. RLS scopes the read to reviewers; no row (or a business verification, which has its own
+ * queue and RPCs) is reported as a state error, not as a missing permission.
+ */
+async function loadDecisionTarget(
+  supabase: Supa,
   id: string,
-  currentStatus: string | undefined,
-): Promise<string | null> {
+): Promise<{ status: string; verificationType: string } | null> {
+  const { data, error } = await supabase
+    .from("verifications")
+    .select("status, verification_type")
+    .eq("id", id)
+    .neq("verification_type", "business")
+    .maybeSingle();
+  if (error || !data) return null;
+  return { status: data.status, verificationType: data.verification_type };
+}
+
+/** Ensure the verification is claimed by the caller before a decision. */
+async function ensureStarted(supabase: Supa, id: string, currentStatus: string): Promise<string | null> {
   if (currentStatus !== "submitted" && currentStatus !== "needs_more_info") return null;
   const { error } = await supabase.rpc("review_start", { p_verification_id: id });
   if (error) return mapReviewError(error.message);
@@ -47,6 +65,7 @@ export async function startReviewAction(_p: ReviewFormState, fd: FormData): Prom
   const { error } = await supabase.rpc("review_start", { p_verification_id: id });
   if (error) return { ok: false, code: mapReviewError(error.message) };
   revalidatePath("/admin/verifications");
+  revalidatePath("/admin/users");
   return { ok: true, code: "admin.review.started" };
 }
 
@@ -55,6 +74,11 @@ export async function startReviewAction(_p: ReviewFormState, fd: FormData): Prom
  * the subject is a separate, idempotent apply step — `apply_account_upgrade` for a
  * professional user, `apply_organization_verification` for an organization. Without
  * it an approval changed nothing about the account or the organization.
+ *
+ * Retry-safe: a request that is ALREADY approved skips the decision and re-runs only the apply step (both
+ * apply RPCs return early once `applied_at` is set). That repairs an approval whose apply failed the first
+ * time, and makes a repeated click or a second admin a no-op instead of an "invalid transition" error.
+ * Rejected / withdrawn requests still fail with the state error.
  *
  * Public listing is only meaningful for a professional upgrade (the database
  * constraint `ck_verifications_listing_only_professional` rejects it on any other
@@ -66,21 +90,25 @@ export async function approveVerificationAction(
 ): Promise<ReviewFormState> {
   const id = str(fd, "id");
   if (!id) return { ok: false, code: "states.genericRetry" };
-  const verificationType = str(fd, "verificationType");
-  const isProfessional = verificationType === "professional";
   const supabase = await getServerSupabase();
 
-  const startErr = await ensureStarted(supabase, id, str(fd, "status"));
-  if (startErr) return { ok: false, code: startErr };
+  const target = await loadDecisionTarget(supabase, id);
+  if (!target) return { ok: false, code: "admin.review.error.state" };
+  const isProfessional = target.verificationType === "professional";
 
-  const { error } = await supabase.rpc("review_approve", {
-    p_verification_id: id,
-    p_grant_public_listing: isProfessional,
-  });
-  if (error) return { ok: false, code: mapReviewError(error.message) };
+  if (target.status !== "approved") {
+    const startErr = await ensureStarted(supabase, id, target.status);
+    if (startErr) return { ok: false, code: startErr };
+
+    const { error } = await supabase.rpc("review_approve", {
+      p_verification_id: id,
+      p_grant_public_listing: isProfessional,
+    });
+    if (error) return { ok: false, code: mapReviewError(error.message) };
+  }
 
   // An `identity` verification has no subject effect to apply yet.
-  if (isProfessional || verificationType === "organization") {
+  if (isProfessional || target.verificationType === "organization") {
     const { error: applyError } = isProfessional
       ? await supabase.rpc("apply_account_upgrade", { p_verification_id: id })
       : await supabase.rpc("apply_organization_verification", { p_verification_id: id });
@@ -103,11 +131,15 @@ export async function rejectVerificationAction(
   if (!reason) return { ok: false, code: "admin.review.error.reasonRequired" };
   const supabase = await getServerSupabase();
 
-  const startErr = await ensureStarted(supabase, id, str(fd, "status"));
+  const target = await loadDecisionTarget(supabase, id);
+  if (!target) return { ok: false, code: "admin.review.error.state" };
+
+  const startErr = await ensureStarted(supabase, id, target.status);
   if (startErr) return { ok: false, code: startErr };
 
   const { error } = await supabase.rpc("review_reject", { p_verification_id: id, p_reason: reason });
   if (error) return { ok: false, code: mapReviewError(error.message) };
   revalidatePath("/admin/verifications");
+  revalidatePath("/admin/users");
   return { ok: true, code: "admin.review.rejected" };
 }

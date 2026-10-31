@@ -1026,6 +1026,12 @@ export const en = {
       started: "Review started.",
       approved: "Approved. The applicant will see the result.",
       rejected: "Rejected. The applicant will see the reason.",
+      noPending: "No pending verification request for this account.",
+      approveTitle: "Approve this account?",
+      approveBody: "The applicant is notified and the account is upgraded. This follows the same review process as the Verifications queue.",
+      rejectTitle: "Reject this verification?",
+      rejectBody: "A reason is required and is shared with the applicant.",
+      alreadyDecided: "This request was already decided.",
       error: {
         notAuthorized: "You don't have reviewer authority.",
         ownReview: "You can't review your own request.",
