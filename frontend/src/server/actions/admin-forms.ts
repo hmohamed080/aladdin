@@ -75,14 +75,21 @@ export async function startReviewAction(_p: ReviewFormState, fd: FormData): Prom
  * professional user, `apply_organization_verification` for an organization. Without
  * it an approval changed nothing about the account or the organization.
  *
- * Retry-safe: a request that is ALREADY approved skips the decision and re-runs only the apply step (both
- * apply RPCs return early once `applied_at` is set). That repairs an approval whose apply failed the first
- * time, and makes a repeated click or a second admin a no-op instead of an "invalid transition" error.
- * Rejected / withdrawn requests still fail with the state error.
+ * Retry-safe: `review_approve` is itself idempotent for an ALREADY-approved request — it returns without changes
+ * only for the assigned reviewer and refuses everyone else (and the applicant themself), so it is always called
+ * and the reviewer restrictions stay enforced on the retry path. The apply step then runs again (both apply RPCs
+ * return early once `applied_at` is set), which repairs an approval whose apply failed the first time and makes a
+ * repeated click a no-op. Rejected / withdrawn requests still fail with the state error. The apply RPCs only check
+ * the `users.verify` / `organizations.verify` permission, so the reviewer gate here is what keeps a retry from being
+ * driven by an admin who did not make the decision.
  *
  * Public listing is only meaningful for a professional upgrade (the database
  * constraint `ck_verifications_listing_only_professional` rejects it on any other
- * subject), so it is requested only there.
+ * subject), so it is requested only there. It is REVIEWER-SET (ADR-0007 D14): the Users dialogs show an explicit
+ * "list publicly" choice (`listingChoice=1`, `grantListing=on` only when ticked); a form that offers no choice (the
+ * Verifications queue) keeps its historical behaviour of listing a professional approval. Listing also publishes the person's
+ * public portfolio media, so it is never inferred from anything else. It cannot be changed by a retry: the flag is
+ * recorded once, when the decision is made.
  */
 export async function approveVerificationAction(
   _p: ReviewFormState,
@@ -95,17 +102,18 @@ export async function approveVerificationAction(
   const target = await loadDecisionTarget(supabase, id);
   if (!target) return { ok: false, code: "admin.review.error.state" };
   const isProfessional = target.verificationType === "professional";
+  // `listingChoice` marks a form that SHOWED the choice: then only a ticked box (`grantListing=on`) lists. A form
+  // that offers no choice (the Verifications queue) keeps the historical default for a professional approval.
+  const grantListing = isProfessional && (str(fd, "listingChoice") ? str(fd, "grantListing") === "on" : true);
 
-  if (target.status !== "approved") {
-    const startErr = await ensureStarted(supabase, id, target.status);
-    if (startErr) return { ok: false, code: startErr };
+  const startErr = await ensureStarted(supabase, id, target.status);
+  if (startErr) return { ok: false, code: startErr };
 
-    const { error } = await supabase.rpc("review_approve", {
-      p_verification_id: id,
-      p_grant_public_listing: isProfessional,
-    });
-    if (error) return { ok: false, code: mapReviewError(error.message) };
-  }
+  const { error } = await supabase.rpc("review_approve", {
+    p_verification_id: id,
+    p_grant_public_listing: grantListing,
+  });
+  if (error) return { ok: false, code: mapReviewError(error.message) };
 
   // An `identity` verification has no subject effect to apply yet.
   if (isProfessional || target.verificationType === "organization") {

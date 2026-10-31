@@ -52,6 +52,32 @@ describe("approveVerificationAction", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/admin/users");
   });
 
+  describe("public listing is reviewer-set", () => {
+    it("lists a professional approval by default (the queue's historical behaviour)", async () => {
+      target("under_review");
+      await approveVerificationAction(initial, form({ id: ID }));
+      expect(rpc).toHaveBeenCalledWith("review_approve", { p_verification_id: ID, p_grant_public_listing: true });
+    });
+
+    it("withholds the listing when the reviewer declines it", async () => {
+      target("under_review");
+      await approveVerificationAction(initial, form({ id: ID, listingChoice: "1" }));
+      expect(rpc).toHaveBeenCalledWith("review_approve", { p_verification_id: ID, p_grant_public_listing: false });
+    });
+
+    it("lists only when the shown choice is ticked", async () => {
+      target("under_review");
+      await approveVerificationAction(initial, form({ id: ID, listingChoice: "1", grantListing: "on" }));
+      expect(rpc).toHaveBeenCalledWith("review_approve", { p_verification_id: ID, p_grant_public_listing: true });
+    });
+
+    it("never requests a listing for a non-professional subject, whatever the form says", async () => {
+      target("under_review", "organization");
+      await approveVerificationAction(initial, form({ id: ID, listingChoice: "1", grantListing: "on" }));
+      expect(rpc).toHaveBeenCalledWith("review_approve", { p_verification_id: ID, p_grant_public_listing: false });
+    });
+  });
+
   it("does not claim a request that is already under review, and never lists a non-professional one", async () => {
     target("under_review", "identity");
     await approveVerificationAction(initial, form({ id: ID }));
@@ -71,11 +97,30 @@ describe("approveVerificationAction", () => {
     expect(calls()).toEqual(["review_approve", "apply_account_upgrade"]);
   });
 
-  it("is idempotent: an already-approved request only re-runs the apply step", async () => {
+  it("is idempotent: an already-approved request goes through review_approve (reviewer gate) and re-runs apply", async () => {
     target("approved");
     const res = await approveVerificationAction(initial, form({ id: ID }));
     expect(res.ok).toBe(true);
-    expect(calls()).toEqual(["apply_account_upgrade"]);
+    expect(calls()).toEqual(["review_approve", "apply_account_upgrade"]);
+  });
+
+  it("a retry by someone who is not the assigned reviewer is refused BEFORE apply runs", async () => {
+    target("approved");
+    rpc.mockImplementation(async (fn: string) =>
+      fn === "review_approve" ? { data: null, error: { message: "only the assigned reviewer may confirm approval" } } : { data: null, error: null },
+    );
+    const res = await approveVerificationAction(initial, form({ id: ID }));
+    expect(res.ok).toBe(false);
+    expect(calls()).toEqual(["review_approve"]);
+  });
+
+  it("an applicant cannot re-apply their own approved request", async () => {
+    target("approved");
+    rpc.mockImplementation(async (fn: string) =>
+      fn === "review_approve" ? { data: null, error: { message: "a reviewer may not approve their own verification" } } : { data: null, error: null },
+    );
+    expect(await approveVerificationAction(initial, form({ id: ID }))).toEqual({ ok: false, code: "admin.review.error.ownReview" });
+    expect(calls()).not.toContain("apply_account_upgrade");
   });
 
   it("repairs an approval whose apply failed the first time", async () => {
@@ -89,7 +134,7 @@ describe("approveVerificationAction", () => {
     rpc.mockReset();
     rpc.mockResolvedValue({ data: null, error: null });
     expect((await approveVerificationAction(initial, form({ id: ID }))).ok).toBe(true);
-    expect(calls()).toEqual(["apply_account_upgrade"]);
+    expect(calls()).toEqual(["review_approve", "apply_account_upgrade"]);
   });
 
   it("refuses a rejected request (invalid transition) without approving it", async () => {

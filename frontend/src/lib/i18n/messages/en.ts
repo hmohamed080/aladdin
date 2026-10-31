@@ -1026,6 +1026,8 @@ export const en = {
       started: "Review started.",
       approved: "Approved. The applicant will see the result.",
       rejected: "Rejected. The applicant will see the reason.",
+      listPublicly: "Also list this profile publicly",
+      listPubliclyHint: "Lists the profile and its public portfolio in the public directory. Leave unticked to verify the account without publishing it; it can be hidden again later.",
       noPending: "No pending verification request for this account.",
       approveTitle: "Approve this account?",
       approveBody: "The applicant is notified and the account is upgraded. This follows the same review process as the Verifications queue.",
