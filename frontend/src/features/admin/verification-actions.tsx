@@ -50,8 +50,6 @@ export function VerificationActions({ v }: { v: VerificationRow }) {
 
         <form action={approve}>
           <input type="hidden" name="id" value={v.id} />
-          <input type="hidden" name="status" value={v.status} />
-          <input type="hidden" name="verificationType" value={v.verificationType} />
           <SubmitButton size="sm">{t("admin.review.approve")}</SubmitButton>
         </form>
 
@@ -63,7 +61,6 @@ export function VerificationActions({ v }: { v: VerificationRow }) {
       {rejecting ? (
         <form action={reject} className="flex flex-col gap-2 rounded-md border border-dashed p-md">
           <input type="hidden" name="id" value={v.id} />
-          <input type="hidden" name="status" value={v.status} />
           <Textarea name="reason" required rows={2} placeholder={t("admin.review.reasonPlaceholder")} />
           <div>
             <SubmitButton size="sm" variant="outline" className="text-danger">

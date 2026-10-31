@@ -26,6 +26,7 @@ const superAdmin = acc(100, ALL);
 
 vi.mock("@/server/authorization/admin", () => ({ requireAdminRoute: (...a: unknown[]) => requireAdminRoute(...a) }));
 vi.mock("@/server/queries/admin-directory", () => ({ loadUserDetail: (...a: unknown[]) => loadUserDetail(...a) }));
+vi.mock("@/server/actions/admin-forms", () => ({ approveVerificationAction: vi.fn(), rejectVerificationAction: vi.fn() }));
 vi.mock("@/server/queries/admin-rbac", () => ({ loadStaffRanks: (...a: unknown[]) => loadStaffRanks(...a) }));
 vi.mock("@/server/queries/admin-preview", () => ({
   previewUserPointsLedger: vi.fn(async () => null),
@@ -140,5 +141,45 @@ describe("User Details - rank-aware Suspend", () => {
     await renderPage(ORDINARY_ID);
     expect(suspendButtons()).toHaveLength(0);
     expect(screen.getAllByRole("button", { name: /^restore$/i }).length).toBeGreaterThan(0);
+  });
+});
+
+describe("User Details - real Verify / Reject", () => {
+  const open = (status: string, verificationType = "professional", id = "99999999-9999-4999-8999-999999999999") => ({
+    id,
+    verificationType,
+    requestedAccountType: "installer_technician",
+    status,
+    reason: null,
+    submittedAt: "2026-10-30T10:00:00Z",
+    decidedAt: null,
+  });
+  const approve = () => screen.queryAllByRole("button", { name: /approve/i });
+
+  it("offers live Approve / Reject when the account has an open request", async () => {
+    loadUserDetail.mockResolvedValue({ ok: true, data: detail(ORDINARY_ID, { status: "pending_verification", verifications: [open("submitted")] }) });
+    await renderPage(ORDINARY_ID);
+    expect(approve()).toHaveLength(1);
+    expect(approve()[0]!.getAttribute("aria-disabled")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^reject$/i })).toHaveLength(1);
+  });
+
+  it("shows them disabled, with the reason, for a pending account that has no open request", async () => {
+    loadUserDetail.mockResolvedValue({ ok: true, data: detail(ORDINARY_ID, { status: "pending_verification", verifications: [open("approved")] }) });
+    await renderPage(ORDINARY_ID);
+    expect(approve()[0]!.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("ignores business verification (its own queue) and decided requests", async () => {
+    loadUserDetail.mockResolvedValue({ ok: true, data: detail(ORDINARY_ID, { verifications: [open("submitted", "business"), open("rejected")] }) });
+    await renderPage(ORDINARY_ID);
+    expect(approve()).toHaveLength(0);
+  });
+
+  it("is hidden without users.verify, even with an open request", async () => {
+    requireAdminRoute.mockResolvedValue(acc(50, ["users.read"]));
+    loadUserDetail.mockResolvedValue({ ok: true, data: detail(ORDINARY_ID, { status: "pending_verification", verifications: [open("submitted")] }) });
+    await renderPage(ORDINARY_ID);
+    expect(approve()).toHaveLength(0);
   });
 });
