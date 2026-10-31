@@ -2,7 +2,7 @@
 
 ## 2026-10-28 — WhatsApp OTP architecture PREPARATION (not active)
 
-Proposed target: Supabase Auth issues/verifies Phone OTP → signed HTTPS Send SMS Hook → isolated `aladdin-whatsapp-otp-preview` Cloudflare Worker → Meta WhatsApp Cloud API using approved Arabic `aladdin_otp` template. **No Send SMS Hook enabled, no Worker deployment, no new phone identity or live flows.** Current installer/showroom phone+password sign-in relies on synthetic email aliases and remains unchanged. Account/phone identity compatibility and durable webhook replay/idempotency are release blockers before anyone may enable delivery. See [ADR-0025](../decisions/ADR-0025-whatsapp-otp-transport.md).
+Proposed target: Supabase Auth issues/verifies Phone OTP → signed HTTPS Send SMS Hook → isolated `aladdin-whatsapp-otp-preview` Cloudflare Worker → Meta WhatsApp Cloud API using approved Arabic `aladdin_otp` template. **No Send SMS Hook enabled, no Worker deployment, no new phone identity or live flows.** Current installer/showroom phone+password sign-in relies on synthetic email aliases and remains unchanged. Account/phone identity compatibility and durable webhook replay/idempotency are release blockers before anyone may enable delivery. See [ADR-0025](../decisions/ADR-0027-whatsapp-otp-worker-transport.md).
 
 
 ## 2026-10-17 — Approved local RC2 R2 integration
