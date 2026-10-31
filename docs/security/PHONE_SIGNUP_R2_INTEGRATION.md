@@ -2,7 +2,7 @@
 
 **Status:** Draft PR, local evidence only. Nothing merged, deployed, applied to Acceptance/Production, enabled, or sent. No real WhatsApp/SMS/e-mail was used; every account was synthetic and local.
 **Base:** `claude/registration-resume` (#116, which sits on #113) **merged with** the phone-authority stack `#119 → #120 → #121 → #122 → #125` and the Windows E2E helper `#124`. The two stacks touch **disjoint files** (checked: no path overlap; the merge had no conflicts).
-**Decision records for the two GO/NO-GO calls are in §10. They are deliberately separate.**
+**Updated 2026-10-31 after the owner's review: merge, deployment and hosted activation are NOT approved. The phased, backward-compatible release plan is `PHONE_SIGNUP_R2_RELEASE_PLAN.md`; the separate GO/NO-GO decisions are in §11.**
 
 ## 1. What changed (and what did not)
 
@@ -15,7 +15,7 @@
 | No-grant phone-alias creators | `createCraftsmanPasswordUser`, `createShowroomPasswordUser`, grant-less `createPhoneSignUpUser` | **removed** from the app (they had no live callers: the Installer/Showroom pages are redirects since #113). `createPhoneSignUpUser` now *requires* a grant. `alias_guard_mode='enforce'` refuses anything else at the database |
 | Legacy phone/password **sign-in**, existing accounts | — | untouched (`resolveSignInEmail`, `deleteCraftsmanPasswordUser` kept; no account, role, membership, consent or point is written by R2) |
 | Email + password (Email OTP), recovery, #116 continuation and username lease, Google, Facebook | — | untouched; WhatsApp proof is **not** required for them |
-| Legacy table | `public.phone_verification_challenges` created by `20261028090001` | dropped by the **new** forward-only migration `20261031090001` (see §4) |
+| Legacy table | `public.phone_verification_challenges` created by `20261028090001` | **kept for now**; unused by the R2 build. Its DROP is a *contract-step proposal*, deliberately **not** in `supabase/migrations` (§4) |
 
 Files removed: `server/auth/whatsapp-otp.ts` (+ test). Env removed from the web app: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_OTP_TEMPLATE` (`lib/env`, `.env.example`, `wrangler.jsonc`). Added to `.env.example` (all OFF): `PHONE_VERIFICATION_ENABLED`, `PHONE_SIGNUP_VERIFICATION_ENABLED`, `PHONE_OTP_HMAC_KEYS`, `PHONE_OTP_DELIVERY`, `PHONE_OTP_OUTBOX_DIR`.
 
@@ -50,15 +50,13 @@ Invariants: the code exists in one place (the authority); the keyring is a serve
 
 With the defaults the phone sign-up screen answers "unavailable" and **no mobile-number account can be created through the app**. Email and OAuth registration continue. This is a visible change relative to `main`, whose Installer/Showroom pages still create phone accounts without proof — see §10 (merge conditions).
 
-## 4. Migration compatibility report
+## 4. Migration compatibility report (revised: R2 adds no migration)
 
-* **History checked:** `supabase/migrations` of the combined tree: #113/#116 (`20261028090001`, `…090003`, `20261029090001/2`) < R1 (`20261030090001/2`) < R2 (`20261031090001`). Strictly increasing, no duplicate versions, nothing renumbered, and no existing migration file modified or deleted: `git diff --name-status origin/claude/registration-resume...HEAD -- supabase/migrations` lists only **added** files (R1's `…30090001/2`, already in its own PRs, and R2's `…31090001`).
-* **Why a forward-only migration instead of editing `20261028090001`:** R1's integration notes call #113's migration "unmerged, so editable". That is not provable from here: the repository records it as not applied to Acceptance/Production (`RUNTIME_STATE.md`), but later #113/#116 migrations *are* recorded as applied to TEST/Acceptance and migrations apply in order, so `…090001` may be present. The new migration is a plain `DROP TABLE IF EXISTS public.phone_verification_challenges` (no `CASCADE`): safe whether or not the old one ran, and it fails loudly if anything unexpected depends on the table. `users.birth_date` (also from `…090001`) is kept.
-* **Rollout order (expand → contract):** deploy the application that no longer touches the table, **then** apply `20261031090001`. Rows are ≤30-minute one-time hashes; dropping them only ends a code already in flight.
-* **Permission contract:** the new migration adds/changes no function, so `supabase/permissions/20261030090002.json` remains the latest reviewed contract and the gate carries it forward (`migration-permission-gate.mjs` loads a contract only when a file exists for that version). Verified on the combined tree: see §6.
-* **Table vs authority separation:** `public.phone_verification_challenges` (legacy, dropped) ≠ `app.phone_verification_challenges` (R1/B1 authority, kept). pgTAP 116 now asserts the first is gone and the second is unreachable by every client role including `service_role`.
-* **Generated types:** the legacy table entry was removed from `database.types.ts` (hand edit of a generated file; regenerate on the CI toolchain after merge).
-* **Hosted history is unknown to this checkout.** The extended read-only inspection reports exactly which repo migrations are applied or missing and whether `20261028090001` exists (§8) — that answer decides nothing about safety (the drop is idempotent) but must be recorded before the hosted apply.
+* **History:** the combined tree's migrations are strictly increasing and unique: #113/#116 (`20261028090001`, `…090003`, `20261029090001/2`) < R1 (`20261030090001/2`, last). No existing migration was modified, renamed or deleted (`git diff --name-status` over `supabase/migrations` shows only R1's two additions relative to #116). **R2 itself adds no migration.**
+* **Legacy table (expand/contract).** `public.phone_verification_challenges` (from `20261028090001`) stays. The R2 build never touches it; leaving it costs nothing (RLS on, `service_role` only, rows live ≤30 minutes). Dropping it is the *contract* step and must not run ahead of the compatible application. A file in `supabase/migrations` is applied by the next `supabase db push --linked` to whichever project is pushed, in order, with no knowledge of the deployed build, so the DROP **cannot** safely live there until the application has moved. It is therefore a proposal: `supabase/proposals/contract_20261031090001_retire_registration_phone_challenges.sql`, with (a) a runtime guard that refuses while codes were issued in the last hour (tested on three paths: table absent → no-op, recent row → refuses, idle table → drops), (b) no `CASCADE`, and (c) three written promotion conditions — R2 live on every target environment, no earlier build reachable by rollback, owner approval plus a fresh read-only migration-history check. `scripts/hosted-db/inspect-auth-security.test.mjs` fails if it ever appears in `supabase/migrations` prematurely. (An earlier revision of this PR *did* put the DROP in `supabase/migrations`; the owner's requirement that migrations cannot run ahead of the compatible app made that wrong, and it was moved out together with the pgTAP-116 and generated-types changes.)
+* **Permission contracts — a real inconsistency found and fixed.** R1's contract files `20261030090001.json` (B1) and `20261030090002.json` were generated on a tree without #113/#116, so both lacked six functions those PRs add (`app.account_specialty_kind`, `app.lock_username`, `app.username_lease_interval`, `app.username_leased_by_other`, `public.account_basics_set`, `public.my_account_basics`). My first local check validated only the latest contract and missed B1's; **GitHub's `supabase-rls` caught it** ("unreviewed signature" at the B1 step of the upgrade path). Both files now contain the six, byte-identical to the entries #116 reviewed in `20261029090002.json`; no R1 entry changed; #116's 697 functions are all contained; the public RPC allow-list is unchanged (9). After the fix `supabase-rls` passes (clean replay, lint, gate, full pgTAP, RC2 upgrade path).
+* **Dormant migrations ahead of the app are safe:** the application makes no authority call while its flags are off, and the guard is inert (`off`).
+* **Hosted history is unknown to this checkout.** Before any hosted migration: `node scripts/hosted-db/inspect-auth-security.mjs --env <env> --only migrations` (one read-only SELECT of the applied versions, diffed against this checkout; reports `applied_not_in_repo`, `repo_not_applied` and whether `20261028090001` is applied). Needs only the read token.
 
 ## 5. Delivery and runtime (Mission 3)
 
@@ -68,104 +66,73 @@ With the defaults the phone sign-up screen answers "unavailable" and **no mobile
 * **Logs:** no code, number or secret is written by any R2 path (`logStepFailure` carries a step name and an error code only; the outbox writes files, never the console). A unit test asserts the Admin payload keeps the grant out of `user_metadata`.
 * `PHONE_OTP_DELIVERY=off` stays the default; the Cloudflare Worker (#114) is not activated and `WORKER_WIRED` is untouched.
 
-## 6. Regression and security evidence (local, isolated stacks, nothing sent)
+## 6. Regression and security evidence
 
-Machine: Windows 11, Docker, Node 24. Stacks are scratch Supabase projects outside the repo (`supabase/tests/r2/stack.sh`: project `aladdin_r2int`, ports 536xx; other projects/worktrees untouched). Toolchains: Supabase CLI 2.110.0 (CI pin; GoTrue v2.193.0) and 2.122.0 (GoTrue v2.197.0).
+Local = Windows 11, Docker, Node 24, isolated scratch Supabase stacks outside the repo (`supabase/tests/r2/stack.sh`; other worktrees' stacks untouched), CLI 2.110.0 (GoTrue v2.193.0) and 2.122.0 (v2.197.0). GitHub = runners on the pushed branch. Nothing was sent anywhere.
 
-| Gate | Result |
-|---|---|
-| TypeScript (`tsc --noEmit`) | clean |
-| ESLint | 0 errors (63 pre-existing warnings, none in R2 files) |
-| Unit (vitest, whole frontend) | 4409 passed, 5 failed, 54 skipped. The 5: `redis-guards` ×2 (Windows `\` vs `/` in a path comparison) and 3 image-processing timing tests — **none in R2's diff; the image tests pass when run alone (21/21)**; not re-run on the pre-R2 head, so "pre-existing" is inferred from the diff, not measured |
-| R2-touched unit files | `phone-sign-up` 22 (grant order, wrong grant/phone/alias/registration, rollback when attach is refused, no existence check, resend keeps the registration), `admin-phone-user` (grant in `app_metadata` only, retired exports gone), `i18n` 60 |
-| Full pgTAP on the combined tree (`supabase test db`, confirmations ON) | **148 files, 6651 tests, PASS** (includes 116 rewritten, 119/120 authority and guard, 104/108/98 identity invariants) |
-| Permission contract | **711 exact function contracts PASS** (`20261031090001.json`). Reconciliation: the latest committed contract (R1, 705) lacked the 6 functions #113/#116 add (`app.account_specialty_kind`, `app.lock_username`, `app.username_lease_interval`, `app.username_leased_by_other`, `public.account_basics_set`, `public.my_account_basics`); the 6 are byte-identical to #116's reviewed entries, no R1 entry changed, #116's 697 are all contained, public RPC allow-list unchanged (9) |
-| R1 security matrix on the combined tree (CI toolchain, both confirmation modes × shipped / observe / enforce) | 6 cells: **0 FAIL, 0 XPASS**; `enforce` → 44 / 45 PASS and **0 XFAIL** in both modes; identical cell-by-cell to R1's own committed `ci110` results (`docs/security/r2-evidence/`). Covers anonymous alias sign-up, squatting, grant forgery / replay / expiry, concurrent creation, wrong phone / account, duplicate identities, attach, rollback, Installer/Showroom identity invariance, direct API/RLS bypass |
-| Interim hook probe | 4 cells (GoTrue v2.193.0 / v2.197.0 × confirmations ON / OFF): **31 PASS, 0 FAIL, 8 observations each** (`PHONE_SIGNUP_R2_INTERIM_ALIAS_HOOK.md`) |
-| Hosted inspection tool | 23 offline tests pass; **not run against any hosted project** |
-| E2E, mobile-number sign-up (outbox, guard `enforce`, `next dev`), desktop **and** mobile (Pixel 5) | `one-field-auth`: each of its 7 tests passes on each project (run in two batches): redirects; form structure; **sign-up with code read from the outbox → `phone_verified_at` set, exactly one attached grant, exactly one Auth user for the alias, sign-in by number and by username**; wrong code creates nothing and the right code still works; **registered number → same screen, no outbox message within 4 s, any code fails, no second account**; **legacy alias account made before enforcement still signs in by number, and a new grant-less alias is refused**; unknown identifier → generic error |
-| E2E, e-mail + password with Email OTP, sign-in, forgot-password journey, resend, interruption/resume, recovery replay, profile completion — production build, **shipped switches (phone OFF)**, desktop + mobile, Turnstile stubbed, 0 retries | **58 passed, 2 failed.** The 2 (same test, both projects): `profile-completion` "display name, phone and avatar…" fails at the **avatar photo upload** ("Save photo" → `avatar-current`), after the name and phone steps passed — media storage is not configured on this local stack; unrelated to registration |
-| E2E, Showroom RC2 desktop set, 0 retries | `showroom-mvp` + `sales` + `orders-projects`: 27 passed, 1 failed; `account-workspace-model`: 10 passed, 1 failed. Re-run alone: the Arabic-RTL workspace-selector test **passes** (flaky); `sales` "branch-limited salesperson… direct URL" **fails again for an environment reason** — it hard-codes the default stack `127.0.0.1:54321` (`ECONNREFUSED`), my isolated stack is on 53621. Neither involves sign-up |
-| Known failing, not caused by R2 | `installer-profile-completion.spec.ts` (both projects): sign-up and proof succeed, then `completeAccountBasics` in `e2e/helpers/auth.ts` fails on the specialty step — the helper bug R1's notes assign to a separate PR (#123). Not patched here |
-| Not run / not possible locally | real Turnstile widget and Supabase Auth CAPTCHA (CI workflow), real Google / Facebook round-trips, `cf:build` Worker bundle, GitHub Actions, hosted anything |
-
-Test coverage vs the mission list: anonymous alias bypass ✔ (R1 SEC-A, hook probe A) · alias squatting ✔ · grant forgery / replay / expiry ✔ (SEC-D, pgTAP 120 F) · concurrent creation ✔ (SEC-D5) · wrong phone / account ✔ (unit + SEC) · duplicate Auth identities ✔ (E2E count = 1, SEC) · completion + `phone_verified_at` ✔ (E2E) · rollback after failed initialisation ✔ (unit; SEC) — **not** exercised end-to-end through the UI (username race) · Installer / Showroom invariance ✔ (SEC-E, pgTAP 104/108) · direct API / RLS ✔ (SEC) · confirmations ON/OFF ✔ · guard observe/enforce ✔.
-
-## 7. GitHub Actions plan for the stacked branch and the final merge candidate
-
-All existing workflows trigger on `pull_request → main` only (plus `workflow_dispatch` on `ci.yml` and `supabase-rls.yml`). A Draft PR whose base is `claude/registration-resume` therefore starts **nothing** by itself. Plan:
-
-| # | When | Run | Why / what it adds over the local run |
-|---|---|---|---|
-| 1 | now, on `integration/unified-registration-r2-20261031` | **CI** (`workflow_dispatch`) | `typecheck`, `lint`, `test`, `build`, and the **`frontend-cloudflare` job** (`cf:build` + Worker dry-run bundle): the only place the Workers bundle containing the `after()`/`waitUntil` path and the edited `wrangler.jsonc` is built (Linux-only here) |
-| 2 | same | **supabase-rls** (`workflow_dispatch`) | clean replay of every migration, `db lint`, permission gate (`check` against `supabase/permissions/20261030090002.json`), full pgTAP, concurrency scripts, **and the upgrade path from the RC2 baseline** |
-| 3 | same | **Auth CAPTCHA E2E** and **Showroom RC2 E2E** (`workflow_dispatch`; the CAPTCHA one also has a branch trigger list) | real Turnstile widget + real Siteverify + Supabase Auth CAPTCHA ON (cannot be reproduced offline). **Add** `e2e/one-field-auth.spec.ts` + `e2e/installer-profile-completion.spec.ts` with `E2E_NEXT_MODE=dev PHONE_OTP_DELIVERY=outbox` (+ the `PHONE_*` env from `supabase/tests/r2/e2e-env.sh`) as a new step: the phone specs skip themselves otherwise |
-| 4 | same | a **new manual workflow `phone-signup-security`** that runs `supabase/tests/sec/run_r1.sh` (R1 matrix, both confirmation modes × shipped/observe/enforce) and `supabase/tests/r2/run_hook_probe.sh` on the CI toolchain | the security evidence must be reproducible by someone other than this machine; R1 already documents a `ci110` toolchain for it |
-| 5 | when #113, #116, #119–#122, #125, #124 have merged (in §9 order) | **retarget this PR to `main`**; the five `pull_request` workflows start automatically | the diff then shrinks to R2's own commits; regenerate `supabase/permissions/*.json` once on the merged tree (`node supabase/tests/b1/permission_contract.mjs <container> generate`) |
-| 6 | final merge candidate | re-run 1–4 on the retargeted head; attach the hosted inspection output (§8) | merge gate |
-
-Notes: (a) `hosted-acceptance-e2e` is **not** part of this plan — it needs the Acceptance project and the owner. (b) The phone specs must run on `next dev` because the outbox is refused under `NODE_ENV=production`; the production build is covered by suites that do not read the outbox. (c) Required-check names to protect on `main` stay `frontend`, `frontend-cloudflare`, `supabase-rls`; the two E2E workflows are informational today.
-
-## 8. Hosted inspection (read-only) — checklist and status
-
-**Status: the audit the owner reported covers Production and Acceptance Auth settings and the 13 disputed functions; this branch did not run it and holds no hosted credential** (no `SUPABASE_ACCESS_TOKEN`, no project refs, no Supabase CLI token, no Cloudflare token in this environment — checked by presence only). Nothing in this document claims hosted safety beyond what the owner reported.
-
-The tool (`scripts/hosted-db/inspect-auth-security.mjs`, 23 offline tests) was extended so the **remaining** questions can be answered by one authorised run without writing anything. Its only network calls are `GET /config/auth`, `POST /database/query/read-only` (single SELECT/WITH, checked in code), `GET …/workers/scripts/<name>/secrets` (names) and `GET …/settings` (binding names; values only for five allow-listed non-secret switches). It prints no token.
-
-| Question | Where it is answered | Known today |
+| Gate | Local | GitHub (final head `9a0b1430`) |
 |---|---|---|
-| E-mail confirmation, CAPTCHA, phone provider, Send-SMS hook, Phone MFA, anonymous sign-ins | `auth_interpretation` | **Owner reports:** confirmations + Turnstile ON, phone provider / Send-SMS hook / Phone MFA OFF (both envs) |
-| Leaked-password protection | `auth_interpretation.leaked_password_protection_on` | **Owner reports: OFF** (both) |
-| Redirect allow-list: stale Vercel, local, insecure, broad entries | `auth_interpretation.redirect_allowlist` | **Owner reports** potentially stale Vercel entries in Production (list not supplied) |
-| Permission differences | `permission_diff` (full inventory vs the reviewed contract at the hosted version) and `disputed_functions_summary` | **Owner reports** the 13 disputed functions match the contract in both. The full-inventory diff is *new* and not yet run |
-| Migration history | `migration_diff` (`applied_not_in_repo`, `repo_not_applied`, `r2_markers`) | **unknown** — in particular whether `20261028090001` is applied |
-| R1 authority / guard installed + switches | `database.authority_objects`, `authority_switches` | **Owner reports** the R1 alias guard is not installed or enforced in either env |
-| Legacy challenge table (what `20261031090001` would drop) | `database.legacy_challenge_table` | unknown |
-| Alias census (possible squats) and 570 existing phone accounts | `database.alias_census` | **Owner reports** 570 confirmed phone-alias accounts in Production (preserve as is) |
-| Worker secrets (names) and `PHONE_*` switch values | `whatsapp_delivery_secrets`, `worker_settings` | **Unverified** (needs `CLOUDFLARE_API_TOKEN` read scope, `CF_ACCOUNT_ID`, worker names) |
+| TypeScript / ESLint | clean / 0 errors (63 pre-existing warnings; none in R2 files) | `CI › frontend` ✓ |
+| Unit (vitest, whole frontend) | **354 files, 4419 tests, 0 failures** (resolved: see §6.1) | `CI › frontend` ✓ |
+| Production build, Cloudflare Worker bundle (dry run, no upload) | not buildable here (Linux-only) | `CI › frontend-cloudflare` ✓ — the first place the `after()`/`waitUntil` path and the edited `wrangler.jsonc` were bundled |
+| Full pgTAP, clean replay, db lint, permission gate, concurrency scripts, **RC2 upgrade path** | 148 files / 6651 tests pass (before the contract-step move) | `supabase-rls` `supabase-rls` ✓ (a236a45b after the contract fix, and again on the final head `9a0b1430`) |
+| R1 security matrix (both confirmation modes × shipped/observe/enforce) | 6 cells, 0 FAIL / 0 XPASS, `enforce` 0 XFAIL, identical to R1's own run | `Phone sign-up security (R2) › r1-security-matrix` ✓ (push and PR runs) |
+| Mobile-number sign-up E2E (outbox, guard `enforce`, `next dev`), desktop **and** mobile | `one-field-auth` 7 tests + `installer-profile-completion` pass | `Phone sign-up security (R2) › phone-e2e` ✓ (push and PR runs) |
+| Interim hook probe (GoTrue v2.193.0 / v2.197.0 × confirmations on/off) | 4 cells × (31 PASS, 0 FAIL) | `› hook-probe` ✓ (CI toolchain) |
+| Hook rollback drill | 13/13 | — (local only) |
+| Auth CAPTCHA E2E (real Turnstile widget, Supabase Auth CAPTCHA ON) incl. e-mail + Email OTP sign-up, sign-in, forgot-password, resend, interruption/resume, recovery replay, profile completion, GoTrue-direct | stubbed-widget runs: 58 / 60 (see §6.1) | `Auth CAPTCHA E2E` ✓ and both `gotrue-direct` jobs (fail / spent) ✓ |
+| Showroom RC2 E2E | desktop set: see §6.1 | `Showroom RC2 E2E` ✓ |
+| Inspection tool (offline) | 29 tests | — |
 
-**Dependency to record:** hosted security clearance is a mandatory precondition for any merge or activation. The items above marked *unknown/unverified* are open. How to run it without pasting a secret: export the variables in your own shell from your secret store, or run `! node scripts/hosted-db/inspect-auth-security.mjs --env both > report.json` yourself; the output is booleans, enums, counts, URLs and function signatures.
+Coverage vs the mission list: anonymous alias bypass ✔ · alias squatting ✔ · grant forgery / replay / expiry ✔ · concurrent creation ✔ · wrong phone / account ✔ · duplicate Auth identities ✔ (E2E: one Auth user for the alias) · completion + `phone_verified_at` ✔ (E2E asserts the attached grant) · rollback after failed initialisation ✔ (unit, SEC; not driven through the UI) · Installer/Showroom invariance ✔ · direct API / RLS bypass ✔ · confirmations ON/OFF ✔ · guard observe/enforce ✔ · email + Email OTP / sign-in / recovery / resume / Google / Facebook ✔ unchanged (Google/Facebook: unchanged code + the exercised user-object shapes; no real provider round-trip is possible on a local stack).
 
-## 9. Dependencies and the safe merge order
+### 6.1 Failure disposition (every failure seen, none left unexplained)
 
-R2 contains, by merge, everything below it; once those are in `main`, this PR retargets `main` and shrinks to R2's own commits.
-
-| Order | PR | Note |
+| Failure | Root cause | Disposition |
 |---|---|---|
-| 0 | — | **Hosted security clearance recorded by the owner (§8). Mandatory before any merge.** |
-| 1 | #113 registration | its own open review findings and owner decisions come first; R2 does not fix them |
-| 2 | #124 Windows-safe E2E helper | targets #113's branch; merge with or right after it |
-| 3 | #116 continuation + username lease | retarget to `main` after #113; regenerate its permission contract on the merged tree |
-| 4 | #119 → #120 → #121 | B1 is blocked on the base-permission-drift decision (`PHONE_VERIFICATION_B1_BASE_PERMISSION_DRIFT.md`); the owner reports the 13 functions already match the contract on both hosted databases, which supports reading the drift as a local-replay artefact — record that decision |
-| 5 | #122 → #125 | security tests, then R1 authority + guard (dormant: `enabled=false`, `signup_enabled=false`, `alias_guard_mode='off'`) |
-| 6 | **this PR (R2)** | retarget to `main`; regenerate `supabase/permissions/*.json` once on the merged tree |
-| — | #114 Cloudflare WhatsApp transport | **not required** for R2 and stays disabled; it needs its own reconciliation (route, language, country list, template name, duplicate ADR number) before it can ever be wired |
+| 5 unit tests (`redis-guards` ×2, 3 image-processing timing) | `redis-guards` compared `app\api\…` with `app/api/…` on Windows; the image tests exceeded 5 s on a loaded machine. **Proven not R2:** a worktree of #116's head (shared `node_modules`) fails the Redis pair **identically** and passes the image files | Redis test made path-separator neutral (2 lines); image tests pass alone (21/21) and in the final full run. **Resolved** |
+| `installer-profile-completion` (desktop + mobile) — the failure R1's notes attributed to a closed PR #123 | investigated against the latest code, **three independent causes**: (1) `next dev` compiles the post-save route on first hit ("Saving…" + "Rendering…" in the screenshot) and the helper waited 10 s; (2) the spec asserted a brand-new installer has *not* done "activities", but the ADR-0026 sign-up step (which this spec's own helper completes) collects specialties and location, so a fresh account starts above 50%; (3) not a product defect. Not the old specialty-selector bug | helper wait raised to 60 s; spec updated for ADR-0026 (the figure-agreement purpose is kept); passes locally (desktop) and on GitHub (desktop + mobile). **Resolved in this PR — not relying on #123** |
+| `profile-completion` avatar upload (prod build, once) | did not recur: passes in the re-run, in the dev-mode installer spec, and on GitHub | transient local environment; not R2 |
+| `sales` branch-limited scope | first: `ECONNREFUSED 127.0.0.1:54321` — the test reads `SUPABASE_URL`, my isolated stack is not on the default port (**fixed in the env script**); second: it failed after I ran `account-workspace-model` in the same invocation, which revokes Karim's membership by design (the workflow documents the order) | passes in the correct order locally; `Showroom RC2 E2E` ✓ on GitHub |
+| `account-workspace-model` Arabic-RTL render | flaky: passes on re-run and on GitHub | not R2 |
+| `profile-completion` "username lost during the OTP window" (mobile, desktop once), "neutral unavailable" (once ×2), `sales` mobile bottom navigation | the Turnstile stub did not hand out a token within 30 s / a 60 s navigation timeout on a machine running several Docker stacks and GitHub traffic; they pass on other runs of the same build (the same tests passed on both projects in my earlier full run) and on GitHub with the **real** widget | load-sensitive locally; GitHub is the reference (`Auth CAPTCHA E2E` ✓ on the final head). Not R2: none touches sign-up code |
 
-**Applying to a hosted project (separate approval each, Acceptance first):** (a) dormant migrations `20261030090001/2`; (b) deploy the application with every `PHONE_*` flag OFF; (c) only then `20261031090001` (drops the legacy table). Any order of (a) and (b) is safe because the app makes no authority call while the flags are off; (c) must come last because an older build still reads the legacy table. Activation (R1 plan stages 4–7: observe → provision → enable → enforce) is a different decision, §10.
-**Independent of all of the above:** the interim hook (`PHONE_SIGNUP_R2_INTERIM_ALIAS_HOOK.md`) needs one function and one Auth setting, no deploy, and does not depend on any PR in this table.
+## 7. GitHub Actions: what ran, what is left
+
+Existing workflows react only to pull requests that target `main`, so for this stacked branch they were dispatched by hand on the branch (`CI`, `supabase-rls`, `Auth CAPTCHA E2E`, `Showroom RC2 E2E`) and a new workflow, `.github/workflows/phone-signup-security.yml`, runs on every push to this branch and on PRs into the registration branch: the outbox-driven phone E2E (desktop + mobile, `next dev`), the R1 security matrix and the hook probe on the CI toolchain. Cloudflare **deploy** workflows were not run (`cloudflare-production` is manual; its default stage only builds and bundles, and `CI › frontend-cloudflare` already does that without any Cloudflare credential). **Left:** when #113/#116/the dormant stack are in `main`, retarget this PR to `main` so the five `pull_request` workflows start by themselves, regenerate nothing else (contracts are already reconciled), and re-run all of the above on that final candidate before any merge.
+
+## 8. Hosted audit and the R2 checklist
+
+The owner's completed read-only audit is reconciled item by item in `PHONE_SIGNUP_R2_RELEASE_PLAN.md` §6 (13 disputed permissions **closed**, not reopened; 570 alias accounts preserved; guard not installed; squatting open → hook; leaked-password and redirects open → prepared only; Worker secret presence → an **activation** dependency, not a blocker for merging entirely dormant code). The inspection tool can now (a) confirm the exact hosted migration history with the narrowest access (`--only migrations`), (b) diff the full function inventory against the reviewed contract, (c) compare the redirect allow-list **exactly** against an owner-confirmed file (`--expected docs/security/hosted/redirect-allowlist.expected.json`, currently unconfirmed), and (d) read Worker binding names and five allow-listed non-secret switches. **It has not been run against any hosted project**; this environment holds no hosted credential.
+
+## 9. Dependencies and merge order
+
+The initial order is accepted by the owner, with the rule that **nothing merges until the final combined candidate passes every mandatory check**. It is executed in two blocks (dormant stack first; route-changing #113 + #116 + R2 last) — see `PHONE_SIGNUP_R2_RELEASE_PLAN.md` §3. Order: #119 → #120 → #121 → #122 → #125 · #124 with #113 · #113 → #116 → **R2 (#126)**; #114 is not required and stays disabled. B1 (#121) still waits for the base-permission-drift decision; the owner's audit (13 functions match the contract on both hosted databases) supports reading the drift as a local-replay artefact — record that decision on #121.
 
 ## 10. Owner decisions
 
-1. **Taken number at sign-up (UX vs enumeration).** R2 chooses *no existence oracle*: a registered number sees the code screen and receives nothing; the screen now says "If this number can be used to sign up, a 6-digit code is on its way…" (en/ar; reversible, one i18n line each). The alternative (keep `phoneExists` at step 1) restores a number-existence oracle behind Turnstile and the limiter. A neutral hint under the code field ("Already have an account? Sign in") is the usual mitigation and is a design task, not done here.
-2. **Phone sign-up is unavailable between merge and activation.** `main` today lets Installer/Showroom users create phone accounts *without any proof* (this is the squatting exposure). #113 already redirects those pages to `/auth/*`; with R2 the phone path answers "unavailable" until activation. Email and Google/Facebook keep working. Accept that window, or schedule deploy and activation together.
-3. **Interim hook** — approve or not (`PHONE_SIGNUP_R2_INTERIM_ALIAS_HOOK.md`).
-4. **Leaked-password protection** and **redirect allow-list cleanup** — approve, and supply the real allow-list (`PHONE_SIGNUP_R2_AUTH_HARDENING_RECOMMENDATIONS.md`).
-5. **Sealed cookie** still carries the password for ≤10 minutes (AES-GCM, httpOnly, `/auth`, own key domain). A server-side pending-registration store would remove that; out of scope here.
+Decided: (1) neutral code-screen message kept (en/ar) and "Already have an account? Sign in" added on the code step (the link was already there; its English copy now reads exactly that, pinned by an E2E assertion); no number-existence information is exposed. (2) No unplanned period without phone registration → the phased plan. (3) Hook: prepare and test only. (4) Leaked-password / redirects: prepare only. (5) Merge order accepted, merge gated on the final candidate.
+Still open: the real redirect allow-list values; plan support for Auth Hooks and leaked-password protection; the delivery adapter design (Phase 3 / activation); whether to replace the cookie-held password (§12 option).
 
+## 11. GO / NO-GO — separate decisions (details: release plan §5)
 
-## 11. GO / NO-GO — two separate decisions
+| Decision | Verdict | Why / when it changes |
+|---|---|---|
+| **Merge dormant code** | **NO-GO today — technically ready** | final head green on every mandatory check (GitHub results above) and the owner records the hosted clearance. Worker secret presence is **not** required for this |
+| **Acceptance rollout** | **NO-GO** | exact Acceptance migration history confirmed read-only; owner approval in their own words; for the Phase 3 rehearsal also the delivery adapter + secrets |
+| **Production rollout** | **NO-GO** | Acceptance clean; exact Production history confirmed; Phase 3 prerequisites; a planned window; rollback rehearsed. Until then Production stays on its current build and phone registration is unchanged |
+| **WhatsApp activation** | **NO-GO** | an approved delivery adapter implemented and wired (`WORKER_WIRED=false` today), Worker secrets verified, Meta template approved, allow-listed rehearsal, the owner's explicit go |
+| *Independent:* interim hook | prepared + tested + rollback drilled; **not applied** | owner approval per environment |
 
-### A. Merging the dormant code (this PR and its stack) — **NO-GO today; technically ready for CI**
-Why technically ready: everything ships OFF; the full local gate set is green (§6); no existing migration was edited; the permission contract is reconciled; rollback is a revert (code) and, for the DB, nothing to undo because all switches are off and `20261031090001` is applied last.
-Why NO-GO right now (all are conditions, not code defects):
-1. **Hosted security clearance is not recorded as complete** — a mandatory precondition you set. Open: Cloudflare Worker secret presence unverified; leaked-password protection OFF and redirect allow-list cleanup undecided (§8 and `PHONE_SIGNUP_R2_AUTH_HARDENING_RECOMMENDATIONS.md`); the migration-history question (`20261028090001` applied?) unanswered.
-2. **GitHub Actions has not run on this stack** (§7). The Worker bundle (`frontend-cloudflare`) and the real-Turnstile E2E are the two things this machine cannot prove.
-3. **#113's own open findings and owner decisions come first** (§9), and B1 (#121) is waiting on the base-permission-drift decision.
-4. **Product decision:** between merge+deploy and activation, mobile-number sign-up answers "unavailable" (§10.2).
-Becomes **GO** when 1–4 are cleared and the §7 runs are green on the final candidate.
+## 12. Sealed sign-up cookie — password retention and key isolation (review)
 
-### B. Enabling registration / WhatsApp delivery — **NO-GO**
-Nothing here authorises any of it. Required first (R1 plan stages 1–7): hosted inspection archived; dormant migrations applied on Acceptance by the owner; app deployed with flags OFF; `observe` window clean (every observation attributable to a retired path, no `phone_whatsapp_sign_up` with `had_grant=false`); HMAC keyring provisioned; edge rate limiting on the start/verify actions; **an approved delivery adapter** — `worker` mode is deliberately not wired (`WORKER_WIRED=false`), PR #114 needs its own reconciliation, and the Meta template/country list/language decisions are open; a rehearsal on Acceptance with an allow-listed number; the §10 decisions; then `enforce` only after the no-grant creators are confirmed retired in the deployed build.
-
-### C. Independent of A and B — the interim hook
-Recommended as a stop-gap **on Acceptance first** if A/B will take long (`PHONE_SIGNUP_R2_INTERIM_ALIAS_HOOK.md` §6–7). It needs its own owner approval; it does not enable registration or delivery.
+**What it holds** (cookie `psu`): registration id, latest challenge id, name, phone, username, account type, **birth date**, **password**, locale, expiry — for at most 10 minutes between the two form steps, because nothing exists in Auth yet. It is the only place the app keeps the password; it is never written to the database or a log (a unit test asserts it is absent from the sealed value).
+**Protection:** AES-256-GCM, random 96-bit IV per cookie, **AEAD associated data binds the ciphertext to this cookie's purpose** (`aladdin/phone-sign-up/psu/v1`); `httpOnly`, `secure`, `sameSite=lax`, `path=/auth`, `maxAge` 10 min, and the expiry is also inside the sealed value and enforced on the server. **Key isolation (changed in this round):** previously derived from `AUTH_PASSWORD_PREVIEW_GRANT_SECRET`, shared with other auth features; now a **dedicated `PHONE_SIGNUP_COOKIE_SECRET`** (≥32 chars, server secret store only), independent of the code keyring and of every other secret, **required whenever phone sign-up is on** — the action refuses to request a code without it (fail closed *before* a message could be sent). Wrong secret and a single flipped byte are both refused (unit tests).
+**Lifecycle:** cleared on success and on every terminal failure; kept on a rejected captcha (so Resend can retry without retyping) and refreshed on resend.
+**Remaining risks (documented, accepted for review):**
+1. **Server-secret compromise** exposes the password of any in-flight sign-up (≤10 min window) — mitigated by the dedicated secret and the short life; rotation invalidates in-flight sign-ups only.
+2. **A copied cookie cannot be read** but can be replayed within 10 minutes; completing a sign-up still needs the one-time code (single use, attempt-capped in the authority), so replay alone achieves nothing.
+3. **No server-side revocation** of a sealed cookie before it expires (the authority's single-use challenge is the real control).
+4. **No client binding (IP/user-agent):** deliberate — mobile networks change IPs mid-flow.
+5. The password also crosses the wire once in the form POST (TLS), as in any sign-up.
+6. **Option that would remove the retention:** ask for the password again on the code step and keep nothing but ids in the cookie (a UX cost; not done without a product decision).
