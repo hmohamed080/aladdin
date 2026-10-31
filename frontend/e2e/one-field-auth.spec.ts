@@ -3,13 +3,14 @@ import { test, expect, type Page } from "@playwright/test";
 import {
   E2E_BIRTH_DATE,
   E2E_PASSWORD,
+  reachLanding,
   SIGN_IN_BUTTON,
   SIGN_IN_IDENTIFIER_LABEL,
   SIGN_UP_CONTACT_LABEL,
   stubTurnstileWhenOffline,
   waitForCaptchaToken,
 } from "./helpers/auth";
-import { e164Of, readSignUpCode, requestPhoneSignUp, sqlValue as sql, submitPhoneCode, uniquePhone, uniquePhoneUsername as uniqueUsername, verifyPhoneSignUp } from "./helpers/phone-sign-up";
+import { deliveryViaRig, e164Of, readSignUpCode, rigClaims, rigFailNext, rigMessages, requestPhoneSignUp, sqlValue as sql, submitPhoneCode, uniquePhone, uniquePhoneUsername as uniqueUsername, verifyPhoneSignUp } from "./helpers/phone-sign-up";
 
 /**
  * One-field sign in and mobile-number sign up (ADR-0025), end to end against
@@ -74,7 +75,7 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     await expect(page.locator('input[name="confirmPassword"], input[type="checkbox"]')).toHaveCount(0);
   });
 
-  const outbox = process.env.PHONE_OTP_DELIVERY === "outbox";
+  const outbox = process.env.PHONE_OTP_DELIVERY === "outbox" || deliveryViaRig;
 
   test("a mobile number signs up with a WhatsApp code, then signs in by number or username", async ({ page }) => {
     test.skip(!outbox, "needs PHONE_OTP_DELIVERY=outbox and E2E_NEXT_MODE=dev (see helpers/phone-sign-up.ts)");
@@ -203,6 +204,45 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     } finally {
       await fetch(`${url}/auth/v1/admin/users/${userId}`, { method: "DELETE", headers: { apikey: service, authorization: `Bearer ${service}` } });
     }
+  });
+
+  test("through the Worker: Meta receives the approved Authentication template exactly once, D1 holds one claim, and the code on the handset verifies", async ({ page }) => {
+    test.skip(!deliveryViaRig, "needs the local Worker rig (E2E_WORKER_RIG_URL, PHONE_OTP_DELIVERY=worker)");
+    const phone = uniquePhone(); const e164 = e164Of(phone);
+    const claimsBefore = Object.values(await rigClaims()).reduce((a, b) => a + b, 0);
+    const since = await requestPhoneSignUp(page, { phone, name: "Worker Path", username: uniqueUsername() });
+    const code = (await readSignUpCode(e164, since))!;
+    const received = await rigMessages(e164);
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({ to: e164.slice(1), template: "aladdin_otp", language: "ar", type: "template", code, buttonCode: code, buttonSubType: "url", buttonIndex: "0" });
+    expect(Object.values(await rigClaims()).reduce((a, b) => a + b, 0)).toBe(claimsBefore + 1);
+    await submitPhoneCode(page, code);
+    await reachLanding(page, /\/home(\/|$|\?)/, 30_000);
+    expect(sql(`select count(*) from public.profiles where phone_e164 = '${e164}' and phone_verified_at is not null;`)).toBe("1");
+    expect(await rigMessages(e164)).toHaveLength(1);
+  });
+
+  test("through the Worker: a Meta failure is invisible in the reply, closes the challenge, and a resend (new challenge) delivers", async ({ page }) => {
+    test.skip(!deliveryViaRig, "needs the local Worker rig");
+    test.setTimeout(240_000); // the Resend button is on a cooldown (about a minute) before the person may ask again
+    const phone = uniquePhone(); const e164 = e164Of(phone);
+    await rigFailNext();
+    const since = await requestPhoneSignUp(page, { phone, name: "Meta Failure", username: uniqueUsername() });
+    expect(await readSignUpCode(e164, since, 4_000), "the failed delivery produced no message").toBeNull();
+    expect(sql(`select count(*) from app.phone_verification_challenges where phone_e164 = '${e164}' and invalidated_why = 'delivery_failed';`)).toBe("1");
+    // the person uses Resend: a NEW challenge, a new delivery id, delivered once
+    const step = page.locator('[data-sign-up-step="phone-code"]');
+    const resend = step.getByRole("button", { name: /resend|إعادة الإرسال/i }).first();
+    await expect(resend).toBeEnabled({ timeout: 120_000 });
+    const second = Date.now() - 1_000;
+    await expect(step.locator("form").nth(1).locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30_000 });
+    await resend.click();
+    const code = (await readSignUpCode(e164, second))!;
+    expect(code).toMatch(/^\d{6}$/);
+    expect(await rigMessages(e164)).toHaveLength(1);
+    await submitPhoneCode(page, code);
+    await reachLanding(page, /\/home(\/|$|\?)/, 30_000);
+    expect(sql(`select count(*) from public.profiles where phone_e164 = '${e164}' and phone_verified_at is not null;`)).toBe("1");
   });
 
   test("an unknown username or number gets the same generic sign-in error", async ({ page }) => {

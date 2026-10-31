@@ -36,7 +36,11 @@ export function evaluateTemplate(list, { name = "aladdin_otp", language = "ar" }
     authentication_category: t?.category === "AUTHENTICATION",
     // The Worker fills body parameter 1 and button index 0 (sub_type "url") with the code: the template must have exactly that shape.
     has_body: Boolean(body),
-    has_otp_button: buttons.some((b) => b.type === "OTP" && ["COPY_CODE", "ONE_TAP", "ZERO_TAP"].includes(b.otp_type)),
+    // EXACTLY one button, and it must be the COPY_CODE button. The Worker's payload fills body param 1 and button index 0 with the code, which is
+    // the Copy Code contract. ONE_TAP / ZERO_TAP buttons need Android package + signature-hash parameters the Worker never sends, so a template
+    // with one of those would be accepted by this check yet fail (or mis-render) on a real handset: they are refused here on purpose.
+    has_exactly_one_button: buttons.length === 1,
+    button_is_copy_code: buttons.length === 1 && buttons[0].type === "OTP" && buttons[0].otp_type === "COPY_CODE",
   };
   return { checks, ok: Object.values(checks).every(Boolean), status: t?.status ?? null, category: t?.category ?? null };
 }

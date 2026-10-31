@@ -19,7 +19,15 @@ test("only an APPROVED Arabic AUTHENTICATION template with a copy-code button pa
   assert.equal(evaluateTemplate({ data: [{ ...goodTemplate.data[0], status: "PENDING" }] }).ok, false);
   assert.equal(evaluateTemplate({ data: [{ ...goodTemplate.data[0], category: "MARKETING" }] }).ok, false);
   assert.equal(evaluateTemplate({ data: [{ ...goodTemplate.data[0], language: "en" }] }).checks.exists_in_language, false);
-  assert.equal(evaluateTemplate({ data: [{ ...goodTemplate.data[0], components: [{ type: "BODY" }] }] }).checks.has_otp_button, false);
+  assert.equal(evaluateTemplate({ data: [{ ...goodTemplate.data[0], components: [{ type: "BODY" }] }] }).checks.button_is_copy_code, false);
+  // incompatible OTP button types are refused: only Copy Code matches the payload the Worker sends
+  for (const otp_type of ["ONE_TAP", "ZERO_TAP", undefined]) {
+    const t = evaluateTemplate({ data: [{ ...goodTemplate.data[0], components: [{ type: "BODY" }, { type: "BUTTONS", buttons: [{ type: "OTP", otp_type }] }] }] });
+    assert.equal(t.ok, false, String(otp_type)); assert.equal(t.checks.button_is_copy_code, false);
+  }
+  // a non-OTP button, or COPY_CODE next to another button, is refused too
+  assert.equal(evaluateTemplate({ data: [{ ...goodTemplate.data[0], components: [{ type: "BODY" }, { type: "BUTTONS", buttons: [{ type: "URL" }] }] }] }).ok, false);
+  assert.equal(evaluateTemplate({ data: [{ ...goodTemplate.data[0], components: [{ type: "BODY" }, { type: "BUTTONS", buttons: [{ type: "OTP", otp_type: "COPY_CODE" }, { type: "QUICK_REPLY" }] }] }] }).checks.has_exactly_one_button, false);
   assert.equal(evaluateTemplate({ data: [] }).ok, false);
 });
 test("run: two GETs only, no token or full number in the output, exit 0 only when ready; missing inputs call nothing", async () => {
