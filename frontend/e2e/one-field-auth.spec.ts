@@ -232,7 +232,7 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     expect(sql(`select count(*) from app.phone_verification_challenges where phone_e164 = '${e164}' and invalidated_why = 'delivery_failed';`)).toBe("1");
     // the person uses Resend: a NEW challenge, a new delivery id, delivered once
     const step = page.locator('[data-sign-up-step="phone-code"]');
-    const resend = step.getByRole("button", { name: /resend|إعادة الإرسال/i }).first();
+    const resend = step.getByRole("button", { name: /resend|إعادة (ال)?إرسال/i }).first();
     await expect(resend).toBeEnabled({ timeout: 120_000 });
     const second = Date.now() - 1_000;
     await expect(step.locator("form").nth(1).locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30_000 });
