@@ -138,7 +138,8 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     const code = (await readSignUpCode(e164, since))!;
     const wrong = code === "000000" ? "111111" : "000000";
     await submitPhoneCode(page, wrong);
-    await expect(page.getByText(/invalid|incorrect|wrong|غير صحيح|خاطئ/i).first()).toBeVisible({ timeout: 20_000 });
+    // The app answers in the visitor's locale (Arabic by default), so assert on the alert inside the code step, not on English words.
+    await expect(page.locator('[data-sign-up-step="phone-code"]').getByRole("alert").first()).toBeVisible({ timeout: 20_000 });
     expect(sql(`select count(*) from public.profiles where phone_e164 = '${e164}';`)).toBe("0");
     expect(sql(`select count(*) from auth.users where email like 'p${e164.slice(1)}@%';`)).toBe("0");
     await verifyPhoneSignUp(page, e164, since);
@@ -164,9 +165,42 @@ test.describe("one-field sign in and mobile-number sign up", () => {
 
     // Any code fails and still no second account appears.
     await submitPhoneCode(other, "123456");
-    await expect(other.getByText(/invalid|incorrect|wrong|expired|غير صحيح|خاطئ|منتهي/i).first()).toBeVisible({ timeout: 20_000 });
+    await expect(other.locator('[data-sign-up-step="phone-code"]').getByRole("alert").first()).toBeVisible({ timeout: 20_000 });
     expect(sql(`select count(*) from auth.users where lower(email) like 'p${e164.slice(1)}@%';`)).toBe(accountsBefore);
     await ctx.close();
+  });
+
+  test("a legacy phone/password account created before enforcement still signs in by number, and a new grant-less alias is refused", async ({ page }) => {
+    test.skip(!outbox, "needs PHONE_OTP_DELIVERY=outbox and E2E_NEXT_MODE=dev");
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const service = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const phone = uniquePhone();
+    const e164 = e164Of(phone);
+    const aliasEmail = `p${e164.slice(1)}@craftsman-login.aladdin.invalid`;
+    const admin = (body: object) => fetch(`${url}/auth/v1/admin/users`, { method: "POST", headers: { apikey: service, authorization: `Bearer ${service}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+    // Reproduce the pre-R2 world: guard off, grant-less Admin creation exactly as the retired Installer page did it.
+    sql("update app.phone_verification_config set signup_enabled = false, alias_guard_mode = 'off';");
+    const legacy = await admin({ email: aliasEmail, password: E2E_PASSWORD, email_confirm: true, user_metadata: { full_name: "Legacy Installer" }, app_metadata: { registration_source: "temporary_craftsman_password_flow", aladdin_pw_preview_password_set: true } });
+    expect(legacy.status).toBe(200);
+    const userId = ((await legacy.json()) as { id: string }).id;
+    sql(`update public.profiles set phone_e164 = '${e164}', phone_national = '${phone}', phone_country_iso2 = 'EG' where user_id = '${userId}';`);
+    // Now the shipped target state: guard enforcing.
+    sql("update app.phone_verification_config set alias_guard_mode = 'observe';");
+    sql("update app.phone_verification_config set alias_guard_mode = 'enforce', signup_enabled = true;");
+    try {
+      // 1) the legacy account is untouched and signs in by number through the real UI
+      await signInWith(page, phone, E2E_PASSWORD);
+      await page.waitForURL(/\/(home|onboarding)(\/|$|\?)/, { waitUntil: "commit" });
+      expect(sql(`select count(*) from auth.users where id = '${userId}' and lower(email) = '${aliasEmail}';`)).toBe("1");
+      expect(sql(`select phone_verified_at is null from public.profiles where user_id = '${userId}';`)).toBe("t");
+      // 2) enforcement now refuses a NEW alias created without a grant (what the retired pages used to do)
+      const other = `p20${String(Date.now()).slice(-9)}@craftsman-login.aladdin.invalid`;
+      const refused = await admin({ email: other, password: E2E_PASSWORD, email_confirm: true, app_metadata: { registration_source: "temporary_craftsman_password_flow" } });
+      expect(refused.status).toBeGreaterThanOrEqual(400);
+      expect(sql(`select count(*) from auth.users where lower(email) = '${other}';`)).toBe("0");
+    } finally {
+      await fetch(`${url}/auth/v1/admin/users/${userId}`, { method: "DELETE", headers: { apikey: service, authorization: `Bearer ${service}` } });
+    }
   });
 
   test("an unknown username or number gets the same generic sign-in error", async ({ page }) => {

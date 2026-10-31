@@ -86,8 +86,9 @@ export default defineConfig({
     // flag is present at build time without any cross-platform env-prefix shim.
     // E2E_NEXT_MODE=dev runs `next dev` instead. Needed ONLY by the mobile-number sign-up specs: they read the code from the local
     // outbox (PHONE_OTP_DELIVERY=outbox), which the app refuses under NODE_ENV=production on purpose (a production build can never be
-    // switched to write codes to disk). Every other suite keeps the deterministic production build.
-    command: process.env.E2E_NEXT_MODE === "dev" ? `pnpm exec next dev --webpack --port ${PORT}` : `pnpm build && pnpm exec next start --port ${PORT}`,
+    // switched to write codes to disk). Bound to 127.0.0.1 because Next 16 blocks dev resources requested from another origin than its host,
+    // and the suite always browses 127.0.0.1 (otherwise the page renders but never hydrates). Every other suite keeps the deterministic production build.
+    command: process.env.E2E_NEXT_MODE === "dev" ? `pnpm exec next dev --webpack --hostname 127.0.0.1 --port ${PORT}` : `pnpm build && pnpm exec next start --port ${PORT}`,
     url: BASE_URL,
     // Never silently reuse a stray dev server — the gate must always run against a
     // fresh production build.
