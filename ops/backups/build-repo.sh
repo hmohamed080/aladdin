@@ -12,7 +12,9 @@ if [ -n "$(find "$DEST" -mindepth 1 -maxdepth 1 ! -name .git -print -quit)" ] &&
 fi
 rm -rf "$DEST/backup" "$DEST/.github/workflows" "$DEST/supabase"
 mkdir -p "$DEST/backup/kit" "$DEST/.github/workflows" "$DEST/supabase" "$DEST/r2"
-cp "$HERE"/{lib,plan,plan-test,db-backup,media-backup,restore-test,freshness,selftest}.sh "$HERE/snapshot-objects.py" "$DEST/backup/"
+# Every script and helper of the kit (a fixed list once left out media-verify.sh and the validators, so the built
+# repo could not run its restore test); build-repo-test.sh fails if anything is missing.
+cp "$HERE"/*.sh "$HERE"/*.py "$DEST/backup/"
 cp "$ROOT"/scripts/hosted-db/{security-tail,schema-fingerprint,rowcounts,auth-storage-columns,local-only-roles-cleanup,local-default-privileges-reset}.sql "$DEST/backup/kit/"
 cp "$HERE"/workflows/*.yml "$DEST/.github/workflows/"
 cp "$HERE"/r2/*.json "$DEST/r2/"
