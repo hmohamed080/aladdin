@@ -8,6 +8,7 @@
 #   R2_ENDPOINT      https://<account id>.r2.cloudflarestorage.com (local-test: http://127.0.0.1:<port>)
 #   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY   an R2 token scoped to BACKUP_BUCKET only
 export LC_ALL=C AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_PAGER=""
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 die() { echo "backup: $*" >&2; exit 1; }
 log() { echo "[$(date -u +%H:%M:%S)] $*"; }
@@ -114,6 +115,49 @@ newest_key() {
 }
 
 sha256() { sha256sum "$1" | cut -d' ' -f1; }
+
+# "Y M D DOW" of the Cairo day backups are filed under. BACKUP_NOW pins it for the local tests (a Sunday, the 1st);
+# any hosted label refuses it, so a stray variable can never misfile a real backup.
+cairo_day() {
+  if [ -n "${BACKUP_NOW:-}" ]; then
+    [ "$BACKUP_LABEL" = local-test ] || die "BACKUP_NOW is only for local tests"
+    TZ=Africa/Cairo date -d "$BACKUP_NOW" +'%Y %m %d %u'
+  else
+    TZ=Africa/Cairo date +'%Y %m %d %u'
+  fi
+}
+
+# Where the copy of one Supabase Storage object (id, bucket, etag) lives. The key holds only the random id.
+media_copy_key() { echo "media/$BACKUP_LABEL/supabase/objects/$2/$1-${3:-noetag}.age"; }
+
+# Findings about one stored snapshot's media step in one prefix, as "P|A|W text" lines (see media-record.py).
+# Fails CLOSED: a missing, unreadable, malformed or incomplete record, or a missing inventory, is a "P" line.
+media_findings() {
+  local prefix="$1" name="$2" tmp len out; tmp="$(mktemp)"
+  if ! s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.media.json" "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"; echo "P no readable media record for $name in $prefix (its media step did not finish)"; return 0
+  fi
+  len="$(s3 s3api head-object --bucket "$BACKUP_BUCKET" --key "$prefix/$name.media.tsv.age" --query ContentLength --output text 2>/dev/null || true)"
+  case "$len" in ''|*[!0-9]*|0) echo "P no media inventory for $name in $prefix";; esac
+  if out="$(python3 "$LIB_DIR/media-record.py" "$tmp" "$BACKUP_LABEL" "$name" "$BACKUP_LABEL")"; then
+    [ -z "$out" ] || echo "$out"
+  else
+    echo "P the media record of $name in $prefix could not be checked"
+  fi
+  rm -f "$tmp"
+}
+
+# 0 when snapshot $1 is stored in every given prefix and each holds a valid, complete media record for it.
+# Only "P" findings count: an alarm a new snapshot cannot fix (Production media in R2) must not cause endless retries.
+snapshot_done() {
+  local name="$1" p found; shift
+  for p in "$@"; do
+    s3 s3api head-object --bucket "$BACKUP_BUCKET" --key "$p/$name.tar.age" >/dev/null 2>&1 || return 1
+    found="$(media_findings "$p" "$name")"
+    if grep -q '^P ' <<< "$found"; then return 1; fi
+  done
+  return 0
+}
 
 # age encryption to every public recipient in AGE_RECIPIENTS (space or newline separated).
 # The backup job holds only public keys: it can encrypt, never decrypt.

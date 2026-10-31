@@ -12,9 +12,11 @@
 #   ACCEPTANCE_BACKUP_SCHEDULE  off (default) | daily (the Acceptance trial) | weekly (Sundays, Cairo)
 #   NOW                         optional UTC time for tests, e.g. 2026-10-29T23:30:00Z
 #
-# Scheduled backups fire at 22:30 and 23:30 UTC. Only a run whose Cairo hour is 01-03 counts, so the backup is
-# taken at 01:30 Cairo both in winter (UTC+2, the second firing) and in summer (UTC+3, the first; the second
-# then finds today's backup and does nothing). A late GitHub start up to 03:59 Cairo still counts.
+# Scheduled backups fire at 22:30, 23:30, 00:30 and 01:30 UTC. Only a run whose Cairo hour is 01-03 counts, so
+# exactly three firings a night count, whatever Cairo's offset: 01:30, 02:30 and 03:30 Cairo (winter UTC+2: the
+# 23:30, 00:30 and 01:30 firings; summer UTC+3: 22:30, 23:30 and 00:30). The first takes the backup; the others
+# are its retries: db-backup.sh does nothing when one of today's snapshots is complete (media included) and
+# takes a new snapshot when none is. A late GitHub start up to 03:59 Cairo still counts.
 set -euo pipefail
 PRODUCTION_CONFIRMATION="back up production"
 mode="${1:?usage: plan.sh backup|freshness}"

@@ -13,7 +13,8 @@
 #   ...<same name>.json                                         a manifest: sizes, hashes, counts; no row data
 #   ...<same name>.media.tsv.age, .media.json                   written next to it by media-backup.sh: this snapshot's media
 # Optional: KIT (folder with the hosted-db SQL kit, default ../../scripts/hosted-db), SUPABASE_CLI,
-#   SKIP_IF_TAKEN=1 (scheduled runs: do nothing when today's Cairo daily backup already exists),
+#   SKIP_IF_TAKEN=1 (scheduled runs: do nothing only when one of today's Cairo snapshots is COMPLETE, media included;
+#   an unfinished one is left as it is and superseded by a new snapshot),
 #   BACKUP_STATE_DIR (where the media step of the same job finds this snapshot's name, prefixes and media list).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"
@@ -31,14 +32,35 @@ command -v psql >/dev/null || die "psql is not installed"
 umask 077
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 # Day boundaries follow Cairo, where the owner reads them.
-read -r Y M D DOW <<< "$(TZ=Africa/Cairo date +'%Y %m %d %u')"
+read -r Y M D DOW <<< "$(cairo_day)"
 NAME="aladdin-$BACKUP_LABEL-$STAMP"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 B="$WORK/$NAME"; mkdir -p "$B"
 STATE="${BACKUP_STATE_DIR:-$WORK/state}"; mkdir -p "$STATE"; rm -f "$STATE/db.env" "$STATE/objects.tsv"
 DAILY="db/$BACKUP_LABEL/daily/$Y/$M/$D"
-if [ -n "${SKIP_IF_TAKEN:-}" ] && [ -n "$(newest_key "$DAILY/aladdin-$BACKUP_LABEL-")" ]; then
-  echo "SKIPPED=1" > "$STATE/db.env"; log "today's $BACKUP_LABEL backup ($Y-$M-$D Cairo) already exists: nothing to do"; exit 0
+PREFIXES="$DAILY"
+[ "$DOW" != 7 ] || PREFIXES="$PREFIXES db/$BACKUP_LABEL/weekly/$Y"
+[ "$D" != 01 ] || PREFIXES="$PREFIXES db/$BACKUP_LABEL/monthly/$Y"
+if [ -n "${SKIP_IF_TAKEN:-}" ]; then
+  # A scheduled run (there are several each night, as retries) is done only when one of today's snapshots is
+  # COMPLETE: stored in every prefix with a valid media record that says complete. A snapshot whose media step
+  # failed or was interrupted never counts. It is left untouched (nothing here ever replaces an object) and a
+  # new snapshot supersedes it, so a failed night is retried, never silently skipped.
+  TODAYS="$(s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "$DAILY/aladdin-$BACKUP_LABEL-" \
+    --query "sort_by(Contents[?ends_with(Key, '.tar.age')] || \`[]\`, &LastModified)[].Key" --output text | tr '\t' '\n' | grep -v '^None$' || true)"
+  UNFINISHED=0
+  for k in $TODAYS; do
+    n="$(basename "$k" .tar.age)"
+    # shellcheck disable=SC2086
+    if snapshot_done "$n" $PREFIXES; then
+      echo "SKIPPED=1" > "$STATE/db.env"; log "today's $BACKUP_LABEL backup ($Y-$M-$D Cairo) is complete: $n. Nothing to do"; exit 0
+    fi
+    UNFINISHED=$((UNFINISHED+1))
+  done
+  if [ "$UNFINISHED" -gt 0 ]; then
+    msg="$UNFINISHED earlier $BACKUP_LABEL snapshot(s) of $Y-$M-$D (Cairo) have no complete media backup. They stay as they are; taking a new snapshot"
+    if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::warning::$msg"; else echo "WARNING: $msg"; fi
+  fi
 fi
 
 log "dumping $BACKUP_LABEL (read-only)"
@@ -87,9 +109,6 @@ upload() {
   verify_stored "$WORK/$NAME.tar.age" "$prefix/$NAME.tar.age"
   log "stored $prefix/$NAME.tar.age ($BYTES bytes)"
 }
-PREFIXES="$DAILY"
-[ "$DOW" != 7 ] || PREFIXES="$PREFIXES db/$BACKUP_LABEL/weekly/$Y"
-[ "$D" != 01 ] || PREFIXES="$PREFIXES db/$BACKUP_LABEL/monthly/$Y"
 for p in $PREFIXES; do upload "$p"; done
 cp "$WORK/objects.tsv" "$STATE/objects.tsv"
 printf 'SKIPPED=0\nNAME=%s\nPREFIXES="%s"\nR2_ROWS=%s\n' "$NAME" "$PREFIXES" "$R2_ROWS" > "$STATE/db.env"

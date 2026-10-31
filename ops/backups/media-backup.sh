@@ -9,7 +9,7 @@
 #   SUPABASE_SERVICE_ROLE_KEY=... AGE_RECIPIENTS=... BACKUP_LABEL=production BACKUP_BUCKET=... R2_ENDPOINT=...
 #   AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...  bash media-backup.sh
 #
-# Writes (never replacing anything):
+# Writes (each object once, never replacing anything; the copies are shared by every snapshot that needs them):
 #   media/<label>/supabase/objects/<bucket>/<object id>-<etag>.age   each file version once, encrypted;
 #                                                                    x-amz-meta-sha256 / size = the plain file
 #   <each prefix of the snapshot>/<snapshot>.media.tsv.age           EVERY object of that snapshot -> its backup copy
@@ -40,12 +40,11 @@ s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "$P/objects/" --quer
   | tr '\t' '\n' | grep -v '^None$' | sort > "$WORK/have.txt" || true
 
 COPIED=0; BYTES=0; FAILED=0
-copy_key() { echo "$P/objects/$2/$1-${5:-noetag}.age"; }
 while IFS=$'\t' read -r id bucket name size etag; do
   [ -n "$id" ] || continue
   case "$id" in *[!0-9a-f-]*) die "unexpected object id";; esac
   case "$bucket" in *[!0-9a-z_-]*) die "unexpected bucket id";; esac
-  key="$(copy_key "$id" "$bucket" "$name" "$size" "$etag")"
+  key="$(media_copy_key "$id" "$bucket" "$etag")"
   grep -qxF "$key" "$WORK/have.txt" && continue
   path="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' "$name")"
   if ! curl -fsS --retry 3 --max-time 300 -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
@@ -64,7 +63,7 @@ done < <(sort -u "$WORK/live.tsv" "$BACKUP_STATE_DIR/objects.tsv")
 # dump and this step is found by its earlier copy; one never copied at all is MISSING and the run fails.
 : > "$WORK/inventory.tsv"; MISSING=0
 while IFS=$'\t' read -r id bucket name size etag; do
-  key="$(copy_key "$id" "$bucket" "$name" "$size" "$etag")"
+  key="$(media_copy_key "$id" "$bucket" "$etag")"
   if grep -qxF "$key" "$WORK/have.txt"; then state=ok; else state=MISSING; MISSING=$((MISSING+1)); fi
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$bucket" "$name" "$size" "$key" "$state" >> "$WORK/inventory.tsv"
 done < "$BACKUP_STATE_DIR/objects.tsv"
@@ -75,10 +74,11 @@ cat > "$WORK/media.json" <<JSON
  "complete":$COMPLETE,"r2_media_records_not_covered":${R2_ROWS:-0},"inventory_sha256":"$(sha256 "$WORK/inventory.tsv")"}
 JSON
 age_encrypt "$WORK/inventory.tsv" "$WORK/inventory.tsv.age"
-for prefix in $PREFIXES; do
-  put_once "$WORK/inventory.tsv.age" "$prefix/$NAME.media.tsv.age" application/octet-stream
-  put_once "$WORK/media.json" "$prefix/$NAME.media.json" application/json
-done
+# Inventories first, records last: a record in a prefix means its inventory is there too. Each object is written
+# once and never replaced. A run interrupted anywhere in here leaves a snapshot that media-record checks reject
+# (a prefix without its record), and the next scheduled run supersedes it with a new snapshot.
+for prefix in $PREFIXES; do put_once "$WORK/inventory.tsv.age" "$prefix/$NAME.media.tsv.age" application/octet-stream; done
+for prefix in $PREFIXES; do put_once "$WORK/media.json" "$prefix/$NAME.media.json" application/json; done
 log "media: snapshot $TOTAL files, $((TOTAL-MISSING)) backed up, $MISSING missing; $COPIED new copied ($BYTES bytes), $FAILED failed"
 [ "${R2_ROWS:-0}" -eq 0 ] || log "WARNING: $R2_ROWS media records live in R2, which this job does not copy (see README, R2 media)"
-[ "$COMPLETE" = true ] || die "the media backup of $NAME is incomplete (marked so in its .media.json); the next daily run retries the copies"
+[ "$COMPLETE" = true ] || die "the media backup of $NAME is incomplete (marked so in its .media.json); the next scheduled run takes a new snapshot"

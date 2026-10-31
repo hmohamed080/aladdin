@@ -7,9 +7,13 @@
 name: Daily backup
 on:
   schedule:
-    # 01:30 Cairo all year: 23:30 UTC in winter (UTC+2), 22:30 UTC in summer (UTC+3). plan.sh keeps the right one.
+    # 01:30 Cairo all year (23:30 UTC in winter UTC+2, 22:30 UTC in summer UTC+3), then retries at 02:30 and 03:30
+    # Cairo. plan.sh keeps the three firings whose Cairo hour is 01-03; a retry does nothing when the night's
+    # snapshot is complete and takes a new snapshot when the media backup failed or was interrupted.
     - cron: "30 22 * * *"
     - cron: "30 23 * * *"
+    - cron: "30 0 * * *"
+    - cron: "30 1 * * *"
   workflow_dispatch:
     inputs:
       label:

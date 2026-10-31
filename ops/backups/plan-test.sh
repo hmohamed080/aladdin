@@ -8,23 +8,31 @@ pass=0; fail=0
 check() { if [ "$2" = "$3" ]; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL  $1: expected [$3], got [$2]"; fi; }
 plan() { env -i PATH="$PATH" "$@" bash "$HERE/plan.sh" backup 2>/dev/null || echo ERROR; }
 
-# Schedule: both cron firings (22:30 and 23:30 UTC) around each change. Exactly one counts per Cairo night,
-# except in summer where both count and db-backup's SKIP_IF_TAKEN makes the second one do nothing.
+# Schedule: the four cron firings (22:30, 23:30, 00:30, 01:30 UTC) around each Cairo change. Exactly three count
+# per Cairo night (01:30, 02:30, 03:30 Cairo): the first backs up, the others retry when it did not finish.
 echo "Scheduled firings (UTC -> Cairo) and whether they back up Production:"
+nextday() { date -u -d "$1 + 1 day" +%F; }
 for d in 2026-04-22 2026-04-23 2026-04-24 2026-07-15 2026-10-28 2026-10-29 2026-10-30 2027-01-15; do
-  for t in 22:30 23:30; do
-    r="$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW="${d}T$t:00Z")"
-    printf '  %s %s UTC = %s Cairo -> %s\n' "$d" "$t" "$(TZ=Africa/Cairo date -d "${d}T$t:00Z" +'%a %F %H:%M %Z')" "$r"
+  counted=0; first=""
+  for t in "$d 22:30" "$d 23:30" "$(nextday "$d") 00:30" "$(nextday "$d") 01:30"; do
+    day="${t% *}"; hm="${t#* }"
+    r="$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW="${day}T$hm:00Z")"
+    printf '  %s %s UTC = %s Cairo -> %s\n' "$day" "$hm" "$(TZ=Africa/Cairo date -d "${day}T$hm:00Z" +'%a %F %H:%M %Z')" "$r"
+    if [ "$r" = '["production"]' ]; then counted=$((counted+1)); [ -n "$first" ] || first="$(TZ=Africa/Cairo date -d "${day}T$hm:00Z" +%H:%M)"; fi
   done
+  check "night starting $d (UTC): three firings count" "$counted" 3
+  check "night starting $d (UTC): the first counted firing is 01:30 Cairo" "$first" 01:30
 done
 check "winter 22:30 UTC is 00:30 Cairo: skipped" "$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW=2027-01-15T22:30:00Z)" '[]'
 check "winter 23:30 UTC is 01:30 Cairo: runs" "$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW=2027-01-15T23:30:00Z)" '["production"]'
 check "summer 22:30 UTC is 01:30 Cairo: runs" "$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW=2026-07-15T22:30:00Z)" '["production"]'
-check "summer 23:30 UTC is 02:30 Cairo: counts (the backup step finds today's and skips)" "$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW=2026-07-15T23:30:00Z)" '["production"]'
+check "summer 23:30 UTC is 02:30 Cairo: counts (a retry: the backup step skips when today's snapshot is complete)" "$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW=2026-07-15T23:30:00Z)" '["production"]'
 check "night of the October change (2026-10-29/30): 00:30 skipped" "$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW=2026-10-29T22:30:00Z)" '[]'
 check "night of the October change: 01:30 runs" "$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW=2026-10-29T23:30:00Z)" '["production"]'
 check "night of the April change (2026-04-23/24): 01:30 runs" "$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW=2026-04-23T22:30:00Z)" '["production"]'
 check "a run delayed to 03:59 Cairo still counts" "$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW=2027-01-16T01:59:00Z)" '["production"]'
+check "winter 01:30 UTC is 03:30 Cairo: the last retry counts" "$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW=2027-01-16T01:30:00Z)" '["production"]'
+check "summer 01:30 UTC is 04:30 Cairo: does not" "$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW=2026-07-16T01:30:00Z)" '[]'
 check "a run delayed past 04:00 Cairo does not" "$(plan EVENT=schedule PRODUCTION_BACKUP_ENABLED=true NOW=2027-01-16T02:01:00Z)" '[]'
 
 # Production gate.

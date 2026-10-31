@@ -2,13 +2,13 @@
 # Monthly restore test. Touches NO hosted project: it downloads the newest daily backup (or BACKUP_KEY, any
 # retained snapshot), checks its hashes and that it is the label's own project, decrypts it, restores it into a
 # throwaway local Supabase stack on this machine and proves the restore is exact (schema fingerprint and the row
-# count of every table equal what the dump holds). Then it proves the snapshot's media inventory lists exactly the
-# files the restored database references, each with a stored copy, and restores up to MEDIA_SAMPLE of them
-# (files deleted after the snapshot included) checking size and sha256. Writes REPORT.txt (counts, no row data).
+# count of every table equal what the dump holds). Then media-verify.sh proves the snapshot's media inventory
+# against the restored database (object id, bucket, complete path, size), that every copy exists, and restores a
+# sample (files deleted after the snapshot included) checking size and sha256. Writes REPORT.txt (counts, no row data).
 #
 #   BACKUP_LABEL=production BACKUP_BUCKET=... R2_ENDPOINT=... AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
 #   AGE_IDENTITY_FILE=<restore-test private key file>  bash restore-test.sh
-# Optional: BACKUP_KEY (a specific daily object instead of the newest), REPO_ROOT (holds supabase/config.toml and
+# Optional: BACKUP_KEY (a specific daily object instead of the newest complete one), REPO_ROOT (holds supabase/config.toml and
 # supabase/templates; default the aladdin checkout, or the backup repo root), KIT, MEDIA_SAMPLE (default 20), OUT (report folder), SUPABASE_CLI, KEEP_STACK=1.
 #
 # The restore steps are the ones scripts/hosted-db/production-rehearsal.sh proved exact on 2026-10-25.
@@ -28,13 +28,20 @@ umask 077
 OUT="${OUT:-$(mktemp -d)/restore-test}"; mkdir -p "$OUT"; W="$OUT/work"; mkdir -p "$W"
 fails=()
 
-# 1. Fetch and check the backup.
-newest_backup() {
-  s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "db/$BACKUP_LABEL/daily/" \
-    --query "sort_by(Contents[?ends_with(Key, '.tar.age')] || \`[]\`, &LastModified)[-1].Key" --output text | sed 's/^None$//'
+# 1. Fetch and check the backup. By default the newest snapshot WITH A COMPLETE MEDIA RECORD: a newer one whose
+# media step failed or was interrupted is skipped (and reported), because it cannot be restored with its files.
+SKIPPED_NEWER=0
+pick_snapshot() {
+  local k
+  for k in $(s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "db/$BACKUP_LABEL/daily/" \
+      --query "reverse(sort_by(Contents[?ends_with(Key, '.tar.age')] || \`[]\`, &LastModified))[:15].Key" --output text | tr '\t' '\n' | grep -v '^None$'); do
+    if ! grep -q '^P ' <<< "$(media_findings "${k%/*}" "$(basename "$k" .tar.age)")"; then KEY="$k"; return 0; fi
+    SKIPPED_NEWER=$((SKIPPED_NEWER+1))
+  done
+  KEY=""
 }
-KEY="${BACKUP_KEY:-$(newest_backup)}"
-case "$KEY" in db/"$BACKUP_LABEL"/*.tar.age) ;; "") die "no daily backup found";; *) die "BACKUP_KEY must be a $BACKUP_LABEL .tar.age backup";; esac
+if [ -n "${BACKUP_KEY:-}" ]; then KEY="$BACKUP_KEY"; else pick_snapshot; fi
+case "$KEY" in db/"$BACKUP_LABEL"/*.tar.age) ;; "") die "no daily backup with a complete media record found";; *) die "BACKUP_KEY must be a $BACKUP_LABEL .tar.age backup";; esac
 log "restore test of $KEY"
 s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$KEY" "$W/b.tar.age" > "$W/head.json"
 s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "${KEY%.tar.age}.json" "$W/manifest.json" >/dev/null
@@ -109,35 +116,12 @@ SCHEMA=exact; diff -q "$B/fingerprint.txt" "$OUT/fingerprint-restored.txt" >/dev
 join -t: -a1 -e MISSING -o 0,1.2,2.2 <(sort "$OUT/rowcounts-restored.txt") <(sort "$B/rowcounts.txt") | awk -F: '$2!=$3' > "$OUT/rowcount-diff.txt" || true
 ROWS=exact; [ ! -s "$OUT/rowcount-diff.txt" ] || { ROWS="DIFFER in $(wc -l < "$OUT/rowcount-diff.txt") tables"; fails+=("row counts differ (rowcount-diff.txt)"); }
 
-# 6. Media: this snapshot's own inventory must list exactly the files the restored database references, each
-# with a stored copy; then a random sample is restored and checked (size and the sha256 recorded at copy time).
-MEDIA="not checked"; N=0; BAD=0; base="${KEY%.tar.age}"
-if ! s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$base.media.json" "$W/media.json" >/dev/null 2>&1 \
-   || ! s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$base.media.tsv.age" "$W/inv.age" >/dev/null 2>&1; then
-  MEDIA="NO INVENTORY for this snapshot"; fails+=("the snapshot has no media inventory (media step did not finish)")
-elif ! age -d -i "$AGE_IDENTITY_FILE" -o "$W/inv.tsv" "$W/inv.age" 2>/dev/null; then
-  MEDIA="inventory cannot be decrypted"; fails+=("the media inventory cannot be decrypted")
-else
-  grep -q "\"inventory_sha256\":\"$(sha256 "$W/inv.tsv")\"" "$W/media.json" || fails+=("the media inventory hash is not its manifest's")
-  grep -q '"complete":true' "$W/media.json" || fails+=("the media step marked this snapshot incomplete")
-  echo "select id from storage.objects where coalesce((metadata->>'size')::bigint,0)>0 order by 1;" > "$W/obj.sql"
-  lq "$W/obj.sql" > "$W/db-ids.txt"
-  cut -f1 "$W/inv.tsv" | sort > "$W/inv-ids.txt"
-  awk -F'\t' '$6!="ok"' "$W/inv.tsv" | wc -l | tr -d ' ' > "$W/inv-missing.txt"
-  COVER=exact; cmp -s "$W/db-ids.txt" "$W/inv-ids.txt" || { COVER=DIFFERS; fails+=("the media inventory does not list exactly the restored storage.objects rows"); }
-  [ "$(cat "$W/inv-missing.txt")" = 0 ] || fails+=("$(cat "$W/inv-missing.txt") files of the snapshot have no stored copy")
-  shuf -n "${MEDIA_SAMPLE:-20}" "$W/inv.tsv" > "$W/media-sample.tsv" || true
-  while IFS=$'\t' read -r _ _ _ size k _; do
-    [ -n "$k" ] || continue; N=$((N+1))
-    if s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$k" "$W/m.age" > "$W/m.json" 2>/dev/null; then
-      want="$(sed -n 's/.*"sha256": *"\([0-9a-f]\{64\}\)".*/\1/p' "$W/m.json")"
-      age -d -i "$AGE_IDENTITY_FILE" -o "$W/m" "$W/m.age" 2>/dev/null && [ "$(sha256 "$W/m")" = "$want" ] \
-        && [ "$(wc -c < "$W/m" | tr -d ' ')" = "$size" ] || BAD=$((BAD+1))
-    else BAD=$((BAD+1)); fi
-  done < "$W/media-sample.tsv"
-  MEDIA="inventory $COVER ($(wc -l < "$W/inv-ids.txt" | tr -d ' ') files); $((N-BAD)) of $N sampled files restored with the recorded size and sha256"
-  [ "$BAD" -eq 0 ] || fails+=("$BAD sampled media files did not restore exactly")
-fi
+# 6. Media: media-verify.sh proves this snapshot's inventory against the restored database (object id, bucket,
+# complete path, size, copy key), that every copy exists with its recorded size, and a sample by sha256.
+env MEDIA_DB_CONTAINER="$C" KEY="$KEY" OUT="$OUT" bash "$HERE/media-verify.sh" > "$OUT/media-verify.log" 2>&1 || true
+MEDIA="$(cat "$OUT/media-summary.txt" 2>/dev/null || true)"
+if [ -z "$MEDIA" ]; then MEDIA="media check did not run"; fails+=("the media check did not finish (see media-verify.log)"); fi
+if [ -s "$OUT/media-fails.txt" ]; then while IFS= read -r l; do fails+=("$l"); done < "$OUT/media-fails.txt"; fi
 
 {
   echo "Restore test $(date -u +%FT%TZ) of $KEY"
@@ -147,6 +131,7 @@ fi
   echo "Schema fingerprint after restore: $SCHEMA"
   echo "Row counts after restore: $ROWS ($(wc -l < "$OUT/rowcounts-restored.txt" | tr -d ' ') tables, $(awk -F: '{s+=$2} END {print s+0}' "$OUT/rowcounts-restored.txt") rows)"
   echo "Media: $MEDIA"
+  [ "$SKIPPED_NEWER" -eq 0 ] || echo "Newer snapshots skipped because their media backup is not complete: $SKIPPED_NEWER"
   if [ "${#fails[@]}" -eq 0 ]; then echo "RESULT: PASS"; else echo "RESULT: FAIL"; printf '  %s\n' "${fails[@]}"; fi
 } | tee "$OUT/REPORT.txt"
 [ "${#fails[@]}" -eq 0 ]
