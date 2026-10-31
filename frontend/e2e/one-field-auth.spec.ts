@@ -9,12 +9,14 @@ import {
   stubTurnstileWhenOffline,
   waitForCaptchaToken,
 } from "./helpers/auth";
-import { e164Of, requestPhoneSignUp, sqlValue as sql, uniquePhone, uniquePhoneUsername as uniqueUsername, verifyPhoneSignUp } from "./helpers/phone-sign-up";
+import { e164Of, readSignUpCode, requestPhoneSignUp, sqlValue as sql, submitPhoneCode, uniquePhone, uniquePhoneUsername as uniqueUsername, verifyPhoneSignUp } from "./helpers/phone-sign-up";
 
 /**
  * One-field sign in and mobile-number sign up (ADR-0025), end to end against
  * the REAL local Supabase and the real server actions. No auth bypass; the
- * WhatsApp code is made known through helpers/phone-sign-up.ts.
+ * WhatsApp code is read from the local delivery outbox (helpers/phone-sign-up.ts),
+ * the way a person reads the message. The mobile sign-up tests need the app started
+ * with PHONE_OTP_DELIVERY=outbox (E2E_NEXT_MODE=dev) and are skipped otherwise.
  */
 
 const ALIAS_MARKER = "craftsman-login";
@@ -72,16 +74,20 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     await expect(page.locator('input[name="confirmPassword"], input[type="checkbox"]')).toHaveCount(0);
   });
 
+  const outbox = process.env.PHONE_OTP_DELIVERY === "outbox";
+
   test("a mobile number signs up with a WhatsApp code, then signs in by number or username", async ({ page }) => {
+    test.skip(!outbox, "needs PHONE_OTP_DELIVERY=outbox and E2E_NEXT_MODE=dev (see helpers/phone-sign-up.ts)");
     const phone = uniquePhone();
     const e164 = e164Of(phone);
     const username = uniqueUsername();
     const name = `Phone Tester ${phone.slice(-4)}`;
 
-    const challengeId = await requestPhoneSignUp(page, { phone, name, username });
-    // Nothing exists yet but the pending challenge: no account before the code is verified.
+    const since = await requestPhoneSignUp(page, { phone, name, username });
+    // Nothing exists yet but the pending challenge: no Auth user and no profile before the code is verified.
     expect(sql(`select count(*) from public.profiles where phone_e164 = '${e164}';`)).toBe("0");
-    await verifyPhoneSignUp(page, challengeId);
+    expect(sql(`select count(*) from auth.users where email like 'p${e164.slice(1)}@%';`)).toBe("0");
+    await verifyPhoneSignUp(page, e164, since);
     await expectNoAlias(page);
 
     const row = sql(`
@@ -91,19 +97,24 @@ test.describe("one-field sign in and mobile-number sign up", () => {
              p.username,
              u.birth_date,
              (select count(distinct consent_type) from public.consent_receipts c where c.user_id = a.id),
-             (select consumed_at is not null from public.phone_verification_challenges where id = '${challengeId}')
+             p.phone_verified_at is not null,
+             (select count(*) from app.phone_signup_grants g where g.consumed_user_id = a.id and g.attached_at is not null and g.phone_e164 = p.phone_e164),
+             (select count(*) from auth.users x where lower(x.email) = lower(a.email))
       from public.profiles p
       join auth.users a on a.id = p.user_id
       join public.users u on u.id = a.id
       where p.phone_e164 = '${e164}';`);
-    const [source, noAuthPhone, displayName, storedUsername, birthDate, consents, consumed] = row.split("|");
+    const [source, noAuthPhone, displayName, storedUsername, birthDate, consents, verified, attachedGrants, aliasUsers] = row.split("|");
     expect(source).toBe("phone_whatsapp_sign_up");
     expect(noAuthPhone).toBe("t");
     expect(displayName).toBe(name);
     expect(storedUsername).toBe(username);
     expect(birthDate).toBe(E2E_BIRTH_DATE);
     expect(consents).toBe("3");
-    expect(consumed).toBe("t");
+    // The proof is attached to exactly the proven number, and exactly one Auth user holds the alias.
+    expect(verified).toBe("t");
+    expect(attachedGrants).toBe("1");
+    expect(aliasUsers).toBe("1");
 
     // Sign in by mobile number: a wrong password gets the generic message, the right one lands.
     await page.context().clearCookies();
@@ -117,6 +128,81 @@ test.describe("one-field sign in and mobile-number sign up", () => {
     await page.context().clearCookies();
     await signInWith(page, username.toUpperCase(), E2E_PASSWORD);
     await page.waitForURL(/\/home(\/|$|\?)/, { waitUntil: "commit" });
+  });
+
+  test("a wrong code creates no account, and the right code is still accepted afterwards", async ({ page }) => {
+    test.skip(!outbox, "needs PHONE_OTP_DELIVERY=outbox and E2E_NEXT_MODE=dev");
+    const phone = uniquePhone();
+    const e164 = e164Of(phone);
+    const since = await requestPhoneSignUp(page, { phone, name: "Wrong Code", username: uniqueUsername() });
+    const code = (await readSignUpCode(e164, since))!;
+    const wrong = code === "000000" ? "111111" : "000000";
+    await submitPhoneCode(page, wrong);
+    // The app answers in the visitor's locale (Arabic by default), so assert on the alert inside the code step, not on English words.
+    await expect(page.locator('[data-sign-up-step="phone-code"]').getByRole("alert").first()).toBeVisible({ timeout: 20_000 });
+    expect(sql(`select count(*) from public.profiles where phone_e164 = '${e164}';`)).toBe("0");
+    expect(sql(`select count(*) from auth.users where email like 'p${e164.slice(1)}@%';`)).toBe("0");
+    await verifyPhoneSignUp(page, e164, since);
+    expect(sql(`select count(*) from public.profiles where phone_e164 = '${e164}' and phone_verified_at is not null;`)).toBe("1");
+  });
+
+  test("an already registered number gets the same screen and no message, and no second account", async ({ page, browser }) => {
+    test.skip(!outbox, "needs PHONE_OTP_DELIVERY=outbox and E2E_NEXT_MODE=dev");
+    const phone = uniquePhone();
+    const e164 = e164Of(phone);
+    const first = await requestPhoneSignUp(page, { phone, name: "First Owner", username: uniqueUsername() });
+    await verifyPhoneSignUp(page, e164, first);
+    const accountsBefore = sql(`select count(*) from auth.users where lower(email) like 'p${e164.slice(1)}@%';`);
+    expect(accountsBefore).toBe("1");
+
+    // A second visitor asks for the SAME number: the page is identical (the heading appears), but nothing is delivered.
+    const ctx = await browser.newContext();
+    const other = await ctx.newPage();
+    const ip = `10.${randomInt(256)}.${randomInt(256)}.${randomInt(1, 255)}`;
+    await other.route("**/*", (route) => route.continue({ headers: { ...route.request().headers(), "x-forwarded-for": ip } }));
+    const since = await requestPhoneSignUp(other, { phone, name: "Someone Else", username: uniqueUsername() });
+    expect(await readSignUpCode(e164, since, 4_000), "a registered number must receive no code").toBeNull();
+    // The code step always offers the way out for people who already have an account - for every number, so it reveals nothing.
+    await expect(other.locator('[data-sign-up-step="phone-code"]').locator('xpath=ancestor::main').getByRole("link", { name: /^(sign in|تسجيل الدخول)$/i }).first()).toHaveAttribute("href", "/auth/sign-in");
+
+    // Any code fails and still no second account appears.
+    await submitPhoneCode(other, "123456");
+    await expect(other.locator('[data-sign-up-step="phone-code"]').getByRole("alert").first()).toBeVisible({ timeout: 20_000 });
+    expect(sql(`select count(*) from auth.users where lower(email) like 'p${e164.slice(1)}@%';`)).toBe(accountsBefore);
+    await ctx.close();
+  });
+
+  test("a legacy phone/password account created before enforcement still signs in by number, and a new grant-less alias is refused", async ({ page }) => {
+    test.skip(!outbox, "needs PHONE_OTP_DELIVERY=outbox and E2E_NEXT_MODE=dev");
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const service = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const phone = uniquePhone();
+    const e164 = e164Of(phone);
+    const aliasEmail = `p${e164.slice(1)}@craftsman-login.aladdin.invalid`;
+    const admin = (body: object) => fetch(`${url}/auth/v1/admin/users`, { method: "POST", headers: { apikey: service, authorization: `Bearer ${service}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+    // Reproduce the pre-R2 world: guard off, grant-less Admin creation exactly as the retired Installer page did it.
+    sql("update app.phone_verification_config set signup_enabled = false, alias_guard_mode = 'off';");
+    const legacy = await admin({ email: aliasEmail, password: E2E_PASSWORD, email_confirm: true, user_metadata: { full_name: "Legacy Installer" }, app_metadata: { registration_source: "temporary_craftsman_password_flow", aladdin_pw_preview_password_set: true } });
+    expect(legacy.status).toBe(200);
+    const userId = ((await legacy.json()) as { id: string }).id;
+    sql(`update public.profiles set phone_e164 = '${e164}', phone_national = '${phone}', phone_country_iso2 = 'EG' where user_id = '${userId}';`);
+    // Now the shipped target state: guard enforcing.
+    sql("update app.phone_verification_config set alias_guard_mode = 'observe';");
+    sql("update app.phone_verification_config set alias_guard_mode = 'enforce', signup_enabled = true;");
+    try {
+      // 1) the legacy account is untouched and signs in by number through the real UI
+      await signInWith(page, phone, E2E_PASSWORD);
+      await page.waitForURL(/\/(home|onboarding)(\/|$|\?)/, { waitUntil: "commit" });
+      expect(sql(`select count(*) from auth.users where id = '${userId}' and lower(email) = '${aliasEmail}';`)).toBe("1");
+      expect(sql(`select phone_verified_at is null from public.profiles where user_id = '${userId}';`)).toBe("t");
+      // 2) enforcement now refuses a NEW alias created without a grant (what the retired pages used to do)
+      const other = `p20${String(Date.now()).slice(-9)}@craftsman-login.aladdin.invalid`;
+      const refused = await admin({ email: other, password: E2E_PASSWORD, email_confirm: true, app_metadata: { registration_source: "temporary_craftsman_password_flow" } });
+      expect(refused.status).toBeGreaterThanOrEqual(400);
+      expect(sql(`select count(*) from auth.users where lower(email) = '${other}';`)).toBe("0");
+    } finally {
+      await fetch(`${url}/auth/v1/admin/users/${userId}`, { method: "DELETE", headers: { apikey: service, authorization: `Bearer ${service}` } });
+    }
   });
 
   test("an unknown username or number gets the same generic sign-in error", async ({ page }) => {

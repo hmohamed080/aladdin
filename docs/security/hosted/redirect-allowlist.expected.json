@@ -1,0 +1,13 @@
+{
+  "_readme": "PROPOSED expected Auth redirect allow-lists. NOT confirmed by the owner (confirmed:false). The inspection compares the hosted list with this file EXACTLY (literal entries) and reports unexpected / missing entries; nothing is changed by it. Replace the values with the real domains, set confirmed:true after the owner reviews, then use: node scripts/hosted-db/inspect-auth-security.mjs --env both --expected docs/security/hosted/redirect-allowlist.expected.json",
+  "production": {
+    "confirmed": false,
+    "site_url": "https://aladdindecore.com",
+    "uri_allow_list": ["https://aladdindecore.com/**", "https://www.aladdindecore.com/**"]
+  },
+  "acceptance": {
+    "confirmed": false,
+    "site_url": "https://aladdin-frontend-preview.bstalent9.workers.dev",
+    "uri_allow_list": ["https://aladdin-frontend-preview.bstalent9.workers.dev/**"]
+  }
+}

@@ -191,8 +191,9 @@ export async function completeAccountBasics(page: Page): Promise<void> {
     const specialty = current.locator("select#specialtyAdd");
     if (await specialty.count()) await specialty.selectOption({ index: 1 });
     await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
-    // The answered step hides (or the page leaves once the last one saves).
-    await expect(current).toBeHidden();
+    // The answered step hides (or the page leaves once the last one saves). The last save lands on a route that `next dev` compiles on first
+    // hit ("Rendering..."), which takes well over the 10 s default; a production build answers at once.
+    await expect(current).toBeHidden({ timeout: 60_000 });
   }
 }
 

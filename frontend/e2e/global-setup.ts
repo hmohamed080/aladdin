@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { E2E_PASSWORD } from "./helpers/auth";
+import { enablePhoneSignupSwitches } from "./helpers/phone-sign-up";
 
 /**
  * Deterministic local-E2E seed (Sprint 6.2 follow-up). Playwright runs this ONCE
@@ -92,4 +93,12 @@ update auth.users
  where email like '%@example.test'
    and coalesce(encrypted_password, '') = '';
 `);
+
+  // Mobile-number sign-up is OFF by default in the database. A run that delivers to the local outbox (PHONE_OTP_DELIVERY=outbox) is the
+  // run that exercises it, so only then are the isolated stack's switches turned on. E2E_ALIAS_GUARD picks the guard mode (default enforce).
+  if (process.env.PHONE_OTP_DELIVERY === "outbox") {
+    const guard = process.env.E2E_ALIAS_GUARD ?? "enforce";
+    if (!["observe", "enforce"].includes(guard)) throw new Error("E2E_ALIAS_GUARD must be observe or enforce");
+    enablePhoneSignupSwitches(guard as "observe" | "enforce");
+  }
 }

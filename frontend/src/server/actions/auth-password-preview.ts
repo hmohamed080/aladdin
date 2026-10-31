@@ -401,6 +401,11 @@ export async function requestPasswordSignUp(
     if (isRateLimitError(error as GoTrueError)) {
       return { ok: false, code: "authPasswordPreview.error.rateLimited", email: parsed.data.email };
     }
+    // GoTrue refuses the password itself (`weak_password`; with leaked-password protection ON the reasons include `pwned`). It judges the
+    // password before it looks at the account, so this answer is the same for a new and an existing e-mail: no enumeration signal.
+    if ((error as GoTrueError).code === "weak_password") {
+      return { ok: false, code: "authPasswordPreview.error.passwordRejected", email: parsed.data.email };
+    }
     // ENUMERATION NORMALIZATION (§Account enumeration) — see
     // `isAccountExistsError`'s doc comment. Collapse into the exact same
     // success response a genuine new registration gets; never a different

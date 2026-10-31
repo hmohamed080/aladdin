@@ -359,6 +359,14 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
     expect(exists.code).toBe("authPasswordPreview.info.codeSent");
   });
 
+  it("a password refused by Auth (weak_password, e.g. a breached one) says so instead of 'could not send', and stages nothing", async () => {
+    signUp.mockResolvedValueOnce({ error: { code: "weak_password", message: "Password is known to be weak and easy to guess", status: 422 } });
+    const res = await requestPasswordSignUp({ ok: false }, consented({ email: "person@example.test", password: GOOD_PASSWORD }));
+    expect(res).toMatchObject({ ok: false, code: "authPasswordPreview.error.passwordRejected", email: "person@example.test" });
+    expect(JSON.stringify(res)).not.toMatch(/pwned|breach|known to be weak/i);
+    expect(savePendingRegistration).not.toHaveBeenCalled();
+  });
+
   it("a genuine unexpected failure surfaces the generic sendFailed code, never a distinguishing one", async () => {
     signUp.mockResolvedValueOnce({ error: { message: "network blip" } });
     const res = await requestPasswordSignUp(

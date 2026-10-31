@@ -6358,7 +6358,7 @@ export const ar: Messages = {
       noCodeHint: "لم يصلك رمز؟ قد يكون لديك حساب بالفعل.",
       verify: "تحقق وتابع",
       verifying: "جارٍ التحقق…",
-      haveAccount: "لديك حساب؟",
+      haveAccount: "لديك حساب بالفعل؟",
       signInLink: "تسجيل الدخول",
     },
     signIn: {
@@ -6440,7 +6440,7 @@ export const ar: Messages = {
       note: "يجب الموافقة على الثلاثة لإنشاء حساب.",
     },
     info: {
-      whatsappCodeSent: "أرسلنا رمزًا من ٦ أرقام إلى {email} على واتساب.",
+      whatsappCodeSent: "إذا كان بالإمكان التسجيل بهذا الرقم، فسيصلك رمز من ٦ أرقام على واتساب على {email}.",
       codeSent: "أرسلنا رمزًا إلى {email}. قد يستغرق وصوله لحظة.",
       resetSent: "إذا كان هناك حساب لـ {email}، فقد أرسلنا رمز إعادة تعيين كلمة المرور.",
     },

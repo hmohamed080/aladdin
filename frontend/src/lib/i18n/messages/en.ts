@@ -6518,8 +6518,8 @@ export const en = {
       noCodeHint: "No code arriving? You may already have an account.",
       verify: "Verify and continue",
       verifying: "Verifying…",
-      haveAccount: "Have an account?",
-      signInLink: "Log in",
+      haveAccount: "Already have an account?",
+      signInLink: "Sign in",
     },
     signIn: {
       identifierLabel: "Mobile number, username or email",
@@ -6600,7 +6600,7 @@ export const en = {
       note: "You must accept all three to create an account.",
     },
     info: {
-      whatsappCodeSent: "We sent a 6-digit code to {email} on WhatsApp.",
+      whatsappCodeSent: "If this number can be used to sign up, a 6-digit code is on its way to {email} on WhatsApp.",
       codeSent: "We sent a code to {email}. It may take a moment to arrive.",
       resetSent: "If an account exists for {email}, we sent a password reset code.",
     },

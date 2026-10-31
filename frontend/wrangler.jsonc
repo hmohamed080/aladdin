@@ -45,10 +45,8 @@
         // Contact-email links point back at the preview, never at production.
         // RESEND_API_KEY is a Worker secret.
         "EMAIL_FROM": "Aladdin <no-reply@aladdindecore.com>",
-        "APP_PUBLIC_ORIGIN": "https://aladdin-frontend-preview.bstalent9.workers.dev",
-        // Approved Meta Authentication template for sign-up codes. WHATSAPP_ACCESS_TOKEN
-        // and WHATSAPP_PHONE_NUMBER_ID are Worker secrets.
-        "WHATSAPP_OTP_TEMPLATE": "aladdin_login_code"
+        "APP_PUBLIC_ORIGIN": "https://aladdin-frontend-preview.bstalent9.workers.dev"
+        // Phone verification (PHONE_*) is intentionally absent: it ships OFF and delivery is never configured here.
       }
     },
     // Production: deployed only after the owner approves the cutover. Routes
@@ -73,9 +71,8 @@
         // aladdindecore.com domain. RESEND_API_KEY is a Worker secret.
         "EMAIL_FROM": "Aladdin <no-reply@aladdindecore.com>",
         "APP_PUBLIC_ORIGIN": "https://aladdindecore.com",
-        // Sign-up codes over WhatsApp. WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID
-        // are Worker secrets; until they are set, mobile-number sign-up says it is unavailable.
-        "WHATSAPP_OTP_TEMPLATE": "aladdin_login_code",
+        // Mobile-number sign-up codes: PHONE_* switches are absent on purpose (feature OFF). The Meta token never
+        // lives in this app; it belongs to the separate delivery Worker (PR #114), which stays disabled.
         // First cutover: media stays on Supabase Storage and Redis stays off. Each one
         // is turned on later by its own approval.
         "R2_STORAGE_ENABLED": "false",
