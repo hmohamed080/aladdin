@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isAuthSessionMissingError, type SupabaseClient } from "@supabase/supabase-js";
@@ -12,44 +12,34 @@ import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { CHOICES_BY_KEY } from "@/lib/onboarding/account-types";
 import { isUsernameWellFormed } from "@/lib/identity/username";
 import { getServerSupabase } from "@/lib/supabase/server";
-import {
-  consumePhoneChallenge,
-  countRecentPhoneChallenges,
-  createPhoneSignUpUser,
-  deleteCraftsmanPasswordUser,
-  deletePhoneChallenge,
-  insertPhoneChallenge,
-  isCanonicalPhoneTaken,
-  loadPhoneChallenge,
-  recordPhoneChallengeAttempt,
-  saveVerifiedBirthDate,
-} from "@/lib/supabase/admin-server";
+import { createPhoneSignUpUser, deleteCraftsmanPasswordUser, isCanonicalPhoneTaken, saveVerifiedBirthDate } from "@/lib/supabase/admin-server";
 import { displayNameSchema, parseBirthDate, passwordWithContextSchema } from "@/features/auth-password-preview/password-policy";
 import { phoneAuthLimit } from "@/server/auth/phone-auth-limit";
 import { captchaTokenFrom, isCaptchaFailure } from "@/server/auth/captcha";
 import { clientIpFrom, turnstileHostnamesFrom, verifyTurnstileToken } from "@/server/auth/turnstile";
-import { sendWhatsAppCode } from "@/server/auth/whatsapp-otp";
+import { getPhoneSignupService } from "@/server/phone-verification/runtime";
+import type { SignupGrant } from "@/server/phone-verification/signup-service";
 import type { Database } from "@/types/database.types";
 
 /**
- * Mobile-number sign-up on /auth/sign-up, for every account type, verified
- * with a 6-digit WhatsApp code (Meta Cloud API, server/auth/whatsapp-otp.ts).
+ * Mobile-number sign-up on /auth/sign-up, for every account type, proven with a 6-digit WhatsApp code.
  *
- *   1. requestPhoneSignUp — validates every field, checks Turnstile with
- *      Siteverify (no GoTrue call happens here, and each send costs money),
- *      applies the durable phone limiter plus a per-number send cap, stores an
- *      HMAC of a fresh code with a 10-minute expiry and 5 attempts, and sends
- *      it. The registration fields ride a SEALED cookie (AES-256-GCM, httpOnly,
- *      10 minutes, /auth only) because nothing exists in Auth yet.
- *   2. verifyPhoneSignUp — counts the guess first (compare-and-set), checks the
- *      code in constant time, consumes it once, and only then creates the
- *      account (internal login alias, lib/auth/craftsman-login-alias.ts),
- *      signs in (GoTrue judges the second Turnstile token) and initializes it
- *      through the same RPCs as every other sign-up. Any failure rolls the new
- *      account back.
+ * There is ONE authority for that proof: the phone verification authority (server/phone-verification, migrations 20261030090001/2).
+ * This file owns the form flow only. It generates, hashes, stores, sends and checks NO code of its own.
  *
- * The password exists only inside the sealed cookie between the two steps,
- * and the cookie is deleted as soon as step 2 ends either way.
+ *   1. requestPhoneSignUp — validates every field, checks Turnstile with Siteverify (no GoTrue call happens here), applies the durable
+ *      phone limiter, then asks the authority to open a challenge for a random REGISTRATION id. The authority generates and MACs the code,
+ *      and the delivery adapter sends it AFTER this reply (Next `after`), so the reply never depends on delivery: a number that already
+ *      belongs to an account gets the same screen, the same timing and simply no message. The registration fields ride a SEALED cookie
+ *      (AES-256-GCM, httpOnly, 10 minutes, /auth only) because nothing exists in Auth yet.
+ *   2. verifyPhoneSignUp — the authority checks the code (attempt caps live there) and returns ONE single-use GRANT for exactly that phone
+ *      alias. Only then is the Auth user created, through the Admin API with the grant in app_metadata (the database guard refuses a
+ *      phone-alias account without one). The user then signs in (GoTrue judges the second Turnstile token), is initialized through the same
+ *      RPCs as every other sign-up, and only then is the proof attached: `attach` sets profiles.phone_verified_at for the exact proven
+ *      number. Any failure — including a refused attach — rolls the new account back.
+ *
+ * The password exists only inside the sealed cookie between the two steps, and the cookie is deleted as soon as step 2 ends either way.
+ * Email and OAuth registration never pass through here and never need WhatsApp proof.
  */
 
 export type PhoneSignUpState = { ok: boolean; code?: string; email?: string; channel?: "email" | "phone" };
@@ -59,13 +49,15 @@ type Locale = "en" | "ar";
 
 const COOKIE = "psu";
 const COOKIE_PATH = "/auth";
-const CODE_TTL_MS = 10 * 60 * 1000;
-const MAX_ATTEMPTS = 5;
-const SENDS_PER_HOUR = 5;
+const COOKIE_TTL_MS = 10 * 60 * 1000;
 const CONSENT_TYPES = ["terms", "privacy", "pilot"] as const;
 const E = (key: string) => `authPasswordPreview.error.${key}`;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Pending = {
+  /** The registration id the authority binds every challenge and the grant to. Random, never derived from the number. */
+  rid: string;
+  /** The latest challenge id (replaced on resend). */
   cid: string;
   name: string;
   phone: CanonicalPhone;
@@ -95,15 +87,12 @@ function unseal(token: string | undefined): Pending | null {
     const decipher = createDecipheriv("aes-256-gcm", key("phone-sign-up-cookie"), raw.subarray(0, 12));
     decipher.setAuthTag(raw.subarray(12, 28));
     const value = JSON.parse(Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString("utf8")) as Pending;
-    if (typeof value.exp !== "number" || value.exp < Date.now() || typeof value.cid !== "string") return null;
+    if (typeof value.exp !== "number" || value.exp < Date.now()) return null;
+    if (typeof value.rid !== "string" || !UUID.test(value.rid) || typeof value.cid !== "string" || !UUID.test(value.cid)) return null;
     return value;
   } catch {
     return null;
   }
-}
-
-function codeHash(challengeId: string, code: string): string {
-  return createHmac("sha256", key("phone-sign-up-code")).update(`${challengeId}:${code}`).digest("hex");
 }
 
 async function writeCookie(value: Pending): Promise<void> {
@@ -112,7 +101,7 @@ async function writeCookie(value: Pending): Promise<void> {
     secure: true,
     sameSite: "lax",
     path: COOKIE_PATH,
-    maxAge: Math.floor(CODE_TTL_MS / 1000),
+    maxAge: Math.floor(COOKIE_TTL_MS / 1000),
   });
 }
 
@@ -124,29 +113,28 @@ function logStepFailure(step: string, error: { code?: string } | null | undefine
   console.error(`phone sign-up: ${step} failed (code ${error?.code ?? "unknown"})`);
 }
 
-/** Issues a fresh code for `pending.phone` and sends it. Returns an error code, or null on success. */
-async function issueCode(phone: CanonicalPhone, locale: Locale): Promise<{ cid: string } | { code: string }> {
+async function callerIp(): Promise<string | null> {
+  const h = await headers();
+  return clientIpFrom((name) => h.get(name)) ?? null;
+}
+
+/**
+ * Opens (or, on resend, replaces) the challenge through the authority. The authority's reply is identical for a free and a taken
+ * number; this function must not add any await on delivery or any branch that depends on whether the number is registered.
+ * `getPhoneSignupService()` is called here, inside the server action, because it wires Next `after()` to the request.
+ */
+async function startChallenge(rid: string, phone: CanonicalPhone, locale: Locale): Promise<{ cid: string } | { code: string }> {
   try {
-    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    if ((await countRecentPhoneChallenges(phone.e164, since)) >= SENDS_PER_HOUR) return { code: E("rateLimited") };
+    const service = getPhoneSignupService();
+    if (!service) return { code: E("whatsappUnavailable") };
+    const outcome = await service.start(rid, phone.e164, await callerIp(), locale);
+    if (outcome.status === "sent") return { cid: outcome.challengeId };
+    if (outcome.status === "rate_limited") return { code: E("rateLimited") };
+    return { code: E("whatsappUnavailable") };
   } catch (error) {
-    logStepFailure("send_count", error as { code?: string });
+    logStepFailure("challenge_start", error as { code?: string });
     return { code: E("sendFailed") };
   }
-  const cid = randomUUID();
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  try {
-    await insertPhoneChallenge({ id: cid, phoneE164: phone.e164, codeHash: codeHash(cid, code), expiresAt: new Date(Date.now() + CODE_TTL_MS).toISOString() });
-  } catch (error) {
-    logStepFailure("challenge", error as { code?: string });
-    return { code: E("sendFailed") };
-  }
-  const sent = await sendWhatsAppCode(phone.e164, code, locale);
-  if (sent === "sent") return { cid };
-  await deletePhoneChallenge(cid).catch(() => undefined);
-  if (sent === "invalid_number") return { code: E("whatsappNumberInvalid") };
-  if (sent === "unavailable") return { code: E("whatsappUnavailable") };
-  return { code: E("sendFailed") };
 }
 
 async function siteverify(formData: FormData, action: string): Promise<string | null> {
@@ -161,7 +149,7 @@ async function siteverify(formData: FormData, action: string): Promise<string | 
 }
 
 // ---------------------------------------------------------------------------
-// Step 1 — validate, send the WhatsApp code.
+// Step 1 — validate, open the challenge (the code is sent after the reply).
 // ---------------------------------------------------------------------------
 export async function requestPhoneSignUp(formData: FormData, phone: CanonicalPhone): Promise<PhoneSignUpState> {
   const echo = String(formData.get("contact") ?? "").trim();
@@ -192,22 +180,20 @@ export async function requestPhoneSignUp(formData: FormData, phone: CanonicalPho
   const limited = await phoneAuthLimit("sign-up", phone.e164, await headers());
   if (limited !== "allowed") return fail(limited === "limited" ? E("rateLimited") : E("sendFailed"));
 
-  try {
-    if (await isCanonicalPhoneTaken(phone.e164)) return fail(E("phoneExists"));
-  } catch (error) {
-    logStepFailure("phone_precheck", error as { code?: string });
-    return fail(E("sendFailed"));
-  }
+  // There is deliberately NO "is this number registered?" check here: the answer would be a phone-number existence oracle. A number that
+  // already has an account goes through the same screens and simply receives no code (the authority suppresses delivery).
   const { data: available, error: availabilityError } = await supabase.rpc("username_available", { p_username: username });
   if (availabilityError || typeof available !== "boolean") return fail(E("sendFailed"));
   if (!available) return fail("registration.error.usernameUnavailable");
 
   const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value) as Locale;
-  const issued = await issueCode(phone, locale);
-  if ("code" in issued) return fail(issued.code);
+  const rid = randomUUID();
+  const started = await startChallenge(rid, phone, locale);
+  if ("code" in started) return fail(started.code);
 
   await writeCookie({
-    cid: issued.cid,
+    rid,
+    cid: started.cid,
     name: name.data,
     phone,
     username,
@@ -215,13 +201,13 @@ export async function requestPhoneSignUp(formData: FormData, phone: CanonicalPho
     birthDate: birthDate.value,
     password: password.data,
     locale,
-    exp: Date.now() + CODE_TTL_MS,
+    exp: Date.now() + COOKIE_TTL_MS,
   });
   return { ok: true, code: "authPasswordPreview.info.whatsappCodeSent", email: echo, channel: "phone" };
 }
 
 // ---------------------------------------------------------------------------
-// Resend — a fresh code for the same pending sign-up.
+// Resend — a fresh challenge for the same registration (the authority supersedes the previous one and enforces the cooldown).
 // ---------------------------------------------------------------------------
 export async function resendPhoneSignUpCode(formData: FormData): Promise<PhoneSignUpState> {
   const pending = unseal((await cookies()).get(COOKIE)?.value);
@@ -230,10 +216,9 @@ export async function resendPhoneSignUpCode(formData: FormData): Promise<PhoneSi
   if (captchaError) return { ok: false, code: captchaError, channel: "phone" };
   const limited = await phoneAuthLimit("sign-up", pending.phone.e164, await headers());
   if (limited !== "allowed") return { ok: false, code: limited === "limited" ? E("rateLimited") : E("sendFailed"), channel: "phone" };
-  const issued = await issueCode(pending.phone, pending.locale);
-  if ("code" in issued) return { ok: false, code: issued.code, channel: "phone" };
-  await deletePhoneChallenge(pending.cid).catch(() => undefined);
-  await writeCookie({ ...pending, cid: issued.cid, exp: Date.now() + CODE_TTL_MS });
+  const started = await startChallenge(pending.rid, pending.phone, pending.locale);
+  if ("code" in started) return { ok: false, code: started.code, channel: "phone" };
+  await writeCookie({ ...pending, cid: started.cid, exp: Date.now() + COOKIE_TTL_MS });
   return { ok: true, code: "authPasswordPreview.info.whatsappCodeSent", channel: "phone" };
 }
 
@@ -243,7 +228,7 @@ class InitializationError extends Error {
   }
 }
 
-async function initializeAccount(supabase: Client, userId: string, pending: Pending): Promise<void> {
+async function initializeAccount(supabase: Client, userId: string, pending: Pending, grant: SignupGrant): Promise<void> {
   const step = async (name: string, call: PromiseLike<{ error: { code?: string } | null }>) => {
     const { error } = await call;
     if (!error) return;
@@ -272,10 +257,18 @@ async function initializeAccount(supabase: Client, userId: string, pending: Pend
     logStepFailure("birth_date", null);
     throw new InitializationError("failed");
   }
+  // Last: the profile now holds exactly the proven number, so the authority can stamp phone_verified_at for it. Anything but a clean
+  // "attached" (grant expired, wrong user, wrong number, feature switched off meanwhile) fails the whole sign-up and rolls it back.
+  const service = getPhoneSignupService();
+  const attached = service ? await service.attach(userId, grant.id) : null;
+  if (attached?.status !== "attached") {
+    logStepFailure("attach", null);
+    throw new InitializationError("failed");
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 — check the code, then create and sign in the account.
+// Step 2 — the authority checks the code and returns a grant; then create, sign in and initialize the account.
 // ---------------------------------------------------------------------------
 export async function verifyPhoneSignUp(formData: FormData): Promise<PhoneSignUpState> {
   const fail = (code: string): PhoneSignUpState => ({ ok: false, code, channel: "phone" });
@@ -287,35 +280,37 @@ export async function verifyPhoneSignUp(formData: FormData): Promise<PhoneSignUp
   const sessionCaptcha = captchaTokenFrom(formData);
   if (!sessionCaptcha) return fail(E("captchaRequired"));
 
-  let challenge;
+  const service = (() => {
+    try {
+      return getPhoneSignupService();
+    } catch (error) {
+      logStepFailure("service", error as { code?: string });
+      return null;
+    }
+  })();
+  if (!service) return fail(E("whatsappUnavailable"));
+
+  let proof;
   try {
-    challenge = await loadPhoneChallenge(pending.cid);
+    proof = await service.verify(pending.rid, pending.cid, token, await callerIp());
   } catch (error) {
-    logStepFailure("challenge_load", error as { code?: string });
+    logStepFailure("challenge_verify", error as { code?: string });
     return fail(E("verifyFailed"));
   }
-  if (!challenge || challenge.phoneE164 !== pending.phone.e164 || challenge.consumedAt || Date.parse(challenge.expiresAt) < Date.now() || challenge.attempts >= MAX_ATTEMPTS) {
-    return fail(E("phoneCodeExpired"));
-  }
-  try {
-    if (!(await recordPhoneChallengeAttempt(challenge.id, challenge.attempts))) return fail(E("invalidCode"));
-  } catch (error) {
-    logStepFailure("challenge_attempt", error as { code?: string });
-    return fail(E("verifyFailed"));
-  }
-  const expected = Buffer.from(challenge.codeHash, "hex");
-  const actual = Buffer.from(codeHash(challenge.id, token), "hex");
-  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
-    return fail(challenge.attempts + 1 >= MAX_ATTEMPTS ? E("phoneCodeExpired") : E("invalidCode"));
-  }
-  try {
-    if (!(await consumePhoneChallenge(challenge.id))) return fail(E("phoneCodeExpired"));
-  } catch (error) {
-    logStepFailure("challenge_consume", error as { code?: string });
+  if (proof.status === "rate_limited") return fail(E("rateLimited"));
+  if (proof.status === "unavailable") return fail(E("verifyFailed"));
+  if (proof.status !== "verified") return fail(E("invalidCode"));
+
+  // The number is now proven. The grant must be for exactly the number and alias this sign-up asked for — never trust that alone.
+  const loginAlias = craftsmanLoginAlias(pending.phone.e164);
+  const grant = proof.grant;
+  if (grant.phone !== pending.phone.e164 || grant.alias !== loginAlias || grant.registrationId !== pending.rid) {
+    await clearCookie();
+    logStepFailure("grant_mismatch", null);
     return fail(E("verifyFailed"));
   }
 
-  // The number is now proven. Create the account only now.
+  // The number may have been taken by another account since the code was sent (the authority re-checks too).
   try {
     if (await isCanonicalPhoneTaken(pending.phone.e164)) {
       await clearCookie();
@@ -325,8 +320,8 @@ export async function verifyPhoneSignUp(formData: FormData): Promise<PhoneSignUp
     logStepFailure("phone_precheck", error as { code?: string });
     return fail(E("verifyFailed"));
   }
-  const loginAlias = craftsmanLoginAlias(pending.phone.e164);
-  const created = await createPhoneSignUpUser({ loginAlias, password: pending.password, fullName: pending.name, locale: pending.locale }).catch(() => ({ ok: false as const, reason: "failed" as const }));
+
+  const created = await createPhoneSignUpUser({ grant, password: pending.password, fullName: pending.name, locale: pending.locale }).catch(() => ({ ok: false as const, reason: "failed" as const }));
   if (!created.ok) {
     await clearCookie();
     if (created.reason === "exists") return fail(E("phoneExists"));
@@ -341,12 +336,12 @@ export async function verifyPhoneSignUp(formData: FormData): Promise<PhoneSignUp
       logStepFailure("session", error as { code?: string });
       throw new InitializationError(isCaptchaFailure(error as { code?: string; message?: string }) ? "captcha" : "failed");
     }
-    await initializeAccount(supabase, created.userId, pending);
+    await initializeAccount(supabase, created.userId, pending, grant);
   } catch (error) {
     try { await supabase.auth.signOut({ scope: "global" }); } catch { logStepFailure("session_revoke", null); }
     try { await deleteCraftsmanPasswordUser(created.userId); } catch { logStepFailure("rollback", null); }
     const outcome = error instanceof InitializationError ? error.outcome : "failed";
-    // A rejected challenge keeps the pending sign-up, so "Resend code" can start over without retyping.
+    // A rejected captcha keeps the pending sign-up, so "Resend code" can start over (same registration) without retyping.
     if (outcome !== "captcha") await clearCookie();
     if (!(error instanceof InitializationError)) logStepFailure("initialization", error as { code?: string });
     if (outcome === "phone_taken") return fail(E("phoneExists"));
