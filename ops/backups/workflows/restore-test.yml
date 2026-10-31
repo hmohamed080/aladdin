@@ -1,0 +1,50 @@
+# Monthly restore test into a throwaway local Supabase stack on the runner. Touches no hosted project.
+# The restore-test private key lives only in the per-project `restore-test-<label>` environment, never next to the write token.
+name: Monthly restore test
+on:
+  schedule:
+    - cron: "0 4 2 * *"        # 06:00 Cairo on the 2nd
+  workflow_dispatch:
+    inputs:
+      label:
+        type: choice
+        options: [production, acceptance]
+        default: production
+      backup_key:
+        description: "Optional: a specific retained snapshot (db/<label>/.../<name>.tar.age) instead of the newest"
+        type: string
+        required: false
+        default: ""
+permissions:
+  contents: read
+jobs:
+  restore:
+    # Scheduled runs restore Production only once it is activated; a manual run restores what it is asked to.
+    if: github.event_name == 'workflow_dispatch' || vars.PRODUCTION_BACKUP_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: restore-test-${{ inputs.label || 'production' }}
+    env:
+      BACKUP_LABEL: ${{ inputs.label || 'production' }}
+      BACKUP_KEY: ${{ inputs.backup_key }}
+      BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
+      R2_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_READ_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_READ_SECRET }}
+      AGE_IDENTITY: ${{ secrets.AGE_RESTORE_TEST_IDENTITY }}
+      LEGACY_MEDIA_BACKUP: ${{ vars.LEGACY_MEDIA_BACKUP }}
+      R2_MEDIA_BACKUP: ${{ vars.R2_MEDIA_BACKUP }}
+      REPO_ROOT: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Work folder on the runner
+        run: echo "OUT=$RUNNER_TEMP/restore-test" >> "$GITHUB_ENV"
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq age >/dev/null
+      - name: Restore and verify
+        run: |
+          umask 077; printf '%s\n' "$AGE_IDENTITY" > "$RUNNER_TEMP/restore.key"
+          [ -n "$BACKUP_KEY" ] || unset BACKUP_KEY
+          AGE_IDENTITY_FILE="$RUNNER_TEMP/restore.key" bash backup/restore-test.sh
+      - name: Report (counts and hashes only)
+        if: always()
+        run: cat "$OUT/REPORT.txt" >> "$GITHUB_STEP_SUMMARY" || true

@@ -132,7 +132,7 @@ describe.skipIf(!isolated)("isolated real Supabase/R2 media backend", { timeout:
       expect(await readMediaUrl(owner, "certificate", object_key)).toMatch(/^\/api\/media\/certificate\?key=/);
       expect(new Uint8Array(await (await deliverMedia(owner, "certificate", object_key)).arrayBuffer())).toEqual(bytes);
       if (grant.provider === "r2") {
-        const unsigned = new URL(await mediaProvider(owner, "certificate", "r2").getReadAccess(object_key, 30)); unsigned.search = "";
+        const unsigned = new URL(await (await mediaProvider(owner, "certificate", "r2", object_key)).getReadAccess(object_key, 30)); unsigned.search = "";
         expect((await fetch(unsigned)).ok).toBe(false);
       }
     } finally {

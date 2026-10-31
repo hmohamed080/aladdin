@@ -7084,3 +7084,31 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Stage 12 on owner GO (17:40Z): Custom Domains `aladdindecore.com` and `www` on `aladdin-frontend-production`; the apex CNAME to `cc39f6c51d632b81.vercel-dns-017.com` was deleted to allow it. Owner reports no errors after ~35 min. Routes are not listed in `wrangler.jsonc` (the deploy token has no zone permission; wrangler leaves dashboard domains alone).
 - Team preview: `aladdin-frontend-preview.bstalent9.workers.dev` behind Cloudflare Access (All traffic; policies `Aladdin team` Allow by email, `GitHub preview smoke` Service Auth). The preview smoke check sends `CF_ACCESS_CLIENT_ID/SECRET` (environment `cloudflare-preview`).
 - **Unfinished / owner steps:** add the One-time PIN login method so teammates without a Cloudflare account can sign in; monitor (stage 13, proposed 7 days) before any Vercel change; the stage 12 rollback (detach domains, re-add the apex CNAME DNS only) stays ready; DMARC record is a separate later task; merge PR #110.
+
+### 2026-10-29 — Phase 1 backups and IDs-only R2 keys (branch `claude/project-thread-yjnwej`)
+
+- Owner decisions: "Start Phase 1" on the backup plan (audit and plan: Claude Doc "R2 media and backups", 2026-10-28), then "Use stable IDs only, with separate user (`u/`) and organization (`o/`) namespaces … Existing keys must remain valid." [ADR-0027](../decisions/ADR-0027-r2-id-keys-and-backups.md).
+- Backups: `ops/backups/` (db-backup, media-backup, restore-test, freshness, selftest, build-repo, three workflows, R2 lock and lifecycle rules, runbook README). The jobs run from a separate private repo `aladdin-backups` so their secrets stay out of this repo's workflows. Local proof: `selftest.sh` 17/17 against a local stack and a SeaweedFS S3 stand-in, exact restore (schema fingerprint, every table's row count, media sha256).
+- Keys: migration `20261029120001` adds the immutable `media_storage_locations.storage_key`, minted by trigger for new backend R2 reservations; `app.media_edge_grant` returns it; service-role `media_storage_object` serves the app (`media.ts`, `delivery.ts`, `r2-provider.ts`) and the cleanup command in `scripts/media-storage.mjs` (which now also deletes variants). The media Worker accepts ids-only keys only in the namespace's own folder. pgTAP `104_media_id_storage_keys_test.sql` (37 checks); full suite 6,370 green.
+- Local testing note: the selftest seeds two Storage files and removes them on exit; files left in local Storage break `100_historical_media_purge_test.sql` test 48.
+- **Unfinished / owner steps:** review and merge the PR; the backup setup steps in `ops/backups/README.md`; Acceptance run; then a separate Production GO. Push `20261029120001` to Acceptance, then Production, before R2 uploads are switched on anywhere. Follow-ups: video keys under `u/`/`o/` if video ships; an R2 source for the media copy once Production media is on R2.
+
+
+- 2026-10-29 17:22Z follow-up (owner review of #118):
+  - **Numbering.** Renumbered to migration `20261029120001` and ADR-0027, because #113 holds `20261029090001` and `20261029090002` (both on Acceptance) and ADR-0025/0026. The WhatsApp OTP branch also uses ADR-0025; that branch needs its own renumbering.
+  - **Permissions.** New permission contract `20261029120001.json` with exactly three reviewed additions. Once #113 merges, merge `main` into #118 and regenerate this contract from the combined replay, because the gate reads only the newest contract.
+  - **Workflows.** Rebuilt around `plan.sh`/`plan-test.sh`:
+    - a matrix decided by a plan job (`matrix` is not available in a job-level `if`);
+    - a Production switch plus a typed confirmation, checked again in the scripts;
+    - two cron firings for Cairo daylight saving.
+  - **Labels.** Each label is pinned to its project ref, database host, Supabase URL, service-key claim and bucket.
+  - **Snapshots.** Each snapshot's media inventory comes from its own dump and is stored next to it (same lock and expiry). Media copies are locked 365 days and never expired. The restore test checks inventory coverage, and freshness fails on an incomplete media step and, for Production, on uncovered R2 media.
+  - **CI.** A new `backup-kit` CI job runs actionlint 1.7.7, shellcheck and the plan tests. actionlint could not be downloaded in the session container, so CI is the evidence.
+
+### 2026-10-31 — Backup consolidation (PR #118 stays the source; branch `claude/project-thread-yjnwej`)
+
+- Owner asks: use the new private repo `hmohamed080/aladdin-backups` (empty, inactive code only), no shared backup bucket, resolve the 90-day versus 366-day retention mismatch, reuse the Acceptance R2 media buckets, separate GitHub environments per project.
+- `lib.sh`: the hardcoded shared bucket is gone. `expected_bucket` pins Production to `aladdin-production-db-backups` and Acceptance to `aladdin-acceptance-backups`; each is refused under the other label. R2 rules are now per bucket (`r2/production/{lifecycle,lock}.json`, `r2/acceptance/lifecycle.json`); workflows use per-project environments (`backup-<label>`, `backup-check-<label>`, `restore-test-<label>`).
+- Retention: database 366 days, R2 media copies 90 days after they are written. A copy can be up to 31 days older than a snapshot that uses it, so the **guaranteed full-restore window is 59 days**; older snapshots are database-only and `media-verify.sh` reports `DATABASE-ONLY` instead of failing on expired copies. `retention-test.sh` (offline, in CI) fails if rules, constants and README drift.
+- `build-repo.sh` builds INACTIVE by default (no `schedule:` trigger); `--scheduled` is for the activation GO.
+- **Not done / owner steps:** nothing hosted was created or changed. `aladdin-acceptance-backups`, its tokens, the GitHub environments and the `--scheduled` build await the Acceptance GO. ADR-0027 is also used by the WhatsApp OTP worker branch (#127): renumber that one.

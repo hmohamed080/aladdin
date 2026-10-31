@@ -589,9 +589,14 @@ async function cleanup(supabase, env, project, options) {
   let retired = 0;
   for (const row of rows) {
     if (row.provider !== "r2") continue; // Legacy source objects are never removed by this tool.
+    // The database names the physical key: ids-only (u/…, o/…) for uploads since 2026-10-29, else the legacy key.
+    const { data: object, error: objectError } = await supabase.rpc("media_storage_object", { p_namespace: row.namespace, p_key: row.object_key });
+    if (objectError || typeof object !== "string" || !object) continue;
     const { error: retireError } = await supabase.rpc("media_cleanup_retire", { p_namespace: row.namespace, p_key: row.object_key, p_owner: row.owner_user_id });
     if (retireError) continue;
-    for (const objectKey of [r2.key(row), `pending/${r2.key(row)}`]) await r2.s3.send(new r2.DeleteObjectCommand({ Bucket: r2.bucket, Key: objectKey }));
+    const variants = ["thumb", "card", "full"].map((variant) => /^[uo]\//.test(object)
+      ? object.replace(/\/original\.[a-z0-9]+$/, `/v/${variant}.webp`) : `v/${object}/${variant}.webp`);
+    for (const objectKey of [object, `pending/${object}`, ...variants]) await r2.s3.send(new r2.DeleteObjectCommand({ Bucket: r2.bucket, Key: objectKey }));
     const { error: completeError } = await supabase.rpc("media_cleanup_complete", { p_namespace: row.namespace, p_key: row.object_key, p_owner: row.owner_user_id });
     if (completeError) throw new OperatorError("Cleanup completion failed; retry safely");
     retired++;

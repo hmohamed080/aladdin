@@ -1,0 +1,49 @@
+# Daily alarm: fails, and emails the owner, when a backup is missing, late, suspiciously small, or its media
+# step did not finish complete. Covers Acceptance whenever ACCEPTANCE_BACKUP_SCHEDULE is daily or weekly (the
+# trial included) and Production once PRODUCTION_BACKUP_ENABLED is "true" (backup/plan.sh).
+name: Backup freshness
+on:
+  schedule:
+    - cron: "0 5 * * *"        # 07:00 Cairo in winter, 08:00 in summer: always hours after the 01:30 backup
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      targets: ${{ steps.plan.outputs.targets }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          PRODUCTION_BACKUP_ENABLED: ${{ vars.PRODUCTION_BACKUP_ENABLED }}
+          ACCEPTANCE_BACKUP_SCHEDULE: ${{ vars.ACCEPTANCE_BACKUP_SCHEDULE }}
+        run: echo "targets=$(bash backup/plan.sh freshness)" >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: plan
+    if: needs.plan.outputs.targets != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.plan.outputs.targets) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: backup-check-${{ matrix.target.label }}
+    env:
+      BACKUP_LABEL: ${{ matrix.target.label }}
+      MAX_AGE_HOURS: ${{ matrix.target.max_age_hours }}
+      BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
+      R2_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_READ_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_READ_SECRET }}
+      LEGACY_MEDIA_BACKUP: ${{ vars.LEGACY_MEDIA_BACKUP }}
+      R2_MEDIA_BACKUP: ${{ vars.R2_MEDIA_BACKUP }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash backup/freshness.sh

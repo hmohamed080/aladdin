@@ -22,13 +22,16 @@ export const MEDIA_VARIANT_WIDTH: Readonly<Record<MediaVariant, number>> = {
 
 /**
  * Where a variant lives in the private bucket, next to — never instead of — the
- * original. Deterministic from the original's key, so a retry, the backfill and
- * the edge Worker all name the same object. It inherits the original's namespace
- * and therefore its authorization: nothing resolves a variant without resolving
- * the original key first.
+ * original, from the original's physical R2 key. Deterministic, so a retry, the
+ * backfill and the edge Worker all name the same object. It inherits the original's
+ * authorization: nothing resolves a variant without resolving the original first.
+ * Ids-only keys (u/… or o/…, from 2026-10-29) keep variants in the original's folder:
+ * `u/<user>/portfolio/<id>/original.png` → `u/<user>/portfolio/<id>/v/card.webp`.
+ * Legacy keys (`<namespace>/<key>`) keep `v/<namespace>/<key>/<variant>.webp`.
  */
-export function variantStorageKey(namespace: string, key: string, variant: MediaVariant): string {
-  return `v/${namespace}/${key}/${variant}.webp`;
+export function variantObjectKey(objectKey: string, variant: MediaVariant): string {
+  return /^[uo]\//.test(objectKey) ? objectKey.replace(/\/original\.[a-z0-9]+$/, `/v/${variant}.webp`)
+    : `v/${objectKey}/${variant}.webp`;
 }
 
 /** URLs per variant, filled by the URL issuer (WP4). Any subset may be present. */
