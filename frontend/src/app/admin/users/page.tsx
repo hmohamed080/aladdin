@@ -47,9 +47,9 @@ function filterHref(keep: Record<string, string | undefined>, overrides: Record<
  * into a safe default. Field sources: docs/admin/ADMIN_USERS_ORGS_READ_AUDIT.md.
  *
  * Last Active has no authoritative source (product activity is not tracked),
- * so it says so rather than showing a sign-in time under that label. Row
- * actions are still Preview dialogs (mutations are Phase 1B-B); the shell's
- * banner says so. The eye opens `/p/[profileId]` — the PROFILE id — only when
+ * so it says so rather than showing a sign-in time under that label. Suspend /
+ * Restore and Approve / Reject are real (Approve / Reject act on the account's open verification request —
+ * see `UserVerificationControls`); the remaining row actions are links. The eye opens `/p/[profileId]` — the PROFILE id — only when
  * `profile_public_directory` will actually render it.
  */
 export default async function PreviewUsersPage({

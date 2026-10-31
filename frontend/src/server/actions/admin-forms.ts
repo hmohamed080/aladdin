@@ -22,7 +22,7 @@ function mapReviewError(message: string | undefined): string {
   const m = (message ?? "").toLowerCase();
   if (m.includes("authority")) return "admin.review.error.notAuthorized";
   if (m.includes("own verification")) return "admin.review.error.ownReview";
-  if (m.includes("another reviewer")) return "admin.review.error.otherReviewer";
+  if (m.includes("another reviewer") || m.includes("assigned reviewer")) return "admin.review.error.otherReviewer";
   if (m.includes("invalid transition")) return "admin.review.error.state";
   if (m.includes("reason")) return "admin.review.error.reasonRequired";
   return "states.genericRetry";
