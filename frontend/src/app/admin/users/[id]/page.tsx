@@ -15,6 +15,8 @@ import { AdminHeader, StatusBadge } from "@/features/admin/parts";
 import { Card, Badge, Field, SectionTitle, StatePanel } from "@/components/ui/primitives";
 import { TabLinks } from "@/components/ui/stat-tiles";
 import { PreviewActionDialog } from "@/features/admin-preview/preview-action-dialog";
+import { UserVerificationControls } from "@/features/admin/user-verification-controls";
+import { isOpenVerificationStatus } from "@/lib/admin/verification-status";
 import { FollowUpPanel } from "@/features/admin-preview/follow-up-panel";
 import { loadCases, loadFollowUpAssignees, loadFollowUps, loadNotes, loadSuspension, loadTimeline } from "@/server/queries/admin-operations";
 import { SuspensionAction, SuspensionBanner } from "@/features/admin-ops/suspension";
@@ -81,6 +83,11 @@ export default async function PreviewUserDetailPage({
   const user = loaded.data;
   if (!user) notFound();
 
+  // The newest open request (the detail RPC returns them newest first); business verification has its own queue.
+  const openRequest = user.verifications.find((v) => isOpenVerificationStatus(v.status) && v.verificationType !== "business");
+  const pendingVerification = openRequest
+    ? { id: openRequest.id, status: openRequest.status, verificationType: openRequest.verificationType }
+    : null;
   const canPoints = can(access, "points.read");
   const canAudit = can(access, "audit.read");
   const typeLabels = m.accountType as Record<string, string>;
@@ -171,11 +178,8 @@ export default async function PreviewUserDetailPage({
               {platform.viewOnPlatform}
             </span>
           )}
-          {user.status === "pending_verification" ? (
-            <>
-              <PreviewActionDialog trigger={ov.verify} triggerVariant="accent" title={ov.verify} confirmLabel={ov.verify} confirmVariant="accent" />
-              <PreviewActionDialog trigger={ov.reject} triggerVariant="danger" title={m.admin.preview.review.rejectTitle} body={m.admin.preview.review.rejectBody} confirmLabel={ov.reject} confirmVariant="danger" />
-            </>
+          {can(access, "users.verify") && (user.status === "pending_verification" || pendingVerification) ? (
+            <UserVerificationControls userId={user.id} pending={pendingVerification} />
           ) : null}
           {canSuspend && user.status !== "deactivated" ? (
             <SuspensionAction m={m} subjectType="user" subjectId={user.id} suspended={user.status === "suspended"} />
