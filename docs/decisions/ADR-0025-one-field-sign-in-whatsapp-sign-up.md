@@ -24,3 +24,6 @@
 - Business types may now register with a mobile number; their account still verifies a channel (WhatsApp) before it exists.
 - Each WhatsApp code costs money: it is sent only after Turnstile, the limiter and every field check pass.
 - Installer Forgot Password is still deferred (recovery by WhatsApp code is the natural next step).
+
+## Amendment (R2, 2026-10-31): one verification authority
+The WhatsApp code for mobile sign-up is no longer generated, stored or checked by the sign-up server. It belongs to the phone verification authority (`supabase/migrations/20261030090001/2`, `frontend/src/server/phone-verification`): the account is created only with that authority's single-use grant, and `profiles.phone_verified_at` is set only after the usual initialisation. The sign-up server holds no code, no hash and no table of its own, and no longer calls Meta; delivery goes through one interface (`PHONE_OTP_DELIVERY`, default off). The first step no longer says whether a number is registered (a registered number simply receives no code). The legacy table `public.phone_verification_challenges` is dropped by the forward-only migration `20261031090001`. Everything ships OFF; see `docs/security/PHONE_SIGNUP_R2_INTEGRATION.md`.
