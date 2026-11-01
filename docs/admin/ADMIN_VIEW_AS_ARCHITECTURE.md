@@ -1,6 +1,6 @@
 # Admin "View as account" — read-only account view (architecture & permission model)
 
-**Status:** DESIGN — for review before any code or migration. Nothing here is implemented.
+**Status:** Owner decisions approved 2026-11-01. **Stage 2 (foundation) is implemented** on this branch (§13); craftsman sections and private media are the next stages. Sections below describe the design; where the build refined it, the text says **Built:**.
 **Branch / PR:** `feat/admin-view-as-design-20261031` (stacked on PR #128, which touches the same Users pages).
 **First account kind:** Craftsman (`installer_technician`). **Designed to be reused** for Showroom and every other account kind without changing the framework.
 
@@ -98,8 +98,10 @@ New table `public.admin_view_sessions`:
 | `ended_at null` | set by an explicit "Exit" |
 
 * RLS enabled; **no** table grants to `authenticated` / `anon` / `service_role`. Only the functions below touch it.
-* `admin_view_as_begin(p_subject uuid, p_kind text) → uuid` (VOLATILE, `SECURITY DEFINER`): runs `app.require_view_as`, **reuses** an unexpired session for the same admin+subject+kind (a page refresh must not spam the log), otherwise inserts a row and writes audit action **`admin.view_as.started`** (`actor_user_id` = admin, `subject_type` = `user`, `subject_id` = subject, `metadata` = `{kind, session_id, expires_at}`) via the existing `app.record_audit_event`. New audit actions are appended with the existing `app.audit_actions_add` helper (never re-creating `ck_audit_action_known` from a literal list).
-* `admin_view_as_end(p_session uuid)` → sets `ended_at`, audit `admin.view_as.ended`.
+* **Built:** the functions end/read a session by `(subject, kind)` of the caller, so the browser never holds a session id: `admin_view_as_begin(p_subject, p_kind) → jsonb` (opens), `admin_view_as_current(p_subject, p_kind) → jsonb` (STABLE read for the page guard/banner), `admin_view_as_end(p_subject, p_kind) → boolean` (Exit), `admin_view_as_end_all() → int` (sign-out). `admin_view_as_begin` (VOLATILE, `SECURITY DEFINER`): runs `app.require_view_as`, **reuses** an unexpired session for the same admin+subject+kind (a page refresh must not spam the log), otherwise inserts a row and writes audit action **`admin.view_as.started`** (`actor_user_id` = admin, `subject_type` = `user`, `subject_id` = subject, `metadata` = `{kind, session_id, expires_at}`) via the existing `app.record_audit_event`. New audit actions are appended with the existing `app.audit_actions_add` helper (never re-creating `ck_audit_action_known` from a literal list).
+* `admin_view_as_end` sets `ended_at` and audits `admin.view_as.ended` (`reason: exit`); `admin_view_as_end_all` does the same with `reason: sign_out`. Exit is allowed even after the permission was revoked, and only ever touches the caller's own rows.
+* **Built — a session opens only by a deliberate same-origin POST** (`POST /admin/users/[id]/view/start`, Origin + `Sec-Fetch-Site` checks). The page guard (`requireViewAs`) only READS the live session via `admin_view_as_current`; a cross-site link, image or prefetch therefore cannot start a session or forge an `admin.view_as.started` audit row. No live session → the admin is returned to the user's admin page.
+* **Invalidation (all enforced server-side, on every call):** explicit Exit; sign-out (`end_all`); the 30-minute window; permission revoked or deactivated; the admin's role/rank or account status changes; the subject stops being eligible. Rank protection ignores the subject's account status (`app.view_as_protected_rank`), so a suspended peer or senior admin stays protected.
 * **Every read function requires a live session** (`exists(... admin_user_id = auth.uid() and subject_user_id = p_subject and ended_at is null and expires_at > now())`). Consequence: the database itself refuses reads that were not preceded by a logged session — a forged direct RPC call cannot skip the audit.
 * The audit entries appear in the existing audit feed (`/admin/audit`) and on the subject's own Audit tab; no new UI is needed.
 
@@ -184,7 +186,7 @@ AccountViewDefinition {
 ## 9. Privacy, caching, headers
 
 * View-as routes: `export const dynamic = "force-dynamic"`, `revalidate = 0`, `Cache-Control: private, no-store` (and `Pragma: no-cache`), no `unstable_cache` / tag caching of any admin-view loader, no analytics events carrying the subject.
-* Responses carry `X-Robots-Tag: noindex, nofollow` and `Referrer-Policy: no-referrer`; the route is not in any sitemap.
+* Responses carry `Cache-Control: private, no-store, max-age=0`, `Pragma: no-cache`, `X-Robots-Tag: noindex, nofollow` and `Referrer-Policy: same-origin`; the route is not in any sitemap. **Built:** the policy is `same-origin`, not `no-referrer` — with `no-referrer` browsers send `Origin: null` on same-origin form POSTs, which broke the Return-to-admin form's own Origin check (found in browser testing). `same-origin` still never sends the URL (it contains the subject's id) to another site.
 * No subject data is written to logs; errors map to generic keys (the existing convention).
 
 ## 10. Private media
@@ -223,13 +225,17 @@ Extension (**a separate, later slice, §13 step 4 — needs its own security rev
 ## 13. Delivery slices (stacked, each reviewable)
 
 1. **Design (this document)** — review/approve permission model and defaults.
-2. **Foundation:** permission, session table, audit actions, `require_view_as`, begin/end, `ADMIN_VIEW_AS_ENABLED`, guard + banner shell with an empty section list + tests.
+2. **Foundation (built):** permission, session table, audit actions, `require_view_as`, begin/current/end/end_all, `ADMIN_VIEW_AS_ENABLED`, guard + banner shell with an empty section list + tests. Migration `20261101090002_admin_view_as_foundation.sql`; pgTAP `117_admin_view_as_foundation_test.sql`.
 3. **Craftsman sections** (§6.4) with readers, read-only components, `LinkScope`, import-graph test; wire the **eye** (craftsman rows → view-as; other kinds keep `/p/<id>`).
 4. **Private media branch** (§10) — separate security review.
 
 Each slice documents its migration impact and regression results here before it is marked ready.
 
-## 14. Decisions needed from the owner
+## 14. Owner decisions
+
+**Approved 2026-11-01:** (1) `users.view_as` for Super Admin + Administrator only; Moderator/Support never automatically, via the existing RBAC and rank rules. (2) 30 minutes, non-sliding; Exit, sign-out, permission revocation and authorization changes invalidate access server-side. (3) Suspended, deactivated, unlisted and unverified accounts are viewable read-only. (4) Private media is a separately reviewed slice but **required before the feature is called production-ready** (existing R2 + Worker only: no public exposure, duplication or Supabase Storage fallback). (5) Mask the secondary phone; show the primary only under the existing admin access policy; never OTPs, passwords, secrets, tokens or auth metadata. (6) Patterns A/C approved; do not rewrite `my_*` or duplicate business logic unless strictly necessary and separately reviewed.
+
+<details><summary>Original questions (answered above)</summary>
 
 1. **Default grants:** Administrator + Super Admin only (proposed). Should Moderator or Support ever have it?
 2. **Session TTL:** 30 minutes, non-sliding (proposed).
@@ -237,6 +243,8 @@ Each slice documents its migration impact and regression results here before it 
 4. **Private media:** keep as the later slice (proposed) or require it before the first release?
 5. **Secondary phone / contact details inside the view:** show as the owner sees them, or mask (proposed: mask the secondary phone, show the primary as the directory already does).
 6. **Pattern B** (refactoring existing `my_*` bodies): not planned; confirm we stay on A/C.
+
+</details>
 
 ## 15. Related
 

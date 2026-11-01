@@ -13,7 +13,7 @@ describe("baseline security headers", () => {
     });
   });
 
-  it("keep Admin View-As responses private, unindexed and referrer-free", async () => {
+  it("keep Admin View-As responses private, unindexed and cross-site-referrer-free", async () => {
     const rules = await nextConfig.headers!();
     const viewAs = rules.filter((rule) => rule.source.startsWith("/admin/users/:id/view"));
     expect(viewAs.length).toBeGreaterThan(0);
@@ -22,7 +22,7 @@ describe("baseline security headers", () => {
       "cache-control": "private, no-store, max-age=0",
       pragma: "no-cache",
       "x-robots-tag": "noindex, nofollow",
-      "referrer-policy": "no-referrer",
+      "referrer-policy": "same-origin",
     });
   });
 });
