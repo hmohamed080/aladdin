@@ -17,6 +17,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const origin = request.headers.get("origin");
   if (origin && origin !== request.nextUrl.origin) return new NextResponse(null, { status: 403 });
+  const site = request.headers.get("sec-fetch-site");
+  if (site && site !== "same-origin") return new NextResponse(null, { status: 403 });
 
   const supabase = await getServerSupabase();
   await supabase.rpc("admin_view_as_end", { p_subject: id, p_kind: "craftsman" });

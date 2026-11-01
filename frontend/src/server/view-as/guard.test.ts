@@ -6,7 +6,10 @@ vi.mock("react", async (orig) => ({ ...(await orig<typeof import("react")>()), c
 const notFound = vi.fn(() => {
   throw new Error("NOT_FOUND");
 });
-vi.mock("next/navigation", () => ({ notFound }));
+const redirect = vi.fn((url: string) => {
+  throw new Error(`REDIRECT:${url}`);
+});
+vi.mock("next/navigation", () => ({ notFound, redirect }));
 
 const rpc = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: vi.fn(async () => ({ rpc })) }));
@@ -32,6 +35,7 @@ const staff = (permissions: string[]) => ({ isStaff: true, rank: 80, permissions
 beforeEach(() => {
   rpc.mockReset();
   notFound.mockClear();
+  redirect.mockClear();
   loadAdminAccess.mockReset();
   vi.stubEnv("ADMIN_VIEW_AS_ENABLED", "true");
 });
@@ -54,12 +58,14 @@ describe("parseViewAsSession", () => {
 });
 
 describe("requireViewAs — fails closed with one 404", () => {
-  it("returns the session for an authorized admin and opens it through the database", async () => {
+  it("returns the live session for an authorized admin, READING it (never opening one)", async () => {
     loadAdminAccess.mockResolvedValue(staff(["users.view_as"]));
     rpc.mockResolvedValue({ data: payload(), error: null });
     const s = await requireViewAs(ID);
     expect(s.subjectUserId).toBe(ID);
-    expect(rpc).toHaveBeenCalledWith("admin_view_as_begin", { p_subject: ID, p_kind: "craftsman" });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("admin_view_as_current", { p_subject: ID, p_kind: "craftsman" });
+    expect(rpc).not.toHaveBeenCalledWith("admin_view_as_begin", expect.anything());
   });
 
   it("404s when the feature is switched off, before any database call", async () => {
@@ -86,15 +92,15 @@ describe("requireViewAs — fails closed with one 404", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("404s when the database refuses (ineligible, unknown or lower-ranked subject): same response for all", async () => {
+  it("sends the admin back to the user page when there is no live session (never started, ended, expired, ineligible)", async () => {
     loadAdminAccess.mockResolvedValue(staff(["users.view_as"]));
     rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "not permitted" } });
-    await expect(requireViewAs(ID)).rejects.toThrow("NOT_FOUND");
+    await expect(requireViewAs(ID)).rejects.toThrow(`REDIRECT:/admin/users/${ID}`);
   });
 
-  it("404s a session payload for a DIFFERENT subject than the one requested", async () => {
+  it("does not trust a session payload for a DIFFERENT subject than the one requested", async () => {
     loadAdminAccess.mockResolvedValue(staff(["users.view_as"]));
     rpc.mockResolvedValue({ data: payload({ subject_user_id: "70000008-0000-4000-8000-000000000008" }), error: null });
-    await expect(requireViewAs(ID)).rejects.toThrow("NOT_FOUND");
+    await expect(requireViewAs(ID)).rejects.toThrow(`REDIRECT:/admin/users/${ID}`);
   });
 });
