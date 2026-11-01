@@ -12,10 +12,9 @@
 export type ViewAsKind = "craftsman";
 
 export type ViewAsSection = {
-  /** Stable key; also the path segment under the view base path ("" = the landing/dashboard). */
+  /** Stable key (also the i18n key under `admin.viewAs.sections`). */
   readonly key: string;
-  /** i18n key (under `admin.viewAs.sections`). */
-  readonly titleKey: string;
+  /** Path segment under the view base path ("" = the landing/dashboard). */
   readonly segment: string;
 };
 
@@ -25,7 +24,7 @@ export type AccountViewDefinition = {
   readonly subjectType: "user";
   /** `users.primary_account_type` values this kind applies to. */
   readonly accountTypes: readonly string[];
-  /** Read-only sections, in navigation order. Empty until the section stage ships. */
+  /** Read-only sections, in navigation order. */
   readonly sections: readonly ViewAsSection[];
 };
 
@@ -34,7 +33,14 @@ export const ACCOUNT_VIEWS: Readonly<Record<ViewAsKind, AccountViewDefinition>> 
     kind: "craftsman",
     subjectType: "user",
     accountTypes: ["installer_technician"],
-    sections: [],
+    sections: [
+      { key: "dashboard", segment: "" },
+      { key: "profile", segment: "profile" },
+      { key: "portfolio", segment: "portfolio" },
+      { key: "work", segment: "work" },
+      { key: "points", segment: "points" },
+      { key: "reviews", segment: "reviews" },
+    ],
   },
 };
 
@@ -50,4 +56,13 @@ export function viewKindForAccountType(accountType: string | null | undefined): 
 /** Base path of the read-only view of a user. The ONLY place this URL shape is built. */
 export function viewAsBasePath(userId: string): string {
   return `/admin/users/${userId}/view`;
+}
+
+/**
+ * The link scope: the ONLY way a view-as component builds an internal link. Every href lands under the view's own base
+ * path, so navigation can never reach the Admin's own craftsman area (`/home/...`).
+ */
+export function viewAsHref(userId: string, segment: string): string {
+  const base = viewAsBasePath(userId);
+  return segment ? `${base}/${segment}` : base;
 }

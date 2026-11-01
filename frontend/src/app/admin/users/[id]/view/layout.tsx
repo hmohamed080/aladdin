@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { requireViewAs } from "@/server/view-as/guard";
 import { ViewAsBanner } from "@/features/admin-view-as/view-as-banner";
+import { ViewAsNav } from "@/features/admin-view-as/craftsman-sections";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -22,6 +23,7 @@ export default async function ViewAsLayout({ children, params }: { children: Rea
         kind={session.kind}
         expiresAt={session.expiresAt}
       />
+      <ViewAsNav userId={session.subjectUserId} kind={session.kind} />
       {children}
     </div>
   );
