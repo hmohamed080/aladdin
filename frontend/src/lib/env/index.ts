@@ -69,14 +69,33 @@ export const serverEnvSchema = z.object({
   WHATSAPP_ACCESS_TOKEN: z.string().trim().min(1).optional(),
   WHATSAPP_PHONE_NUMBER_ID: z.string().trim().regex(/^[0-9]{5,32}$/).optional(),
   WHATSAPP_OTP_TEMPLATE: z.string().trim().regex(/^[a-z0-9_]{1,512}$/).optional(),
+  // Language code of the approved template (e.g. "ar"). When set, every message uses it; the approved
+  // `aladdin_otp` template exists in Arabic only, so a locale-based guess would be rejected by Meta.
+  WHATSAPP_OTP_LANGUAGE: z.string().trim().regex(/^[a-z]{2}(_[A-Z]{2})?$/).optional(),
+  // Comma-separated E.164 numbers that may receive a code. REQUIRED outside production (fail closed), so a
+  // Preview can never message the public. A Worker secret: these are personal numbers, never committed.
+  WHATSAPP_ALLOWED_RECIPIENTS: z.string().trim().max(2000).optional(),
+  // Maximum codes sent in any rolling 24 hours, across all numbers. REQUIRED outside production (the message budget).
+  WHATSAPP_DAILY_SEND_LIMIT: z.coerce.number().int().min(1).max(100000).optional(),
 });
 
 /** Server-only WhatsApp Cloud API configuration (sign-up verification codes). */
-export function readWhatsAppEnv(): Pick<ServerEnv, "WHATSAPP_ACCESS_TOKEN" | "WHATSAPP_PHONE_NUMBER_ID" | "WHATSAPP_OTP_TEMPLATE"> {
+export function readWhatsAppEnv(): Pick<
+  ServerEnv,
+  | "WHATSAPP_ACCESS_TOKEN"
+  | "WHATSAPP_PHONE_NUMBER_ID"
+  | "WHATSAPP_OTP_TEMPLATE"
+  | "WHATSAPP_OTP_LANGUAGE"
+  | "WHATSAPP_ALLOWED_RECIPIENTS"
+  | "WHATSAPP_DAILY_SEND_LIMIT"
+> {
   return parseServerEnv({
     WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN,
     WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID,
     WHATSAPP_OTP_TEMPLATE: process.env.WHATSAPP_OTP_TEMPLATE,
+    WHATSAPP_OTP_LANGUAGE: process.env.WHATSAPP_OTP_LANGUAGE || undefined,
+    WHATSAPP_ALLOWED_RECIPIENTS: process.env.WHATSAPP_ALLOWED_RECIPIENTS || undefined,
+    WHATSAPP_DAILY_SEND_LIMIT: process.env.WHATSAPP_DAILY_SEND_LIMIT || undefined,
   });
 }
 

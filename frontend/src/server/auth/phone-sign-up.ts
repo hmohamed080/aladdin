@@ -21,6 +21,7 @@ import {
   insertPhoneChallenge,
   isCanonicalPhoneTaken,
   loadPhoneChallenge,
+  markPhoneVerified,
   recordPhoneChallengeAttempt,
   saveVerifiedBirthDate,
 } from "@/lib/supabase/admin-server";
@@ -28,7 +29,7 @@ import { displayNameSchema, parseBirthDate, passwordWithContextSchema } from "@/
 import { phoneAuthLimit } from "@/server/auth/phone-auth-limit";
 import { captchaTokenFrom, isCaptchaFailure } from "@/server/auth/captcha";
 import { clientIpFrom, turnstileHostnamesFrom, verifyTurnstileToken } from "@/server/auth/turnstile";
-import { sendWhatsAppCode } from "@/server/auth/whatsapp-otp";
+import { sendWhatsAppCode, withinDailyBudget } from "@/server/auth/whatsapp-otp";
 import type { Database } from "@/types/database.types";
 
 /**
@@ -133,6 +134,12 @@ async function issueCode(phone: CanonicalPhone, locale: Locale): Promise<{ cid: 
     logStepFailure("send_count", error as { code?: string });
     return { code: E("sendFailed") };
   }
+  try {
+    if (!(await withinDailyBudget())) return { code: E("whatsappUnavailable") };
+  } catch (error) {
+    logStepFailure("send_budget", error as { code?: string });
+    return { code: E("sendFailed") };
+  }
   const cid = randomUUID();
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   try {
@@ -232,7 +239,9 @@ export async function resendPhoneSignUpCode(formData: FormData): Promise<PhoneSi
   if (limited !== "allowed") return { ok: false, code: limited === "limited" ? E("rateLimited") : E("sendFailed"), channel: "phone" };
   const issued = await issueCode(pending.phone, pending.locale);
   if ("code" in issued) return { ok: false, code: issued.code, channel: "phone" };
-  await deletePhoneChallenge(pending.cid).catch(() => undefined);
+  // Retire the old code but keep its row: the hourly and daily send caps count rows, so deleting it would let a
+  // resend loop send without limit.
+  await consumePhoneChallenge(pending.cid).catch(() => undefined);
   await writeCookie({ ...pending, cid: issued.cid, exp: Date.now() + CODE_TTL_MS });
   return { ok: true, code: "authPasswordPreview.info.whatsappCodeSent", channel: "phone" };
 }
@@ -264,6 +273,13 @@ async function initializeAccount(supabase: Client, userId: string, pending: Pend
     p_national: pending.phone.national,
     p_e164: pending.phone.e164,
   }));
+  // The code for this exact number was just verified server-side; this is the only place the proof is recorded.
+  try {
+    if (!(await markPhoneVerified(userId, pending.phone.e164))) throw new Error("no profile row matched");
+  } catch (error) {
+    logStepFailure("phone_verified", error as { code?: string });
+    throw new InitializationError("failed");
+  }
   await step("username", supabase.rpc("profile_set_username", { p_username: pending.username }));
   await step("display_name", supabase.rpc("profile_set_display_name", { p_display_name: pending.name }));
   try {

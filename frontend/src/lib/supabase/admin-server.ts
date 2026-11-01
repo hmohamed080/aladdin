@@ -286,6 +286,32 @@ export async function countRecentPhoneChallenges(e164: string, sinceIso: string)
   return count ?? 0;
 }
 
+/** How many sign-up codes were issued to anyone since `sinceIso` (the message budget). Throws on a lookup failure. */
+export async function countAllPhoneChallengesSince(sinceIso: string): Promise<number> {
+  const { count, error } = await getAdminClient()
+    .from("phone_verification_challenges")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", sinceIso);
+  if (error) throw new Error(`phone challenge budget count failed (code ${error.code ?? "unknown"})`);
+  return count ?? 0;
+}
+
+/**
+ * Records that ownership of `e164` was proven by a WhatsApp code: sets profiles.phone_verified_at. The only writer of that
+ * column besides a future definer function; no API role can write it. It matches on the user AND the number, so it can
+ * never verify a different number than the one the code was sent to. Returns false when no row matched.
+ */
+export async function markPhoneVerified(userId: string, e164: string): Promise<boolean> {
+  const { data, error } = await getAdminClient()
+    .from("profiles")
+    .update({ phone_verified_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .eq("phone_e164", e164)
+    .select("user_id");
+  if (error) throw new Error(`phone verification save failed (code ${error.code ?? "unknown"})`);
+  return (data?.length ?? 0) === 1;
+}
+
 export async function insertPhoneChallenge(row: { id: string; phoneE164: string; codeHash: string; expiresAt: string }): Promise<void> {
   const { error } = await getAdminClient().from("phone_verification_challenges").insert({
     id: row.id,

@@ -46,9 +46,12 @@
         // RESEND_API_KEY is a Worker secret.
         "EMAIL_FROM": "Aladdin <no-reply@aladdindecore.com>",
         "APP_PUBLIC_ORIGIN": "https://aladdin-frontend-preview.bstalent9.workers.dev",
-        // Approved Meta Authentication template for sign-up codes. WHATSAPP_ACCESS_TOKEN
-        // and WHATSAPP_PHONE_NUMBER_ID are Worker secrets.
-        "WHATSAPP_OTP_TEMPLATE": "aladdin_login_code"
+        // Approved Meta Authentication template for sign-up codes (Arabic only). WHATSAPP_ACCESS_TOKEN,
+        // WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ALLOWED_RECIPIENTS are Worker secrets: with no allowlist the
+        // Preview sends nothing. The daily limit is the Preview message budget.
+        "WHATSAPP_OTP_TEMPLATE": "aladdin_otp",
+        "WHATSAPP_OTP_LANGUAGE": "ar",
+        "WHATSAPP_DAILY_SEND_LIMIT": "20"
       }
     },
     // Production: deployed only after the owner approves the cutover. Routes
@@ -75,7 +78,8 @@
         "APP_PUBLIC_ORIGIN": "https://aladdindecore.com",
         // Sign-up codes over WhatsApp. WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID
         // are Worker secrets; until they are set, mobile-number sign-up says it is unavailable.
-        "WHATSAPP_OTP_TEMPLATE": "aladdin_login_code",
+        "WHATSAPP_OTP_TEMPLATE": "aladdin_otp",
+        "WHATSAPP_OTP_LANGUAGE": "ar",
         // First cutover: media stays on Supabase Storage and Redis stays off. Each one
         // is turned on later by its own approval.
         "R2_STORAGE_ENABLED": "false",
