@@ -1,7 +1,6 @@
 import "server-only";
 
 import { readPublicEnv, readWhatsAppEnv } from "@/lib/env";
-import { countAllPhoneChallengesSince } from "@/lib/supabase/admin-server";
 
 /**
  * Sends a sign-up verification code through the Meta WhatsApp Cloud API, as
@@ -17,10 +16,12 @@ import { countAllPhoneChallengesSince } from "@/lib/supabase/admin-server";
 const GRAPH_VERSION = "v21.0";
 const TEMPLATE_LANGUAGE: Record<"en" | "ar", string> = { en: "en", ar: "ar" };
 
-/** Recipient allowlist. Outside production it is mandatory: an empty list means nobody may be messaged. */
-export function recipientAllowed(e164: string, allowList: string | undefined, appEnv: string): boolean {
+/**
+ * Recipient allowlist. Delivery is explicitly controlled in EVERY environment (production included): an empty or unset
+ * list means nobody may be messaged. A wider rollout is a separate, approved code change, never a missing setting.
+ */
+export function recipientAllowed(e164: string, allowList: string | undefined): boolean {
   const list = (allowList ?? "").split(",").map((entry) => entry.trim()).filter(Boolean);
-  if (list.length === 0) return appEnv === "production";
   return list.includes(e164);
 }
 
@@ -46,7 +47,7 @@ export async function sendWhatsAppCode(
     return "unavailable";
   }
   // Not an allowed test recipient: answer exactly like an unconfigured sender, so the response says nothing about the list.
-  if (!recipientAllowed(e164, env.WHATSAPP_ALLOWED_RECIPIENTS, readPublicEnv().NEXT_PUBLIC_APP_ENV)) return "unavailable";
+  if (!recipientAllowed(e164, env.WHATSAPP_ALLOWED_RECIPIENTS)) return "unavailable";
 
   let response: Response;
   try {
@@ -85,18 +86,27 @@ export async function sendWhatsAppCode(
 }
 
 /**
- * The message budget: true while fewer than WHATSAPP_DAILY_SEND_LIMIT codes were issued in the last 24 hours (all
- * numbers together). Outside production the limit is mandatory, so an unset value blocks sending.
+ * The message budget (codes per rolling 24 h, all numbers). Required in every environment: undefined means no sending.
+ * The limit is enforced atomically by the database (phone_challenge_issue), not by this process. Locally with no token
+ * (codes are only printed) a generous default applies.
  */
-export async function withinDailyBudget(): Promise<boolean> {
-  let env;
+export function dailySendLimit(): number | null {
   try {
-    env = readWhatsAppEnv();
+    const env = readWhatsAppEnv();
+    if (env.WHATSAPP_DAILY_SEND_LIMIT !== undefined) return env.WHATSAPP_DAILY_SEND_LIMIT;
+    return !env.WHATSAPP_ACCESS_TOKEN && readPublicEnv().NEXT_PUBLIC_APP_ENV === "local" ? 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a code may be sent to `e164` at all, checked BEFORE a budget slot is reserved. */
+export function sendingEnabledFor(e164: string): boolean {
+  try {
+    const env = readWhatsAppEnv();
+    if (!env.WHATSAPP_ACCESS_TOKEN && readPublicEnv().NEXT_PUBLIC_APP_ENV === "local") return true;
+    return recipientAllowed(e164, env.WHATSAPP_ALLOWED_RECIPIENTS) && dailySendLimit() !== null;
   } catch {
     return false;
   }
-  const limit = env.WHATSAPP_DAILY_SEND_LIMIT;
-  if (limit === undefined) return readPublicEnv().NEXT_PUBLIC_APP_ENV === "production";
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  return (await countAllPhoneChallengesSince(since)) < limit;
 }

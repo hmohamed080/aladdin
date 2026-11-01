@@ -14,11 +14,11 @@ import { isUsernameWellFormed } from "@/lib/identity/username";
 import { getServerSupabase } from "@/lib/supabase/server";
 import {
   consumePhoneChallenge,
-  countRecentPhoneChallenges,
   createPhoneSignUpUser,
   deleteCraftsmanPasswordUser,
   deletePhoneChallenge,
-  insertPhoneChallenge,
+  issuePhoneChallenge,
+  markPhoneChallengeSent,
   isCanonicalPhoneTaken,
   loadPhoneChallenge,
   markPhoneVerified,
@@ -29,7 +29,7 @@ import { displayNameSchema, parseBirthDate, passwordWithContextSchema } from "@/
 import { phoneAuthLimit } from "@/server/auth/phone-auth-limit";
 import { captchaTokenFrom, isCaptchaFailure } from "@/server/auth/captcha";
 import { clientIpFrom, turnstileHostnamesFrom, verifyTurnstileToken } from "@/server/auth/turnstile";
-import { sendWhatsAppCode, withinDailyBudget } from "@/server/auth/whatsapp-otp";
+import { dailySendLimit, sendWhatsAppCode, sendingEnabledFor } from "@/server/auth/whatsapp-otp";
 import type { Database } from "@/types/database.types";
 
 /**
@@ -39,9 +39,9 @@ import type { Database } from "@/types/database.types";
  *   1. requestPhoneSignUp — validates every field, checks Turnstile with
  *      Siteverify (no GoTrue call happens here, and each send costs money),
  *      applies the durable phone limiter plus a per-number send cap, stores an
- *      HMAC of a fresh code with a 10-minute expiry and 5 attempts, and sends
+ *      HMAC of a fresh code with a 5-minute expiry and 5 attempts, and sends
  *      it. The registration fields ride a SEALED cookie (AES-256-GCM, httpOnly,
- *      10 minutes, /auth only) because nothing exists in Auth yet.
+ *      5 minutes, /auth only) because nothing exists in Auth yet.
  *   2. verifyPhoneSignUp — counts the guess first (compare-and-set), checks the
  *      code in constant time, consumes it once, and only then creates the
  *      account (internal login alias, lib/auth/craftsman-login-alias.ts),
@@ -60,7 +60,8 @@ type Locale = "en" | "ar";
 
 const COOKIE = "psu";
 const COOKIE_PATH = "/auth";
-const CODE_TTL_MS = 10 * 60 * 1000;
+// Must not exceed the expiry printed in the approved Meta template (aladdin_otp shows 5 minutes).
+const CODE_TTL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const SENDS_PER_HOUR = 5;
 const CONSENT_TYPES = ["terms", "privacy", "pilot"] as const;
@@ -125,31 +126,37 @@ function logStepFailure(step: string, error: { code?: string } | null | undefine
   console.error(`phone sign-up: ${step} failed (code ${error?.code ?? "unknown"})`);
 }
 
-/** Issues a fresh code for `pending.phone` and sends it. Returns an error code, or null on success. */
+/**
+ * Issues a fresh code for `phone` and sends it. Delivery is explicitly controlled: the number must be allowed and a daily
+ * limit configured (otherwise "unavailable", nothing reserved). The send budget is reserved atomically in the database
+ * BEFORE the message goes out, so parallel requests cannot overshoot; a send Meta rejects releases its slot (not billed),
+ * and an accepted one is stamped (billable).
+ */
 async function issueCode(phone: CanonicalPhone, locale: Locale): Promise<{ cid: string } | { code: string }> {
-  try {
-    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    if ((await countRecentPhoneChallenges(phone.e164, since)) >= SENDS_PER_HOUR) return { code: E("rateLimited") };
-  } catch (error) {
-    logStepFailure("send_count", error as { code?: string });
-    return { code: E("sendFailed") };
-  }
-  try {
-    if (!(await withinDailyBudget())) return { code: E("whatsappUnavailable") };
-  } catch (error) {
-    logStepFailure("send_budget", error as { code?: string });
-    return { code: E("sendFailed") };
-  }
+  const dailyLimit = dailySendLimit();
+  if (dailyLimit === null || !sendingEnabledFor(phone.e164)) return { code: E("whatsappUnavailable") };
   const cid = randomUUID();
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   try {
-    await insertPhoneChallenge({ id: cid, phoneE164: phone.e164, codeHash: codeHash(cid, code), expiresAt: new Date(Date.now() + CODE_TTL_MS).toISOString() });
+    const reserved = await issuePhoneChallenge({
+      id: cid,
+      phoneE164: phone.e164,
+      codeHash: codeHash(cid, code),
+      expiresAt: new Date(Date.now() + CODE_TTL_MS).toISOString(),
+      perNumberHourlyLimit: SENDS_PER_HOUR,
+      dailyLimit,
+    });
+    if (reserved === "rate_limited") return { code: E("rateLimited") };
+    if (reserved === "budget_exhausted") return { code: E("whatsappUnavailable") };
   } catch (error) {
     logStepFailure("challenge", error as { code?: string });
     return { code: E("sendFailed") };
   }
   const sent = await sendWhatsAppCode(phone.e164, code, locale);
-  if (sent === "sent") return { cid };
+  if (sent === "sent") {
+    await markPhoneChallengeSent(cid).catch(() => logStepFailure("challenge_stamp", null));
+    return { cid };
+  }
   await deletePhoneChallenge(cid).catch(() => undefined);
   if (sent === "invalid_number") return { code: E("whatsappNumberInvalid") };
   if (sent === "unavailable") return { code: E("whatsappUnavailable") };

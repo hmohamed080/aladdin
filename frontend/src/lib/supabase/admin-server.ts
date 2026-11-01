@@ -275,52 +275,50 @@ export async function saveVerifiedBirthDate(userId: string, birthDate: string): 
 // ---------------------------------------------------------------------------
 export type PhoneChallenge = { id: string; phoneE164: string; codeHash: string; attempts: number; expiresAt: string; consumedAt: string | null };
 
-/** How many sign-up codes this number was sent since `sinceIso`. Throws on a lookup failure. */
-export async function countRecentPhoneChallenges(e164: string, sinceIso: string): Promise<number> {
-  const { count, error } = await getAdminClient()
-    .from("phone_verification_challenges")
-    .select("id", { count: "exact", head: true })
-    .eq("phone_e164", e164)
-    .gte("created_at", sinceIso);
-  if (error) throw new Error(`phone challenge count failed (code ${error.code ?? "unknown"})`);
-  return count ?? 0;
+export type IssueChallengeResult = "issued" | "rate_limited" | "budget_exhausted";
+
+/**
+ * Atomically reserves one send: inside ONE database transaction (serialized by an advisory lock) it checks the number's
+ * hourly cap and the global rolling-24h budget and inserts the challenge only within both. Concurrent requests cannot
+ * overshoot. Throws on a failure; an unexpected answer counts as a failure.
+ */
+export async function issuePhoneChallenge(row: {
+  id: string;
+  phoneE164: string;
+  codeHash: string;
+  expiresAt: string;
+  perNumberHourlyLimit: number;
+  dailyLimit: number;
+}): Promise<IssueChallengeResult> {
+  const { data, error } = await getAdminClient().rpc("phone_challenge_issue", {
+    p_id: row.id,
+    p_phone_e164: row.phoneE164,
+    p_code_hash: row.codeHash,
+    p_expires_at: row.expiresAt,
+    p_phone_hourly_limit: row.perNumberHourlyLimit,
+    p_daily_limit: row.dailyLimit,
+  });
+  if (error) throw new Error(`phone challenge issue failed (code ${error.code ?? "unknown"})`);
+  if (data !== "issued" && data !== "rate_limited" && data !== "budget_exhausted") throw new Error("phone challenge issue failed (code unexpected)");
+  return data;
 }
 
-/** How many sign-up codes were issued to anyone since `sinceIso` (the message budget). Throws on a lookup failure. */
-export async function countAllPhoneChallengesSince(sinceIso: string): Promise<number> {
-  const { count, error } = await getAdminClient()
-    .from("phone_verification_challenges")
-    .select("id", { count: "exact", head: true })
-    .gte("created_at", sinceIso);
-  if (error) throw new Error(`phone challenge budget count failed (code ${error.code ?? "unknown"})`);
-  return count ?? 0;
+/** Stamps the moment Meta accepted the message (the billable event; accepted is not delivered). */
+export async function markPhoneChallengeSent(id: string): Promise<void> {
+  const { error } = await getAdminClient().rpc("phone_challenge_mark_sent", { p_id: id });
+  if (error) throw new Error(`phone challenge stamp failed (code ${error.code ?? "unknown"})`);
 }
 
 /**
- * Records that ownership of `e164` was proven by a WhatsApp code: sets profiles.phone_verified_at. The only writer of that
- * column besides a future definer function; no API role can write it. It matches on the user AND the number, so it can
- * never verify a different number than the one the code was sent to. Returns false when no row matched.
+ * Records that ownership of `e164` was proven by a WhatsApp code, through the service-role-only definer function
+ * phone_sign_up_mark_verified (profiles has no direct service_role UPDATE, by design). The database requires a sign-up
+ * code for exactly that number to have been consumed moments ago and only marks the user's current primary number.
+ * Returns false when the proof does not hold.
  */
 export async function markPhoneVerified(userId: string, e164: string): Promise<boolean> {
-  const { data, error } = await getAdminClient()
-    .from("profiles")
-    .update({ phone_verified_at: new Date().toISOString() })
-    .eq("user_id", userId)
-    .eq("phone_e164", e164)
-    .select("user_id");
+  const { data, error } = await getAdminClient().rpc("phone_sign_up_mark_verified", { p_user_id: userId, p_e164: e164 });
   if (error) throw new Error(`phone verification save failed (code ${error.code ?? "unknown"})`);
-  return (data?.length ?? 0) === 1;
-}
-
-export async function insertPhoneChallenge(row: { id: string; phoneE164: string; codeHash: string; expiresAt: string }): Promise<void> {
-  const { error } = await getAdminClient().from("phone_verification_challenges").insert({
-    id: row.id,
-    purpose: "sign_up",
-    phone_e164: row.phoneE164,
-    code_hash: row.codeHash,
-    expires_at: row.expiresAt,
-  });
-  if (error) throw new Error(`phone challenge insert failed (code ${error.code ?? "unknown"})`);
+  return data === true;
 }
 
 export async function deletePhoneChallenge(id: string): Promise<void> {

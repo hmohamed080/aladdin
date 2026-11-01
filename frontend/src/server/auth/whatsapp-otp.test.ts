@@ -2,11 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const env = vi.hoisted(() => ({ whatsapp: {} as Record<string, string | undefined>, appEnv: "staging" }));
-const count = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/supabase/admin-server", () => ({ countAllPhoneChallengesSince: count }));
 vi.mock("@/lib/env", () => ({ readWhatsAppEnv: () => env.whatsapp, readPublicEnv: () => ({ NEXT_PUBLIC_APP_ENV: env.appEnv }) }));
 
-import { recipientAllowed, sendWhatsAppCode, withinDailyBudget } from "./whatsapp-otp";
+import { dailySendLimit, recipientAllowed, sendWhatsAppCode, sendingEnabledFor } from "./whatsapp-otp";
 
 const configured = { WHATSAPP_ACCESS_TOKEN: "token", WHATSAPP_PHONE_NUMBER_ID: "1234567890", WHATSAPP_OTP_TEMPLATE: "aladdin_otp", WHATSAPP_OTP_LANGUAGE: "ar", WHATSAPP_ALLOWED_RECIPIENTS: "+201012345678, +201099999999" };
 const reply = (status: number, body: unknown = {}) => vi.fn(async () => new Response(JSON.stringify(body), { status }));
@@ -83,31 +81,38 @@ describe("recipient allowlist", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("fails closed outside production when no list is set, and allows anyone only in production", async () => {
+  it("fails closed with no list, in every environment including production", async () => {
     env.whatsapp = { ...configured, WHATSAPP_ALLOWED_RECIPIENTS: undefined };
-    const fetcher = reply(200);
-    expect(await sendWhatsAppCode("+201012345678", "123456", "ar", fetcher as never)).toBe("unavailable");
-    expect(fetcher).not.toHaveBeenCalled();
-    env.appEnv = "production";
-    expect(await sendWhatsAppCode("+201012345678", "123456", "ar", fetcher as never)).toBe("sent");
-    expect(recipientAllowed("+20100", "", "staging")).toBe(false);
-    expect(recipientAllowed("+20100", " +20100 ,", "production")).toBe(true);
-    expect(recipientAllowed("+20101", "+20100", "production")).toBe(false);
+    for (const appEnv of ["staging", "production"]) {
+      env.appEnv = appEnv;
+      const fetcher = reply(200);
+      expect(await sendWhatsAppCode("+201012345678", "123456", "ar", fetcher as never)).toBe("unavailable");
+      expect(fetcher).not.toHaveBeenCalled();
+    }
+    expect(recipientAllowed("+20100", "")).toBe(false);
+    expect(recipientAllowed("+20100", " +20100 ,")).toBe(true);
+    expect(recipientAllowed("+20101", "+20100")).toBe(false);
   });
 });
 
-describe("withinDailyBudget", () => {
-  it("allows sending below the limit and blocks at it", async () => {
-    env.whatsapp = { ...configured, WHATSAPP_DAILY_SEND_LIMIT: 3 as never };
-    count.mockResolvedValueOnce(2);
-    expect(await withinDailyBudget()).toBe(true);
-    count.mockResolvedValueOnce(3);
-    expect(await withinDailyBudget()).toBe(false);
+describe("send limits", () => {
+  it("needs both an allowed number and a daily limit, in every environment", () => {
+    env.whatsapp = { ...configured, WHATSAPP_DAILY_SEND_LIMIT: 20 as never };
+    expect(sendingEnabledFor("+201012345678")).toBe(true);
+    expect(sendingEnabledFor("+201055555555")).toBe(false);
+    env.whatsapp = { ...configured };
+    expect(dailySendLimit()).toBeNull();
+    expect(sendingEnabledFor("+201012345678")).toBe(false);
+    env.appEnv = "production";
+    expect(sendingEnabledFor("+201012345678")).toBe(false);
   });
 
-  it("requires a limit outside production", async () => {
-    expect(await withinDailyBudget()).toBe(false);
-    env.appEnv = "production";
-    expect(await withinDailyBudget()).toBe(true);
+  it("uses a generous default only for local, token-less development", () => {
+    env.whatsapp = {};
+    env.appEnv = "local";
+    expect(dailySendLimit()).toBe(1000);
+    expect(sendingEnabledFor("+201012345678")).toBe(true);
+    env.appEnv = "staging";
+    expect(dailySendLimit()).toBeNull();
   });
 });
