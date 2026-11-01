@@ -107,6 +107,12 @@ Keys never contain names. Database files are named by label and time, and media 
 
 R2's durability is not a second copy: a deleted or overwritten object is gone. `r2-media-backup.sh` therefore copies every verified R2 original (`media_storage_locations`, provider r2) into the project's own backup bucket, a different bucket from the media bucket, read through a read-only token (`R2_MEDIA_BACKUP=1`). Until it is switched on, every snapshot records `r2_media_records_not_covered`; the freshness alarm fails for Production when that number is above 0 and only warns for Acceptance.
 
+### Retired originals (removed on purpose)
+
+An original a user replaced or removed is deleted from R2 by the app, so it cannot be copied and does not need to be. One rule, `r2-eligibility.sql`, decides which verified R2 locations a backup must hold; `snapshot-objects.py` applies the same rule to the dump, `r2-media-backup.sh` to the live database and `media-verify.sh` to the restored one, and `r2-eligibility-test.sh` proves the three agree. A location is **retired** only when ALL hold: exactly one canonical row exists for it (`avatar_uploads`, `portfolio_items`, `professional_certificates`, `product_images`, `organization_images`) and its state is `deleted`; that row's owner equals the location's owner; no other canonical row in any namespace uses the key; no other location resolves to the same physical key; nothing active points at it (`profiles.avatar_media_id` or `cover_media_id`, `organizations.logo_media_id`). `cleaned_at` is NOT used as evidence either way. Anything else, including a missing, duplicate, pending or unknown row, stays **required** and fails the backup if its bytes are missing, unreadable, refused (403) or different from the recorded sha256.
+
+The record (`.r2media.json`) reports `excluded_retired` as counts per reason (`{"retired:avatar":2}`): no keys, names or user ids. The restore test recomputes the rule on the restored database and fails if its retired counts differ from the record, or if any original it requires is missing from the inventory. A replacement that happens between the snapshot and the copy (the dump still lists the old original, the live database already marks it retired) fails that snapshot with a message saying so; the next snapshot excludes it.
+
 Source-of-truth for what must be recoverable, and where its independent copy comes from:
 
 | Content | Primary | Independent recovery source |

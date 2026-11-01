@@ -28,7 +28,7 @@ require_env KEY AGE_IDENTITY_FILE OUT
 case "$KEY" in db/"$BACKUP_LABEL"/*.tar.age) ;; *) die "KEY must be a $BACKUP_LABEL .tar.age snapshot";; esac
 umask 077
 mkdir -p "$OUT"; W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
-KIND="${MEDIA_KIND:-supabase}"
+KIND="${MEDIA_KIND:-supabase}"; EXCLUDED=""
 case "$KIND" in supabase) REC=media;; r2) REC=r2media;; *) die "MEDIA_KIND must be supabase or r2";; esac
 s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "${KEY%.tar.age}.json" "$W/snap-manifest.json" >/dev/null 2>&1 || die "the snapshot manifest cannot be read"
 TAKEN="$(sed -n 's/.*"taken_utc":"\([^"]*\)".*/\1/p' "$W/snap-manifest.json" | head -1)"
@@ -68,10 +68,15 @@ records="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["obje
 
 # 2. The inventory against the database: id, bucket, complete path, size, copy key, state.
 if [ "$KIND" = r2 ]; then
-  dbq > "$W/db.tsv" <<'SQL'
-select sha256, size_bytes, coalesce(to_jsonb(l)->>'storage_key', namespace||'/'||object_key)
-from public.media_storage_locations l where provider = 'r2' and cleaned_at is null and verified_at is not null order by 3;
-SQL
+  # The SAME rule the backup used (r2-eligibility.sql), evaluated independently on the restored database: the
+  # required originals must equal the inventory exactly, and the retired ones must equal what the record reported.
+  dbq < "$HERE/r2-eligibility.sql" > "$W/elig.tsv"
+  awk -F'\t' '$4 == "required" {print $1 "\t" $2 "\t" $3}' "$W/elig.tsv" | sort -u > "$W/db.tsv"
+  want_ex="$(python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1])).get("excluded_retired"), sort_keys=True, separators=(",",":")))' "$W/media.json")"
+  got_ex="$(awk -F'\t' '$4 ~ /^retired:/ {n[$4]++} END {for (k in n) print k "\t" n[k]}' "$W/elig.tsv" | python3 -c 'import sys,json; print(json.dumps({l.split("\t")[0]: int(l.split("\t")[1]) for l in sys.stdin if l.strip()}, sort_keys=True, separators=(",",":")))')"
+  if [ "$want_ex" = null ]; then fails+=("the media record does not report its retired originals (excluded_retired)")
+  elif [ "$want_ex" != "$got_ex" ]; then fails+=("the retired originals the record excluded ($want_ex) differ from the restored database's ($got_ex)"); fi
+  EXCLUDED="$got_ex"; [ "$EXCLUDED" != "{}" ] || EXCLUDED=""
   CMP="$HERE/r2-inventory-compare.py"
 else
   dbq > "$W/db.tsv" <<'SQL'
@@ -124,9 +129,9 @@ done < "$W/sample.tsv"
 
 if [ "${#fails[@]}" -eq 0 ]; then
   if [ "$OUTSIDE" = 1 ]; then
-    summary="[$KIND] DATABASE-ONLY restore (snapshot older than the $(media_guarantee_days "$([ "$KIND" = r2 ] && echo r2 || echo supabase)")-day guaranteed full-restore window): inventory exact ($FILES files); $EXPIRED copies already expired (expected), every remaining copy has the recorded size; $((N-BAD)) of $N sampled files restored with the recorded sha256 and size"
+    summary="[$KIND] DATABASE-ONLY restore (snapshot older than the $(media_guarantee_days "$([ "$KIND" = r2 ] && echo r2 || echo supabase)")-day guaranteed full-restore window): inventory exact ($FILES files${EXCLUDED:+; retired originals excluded: $EXCLUDED}); $EXPIRED copies already expired (expected), every remaining copy has the recorded size; $((N-BAD)) of $N sampled files restored with the recorded sha256 and size"
   else
-    summary="[$KIND] inventory exact ($FILES files: identity, size and copy key equal the restored database); all $FILES copies exist with the recorded size; $((N-BAD)) of $N sampled files restored with the recorded sha256 and size"
+    summary="[$KIND] inventory exact ($FILES files${EXCLUDED:+, retired originals excluded: $EXCLUDED}: identity, size and copy key equal the restored database); all $FILES copies exist with the recorded size; $((N-BAD)) of $N sampled files restored with the recorded sha256 and size"
   fi
 else
   summary="MEDIA CHECK FAILED ($FILES files in the restored database; $((N-BAD)) of $N sampled files restored exactly)"

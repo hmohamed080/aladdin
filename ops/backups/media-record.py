@@ -69,6 +69,13 @@ def findings(path, label, snapshot, kind):
         bad(f"the media record is of {record['label']!r}, not {label!r}")
     if "snapshot" in record and record["snapshot"] != snapshot:
         bad(f"the media record is of snapshot {record['snapshot']!r}, not {snapshot!r}")
+    if "excluded_retired" in record:
+        ex = record["excluded_retired"]
+        if not isinstance(ex, dict) or any(
+            not re.fullmatch(r"retired:(avatar|portfolio|certificate|product|organization)", str(k))
+            or isinstance(v, bool) or not isinstance(v, int) or v < 1 for k, v in ex.items()
+        ):
+            bad("the media record field 'excluded_retired' is not a map of retired:<namespace> to a positive count")
     if problems:
         return problems
 

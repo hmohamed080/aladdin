@@ -33,7 +33,7 @@ s3 s3api put-object --bucket "$SRC" --key "avatar/userSECRET1.jpg" --body "$T/go
 mkdir -p "$T/state" "$T/bin"
 printf '%s\t321\tavatar/userSECRET1.jpg\n%s\t57\tavatar/userSECRET2.jpg\n' "$GS" "$GONE" > "$T/state/r2-objects.tsv"
 printf 'SKIPPED=0\nNAME=aladdin-local-test-20261101T090000Z\nPREFIXES="db/local-test/daily/2026/11/01"\nR2_ROWS=2\n' > "$T/state/db.env"
-printf '#!/usr/bin/env bash\ncat >/dev/null; cat "%s/state/r2-objects.tsv"\n' "$T" > "$T/bin/psql"; chmod +x "$T/bin/psql"
+printf '#!/usr/bin/env bash\ncat >/dev/null; sed "s/$/\\trequired/" "%s/state/r2-objects.tsv"\n' "$T" > "$T/bin/psql"; chmod +x "$T/bin/psql"
 out="$(PATH="$T/bin:$PATH" BACKUP_STATE_DIR="$T/state" BACKUP_DB_URL=postgresql://stub@127.0.0.1:1/postgres \
   R2_SOURCE_ENDPOINT="$R2_ENDPOINT" R2_SOURCE_BUCKET="$SRC" R2_SOURCE_ACCESS_KEY_ID=testkey R2_SOURCE_SECRET_ACCESS_KEY=testsecret \
   R2_READ_RETRY_SLEEP=0 bash "$HERE/r2-media-backup.sh" 2>&1)"; rc=$?; printf '%s\n' "$out" > "$T/out.txt"

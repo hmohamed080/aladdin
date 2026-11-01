@@ -42,6 +42,11 @@ class Record(unittest.TestCase):
     def test_a_good_record_is_silent(self):
         self.assertEqual(check(good()), [])
 
+    def test_excluded_retired_must_be_a_map_of_known_reasons_to_counts(self):
+        self.assertEqual(problems(good(excluded_retired={"retired:avatar": 2})), [])
+        for bad in ([], {"retired:avatar": 0}, {"retired:avatar": True}, {"deleted": 1}, {"retired:unknown": 1}, {"retired:avatar": "2"}):
+            self.assertTrue(problems(good(excluded_retired=bad)), bad)
+
     def test_missing_file_fails(self):
         self.assertTrue(problems(None))
 

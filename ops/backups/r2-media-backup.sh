@@ -42,16 +42,15 @@ WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 src() { AWS_ACCESS_KEY_ID="$R2_SOURCE_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$R2_SOURCE_SECRET_ACCESS_KEY" aws --endpoint-url "$R2_SOURCE_ENDPOINT" "$@"; }
 
 # Live originals too: one verified after the dump is copied now, so tomorrow's snapshot finds it even if the
-# user removes it before then. (to_jsonb: the storage_key column exists only after migration 20261029120001.)
-psql "$BACKUP_DB_URL" -X -At -F $'\t' -v ON_ERROR_STOP=1 -c 'set session characteristics as transaction read only' -c "
-  select sha256, size_bytes, coalesce(to_jsonb(l)->>'storage_key', namespace||'/'||object_key)
-  from public.media_storage_locations l
-  where provider = 'r2' and cleaned_at is null and verified_at is not null order by created_at, namespace, object_key" \
-  | sed '1{/^SET$/d}' > "$WORK/live.tsv"
+# user removes it before then. Retired originals (removed on purpose, see r2-eligibility.sql) are not required.
+psql "$BACKUP_DB_URL" -X -At -F $'\t' -v ON_ERROR_STOP=1 -c 'set session characteristics as transaction read only' -f "$HERE/r2-eligibility.sql" \
+  | sed '1{/^SET$/d}' > "$WORK/elig.tsv"
+# Only a PROVABLY retired original (r2-eligibility.sql) is left out; every other row, including any doubt, is required.
+awk -F'\t' '$4 == "required" {print $1 "\t" $2 "\t" $3}' "$WORK/elig.tsv" > "$WORK/live.tsv"
 s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "$P/objects/" --query 'Contents[].Key' --output text \
   | tr '\t' '\n' | grep -v '^None$' | sort > "$WORK/have.txt" || true
 
-COPIED=0; BYTES=0; FAILED=0; FAIL_CLASSES=""
+COPIED=0; BYTES=0; FAILED=0; FAIL_CLASSES=""; AFTER_SNAP=0
 while IFS=$'\t' read -r sha size key; do
   [ -n "$sha" ] || continue
   case "$sha" in *[!0-9a-f]*) die "unexpected sha256 in the media records";; esac
@@ -71,7 +70,12 @@ while IFS=$'\t' read -r sha size key; do
   if [ -n "$cls" ]; then
     FAILED=$((FAILED+1)); FAIL_CLASSES="$FAIL_CLASSES $cls"
     case "$cls" in
-      not_found) why="the object does not exist in the media bucket (404)";;
+      not_found) why="the object does not exist in the media bucket (404)"
+        # The dump held it as live but the database now says it was retired: it was replaced or removed after the
+        # snapshot was taken. Still a failure (the snapshot refers to it); the next run takes a new snapshot.
+        if awk -F'\t' -v k="$key" '$3 == k && $4 ~ /^retired:/ {f=1} END {exit !f}' "$WORK/elig.tsv"; then
+          why="$why; the database now marks it retired, so it was removed after this snapshot was taken (a new snapshot will not need it)"; AFTER_SNAP=$((AFTER_SNAP+1))
+        fi;;
       access_denied) why="the read token is refused (403): check the token's bucket and permission";;
       transient) why="a network or R2 error persisted after $tries attempts";;
       *) why="an unclassified read error after $tries attempts";;
@@ -95,10 +99,12 @@ while IFS=$'\t' read -r sha size key; do
   printf '%s\tr2\t%s\t%s\t%s\t%s\n' "$sha" "$key" "$size" "$ck" "$state" >> "$WORK/inventory.tsv"
 done < "$BACKUP_STATE_DIR/r2-objects.tsv"
 TOTAL="$(wc -l < "$WORK/inventory.tsv" | tr -d ' ')"
+EXCL_JSON="$(cat "$BACKUP_STATE_DIR/r2-excluded.json" 2>/dev/null || echo '{}')"
+EXCL_N="$(python3 -c 'import json,sys; print(sum(json.loads(sys.argv[1]).values()))' "$EXCL_JSON")"
 COMPLETE=true; [ "$MISSING" -eq 0 ] && [ "$FAILED" -eq 0 ] || COMPLETE=false
 cat > "$WORK/r2media.json" <<JSON
 {"snapshot":"$NAME","label":"$BACKUP_LABEL","objects":$TOTAL,"backed_up":$((TOTAL-MISSING)),"missing":$MISSING,"copy_failures":$FAILED,
- "complete":$COMPLETE,"r2_media_records_not_covered":0,"inventory_sha256":"$(sha256 "$WORK/inventory.tsv")"}
+ "complete":$COMPLETE,"r2_media_records_not_covered":0,"excluded_retired":$EXCL_JSON,"inventory_sha256":"$(sha256 "$WORK/inventory.tsv")"}
 JSON
 age_encrypt "$WORK/inventory.tsv" "$WORK/inventory.tsv.age"
 # Inventories first, records last (see media-backup.sh): an interrupted run is superseded by the next one.
@@ -108,6 +114,8 @@ if [ "$FAILED" -gt 0 ]; then
   for c in not_found access_denied transient other; do
     n="$(printf '%s\n' $FAIL_CLASSES | grep -cx "$c" || true)"; [ "$n" = 0 ] || log "read failures: $n $c"
   done
+  [ "$AFTER_SNAP" = 0 ] || log "of the not_found failures, $AFTER_SNAP are originals the database now marks retired (removed after the snapshot was taken)"
 fi
 log "r2 media: snapshot $TOTAL originals, $((TOTAL-MISSING)) backed up, $MISSING missing; $COPIED new copied ($BYTES bytes), $FAILED failed"
+[ "$EXCL_N" = 0 ] || log "r2 media: $EXCL_N retired originals (removed on purpose, state deleted, nothing active refers to them) are not required: $EXCL_JSON"
 [ "$COMPLETE" = true ] || die "the R2 media backup of $NAME is incomplete (marked so in its .r2media.json); the next scheduled run takes a new snapshot"

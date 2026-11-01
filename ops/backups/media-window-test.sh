@@ -26,13 +26,13 @@ for i in 1 2 3; do
   printf '%s\t%s\tu/user%s/file%s.bin\n' "$sha" "$size" "$i" "$i" >> "$T/db.tsv"
 done
 age -r "$R" -o "$T/inv.age" "$T/inv.tsv"
-printf '{"snapshot":"%s","label":"local-test","objects":3,"backed_up":3,"missing":0,"copy_failures":0,"complete":true,"r2_media_records_not_covered":0,"inventory_sha256":"%s"}' \
+printf '{"snapshot":"%s","label":"local-test","objects":3,"backed_up":3,"missing":0,"copy_failures":0,"complete":true,"r2_media_records_not_covered":0,"excluded_retired":{},"inventory_sha256":"%s"}' \
   "$NAME" "$(sha256sum "$T/inv.tsv" | cut -d' ' -f1)" > "$T/rec.json"
 printf '{"label":"local-test","taken_utc":"20260801T013000Z"}' > "$T/man.json"
 echo x > "$T/snap"
 put() { s3 s3api put-object --bucket "$B" --key "$1" --body "$2" >/dev/null; }
 put "$DAY/$NAME.tar.age" "$T/snap"; put "$DAY/$NAME.json" "$T/man.json"; put "$DAY/$NAME.r2media.tsv.age" "$T/inv.age"; put "$DAY/$NAME.r2media.json" "$T/rec.json"
-mkdir -p "$T/bin"; printf '#!/usr/bin/env bash\ncat >/dev/null; cat "%s/db.tsv"\n' "$T" > "$T/bin/psql"; chmod +x "$T/bin/psql"
+mkdir -p "$T/bin"; printf '#!/usr/bin/env bash\ncat >/dev/null; sed "s/$/\\trequired/" "%s/db.tsv"\n' "$T" > "$T/bin/psql"; chmod +x "$T/bin/psql"
 export MEDIA_DB_URL=postgresql://stub@127.0.0.1:1/postgres
 verify() { # <name> <VERIFY_NOW>
   PATH="$T/bin:$PATH" VERIFY_NOW="$2" KEY="$DAY/$NAME.tar.age" AGE_IDENTITY_FILE="$T/id.key" OUT="$T/o-$1" MEDIA_SAMPLE=10 bash "$HERE/media-verify.sh" > "$T/o-$1.log" 2>&1

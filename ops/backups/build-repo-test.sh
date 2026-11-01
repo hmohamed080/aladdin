@@ -5,7 +5,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; D="$(mktemp -d)"; trap 'rm -rf "$D"' EXIT
 bash "$HERE/build-repo.sh" "$D/repo" >/dev/null
 fail=0
-for f in "$HERE"/*.sh "$HERE"/*.py; do
+for f in "$HERE"/*.sh "$HERE"/*.py "$HERE"/*.sql; do
   [ -f "$D/repo/backup/$(basename "$f")" ] || { echo "FAIL  the built repo lacks $(basename "$f")"; fail=1; }
 done
 # Every kit file a script sources or runs must exist next to it in the built repo.

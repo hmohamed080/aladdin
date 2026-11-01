@@ -54,3 +54,9 @@
 - Each project has its own backup bucket (Production `aladdin-production-db-backups`, Acceptance `aladdin-acceptance-backups-weur`), its own tokens, rule files and GitHub environments; no code path accepts the other project's bucket.
 - Database snapshots live up to 366 days, R2 media copies 90 days after they are written. Copies can predate a snapshot by up to one monthly generation, so the guaranteed full-restore window is 59 days; older snapshots are database-only restores and are verified and reported as such.
 - The built `aladdin-backups` repo is inactive by default (no schedule trigger) until the owner's activation GO.
+
+## Amendment 2026-11-01: retired originals are not required
+
+- A media backup holds every R2 original that the database still needs, not every row with `cleaned_at IS NULL`: the app deletes the bytes of a replaced or removed object itself and does not set `cleaned_at` (see the work log). An original is excluded only when it is provably retired (one canonical row in state `deleted`, same owner, no other canonical row or location sharing the key, nothing active pointing at it). Any doubt keeps it required, and a missing, unreadable, refused or different required original stays a hard failure.
+- One SQL rule (`ops/backups/r2-eligibility.sql`) serves the live and the restored database; `snapshot-objects.py` implements it over the dump; a PostgreSQL test proves they agree. The record reports `excluded_retired` counts per reason, never keys.
+

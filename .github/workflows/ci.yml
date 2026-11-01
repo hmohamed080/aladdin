@@ -196,6 +196,12 @@ jobs:
       - name: Freshness alarm fails closed
         env: { AWS_ACCESS_KEY_ID: testkey, AWS_SECRET_ACCESS_KEY: testsecret }
         run: bash ops/backups/freshness-test.sh
+      - name: Retired R2 originals - one rule for the live, restored and dump readers (real PostgreSQL)
+        env: { REQUIRE_PG: "1" }
+        run: bash ops/backups/r2-eligibility-test.sh
+      - name: Retired R2 originals - backup, replacement race and restore verification (S3 stand-in + PostgreSQL)
+        env: { AWS_ACCESS_KEY_ID: testkey, AWS_SECRET_ACCESS_KEY: testsecret, REQUIRE_PG: "1" }
+        run: bash ops/backups/r2-retired-media-test.sh
       - name: R2 read failures are classified, retried only if transient, and never leak names
         env: { AWS_ACCESS_KEY_ID: testkey, AWS_SECRET_ACCESS_KEY: testsecret }
         run: bash ops/backups/r2-read-diagnostics-test.sh
