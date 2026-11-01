@@ -1,5 +1,5 @@
 import { test, expect, chromium } from "@playwright/test";
-import { messageIdsFor, readNewOtp } from "./helpers/auth";
+import { messageIdsFor, readNewOtp, SIGN_IN_BUTTON, SIGN_IN_IDENTIFIER_LABEL } from "./helpers/auth";
 import { createConfirmedAccount } from "./helpers/fixtures";
 
 /**
@@ -53,10 +53,10 @@ async function signInWorks(browser: import("@playwright/test").Browser, email: s
   const context = await browser.newContext({ baseURL: baseUrl() });
   const page = await context.newPage();
   await page.goto("/auth/sign-in");
-  await page.getByLabel(/email address|البريد الإلكتروني/i).fill(email);
+  await page.getByLabel(SIGN_IN_IDENTIFIER_LABEL).fill(email);
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
   // Sign In has no CAPTCHA.
-  await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
+  await page.getByRole("button", { name: SIGN_IN_BUTTON }).click();
   await page.waitForTimeout(1500);
   const works = !/sign-in/.test(page.url());
   await context.close();

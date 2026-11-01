@@ -26,4 +26,4 @@ Vercel production variable names at retirement (names only): `NEXT_PUBLIC_SUPABA
 
 - One platform for the web app, FastAPI, media and DNS.
 - The migration-first promotion pipeline (`deploy-staging.yml`) is gone; until a Cloudflare equivalent exists, the owner pushes migrations before each production deploy.
-- Leftover follow-ups: `backend/app/config.py` still accepts `VERCEL_ENV` (harmless; never set on Cloudflare), and some comments and historical docs still mention Vercel.
+- Follow-up done 2026-10-28: `backend/app/config.py` no longer reads `VERCEL_ENV`; code comments and current guides describe Cloudflare; the unused `scripts/main-head-check.mjs` (a Vercel-promotion guard) is removed. Dated reports, the work log, earlier ADRs and runbooks marked historical still mention Vercel on purpose. The internal header name `x-vercel-forwarded-for` is kept: the frontend Worker rebuilds it from `cf-connecting-ip` on every request.

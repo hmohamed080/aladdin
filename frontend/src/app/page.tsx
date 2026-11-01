@@ -1,11 +1,11 @@
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, resolveLocale, directionFor } from "@/lib/i18n/config";
 import { I18nMessagesProvider } from "@/lib/i18n/context";
-import { pickMessages } from "@/lib/i18n/translate";
 import { LandingHero } from "@/features/landing-preview/landing-hero";
 import { LandingEcosystem } from "@/features/landing-preview/landing-ecosystem";
+import { LandingMarketplaceSection } from "@/features/landing-marketplace/landing-marketplace-section";
 import { LandingMotion } from "@/features/landing-preview/landing-motion";
-import { LANDING_MESSAGE_NAMESPACES } from "@/features/landing-preview/landing-messages";
+import { landingMessages } from "@/features/landing-preview/landing-messages";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * The approved composition is `LandingMotion` > `LandingHero` + `LandingEcosystem`
  * (header, hero, process, roles, videos, brands, stories, final call to action and
  * footer all live inside those). It is deliberately NOT chosen by environment: a
- * Vercel Preview, Production, staging and a plain branch deployment must all serve
+ * preview, Production, staging and a plain branch deployment must all serve
  * the same page. `NEXT_PUBLIC_APP_ENV` used to select between this and the older
  * `landing-v2` stack, which let the old page come back on any deployment that did
  * not set it to "staging"; that split is gone. The `landing-v2` components stay in
@@ -29,11 +29,11 @@ export default async function RootPage() {
     <I18nMessagesProvider
       locale={locale}
       dir={directionFor(locale)}
-      messages={pickMessages(locale, LANDING_MESSAGE_NAMESPACES)}
+      messages={landingMessages(locale)}
     >
       <LandingMotion>
         <LandingHero />
-        <LandingEcosystem />
+        <LandingEcosystem marketplaceSlot={<LandingMarketplaceSection />} />
       </LandingMotion>
     </I18nMessagesProvider>
   );

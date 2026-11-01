@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { test, expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
-import { E2E_PASSWORD, registerWithPassword, signIn } from "./helpers/auth";
+import { E2E_PASSWORD, answerBusinessContactIfAsked, pickBusinessActivity, registerWithPassword, signIn } from "./helpers/auth";
 
 /**
  * MANDATORY FIRST BUSINESS for a business registration, end to end against the REAL local Supabase + Mailpit, through the
@@ -63,13 +63,16 @@ async function fillIdentity(page: Page, name: string): Promise<void> {
   await expect(page.getByRole("heading", { name: /set up your business/i })).toBeVisible();
   await page.locator("#bname").fill(name);
   await page.locator("#blegal").fill(`${name} Legal LLC`);
+  // Each business type answers its own activity list; a Showroom also gives its business phone.
+  await pickBusinessActivity(page);
+  if (await page.locator("#bphone").count()) await page.locator("#bphone").fill(`10${String(Date.now()).slice(-8)}`);
   await page.getByRole("button", { name: /^continue$/i }).click();
   await expect(page.getByRole("heading", { name: /where are you based/i })).toBeVisible();
 }
 
 async function finishWizardFromLocation(page: Page, branch = "Cairo HQ"): Promise<void> {
   await page.getByRole("button", { name: /^continue$/i }).click();
-  await expect(page.getByRole("heading", { name: /your primary branch/i })).toBeVisible();
+  await answerBusinessContactIfAsked(page);
   await page.locator("#bbranch").fill(branch);
   await page.getByRole("button", { name: /^continue$/i }).click();
   await expect(page.getByRole("heading", { name: /review and create your business/i })).toBeVisible();

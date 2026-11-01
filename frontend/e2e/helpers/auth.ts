@@ -109,6 +109,21 @@ export async function readNewOtp(
  * through `/auth/sign-up` choose it themselves. Never a production credential.
  */
 export const E2E_PASSWORD = "Zq9$Kx4#WmT7!Pn2Rb";
+/** Sign-up requires an 18+ birthday (ADR-0025). */
+export const E2E_BIRTH_DATE = "1990-01-15";
+
+/** Picks E2E_BIRTH_DATE in the sign-up Month / Day / Year dropdowns. */
+export async function fillBirthDate(page: Page): Promise<void> {
+  const [year, month, day] = E2E_BIRTH_DATE.split("-").map(Number);
+  await page.locator("#birthMonth").selectOption(String(month));
+  await page.locator("#birthDay").selectOption(String(day));
+  await page.locator("#birthYear").selectOption(String(year));
+}
+/** The one sign-in field and the sign-up contact field (ADR-0025), EN and AR. */
+export const SIGN_IN_IDENTIFIER_LABEL = /^mobile number, username or email$|^رقم الموبايل أو اسم المستخدم أو البريد الإلكتروني$/i;
+export const SIGN_UP_CONTACT_LABEL = /^mobile number or email$|^رقم الموبايل أو البريد الإلكتروني$/i;
+export const SIGN_IN_BUTTON = /^log in$|^تسجيل الدخول$/i;
+export const SIGN_UP_BUTTON = /^sign up$|^تسجيل$/i;
 
 /**
  * Sign in through the REAL canonical Email + Password flow (`/auth/sign-in`,
@@ -124,17 +139,80 @@ export async function signIn(
 ): Promise<void> {
   await stubTurnstileWhenOffline(page);
   await page.goto("/auth/sign-in");
-  await page.getByLabel(/^email address$|^البريد الإلكتروني$/i).fill(email);
+  await page.getByLabel(SIGN_IN_IDENTIFIER_LABEL).fill(email);
   // Anchored: the "Show password" toggle is labelled too.
   await page.getByLabel(/^password$|^كلمة المرور$/i).fill(password);
   // PR #84: sign-in forwards a Turnstile token to GoTrue and refuses an unchallenged request, so wait for the REAL widget
   // (always-pass TEST site key locally) to produce it before submitting.
   await waitForCaptchaToken(page);
-  await page.getByRole("button", { name: /^sign in$|^تسجيل الدخول$/i }).click();
+  await page.getByRole("button", { name: SIGN_IN_BUTTON }).click();
 
   // Wait on the URL committing, not the full "load" event — under sustained
   // full-suite load the load event can lag far behind an interactive page.
-  await page.waitForURL(expectedLanding, { waitUntil: "commit" });
+  await reachLanding(page, expectedLanding);
+}
+
+const ACCOUNT_BASICS_URL = /\/onboarding\/basics(\?|$)/;
+
+/**
+ * Waits for `landing`, completing the one-time "Complete your account" screen
+ * (ADR-0026: phone, governorate + town, specialties) through the REAL form if
+ * the account is sent there first. Only the sections the account still misses
+ * are on the page.
+ */
+export async function reachLanding(page: Page, landing: RegExp, timeout = 20_000): Promise<void> {
+  const onBasics = (url: URL) => ACCOUNT_BASICS_URL.test(url.pathname + url.search);
+  await page.waitForURL((url) => onBasics(url) || landing.test(url.href), { waitUntil: "commit", timeout });
+  if (onBasics(new URL(page.url()))) {
+    await completeAccountBasics(page);
+    await page.waitForURL(landing, { waitUntil: "commit", timeout });
+  }
+}
+
+/**
+ * Answers the basics steps (ADR-0026: one step per missing item - phone, then
+ * governorate + town, then specialties) through the REAL form. Only the steps
+ * the account still misses are shown; the last Continue saves and leaves.
+ */
+export async function completeAccountBasics(page: Page): Promise<void> {
+  await expect(page.getByText(/complete your account|أكمل حسابك/i).first()).toBeVisible();
+  const sections = page.locator("form section");
+  for (let step = 0; step < 3 && ACCOUNT_BASICS_URL.test(new URL(page.url()).pathname + new URL(page.url()).search); step++) {
+    const index = await sections.evaluateAll((els) => els.findIndex((el) => !(el as HTMLElement).hidden));
+    if (index < 0) break;
+    const current = sections.nth(index);
+    const phone = current.locator('input[name="phone"]');
+    if (await phone.count()) await phone.fill(`010${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`);
+    const governorate = current.locator('select[name="governorate"]');
+    if (await governorate.count()) {
+      await governorate.selectOption("cairo");
+      await current.locator("select#city").selectOption("new-cairo");
+    }
+    const specialty = current.locator("select#specialtyAdd");
+    if (await specialty.count()) await specialty.selectOption({ index: 1 });
+    await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
+    // The answered step hides (or the page leaves once the last one saves).
+    await expect(current).toBeHidden();
+  }
+}
+
+/** Business setup: picks the first activity of the business type's own list, when this step asks for it. */
+export async function pickBusinessActivity(page: Page): Promise<void> {
+  const activity = page.locator("#bactivity");
+  if (!(await activity.count())) return;
+  await activity.selectOption({ index: 1 });
+}
+
+/** Business setup: answers the owner's own mobile number step, when a first business registration still owes it. */
+export async function answerBusinessContactIfAsked(page: Page): Promise<void> {
+  const heading = page.getByRole("heading", { name: /^how to reach you$|^كيف نتواصل معك$/i });
+  const branch = page.getByRole("heading", { name: /your primary branch/i });
+  await expect(heading.or(branch)).toBeVisible();
+  if (!(await heading.isVisible())) return;
+  const phone = page.locator("#ownerPhone");
+  if (await phone.count()) await phone.fill(`10${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`);
+  await page.getByRole("button", { name: /^continue$|^متابعة$/i }).click();
+  await expect(branch).toBeVisible();
 }
 
 /**
@@ -192,7 +270,7 @@ export async function accountTypeOptions(page: Page): Promise<Array<{ text: stri
 
 /**
  * Register a brand-new account through the REAL canonical `/auth/sign-up`
- * (Full Name, email, username, account type, password, consents, Turnstile)
+ * (email, password, birthday, Full Name, username, account type, Turnstile)
  * and its OTP confirmation, then wait for the app landing. Leaves the browser
  * signed in; the account's password is `E2E_PASSWORD`.
  */
@@ -209,21 +287,18 @@ export async function registerWithPassword(
 ): Promise<void> {
   await stubTurnstileWhenOffline(page);
   await page.goto("/auth/sign-up");
+  await page.getByLabel(SIGN_UP_CONTACT_LABEL).fill(email);
+  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(E2E_PASSWORD);
+  await fillBirthDate(page);
   await page.getByLabel(/^full name$|^الاسم الكامل$/i).fill(displayName);
-  await page.getByLabel(/^email address$|^البريد الإلكتروني$/i).fill(email);
   await page.getByLabel(/^username$|^اسم المستخدم$/i).fill(username);
   await selectAccountType(page, accountType);
-  await page.getByLabel(/^password$|^كلمة المرور$/i).fill(E2E_PASSWORD);
-  await page.getByLabel(/confirm password|تأكيد كلمة المرور/i).fill(E2E_PASSWORD);
-  await page.getByLabel(/terms of service|شروط الخدمة/i).check();
-  await page.getByLabel(/privacy policy|سياسة الخصوصية/i).check();
-  await page.getByLabel(/pilot release|إصدار تجريبي/i).check();
   const seen = await messageIdsFor(request, email);
   await waitForCaptchaToken(page);
-  await page.getByRole("button", { name: /create account|إنشاء حساب/i }).click();
-  await expect(page.getByText(/next step|الخطوة التالية/i)).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: SIGN_UP_BUTTON }).click();
+  await expect(page.getByRole("heading", { name: /verify your email|تحقق من بريدك الإلكتروني/i })).toBeVisible({ timeout: 20_000 });
   const code = await readNewOtp(request, email, seen);
   await page.getByLabel(/one-time code|الرمز لمرة واحدة/i).pressSequentially(code);
   await page.getByRole("button", { name: /verify and continue|تحقق وتابع/i }).click();
-  await page.waitForURL(landing, { waitUntil: "commit", timeout: 20_000 });
+  await reachLanding(page, landing);
 }

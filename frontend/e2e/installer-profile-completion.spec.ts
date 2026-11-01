@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { test, expect, type Page } from "@playwright/test";
-import { stubTurnstileWhenOffline } from "./helpers/auth";
+import { registerWithPhone } from "./helpers/phone-sign-up";
 
 /**
  * Installer profile completion across every surface that shows it, driven through the approved
@@ -23,7 +23,6 @@ import { stubTurnstileWhenOffline } from "./helpers/auth";
  */
 
 const DB = process.env.E2E_DB_CONTAINER ?? "supabase_db_aladdin";
-const PASSWORD = "green-tiles-on-roof";
 const TOTAL_ITEMS = 9;
 
 function sql(query: string): string {
@@ -91,16 +90,7 @@ async function pngBytes(page: Page, colour: string): Promise<Buffer> {
 }
 
 async function register(page: Page, name: string, phone: string): Promise<void> {
-  await stubTurnstileWhenOffline(page);
-  await page.goto("/installer/sign-up");
-  await page.getByLabel("الاسم الكامل").fill(name);
-  // Scoped by name: the sign-up page also has a labelled tab panel for the phone method.
-  await page.locator('input[name="phone"]').fill(phone);
-  await page.getByLabel("كلمة المرور", { exact: true }).fill(PASSWORD);
-  await page.getByRole("checkbox").check();
-  await expect(page.locator('input[name="captchaToken"]')).not.toHaveValue("", { timeout: 30_000 });
-  await page.getByRole("button", { name: "إنشاء الحساب" }).click();
-  await page.waitForURL(/\/home(\/|$)/, { waitUntil: "commit", timeout: 30_000 });
+  await registerWithPhone(page, { phone, name });
 }
 
 /** What each surface shows right now, as numbers. `null` = the surface is not drawn (hidden at 100%). */

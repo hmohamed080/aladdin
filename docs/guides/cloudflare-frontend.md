@@ -1,18 +1,18 @@
 # Cloudflare Workers frontend: build, preview and configuration
 
-How the Next.js frontend is built and run on Cloudflare Workers ([ADR-0021](../decisions/ADR-0021-cloudflare-workers-frontend.md)). Vercel stays the live host until the owner approves the cutover ([cutover plan](../operations/cloudflare-frontend-cutover-plan.md)). Names only: values live in Cloudflare, the GitHub Environment and the owner's password manager, never in Git.
+How the Next.js frontend is built and run on Cloudflare Workers ([ADR-0021](../decisions/ADR-0021-cloudflare-workers-frontend.md)). The production Worker has served aladdindecore.com since the 2026-10-27 cutover ([cutover plan](../operations/cloudflare-frontend-cutover-plan.md)); Vercel is retired ([ADR-0024](../decisions/ADR-0024-vercel-retired.md)). Names only: values live in Cloudflare, the GitHub Environment and the owner's password manager, never in Git.
 
 ## Commands (in `frontend/`)
 
 | Command | What it does |
 |---|---|
-| `pnpm cf:build` | `next build` with the middleware on the Edge runtime, then the OpenNext bundle in `.open-next/` (`scripts/build-cloudflare.mjs`). The Vercel build (`pnpm build`) is unchanged. |
+| `pnpm cf:build` | `next build` with the middleware on the Edge runtime, then the OpenNext bundle in `.open-next/` (`scripts/build-cloudflare.mjs`). The plain `pnpm build` (CI) is unchanged. |
 | `pnpm exec wrangler dev --port 8787` | Serves that build in the real Workers runtime (workerd) locally. Reads runtime variables from `frontend/.dev.vars` (gitignored). |
 | `pnpm exec playwright test -c playwright.workers.config.ts [spec]` | The E2E suite against the Workers build, local Supabase only. Writes `.dev.vars` from `npx supabase status`. |
 | `pnpm exec wrangler deploy --env preview --dry-run --outdir /tmp/w` | Bundles without uploading; prints the size that counts against the 64 MiB limit. |
 | `pnpm cf:preview:deploy` | Uploads to the `preview` environment (workers.dev). Needs `CLOUDFLARE_API_TOKEN`. Prefer the manual GitHub workflow `Cloudflare frontend preview`. |
 
-`NEXT_PUBLIC_*` values are compiled into the build, exactly as on Vercel, so each environment is built with its own values.
+`NEXT_PUBLIC_*` values are compiled into the build, so each environment is built with its own values.
 
 ## Environments (`frontend/wrangler.jsonc`)
 
@@ -31,12 +31,12 @@ Runtime, on the Worker. Plain values go in `wrangler.jsonc` `vars` or `wrangler 
 | Name | Kind | Notes |
 |---|---|---|
 | `NEXT_PUBLIC_APP_ENV`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | var | Same values as the build; server code also reads them at runtime. |
-| `SUPABASE_SERVICE_ROLE_KEY` | **secret** | As on Vercel. |
-| `AUTH_PASSWORD_PREVIEW_GRANT_SECRET` | **secret** | As on Vercel. |
+| `SUPABASE_SERVICE_ROLE_KEY` | **secret** | Server-only. |
+| `AUTH_PASSWORD_PREVIEW_GRANT_SECRET` | **secret** | Server-only. |
 | `TURNSTILE_SECRET_KEY` | **secret** | Add the workers.dev hostname to the Turnstile widget and to `TURNSTILE_ALLOWED_HOSTNAMES` (var) for the preview. |
 | `BACKEND` | service binding | The `aladdin-backend[-env]` Worker (FastAPI in a Cloudflare Container, [ADR-0022](../decisions/ADR-0022-fastapi-cloudflare-containers.md)). Wins over `BACKEND_ORIGIN` when bound. Not bound until the backend preview is approved and deployed. |
-| `BACKEND_ORIGIN` | var | FastAPI origin for `/api/backend/*`, e.g. the Vercel deployment's own URL. `https` only. Used when `BACKEND` is not bound; unset (and unbound) answers 503 on `/api/backend`. |
-| `R2_*`, `MEDIA_EDGE_*`, `VIDEO_ENABLED` | var / **secret** for keys | Same names and approvals as the retired Vercel setup ([ADR-0018](../decisions/ADR-0018-r2-edge-media-delivery.md)). Preview: acceptance buckets only. |
+| `BACKEND_ORIGIN` | var | FastAPI origin for `/api/backend/*`, `https` only; unused while both Workers bind `BACKEND`. Used when `BACKEND` is not bound; unset (and unbound) answers 503 on `/api/backend`. |
+| `R2_*`, `MEDIA_EDGE_*`, `VIDEO_ENABLED` | var / **secret** for keys | Names and approvals per [ADR-0018](../decisions/ADR-0018-r2-edge-media-delivery.md)). Preview: acceptance buckets only. |
 | `REDIS_CACHE_ENABLED`, `REDIS_REST_URL`, `REDIS_KEY_ENV` | var | Workers use Upstash's HTTPS interface; a TCP `REDIS_URL` is refused on Workers ([upstash-setup.md](upstash-setup.md)). |
 | `REDIS_REST_TOKEN` | **secret** | Full (not read-only) token of the existing database. |
 

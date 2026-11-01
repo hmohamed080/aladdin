@@ -4,11 +4,11 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { isViewAsEnabled } from "@/lib/env/view-as";
 import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/config";
 import { sanitizeNext } from "@/server/auth/next";
 import { resolveActiveLanding } from "@/server/queries/landing";
 import { hasAppAccess, type RegistrationState } from "@/server/queries/registration";
-import { isCraftsmanLoginAlias } from "@/lib/auth/craftsman-login-alias";
 import { captchaTokenFrom, isCaptchaFailure } from "@/server/auth/captcha";
 
 /**
@@ -212,21 +212,18 @@ export async function verifySignUpOtp(_prev: AuthState, formData: FormData): Pro
   redirect("/onboarding");
 }
 
-/**
- * Sign out and return to the sign-in screen THIS account can use. The identity
- * is read before the session ends — a known fact about the caller, not a guess:
- * an installer phone + password account (internal login alias,
- * lib/auth/craftsman-login-alias.ts) cannot sign in on the email page, so it
- * returns to /installer/sign-in; every other account returns to /auth/sign-in
- * exactly as before.
- */
+/** Sign out and return to the one sign-in page (it takes a mobile number, username or email). */
 export async function signOut(): Promise<void> {
   const supabase = await getServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Admin View-As: a sign-out closes every live view session of this admin (audited). Best effort, and only when the
+  // feature is switched on, so a normal sign-out is byte-for-byte what it was.
+  if (isViewAsEnabled()) {
+    try {
+      await supabase.rpc("admin_view_as_end_all");
+    } catch {
+      /* never block a sign-out; the session also expires on its own after 30 minutes */
+    }
+  }
   await supabase.auth.signOut();
-  // Registration source selects an entry page only; it never grants authority.
-  const phoneEntry = user?.app_metadata?.registration_source === "temporary_showroom_password_flow" ? "/showroom/sign-in" : "/installer/sign-in";
-  redirect(isCraftsmanLoginAlias(user?.email) ? phoneEntry : "/auth/sign-in");
+  redirect("/auth/sign-in");
 }

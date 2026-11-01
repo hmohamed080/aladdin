@@ -22,7 +22,7 @@ Show Aladdin's external actors and systems — who and what it talks to.
 | WhatsApp (OTP + operational messaging) | passwordless auth + notifications | server-side only *(Superseded by the canonical password-auth rollout on 2026-09-28 — General = Email + Password; Installer = Phone + Password.)* |
 | Email provider | Email OTP / verification links, transactional email | server-side only |
 | Sentry | error monitoring | all services |
-| Vercel (Services: web app + FastAPI) | hosting | ops |
+| Cloudflare (Workers: web app · Containers: FastAPI) | hosting | ops |
 
 ## Rationale
 

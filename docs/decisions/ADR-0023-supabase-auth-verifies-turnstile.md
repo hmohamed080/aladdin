@@ -1,6 +1,6 @@
 # ADR-0023 — Supabase Auth verifies sign-in Turnstile tokens; the app verifies only what bypasses it
 
-**Status:** Accepted (code, tests and docs) · 2026-10-26 · owner decision "Option 2 — implement real server-side Turnstile verification", then Option B on the proposal ([Sign-in security: real Turnstile verification](https://claude.ai/artifact/XApKUShLDLvnHE9iojQcXS)). **The hosted half is not in effect** until the owner turns on Supabase Auth CAPTCHA protection on each project (Acceptance first, then Production), after this code is live there.
+**Status:** Accepted (code, tests and docs) · 2026-10-26 · owner decision "Option 2 — implement real server-side Turnstile verification", then Option B on the proposal ([Sign-in security: real Turnstile verification](https://claude.ai/artifact/XApKUShLDLvnHE9iojQcXS)). **Hosted half in effect since 2026-10-28:** the owner turned on Supabase Auth CAPTCHA protection on Acceptance and Production.
 
 **Supersedes** the 2026-09-24 "application-scoped CAPTCHA, `[auth.captcha]` permanently off" decision ([ARCHITECTURE_GUIDE](../architecture/ARCHITECTURE_GUIDE.md) change history), which commit 05c4eec had already left behind in code: since then every Supabase Auth call forwards its token to Supabase Auth, while Supabase Auth's CAPTCHA protection stayed off, so those tokens were only checked for presence.
 
@@ -32,7 +32,7 @@ The public (anon) key is public, so anyone can call `/auth/v1` directly. An app-
 
 - **Proven in CI (direct `/auth/v1` calls with the public key, no app):** a missing token is refused on all five operations; a token Cloudflare rejects (2x test secret, what a real secret answers for a made-up or invalid token) is refused; a token Cloudflare reports as already spent (3x test secret, the replay/expiry answer) is refused; a genuine test token gets past the check. Unit tests cover the app's Siteverify: one call per token, replay refused, expired/invalid/unavailable, hostname and action mismatch.
 - **Not proven:** a real replay against Cloudflare (test keys do not track single use; it can only be observed with real keys, for example on Acceptance after the hosted switch). Supabase Auth does **not** check a token's hostname or action; hostname protection on those calls relies on the Turnstile widget's hostname allowlist in Cloudflare. Supabase Auth CAPTCHA does not cover `verifyOtp`, token refresh, OAuth or the Admin API; those rely on rate limits and their own checks.
-- **Until the hosted switch is on, hosted projects still check presence only.** No document may describe hosted sign-in as CAPTCHA-verified before that.
+- **Hosted switch ON since 2026-10-28** (owner, Acceptance and Production). Verified the same day: a direct `/auth/v1/token?grant_type=password` call answers `captcha_failed` with no token ("no captcha_token found") and with a made-up token ("invalid-input-response", so Cloudflare checked it with the real secret) on both projects, and the owner's browser smoke test (email sign-in, installer sign-in, forgot password) passed on aladdindecore.com.
 
 ## Rollout (each step needs the owner's GO)
 

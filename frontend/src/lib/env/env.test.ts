@@ -37,10 +37,10 @@ describe("parsePublicEnv", () => {
 });
 
 /**
- * Deployment contract. These assertions are what make the Vercel environment
+ * Deployment contract. These assertions are what make the Worker variables
  * safe to fill in by hand: they enumerate the schemas rather than a maintained
  * list, so adding a variable to the wrong half fails here instead of leaking.
- * See docs/operations/staging-deployment-runbook.md.
+ * See docs/guides/cloudflare-frontend.md.
  */
 describe("environment exposure contract", () => {
   it("exposes only NEXT_PUBLIC_-prefixed variables to the browser", () => {

@@ -5,8 +5,11 @@ const state = vi.hoisted(() => ({
   data: null as unknown,
   mandatory: { required: false, orgType: null } as { required: boolean; orgType: string | null },
   flow: vi.fn(),
+  basics: null as unknown,
+  basicsError: false,
 }));
 
+vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => {
     throw new Error(`REDIRECT:${to}`);
@@ -18,6 +21,21 @@ vi.mock("@/server/queries/registration", () => ({
 }));
 vi.mock("@/server/queries/onboarding", () => ({ getBusinessOnboardingData: async () => state.data }));
 vi.mock("@/server/queries/business-setup", () => ({ loadMandatoryBusinessSetup: async () => state.mandatory }));
+vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({}) }));
+vi.mock("@/server/queries/account-basics", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/server/queries/account-basics")>();
+  return {
+    missingBasics: real.missingBasics,
+    loadAccountBasics: async () => {
+      if (state.basicsError) throw new Error("read failed");
+      return state.basics;
+    },
+  };
+});
+vi.mock("@/server/queries/specialty-source", () => ({
+  loadSpecialtySource: async (kind: string) =>
+    kind === "trades" ? { kind: "trades", keys: ["painting"] } : null,
+}));
 vi.mock("@/features/onboarding/business-flow", () => ({
   BusinessFlow: (props: unknown) => {
     state.flow(props);
@@ -51,6 +69,7 @@ type FlowProps = {
   answers: { orgType: string | null; displayName: string | null };
   presetOrgType: string | null;
   draftId: string | null;
+  basics: { phone: boolean; specialties: boolean; source: { kind: string } | null } | null;
 };
 /** The page returns the wizard element; its props are what the wizard will be given. */
 async function flowProps(): Promise<FlowProps> {
@@ -64,6 +83,18 @@ beforeEach(() => {
   state.registration = "access_ready";
   state.data = data();
   state.mandatory = { required: false, orgType: null };
+  state.basics = null;
+  state.basicsError = false;
+});
+
+const accountBasics = (over: Record<string, unknown> = {}) => ({
+  phone: null,
+  governorate: null,
+  city: null,
+  cityCustom: null,
+  specialtyKind: "none",
+  specialties: [],
+  ...over,
 });
 
 describe("/onboarding/business", () => {
@@ -114,5 +145,28 @@ describe("/onboarding/business", () => {
     state.data = data({ selectedTrack: "professional" });
     await expect(BusinessOnboardingPage()).rejects.toThrow("REDIRECT:/onboarding");
     expect(state.flow).not.toHaveBeenCalled();
+  });
+
+  it("asks the owner's missing phone inside the wizard (no separate page); the business activity is the business's list", async () => {
+    state.mandatory = { required: true, orgType: "showroom_dealer" };
+    state.basics = accountBasics();
+    const props = await flowProps();
+    expect(props.basics).toEqual({ phone: true, specialties: false, source: null });
+  });
+
+  it("never asks what the account already has, and never asks an owner adding another business", async () => {
+    state.mandatory = { required: true, orgType: "showroom_dealer" };
+    state.basics = accountBasics({ phone: "+201055501029" });
+    expect((await flowProps()).basics).toBeNull();
+
+    state.mandatory = { required: false, orgType: null };
+    state.basics = accountBasics();
+    expect((await flowProps()).basics).toBeNull();
+  });
+
+  it("a failed basics read never blocks business setup", async () => {
+    state.mandatory = { required: true, orgType: "showroom_dealer" };
+    state.basicsError = true;
+    expect((await flowProps()).basics).toBeNull();
   });
 });

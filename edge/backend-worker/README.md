@@ -18,7 +18,7 @@ browser ── /api/backend/* ──▶ frontend Worker (aladdin-frontend[-env])
 ```
 
 This Worker has no workers.dev address and no route, so the binding is the only
-way in. Without the binding the frontend falls back to `BACKEND_ORIGIN` (Vercel).
+way in. Without the binding the frontend falls back to `BACKEND_ORIGIN` (unused today).
 
 ## Files
 

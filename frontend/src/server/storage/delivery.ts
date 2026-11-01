@@ -7,7 +7,6 @@ import { mediaProvider, resolveMedia, privilegedStorageClient } from "./media";
 export const MEDIA_NO_STORE = {
   "cache-control": "no-store, no-cache, must-revalidate, private",
   "cdn-cache-control": "no-store",
-  "vercel-cdn-cache-control": "no-store",
   pragma: "no-cache", expires: "0",
   "x-content-type-options": "nosniff",
   "referrer-policy": "no-referrer",

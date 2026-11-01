@@ -7,7 +7,7 @@ import { mintVideoTicket } from "./ticket";
 /**
  * Playback URLs. Video is delivered ONLY by the media Worker (`/v/<id>/...`):
  * there is no application-proxy fallback, because video bytes must never pass
- * through Vercel or Supabase. With video or edge delivery off, nothing plays.
+ * through the web app or Supabase. With video or edge delivery off, nothing plays.
  */
 export type VideoSummary = {
   id: string;

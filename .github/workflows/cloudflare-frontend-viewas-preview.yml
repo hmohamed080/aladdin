@@ -1,0 +1,118 @@
+# Aladdin - isolated Admin View-As PREVIEW Worker (workers.dev), separate from Registration's `aladdin-frontend-preview`.
+#
+# Manual only. Builds with OpenNext for the `viewas-preview` environment in frontend/wrangler.jsonc (Worker
+# `aladdin-frontend-viewas-preview`). It never touches `aladdin-frontend-preview`, DNS, aladdindecore.com, the live Supabase
+# project or any Production resource.
+#
+# TWO independent switches on the GitHub Environment `cloudflare-viewas-preview` must both be exactly "true" before anything
+# is uploaded; without them the run only builds and bundles (dry run):
+#   CLOUDFLARE_VIEWAS_PREVIEW_ENABLED   the owner approved this deployment
+#   VIEWAS_ACCESS_CONFIRMED             Cloudflare Access already protects the Worker's hostname (owner attests)
+# The Worker is deployed DARK (workers_dev=false, preview_urls=false in wrangler.jsonc): it has no public route. After the upload
+# this workflow proves that, and only the owner enables the route once Access is verified (docs/admin/ADMIN_VIEW_AS_PREVIEW_DEPLOYMENT_PLAN.md).
+#
+# Environment `cloudflare-viewas-preview` (restrict deployment branches to the approved integration branch only):
+#   secrets:   CLOUDFLARE_API_TOKEN (Workers Scripts:Edit on this Worker/account only), CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET (optional, smoke only)
+#   variables: CLOUDFLARE_ACCOUNT_ID, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY (ACCEPTANCE project only),
+#              NEXT_PUBLIC_TURNSTILE_SITE_KEY, CLOUDFLARE_VIEWAS_PREVIEW_ENABLED, VIEWAS_ACCESS_CONFIRMED
+# Runtime secrets are set once by the operator with `wrangler secret put --env viewas-preview` (never copied from the other Worker,
+# never printed). No Supabase service-role key is needed by the View-As feature.
+
+name: Cloudflare frontend View-As preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      smoke:
+        description: "After the owner enabled the route behind Access: run the smoke check (needs the Access service token)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: cloudflare-frontend-viewas-preview
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  viewas-preview:
+    name: cloudflare-frontend-viewas-preview
+    runs-on: ubuntu-latest
+    environment: cloudflare-viewas-preview
+    env:
+      NEXT_PUBLIC_APP_ENV: staging
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+      ACCEPTANCE_REF: nxossqhdfltcqdwvbewi
+      WORKER_NAME: aladdin-frontend-viewas-preview
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Enable pnpm (corepack, pinned to packageManager)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+      - name: Allow only the Acceptance Supabase project
+        run: |
+          case "$NEXT_PUBLIC_SUPABASE_URL" in
+            "https://$ACCEPTANCE_REF.supabase.co") ;;
+            *) echo "NEXT_PUBLIC_SUPABASE_URL must be exactly the Acceptance project (https://$ACCEPTANCE_REF.supabase.co)"; exit 1 ;;
+          esac
+          [ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ] || { echo "NEXT_PUBLIC_SUPABASE_ANON_KEY is not set on the environment"; exit 1; }
+      - run: pnpm install --frozen-lockfile
+      - name: Build for Workers
+        run: |
+          [ -n "$NEXT_PUBLIC_TURNSTILE_SITE_KEY" ] || unset NEXT_PUBLIC_TURNSTILE_SITE_KEY
+          pnpm --filter frontend cf:build
+      - name: Bundle (dry run) and prove the Worker stays dark and View-As only
+        working-directory: frontend
+        run: |
+          pnpm exec wrangler deploy --env viewas-preview --dry-run --outdir "$RUNNER_TEMP/worker"
+          # The checked-in config must stay dark, isolated from Registration's Worker, with R2 and Redis off.
+          pnpm exec vitest run src/lib/cloudflare/viewas-preview-config.test.ts
+      - name: Upload (dark: no public route)
+        if: vars.CLOUDFLARE_VIEWAS_PREVIEW_ENABLED == 'true' && vars.VIEWAS_ACCESS_CONFIRMED == 'true'
+        working-directory: frontend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler deploy --env viewas-preview \
+            --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            --var "R2_ACCOUNT_ID:$CLOUDFLARE_ACCOUNT_ID"
+      - name: Fail if the Worker is reachable without Cloudflare Access
+        if: vars.CLOUDFLARE_VIEWAS_PREVIEW_ENABLED == 'true' && vars.VIEWAS_ACCESS_CONFIRMED == 'true'
+        run: |
+          url="https://$WORKER_NAME.bstalent9.workers.dev"
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url/api/health" || true)
+          echo "unauthenticated $url/api/health -> $code" | tee -a "$GITHUB_STEP_SUMMARY"
+          case "$code" in
+            200) echo "EXPOSED: the Worker answers without Access. Disable the workers.dev route NOW."; exit 1 ;;
+            5*)  echo "Unexpected server answer without Access ($code)"; exit 1 ;;
+          esac
+      - name: Smoke check behind Access (owner enabled the route)
+        if: inputs.smoke && vars.CLOUDFLARE_VIEWAS_PREVIEW_ENABLED == 'true' && vars.VIEWAS_ACCESS_CONFIRMED == 'true'
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          [ -n "$CF_ACCESS_CLIENT_ID" ] && [ -n "$CF_ACCESS_CLIENT_SECRET" ] || { echo "the Access service token is required for the smoke check"; exit 1; }
+          url="https://$WORKER_NAME.bstalent9.workers.dev"
+          anon=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url/api/health" || true)
+          case "$anon" in 200) echo "EXPOSED without Access"; exit 1 ;; esac
+          fail=0
+          for path in /api/health /auth/sign-in; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" "$url$path" || true)
+            echo "$path -> $code" | tee -a "$GITHUB_STEP_SUMMARY"
+            case "$code" in 2*|3*) ;; *) fail=1 ;; esac
+          done
+          # View-As must refuse anonymous callers: the start endpoint is POST-only and same-origin.
+          get=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" "$url/admin/users/00000000-0000-4000-8000-000000000000/view/start" || true)
+          echo "GET view/start -> $get (must not be 2xx)" | tee -a "$GITHUB_STEP_SUMMARY"
+          case "$get" in 2*) fail=1 ;; esac
+          exit $fail

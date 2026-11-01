@@ -75,11 +75,17 @@ vi.mock("@/server/queries/landing", () => ({
 
 const markPasswordAttachedAuthoritatively = vi.fn();
 const savePendingRegistration = vi.fn();
+const resolveSignInEmail = vi.fn();
+const saveVerifiedBirthDate = vi.fn();
+const phoneAuthLimit = vi.fn(async () => "allowed");
+vi.mock("@/server/auth/phone-auth-limit", () => ({ phoneAuthLimit: (...args: unknown[]) => phoneAuthLimit(...(args as [])) }));
 // Inlined literal (not a shared const) — referencing an outer const directly inside a
 // hoisted vi.mock factory hits the TDZ, since the factory runs before the const initializes.
 vi.mock("@/lib/supabase/admin-server", () => ({
   markPasswordAttachedAuthoritatively: (...args: unknown[]) => markPasswordAttachedAuthoritatively(...args),
   savePendingRegistration: (...args: unknown[]) => savePendingRegistration(...args),
+  resolveSignInEmail: (...args: unknown[]) => resolveSignInEmail(...args),
+  saveVerifiedBirthDate: (...args: unknown[]) => saveVerifiedBirthDate(...args),
   PASSWORD_SET_FLAG: "aladdin_pw_preview_password_set",
 }));
 const PASSWORD_SET_FLAG = "aladdin_pw_preview_password_set";
@@ -112,6 +118,8 @@ import {
   requestPasswordSignUp,
   resendPasswordSignUpCode,
   verifyPasswordSignUp,
+  pendingRegistrationEmail,
+  forgetPendingRegistration,
   migrationEligibility,
   passwordSignIn,
   requestRecoveryCode,
@@ -145,6 +153,7 @@ function consented(entries: Record<string, string> = {}) {
     displayName: "Mona Adel",
     username: "validuser123",
     accountType: "installer_technician",
+    birthDate: "1990-05-17",
     ...entries,
   });
 }
@@ -210,7 +219,7 @@ describe("10-character minimum enforced everywhere", () => {
   it("rejects a 9-character password at registration", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "person@example.test", password: "a".repeat(9), confirmPassword: "a".repeat(9) }),
+      consented({ email: "person@example.test", password: "a".repeat(9)}),
     );
     expect(res.ok).toBe(false);
     expect(res.code).toBe("authPasswordPreview.error.passwordTooShort");
@@ -221,7 +230,7 @@ describe("10-character minimum enforced everywhere", () => {
     const pw = "Xk7#mLp2Qz"; // 10 chars, not common/sequential/account-related
     const res = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "person@example.test", password: pw, confirmPassword: pw }),
+      consented({ email: "person@example.test", password: pw}),
     );
     expect(res.ok).toBe(true);
   });
@@ -231,7 +240,7 @@ describe("weak-password rejection", () => {
   it("rejects a common password even at 10+ characters", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "person@example.test", password: "iloveyou12345", confirmPassword: "iloveyou12345" }),
+      consented({ email: "person@example.test", password: "iloveyou12345"}),
     );
     expect(res.ok).toBe(false);
     expect(res.code).toBe("authPasswordPreview.error.passwordCommon");
@@ -241,7 +250,7 @@ describe("weak-password rejection", () => {
   it("rejects a sequential/repetitive password", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "person@example.test", password: "abcdefghij1234", confirmPassword: "abcdefghij1234" }),
+      consented({ email: "person@example.test", password: "abcdefghij1234"}),
     );
     expect(res.ok).toBe(false);
     expect(res.code).toBe("authPasswordPreview.error.passwordSequential");
@@ -250,7 +259,7 @@ describe("weak-password rejection", () => {
   it("rejects a password derived from the account's own email", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "ahmedhassan@example.test", password: "ahmedhassan99!", confirmPassword: "ahmedhassan99!" }),
+      consented({ email: "ahmedhassan@example.test", password: "ahmedhassan99!"}),
     );
     expect(res.ok).toBe(false);
     expect(res.code).toBe("authPasswordPreview.error.passwordAccountRelated");
@@ -258,19 +267,21 @@ describe("weak-password rejection", () => {
 });
 
 describe("requestPasswordSignUp (Architecture B — signUp() sets the password atomically)", () => {
-  it("rejects a mismatched password confirmation", async () => {
-    const res = await requestPasswordSignUp(
+  it("requires an adult birthday before anything reaches signUp()", async () => {
+    const child = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: "a-totally-different-value" }),
+      consented({ email: "person@example.test", password: GOOD_PASSWORD, birthDate: `${new Date().getFullYear() - 12}-03-01` }),
     );
-    expect(res.code).toBe("authPasswordPreview.error.passwordMismatch");
+    expect(child.code).toBe("authPasswordPreview.error.birthDateTooYoung");
+    const missing = await requestPasswordSignUp({ ok: false }, consented({ email: "person@example.test", password: GOOD_PASSWORD, birthDate: "" }));
+    expect(missing.code).toBe("authPasswordPreview.error.birthDateRequired");
     expect(signUp).not.toHaveBeenCalled();
   });
 
   it("requires all three consents", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
-      fd({ displayName: "Mona Adel", email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, consent_terms: "on" }),
+      fd({ displayName: "Mona Adel", email: "person@example.test", username: "validuser123", accountType: "installer_technician", birthDate: "1990-05-17", password: GOOD_PASSWORD, consent_terms: "on" }),
     );
     expect(res.code).toBe("authPasswordPreview.error.consentRequired");
     expect(signUp).not.toHaveBeenCalled();
@@ -280,14 +291,14 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
     signUp.mockResolvedValueOnce({ error: null });
     const res = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "new-person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      consented({ email: "new-person@example.test", password: GOOD_PASSWORD}),
     );
     expect(res.ok).toBe(true);
     // The token is judged by GoTrue (forwarded), never spent on the app's own Siteverify.
     expect(signUp).toHaveBeenCalledWith({
       email: "new-person@example.test",
       password: GOOD_PASSWORD,
-      options: { data: { display_name: "Mona Adel", locale: "ar" }, captchaToken: "test-captcha-token" },
+      options: { data: { display_name: "Mona Adel", birth_date: "1990-05-17", locale: "ar" }, captchaToken: "test-captcha-token" },
     });
     expect(siteverifyCalls()).toHaveLength(0);
     // Never the passwordless OTP endpoint — Architecture B never calls it.
@@ -297,7 +308,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
   it("refuses without a captcha token — never calls signUp", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
-      fd({ consent_terms: "on", consent_privacy: "on", consent_pilot: "on", displayName: "Mona Adel", email: "person@example.test", username: "validuser123", accountType: "installer_technician", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      fd({ consent_terms: "on", consent_privacy: "on", consent_pilot: "on", displayName: "Mona Adel", email: "person@example.test", username: "validuser123", accountType: "installer_technician", birthDate: "1990-05-17", password: GOOD_PASSWORD }),
     );
     expect(res.code).toBe("authPasswordPreview.error.captchaRequired");
     expect(signUp).not.toHaveBeenCalled();
@@ -308,7 +319,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
     signUp.mockResolvedValueOnce({ error: null });
     await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "new-person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      consented({ email: "new-person@example.test", password: GOOD_PASSWORD}),
     );
     expect(signUp).toHaveBeenCalledTimes(1);
     expect((signUp.mock.calls[0]![0] as { options: { captchaToken: string } }).options.captchaToken).toBe("test-captcha-token");
@@ -324,7 +335,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
     signUp.mockResolvedValueOnce({ error: { code: "captcha_failed", message, status: 400 } });
     const res = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      consented({ email: "person@example.test", password: GOOD_PASSWORD}),
     );
     expect(res.ok).toBe(false);
     expect(res.code).toBe("authPasswordPreview.error.captchaRejected");
@@ -336,12 +347,12 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
     signUp.mockResolvedValueOnce({ error: { code: "captcha_failed", message: "captcha protection: request disallowed", status: 400 } });
     const failed = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "already-has-account@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      consented({ email: "already-has-account@example.test", password: GOOD_PASSWORD}),
     );
     signUp.mockResolvedValueOnce({ error: { code: "user_already_exists" } });
     const exists = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "already-has-account@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      consented({ email: "already-has-account@example.test", password: GOOD_PASSWORD}),
     );
     expect(failed.code).toBe("authPasswordPreview.error.captchaRejected");
     expect(exists.ok).toBe(true);
@@ -352,7 +363,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
     signUp.mockResolvedValueOnce({ error: { message: "network blip" } });
     const res = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      consented({ email: "person@example.test", password: GOOD_PASSWORD}),
     );
     expect(res.code).toBe("authPasswordPreview.error.sendFailed");
   });
@@ -362,13 +373,13 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
       signUp.mockResolvedValueOnce({ error: { code: "user_already_exists", status: 422 } });
       const existing = await requestPasswordSignUp(
         { ok: false },
-        consented({ email: "already-has-account@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+        consented({ email: "already-has-account@example.test", password: GOOD_PASSWORD}),
       );
 
       signUp.mockResolvedValueOnce({ error: null });
       const fresh = await requestPasswordSignUp(
         { ok: false },
-        consented({ email: "genuinely-new@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+        consented({ email: "genuinely-new@example.test", password: GOOD_PASSWORD}),
       );
 
       expect(existing.ok).toBe(true);
@@ -380,7 +391,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
       signUp.mockResolvedValueOnce({ error: { code: "email_exists", status: 422 } });
       const res = await requestPasswordSignUp(
         { ok: false },
-        consented({ email: "already-has-account@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+        consented({ email: "already-has-account@example.test", password: GOOD_PASSWORD}),
       );
       expect(res.ok).toBe(true);
       expect(res.code).toBe("authPasswordPreview.info.codeSent");
@@ -390,7 +401,7 @@ describe("requestPasswordSignUp (Architecture B — signUp() sets the password a
       signUp.mockResolvedValueOnce({ error: { status: 429 } });
       const res = await requestPasswordSignUp(
         { ok: false },
-        consented({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+        consented({ email: "person@example.test", password: GOOD_PASSWORD}),
       );
       expect(res.code).toBe("authPasswordPreview.error.rateLimited");
     });
@@ -403,7 +414,7 @@ describe("requestPasswordSignUp — account type is resolved on the SERVER, neve
     async (accountType) => {
       const res = await requestPasswordSignUp(
         { ok: false },
-        consented({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, accountType }),
+        consented({ email: "person@example.test", password: GOOD_PASSWORD, accountType }),
       );
       expect(res.ok).toBe(false);
       expect(signUp).not.toHaveBeenCalled();
@@ -422,7 +433,7 @@ describe("requestPasswordSignUp — account type is resolved on the SERVER, neve
     signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "new-user-id" } } });
     const res = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "new-person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, accountType }),
+      consented({ email: "new-person@example.test", password: GOOD_PASSWORD, accountType }),
     );
     expect(res.ok).toBe(true);
     expect(savePendingRegistration).toHaveBeenCalledWith({
@@ -438,7 +449,7 @@ describe("requestPasswordSignUp — username pre-flight BEFORE signUp() (no Auth
   function submit(username = "validuser123") {
     return requestPasswordSignUp(
       { ok: false },
-      consented({ email: "new-person@example.test", username, password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD }),
+      consented({ email: "new-person@example.test", username, password: GOOD_PASSWORD}),
     );
   }
   function availability(answer: { data: unknown; error: unknown }) {
@@ -458,6 +469,23 @@ describe("requestPasswordSignUp — username pre-flight BEFORE signUp() (no Auth
     expect(res).toEqual({ ok: false, code: "registration.error.usernameUnavailable", email: "new-person@example.test" });
     expect(signUp).not.toHaveBeenCalled();
     expect(savePendingRegistration).not.toHaveBeenCalled();
+  });
+
+  it("the same browser's own unfinished sign-up (same email) is pointed at Continue registration", async () => {
+    availability({ data: false, error: null });
+    cookieStore.set("reg_email", "new-person@example.test");
+    const res = await submit("mylease");
+    cookieStore.delete("reg_email");
+    expect(res).toEqual({ ok: false, code: "registration.error.usernameHeld", email: "new-person@example.test" });
+    expect(signUp).not.toHaveBeenCalled();
+  });
+
+  it("another email's unfinished sign-up in this browser does not change the answer", async () => {
+    availability({ data: false, error: null });
+    cookieStore.set("reg_email", "someone-else@example.test");
+    const res = await submit("takenname");
+    cookieStore.delete("reg_email");
+    expect(res.code).toBe("registration.error.usernameUnavailable");
   });
 
   it("reserved and taken usernames get the IDENTICAL response (the RPC answers false for both)", async () => {
@@ -481,7 +509,7 @@ describe("requestPasswordSignUp — username pre-flight BEFORE signUp() (no Auth
   it("runs only after the CAPTCHA gate - a request with no token never reaches the DB", async () => {
     const res = await requestPasswordSignUp(
       { ok: false },
-      consented({ email: "person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, captchaToken: "" }),
+      consented({ email: "person@example.test", password: GOOD_PASSWORD, captchaToken: "" }),
     );
     expect(res.code).toBe("authPasswordPreview.error.captchaRequired");
     expect(rpc).not.toHaveBeenCalledWith("username_available", expect.anything());
@@ -539,7 +567,7 @@ describe("verifyPasswordSignUp — the post-OTP username claim is never ignored"
 
 describe("requestPasswordSignUp — Full Name (profile data, server-authoritative)", () => {
   function submit(displayName: string | null, entries: Record<string, string> = {}) {
-    const form = consented({ email: "new-person@example.test", password: GOOD_PASSWORD, confirmPassword: GOOD_PASSWORD, ...entries });
+    const form = consented({ email: "new-person@example.test", password: GOOD_PASSWORD, ...entries });
     if (displayName === null) form.delete("displayName");
     else form.set("displayName", displayName);
     return requestPasswordSignUp({ ok: false }, form);
@@ -569,7 +597,7 @@ describe("requestPasswordSignUp — Full Name (profile data, server-authoritativ
     signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "u-new" } } });
     await submit("  منى عادل  ");
     const call = signUp.mock.calls[0]![0] as { options: { data: Record<string, unknown> } } & Record<string, unknown>;
-    expect(call.options).toEqual({ data: { display_name: "منى عادل", locale: "en" }, captchaToken: "test-captcha-token" });
+    expect(call.options).toEqual({ data: { display_name: "منى عادل", birth_date: "1990-05-17", locale: "en" }, captchaToken: "test-captcha-token" });
     expect(JSON.stringify(call)).not.toContain("app_metadata");
   });
 
@@ -613,6 +641,16 @@ describe("verifyPasswordSignUp — confirms the Full Name from the VERIFIED user
     expect(rpc).toHaveBeenCalledWith("profile_set_display_name", { p_display_name: "Mona Adel" });
     const calls = rpc.mock.calls.map((c) => c[0]);
     expect(calls).toContain("profile_set_username");
+  });
+
+  it("saves the birthday from the verified metadata, never from the request, and only when it is still valid", async () => {
+    stage({ display_name: "Mona Adel", birth_date: "1990-05-17" });
+    await expect(verify({ birthDate: "2015-01-01" })).rejects.toThrow(/REDIRECT:/);
+    expect(saveVerifiedBirthDate).toHaveBeenCalledWith("u1", "1990-05-17");
+    saveVerifiedBirthDate.mockClear();
+    stage({ display_name: "Mona Adel", birth_date: "2020-01-01" });
+    await expect(verify()).rejects.toThrow(/REDIRECT:/);
+    expect(saveVerifiedBirthDate).not.toHaveBeenCalled();
   });
 
   it("ignores any display name in the verify request — only the verified user's metadata counts", async () => {
@@ -721,6 +759,108 @@ describe("resendPasswordSignUpCode — never re-submits the password, never re-r
   });
 });
 
+describe("Interrupted registration — resume without the password, without enumeration", () => {
+  it("a sent code remembers the email in an httpOnly, path-scoped cookie — never the password or the code", async () => {
+    signUp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1" } } });
+    await requestPasswordSignUp({ ok: false }, consented({ email: "person@example.test", password: GOOD_PASSWORD }));
+    expect(cookiesApi.set).toHaveBeenCalledWith("reg_email", "person@example.test", expect.objectContaining({ httpOnly: true, path: "/auth", maxAge: 1800 }));
+    expect(JSON.stringify(cookiesApi.set.mock.calls)).not.toContain(GOOD_PASSWORD);
+    expect(await pendingRegistrationEmail()).toBe("person@example.test");
+  });
+
+  it("an already-confirmed email sets the very same cookie (no enumeration through navigation)", async () => {
+    signUp.mockResolvedValueOnce({ error: { code: "user_already_exists" }, data: { user: null } });
+    const res = await requestPasswordSignUp({ ok: false }, consented({ email: "taken@example.test", password: GOOD_PASSWORD }));
+    expect(res.ok).toBe(true);
+    expect(cookieStore.get("reg_email")).toBe("taken@example.test");
+  });
+
+  it("continue-registration resends from the cookie alone — no email field, no password, never signUp()", async () => {
+    cookieStore.set("reg_email", "person@example.test");
+    resend.mockResolvedValueOnce({ error: null });
+    const res = await resendPasswordSignUpCode({ ok: false }, withCaptcha());
+    expect(res).toMatchObject({ ok: true, code: "authPasswordPreview.info.codeSent", email: "person@example.test" });
+    expect(resend).toHaveBeenCalledWith({ type: "signup", email: "person@example.test", options: { captchaToken: "test-captcha-token" } });
+    expect(signUp).not.toHaveBeenCalled();
+  });
+
+  it("the server throttle runs per email (lowercased) before GoTrue; a limited answer sends nothing", async () => {
+    phoneAuthLimit.mockResolvedValueOnce("limited");
+    const res = await resendPasswordSignUpCode({ ok: false }, withCaptcha({ email: "Person@Example.test" }));
+    expect(phoneAuthLimit).toHaveBeenCalledWith("email-resend", "person@example.test", expect.anything());
+    expect(res.code).toBe("authPasswordPreview.error.rateLimited");
+    expect(resend).not.toHaveBeenCalled();
+  });
+
+  it("an unavailable throttle fails closed (no email sent)", async () => {
+    phoneAuthLimit.mockResolvedValueOnce("unavailable");
+    const res = await resendPasswordSignUpCode({ ok: false }, withCaptcha({ email: "person@example.test" }));
+    expect(res.code).toBe("authPasswordPreview.error.sendFailed");
+    expect(resend).not.toHaveBeenCalled();
+  });
+
+  it("CAPTCHA is checked before the throttle is spent", async () => {
+    const res = await resendPasswordSignUpCode({ ok: false }, fd({ email: "person@example.test" }));
+    expect(res.code).toBe("authPasswordPreview.error.captchaRequired");
+    expect(phoneAuthLimit).not.toHaveBeenCalled();
+  });
+
+  it("an SMTP failure is reported as a neutral sendFailed and logged with status/code only", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    resend.mockResolvedValueOnce({ error: { status: 500, code: "unexpected_failure", message: '535 "Authentication credentials invalid"' } });
+    const res = await resendPasswordSignUpCode({ ok: false }, withCaptcha({ email: "person@example.test" }));
+    expect(res.code).toBe("authPasswordPreview.error.sendFailed");
+    expect(cookieStore.has("reg_email")).toBe(false);
+    const line = String(log.mock.calls[0]![0]);
+    expect(line).toContain("unexpected_failure");
+    expect(line).not.toMatch(/person@example\.test|535|Authentication/);
+    log.mockRestore();
+  });
+
+  it("verify reads the email from the cookie when the step has no email field, and clears the cookie on success", async () => {
+    cookieStore.set("reg_email", "person@example.test");
+    verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test", user_metadata: {} } } });
+    rpc.mockImplementation(async (fn: string) => (fn === "my_registration_state" ? { data: "access_ready", error: null } : { data: null, error: null }));
+    await expect(verifyPasswordSignUp({ ok: false }, fd({ token: "123456" }))).rejects.toThrow(/^REDIRECT:/);
+    expect(verifyOtp).toHaveBeenCalledWith({ email: "person@example.test", token: "123456", type: "signup" });
+    expect(cookieStore.has("reg_email")).toBe(false);
+  });
+
+  it("a wrong code keeps the cookie so the person can try again after a refresh", async () => {
+    cookieStore.set("reg_email", "person@example.test");
+    verifyOtp.mockResolvedValueOnce({ error: { code: "otp_expired" }, data: { user: null } });
+    const res = await verifyPasswordSignUp({ ok: false }, fd({ token: "123456" }));
+    expect(res.code).toBe("authPasswordPreview.error.otpExpired");
+    expect(cookieStore.get("reg_email")).toBe("person@example.test");
+  });
+
+  it("an expired username lease (NULL username) keeps the account type and asks only for a new name", async () => {
+    verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test", user_metadata: {} } } });
+    rpc.mockImplementation(async (fn: string) =>
+      fn === "pending_registration_consume"
+        ? { data: [{ username: null, audience_kind: "persona_type", audience_value: "engineer" }], error: null }
+        : { data: null, error: null },
+    );
+    await expect(verifyPasswordSignUp({ ok: false }, fd({ email: "person@example.test", token: "123456" }))).rejects.toThrow(
+      "REDIRECT:/auth/finish-registration?reason=username_unavailable",
+    );
+    expect(rpc).toHaveBeenCalledWith("onboarding_select_account_type", { p_track: "professional", p_account_type: "engineer" });
+    expect(rpc).not.toHaveBeenCalledWith("profile_set_username", expect.anything());
+  });
+
+  it("a malformed cookie value is ignored", async () => {
+    cookieStore.set("reg_email", "not-an-email");
+    expect(await pendingRegistrationEmail()).toBeNull();
+  });
+
+  it("'use a different email' only forgets the cookie", async () => {
+    cookieStore.set("reg_email", "person@example.test");
+    await expect(forgetPendingRegistration()).rejects.toThrow("REDIRECT:/auth/continue-registration");
+    expect(cookieStore.has("reg_email")).toBe(false);
+    expect(resend).not.toHaveBeenCalled();
+  });
+});
+
 describe("verifyPasswordSignUp (Architecture B — OTP-only, no password)", () => {
   it("verifies with type:'signup' (the EmailOtpType the installed @supabase/auth-js defines for this exact case) — never 'email'", async () => {
     verifyOtp.mockResolvedValueOnce({ error: null, data: { user: { id: "u1", email: "person@example.test" } } });
@@ -775,6 +915,52 @@ describe("resumePasswordSignUpEmail / finishPasswordSignUp — Architecture-A-on
     const actions = await import("./auth-password-preview");
     expect((actions as Record<string, unknown>).resumePasswordSignUpEmail).toBeUndefined();
     expect((actions as Record<string, unknown>).finishPasswordSignUp).toBeUndefined();
+  });
+});
+
+describe("passwordSignIn — one field: mobile number, username or email", () => {
+  it("resolves a username to its account email on the server, then runs the normal password grant", async () => {
+    resolveSignInEmail.mockResolvedValueOnce("mona@example.test");
+    signInWithPassword.mockResolvedValueOnce({ error: null });
+    rpc.mockResolvedValueOnce({ data: "active_personal" });
+    await expect(passwordSignIn({ ok: false }, withCaptcha({ identifier: "Mona.Adel", password: GOOD_PASSWORD }))).rejects.toThrow(/^REDIRECT:/);
+    expect(resolveSignInEmail).toHaveBeenCalledWith({ username: "mona.adel" });
+    expect(signInWithPassword).toHaveBeenCalledWith({ email: "mona@example.test", password: GOOD_PASSWORD, options: { captchaToken: "test-captcha-token" } });
+  });
+
+  it("resolves a local Egyptian mobile number in canonical form", async () => {
+    resolveSignInEmail.mockResolvedValueOnce("p201012345678@craftsman-login.aladdin.invalid");
+    signInWithPassword.mockResolvedValueOnce({ error: null });
+    rpc.mockResolvedValueOnce({ data: "active_personal" });
+    await expect(passwordSignIn({ ok: false }, withCaptcha({ identifier: "010 1234 5678", password: GOOD_PASSWORD }))).rejects.toThrow(/^REDIRECT:/);
+    expect(resolveSignInEmail).toHaveBeenCalledWith({ phoneE164: "+201012345678" });
+    expect(phoneAuthLimit).toHaveBeenCalledWith("sign-in", "+201012345678", expect.anything());
+  });
+
+  it("answers an unknown username or number exactly like a wrong password, without calling GoTrue", async () => {
+    resolveSignInEmail.mockResolvedValueOnce(null);
+    const unknown = await passwordSignIn({ ok: false }, withCaptcha({ identifier: "nobody_here", password: GOOD_PASSWORD }));
+    signInWithPassword.mockResolvedValueOnce({ error: { message: "Invalid login credentials" } });
+    const wrong = await passwordSignIn({ ok: false }, withCaptcha({ identifier: "person@example.test", password: GOOD_PASSWORD }));
+    expect(unknown.code).toBe("authPasswordPreview.error.invalidCredentials");
+    expect(wrong.code).toBe(unknown.code);
+    expect(signInWithPassword).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a typed internal login alias and a value that is none of the three", async () => {
+    for (const identifier of ["p201012345678@craftsman-login.aladdin.invalid", "!!"]) {
+      const res = await passwordSignIn({ ok: false }, withCaptcha({ identifier, password: GOOD_PASSWORD }));
+      expect(res.code).toBe("authPasswordPreview.error.invalidCredentials");
+    }
+    expect(signInWithPassword).not.toHaveBeenCalled();
+    expect(resolveSignInEmail).not.toHaveBeenCalled();
+  });
+
+  it("stops at the limiter before looking anything up", async () => {
+    phoneAuthLimit.mockResolvedValueOnce("limited");
+    const res = await passwordSignIn({ ok: false }, withCaptcha({ identifier: "mona.adel", password: GOOD_PASSWORD }));
+    expect(res.code).toBe("authPasswordPreview.error.rateLimited");
+    expect(resolveSignInEmail).not.toHaveBeenCalled();
   });
 });
 
