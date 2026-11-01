@@ -13,7 +13,7 @@ ok() { if [ "$1" -eq 0 ]; then pass=$((pass+1)); echo "PASS  $2"; else fail=$((f
 Q() { psql "$PGURL" -X -q -At -F $'\t' -v ON_ERROR_STOP=1 "$@"; }
 
 U1=11111111-1111-1111-1111-111111111111; U2=22222222-2222-2222-2222-222222222222
-# One fixture. $1 = "plain" (no storage_key column, the layout before migration 20261029120001) or "keyed".
+# One fixture. $1 = "plain" (no storage_key column, the layout before migration 20261101090001) or "keyed".
 build() {
   Q -c "drop schema if exists public cascade; drop schema if exists storage cascade; create schema public; create schema storage" >/dev/null
   python3 - "$1" "$U1" "$U2" > "$T/fixture.sql" <<'PY'

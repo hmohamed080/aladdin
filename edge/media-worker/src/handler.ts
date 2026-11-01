@@ -9,7 +9,11 @@ const TYPES: Record<string, readonly string[]> = {
   certificate: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
   product: ["image/jpeg", "image/png", "image/webp"],
   organization: ["image/jpeg", "image/png", "image/webp"],
+  request: ["image/jpeg", "image/png", "image/webp"],
+  verification: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
 };
+// Compliance documents are never stored in the shared edge byte cache (folder segment of the ids-only key).
+const NEVER_EDGE_CACHED = new Set(["verification"]);
 const PUBLIC_NAMESPACES = ["portfolio", "avatar"];
 
 const SECURITY = {
@@ -33,7 +37,7 @@ function log(reason: string, mode: string) {
   console.log(JSON.stringify({ event: "media.denied", reason, mode }));
 }
 
-// Ids-only keys of uploads made from 2026-10-29 (migration 20261029120001), per namespace:
+// Ids-only keys of uploads made from 2026-10-29 (migration 20261101090001), per namespace:
 // <u|o>/<owner id>/<folder>/[<product id>/]<media id>/(original.<ext> | v/<variant>.webp).
 const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const ID_KEY_FOLDERS: Record<string, string> = {
@@ -42,6 +46,8 @@ const ID_KEY_FOLDERS: Record<string, string> = {
   certificate: `u/${ID}/certificates/${ID}`,
   product: `[uo]/${ID}/products/${ID}/${ID}`,
   organization: `o/${ID}/profile/${ID}`,
+  request: `[uo]/${ID}/requests/${ID}/${ID}`,
+  verification: `o/${ID}/verification/${ID}`,
 };
 const ID_KEYS = Object.fromEntries(Object.entries(ID_KEY_FOLDERS).map(([namespace, folder]) =>
   [namespace, new RegExp(`^${folder}/(original\\.[a-z0-9]{2,5}|v/(thumb|card|full)\\.webp)$`)]));
@@ -124,7 +130,7 @@ async function serve(request: Request, env: Env, ctx: ExecutionContextLike, byte
   }
   // Edge byte cache: only whole-object GETs of a known, bounded size. The response
   // the browser receives keeps its private headers; only the stored copy is public.
-  const cacheable = bytes !== null && env.EDGE_CACHE === "on" && !range && grant.size !== null
+  const cacheable = bytes !== null && env.EDGE_CACHE === "on" && !NEVER_EDGE_CACHED.has(grant.object.split("/")[2] ?? "") && !range && grant.size !== null
     && grant.size <= EDGE_CACHE_MAX_BYTES;
   const key = edgeCacheKey(grant);
   if (cacheable) {

@@ -10,8 +10,14 @@ export const storageEnvSchema = z.object({
   R2_SECRET_ACCESS_KEY: optional,
   R2_PUBLIC_BUCKET: optional,
   R2_PRIVATE_BUCKET: optional,
+  // Admin-managed dynamic site media (banners, hero art): its own bucket, never the private user-media one.
+  R2_SITE_BUCKET: optional,
   R2_PUBLIC_BASE_URL: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
   SUPABASE_SERVICE_ROLE_KEY: optional,
+  // R2-only cutover: "false" closes every NEW write to Supabase Storage even while R2 is off, so a
+  // disabled or failing R2 pauses uploads instead of silently falling back. Default "true" keeps the
+  // pre-activation behaviour; R2_STORAGE_ENABLED=true closes legacy writes regardless of this value.
+  MEDIA_LEGACY_STORAGE_WRITES: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
   // Edge delivery through the media Worker (edge/media-worker). Off by default; the
   // application proxy (server/storage/delivery.ts) remains the path when off.
   MEDIA_EDGE_DELIVERY_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
@@ -36,6 +42,9 @@ export const storageEnvSchema = z.object({
   }
   if (env.R2_PUBLIC_BASE_URL && !env.R2_PUBLIC_BASE_URL.startsWith("https://")) {
     ctx.addIssue({ code: "custom", path: ["R2_PUBLIC_BASE_URL"], message: "Public media must use HTTPS" });
+  }
+  if (env.R2_SITE_BUCKET && (env.R2_SITE_BUCKET === env.R2_PRIVATE_BUCKET || env.R2_SITE_BUCKET === env.R2_PUBLIC_BUCKET)) {
+    ctx.addIssue({ code: "custom", path: ["R2_SITE_BUCKET"], message: "Site media must not share a bucket with user media" });
   }
   if (env.R2_PUBLIC_BUCKET && env.R2_PUBLIC_BUCKET === env.R2_PRIVATE_BUCKET) {
     ctx.addIssue({ code: "custom", path: ["R2_PRIVATE_BUCKET"], message: "Public and private buckets must differ" });
@@ -66,6 +75,8 @@ export function readStorageEnv() {
     R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
     R2_PUBLIC_BUCKET: process.env.R2_PUBLIC_BUCKET,
     R2_PRIVATE_BUCKET: process.env.R2_PRIVATE_BUCKET,
+    R2_SITE_BUCKET: process.env.R2_SITE_BUCKET,
+    MEDIA_LEGACY_STORAGE_WRITES: process.env.MEDIA_LEGACY_STORAGE_WRITES,
     R2_PUBLIC_BASE_URL: process.env.R2_PUBLIC_BASE_URL,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     MEDIA_EDGE_DELIVERY_ENABLED: process.env.MEDIA_EDGE_DELIVERY_ENABLED,
@@ -77,4 +88,9 @@ export function readStorageEnv() {
     VIDEO_ENABLED: process.env.VIDEO_ENABLED,
     APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
   });
+}
+
+/** Whether NEW media bytes may still go to Supabase Storage. Never true once R2 routing is on. */
+export function legacyStorageWritesOpen(env: { R2_STORAGE_ENABLED: boolean; MEDIA_LEGACY_STORAGE_WRITES: boolean }): boolean {
+  return !env.R2_STORAGE_ENABLED && env.MEDIA_LEGACY_STORAGE_WRITES;
 }

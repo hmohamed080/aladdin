@@ -7250,3 +7250,7 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Added `components/media` (`SafeImage`, `MediaAvatar/Cover/Logo/Thumb`, `EmptyMedia`): a missing or failing media URL shows initials, a neutral cover or a glyph, never a broken image. Applied to the avatar field, installer hero/summary, public profile cover, portfolio `MediaImage`, quote thumbnails.
 - Added `lib/assets/registry.ts`; removed 6 byte-identical landing/brand duplicates (6.8 MB), old URLs kept by permanent redirects. Static assets stay in `public/`, never R2.
 - Not done: browser E2E for missing media (needs a seeded Supabase); hosted data untouched.
+
+## 2026-11-01 — Unified Media & Assets, Stage 2 (R2 core, isolation, no fallback)
+- Runtime environment guard in `createR2Client` (bucket vs APP_ENV, Supabase project, backup buckets, shared buckets); `MEDIA_LEGACY_STORAGE_WRITES` + `R2_STORAGE_ENABLED` close new Supabase writes with no fallback; `R2_SITE_BUCKET` and `site/` key builders; allow-list test for direct Supabase Storage access. See `docs/operations/r2/r2-only-media-stage2.md`.
+- Open: purchase-request photos still on Supabase Storage (owner decision).

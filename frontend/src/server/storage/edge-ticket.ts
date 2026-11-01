@@ -78,7 +78,7 @@ export async function privateMediaUrl(client: SupabaseClient, namespace: MediaNa
   const viewer = config ? await edgeViewer(client) : null;
   if (!config || !viewer) return applicationMediaUrl(namespace, key, options.workspace);
   const variant = options.variant ?? "original";
-  const ws = namespace === "product" || namespace === "organization" ? options.workspace ?? null : null;
+  const ws = namespace === "product" || namespace === "organization" || namespace === "request" ? options.workspace ?? null : null;
   const ticket = mintTicket(config.kid, config.secret, { v: 1, ns: namespace, k: key, var: variant,
     sub: viewer.sub, sid: viewer.sid, ws, exp: ticketExpiry(options.nowMs ?? Date.now()) });
   return `${config.origin}/m/${namespace}/${variant}?t=${ticket}`;
