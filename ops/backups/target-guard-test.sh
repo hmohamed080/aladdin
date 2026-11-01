@@ -38,7 +38,7 @@ run "acceptance + the old shared/ENAM bucket" "must use its own bucket" db-backu
 run "acceptance + a non-R2 endpoint" "must go to R2" db-backup.sh BACKUP_LABEL=acceptance BACKUP_BUCKET=aladdin-acceptance-backups-weur R2_ENDPOINT=https://example.com BACKUP_DB_URL="$ACC_POOLER"
 run "production label, switch off" "not activated" db-backup.sh BACKUP_LABEL=production BACKUP_BUCKET=aladdin-production-db-backups BACKUP_DB_URL="$PROD_POOLER"
 run "production label + Acceptance URL, switch on" "is not the production project" db-backup.sh BACKUP_LABEL=production BACKUP_BUCKET=aladdin-production-db-backups PRODUCTION_BACKUP_ENABLED=true BACKUP_DB_URL="$ACC_POOLER"
-run "r2 media step: acceptance + Production URL" "is not the acceptance project" r2-media-backup.sh $A BACKUP_DB_URL="$PROD_POOLER" \
+run "r2 media step: acceptance + Production URL" "is not the acceptance project" r2-media-backup.sh $A R2_MEDIA_BACKUP=1 BACKUP_DB_URL="$PROD_POOLER" \
   R2_SOURCE_ENDPOINT="$ENDPOINT" R2_SOURCE_BUCKET=aladdin-r2-acceptance-20261011-private R2_SOURCE_ACCESS_KEY_ID=other R2_SOURCE_SECRET_ACCESS_KEY=dummy
 echo "target-guard-test: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
