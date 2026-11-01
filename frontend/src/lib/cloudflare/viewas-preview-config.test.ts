@@ -7,9 +7,9 @@ const FRONTEND = join(__dirname, "..", "..", "..");
 const config = () => parseJsonc(readFileSync(join(FRONTEND, "wrangler.jsonc"), "utf8"));
 
 describe("Admin View-As isolated preview Worker (committed Wrangler config)", () => {
-  const env = () => config().env["viewas-preview"];
-  const registration = () => config().env.preview;
-  const production = () => config().env.production;
+  const env = () => config().env["viewas-preview"]!;
+  const registration = () => config().env.preview!;
+  const production = () => config().env.production!;
 
   it("is its own Worker, never Registration's preview or production", () => {
     expect(env().name).toBe("aladdin-frontend-viewas-preview");
