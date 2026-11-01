@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BUCKETS, NAMESPACE_TABLES, buildInventory, main, resetScope } from "./media-reset.mjs";
+import { BUCKETS, NAMESPACE_TABLES, buildInventory, compareSnapshots, main, resetScope, storageSnapshot } from "./media-reset.mjs";
 
 function fakeIo(over = {}) {
   const calls = [];
@@ -62,4 +62,14 @@ test("the CLI refuses anything but inventory and a mismatched project, and has n
   process.env.SUPABASE_URL = "https://abcdefgh.supabase.co"; process.env.SUPABASE_SERVICE_ROLE_KEY = "x";
   try { await assert.rejects(() => main(["inventory", "--project", "someotherref"]), /does not match/); }
   finally { process.env.SUPABASE_URL = saved.u; process.env.SUPABASE_SERVICE_ROLE_KEY = saved.k; if (!saved.u) delete process.env.SUPABASE_URL; if (!saved.k) delete process.env.SUPABASE_SERVICE_ROLE_KEY; }
+});
+
+test("the no-new-bytes proof: a bucket that grew fails, shrinking passes, an incomplete snapshot is refused", async () => {
+  const before = await storageSnapshot(fakeIo({ storage: () => 10 }));
+  assert.deepEqual(Object.keys(before.buckets).sort(), [...BUCKETS].sort());
+  assert.equal(compareSnapshots(before, await storageSnapshot(fakeIo({ storage: () => 10 }))).ok, true);
+  assert.equal(compareSnapshots(before, await storageSnapshot(fakeIo({ storage: () => 4 }))).ok, true);
+  const grown = compareSnapshots(before, await storageSnapshot(fakeIo({ storage: (b) => (b === "purchase-request-images" ? 11 : 10) })));
+  assert.deepEqual(grown, { ok: false, grown: [{ bucket: "purchase-request-images", before: 10, after: 11 }] });
+  assert.throws(() => compareSnapshots(before, { buckets: {} }), /missing bucket/);
 });

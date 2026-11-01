@@ -16,10 +16,12 @@ Status: implemented and tested locally; nothing hosted changed. Builds on the id
 | No second Supabase Storage write path appears unreviewed | `no-direct-supabase-writes.test.ts` allow-list | test |
 | Ownership and permissions decided by the database | unchanged: `media_storage_resolve` / `organization_media_resolve` before any provider is created | cross-account test |
 
-## Known remaining Supabase Storage users (decision needed)
+## Supabase Storage users
 
-- Business verification documents: compliance documents, kept by decision.
-- Purchase-request photos (`server/actions/purchase-requests.ts`, `server/queries/purchase-requests.ts`): still write to Supabase Storage. Owner decision needed: move to R2 (follow-up) or keep as a documented exception. Listed in the allow-list as PENDING.
+None remain for new bytes. Purchase-request photos and business-verification documents moved to the central R2 media path
+(Stage 3, `r2-only-media-stage3.md`); the only code allowed to touch Supabase Storage is `supabase-provider.ts` (legacy reads
+and deletes until retirement) and `browser-upload.ts` (the legacy signed-URL upload used only while the pre-activation
+provider is selected).
 
 ## Not built yet (dependencies)
 
