@@ -17,3 +17,15 @@ export const SECURITY_HEADERS: readonly { key: string; value: string }[] = [
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "X-Content-Type-Options", value: "nosniff" },
 ];
+
+/**
+ * Admin View-As responses (/admin/users/[id]/view/**) carry another person's private account data. They are never
+ * stored by a shared or browser cache, never indexed, and never leak the URL (which contains the subject's id) as a
+ * referrer. Applied by next.config.ts `headers()` in ADDITION to SECURITY_HEADERS.
+ */
+export const VIEW_AS_HEADERS: readonly { key: string; value: string }[] = [
+  { key: "Cache-Control", value: "private, no-store, max-age=0" },
+  { key: "Pragma", value: "no-cache" },
+  { key: "X-Robots-Tag", value: "noindex, nofollow" },
+  { key: "Referrer-Policy", value: "no-referrer" },
+];

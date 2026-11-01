@@ -810,6 +810,17 @@ export const ar: Messages = {
   admin: {
     title: "الإدارة",
     roleLabel: { super_admin: "المدير الأعلى", support: "دعم", moderator: "مشرف", administrator: "مسؤول" },
+    viewAs: {
+      banner: "عرض الإدارة — للقراءة فقط",
+      viewing: "عرض حساب {name}",
+      kind: { craftsman: "حساب حِرفي" },
+      expires: "تنتهي الجلسة {time}",
+      returnToAdmin: "العودة إلى الإدارة",
+      notice: "ما زلت مسجّلاً الدخول كمسؤول. لا يمكن تغيير أي شيء هنا ولا يُحفظ أي شيء في هذا الحساب.",
+      sectionsPending: "تُضاف أقسام الحساب في المرحلة التالية.",
+      eyeLabel: "عرض الحساب (للقراءة فقط)",
+      eyeDisabled: "لا يمكنك عرض هذا الحساب",
+    },
     rbac: {
       saved: "تم الحفظ.",
       archived: "تمت أرشفة الدور.",
@@ -1872,6 +1883,7 @@ export const ar: Messages = {
             read: "عرض حسابات المستخدمين وملفاتهم",
             verify: "الموافقة على توثيق المستخدمين أو رفضه",
             suspend: "تعليق حسابات المستخدمين أو استعادتها",
+            view_as: "فتح عرض مُدقَّق للقراءة فقط لحساب مستخدم آخر",
           },
           organizations: {
             read: "عرض المؤسسات وأعضائها وفروعها",

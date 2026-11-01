@@ -8094,6 +8094,19 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_view_as_begin: {
+        Args: { p_kind?: string; p_subject: string }
+        Returns: Json
+      }
+      admin_view_as_current: {
+        Args: { p_kind?: string; p_subject: string }
+        Returns: Json
+      }
+      admin_view_as_end: {
+        Args: { p_kind?: string; p_subject: string }
+        Returns: boolean
+      }
+      admin_view_as_end_all: { Args: never; Returns: number }
       apply_account_upgrade: {
         Args: { p_verification_id: string }
         Returns: undefined
