@@ -180,3 +180,19 @@ Recorded for the Production readiness review. Neither is fixed; no code was chan
 - Acceptance stays in the safe OFF state; no sign-up requests or browser tests by the operator; the owner will not open or submit the sign-up form during preparation.
 - Pilot limits stay at `signup_phone_hourly=1`, `user_hourly_starts=1`, `resend_cooldown='1 hour'` until Phase C is completed or cancelled; then restore `5 / 6 / '1 minute'`.
 - On the owner's explicit message after 15:50Z: re-check the rolling-hour quota, repeat C3/C4 as read-only readiness, stop, and request the separate C5 approval. At C5 the operator watches D1 and turns Worker delivery OFF promptly after the first accepted attempt; the owner submits the form only after the operator says GO.
+
+## Pilot rate limits — revision (owner-approved 2026-11-01, applied 15:21Z)
+
+Acceptance only; rate limiting is not disabled and the Production policy is unchanged. `user_daily_starts=10` and `ip_hourly_starts=20` are untouched.
+
+| Setting | Original default | First pilot value | **Current pilot value** |
+|---|---|---|---|
+| `signup_phone_hourly` | 5 | 1 | **3** |
+| `user_hourly_starts` | 6 | 1 | **3** |
+| `resend_cooldown` | 1 minute | 1 hour | **1 minute** |
+
+Supersedes the "database hard cap" values in the quota section above. **Consequence:** the database limit is now a ceiling of up to 3 starts in a rolling hour for the pilot number, not a guarantee of exactly one message. The remaining controls are the one-number allowlist, the short monitored delivery window (Worker OFF immediately after the first `state='accepted'` D1 row or on any stop condition), no automatic retry or resend, and owner discipline (one submission after GO). If the first real delivery fails, the evidence is reported and a new approval is needed before another attempt.
+
+After Phase C completes or is cancelled, restore `5 / 6 / '60 seconds'` and set all seven activation/delivery settings to OFF.
+
+At 15:21Z the rolling hour held 1 challenge (the 14:47:04Z accidental attempt) against the cap of 3 and 3 in 24 h against 10, so a new attempt was allowed without waiting for 15:47Z. C3 was repeated at 15:22Z (frontend `bcdf4aa3-bc2f-4253-894e-723d06c91b25`) with Worker delivery `false`, and C4 read-only readiness passed. C5 is not approved.
