@@ -14,7 +14,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(52);
+select plan(64);
 
 \set adminA   '55555555-5555-4555-8555-555555555555'
 \set super1   '11111111-1111-4111-8111-111111111111'
@@ -27,9 +27,10 @@ select plan(52);
 \set engineer '70000008-0000-4000-8000-000000000008'
 \set plain    '70000001-0000-4000-8000-000000000001'
 
-create function pg_temp.act_as(p_user uuid) returns void language plpgsql as $$
+-- session_id is the Supabase Auth session claim; a view session is bound to it. p_session simulates a NEW login.
+create function pg_temp.act_as(p_user uuid, p_session uuid default 'a0000000-0000-4000-8000-000000000001') returns void language plpgsql as $$
 begin
-  perform set_config('request.jwt.claims', json_build_object('sub', p_user, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', p_user, 'role', 'authenticated', 'session_id', p_session)::text, true);
   execute 'set local role authenticated';
 end;
 $$;
@@ -39,7 +40,7 @@ begin
   perform set_config('request.jwt.claims', '', true);
 end;
 $$;
-grant execute on function pg_temp.act_as(uuid), pg_temp.as_dba() to authenticated, anon;
+grant execute on function pg_temp.act_as(uuid, uuid), pg_temp.as_dba() to authenticated, anon;
 
 -- Fixture roles (this transaction only).
 select app.admin_bootstrap_super_admin(:'super1');
@@ -194,6 +195,49 @@ select is(has_function_privilege('anon', 'public.admin_view_as_begin(uuid,text)'
 select is(has_function_privilege('service_role', 'public.admin_view_as_begin(uuid,text)', 'execute'), false, 'service_role cannot execute begin');
 select is(has_function_privilege('authenticated', 'public.admin_view_as_begin(uuid,text)', 'execute'), true, 'authenticated can (the function authorizes internally)');
 select is(has_function_privilege('anon', 'app.require_view_as(uuid,text)', 'execute'), false, 'anon cannot execute the gate');
+
+
+-- ===========================================================================
+-- G. Binding to the Auth session, and invalidation on role / rank / status change
+-- ===========================================================================
+select pg_temp.act_as(:'adminA');
+select lives_ok(format($$select public.admin_view_as_begin(%L)$$, :'craft'), 'G: a view opens in login session 1');
+select lives_ok(format($$select app.require_view_as(%L)$$, :'craft'), 'G: and passes the gate in that session');
+select pg_temp.act_as(:'adminA', 'a0000000-0000-4000-8000-000000000002');
+select throws_ok(format($$select app.require_view_as(%L)$$, :'craft'), '42501', 'not permitted', 'G: a NEW login session cannot reuse the old view (gate)');
+select throws_ok(format($$select public.admin_view_as_current(%L)$$, :'craft'), '42501', 'not permitted', 'G: nor read it');
+create temp table t_g (j jsonb) on commit drop;
+grant all on t_g to authenticated;
+insert into t_g select public.admin_view_as_begin(:'craft');
+select pg_temp.as_dba();
+select is((select count(*)::int from public.audit_log where action = 'admin.view_as.ended' and metadata->>'reason' = 'session_changed'), 1,
+  'G: the old view is closed and audited when a new login starts');
+select is((select count(*)::int from public.admin_view_sessions where admin_user_id = :'adminA' and subject_user_id = :'craft' and ended_at is null), 1,
+  'G: exactly one live view, bound to the new login');
+select pg_temp.act_as(:'adminA');
+select throws_ok(format($$select app.require_view_as(%L)$$, :'craft'), '42501', 'not permitted', 'G: the old login can no longer use it');
+select pg_temp.as_dba();
+-- A token with no session claim can never open a view.
+select set_config('request.jwt.claims', json_build_object('sub', :'adminA'::text, 'role', 'authenticated')::text, true);
+set local role authenticated;
+select throws_ok(format($$select public.admin_view_as_begin(%L)$$, :'craft'), '42501', 'not permitted', 'G: a JWT without a session id cannot open a view');
+select pg_temp.as_dba();
+
+-- Rank change: the SUBJECT is promoted to the actor's rank while a view is live => access ends at once.
+select pg_temp.act_as(:'adminA', 'a0000000-0000-4000-8000-000000000002');
+select lives_ok(format($$select app.require_view_as(%L)$$, :'craft'), 'G: live before the rank change');
+select pg_temp.as_dba();
+insert into public.platform_role_grants (user_id, role, granted_by) values (:'craft', 'administrator', :'adminA');
+select pg_temp.act_as(:'adminA', 'a0000000-0000-4000-8000-000000000002');
+select throws_ok(format($$select app.require_view_as(%L)$$, :'craft'), '42501', 'not permitted', 'G: promoting the subject to the actor rank ends the view at once');
+-- Role change: the ACTOR loses the role.
+select pg_temp.act_as(:'adminB', 'b0000000-0000-4000-8000-000000000001');
+select lives_ok(format($$select public.admin_view_as_begin(%L)$$, :'craftSus'), 'G: another admin opens a view');
+select pg_temp.as_dba();
+delete from public.platform_role_grants where user_id = :'adminB';
+select pg_temp.act_as(:'adminB', 'b0000000-0000-4000-8000-000000000001');
+select throws_ok(format($$select app.require_view_as(%L)$$, :'craftSus'), '42501', 'not permitted', 'G: losing the role ends the view at once');
+select pg_temp.as_dba();
 
 select * from finish();
 rollback;

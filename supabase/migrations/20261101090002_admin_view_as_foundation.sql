@@ -36,6 +36,8 @@ select app.audit_actions_add(array['admin.view_as.started', 'admin.view_as.ended
 create table public.admin_view_sessions (
   id                uuid primary key default gen_random_uuid(),
   admin_user_id     uuid not null references public.users(id) on delete cascade,
+  -- The Supabase Auth session (JWT session_id) the view was opened in. A NEW login has a new id, so it can never reuse an old view.
+  auth_session_id   uuid not null,
   subject_user_id   uuid not null references public.users(id) on delete cascade,
   account_kind      text not null,
   started_at        timestamptz not null default now(),
@@ -132,6 +134,7 @@ as $$
        where s.admin_user_id = (select auth.uid())
          and s.subject_user_id = p_subject
          and s.account_kind = p_kind
+         and s.auth_session_id is not distinct from nullif((select auth.jwt()) ->> 'session_id', '')::uuid
          and s.ended_at is null
          and s.expires_at > now());
 $$;
@@ -169,9 +172,11 @@ set search_path = ''
 as $$
 declare
   v_actor uuid := (select auth.uid());
+  v_auth  uuid := nullif((select auth.jwt()) ->> 'session_id', '')::uuid;
   v_s     public.admin_view_sessions;
+  v_old   public.admin_view_sessions;
 begin
-  if not app.view_as_subject_ok(p_subject, p_kind) then
+  if v_auth is null or not app.view_as_subject_ok(p_subject, p_kind) then
     raise exception 'not permitted' using errcode = '42501';
   end if;
   perform pg_advisory_xact_lock(hashtextextended(v_actor::text || ':' || p_subject::text || ':' || p_kind, 0));
@@ -182,12 +187,24 @@ begin
    where admin_user_id = v_actor and subject_user_id = p_subject and account_kind = p_kind
      and ended_at is null and expires_at <= now();
 
+  -- A view opened in ANOTHER login session is never reused: it is closed (audited) and a new authorized start follows.
+  for v_old in
+    update public.admin_view_sessions
+       set ended_at = now()
+     where admin_user_id = v_actor and subject_user_id = p_subject and account_kind = p_kind
+       and ended_at is null and auth_session_id is distinct from v_auth
+    returning *
+  loop
+    perform app.record_audit_event('admin.view_as.ended', 'user', p_subject, null, jsonb_build_object(
+      'kind', p_kind, 'session_id', v_old.id, 'reason', 'session_changed'));
+  end loop;
+
   select * into v_s from public.admin_view_sessions
    where admin_user_id = v_actor and subject_user_id = p_subject and account_kind = p_kind and ended_at is null;
 
   if not found then
-    insert into public.admin_view_sessions (admin_user_id, subject_user_id, account_kind, expires_at)
-    values (v_actor, p_subject, p_kind, now() + interval '30 minutes')
+    insert into public.admin_view_sessions (admin_user_id, subject_user_id, account_kind, auth_session_id, expires_at)
+    values (v_actor, p_subject, p_kind, v_auth, now() + interval '30 minutes')
     returning * into v_s;
     perform app.record_audit_event('admin.view_as.started', 'user', p_subject, null, jsonb_build_object(
       'kind', p_kind, 'session_id', v_s.id, 'expires_at', v_s.expires_at));
@@ -214,7 +231,8 @@ begin
   perform app.require_view_as(p_subject, p_kind);
   select * into v_s from public.admin_view_sessions s
    where s.admin_user_id = (select auth.uid()) and s.subject_user_id = p_subject
-     and s.account_kind = p_kind and s.ended_at is null and s.expires_at > now();
+     and s.account_kind = p_kind and s.ended_at is null and s.expires_at > now()
+     and s.auth_session_id is not distinct from nullif((select auth.jwt()) ->> 'session_id', '')::uuid;
   return jsonb_build_object(
     'session_id', v_s.id, 'kind', v_s.account_kind, 'subject_user_id', v_s.subject_user_id,
     'started_at', v_s.started_at, 'expires_at', v_s.expires_at,
