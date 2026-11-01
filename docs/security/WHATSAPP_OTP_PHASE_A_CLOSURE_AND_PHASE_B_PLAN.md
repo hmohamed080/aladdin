@@ -1,6 +1,6 @@
 # WhatsApp OTP — Phase A closure and Phase B approval package
 
-**Status:** Phase A **CLOSED** on 2026-11-01. Phase B is **prepared, not approved and not executed**. WhatsApp delivery is **OFF** on the only deployed Worker version, and it stays OFF for all of Phase B. No Supabase migration, frontend deploy, Auth activation, message or Production change was made for this document.
+**Status:** Phase A **CLOSED** on 2026-11-01. Phase B **CLOSED** on 2026-11-01 (owner accepted the results); see [Phase B — actual results](#phase-b--actual-results-closed) at the end of this file and the [Phase C plan](WHATSAPP_OTP_PHASE_C_PILOT_PLAN.md). WhatsApp delivery stayed **OFF** on the only deployed Worker version throughout Phase B. The sections below are the plan as approved; the results section records what actually happened.
 
 ## Purpose
 
@@ -435,3 +435,26 @@ Phase C — one real message to the allow-listed handset — remains a separate 
 - [Local rehearsal script](../../supabase/tests/r2/acceptance_order_rehearsal.sh)
 - [App environment schema](../../frontend/src/lib/env/phone-verification.ts)
 - [Preview deployment workflow](../../.github/workflows/cloudflare-frontend-preview.yml)
+
+## Phase B — actual results (CLOSED)
+
+Machine-readable record: [phase-b-results-20261101.json](../operations/evidence/whatsapp-otp/phase-b-results-20261101.json). Versions, counts and booleans only.
+
+| Step | Result |
+|---|---|
+| B0 | Fresh read-only inspection (12:56:59Z) matched the plan: project `nxossqhdfltcqdwvbewi`, 197 applied, only `20261030090001` and `20261030090002` missing. |
+| B1 | Owner-run `supabase db push --linked --dry-run` listed exactly those two. |
+| B2 | Owner-run plain `supabase db push`. No `--include-all`, no history repair, no ledger rename, no MCP `apply_migration`. |
+| B3 | 199 applied / 199 repo, latest `20261030090002`; authority objects present; switches `false|false|off`; Auth settings, the 13 disputed function rights, alias census and phone flags unchanged; hosted functions 697 → 711; the 8 new public RPCs are `service_role` only, the 5 internal helpers have no API-role execute. |
+| B4 | Workflow run 41310152606 on `b29a3169` built and deployed `aladdin-frontend-preview` (smoke check passed). Version `c5c7f845`. Rollback target `da4eb8c9`. `WHATSAPP_OTP_TEMPLATE` absent. |
+| B5 | Seven `PHONE_*` secrets set (HMAC keyring and cookie secret newly generated and never displayed; Worker signing secret entered by the owner). Version `5d54e2c3`. |
+| B6 | **UI checks only**, run by the owner: sign-up and sign-in pages, phone sign-up shows the "not available" message, Google/Facebook buttons visible, mobile layout. **Authentication was not exercised** (email login, phone-alias login, OAuth round trips). Database read-only checks: 0 challenges, 0 grants, `false|false|off`. |
+| B7 | `alias_guard_mode='observe'`, then `enabled=true, signup_enabled=true` (3 audit rows); both app flags `true` (version `52ed32b4`). Worker delivery flag confirmed `false` first. |
+| B8 | Owner signed up once with the allow-listed number and reached the code screen, and requested one resend. Result: **2** `signup_proof` challenges (13:38:18Z, 13:39:22Z), both `invalidated_why='delivery_failed'`, neither consumed; 0 signup grants; `auth.users` 13 → 13; 0 alias-guard observations; D1 `whatsapp_hook_events` 0 rows; no WhatsApp message. The Worker's `503 delivery_disabled` is inferred from `delivery_failed`; Worker logs were not read. |
+| B9 | Switches back to `false|false|off` (6 audit rows); `PHONE_VERIFICATION_ENABLED=false`, `PHONE_SIGNUP_VERIFICATION_ENABLED=false`, `PHONE_OTP_DELIVERY=off` (version `dbe1a188`, 100%); 0 open challenges. Secret values cannot be read back, so the app-flag state rests on the writes. |
+
+Worker `aladdin-whatsapp-otp-preview` stayed on `6eb9364d` with `WHATSAPP_DELIVERY_ENABLED="false"`. Nothing in Production, Auth providers or `main` changed; PR #127 remains a draft.
+
+**Phase B verdict:** CLOSED. Lasting changes: two dormant migrations, the integrated build with seven `PHONE_*` secrets (all features OFF), two retained dry-run challenge rows, and six audit rows.
+
+**Carry-over for Phase C:** the two retained challenges count toward the per-phone hourly start limit until 14:39Z (see the Phase C plan).

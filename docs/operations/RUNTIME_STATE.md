@@ -1,6 +1,14 @@
 # Runtime State
 
-## WhatsApp OTP Worker Phase A closed; Phase B awaiting approval — 2026-11-01
+## WhatsApp OTP Phase B CLOSED; Phase C prepared, not approved — 2026-11-01
+
+- **Phase B CLOSED on Acceptance** (`nxossqhdfltcqdwvbewi`): `20261030090001` and `20261030090002` applied by a plain `supabase db push` (199 applied / 199 repo); `aladdin-frontend-preview` runs the integrated build from `b29a3169` with the seven `PHONE_*` secrets; final frontend version `dbe1a188-1583-410b-a5b5-f06bbd92f402`; rollback code target `da4eb8c9-f4f2-4434-9184-d92d9b18a90f`. Worker `aladdin-whatsapp-otp-preview` unchanged at `6eb9364d`, `WHATSAPP_DELIVERY_ENABLED="false"`. Evidence: [Phase B results](../security/WHATSAPP_OTP_PHASE_A_CLOSURE_AND_PHASE_B_PLAN.md#phase-b--actual-results-closed), [JSON](evidence/whatsapp-otp/phase-b-results-20261101.json).
+- **Current state: everything OFF.** DB `false|false|off`; `PHONE_VERIFICATION_ENABLED=false`, `PHONE_SIGNUP_VERIFICATION_ENABLED=false`, `PHONE_OTP_DELIVERY=off`; Worker delivery `false`. Two retained dry-run challenges (both `delivery_failed`) and 6 config audit rows; `auth.users` 13; D1 journal 0 rows. Phone sign-up shows "isn't available right now" on the preview.
+- **Not verified:** hosted authentication paths (email login, phone-alias login, OAuth) were not exercised; B6 was UI checks only. The Worker's `503 delivery_disabled` is inferred from `delivery_failed`.
+- **Phase C is prepared, not approved:** [Phase C pilot plan](../security/WHATSAPP_OTP_PHASE_C_PILOT_PLAN.md). It needs two approvals (preparation with Worker OFF; then the explicit `WHATSAPP_DELIVERY_ENABLED=true` window). The Worker has no per-recipient quota, so the pilot caps the database limits (`signup_phone_hourly=1`, `user_hourly_starts=1`, `resend_cooldown='1 hour'`); the dry-run challenges make the earliest start **14:40Z**.
+- Nothing merged (PR #127 draft); Production, Auth providers and `main` untouched.
+
+## WhatsApp OTP Worker Phase A closed; Phase B awaiting approval — 2026-11-01 (superseded by the Phase B CLOSED section above)
 
 - Branch `integration/whatsapp-otp-worker-r2-20261031` (reviewed code head `39523e4b`; 199 migrations, latest `20261030090002`). Nothing merged to `main`; Production untouched.
 - **Phase A CLOSED:** Worker `aladdin-whatsapp-otp-preview` active version `6eb9364d-aa89-4e30-9005-a516ac0cd29f` (100%), code version `3e02b69b-865f-4eb1-854a-d22f7359a8dd`. `IDEMPOTENCY_DB` → D1 `da65d5e4-8344-4078-9c2d-8a4bb4907f79`; `OTP_SIGNING_SECRET` and `WHATSAPP_ACCESS_TOKEN` → Secrets Store `acfaa67f391e499db6fde398022f50ce`; `OTP_ALLOWED_RECIPIENTS` present. Vars: `OTP_ENVIRONMENT=acceptance`, `OTP_RECIPIENT_MODE=allowlist`, `WHATSAPP_DELIVERY_ENABLED=false`, Graph `v25.0`, template `aladdin_otp`, language `ar`, sender `1415528588305492`.

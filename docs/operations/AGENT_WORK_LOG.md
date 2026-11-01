@@ -1,3 +1,19 @@
+## 2026-11-01 — WhatsApp OTP Phase B executed and closed on Acceptance; Phase C prepared (no real message)
+
+**Goal:** execute the approved Phase B (dormant migrations, integrated preview build, one failing-by-design dry run), return to a fully OFF state, and prepare Phase C for separate approval.
+
+**Done:** B0 fresh read-only inspection (197/199, only the two target migrations missing, project identity matched) using the Supabase CLI token read in a child process from Windows Credential Manager (never printed). Owner linked the CLI and ran the dry run and the plain `db push`; 199/199 afterwards, authority objects present, switches `false|false|off`, no change to Auth settings, the 13 disputed function rights, alias census or phone flags, new RPCs `service_role`-only. B4 workflow run 41310152606 on `b29a3169`; B5 seven `PHONE_*` secrets (new HMAC keyring and cookie secret generated and piped without display; signing secret entered by the owner). B6 UI checks by the owner. B7 switches/flags ON, B8 owner sign-up reached the code screen (plus one owner-requested resend): 2 challenges both `delivery_failed`, 0 grants, `auth.users` 13 → 13, D1 journal 0 rows, no message. B9 everything OFF again and verified.
+
+**Evidence:** [Phase B results](../security/WHATSAPP_OTP_PHASE_A_CLOSURE_AND_PHASE_B_PLAN.md#phase-b--actual-results-closed) and [JSON](evidence/whatsapp-otp/phase-b-results-20261101.json).
+
+**Findings:** the Worker has no per-recipient quota (a new `delivery_id` per start/resend); the database limits are the throttle, and the Phase B challenges count toward `signup_phone_hourly` for an hour. Config-limit changes are not written to the audit log (only the three switches are). Phone accounts are alias-domain Auth users; `phone_signup_attach` sets `profiles.phone_verified_at`.
+
+**Not verified / open:** hosted authentication paths were not exercised; the Worker 503 is inferred; app-flag secret values cannot be read back. Phase C is prepared in [WHATSAPP_OTP_PHASE_C_PILOT_PLAN.md](../security/WHATSAPP_OTP_PHASE_C_PILOT_PLAN.md) and not approved.
+
+**Hosted state:** two migrations applied to Acceptance; frontend preview redeployed with secrets; Worker, Production, Auth providers and `main` unchanged; no merge; no real WhatsApp message.
+
+**Validation:** docs-only commit; internal links checked (see commit).
+
 ## 2026-11-01 — WhatsApp OTP Phase A closed; Acceptance Phase B prepared (no hosted writes)
 
 **Goal:** close the isolated Acceptance WhatsApp OTP Worker phase with deployment and rollback evidence, then prepare a read-only, approval-ready Phase B for the Acceptance app/database without changing hosted state.
