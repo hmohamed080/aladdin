@@ -1,3 +1,11 @@
+## 2026-11-01 — WhatsApp OTP Phase C preparation interrupted by an accidental sign-up; restored to OFF (no message)
+
+**Done:** pushed the Phase B docs commit `53525515` to draft PR #127; applied the pilot limits (`1 / 1 / '1 hour'`, originals `5 / 6 / '1 minute'`); owner ran the signed preflight (PASS, delivery OFF); C3 switched the DB and frontend ON with Worker delivery OFF; the owner's accidental *Create Account* at 14:47:04Z produced one `delivery_failed` challenge; all switches restored OFF at 14:50Z.
+
+**Evidence and findings:** see the incident section of the [Phase C plan](../security/WHATSAPP_OTP_PHASE_C_PILOT_PLAN.md#preparation-incident-and-findings--2026-11-01-c4-attempt-no-message-sent) (F1 resend countdown, F2 "code sent" wording, F3 read-only C4). No code changed.
+
+**Hosted state:** Worker unchanged (`6eb9364d`, delivery `false`); no message; Production, Auth providers and `main` untouched; C5 not approved. Earliest repeat of C3/C4: after 15:47:04Z.
+
 ## 2026-11-01 — WhatsApp OTP Phase B executed and closed on Acceptance; Phase C prepared (no real message)
 
 **Goal:** execute the approved Phase B (dormant migrations, integrated preview build, one failing-by-design dry run), return to a fully OFF state, and prepare Phase C for separate approval.

@@ -144,3 +144,26 @@ In scope: one message, one allow-listed handset, Acceptance only. Deferred: any 
 - [Worker integration and pilot plan](WHATSAPP_OTP_R2_PILOT_AND_RELEASE.md)
 - [Signed preflight script](../../edge/whatsapp-otp-worker/scripts/worker-preflight.mjs)
 - [Worker source](../../edge/whatsapp-otp-worker/src/index.ts)
+
+## Preparation incident and findings — 2026-11-01 (C4 attempt, no message sent)
+
+**What happened.** After C3 (switches ON, Worker delivery OFF) the owner opened the sign-up page for the C4 availability check and clicked *Create Account* by mistake. The app showed the WhatsApp code screen; no message was sent (Worker delivery was `false`). No code was entered and no resend was made. C5 was not approved and delivery was never enabled.
+
+**Evidence (read-only).**
+
+- Accidental attempt: challenge created **2026-11-01T14:47:04.390Z**, invalidated **14:47:04.599Z** with `invalidated_why='delivery_failed'` (0.2 s), `attempts=0`, not consumed.
+- Open challenges 0; signup grants 0; `auth.users` 13 (unchanged); alias-guard observations 0; D1 `whatsapp_hook_events` 0 rows; Worker `6eb9364d` with `WHATSAPP_DELIVERY_ENABLED="false"` throughout.
+- The single hourly start allowed for the pilot number is **spent**. The rolling window (`created_at > now() - 1 hour`) frees up at **2026-11-01T15:47:04Z**.
+- Safe state restored at 14:50Z: DB `false|false|off`, `PHONE_VERIFICATION_ENABLED=false`, `PHONE_SIGNUP_VERIFICATION_ENABLED=false`, `PHONE_OTP_DELIVERY=off` (frontend version `7ff6c04d-ce50-4dde-8387-77b4e3550d89`). The temporary pilot limits (`1 / 1 / '1 hour'`) were kept; original values to restore after the pilot are `5 / 6 / '1 minute'`.
+
+**Finding F1 — resend countdown does not follow the server cooldown (frontend only; record for Production readiness).** The phone sign-up form starts a fixed client countdown, `PHONE_RESEND_COOLDOWN_SECONDS = 60` in `frontend/src/features/auth-password-preview/sign-up-form.tsx`, and ignores the `resendAvailableAt` the server returns (`signup-service.ts` returns `resend_available_at`; no UI file reads it). The ~23 s the owner saw is that 60 s countdown observed mid-way, so it is not a server-side gap: the database enforces `resend_cooldown` in `phone_signup_start` (`20261030090002`, `v_last > v_now - cfg.resend_cooldown` → `rate_limited`). That enforcement is verified by code and unit tests, **not exercised live** in this pilot (no resend was made). Consequence: with a long server cooldown the UI would enable *Resend* after 60 s and the click would be refused. Recommended later fix (not made): drive the countdown from `resendAvailableAt` and show a clear message on `rate_limited`.
+
+**Finding F2 — the code screen claims a code was sent even when delivery failed (UX; record for Production readiness).** This is by design: the start reply is deliberately independent of delivery (anti-enumeration; `signup-service.ts` defers delivery and closes the challenge as `delivery_failed` afterwards). The cost is that a user whose delivery failed sees "code sent" and has no recourse except waiting out the cooldown. Options for a later decision (none implemented): neutral wording ("If this number can receive WhatsApp, a code is on its way"), plus a visible help path after the code expires.
+
+**F3 — process.** A readiness check that opens the live form can be triggered by one stray click and burns the only allowed start. For the repeat, verify the surface read-only and do not load the form (see below).
+
+## Repeating C3/C4 and C5
+
+- Earliest safe repeat: **after 15:47:04Z**; plan for **15:50Z or later** and re-check `count(created_at > now() - 1 hour) = 0` first.
+- C3 is repeated as written. C4's browser step changes: the owner does **not** open the sign-up form. Readiness is the read-only checklist only (switches, limits, flags written, Worker `false`, D1 0 rows, 0 challenges in the window, preflight already passed). The owner opens the page only at C6, when the operator says "go".
+- C5 (`WHATSAPP_DELIVERY_ENABLED=true`) still needs its own explicit approval.

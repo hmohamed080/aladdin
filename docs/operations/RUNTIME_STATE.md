@@ -1,5 +1,11 @@
 # Runtime State
 
+## WhatsApp OTP Phase C: C3/C4 attempt interrupted, back to OFF — 2026-11-01
+
+- C3 ran at 14:41-14:43Z; the owner's accidental *Create Account* click at **14:47:04Z** created one challenge, closed `delivery_failed` in 0.2 s (Worker delivery stayed `false`; no message; D1 0 rows; `auth.users` 13; 0 grants). The hourly pilot start is spent until **15:47:04Z**.
+- Safe state restored 14:50Z (frontend `7ff6c04d`): DB `false|false|off`, app flags `false`, `PHONE_OTP_DELIVERY=off`. Pilot limits `1 / 1 / '1 hour'` are still set (originals `5 / 6 / '1 minute'`). C5 not approved.
+- Findings F1 (client resend countdown ignores `resendAvailableAt`), F2 (code screen says sent after a delivery failure) and F3 (read-only C4) are in the [Phase C plan](../security/WHATSAPP_OTP_PHASE_C_PILOT_PLAN.md#preparation-incident-and-findings--2026-11-01-c4-attempt-no-message-sent).
+
 ## WhatsApp OTP Phase B CLOSED; Phase C prepared, not approved — 2026-11-01
 
 - **Phase B CLOSED on Acceptance** (`nxossqhdfltcqdwvbewi`): `20261030090001` and `20261030090002` applied by a plain `supabase db push` (199 applied / 199 repo); `aladdin-frontend-preview` runs the integrated build from `b29a3169` with the seven `PHONE_*` secrets; final frontend version `dbe1a188-1583-410b-a5b5-f06bbd92f402`; rollback code target `da4eb8c9-f4f2-4434-9184-d92d9b18a90f`. Worker `aladdin-whatsapp-otp-preview` unchanged at `6eb9364d`, `WHATSAPP_DELIVERY_ENABLED="false"`. Evidence: [Phase B results](../security/WHATSAPP_OTP_PHASE_A_CLOSURE_AND_PHASE_B_PLAN.md#phase-b--actual-results-closed), [JSON](evidence/whatsapp-otp/phase-b-results-20261101.json).
