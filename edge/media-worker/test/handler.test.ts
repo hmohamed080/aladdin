@@ -139,6 +139,24 @@ describe("Mode P: private delivery", () => {
     }
   });
 
+  it("serves an ids-only key, and refuses one from another namespace's folder", async () => {
+    const id = "e9200000-0000-4000-8000-000000000002";
+    const object = `u/${VIEWER}/certificates/${id}/original.pdf`;
+    env.MEDIA_BUCKET = bucket({ [object]: BYTES, [`u/${VIEWER}/portfolio/${id}/original.pdf`]: BYTES,
+      [`u/${VIEWER}/certificates/${id}/v/card.webp`]: BYTES });
+    db.grant = { object, contentType: "application/pdf", size: BYTES.length, sha256: SHA };
+    const res = await get(await privateUrl());
+    expect(res.status).toBe(200);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(BYTES);
+    for (const grant of [{ object: `u/${VIEWER}/portfolio/${id}/original.pdf`, contentType: "application/pdf", size: BYTES.length, sha256: SHA },
+      { object: `u/${VIEWER}/certificates/${id}/v/card.webp`, contentType: "application/pdf", size: BYTES.length, sha256: SHA },
+      { object: `o/${VIEWER}/certificates/${id}/original.pdf`, contentType: "application/pdf", size: BYTES.length, sha256: SHA },
+      { object: `u/${VIEWER}/certificates/${id}/original.pdf/../x`, contentType: "application/pdf", size: BYTES.length, sha256: SHA }]) {
+      db.grant = grant;
+      expect((await get(await privateUrl())).status).toBe(404);
+    }
+  });
+
   it("supports single byte ranges and HEAD", async () => {
     const url = await privateUrl();
     const part = await get(url, { range: "bytes=0-3" });

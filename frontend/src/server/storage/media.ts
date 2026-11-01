@@ -26,9 +26,16 @@ export async function resolveMedia(client: SupabaseClient, namespace: MediaNames
   return descriptor.parse(data);
 }
 
-export function mediaProvider(client: SupabaseClient, namespace: MediaNamespace, provider: StorageProviderName) {
-  return provider === "r2" ? new CloudflareR2StorageProvider(namespace)
-    : new SupabaseStorageProvider(client, mediaPolicy(namespace).bucket);
+/**
+ * The provider for one reserved record. For R2 the physical key comes from the
+ * database (ids-only `u/…`/`o/…` for new uploads, the legacy key otherwise), so
+ * old and new objects are both found. Callers authorize through the resolvers first.
+ */
+export async function mediaProvider(client: SupabaseClient, namespace: MediaNamespace, provider: StorageProviderName, key: string) {
+  if (provider !== "r2") return new SupabaseStorageProvider(client, mediaPolicy(namespace).bucket);
+  const { data, error } = await privilegedStorageClient().rpc("media_storage_object", { p_namespace: namespace, p_key: key });
+  if (error || typeof data !== "string" || !data) throw new Error("media unavailable");
+  return new CloudflareR2StorageProvider(namespace, "private", data);
 }
 
 export function privilegedStorageClient() {
@@ -65,7 +72,7 @@ export async function authorizeMediaUpload(client: SupabaseClient, namespace: Me
       p_provider: provider, ...(backendReservation ? { p_owner: media.owner } : {}) });
     if (error) throw new Error("upload limit or reservation failure");
   }
-  return mediaProvider(client, namespace, provider).createUploadUrl(key, media.contentType, expectedBytes);
+  return (await mediaProvider(client, namespace, provider, key)).createUploadUrl(key, media.contentType, expectedBytes);
 }
 
 /**
@@ -112,7 +119,7 @@ export async function verifyPendingMedia(client: SupabaseClient, namespace: Medi
     });
     if (reserveError) throw new Error("reservation failed");
   }
-  const provider = mediaProvider(pending.provider === "supabase" ? privilegedStorageClient() : client, namespace, pending.provider);
+  const provider = await mediaProvider(pending.provider === "supabase" ? privilegedStorageClient() : client, namespace, pending.provider, key);
   requireWriteApproval(pending.provider);
   const maxBytes = mediaPolicy(namespace).maxBytes;
   const bytes = await provider.readObject(key, maxBytes);
@@ -145,5 +152,5 @@ export async function readMediaUrl(client: SupabaseClient, namespace: MediaNames
 
 export async function removeMedia(client: SupabaseClient, namespace: MediaNamespace, key: string) {
   const media = await resolveMedia(client, namespace, key, "delete");
-  await mediaProvider(media.provider === "supabase" ? privilegedStorageClient() : client, namespace, media.provider).deleteObject(key);
+  await (await mediaProvider(media.provider === "supabase" ? privilegedStorageClient() : client, namespace, media.provider, key)).deleteObject(key);
 }
