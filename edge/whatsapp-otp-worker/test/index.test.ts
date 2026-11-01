@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import { strict as assert } from "node:assert";
-import { buildMetaPayload, handleRequest, parseSend, recipientAllowed, templateLanguage, verifySignature, type Env } from "../src/index.ts";
+import { buildMetaPayload, handleRequest, parseSend, readBounded, recipientAllowed, templateLanguage, verifySignature, type Env } from "../src/index.ts";
 import { DELIVERY, FAKE_TOKEN, PHONE, SECRET, baseEnv, goodBody, memoryReplayDb, mockMeta, sign, signedSend } from "./support.ts";
 
 const OTHER = "7c2e5d2d-1e4b-4d6f-8b88-3a7e4a1b0c22";
@@ -229,6 +229,196 @@ describe("preflight (signed, side-effect free) and leak checks", () => {
       for (const [req, env, f] of cases) { const r = await handleRequest(req, env, f); bodies.push(await r.text()); }
       for (const text of [...bodies, ...logged]) for (const s of ["123456", PHONE, "1012345678", FAKE_TOKEN, SECRET]) assert.ok(!text.includes(s), `leaked ${s.slice(0, 5)}`);
     } finally { Object.assign(console, orig); }
-    assert.deepEqual(logged, []);
+    // The ONLY console output allowed is the sanitized failure line from the Meta-rejected case above.
+    assert.equal(logged.length, 1);
+    assert.deepEqual(JSON.parse(logged[0]!), { event: "whatsapp_otp_delivery_failed", category: "http", status: 502 });
+  });
+});
+
+describe("delivery failure diagnostics (sanitized, whitelist only)", () => {
+  const RAW_SECRETS = ["123456", PHONE, "1012345678", "201012345678", FAKE_TOKEN, SECRET, "Bearer", "aladdin_otp", "authorization"];
+  const ALLOWED_KEYS = ["event", "category", "status", "meta_code", "meta_subcode", "fbtrace_id"];
+  const metaError = (status: number, body: unknown) => (async () => new Response(typeof body === "string" ? body : JSON.stringify(body), { status })) as unknown as typeof fetch;
+
+  async function run(env: Env, fetcher: typeof fetch) {
+    const logged: string[] = []; const orig = { log: console.log, error: console.error, warn: console.warn, info: console.info, debug: console.debug };
+    for (const k of Object.keys(orig) as Array<keyof typeof orig>) console[k] = ((...a: unknown[]) => { logged.push(a.join(" ")); }) as never;
+    try {
+      const res = await handleRequest(await signedSend(), env, fetcher);
+      return { res, body: await res.text(), logged };
+    } finally { Object.assign(console, orig); }
+  }
+  /** Every captured line is one JSON object from the whitelist and contains no raw secret. */
+  function assertSanitized(logged: string[]) {
+    for (const line of logged) {
+      for (const s of RAW_SECRETS) assert.ok(!line.toLowerCase().includes(s.toLowerCase()), `leaked ${s.slice(0, 6)}`);
+      const o = JSON.parse(line) as Record<string, unknown>;
+      for (const k of Object.keys(o)) assert.ok(ALLOWED_KEYS.includes(k), `unexpected key ${k}`);
+      assert.equal(o.event, "whatsapp_otp_delivery_failed");
+    }
+  }
+  const line = (r: { logged: string[] }) => { assert.equal(r.logged.length, 1); return JSON.parse(r.logged[0]!) as Record<string, unknown>; };
+  const DENIED = JSON.stringify({ error: "delivery_unavailable" });
+
+  test("a Meta rejection logs exactly status, numeric code, numeric subcode, a valid fbtrace_id and the category; the API answer is unchanged", async () => {
+    const r = await run(baseEnv(), metaError(400, { error: { message: "Template aladdin_otp for 201012345678 code 123456 not found", type: "GraphMethodException", code: 100, error_subcode: 33, fbtrace_id: "AbCdEf123_-xYz", error_data: { details: "secret" } } }));
+    assert.equal(r.res.status, 502);
+    assert.equal(r.body, DENIED);
+    assert.deepEqual(line(r), { event: "whatsapp_otp_delivery_failed", category: "http", status: 400, meta_code: 100, meta_subcode: 33, fbtrace_id: "AbCdEf123_-xYz" });
+    assertSanitized(r.logged);
+  });
+
+  test("hostile / out-of-range fields are dropped, never echoed: string, float, negative, huge numbers; bad or injected fbtrace_id", async () => {
+    const hostile = [
+      { error: { code: "100", error_subcode: "33", fbtrace_id: 12345678 } },
+      { error: { code: 1.5, error_subcode: -1, fbtrace_id: "short" } },
+      { error: { code: 1e12, error_subcode: Number.MAX_SAFE_INTEGER, fbtrace_id: "x".repeat(41) } },
+      { error: { code: 100, fbtrace_id: "AbCdEf12\"\\n<script>alert(1)</script>" } },
+      { error: { code: 100, fbtrace_id: "AbCdEf12 34 56 78" } },
+      { error: { code: null, error_subcode: {}, fbtrace_id: [] } },
+    ];
+    for (const body of hostile) {
+      const r = await run(baseEnv(), metaError(403, body));
+      assert.equal(r.res.status, 502);
+      const o = line(r);
+      assert.equal(o.category, "http"); assert.equal(o.status, 403);
+      assert.equal(o.fbtrace_id, undefined); assert.equal(o.meta_subcode, undefined);
+      assert.ok(o.meta_code === undefined || o.meta_code === 100);
+      assertSanitized(r.logged);
+    }
+  });
+
+  test("malformed, empty, non-JSON, array, scalar, truncated and oversized error bodies still log the HTTP status and nothing else", async () => {
+    const bodies: string[] = ["", "not json at all 123456", "[]", "null", "42", "\"str\"", "{\"error\":\"just text\"}", "{\"error\":null}", "{\"error\":{\"code\":1", JSON.stringify({ error: { code: 100, pad: "x".repeat(200_000) } })];
+    for (const body of bodies) {
+      const r = await run(baseEnv(), metaError(500, body));
+      assert.equal(r.res.status, 502);
+      const o = line(r);
+      assert.equal(o.category, "http"); assert.equal(o.status, 500);
+      assert.equal(o.fbtrace_id, undefined);
+      assertSanitized(r.logged);
+    }
+  });
+
+  const enc = new TextEncoder();
+  /** A response whose body is a controllable stream; `state` records how much was pulled and whether it was cancelled. */
+  function streamed(status: number, chunks: Array<Uint8Array | Error>, opts: { endless?: Uint8Array; cancelThrows?: boolean } = {}) {
+    const state = { pulled: 0, cancelled: false };
+    let i = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) {
+        state.pulled += 1;
+        if (opts.endless) { c.enqueue(opts.endless); return; }
+        const next = chunks[i++];
+        if (next === undefined) { c.close(); return; }
+        if (next instanceof Error) { c.error(next); return; }
+        c.enqueue(next);
+      },
+      cancel() { state.cancelled = true; if (opts.cancelThrows) throw new Error("cancel failed with Bearer " + FAKE_TOKEN); },
+    }, { highWaterMark: 0 });
+    return { res: new Response(body, { status }), state };
+  }
+
+  test("an oversized error body is NOT consumed: reading stops at the byte limit, the stream is cancelled, and the status is still logged", async () => {
+    const kb = new Uint8Array(1024).fill(120); // 'x'
+    const { res, state } = streamed(500, [], { endless: kb });
+    const r = await run(baseEnv(), (async () => res) as unknown as typeof fetch);
+    assert.deepEqual(line(r), { event: "whatsapp_otp_delivery_failed", category: "http", status: 500 });
+    assert.equal(state.cancelled, true);
+    assert.ok(state.pulled <= 9, `pulled ${state.pulled} KB from an endless body`); // 8 KB limit => at most 8 full chunks (+1 for the stream's own look-ahead)
+    assertSanitized(r.logged);
+  });
+
+  test("a valid error split across many small chunks is parsed; a failing cancel or a stream error never changes the outcome", async () => {
+    const json = JSON.stringify({ error: { message: "m", code: 190, error_subcode: 463, fbtrace_id: "Trace_ABCDEFGH" } });
+    const bytes = enc.encode(json);
+    const parts = Array.from({ length: Math.ceil(bytes.length / 7) }, (_, k) => bytes.subarray(k * 7, k * 7 + 7));
+    const ok = streamed(401, parts, { cancelThrows: true });
+    const a = await run(baseEnv(), (async () => ok.res) as unknown as typeof fetch);
+    assert.deepEqual(line(a), { event: "whatsapp_otp_delivery_failed", category: "http", status: 401, meta_code: 190, meta_subcode: 463, fbtrace_id: "Trace_ABCDEFGH" });
+    const broken = streamed(429, [enc.encode('{"error":{"code":4,'), new Error("stream reset with Bearer " + FAKE_TOKEN)]);
+    const b = await run(baseEnv(), (async () => broken.res) as unknown as typeof fetch);
+    assert.equal(b.res.status, 502);
+    assert.deepEqual(line(b), { event: "whatsapp_otp_delivery_failed", category: "http", status: 429 });
+    assertSanitized([...a.logged, ...b.logged]);
+  });
+
+  test("readBounded: exact limit, over the limit, multi-byte split at the cut, empty and absent bodies, never more than max bytes", async () => {
+    assert.equal(await readBounded(new Response("abcdef"), 6), "abcdef");
+    assert.equal(await readBounded(new Response("abcdefgh"), 6), "abcdef");
+    assert.equal(await readBounded(new Response(""), 6), "");
+    assert.equal(await readBounded(new Response(null), 6), "");
+    assert.equal(await readBounded(new Response(new Uint8Array([97, 98, 99, 100]), { status: 400 }), 0), "");
+    const cut = await readBounded(new Response(enc.encode("abéé")), 3); // 3rd byte is half of a 2-byte char
+    assert.equal(cut?.startsWith("ab"), true); assert.ok((cut ?? "").length <= 3);
+    const { res, state } = streamed(200, [], { endless: new Uint8Array(4096).fill(65) });
+    const got = await readBounded(res, 8192);
+    assert.equal(got?.length, 8192); assert.equal(state.cancelled, true); assert.ok(state.pulled <= 3);
+    const failing = streamed(200, [new Error("boom")]);
+    assert.equal(await readBounded(failing.res, 100), null);
+  });
+
+  test("token lookup failure and empty token are distinct categories, never reach Meta, and a throwing store's message is not logged", async () => {
+    let calls = 0; const meta = (async () => { calls += 1; return new Response("{}"); }) as unknown as typeof fetch;
+    const throwing = await run(baseEnv({ WHATSAPP_ACCESS_TOKEN: { get: async () => { throw new Error("store down " + FAKE_TOKEN + " " + SECRET); } } }), meta);
+    assert.equal(throwing.res.status, 502); assert.equal(throwing.body, DENIED);
+    assert.deepEqual(line(throwing), { event: "whatsapp_otp_delivery_failed", category: "token_lookup" });
+    const empty = await run(baseEnv({ WHATSAPP_ACCESS_TOKEN: { get: async () => "" } }), meta);
+    assert.deepEqual(line(empty), { event: "whatsapp_otp_delivery_failed", category: "token_empty" });
+    const unbound = await run(baseEnv({ WHATSAPP_ACCESS_TOKEN: undefined as never }), meta);
+    assert.deepEqual(line(unbound), { event: "whatsapp_otp_delivery_failed", category: "token_lookup" });
+    assert.equal(calls, 0);
+    for (const x of [throwing, empty, unbound]) assertSanitized(x.logged);
+  });
+
+  test("timeouts and network failures are distinguished by error name only; the error message is never read or logged", async () => {
+    const thrower = (e: unknown) => (async () => { throw e; }) as unknown as typeof fetch;
+    const leaky = "https://graph.facebook.com/v25.0/1415528588305492/messages Bearer " + FAKE_TOKEN + " to 201012345678";
+    const cases: Array<[unknown, string]> = [
+      [new DOMException(leaky, "TimeoutError"), "timeout"],
+      [new DOMException(leaky, "AbortError"), "timeout"],
+      [new TypeError("fetch failed " + leaky), "network"],
+      [new Error(leaky), "network"],
+      ["a thrown string " + leaky, "network"],
+      [undefined, "network"],
+    ];
+    for (const [err, category] of cases) {
+      const r = await run(baseEnv(), thrower(err));
+      assert.equal(r.res.status, 502);
+      assert.deepEqual(line(r), { event: "whatsapp_otp_delivery_failed", category });
+      assertSanitized(r.logged);
+    }
+  });
+
+  test("a 2xx without a message id, with a non-string id, or with a non-JSON body is invalid_response (still 502)", async () => {
+    const ok = (body: string) => (async () => new Response(body, { status: 200 })) as unknown as typeof fetch;
+    for (const body of ["", "<html>ok</html>", "{}", "{\"messages\":[]}", "{\"messages\":[{}]}", "{\"messages\":[{\"id\":7}]}", "null", "[]"]) {
+      const r = await run(baseEnv(), ok(body));
+      assert.equal(r.res.status, 502);
+      assert.deepEqual(line(r), { event: "whatsapp_otp_delivery_failed", category: "invalid_response", status: 200 });
+      assertSanitized(r.logged);
+    }
+  });
+
+  test("invalid local configuration is category 'config' and never calls Meta", async () => {
+    let calls = 0; const meta = (async () => { calls += 1; return new Response("{}"); }) as unknown as typeof fetch;
+    for (const over of [{ WHATSAPP_PHONE_NUMBER_ID: "abc" }, { WHATSAPP_OTP_TEMPLATE: "Bad Name" }, { WHATSAPP_GRAPH_API_VERSION: "latest" }, { WHATSAPP_OTP_LANGUAGES: "en" }]) {
+      const r = await run(baseEnv(over), meta);
+      assert.equal(r.res.status, 502);
+      assert.deepEqual(line(r), { event: "whatsapp_otp_delivery_failed", category: "config" });
+    }
+    assert.equal(calls, 0);
+  });
+
+  test("success logs nothing; a Meta failure stays recorded as 'failed' and is never retried (409), with one diagnostic line only", async () => {
+    const ok = await run(baseEnv(), mockMeta().fetcher);
+    assert.equal(ok.res.status, 200); assert.deepEqual(ok.logged, []);
+    const env = baseEnv(); let calls = 0;
+    const f = (async () => { calls += 1; return new Response(JSON.stringify({ error: { code: 131000, fbtrace_id: "Trace_12345678" } }), { status: 400 }); }) as unknown as typeof fetch;
+    const first = await run(env, f); const second = await run(env, f);
+    assert.equal(first.res.status, 502); assert.equal(second.res.status, 409);
+    assert.equal(first.logged.length, 1); assert.deepEqual(second.logged, []);
+    assert.equal(calls, 1);
+    assert.equal([...(env.IDEMPOTENCY_DB as ReturnType<typeof memoryReplayDb>).rows.values()][0], "failed");
   });
 });

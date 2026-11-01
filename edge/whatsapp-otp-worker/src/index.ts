@@ -204,29 +204,126 @@ export function buildMetaPayload(phone: string, code: string, template: string, 
   };
 }
 
-export async function submitOtp(req: SendRequest, env: Env, fetcher: typeof fetch = fetch): Promise<boolean> {
-  if (!/^\d{5,30}$/.test(env.WHATSAPP_PHONE_NUMBER_ID)) return false;
-  if (!/^[a-z][a-z0-9_]{0,511}$/.test(env.WHATSAPP_OTP_TEMPLATE)) return false;
-  if (!/^v\d{1,2}\.\d$/.test(env.WHATSAPP_GRAPH_API_VERSION)) return false;
-  const language = templateLanguage(req.locale, env);
-  if (!language) return false;
-  const uri = `${graphBase(env)}/${env.WHATSAPP_GRAPH_API_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+/**
+ * Why a Meta send did not succeed. A CLOSED set of values, never free text: nothing here can carry a code, a number, a token, a header,
+ * the template or any part of Meta's message. `status`/`meta_code`/`meta_subcode` are bounded integers and `fbtrace_id` passes a strict pattern.
+ */
+export type FailureCategory = "config" | "token_lookup" | "token_empty" | "http" | "timeout" | "network" | "invalid_response";
+export type DeliveryDiagnostic = { category: FailureCategory; status?: number; meta_code?: number; meta_subcode?: number; fbtrace_id?: string };
+
+const FBTRACE = /^[A-Za-z0-9_-]{8,40}$/;
+const MAX_ERROR_BODY = 8192;
+
+function boundedInt(v: unknown, min: number, max: number): number | undefined {
+  return typeof v === "number" && Number.isSafeInteger(v) && v >= min && v <= max ? v : undefined;
+}
+
+/**
+ * Read at most `max` BYTES from the response stream, then cancel it: a larger body is never pulled into memory. Returns the decoded text
+ * (a body cut at the limit is simply unparseable later), "" for no body, or null if the stream failed.
+ */
+export async function readBounded(r: Response, max: number = MAX_ERROR_BODY): Promise<string | null> {
+  const stream = r.body;
+  if (!stream) return "";
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
   try {
-    // The Meta token is resolved only now, after every gate passed.
-    const token = await env.WHATSAPP_ACCESS_TOKEN.get();
-    if (!token) return false;
-    const r = await fetcher(uri, {
+    while (total < max) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!(value instanceof Uint8Array)) continue;
+      const room = max - total;
+      const part = value.length > room ? value.subarray(0, room) : value;
+      chunks.push(part);
+      total += part.length;
+    }
+  } catch {
+    return null;
+  } finally {
+    // Stop the producer without waiting for, or reading, the rest of the body; a failing cancel is irrelevant.
+    await reader.cancel().catch(() => undefined);
+  }
+  const bytes = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) { bytes.set(c, at); at += c.length; }
+  return new TextDecoder().decode(bytes);
+}
+
+/** Keep only the four whitelisted fields of a Meta error body. Anything else (message, details, user text) is dropped on the floor. */
+export async function sanitizeMetaError(r: Response): Promise<DeliveryDiagnostic> {
+  const diag: DeliveryDiagnostic = { category: "http" };
+  const status = boundedInt(r.status, 100, 599);
+  if (status !== undefined) diag.status = status;
+  try {
+    const text = await readBounded(r);
+    if (text === null) return diag;
+    const parsed: unknown = JSON.parse(text);
+    const err = (parsed as { error?: unknown } | null)?.error;
+    if (err && typeof err === "object") {
+      const e = err as Record<string, unknown>;
+      const code = boundedInt(e.code, 0, 999_999_999);
+      const subcode = boundedInt(e.error_subcode, 0, 999_999_999);
+      if (code !== undefined) diag.meta_code = code;
+      if (subcode !== undefined) diag.meta_subcode = subcode;
+      if (typeof e.fbtrace_id === "string" && FBTRACE.test(e.fbtrace_id)) diag.fbtrace_id = e.fbtrace_id;
+    }
+  } catch {
+    // An unreadable or non-JSON error body still yields the status; nothing else is kept.
+  }
+  return diag;
+}
+
+/** One structured line, written only on failure, built from the whitelisted diagnostic and nothing else. */
+function logDeliveryFailure(d: DeliveryDiagnostic): void {
+  console.warn(JSON.stringify({ event: "whatsapp_otp_delivery_failed", category: d.category, status: d.status, meta_code: d.meta_code, meta_subcode: d.meta_subcode, fbtrace_id: d.fbtrace_id }));
+}
+
+/** null = Meta accepted the message; otherwise the sanitized reason it did not. */
+async function deliver(req: SendRequest, env: Env, fetcher: typeof fetch): Promise<DeliveryDiagnostic | null> {
+  if (!/^\d{5,30}$/.test(env.WHATSAPP_PHONE_NUMBER_ID)) return { category: "config" };
+  if (!/^[a-z][a-z0-9_]{0,511}$/.test(env.WHATSAPP_OTP_TEMPLATE)) return { category: "config" };
+  if (!/^v\d{1,2}\.\d$/.test(env.WHATSAPP_GRAPH_API_VERSION)) return { category: "config" };
+  const language = templateLanguage(req.locale, env);
+  if (!language) return { category: "config" };
+  const uri = `${graphBase(env)}/${env.WHATSAPP_GRAPH_API_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+  // The Meta token is resolved only now, after every gate passed.
+  let token: string;
+  try {
+    token = await env.WHATSAPP_ACCESS_TOKEN.get();
+  } catch {
+    return { category: "token_lookup" };
+  }
+  if (!token) return { category: "token_empty" };
+  let r: Response;
+  try {
+    r = await fetcher(uri, {
       method: "POST",
       headers: { authorization: "Bearer " + token, "content-type": "application/json" },
       body: JSON.stringify(buildMetaPayload(req.to, req.code, env.WHATSAPP_OTP_TEMPLATE, language)),
       signal: AbortSignal.timeout(9000),
     });
-    if (!r.ok) return false;
-    const data = (await r.json()) as { messages?: Array<{ id?: unknown }> };
-    return typeof data?.messages?.[0]?.id === "string";
-  } catch {
-    return false;
+  } catch (e) {
+    // Only the error NAME selects a category; its message (which could echo a URL or header) is never read.
+    const name = e instanceof Error ? e.name : "";
+    return { category: name === "TimeoutError" || name === "AbortError" ? "timeout" : "network" };
   }
+  if (!r.ok) return sanitizeMetaError(r);
+  const status = boundedInt(r.status, 100, 599);
+  try {
+    const data = (await r.json()) as { messages?: Array<{ id?: unknown }> };
+    if (typeof data?.messages?.[0]?.id === "string") return null;
+  } catch {
+    // fall through: a 2xx body that is not JSON is an invalid response
+  }
+  return { category: "invalid_response", status };
+}
+
+export async function submitOtp(req: SendRequest, env: Env, fetcher: typeof fetch = fetch): Promise<boolean> {
+  const failure = await deliver(req, env, fetcher);
+  if (failure === null) return true;
+  logDeliveryFailure(failure);
+  return false;
 }
 
 /** Signed, side-effect-free runtime check: reports whether each binding is PRESENT and the switches' state. Never a value. */
