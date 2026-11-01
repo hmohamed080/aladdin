@@ -161,7 +161,17 @@ export async function readMediaUrl(client: SupabaseClient, namespace: MediaNames
   return applicationMediaUrl(namespace, key);
 }
 
+/**
+ * Deletes the bytes (original, variants and any pending copy) of a retired record and, for R2,
+ * records that the physical cleanup finished (`cleaned_at`). Recording is what stops the retry worker
+ * and the backup eligibility rule from treating the object as still pending. It is idempotent: a
+ * repeat finds no object, deletes nothing and records the same completion. If recording fails the
+ * bytes are already gone, so the error is logged and the reconciliation job completes it later.
+ */
 export async function removeMedia(client: SupabaseClient, namespace: MediaNamespace, key: string) {
   const media = await resolveMedia(client, namespace, key, "delete");
   await (await mediaProvider(media.provider === "supabase" ? privilegedStorageClient() : client, namespace, media.provider, key)).deleteObject(key);
+  if (media.provider !== "r2" || !media.owner) return;
+  const { error } = await privilegedStorageClient().rpc("media_cleanup_complete", { p_namespace: namespace, p_key: key, p_owner: media.owner });
+  if (error) console.warn(JSON.stringify({ event: "media.cleanup_unrecorded", namespace }));
 }

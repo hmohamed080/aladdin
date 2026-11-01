@@ -12,11 +12,11 @@ const limiter = vi.hoisted(() => ({ consume: vi.fn(), identity: vi.fn() }));
 vi.mock("@/server/cache/rate-limit", () => ({ consumeRateLimit: limiter.consume }));
 vi.mock("@/server/auth/session", () => ({ readSessionIdentity: limiter.identity }));
 const r2Upload = vi.hoisted(() => vi.fn());
-const r2 = vi.hoisted(() => ({ readObject: vi.fn(), commitVerifiedObject: vi.fn(), putVariant: vi.fn() }));
+const r2 = vi.hoisted(() => ({ readObject: vi.fn(), commitVerifiedObject: vi.fn(), putVariant: vi.fn(), deleteObject: vi.fn() }));
 const r2Keys = vi.hoisted(() => [] as unknown[][]);
 vi.mock("./r2-provider", () => ({ CloudflareR2StorageProvider: class {
   constructor(...args: unknown[]) { r2Keys.push(args); }
-  createUploadUrl = r2Upload; readObject = r2.readObject; commitVerifiedObject = r2.commitVerifiedObject; putVariant = r2.putVariant;
+  createUploadUrl = r2Upload; readObject = r2.readObject; commitVerifiedObject = r2.commitVerifiedObject; putVariant = r2.putVariant; deleteObject = (key: string) => r2.deleteObject(key);
 } }));
 import { authorizeMediaUpload, readMediaUrl, removeMedia, verifyPendingMedia } from "./media";
 
@@ -185,5 +185,28 @@ describe("R2 is the only home of new media bytes", () => {
     rpc.mockResolvedValue({ data: null, error: { message: "denied" } });
     await expect(authorizeMediaUpload(client, "portfolio", `u/${OWNER}/portfolio/x/original.png`, 93)).rejects.toThrow();
     expect(r2Keys).toHaveLength(0); expect(adminRpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("cleanup completion", () => {
+  const r2Ready = { provider: "r2", reserved: true, contentType: "image/png", state: "deleted", owner: OWNER };
+  it("records cleaned_at after an R2 object's bytes are deleted", async () => {
+    rpc.mockResolvedValue({ data: r2Ready, error: null });
+    r2.deleteObject = vi.fn().mockResolvedValue(undefined);
+    await removeMedia(client, "avatar", "key.png");
+    expect(r2.deleteObject).toHaveBeenCalled();
+    expect(adminRpc).toHaveBeenCalledWith("media_cleanup_complete", { p_namespace: "avatar", p_key: "key.png", p_owner: OWNER });
+  });
+  it("does not record completion when the delete fails, so the worker retries", async () => {
+    rpc.mockResolvedValue({ data: r2Ready, error: null });
+    r2.deleteObject = vi.fn().mockRejectedValue(new Error("r2 down"));
+    await expect(removeMedia(client, "avatar", "key.png")).rejects.toThrow("r2 down");
+    expect(adminRpc.mock.calls.map((c) => c[0])).not.toContain("media_cleanup_complete");
+  });
+  it("tolerates an unrecorded completion (bytes are gone; reconciliation finishes it)", async () => {
+    rpc.mockResolvedValue({ data: r2Ready, error: null });
+    r2.deleteObject = vi.fn().mockResolvedValue(undefined);
+    adminRpc.mockImplementation(async (name: string) => name === "media_storage_object" ? { data: OBJECT, error: null } : { error: { message: "x" } });
+    await expect(removeMedia(client, "avatar", "key.png")).resolves.toBeUndefined();
   });
 });
