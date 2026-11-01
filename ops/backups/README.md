@@ -195,6 +195,16 @@ Each check below must pass:
 - **Nightly runs:** for 7 nights, one Acceptance snapshot per Cairo night (summer and winter alike) and green freshness.
 - **Freshness alarm:** set `ACCEPTANCE_BACKUP_SCHEDULE=off` for one night. Freshness checks nothing, which is expected. Then run freshness manually with the schedule set back to `daily` and `MAX_AGE_HOURS` low, and confirm the alert email arrives.
 
+### Milestone: Acceptance manual backup and restore, PASS (2026-11-01)
+
+Verified by the owner on runs of `aladdin-backups` main (inactive build):
+- **Daily backup** (label `acceptance`): PASS, run 41297677151, snapshot `aladdin-acceptance-20261101T102928Z`. An earlier run, 41296852555 (snapshot `...T101811Z`), also passed: 7 of 7 required R2 originals, `excluded_retired` `{"retired:avatar":2}`.
+- **Monthly restore test** (label `acceptance`, Supabase CLI 2.119.0): PASS, run 41299245228. Schema and row counts exact; 7 of 7 R2 originals verified.
+- **Backup freshness** (manual): PASS, run 41299846162.
+- First restore attempt, run 41297494168, stopped at the STACK MISMATCH guard (CLI 2.110.0 older than Acceptance's Auth/Storage); fixed by the 2.119.0 pin, guard unchanged.
+
+This is the manual milestone only. Schedules stay off (`ACCEPTANCE_BACKUP_SCHEDULE=off`), `PRODUCTION_BACKUP_ENABLED=false`, PR #118 stays a draft. Still open for automatic Acceptance backups: the wrong-project test, the 7-night trial and the freshness-alarm test above, each needing a separate owner approval.
+
 Rollback: set `ACCEPTANCE_BACKUP_SCHEDULE=off`. Nothing else runs on its own.
 - The backups never write to Acceptance. Turning them off leaves nothing to undo there.
 - Objects already written stay until their lock and expiry pass. Daily copies go after about 15 days. Media copies are not locked and expire on their own (R2 generations after 90 days, legacy copies after 30).
