@@ -335,3 +335,49 @@ begin
   if not found then raise exception 'cleanup snapshot is stale' using errcode='42501'; end if;
 end;
 $$;
+
+-- Private edge delivery for the two new namespaces. Same session, ticket-expiry and active-account checks;
+-- the read decision is still organization_media_resolve (request: requester side, or a workspace that may read
+-- the request right now; verification: org.manage, or a reviewer of a ready document). Signature and grants unchanged.
+create or replace function public.media_edge_authorize(p_namespace text,p_key text,p_variant text,
+  p_viewer uuid,p_session uuid,p_workspace uuid,p_expires_at timestamptz)
+returns jsonb language plpgsql volatile security definer set search_path='' as $$
+declare
+  v_claims text := current_setting('request.jwt.claims',true);
+  v_sub text := current_setting('request.jwt.claim.sub',true);
+  v_role text := current_setting('request.jwt.claim.role',true);
+  m jsonb;
+begin
+  if p_namespace is null or p_namespace not in ('avatar','portfolio','certificate','product','organization','request','verification')
+    or p_key is null or length(p_key)>256 or p_variant is null or p_viewer is null or p_session is null
+    -- The ticket expiry is enforced here too, independent of the Worker clock:
+    -- at most 120 s lifetime, 5 s skew.
+    or p_expires_at is null or p_expires_at < now()-interval '5 seconds'
+    or p_expires_at > now()+interval '125 seconds' then
+    return null;
+  end if;
+  if not app.account_is_active(p_viewer) then return null; end if;
+  -- Sign-out (any scope) deletes the session row; bans and deletion end it too.
+  if not exists(select 1 from auth.sessions s join auth.users u on u.id=s.user_id
+      where s.id=p_session and s.user_id=p_viewer and (s.not_after is null or s.not_after>now())
+        and u.deleted_at is null and (u.banned_until is null or u.banned_until<=now())) then
+    return null;
+  end if;
+  perform set_config('request.jwt.claim.sub',p_viewer::text,true);
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claims',jsonb_build_object('sub',p_viewer,'role','authenticated',
+    'session_id',p_session)::text,true);
+  if p_namespace in ('product','organization','request','verification') then
+    m := public.organization_media_resolve(p_namespace,p_key,'read',p_workspace);
+  else
+    m := public.media_storage_resolve(p_namespace,p_key,'read');
+    -- Parity with /api/media: personal media is owner-only; public reads use Mode C.
+    if (m->>'owner')::uuid is distinct from p_viewer then m := null; end if;
+  end if;
+  perform set_config('request.jwt.claims',coalesce(v_claims,''),true);
+  perform set_config('request.jwt.claim.sub',coalesce(v_sub,''),true);
+  perform set_config('request.jwt.claim.role',coalesce(v_role,''),true);
+  if m is null or m->>'state'<>'ready' or m->>'provider'<>'r2' then return null; end if;
+  return app.media_edge_grant(p_namespace,p_key,p_variant);
+end;
+$$;

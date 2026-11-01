@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { sanitizeSearchTerm } from "@/server/queries/sales";
 import { applicationMediaUrl } from "@/lib/storage/media-url";
+import { edgeConfig, privateMediaUrl } from "@/server/storage/edge-ticket";
 import {
   parseRequestDetail,
   parseRequestItems,
@@ -131,13 +132,32 @@ export async function listResponsesForRequester(supabase: DB, requestId: string)
  * simply fails to load (the image falls back to its placeholder).
  */
 export async function signRequestImageUrls(
-  _supabase: DB,
+  supabase: DB,
   keys: readonly (string | null | undefined)[],
   viewer?: { orgId: string },
 ): Promise<Map<string, string>> {
+  const unique = [...new Set(keys.filter((k): k is string => Boolean(k)))];
   const out = new Map<string, string>();
-  for (const key of new Set(keys.filter((k): k is string => Boolean(k)))) {
-    out.set(key, applicationMediaUrl("request", key, viewer?.orgId ?? null));
+  // Without edge delivery the application proxy URL is used as before (authorized on every request).
+  if (unique.length === 0 || edgeConfig() === null) {
+    for (const key of unique) out.set(key, applicationMediaUrl("request", key, viewer?.orgId ?? null));
+    return out;
+  }
+  // Edge delivery: the caller-scoped resolver names each READABLE key's provider (the requester side, or
+  // the active workspace if it may read the request right now). Unreadable keys get no edge ticket.
+  for (let i = 0; i < unique.length; i += 60) {
+    const { data, error } = await supabase.rpc("organization_media_read_providers",
+      { p_namespace: "request", p_keys: unique.slice(i, i + 60), p_workspace: viewer?.orgId ?? undefined });
+    if (error || !data || typeof data !== "object" || Array.isArray(data)) {
+      for (const key of unique) if (!out.has(key)) out.set(key, applicationMediaUrl("request", key, viewer?.orgId ?? null));
+      return out;
+    }
+    const providers = data as Record<string, string>;
+    for (const key of unique.slice(i, i + 60)) {
+      out.set(key, providers[key] === undefined
+        ? applicationMediaUrl("request", key, viewer?.orgId ?? null)
+        : await privateMediaUrl(supabase, "request", key, providers[key] === "r2" ? "r2" : "supabase", { workspace: viewer?.orgId ?? null }));
+    }
   }
   return out;
 }

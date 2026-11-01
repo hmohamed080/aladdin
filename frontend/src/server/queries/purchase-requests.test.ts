@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
+const edge = vi.hoisted(() => ({ config: vi.fn(() => null as unknown), url: vi.fn() }));
+vi.mock("@/server/storage/edge-ticket", () => ({ edgeConfig: edge.config, privateMediaUrl: edge.url }));
+
 import { discoverRequestsPage, getMyRequest, getRequestForWorkspace, listResponsesForRequester, signRequestImageUrls } from "./purchase-requests";
 
 type Call = [string, ...unknown[]];
@@ -110,6 +113,16 @@ describe("reference image URLs", () => {
     expect(urls.size).toBe(1);
     expect(urls.get("k")).toBe(`/api/media/request?key=k&workspace=${ORG}`);
     expect(calls).toEqual([]); // no grant table, no Storage call: authorization happens per request in the database
+  });
+  it("with edge delivery on, only keys the caller-scoped resolver names get an edge URL; the rest keep the refusing proxy URL", async () => {
+    edge.config.mockReturnValue({});
+    edge.url.mockImplementation(async (_c: unknown, ns: string, key: string, provider: string, o: { workspace: string | null }) => `edge:${ns}:${key}:${provider}:${o.workspace}`);
+    const { supabase, calls } = stub({ rpc: { data: { a: "r2" }, error: null } });
+    const urls = await signRequestImageUrls(supabase, ["a", "b"], { orgId: ORG });
+    expect(urls.get("a")).toBe(`edge:request:a:r2:${ORG}`);
+    expect(urls.get("b")).toBe(`/api/media/request?key=b&workspace=${ORG}`);
+    expect(calls.some((c) => c[0] === "rpc" && c[1] === "organization_media_read_providers")).toBe(true);
+    edge.config.mockReturnValue(null);
   });
   it("the requester's own images carry no workspace", async () => {
     const { supabase } = stub({});

@@ -75,5 +75,13 @@ select ok(has_function_privilege('service_role','public.media_cleanup_candidates
   and not has_function_privilege('authenticated','public.media_cleanup_candidates(integer)','EXECUTE'),
   'only the backend runs the lifecycle functions');
 
+select ok(has_function_privilege('media_edge','public.media_edge_authorize(text,text,text,uuid,uuid,uuid,timestamp with time zone)','EXECUTE')
+  and not has_function_privilege('authenticated','public.media_edge_authorize(text,text,text,uuid,uuid,uuid,timestamp with time zone)','EXECUTE'),
+  'only the edge role runs the edge authorization, including for the two new namespaces');
+select is(public.media_edge_authorize('request',:'rkey','original',:'eng','00000000-0000-4000-8000-000000000001',null,now()+interval '60 seconds'),null,
+  'an edge ticket without a live Auth session is refused for a request photo');
+select is(public.media_edge_authorize('verification',:'rkey','original',:'eng','00000000-0000-4000-8000-000000000001',null,now()+interval '60 seconds'),null,
+  'and for a verification document');
+
 select * from finish();
 rollback;
