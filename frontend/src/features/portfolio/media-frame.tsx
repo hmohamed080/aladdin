@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SafeImage } from "@/components/media/safe-image";
 import { cn } from "@/lib/ui/cn";
 import {
   GRID_IMAGE_SIZES,
@@ -82,8 +83,7 @@ export function MediaImage({
 }) {
   const srcSet = variantSrcSet(source.variants, use);
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- revocable media URL, never optimiser-cached
-    <img
+    <SafeImage
       src={variantSrc(source, use)}
       srcSet={srcSet}
       sizes={srcSet ? sizes : undefined}
@@ -93,6 +93,7 @@ export function MediaImage({
       loading={priority ? "eager" : "lazy"}
       decoding="async"
       className={cn("h-full w-full object-cover", className)}
+      fallback={<div aria-hidden="true" data-testid="media-image-fallback" className="h-full w-full bg-surface-2" />}
     />
   );
 }

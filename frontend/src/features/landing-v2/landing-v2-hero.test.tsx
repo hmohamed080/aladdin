@@ -18,7 +18,7 @@ describe("LandingV2Hero", () => {
     expect(imageSources).toHaveLength(2);
     expect(imageSources).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("/landing-v2/hero/background-2-new-trimmed.png"),
+        expect.stringContaining("/assets/pages/landing/hero/background-2-new-trimmed.png"),
         expect.stringContaining("/brand/aladdin-logo.png"),
       ]),
     );

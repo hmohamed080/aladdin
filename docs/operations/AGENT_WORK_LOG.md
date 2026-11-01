@@ -7084,3 +7084,8 @@ The owner's hosted rebuild applied 180 migrations, but `default_acl`/`table_acl`
 - Stage 12 on owner GO (17:40Z): Custom Domains `aladdindecore.com` and `www` on `aladdin-frontend-production`; the apex CNAME to `cc39f6c51d632b81.vercel-dns-017.com` was deleted to allow it. Owner reports no errors after ~35 min. Routes are not listed in `wrangler.jsonc` (the deploy token has no zone permission; wrangler leaves dashboard domains alone).
 - Team preview: `aladdin-frontend-preview.bstalent9.workers.dev` behind Cloudflare Access (All traffic; policies `Aladdin team` Allow by email, `GitHub preview smoke` Service Auth). The preview smoke check sends `CF_ACCESS_CLIENT_ID/SECRET` (environment `cloudflare-preview`).
 - **Unfinished / owner steps:** add the One-time PIN login method so teammates without a Cloudflare account can sign in; monitor (stage 13, proposed 7 days) before any Vercel change; the stage 12 rollback (detach domains, re-add the apex CNAME DNS only) stays ready; DMARC record is a separate later task; merge PR #110.
+
+## 2026-11-01 — Unified Media & Assets, Stage 1 (UI fallbacks, static asset registry)
+- Added `components/media` (`SafeImage`, `MediaAvatar/Cover/Logo/Thumb`, `EmptyMedia`): a missing or failing media URL shows initials, a neutral cover or a glyph, never a broken image. Applied to the avatar field, installer hero/summary, public profile cover, portfolio `MediaImage`, quote thumbnails.
+- Added `lib/assets/registry.ts`; removed 6 byte-identical landing/brand duplicates (6.8 MB), old URLs kept by permanent redirects. Static assets stay in `public/`, never R2.
+- Not done: browser E2E for missing media (needs a seeded Supabase); hosted data untouched.

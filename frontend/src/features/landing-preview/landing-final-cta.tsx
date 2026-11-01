@@ -6,6 +6,7 @@ import { MailIcon, UserIcon } from "@/components/ui/icons";
 import { useI18n } from "@/lib/i18n/context";
 import { landingBlockContent } from "./landing-block-content";
 import styles from "./landing-final-cta.module.css";
+import { LANDING } from "@/lib/assets/registry";
 
 export function LandingFinalCta() {
   const { locale } = useI18n();
@@ -13,7 +14,7 @@ export function LandingFinalCta() {
   return (
     <section className={styles.banner} data-landing-preview-part="FinalCta" aria-labelledby="join-heading">
       <div className={styles.visual} aria-hidden="true">
-        <Image src="/preview/landing/sections/products-scene.png" alt="" fill sizes="30vw" className={styles.image} />
+        <Image src={LANDING.productsScene} alt="" fill sizes="30vw" className={styles.image} />
       </div>
       <div className={styles.copy}>
         <h2 id="join-heading">{t.cta}</h2>

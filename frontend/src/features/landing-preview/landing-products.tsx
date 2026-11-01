@@ -6,6 +6,7 @@ import { ArrowUpRightIcon } from "@/components/ui/icons";
 import { Reveal } from "@/components/ui/reveal";
 import { useI18n } from "@/lib/i18n/context";
 import styles from "./landing-products.module.css";
+import { LANDING } from "@/lib/assets/registry";
 
 const content = {
   ar: {
@@ -39,7 +40,7 @@ export function LandingProducts() {
     <section id="platform" className={styles.section} data-landing-preview-part="Products">
       <div className={styles.frame}>
         <Image
-          src="/preview/landing/sections/products-scene.png"
+          src={LANDING.productsScene}
           alt=""
           fill
           sizes="100vw"
