@@ -845,6 +845,17 @@ export const en = {
   admin: {
     title: "Admin",
     roleLabel: { super_admin: "Super Admin", support: "Support", moderator: "Moderator", administrator: "Administrator" },
+    viewAs: {
+      banner: "Admin View — Read Only",
+      viewing: "Viewing {name}",
+      kind: { craftsman: "Craftsman account" },
+      expires: "Session ends {time}",
+      returnToAdmin: "Return to admin",
+      notice: "You are still signed in as an administrator. Nothing here can be changed and nothing is saved to this account.",
+      sectionsPending: "Account sections are added in the next stage.",
+      eyeLabel: "View account (read-only)",
+      eyeDisabled: "You cannot view this account",
+    },
     rbac: {
       saved: "Saved.",
       archived: "Role archived.",
@@ -1893,6 +1904,7 @@ export const en = {
             read: "View user accounts and profiles",
             verify: "Approve or reject user verification",
             suspend: "Suspend or restore user accounts",
+            view_as: "Open a read-only, audited view of another user's account",
           },
           organizations: {
             read: "View organizations, members and branches",
