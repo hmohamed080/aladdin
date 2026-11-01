@@ -1,3 +1,19 @@
+## 2026-11-01 — WhatsApp OTP Phase A closed; Acceptance Phase B prepared (no hosted writes)
+
+**Goal:** close the isolated Acceptance WhatsApp OTP Worker phase with deployment and rollback evidence, then prepare a read-only, approval-ready Phase B for the Acceptance app/database without changing hosted state.
+
+**Phase A evidence:** Worker `aladdin-whatsapp-otp-preview` active version `6eb9364d-aa89-4e30-9005-a516ac0cd29f` (100%), code version `3e02b69b-865f-4eb1-854a-d22f7359a8dd`; the two later versions are secret-only changes. Bindings: `IDEMPOTENCY_DB` → D1 `da65d5e4-8344-4078-9c2d-8a4bb4907f79`; `OTP_SIGNING_SECRET` and `WHATSAPP_ACCESS_TOKEN` → Secrets Store `acfaa67f391e499db6fde398022f50ce`; `OTP_ALLOWED_RECIPIENTS` present. Vars: `OTP_ENVIRONMENT=acceptance`, `OTP_RECIPIENT_MODE=allowlist`, `WHATSAPP_DELIVERY_ENABLED=false`, Graph `v25.0`, template `aladdin_otp`, language `ar`, sender `1415528588305492`. Only trigger is the `workers.dev` URL; `routes: []`; zero routes on the `aladdindecore.com` zone; no custom domain. Signed preflight: `ok:true`, all five bindings/allowlist checks true, `delivery_enabled:false`, `environment:acceptance`, `allowlist_entries:1`. Rollback: `6dffc68b` (previous secret state) or `3e02b69b` (code, then re-apply signing secret and allowlist).
+
+**Read-only Acceptance inspection:** project `nxossqhdfltcqdwvbewi`; 197 applied / 199 repo; latest `20261029090002`; only `20261030090001` and `20261030090002` missing; no applied-not-in-repo; no out-of-order; `plain_push_possible:true`. Auth phone provider OFF, Send SMS hook OFF, before-user-created hook OFF, CAPTCHA ON, Google/Facebook ON. Alias users 0; profiles with phone 4 / verified 0; legacy challenge table approx. 0 rows; authority objects absent. The 13 disputed functions keep `service_role:false`, `anon:false`, `authenticated:true`. The general `permission_diff` shows 108 paired type-qualification renderings, not an EXECUTE delta.
+
+**Local rehearsal:** rebuilt the isolated stack `aladdin_r2acc` to the exact 197-version history, then ran `supabase/tests/r2/acceptance_order_rehearsal.sh`: pre-state matched, plain `db push` (no `--include-all`, no repair) applied exactly the two in order, existing email and phone-alias accounts/passwords/profiles/old history rows unchanged, switches `false|false|off`, alias guard deferred/inert, a new alias sign-up still allowed at `off`, second push up to date. **PASS.**
+
+**Files:** new [Phase A closure and Phase B plan](../security/WHATSAPP_OTP_PHASE_A_CLOSURE_AND_PHASE_B_PLAN.md); updated [activation steps](../security/WHATSAPP_OTP_ACCEPTANCE_ACTIVATION.md), [RUNTIME_STATE](RUNTIME_STATE.md), [implementation log](WHATSAPP_OTP_IMPLEMENTATION_LOG.md); corrected `supabase/tests/r2/acceptance_order_rehearsal.sh` and added the `R2_HOLD_BACK` rehearsal option to `supabase/tests/r2/stack.sh`.
+
+**Hosted state:** no Supabase migration, Auth configuration, frontend deploy, Worker delivery change, WhatsApp message, merge or Production change was made. Phase B is blocked on explicit owner approval; Phase C needs a separate approval for one real message.
+
+**Next:** owner reviews and approves Phase B only, then the sequence in the plan runs with delivery still OFF; Phase C remains separate.
+
 ## 2026-10-26 — Owner Sales delegation capabilities (Stage 6 finding, Option A)
 
 ## 2026-10-28 — WhatsApp OTP security hardening on Draft PR #114

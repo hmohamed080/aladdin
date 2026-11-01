@@ -1,5 +1,5 @@
-# WhatsApp OTP — Acceptance Preview Deployment Runbook (DEPLOYED; HTTP SMOKE PENDING)
-**Status:** first delivery-disabled Preview Worker deployment verified with Cloudflare API on 2026-10-28. **NO release approval** for delivery or Production. HTTPS smoke tests pending.
+# WhatsApp OTP — Acceptance Preview Deployment Runbook (historical)
+**Status:** superseded for the R2 Worker integration by the [Phase A closure and Phase B plan](../security/WHATSAPP_OTP_PHASE_A_CLOSURE_AND_PHASE_B_PLAN.md). This file records the first delivery-disabled Preview deployment on 2026-10-28. The Worker no longer exposes the Supabase Send-SMS hook route; it serves signed `POST /v1/otp/send` and `POST /v1/preflight`. Phase A is closed; Phase B is prepared and awaiting approval; delivery remains OFF.
 
 > Do not treat this runbook as an instruction to enable SMS/WhatsApp Auth. The current Phone + Password installer/showroom identities are synthetic email-alias accounts; enabling Supabase Phone Auth without a migration/linking design can create duplicate users.
 

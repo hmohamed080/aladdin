@@ -1,6 +1,6 @@
 # WhatsApp OTP: Worker integration, Acceptance pilot, Production readiness
 
-**Status:** Draft. Nothing merged, deployed, migrated, activated or sent. No hosted resource was touched; no Meta call was made.
+**Status:** Draft branch, not merged. **Phase A is closed** (2026-11-01): the isolated Worker is deployed with delivery OFF and passed the signed preflight. The Acceptance app/database (Phase B) is prepared but **not executed**; no Supabase migration, frontend deploy, Auth activation, message or Production change has been made. The exact plan is [Phase A closure and Phase B plan](WHATSAPP_OTP_PHASE_A_CLOSURE_AND_PHASE_B_PLAN.md).
 
 ## 1. What is integrated (this branch = #126 + #114 + the adaptation)
 R1/R2 stays the **only** authority (generates, MACs, verifies; single-use grant; Auth user created with the grant). The Worker is **delivery only**.
@@ -22,15 +22,15 @@ R1/R2 stays the **only** authority (generates, MACs, verifies; single-use grant;
 
 ## 3. Acceptance pilot steps (each needs your explicit approval; none executed)
 1. Meta preflight passes (section 2).
-2. Create the new Secrets Store secret `PHONE_OTP_WORKER_SECRET` (a fresh `whsec_...` value); put the same value in the Acceptance app's `PHONE_OTP_WORKER_SECRET`.
-3. Deploy the Worker with `WHATSAPP_DELIVERY_ENABLED="false"`; set `OTP_ALLOWED_RECIPIENTS` to your authorised test number **in the Worker dashboard** (never in the repository). Run the signed preflight and expect `meta_token_bound:true`, `d1_reachable:true`, `allowlist_entries:1`, `delivery_enabled:false`.
-4. Apply the dormant migrations `20261030090001/2` to Acceptance after the read-only exact-history check. Set the Acceptance app env: `PHONE_OTP_DELIVERY=worker`, `PHONE_OTP_WORKER_URL`, `PHONE_VERIFICATION_ENABLED=true`, `PHONE_SIGNUP_VERIFICATION_ENABLED=true`, the keyring and `PHONE_SIGNUP_COOKIE_SECRET`. Database: `alias_guard_mode='observe'`, then `enabled` and `signup_enabled` true.
-5. Set `WHATSAPP_DELIVERY_ENABLED="true"` on the Acceptance Worker (the **only** switch that lets a message leave).
+2. ~~Create the new Secrets Store secret `PHONE_OTP_WORKER_SECRET`; put the same value in the Acceptance app.~~ **Done in Phase A; the app value is still to be set in Phase B.**
+3. ~~Deploy the Worker with `WHATSAPP_DELIVERY_ENABLED="false"`; set `OTP_ALLOWED_RECIPIENTS`; run the signed preflight.~~ **Done in Phase A:** active version `6eb9364d`, signed preflight `ok:true`, `delivery_enabled:false`, `allowlist_entries:1`.
+4. Apply the dormant migrations `20261030090001/2` to Acceptance. **The read-only exact-history check is done:** 197 applied, only those two missing, no out-of-order, plain forward push possible. Set the Acceptance app env with the feature flags false first: `PHONE_OTP_DELIVERY=worker`, `PHONE_OTP_WORKER_URL`, `PHONE_OTP_WORKER_SECRET`, the keyring and `PHONE_SIGNUP_COOKIE_SECRET`. Database for the dry run: `alias_guard_mode='observe'`, then `enabled` and `signup_enabled` true, then the two app flags true. The Worker master switch stays **false**, so the dry run must end in `503 delivery_disabled` and `invalidated_why='delivery_failed'`. Return all switches to off after the dry run.
+5. Set `WHATSAPP_DELIVERY_ENABLED="true"` on the Acceptance Worker (the **only** switch that lets a message leave). This is Phase C and needs a separate approval.
 6. Sign up with your number. **Success = the code arrives on the handset and entering it creates the account with `phone_verified_at` set.** Meta "accepted" alone is not success.
 **Rollback:** `WHATSAPP_DELIVERY_ENABLED="false"` (instant, on the Worker); app `PHONE_OTP_DELIVERY=off`; database `update app.phone_verification_config set signup_enabled=false, alias_guard_mode='off'`.
 
 ## 4. Exactly what blocks
-**The first real Acceptance message:** (a) your approvals for steps 2-5; (b) the Meta preflight result (is `1415528588305492` a live sender; is `aladdin_otp` approved in `ar` with the OTP button); (c) the new Secrets Store secret; (d) the Acceptance migration history confirmed read-only (needs the token holder); (e) this branch's CI green on GitHub.
+**The first real Acceptance message:** (a) your approvals for Phase B and Phase C; (b) the Meta preflight result (is `1415528588305492` a live sender; is `aladdin_otp` approved in `ar` with the OTP button); (c) the new Secrets Store secret (done) and the matching app value (Phase B); (d) the Acceptance migration history confirmed read-only (done: 197 applied, only `20261030090001/2` missing, plain push possible); (e) this branch's CI green on GitHub.
 **Production:** everything in R2's release plan (exact hosted history, Acceptance rehearsal, a planned window, the rule that the guard is enforced only when no grant-less build can serve traffic) **plus** a production Worker (own D1, own secrets, `OTP_ENVIRONMENT=production`, `OTP_RECIPIENT_MODE=open`, preferably reached by a Cloudflare service binding rather than a public URL), the production sender and template verified, and a delivery-reliability observation window.
 
 ## 5. Merge-order risk (analysis only, NOT yet simulated)
