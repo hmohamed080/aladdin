@@ -18,7 +18,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(47);
+select plan(48);
 
 \set revA   '55555555-5555-4555-8555-555555555555'
 \set revB   '22222222-2222-4222-8222-222222222222'
@@ -195,6 +195,9 @@ select is((select primary_account_type::text from public.users where id = :'appl
 
 select is(pg_get_function_arguments('public.review_approve(uuid,boolean)'::regprocedure), 'p_verification_id uuid, p_grant_public_listing boolean DEFAULT false',
   'an omitted listing argument never publishes (default is false)');
+
+select is(has_function_privilege('authenticated', 'app.assert_assigned_reviewer(public.verifications)', 'execute'), false,
+  'the reviewer-gate helper is internal: no client role can execute it');
 
 select * from finish();
 rollback;
