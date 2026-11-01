@@ -2,7 +2,7 @@ import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { readPublicEnv } from "@/lib/env";
-import { readStorageEnv } from "@/lib/env/storage";
+import { legacyStorageWritesOpen, readStorageEnv } from "@/lib/env/storage";
 import { mediaPolicy, isOrganizationMedia } from "@/lib/storage/media-policy";
 import type { MediaNamespace, StorageProviderName } from "@/lib/storage/provider-types";
 import { SupabaseStorageProvider } from "./supabase-provider";
@@ -50,6 +50,15 @@ function requireWriteApproval(provider: StorageProviderName) {
     && !readStorageEnv().R2_PRODUCTION_WRITES_APPROVED) throw new Error("production R2 writes are not approved");
 }
 
+/**
+ * R2 is the only home of new application media. Once R2 routing is on (or legacy writes are
+ * closed explicitly) a Supabase-backed write fails closed: there is no automatic fallback when R2
+ * is down, uploads simply pause and the user retries. Reads and deletes of legacy objects stay open.
+ */
+function requireWritableProvider(provider: StorageProviderName) {
+  if (provider === "supabase" && !legacyStorageWritesOpen(readStorageEnv())) throw new Error("media uploads are unavailable");
+}
+
 export async function authorizeMediaUpload(client: SupabaseClient, namespace: MediaNamespace, key: string, expectedBytes?: number) {
   const media = await resolveMedia(client, namespace, key, "upload");
   // An extra per-user brake ahead of the reservation quota (Redis, or per-instance memory when Redis is down).
@@ -60,6 +69,7 @@ export async function authorizeMediaUpload(client: SupabaseClient, namespace: Me
   const env = readStorageEnv();
   // Existing R2 records remain R2 when routing is disabled. Reserve is authoritative and rejects provider changes.
   const provider = media.reserved ? media.provider : env.R2_STORAGE_ENABLED ? "r2" : "supabase";
+  requireWritableProvider(provider);
   requireWriteApproval(provider);
   const maxBytes = mediaPolicy(namespace).maxBytes;
   if (provider === "r2" && (!expectedBytes || !Number.isSafeInteger(expectedBytes) || expectedBytes <= 0 || expectedBytes > maxBytes)) {
@@ -111,6 +121,7 @@ export async function verifyPendingMedia(client: SupabaseClient, namespace: Medi
   }
   const pending = await resolveMedia(client, namespace, key, "upload");
   if (!pending.owner) throw new Error("owner required");
+  requireWritableProvider(pending.provider);
   if (!pending.reserved) {
     const reserveClient = isOrganizationMedia(namespace) ? privilegedStorageClient() : client;
     const { error: reserveError } = await reserveClient.rpc("media_storage_reserve", {

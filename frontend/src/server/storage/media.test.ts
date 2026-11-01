@@ -5,8 +5,9 @@ vi.mock("server-only", () => ({}));
 const adminRpc = vi.hoisted(() => vi.fn());
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({ rpc: adminRpc, storage: { from: () => ({ createSignedUrl: sign, remove }) } }) }));
 vi.mock("@/lib/env", () => ({ readPublicEnv: () => ({ NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co" }) }));
-const settings = vi.hoisted(() => ({ R2_STORAGE_ENABLED: false, SUPABASE_SERVICE_ROLE_KEY: "test-only-key" }));
-vi.mock("@/lib/env/storage", () => ({ readStorageEnv: () => settings }));
+const settings = vi.hoisted(() => ({ R2_STORAGE_ENABLED: false, MEDIA_LEGACY_STORAGE_WRITES: true, SUPABASE_SERVICE_ROLE_KEY: "test-only-key" }));
+vi.mock("@/lib/env/storage", () => ({ readStorageEnv: () => settings,
+  legacyStorageWritesOpen: (env: { R2_STORAGE_ENABLED: boolean; MEDIA_LEGACY_STORAGE_WRITES: boolean }) => !env.R2_STORAGE_ENABLED && env.MEDIA_LEGACY_STORAGE_WRITES }));
 const limiter = vi.hoisted(() => ({ consume: vi.fn(), identity: vi.fn() }));
 vi.mock("@/server/cache/rate-limit", () => ({ consumeRateLimit: limiter.consume }));
 vi.mock("@/server/auth/session", () => ({ readSessionIdentity: limiter.identity }));
@@ -27,7 +28,7 @@ const rpc = vi.fn(); const sign = vi.fn(); const remove = vi.fn(); const upload 
 const client = { rpc, storage: { from: () => ({ createSignedUrl: sign, remove, createSignedUploadUrl: upload }) } } as unknown as ReturnType<typeof createClient>;
 const pending = { provider: "supabase", reserved: true, contentType: "image/png", state: "pending", owner: OWNER };
 beforeEach(() => {
-  vi.clearAllMocks(); settings.R2_STORAGE_ENABLED = false;
+  vi.clearAllMocks(); settings.R2_STORAGE_ENABLED = false; settings.MEDIA_LEGACY_STORAGE_WRITES = true;
   rpc.mockResolvedValue({ data: pending, error: null });
   sign.mockResolvedValue({ data: { signedUrl: "https://test.invalid/image" }, error: null });
   r2Keys.length = 0;
@@ -128,5 +129,61 @@ describe("mixed-provider authorization and finalization", () => {
     rpc.mockResolvedValue({ data: { ...pending, state: "ready" }, error: null });
     await verifyPendingMedia(client, "portfolio", "key.png");
     expect(sign).not.toHaveBeenCalled(); expect(adminRpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("R2 is the only home of new media bytes", () => {
+  const fresh = { ...pending, reserved: false };
+  it("sends a new upload to R2 and never to Supabase once R2 routing is on", async () => {
+    settings.R2_STORAGE_ENABLED = true;
+    rpc.mockResolvedValue({ data: fresh, error: null });
+    r2Upload.mockResolvedValue({ provider: "r2", url: "https://r2.test/pending" });
+    await authorizeMediaUpload(client, "portfolio", "key.png", 93);
+    expect(adminRpc).toHaveBeenCalledWith("media_storage_reserve", expect.objectContaining({ p_provider: "r2" }));
+    expect(upload).not.toHaveBeenCalled();
+  });
+  it("refuses a Supabase upload that was reserved before activation, without touching Supabase Storage", async () => {
+    settings.R2_STORAGE_ENABLED = true;
+    rpc.mockResolvedValue({ data: pending, error: null });
+    await expect(authorizeMediaUpload(client, "portfolio", "key.png", 93)).rejects.toThrow("unavailable");
+    expect(upload).not.toHaveBeenCalled(); expect(r2Upload).not.toHaveBeenCalled();
+  });
+  it("refuses to verify pending Supabase bytes once legacy writes are closed", async () => {
+    settings.R2_STORAGE_ENABLED = true;
+    rpc.mockResolvedValue({ data: pending, error: null });
+    await expect(verifyPendingMedia(client, "portfolio", "key.png")).rejects.toThrow("unavailable");
+    expect(writes()).not.toContain("media_storage_attest");
+  });
+  it("pauses uploads instead of falling back when R2 is off and legacy writes are closed", async () => {
+    settings.MEDIA_LEGACY_STORAGE_WRITES = false;
+    rpc.mockResolvedValue({ data: fresh, error: null });
+    await expect(authorizeMediaUpload(client, "avatar", "key.png", 93)).rejects.toThrow("unavailable");
+    expect(adminRpc).not.toHaveBeenCalled(); expect(upload).not.toHaveBeenCalled();
+  });
+  it("does not fall back to Supabase when R2 fails: the error surfaces and nothing is written there", async () => {
+    settings.R2_STORAGE_ENABLED = true;
+    rpc.mockResolvedValue({ data: fresh, error: null });
+    r2Upload.mockRejectedValue(new Error("R2 unavailable"));
+    await expect(authorizeMediaUpload(client, "portfolio", "key.png", 93)).rejects.toThrow("R2 unavailable");
+    expect(upload).not.toHaveBeenCalled();
+    expect(sign).not.toHaveBeenCalled();
+  });
+  it("still allows legacy Supabase writes before activation (default) so the current release is unchanged", async () => {
+    rpc.mockResolvedValue({ data: pending, error: null });
+    upload.mockResolvedValue({ data: { token: "t" }, error: null });
+    await expect(authorizeMediaUpload(client, "portfolio", "key.png")).resolves.toMatchObject({ provider: "supabase" });
+  });
+  it("still deletes legacy Supabase objects after activation", async () => {
+    settings.R2_STORAGE_ENABLED = true;
+    rpc.mockResolvedValue({ data: { ...pending, state: "ready" }, error: null });
+    remove.mockResolvedValue({ data: [{ name: "key.png" }], error: null });
+    await removeMedia(client, "portfolio", "key.png");
+    expect(remove).toHaveBeenCalled();
+  });
+  it("authorizes uploads through the database resolver before any provider is created (cross-account)", async () => {
+    settings.R2_STORAGE_ENABLED = true;
+    rpc.mockResolvedValue({ data: null, error: { message: "denied" } });
+    await expect(authorizeMediaUpload(client, "portfolio", `u/${OWNER}/portfolio/x/original.png`, 93)).rejects.toThrow();
+    expect(r2Keys).toHaveLength(0); expect(adminRpc).not.toHaveBeenCalled();
   });
 });

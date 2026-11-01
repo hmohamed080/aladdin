@@ -3,6 +3,8 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { StorageProvider, UploadGrant } from "@/lib/storage/provider-types";
 import { readStorageEnv } from "@/lib/env/storage";
+import { readPublicEnv } from "@/lib/env";
+import { assertMediaEnvironment } from "@/lib/storage/environment-guard";
 import { readBoundedBody } from "./validation";
 import { MEDIA_VARIANTS, variantObjectKey, type MediaVariant } from "@/lib/media/image-variants";
 
@@ -10,6 +12,9 @@ import { MEDIA_VARIANTS, variantObjectKey, type MediaVariant } from "@/lib/media
 export function createR2Client(): S3Client {
   const env = readStorageEnv();
   if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY) throw new Error("R2 credentials are not configured");
+  // Every R2 client (images, video, backfills) passes the same wrong-environment check first.
+  assertMediaEnvironment({ appEnv: env.APP_ENV, supabaseUrl: readPublicEnv().NEXT_PUBLIC_SUPABASE_URL,
+    privateBucket: env.R2_PRIVATE_BUCKET, publicBucket: env.R2_PUBLIC_BUCKET, siteBucket: env.R2_SITE_BUCKET });
   return new S3Client({ region: "auto", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED", responseChecksumValidation: "WHEN_REQUIRED",
     endpoint: env.R2_LOCAL_S3_ENDPOINT ?? `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY },
