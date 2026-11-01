@@ -7,10 +7,13 @@
 // scope; compliance evidence is reported as RETAINED and is never offered for deletion.
 //
 //   node scripts/media-reset.mjs inventory --project <ref|local> [--json]
+//   node scripts/media-reset.mjs snapshot  --project <ref|local> > before.json   (per-bucket object counts)
+//   node scripts/media-reset.mjs compare --before before.json --after after.json  (fails if any bucket grew)
 //
 // Output: counts only (never keys, names, owners or ids), a `retained` section naming what must not be removed, and a
 // SHA-256 over the canonical counts so an approval refers to exactly this inventory.
 import { createHash } from "node:crypto";
+import fs from "node:fs";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
@@ -35,6 +38,24 @@ export const REFERENCES = [
 ];
 
 export class ResetOperatorError extends Error {}
+
+/** Per-bucket object counts: the before/after evidence that no application file bytes entered Supabase Storage. */
+export async function storageSnapshot(io) {
+  const buckets = {};
+  for (const bucket of BUCKETS) buckets[bucket] = await io.storageObjects(bucket);
+  return { takenAt: new Date().toISOString(), buckets };
+}
+
+/** Passes only if no application bucket grew. Shrinking is fine (cleanup); a bucket missing from either side fails. */
+export function compareSnapshots(before, after) {
+  const grown = [];
+  for (const bucket of BUCKETS) {
+    const a = before?.buckets?.[bucket], b = after?.buckets?.[bucket];
+    if (!Number.isInteger(a) || !Number.isInteger(b)) throw new ResetOperatorError(`Snapshot is missing bucket ${bucket}`);
+    if (b > a) grown.push({ bucket, before: a, after: b });
+  }
+  return { ok: grown.length === 0, grown };
+}
 
 /**
  * io = { count(table, filters?) -> number, storageObjects(bucket) -> number, locations(provider, cleaned) -> number }
@@ -107,7 +128,14 @@ function supabaseIo(supabase) {
 
 export async function main(argv = process.argv.slice(2)) {
   const [command, ...rest] = argv;
-  if (command !== "inventory") throw new ResetOperatorError("Usage: media-reset.mjs inventory --project <ref|local> [--json]. This tool never deletes.");
+  if (command === "compare") {
+    const read = (flag) => JSON.parse(fs.readFileSync(rest[rest.indexOf(flag) + 1], "utf8"));
+    const result = compareSnapshots(read("--before"), read("--after"));
+    console.log(JSON.stringify(result));
+    if (!result.ok) process.exitCode = 1;
+    return;
+  }
+  if (command !== "inventory" && command !== "snapshot") throw new ResetOperatorError("Usage: media-reset.mjs inventory|snapshot --project <ref|local> [--json] | compare --before f --after f. This tool never deletes.");
   const project = rest[rest.indexOf("--project") + 1];
   const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new ResetOperatorError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required");
@@ -116,6 +144,7 @@ export async function main(argv = process.argv.slice(2)) {
   if (project !== configured) throw new ResetOperatorError("Requested project does not match the configured environment");
   const require = createRequire(new URL("../frontend/package.json", import.meta.url));
   const supabase = require("@supabase/supabase-js").createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (command === "snapshot") { console.log(JSON.stringify({ project: configured, readOnly: true, ...(await storageSnapshot(supabaseIo(supabase))) })); return; }
   const inventory = await buildInventory(supabaseIo(supabase));
   console.log(JSON.stringify({ project: configured, readOnly: true, ...inventory, scope: resetScope(inventory) }, null, rest.includes("--json") ? 0 : 2));
 }
