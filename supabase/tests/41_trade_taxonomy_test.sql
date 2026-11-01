@@ -388,9 +388,10 @@ select is(
       and p.proname not in ('user_trades_set', '_profile_public_directory',
                             '_job_applicants', 'profile_completion',
                             'job_match_rows', 'job_opportunities_page',
-                            'user_trade_specialties_set')),
+                            'user_trade_specialties_set',
+                            'admin_view_craftsman_profile')),
   0::bigint,
-  'and the ONLY functions that mention it are its writer and two DISPLAY projections — no capability, no can_* predicate');
+  'and the ONLY functions that mention it are its writer and DISPLAY projections (incl. the Admin View-As profile) — no capability, no can_* predicate');
 
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace

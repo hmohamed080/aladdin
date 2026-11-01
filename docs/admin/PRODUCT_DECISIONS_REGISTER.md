@@ -450,3 +450,13 @@ Every row below is a real business-rule question surfaced by the Admin gap analy
 **Backlog note — Data Freshness / Realtime Architecture Audit:** a site-wide audit will happen **after** the Admin Core backend-wiring stage (never inside Phase 0D, which must not implement any realtime architecture). It will classify every module as one of: **Realtime subscription** · **mutation-triggered refetch** · **focus/navigation refetch** · **polling** · **normal fetch**. Tracked as [BL-024](ADMIN_IMPLEMENTATION_BACKLOG.md).
 
 **Data model impact:** none. **STATUS: APPROVED — 2026-09-29 (process/architecture decision, in effect from Phase 0D approval)**
+
+## Verification approval: public listing is opt-in (2026-11-01)
+
+**Decision (owner, 2026-11-01, APPROVED):** approving an account verification **never publishes the profile or its portfolio media by default**. Every approval entry point (Users directory, user page and `/admin/verifications`) shows an explicit **"Also list this profile publicly"** checkbox, **unticked by default**; only a ticked box lists (ADR-0007 D14, reviewer-set). A missing or forged field, or any non-professional subject, never lists.
+
+**Change from historical behaviour:** the Verifications queue previously listed every professional approval, and the database default for `review_approve(p_grant_public_listing)` was `true`. Both are now `false`. Existing approved requests are unchanged; nothing is retro-unlisted.
+
+**Database boundary (migration `20261101090001_verification_apply_reviewer_gate.sql`):** `apply_account_upgrade` and `apply_organization_verification` now refuse the request's subject and any admin who is not the assigned reviewer, before the idempotent early return. The assigned reviewer can still re-run apply safely. pgTAP: `116_admin_verification_retry_authorization_test.sql`.
+
+**Data model impact:** function bodies and one parameter default only; no table or data change. **STATUS: APPROVED — 2026-11-01**

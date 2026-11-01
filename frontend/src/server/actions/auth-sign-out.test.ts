@@ -10,8 +10,9 @@ vi.mock("next/headers", () => ({ cookies: vi.fn(async () => ({ get: () => undefi
 
 const getUser = vi.fn();
 const signOutSpy = vi.fn(async () => ({ error: null }));
+const rpcSpy = vi.fn(async () => ({ data: 0, error: null }));
 vi.mock("@/lib/supabase/server", () => ({
-  getServerSupabase: vi.fn(async () => ({ auth: { getUser, signOut: signOutSpy } })),
+  getServerSupabase: vi.fn(async () => ({ auth: { getUser, signOut: signOutSpy }, rpc: rpcSpy })),
 }));
 vi.mock("@/server/queries/landing", () => ({ resolveActiveLanding: vi.fn() }));
 
@@ -49,5 +50,37 @@ describe("signOut — returns each account to the sign-in page it can use", () =
     getUser.mockResolvedValue({ data: { user: null } });
     expect(await run()).toBe("REDIRECT:/auth/sign-in");
     expect(signOutSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("signOut — Admin View-As sessions", () => {
+  it("does nothing extra while the feature is off (a normal sign-out is unchanged)", async () => {
+    getUser.mockResolvedValue({ data: { user: { email: "a@b.co" } } });
+    await run();
+    expect(rpcSpy).not.toHaveBeenCalled();
+  });
+
+  it("closes every live view session before signing out when the feature is on", async () => {
+    vi.stubEnv("ADMIN_VIEW_AS_ENABLED", "true");
+    getUser.mockResolvedValue({ data: { user: { email: "a@b.co" } } });
+    try {
+      expect(await run()).toBe("REDIRECT:/auth/sign-in");
+      expect(rpcSpy).toHaveBeenCalledWith("admin_view_as_end_all");
+      expect(rpcSpy.mock.invocationCallOrder[0]).toBeLessThan(signOutSpy.mock.invocationCallOrder[0]!);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("never blocks sign-out if closing the sessions fails", async () => {
+    vi.stubEnv("ADMIN_VIEW_AS_ENABLED", "true");
+    rpcSpy.mockRejectedValueOnce(new Error("db down"));
+    getUser.mockResolvedValue({ data: { user: { email: "a@b.co" } } });
+    try {
+      expect(await run()).toBe("REDIRECT:/auth/sign-in");
+      expect(signOutSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
