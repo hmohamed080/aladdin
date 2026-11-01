@@ -167,3 +167,16 @@ In scope: one message, one allow-listed handset, Acceptance only. Deferred: any 
 - Earliest safe repeat: **after 15:47:04Z**; plan for **15:50Z or later** and re-check `count(created_at > now() - 1 hour) = 0` first.
 - C3 is repeated as written. C4's browser step changes: the owner does **not** open the sign-up form. Readiness is the read-only checklist only (switches, limits, flags written, Worker `false`, D1 0 rows, 0 challenges in the window, preflight already passed). The owner opens the page only at C6, when the operator says "go".
 - C5 (`WHATSAPP_DELIVERY_ENABLED=true`) still needs its own explicit approval.
+
+## Production readiness findings (owner-accepted 2026-11-01)
+
+Recorded for the Production readiness review. Neither is fixed; no code was changed.
+
+- **F1 — resend timer (must be corrected before general Production activation).** The frontend resend timer is a fixed 60-second countdown and does not follow the server-enforced availability and retry limits (`resendAvailableAt`, `rate_limited` / `retry_after_seconds`). The countdown and the Resend button must be driven by the server's values, and a refused resend must show a clear message.
+- **F2 — OTP delivery wording.** Keep the account-enumeration protection (the start reply is independent of delivery and of whether the number already belongs to an account). Consider more neutral OTP wording. The UI must not reveal whether a number exists or whether delivery succeeded.
+
+## Owner instructions in force (2026-11-01)
+
+- Acceptance stays in the safe OFF state; no sign-up requests or browser tests by the operator; the owner will not open or submit the sign-up form during preparation.
+- Pilot limits stay at `signup_phone_hourly=1`, `user_hourly_starts=1`, `resend_cooldown='1 hour'` until Phase C is completed or cancelled; then restore `5 / 6 / '1 minute'`.
+- On the owner's explicit message after 15:50Z: re-check the rolling-hour quota, repeat C3/C4 as read-only readiness, stop, and request the separate C5 approval. At C5 the operator watches D1 and turns Worker delivery OFF promptly after the first accepted attempt; the owner submits the form only after the operator says GO.
