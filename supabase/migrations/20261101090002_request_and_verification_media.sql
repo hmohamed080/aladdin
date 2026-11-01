@@ -24,7 +24,16 @@ alter table public.media_storage_locations drop constraint media_storage_locatio
 alter table public.media_storage_locations add constraint media_storage_locations_namespace_check
   check (namespace in ('avatar','portfolio','certificate','product','organization','request','verification'));
 
-alter table public.media_storage_locations drop constraint media_storage_locations_storage_key_check;
+-- The 20261101090001 check spans two columns, so PostgreSQL named it automatically; find it by definition.
+do $$
+declare c record;
+begin
+  for c in select conname from pg_constraint
+    where conrelid = 'public.media_storage_locations'::regclass and contype = 'c' and pg_get_constraintdef(oid) like '%storage_key%'
+  loop
+    execute format('alter table public.media_storage_locations drop constraint %I', c.conname);
+  end loop;
+end $$;
 alter table public.media_storage_locations add constraint media_storage_locations_storage_key_check
   check (storage_key is null or (provider = 'r2' and storage_key !~ '\.\.' and storage_key ~
     '^(u|o)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/(profile|portfolio|certificates|products|requests|verification)/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/){1,2}original\.[a-z0-9]{2,5}$'));
