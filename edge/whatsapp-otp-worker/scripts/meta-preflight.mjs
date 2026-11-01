@@ -1,28 +1,28 @@
 #!/usr/bin/env node
-// READ-ONLY Meta WhatsApp Cloud API preflight. Sends NOTHING, creates nothing, changes nothing: GET requests to graph.facebook.com only.
+// READ-ONLY Meta WhatsApp Cloud API preflight. Sends NOTHING, creates nothing, changes nothing: GET requests to graph.facebook.com only
+// (plus, only when explicitly opted in, one POST to debug_token, which is a read).
 //
-//   WHATSAPP_ACCESS_TOKEN=<token> WHATSAPP_PHONE_NUMBER_ID=<sender id> [WHATSAPP_BUSINESS_ACCOUNT_ID=<candidate WABA id>] \
-//     node edge/whatsapp-otp-worker/scripts/meta-preflight.mjs
+//   WHATSAPP_ACCESS_TOKEN=<token> WHATSAPP_PHONE_NUMBER_ID=<sender id> WHATSAPP_BUSINESS_ACCOUNT_ID=<WABA / messaging account id> \
+//     [WHATSAPP_ACCOUNT_ID=<WhatsApp Account that holds the number, only if different>] node edge/whatsapp-otp-worker/scripts/meta-preflight.mjs
 //
-// Run it in your own shell from your secret store; never paste a token into a chat. It prints booleans, enums and the LAST FOUR digits of ids
-// only - never the token, never a template body, never a recipient. Exit 0 only when every check passes.
+// Run it in your own shell from your secret store; never paste a token into a chat. It prints booleans, enums, sanitized Graph error codes and
+// the LAST FOUR digits of ids only - never the token, never a template body, never a recipient. Exit 0 only when every check passes.
 //
-// WABA RESOLUTION (why this exists): `message_templates` is a field of the WhatsApp Business ACCOUNT (WABA) node only. Asking a phone-number
-// or business-portfolio id for it fails with Graph error #100 ("Tried accessing nonexisting field (message_templates)"). So the script never
-// assumes which id it was given. It collects candidates (the id you supplied, then every target the token itself was granted through
-// `debug_token`), asks Graph what TYPE each node is (`?metadata=1`), keeps only WhatsAppBusinessAccount nodes, and then requires that the WABA
-// actually OWNS the sender (`/{waba}/phone_numbers` contains it). Only that verified WABA is used for the template lookup.
+// ACCOUNT MODEL (Graph v25.0, Meta's 2026 WhatsApp Account Model Evolution): WhatsApp Accounts hold phone numbers; Messaging Accounts hold
+// templates and billing. Existing WABA ids generally ARE the Messaging Account ids and legacy edges stay compatible. `?metadata=1` node
+// introspection is deprecated in v25.0 (it answers HTTP 400), so NOTHING here relies on it. Evidence used instead, all supported read-only calls:
+//   - sender: the phone-number fields themselves (display_phone_number, status, account_mode, code_verification_status, name_status,
+//     quality_rating) plus an EXACT id echo (`id` in the answer equals the id asked for) and equality with the id pinned in wrangler.jsonc;
+//   - account: a successful `/{account}/message_templates?name=aladdin_otp` proves the id serves templates; the answer must contain the approved
+//     template (shape checked below);
+//   - association (NOT weakened): the account must LIST the sender through `/{account}/phone_numbers` (paged). If Meta's migrated model does
+//     not list the number there, the script reports not ready with the sanitized Graph error rather than guessing. An optional
+//     WHATSAPP_ACCOUNT_ID (the WhatsApp Account that holds the number) is checked the same way; the template lookup and the association
+//     must both succeed for the SAME account id.
 //
-// TOKEN HANDLING: the token travels ONLY in the Authorization header (never in a URL, query string or log line). By default the script does NOT
-// call `debug_token` (which needs the token as `input_token`): give it the WABA id (Business settings > Accounts > WhatsApp accounts) in
-// WHATSAPP_BUSINESS_ACCOUNT_ID and it verifies type + ownership. Token introspection is opt-in (META_PREFLIGHT_RESOLVE_FROM_TOKEN=1) and sends
-// `input_token` in a POST form body, still never in a URL.
-//
-// SENDER ID: it also proves WHATSAPP_PHONE_NUMBER_ID is a WhatsApp phone-number NODE (not the phone number itself, not a WABA) and that it equals
-// the id pinned in wrangler.jsonc, so a wrong id in the repository blocks the deploy instead of surprising it.
-//
-// Answers: is the sender a LIVE, connected, verified business number; is `aladdin_otp` an APPROVED AUTHENTICATION template in Arabic with
-// exactly one COPY_CODE button (the shape the Worker's payload fills) and an expiry equal to the authority's code lifetime (5 minutes).
+// TOKEN HANDLING: the token travels ONLY in the Authorization header (never in a URL, query string or log line). `debug_token` is NOT called by
+// default; token introspection is opt-in (META_PREFLIGHT_RESOLVE_FROM_TOKEN=1) and sends `input_token` in a POST form body, never in a URL.
+// Graph errors are reported as sanitized code / subcode / type / message (long digit runs, numbers and token-like strings removed).
 import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -30,10 +30,11 @@ const GRAPH = "https://graph.facebook.com";
 const VERSION = "v25.0";
 /** The authority's challenge_ttl default and the transport's ttlSeconds (300): the template's "expires in N minutes" must not lie. */
 export const EXPECTED_EXPIRY_MINUTES = 5;
-const WABA_TYPE = "WhatsAppBusinessAccount";
 
-export function evaluateSender(p) {
+export function evaluateSender(p, requestedId) {
   const checks = {
+    // v25.0-safe node evidence: the answer echoes the id that was asked for (skipped only when no id is supplied, e.g. unit use)
+    exact_id_echo: requestedId === undefined ? true : String(p?.id) === requestedId,
     connected: p?.status === "CONNECTED",
     live_not_sandbox: p?.account_mode === "LIVE",
     code_verified: p?.code_verification_status === "VERIFIED",
@@ -74,7 +75,8 @@ export function configuredSenderId() {
 }
 
 const tail4 = (id) => String(id).slice(-4);
-/** Candidate ids, in order: the supplied one, then every target the token was granted for WhatsApp management/messaging. De-duplicated. */
+
+/** Candidate ids, in order: the supplied one, then (opt-in introspection) every target the token was granted for WhatsApp management/messaging. */
 export function candidateIds(suppliedId, debugData) {
   const granted = (debugData?.data?.granular_scopes ?? [])
     .filter((s) => /^whatsapp_business_(management|messaging)$/.test(String(s?.scope)))
@@ -82,79 +84,106 @@ export function candidateIds(suppliedId, debugData) {
   return [...new Set([suppliedId, ...granted].filter((x) => /^\d{5,30}$/.test(String(x ?? ""))))];
 }
 
+/** Graph error -> a few safe fields. No token, no long digit run (ids, numbers), no long token-like string, bounded length. */
+export function sanitizeError(data, token = "") {
+  const er = data?.error;
+  if (!er || typeof er !== "object") return null;
+  let msg = String(er.message ?? "");
+  if (token) msg = msg.split(token).join("[redacted]");
+  msg = msg.replace(/[A-Za-z0-9_|.-]{24,}/g, "[redacted]").replace(/\+?\d[\d\s-]{4,}\d/g, "[number]").replace(/\d{5,}/g, "[id]");
+  return {
+    code: Number.isInteger(er.code) ? er.code : null,
+    subcode: Number.isInteger(er.error_subcode) ? er.error_subcode : null,
+    type: typeof er.type === "string" ? er.type.slice(0, 40) : null,
+    message: msg.slice(0, 160),
+  };
+}
+
 export async function run(env, fetchImpl = fetch, log = console.log, pinned = configuredSenderId()) {
   const need = ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"].filter((k) => !env[k]);
   if (need.length) { log("NOT RUN - missing: " + need.join(", ") + ". Nothing was called."); return 3; }
   const supplied = env.WHATSAPP_BUSINESS_ACCOUNT_ID;
-  if (!/^\d{5,30}$/.test(env.WHATSAPP_PHONE_NUMBER_ID) || (supplied && !/^\d{5,30}$/.test(supplied))) { log("NOT RUN - ids must be numeric."); return 2; }
+  const waAccount = env.WHATSAPP_ACCOUNT_ID;
+  const numeric = (x) => /^\d{5,30}$/.test(x);
+  if (!numeric(env.WHATSAPP_PHONE_NUMBER_ID) || (supplied && !numeric(supplied)) || (waAccount && !numeric(waAccount))) { log("NOT RUN - ids must be numeric."); return 2; }
+  const token = env.WHATSAPP_ACCESS_TOKEN;
   const ALLOWED = [
-    /^\d+\?fields=[a-z_,]+$/,                                   // the sender's own fields
-    /^\d+\?metadata=1&fields=id$/,                              // what TYPE of node is this id
-    /^\d+\/phone_numbers\?fields=id$/,                          // which senders a WABA owns
-    /^\d+\/message_templates\?name=aladdin_otp&fields=[a-z_,]+$/, // WABA nodes only
+    /^\d+\?fields=[a-z_,]+$/,                                                          // the sender's own fields
+    /^\d+\/phone_numbers\?fields=id&limit=\d{1,3}(&after=[A-Za-z0-9=_-]{1,200})?$/,    // senders an account lists (paged)
+    /^\d+\/message_templates\?name=aladdin_otp&fields=[a-z_,]+$/,                      // templates of a messaging account
   ];
-  const get = async (path) => {
+  const call = async (method, path, body) => {
+    const r = await fetchImpl(`${GRAPH}/${VERSION}/${path}`, {
+      method,
+      headers: { authorization: `Bearer ${token}`, ...(body ? { "content-type": "application/x-www-form-urlencoded" } : {}) },
+      ...(body ? { body } : {}),
+    });
+    const data = await r.json().catch(() => null);
+    return { status: r.status, data, error: r.status === 200 ? null : sanitizeError(data, token) };
+  };
+  const get = (path) => {
     if (!ALLOWED.some((re) => re.test(path))) throw new Error("REFUSED: not an allowed read-only call");
-    const r = await fetchImpl(`${GRAPH}/${VERSION}/${path}`, { method: "GET", headers: { authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}` } });
-    return { status: r.status, data: await r.json().catch(() => null) };
+    return call("GET", path);
   };
   // Opt-in only. The token to inspect goes in the POST BODY, never in the URL.
-  const introspect = async () => {
-    const r = await fetchImpl(`${GRAPH}/${VERSION}/debug_token`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`, "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ input_token: env.WHATSAPP_ACCESS_TOKEN }).toString(),
-    });
-    return { status: r.status, data: await r.json().catch(() => null) };
-  };
+  const introspect = () => call("POST", "debug_token", new URLSearchParams({ input_token: token }).toString());
 
-  const sender = await get(`${env.WHATSAPP_PHONE_NUMBER_ID}?fields=display_phone_number,status,account_mode,code_verification_status,name_status,quality_rating`);
-  const senderNode = await get(`${env.WHATSAPP_PHONE_NUMBER_ID}?metadata=1&fields=id`);
-  const senderType = senderNode.status === 200 ? String(senderNode.data?.metadata?.type ?? "unknown") : `http_${senderNode.status}`;
+  const sender = await get(`${env.WHATSAPP_PHONE_NUMBER_ID}?fields=id,display_phone_number,verified_name,status,account_mode,code_verification_status,name_status,quality_rating`);
+  const senderEval = sender.status === 200 ? evaluateSender(sender.data, env.WHATSAPP_PHONE_NUMBER_ID) : { ok: false, http: sender.status, error: sender.error };
   const senderId = {
-    is_phone_number_node: senderType === "WhatsAppBusinessPhoneNumber",
-    node_type: senderType,
     id_suffix: tail4(env.WHATSAPP_PHONE_NUMBER_ID),
     repo_config_suffix: pinned ? tail4(pinned) : null,
     matches_repo_config: pinned === env.WHATSAPP_PHONE_NUMBER_ID,
+    echoed_id_matches: sender.status === 200 && String(sender.data?.id) === env.WHATSAPP_PHONE_NUMBER_ID,
   };
 
-  // ---- resolve and validate the WABA ----
+  // ---- candidate accounts: supplied messaging account / WABA, the optional WhatsApp Account, and (opt-in) the token's own grants ----
   const debug = env.META_PREFLIGHT_RESOLVE_FROM_TOKEN === "1" ? await introspect().catch(() => ({ status: 0, data: null })) : { status: 0, data: null };
   const candidates = candidateIds(supplied, debug.status === 200 ? debug.data : null);
-  const checked = [];
-  let wabaId = null;
-  for (const id of candidates) {
-    const node = await get(`${id}?metadata=1&fields=id`);
-    const type = node.status === 200 ? String(node.data?.metadata?.type ?? "unknown") : `http_${node.status}`;
-    const entry = { id_suffix: tail4(id), type, is_waba: type === WABA_TYPE, owns_sender: false, supplied: id === supplied };
-    if (entry.is_waba) {
-      const owned = await get(`${id}/phone_numbers?fields=id`);
-      entry.owns_sender = owned.status === 200 && (owned.data?.data ?? []).some((p) => String(p?.id) === env.WHATSAPP_PHONE_NUMBER_ID);
-      if (entry.owns_sender && !wabaId) wabaId = id;
+  if (waAccount && !candidates.includes(waAccount)) candidates.push(waAccount);
+
+  /** Does this account list the sender? Pages through /phone_numbers (max 5 pages of 100). */
+  const listsSender = async (id) => {
+    let path = `${id}/phone_numbers?fields=id&limit=100`;
+    for (let page = 0; page < 5; page++) {
+      const res = await get(path);
+      if (res.status !== 200) return { owns: false, http: res.status, error: res.error };
+      if ((res.data?.data ?? []).some((x) => String(x?.id) === env.WHATSAPP_PHONE_NUMBER_ID)) return { owns: true };
+      const after = res.data?.paging?.cursors?.after;
+      if (!res.data?.paging?.next || !after || !/^[A-Za-z0-9=_-]{1,200}$/.test(String(after))) break;
+      path = `${id}/phone_numbers?fields=id&limit=100&after=${after}`;
     }
-    checked.push(entry);
+    return { owns: false };
+  };
+
+  const checked = []; let wabaId = null; let tpl = null;
+  for (const id of candidates) {
+    const t = await get(`${id}/message_templates?name=aladdin_otp&fields=name,language,status,category,components`);
+    const a = await listsSender(id);
+    checked.push({
+      id_suffix: tail4(id), supplied: id === supplied,
+      template_lookup_ok: t.status === 200, template_lookup_error: t.error,
+      lists_sender: a.owns, phone_numbers_http: a.http ?? 200, phone_numbers_error: a.error ?? null,
+    });
+    if (t.status === 200 && a.owns && !wabaId) { wabaId = id; tpl = t; }
   }
   const waba = {
     resolved: Boolean(wabaId),
     id_suffix: wabaId ? tail4(wabaId) : null,
-    source: wabaId ? (wabaId === supplied ? "supplied_id" : "token_granted_target") : null,
+    source: wabaId ? (wabaId === supplied ? "supplied_id" : wabaId === waAccount ? "whatsapp_account_id" : "token_granted_target") : null,
     candidates_checked: checked,
-    supplied_id_was_waba: supplied ? checked.find((c) => c.supplied)?.is_waba ?? false : null,
-    hint: wabaId ? null : "No WhatsApp Business Account that owns this sender could be resolved. Set WHATSAPP_BUSINESS_ACCOUNT_ID to the WABA id (Business settings > Accounts > WhatsApp accounts). The token needs whatsapp_business_management access to the WABA that owns the sender (Business settings > System users > assign the WABA asset).",
+    hint: wabaId ? null : candidates.length
+      ? "No supplied account both serves the aladdin_otp template lookup AND lists this sender. See each candidate's sanitized Graph error. Under Meta's 2026 account model the template (Messaging Account) and the number (WhatsApp Account) may sit under different ids: supply WHATSAPP_BUSINESS_ACCOUNT_ID = the messaging account / WABA id and, if it does not list the number, WHATSAPP_ACCOUNT_ID = the account that does. The token needs whatsapp_business_management on them."
+      : "Set WHATSAPP_BUSINESS_ACCOUNT_ID to the WABA / messaging account id (Business settings > Accounts > WhatsApp accounts).",
   };
-
-  const tpl = wabaId
-    ? await get(`${wabaId}/message_templates?name=aladdin_otp&fields=name,language,status,category,components`)
-    : { status: 0, data: null };
   const report = {
     read_only: true,
-    sender: sender.status === 200 ? evaluateSender(sender.data) : { ok: false, http: sender.status },
+    sender: senderEval,
     sender_id: senderId,
     waba,
-    template: wabaId ? (tpl.status === 200 ? evaluateTemplate(tpl.data) : { ok: false, http: tpl.status }) : { ok: false, skipped: "no verified WABA" },
+    template: wabaId ? evaluateTemplate(tpl.data) : { ok: false, skipped: "no verified account" },
   };
-  report.ready_for_pilot = report.sender.ok === true && senderId.is_phone_number_node && senderId.matches_repo_config && waba.resolved && report.template.ok === true;
+  report.ready_for_pilot = report.sender.ok === true && senderId.matches_repo_config && senderId.echoed_id_matches && waba.resolved && report.template.ok === true;
   log(JSON.stringify(report, null, 2));
   return report.ready_for_pilot ? 0 : 1;
 }
