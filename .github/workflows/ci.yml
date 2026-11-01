@@ -177,6 +177,8 @@ jobs:
         run: bash ops/backups/plan-test.sh
       - name: Retention contract (rules, constants, buckets, 59-day window)
         run: bash ops/backups/retention-test.sh
+      - name: Restore stack pin and strict Auth/Storage guard
+        run: bash ops/backups/restore-pin-test.sh
       - name: The built backup repo holds the whole kit
         run: bash ops/backups/build-repo-test.sh
       - name: Media record validator (fail-closed rules)

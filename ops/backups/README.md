@@ -201,6 +201,10 @@ Rollback: set `ACCEPTANCE_BACKUP_SCHEDULE=off`. Nothing else runs on its own.
 - If the lock or lifecycle rules have to go, `wrangler r2 bucket lock set` and `lifecycle set` with an empty rule list remove them. Objects that are already locked stay locked until their own expiry.
 - Revoke the two tokens to cut all access.
 
+### Restore-test stack version
+
+`restore-test.sh` starts a throwaway local Supabase stack and refuses to restore (exit 2, "STACK MISMATCH") unless its Auth/Storage columns equal the backed-up project's. The stack comes from the pinned CLI (`RESTORE_SUPABASE_CLI_VERSION`, now 2.119.0: gotrue v2.197.0, storage-api v1.79.28, postgres 17.11.0.002), which reproduces Acceptance's managed schema (SCIM, MFA recovery codes, one-time-token expiry, storage versioning and bucket lifecycle). 2.110.0 (gotrue v2.193.0, storage-api v1.66.4) did not. When Supabase upgrades the hosted Auth/Storage, the guard fails again by design: bump the pin to the CLI whose `pkg/config/templates/Dockerfile` images match, never weaken the guard. `restore-pin-test.sh` pins both.
+
 ## Restoring for real
 
 The restore test is a rehearsal of exactly this, run every month.

@@ -22,7 +22,13 @@ REPO_ROOT="${REPO_ROOT:-$HERE/../..}"; [ -s "$REPO_ROOT/supabase/config.toml" ] 
 for f in schema-fingerprint.sql rowcounts.sql auth-storage-columns.sql local-only-roles-cleanup.sql local-default-privileges-reset.sql; do
   [ -s "$KIT/$f" ] || die "missing kit file $f"; done
 [ -s "$REPO_ROOT/supabase/config.toml" ] || die "no supabase/config.toml under $REPO_ROOT"
-read -r -a SB <<< "${SUPABASE_CLI:-npx --yes supabase@2.110.0}"
+# The throwaway stack must reproduce the hosted project's managed Auth/Storage schema EXACTLY (step 3 refuses otherwise).
+# Pinned to the CLI whose images match Acceptance: gotrue v2.197.0 (auth migrations through 20260831180000: SCIM, MFA
+# recovery codes, one-time-token expiry) and storage-api v1.79.28 (storage migrations through 0073: object versioning,
+# bucket lifecycle), postgres 17.11.0.002. 2.110.0 ran gotrue v2.193.0 / storage-api v1.66.4 and could not. Bump this
+# only together with the hosted project's Auth/Storage versions; db-backup.sh keeps its own dump-tool pin.
+RESTORE_SUPABASE_CLI_VERSION=2.119.0
+read -r -a SB <<< "${SUPABASE_CLI:-npx --yes supabase@$RESTORE_SUPABASE_CLI_VERSION}"
 sb() { "${SB[@]}" "$@"; }
 umask 077
 OUT="${OUT:-$(mktemp -d)/restore-test}"; mkdir -p "$OUT"; W="$OUT/work"; mkdir -p "$W"
@@ -49,7 +55,7 @@ pick_snapshot() {
 }
 if [ -n "${BACKUP_KEY:-}" ]; then KEY="$BACKUP_KEY"; else pick_snapshot; fi
 case "$KEY" in db/"$BACKUP_LABEL"/*.tar.age) ;; "") die "no daily backup with a complete media record found";; *) die "BACKUP_KEY must be a $BACKUP_LABEL .tar.age backup";; esac
-log "restore test of $KEY"
+log "restore test of $KEY (local stack: ${SUPABASE_CLI:-supabase CLI $RESTORE_SUPABASE_CLI_VERSION})"
 s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "$KEY" "$W/b.tar.age" > "$W/head.json"
 s3 s3api get-object --bucket "$BACKUP_BUCKET" --key "${KEY%.tar.age}.json" "$W/manifest.json" >/dev/null
 SUM="$(sha256 "$W/b.tar.age")"
