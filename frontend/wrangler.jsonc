@@ -51,6 +51,34 @@
         "WHATSAPP_OTP_TEMPLATE": "aladdin_login_code"
       }
     },
+    // Isolated Admin View-As review Worker (Registration keeps `preview` untouched). Same Acceptance Supabase project,
+    // its OWN Worker name, secrets, Redis key prefix and origin. It is deployed DARK: no workers.dev route and no preview
+    // URLs until Cloudflare Access protects the Worker and the owner enables the route (docs/admin/ADMIN_VIEW_AS_PREVIEW_DEPLOYMENT_PLAN.md).
+    // Hosted media delivery is OFF (R2_STORAGE_ENABLED=false): Admin View-As shows placeholders until Stage 4 is approved.
+    "viewas-preview": {
+      "name": "aladdin-frontend-viewas-preview",
+      "workers_dev": false,
+      "preview_urls": false,
+      "services": [
+        { "binding": "WORKER_SELF_REFERENCE", "service": "aladdin-frontend-viewas-preview" },
+        { "binding": "BACKEND", "service": "aladdin-backend-preview" }
+      ],
+      "images": { "binding": "IMAGES" },
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
+      "vars": {
+        "NEXT_PUBLIC_APP_ENV": "staging",
+        "ADMIN_VIEW_AS_ENABLED": "true",
+        // Redis stays OFF here: the owner accepted it for the `preview` Worker only, and off means this Worker can never
+        // share a cache key (or the Upstash instance) with Registration's preview.
+        "REDIS_CACHE_ENABLED": "false",
+        "R2_STORAGE_ENABLED": "false",
+        "R2_PRODUCTION_WRITES_APPROVED": "false",
+        "R2_PRIVATE_BUCKET": "aladdin-r2-acceptance-20261011-private",
+        "TURNSTILE_ALLOWED_HOSTNAMES": "aladdin-frontend-viewas-preview.bstalent9.workers.dev",
+        "EMAIL_FROM": "Aladdin <no-reply@aladdindecore.com>",
+        "APP_PUBLIC_ORIGIN": "https://aladdin-frontend-viewas-preview.bstalent9.workers.dev"
+      }
+    },
     // Production: deployed only after the owner approves the cutover. Routes
     // (aladdindecore.com) are added at cutover, not before. Deployed by the manual
     // `Cloudflare production` workflow, backend first: the BACKEND service must exist.
