@@ -51,7 +51,7 @@ psql "$BACKUP_DB_URL" -X -At -F $'\t' -v ON_ERROR_STOP=1 -c 'set session charact
 s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "$P/objects/" --query 'Contents[].Key' --output text \
   | tr '\t' '\n' | grep -v '^None$' | sort > "$WORK/have.txt" || true
 
-COPIED=0; BYTES=0; FAILED=0
+COPIED=0; BYTES=0; FAILED=0; FAIL_CLASSES=""
 while IFS=$'\t' read -r sha size key; do
   [ -n "$sha" ] || continue
   case "$sha" in *[!0-9a-f]*) die "unexpected sha256 in the media records";; esac
@@ -59,8 +59,24 @@ while IFS=$'\t' read -r sha size key; do
   case "$size" in ''|*[!0-9]*) die "unexpected size in the media records";; esac
   ck="$(r2_copy_key "$sha" "$GEN")"
   grep -qxF "$ck" "$WORK/have.txt" && continue
-  if ! src s3api get-object --bucket "$R2_SOURCE_BUCKET" --key "$key" "$WORK/f" >/dev/null 2>&1; then
-    FAILED=$((FAILED+1)); log "could not read an R2 original (sha256 ${sha:0:12})"; continue
+  # Read the original. Only a transient failure is retried (twice); a 404 or a 403 is final. The error text is
+  # classified and never logged (it names the bucket and object, which hold user ids).
+  tries=0; cls=""
+  while :; do
+    if src s3api get-object --bucket "$R2_SOURCE_BUCKET" --key "$key" "$WORK/f" >/dev/null 2> "$WORK/err"; then cls=""; break; fi
+    cls="$(classify_s3_error "$WORK/err")"; tries=$((tries+1))
+    { [ "$cls" = transient ] || [ "$cls" = other ]; } && [ "$tries" -lt 3 ] && { sleep "${R2_READ_RETRY_SLEEP:-2}"; continue; }
+    break
+  done
+  if [ -n "$cls" ]; then
+    FAILED=$((FAILED+1)); FAIL_CLASSES="$FAIL_CLASSES $cls"
+    case "$cls" in
+      not_found) why="the object does not exist in the media bucket (404)";;
+      access_denied) why="the read token is refused (403): check the token's bucket and permission";;
+      transient) why="a network or R2 error persisted after $tries attempts";;
+      *) why="an unclassified read error after $tries attempts";;
+    esac
+    log "could not read an R2 original (sha256 ${sha:0:12}): $cls: $why"; rm -f "$WORK/f" "$WORK/err"; continue
   fi
   if [ "$(wc -c < "$WORK/f" | tr -d ' ')" != "$size" ] || [ "$(sha256 "$WORK/f")" != "$sha" ]; then
     FAILED=$((FAILED+1)); log "an R2 original differs from the size or sha256 the database recorded (${sha:0:12})"; rm -f "$WORK/f"; continue
@@ -88,5 +104,10 @@ age_encrypt "$WORK/inventory.tsv" "$WORK/inventory.tsv.age"
 # Inventories first, records last (see media-backup.sh): an interrupted run is superseded by the next one.
 for prefix in $PREFIXES; do put_once "$WORK/inventory.tsv.age" "$prefix/$NAME.r2media.tsv.age" application/octet-stream; done
 for prefix in $PREFIXES; do put_once "$WORK/r2media.json" "$prefix/$NAME.r2media.json" application/json; done
+if [ "$FAILED" -gt 0 ]; then
+  for c in not_found access_denied transient other; do
+    n="$(printf '%s\n' $FAIL_CLASSES | grep -cx "$c" || true)"; [ "$n" = 0 ] || log "read failures: $n $c"
+  done
+fi
 log "r2 media: snapshot $TOTAL originals, $((TOTAL-MISSING)) backed up, $MISSING missing; $COPIED new copied ($BYTES bytes), $FAILED failed"
 [ "$COMPLETE" = true ] || die "the R2 media backup of $NAME is incomplete (marked so in its .r2media.json); the next scheduled run takes a new snapshot"

@@ -158,6 +158,16 @@ verify_stored() {
   rm -f "$back"
 }
 
+# Classifies the stderr of a failed S3 call WITHOUT ever printing it (it holds bucket and object names, which carry
+# user and organization ids): not_found | access_denied | transient | other.
+classify_s3_error() {
+  local f="$1"
+  if grep -qiE 'NoSuchKey|\(404\)|Not Found|does not exist' "$f"; then echo not_found
+  elif grep -qiE 'AccessDenied|\(403\)|Forbidden|InvalidAccessKeyId|SignatureDoesNotMatch|Unauthorized' "$f"; then echo access_denied
+  elif grep -qiE 'timed? ?out|Could not connect|Connection (reset|closed|aborted)|SlowDown|ServiceUnavailable|InternalError|\(5[0-9][0-9]\)|Temporary|EOF' "$f"; then echo transient
+  else echo other; fi
+}
+
 # Newest object key under a prefix ("" when none), by LastModified.
 newest_key() {
   s3 s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "$1" \

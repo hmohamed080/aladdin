@@ -196,6 +196,9 @@ jobs:
       - name: Freshness alarm fails closed
         env: { AWS_ACCESS_KEY_ID: testkey, AWS_SECRET_ACCESS_KEY: testsecret }
         run: bash ops/backups/freshness-test.sh
+      - name: R2 read failures are classified, retried only if transient, and never leak names
+        env: { AWS_ACCESS_KEY_ID: testkey, AWS_SECRET_ACCESS_KEY: testsecret }
+        run: bash ops/backups/r2-read-diagnostics-test.sh
       - name: Restore verification inside and outside the guaranteed window
         env: { AWS_ACCESS_KEY_ID: testkey, AWS_SECRET_ACCESS_KEY: testsecret }
         run: bash ops/backups/media-window-test.sh
