@@ -18,7 +18,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(41);
+select plan(47);
 
 \set revA   '55555555-5555-4555-8555-555555555555'
 \set revB   '22222222-2222-4222-8222-222222222222'
@@ -111,6 +111,10 @@ select throws_ok($$ select public.apply_account_upgrade(pg_temp.vid('44444444-44
 select pg_temp.act_as(:'supp');
 select throws_ok($$ select public.apply_account_upgrade(pg_temp.vid('44444444-4444-4444-8444-444444444444')) $$, '42501', null,
   'a Support user cannot apply an approved upgrade');
+select pg_temp.act_as(:'revB');
+select throws_ok($$ select public.apply_account_upgrade(pg_temp.vid('44444444-4444-4444-8444-444444444444')) $$, '42501',
+  'only the assigned reviewer may confirm approval',
+  'a non-assigned administrator cannot apply a request another reviewer decided (direct RPC)');
 select pg_temp.as_dba();
 select is((select primary_account_type::text from public.users where id = :'appl'), 'end_consumer',
   'none of the refused calls changed the account type');
@@ -148,6 +152,17 @@ select pg_temp.act_as(:'revB');
 select throws_ok($$ select public.review_approve(pg_temp.vid('22222222-2222-4222-8222-222222222222')) $$, '42501',
   'a reviewer may not approve their own verification',
   'a staff member cannot confirm (retry) their OWN approved request, despite holding users.verify');
+select throws_ok($$ select public.apply_account_upgrade(pg_temp.vid('22222222-2222-4222-8222-222222222222')) $$, '42501',
+  'a reviewer may not approve their own verification',
+  'a staff member cannot APPLY their own approved request via the direct RPC');
+select pg_temp.act_as(:'revA');
+select lives_ok($$ select public.apply_account_upgrade(pg_temp.vid('22222222-2222-4222-8222-222222222222')) $$,
+  'the assigned reviewer applies it');
+select lives_ok($$ select public.apply_account_upgrade(pg_temp.vid('22222222-2222-4222-8222-222222222222')) $$,
+  'and may repeat it (idempotent recovery)');
+select pg_temp.act_as(:'revB');
+select throws_ok($$ select public.apply_account_upgrade(pg_temp.vid('22222222-2222-4222-8222-222222222222')) $$, '42501', null,
+  'even once applied, the subject is still refused (no state probing)');
 select pg_temp.as_dba();
 
 -- ===========================================================================
@@ -177,6 +192,9 @@ select throws_ok($$ select public.review_reject(pg_temp.vid('44444444-4444-4444-
 select pg_temp.as_dba();
 select is((select primary_account_type::text from public.users where id = :'appl2'), 'engineer',
   'a rejection never changes the applicant''s account type');
+
+select is(pg_get_function_arguments('public.review_approve(uuid,boolean)'::regprocedure), 'p_verification_id uuid, p_grant_public_listing boolean DEFAULT false',
+  'an omitted listing argument never publishes (default is false)');
 
 select * from finish();
 rollback;

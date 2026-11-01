@@ -18,22 +18,20 @@ const show = (verificationType: string) =>
 afterEach(cleanup);
 
 describe("UserVerificationControls", () => {
-  it("makes public listing an explicit, visible choice for a professional approval (ticked = the queue's default)", () => {
+  it("makes public listing an explicit, visible choice for a professional approval (unticked by default: approving never publishes on its own)", () => {
     show("professional");
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
     const box = screen.getByRole("checkbox", { name: /list this profile publicly/i }) as HTMLInputElement;
-    expect(box.checked).toBe(true);
-    expect(box.name).toBe("grantListing");
-    expect(document.querySelector('input[name="listingChoice"]')).not.toBeNull();
-    fireEvent.click(box);
     expect(box.checked).toBe(false);
+    expect(box.name).toBe("grantListing");
+    fireEvent.click(box);
+    expect(box.checked).toBe(true);
   });
 
   it("offers no listing choice for an identity verification", () => {
     show("identity");
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
     expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(document.querySelector('input[name="listingChoice"]')).toBeNull();
   });
 
   it("requires a reason to reject", () => {
