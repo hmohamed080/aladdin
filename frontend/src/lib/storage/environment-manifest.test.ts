@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { parseJsonc } from "../../../scripts/check-cloudflare-production.mjs";
 import { ENVIRONMENT_MANIFEST } from "./environment-manifest";
 
-const wrangler = parseJsonc(readFileSync(join(__dirname, "..", "..", "..", "wrangler.jsonc"), "utf8")) as { env: Record<"preview" | "production", { vars: Record<string, string> }> };
+const wrangler = parseJsonc(readFileSync(join(__dirname, "..", "..", "..", "wrangler.jsonc"), "utf8")) as unknown as { env: Record<"preview" | "production", { vars: Record<string, string> }> };
 
 describe("committed Wrangler config agrees with the environment manifest", () => {
   it("binds the Preview Worker to exactly the approved Acceptance bucket", () => {
