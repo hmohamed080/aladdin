@@ -209,6 +209,8 @@ jobs:
       - name: Retired R2 originals - backup, replacement race and restore verification (S3 stand-in + PostgreSQL)
         env: { AWS_ACCESS_KEY_ID: testkey, AWS_SECRET_ACCESS_KEY: testsecret, REQUIRE_PG: "1" }
         run: bash ops/backups/r2-retired-media-test.sh
+      - name: Request photos and verification documents are always required in a media backup
+        run: python3 ops/backups/r2-new-namespaces-test.py
       - name: R2 read failures are classified, retried only if transient, and never leak names
         env: { AWS_ACCESS_KEY_ID: testkey, AWS_SECRET_ACCESS_KEY: testsecret }
         run: bash ops/backups/r2-read-diagnostics-test.sh
