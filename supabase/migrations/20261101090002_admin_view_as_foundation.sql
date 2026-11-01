@@ -77,6 +77,25 @@ revoke all on function app.view_as_kind_matches(text, uuid) from public, anon, a
 -- ---------------------------------------------------------------------------
 -- 5. The gate. Evaluated on every call; any failure is the SAME generic error (no existence oracle).
 -- ---------------------------------------------------------------------------
+-- Rank used to PROTECT a subject. `app.admin_rank_of` reports 0 for a suspended / deactivated account (such a user
+-- holds no live authority), which would let an Administrator open a view of a suspended peer or senior admin. For the
+-- protection check we therefore ignore the account status: any active platform assignment still counts.
+create or replace function app.view_as_protected_rank(p_user_id uuid)
+returns int
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(max(r.rank), 0)
+  from public.admin_role_assignments a
+  join public.admin_roles r on r.id = a.role_id
+  where a.user_id = p_user_id
+    and a.is_active and a.scope_type = 'platform'
+    and r.status = 'active';
+$$;
+revoke all on function app.view_as_protected_rank(uuid) from public, anon, authenticated, service_role;
+
 create or replace function app.view_as_subject_ok(p_subject uuid, p_kind text)
 returns boolean
 language plpgsql
@@ -94,8 +113,8 @@ begin
   if not exists (select 1 from public.users u where u.id = p_subject) then return false; end if;
   if not app.view_as_kind_matches(p_kind, p_subject) then return false; end if;
   v_rank := app.admin_rank_of(v_actor);
-  -- Never Admin Staff at or above the actor's rank, unless the actor is a Super Admin (rank >= 100).
-  if v_rank < 100 and app.admin_rank_of(p_subject) >= v_rank then return false; end if;
+  -- Never Admin Staff at or above the actor's rank (even if suspended), unless the actor is a Super Admin (rank >= 100).
+  if v_rank < 100 and app.view_as_protected_rank(p_subject) >= v_rank then return false; end if;
   return true;                                                            -- suspended / deactivated / unverified are viewable
 end;
 $$;

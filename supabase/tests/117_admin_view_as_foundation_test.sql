@@ -14,7 +14,7 @@
 create extension if not exists pgtap;
 
 begin;
-select plan(50);
+select plan(52);
 
 \set adminA   '55555555-5555-4555-8555-555555555555'
 \set super1   '11111111-1111-4111-8111-111111111111'
@@ -88,6 +88,16 @@ select pg_temp.act_as(:'super1');
 select lives_ok(format($$select public.admin_view_as_begin(%L)$$, :'craft2'), 'a Super Admin may view an Administrator');
 select pg_temp.act_as(:'craft2');
 select throws_ok(format($$select public.admin_view_as_begin(%L)$$, :'craft2'), '42501', 'not permitted', 'and no one may view themselves, even an Administrator');
+-- A SUSPENDED peer admin is still protected (admin_rank_of reports 0 for a suspended account; the gate must not).
+select pg_temp.as_dba();
+update public.users set status = 'suspended' where id = :'craft2';
+select pg_temp.act_as(:'adminA');
+select throws_ok(format($$select public.admin_view_as_begin(%L)$$, :'craft2'), '42501', 'not permitted',
+  'an Administrator cannot view a SUSPENDED Administrator either (rank protection ignores account status)');
+select pg_temp.act_as(:'super1');
+select lives_ok(format($$select public.admin_view_as_begin(%L)$$, :'craft2'), 'a Super Admin still may');
+select pg_temp.as_dba();
+update public.users set status = 'active' where id = :'craft2';
 select pg_temp.act_as(:'adminA');
 select lives_ok(format($$select public.admin_view_as_begin(%L)$$, :'craftSus'), 'a SUSPENDED craftsman is viewable');
 
