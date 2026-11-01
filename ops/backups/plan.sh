@@ -3,10 +3,12 @@
 # offline (plan-test.sh). Prints one JSON array for the job matrix, or fails with the reason.
 #
 #   plan.sh backup      ["acceptance","production"] (subset)
+#   plan.sh restore     true | false: whether this run of the Monthly restore test may start (see below)
 #   plan.sh freshness   [{"label":"acceptance","max_age_hours":26}, ...]  (scheduled: per switches; manual: Acceptance always)
 #
 # Environment (repository variables in aladdin-backups, set by the owner):
 #   EVENT                       schedule | workflow_dispatch
+#   PRODUCTION_RESTORE_SCHEDULE_ENABLED  "true" only when the owner separately approves the SCHEDULED monthly Production restore
 #   INPUT_LABEL, INPUT_CONFIRM  manual runs: the chosen project, and for Production the typed confirmation
 #   PRODUCTION_BACKUP_ENABLED   "true" only after the owner's Production activation GO
 #   ACCEPTANCE_BACKUP_SCHEDULE  off (default) | daily (the Acceptance trial) | weekly (Sundays, Cairo)
@@ -20,12 +22,24 @@
 # takes a new snapshot when none is. A late GitHub start up to 03:59 Cairo still counts.
 set -euo pipefail
 PRODUCTION_CONFIRMATION="back up production"
-mode="${1:?usage: plan.sh backup|freshness}"
+mode="${1:?usage: plan.sh backup|freshness|restore}"
 now="${NOW:-$(date -u +%FT%TZ)}"
 read -r hour dow <<< "$(TZ=Africa/Cairo date -d "$now" +'%H %u')"
 schedule="${ACCEPTANCE_BACKUP_SCHEDULE:-off}"
 case "$schedule" in off|daily|weekly) ;; *) echo "ACCEPTANCE_BACKUP_SCHEDULE must be off, daily or weekly" >&2; exit 1;; esac
 production=false; [ "${PRODUCTION_BACKUP_ENABLED:-}" = true ] && production=true
+
+# Monthly restore test. A manual run is always allowed (it restores what it is asked to). A SCHEDULED run restores
+# Production, so it needs BOTH Production backups switched on AND its own switch: enabling backups alone never
+# starts a scheduled restore, whose environment and keys may not exist yet.
+if [ "$mode" = restore ]; then
+  case "${EVENT:-}" in
+    workflow_dispatch) echo true ;;
+    schedule) if [ "$production" = true ] && [ "${PRODUCTION_RESTORE_SCHEDULE_ENABLED:-}" = true ]; then echo true; else echo false; fi ;;
+    *) echo "unknown event: ${EVENT:-}" >&2; exit 1 ;;
+  esac
+  exit 0
+fi
 
 labels=()
 case "$mode:${EVENT:-}" in

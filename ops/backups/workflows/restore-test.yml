@@ -18,9 +18,27 @@ on:
 permissions:
   contents: read
 jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.plan.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          PRODUCTION_BACKUP_ENABLED: ${{ vars.PRODUCTION_BACKUP_ENABLED }}
+          PRODUCTION_RESTORE_SCHEDULE_ENABLED: ${{ vars.PRODUCTION_RESTORE_SCHEDULE_ENABLED }}
+        run: |
+          run="$(bash backup/plan.sh restore)"
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [ "$run" != true ]; then echo "NO RESTORE TEST RAN: the scheduled Production restore needs PRODUCTION_BACKUP_ENABLED=true and PRODUCTION_RESTORE_SCHEDULE_ENABLED=true." | tee -a "$GITHUB_STEP_SUMMARY"; fi
+
   restore:
-    # Scheduled runs restore Production only once it is activated; a manual run restores what it is asked to.
-    if: github.event_name == 'workflow_dispatch' || vars.PRODUCTION_BACKUP_ENABLED == 'true'
+    needs: plan
+    # A manual run restores what it is asked to. A scheduled run restores Production only when plan.sh says so (both switches).
+    if: needs.plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     environment: restore-test-${{ inputs.label || 'production' }}

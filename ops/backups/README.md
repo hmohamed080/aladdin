@@ -21,9 +21,10 @@ Nothing in these workflows can write to a database or delete a backup. Only the 
 
 ### Which projects a run covers
 
-`plan.sh` decides; `plan-test.sh` tests it offline (39 checks, also run in the main repo's CI).
+`plan.sh` decides; `plan-test.sh` tests it offline (86 checks, also run in the main repo's CI).
 
 - **Production** is backed up only when the repository variable `PRODUCTION_BACKUP_ENABLED` is exactly `true`. A manual Production run also needs the typed confirmation `back up production`. `db-backup.sh` and `media-backup.sh` refuse a Production label without the same variable, so the gate holds even if a workflow is edited.
+- **Monthly restore test** (`plan.sh restore`): a manual run is always allowed and unchanged. A SCHEDULED run restores Production, so it needs BOTH `PRODUCTION_BACKUP_ENABLED=true` AND its own repository variable `PRODUCTION_RESTORE_SCHEDULE_ENABLED=true` (default off, exact value `true`). Enabling Production backups alone never starts it. Set the second switch only after a manual Production restore has passed and the `restore-test-production` environment and its keys exist. When it is off the run's summary says "NO RESTORE TEST RAN". The restore job itself (environment `restore-test-<label>`, read-only permission, the schema and integrity guards) is unchanged.
 - **Acceptance** follows `ACCEPTANCE_BACKUP_SCHEDULE`:
   - `off` (default): no scheduled runs and no freshness check;
   - `daily`: the trial; freshness allows 26 h;
@@ -181,6 +182,8 @@ Part A is read-only preparation and changes nothing hosted. Part B changes hoste
    - Then let the schedule run nightly. Check that each night's daily backup exists and that freshness stays green.
 
 ### C. Production (only after the separate Production GO)
+
+**Known Production blockers (2026-11-01):** (a) owner-verified in Cloudflare: `aladdin-production-db-backups` has only the default 7-day multipart-abort lifecycle rule and **no Object Lock rules**; `r2/production/lifecycle.json` and `lock.json` are not applied yet. (b) A database-only backup is **not** complete Production protection: Production media is still in Supabase Storage, so before activation either `R2_MEDIA_BACKUP=1` (with R2 media live) or the legacy `LEGACY_MEDIA_BACKUP=1` backup of the Supabase Storage files must be on, and freshness must be checking it (`freshness.sh` only checks media kinds whose switch is on, so with both off a database-only backup would pass freshness).
 
 9. Create the three Production environments from the table above (`SUPABASE_URL` = `https://kkpkgjrweysgvhvkhzun.supabase.co`, bucket `aladdin-production-db-backups`), apply the Production lock and lifecycle rules, then set `PRODUCTION_BACKUP_ENABLED=true`.
 10. Run *Daily backup* with label `production` and the confirmation `back up production`.
