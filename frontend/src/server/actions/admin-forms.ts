@@ -85,11 +85,11 @@ export async function startReviewAction(_p: ReviewFormState, fd: FormData): Prom
  *
  * Public listing is only meaningful for a professional upgrade (the database
  * constraint `ck_verifications_listing_only_professional` rejects it on any other
- * subject), so it is requested only there. It is REVIEWER-SET (ADR-0007 D14): the Users dialogs show an explicit
- * "list publicly" choice (`listingChoice=1`, `grantListing=on` only when ticked); a form that offers no choice (the
- * Verifications queue) keeps its historical behaviour of listing a professional approval. Listing also publishes the person's
- * public portfolio media, so it is never inferred from anything else. It cannot be changed by a retry: the flag is
- * recorded once, when the decision is made.
+ * subject), so it is requested only there. It is REVIEWER-SET (ADR-0007 D14) and OPT-IN: every approval form (the
+ * Users dialogs and the Verifications queue) shows an explicit "list publicly" checkbox, unticked by default, and only
+ * `grantListing=on` lists. Listing also publishes the person's public portfolio media, so a missing field, a forged
+ * request or a non-professional subject never lists. (Historically the queue listed professionals by default.) It
+ * cannot be changed by a retry: the flag is recorded once, when the decision is made.
  */
 export async function approveVerificationAction(
   _p: ReviewFormState,
@@ -102,9 +102,8 @@ export async function approveVerificationAction(
   const target = await loadDecisionTarget(supabase, id);
   if (!target) return { ok: false, code: "admin.review.error.state" };
   const isProfessional = target.verificationType === "professional";
-  // `listingChoice` marks a form that SHOWED the choice: then only a ticked box (`grantListing=on`) lists. A form
-  // that offers no choice (the Verifications queue) keeps the historical default for a professional approval.
-  const grantListing = isProfessional && (str(fd, "listingChoice") ? str(fd, "grantListing") === "on" : true);
+  // Opt-in: only an explicitly ticked box lists, and only a professional upgrade can be listed.
+  const grantListing = isProfessional && str(fd, "grantListing") === "on";
 
   const startErr = await ensureStarted(supabase, id, target.status);
   if (startErr) return { ok: false, code: startErr };

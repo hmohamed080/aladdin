@@ -43,37 +43,37 @@ beforeEach(() => {
 });
 
 describe("approveVerificationAction", () => {
-  it("claims, approves with a public listing, then applies the account upgrade (professional)", async () => {
+  it("claims, approves WITHOUT a public listing, then applies the account upgrade (professional)", async () => {
     target("submitted");
     const res = await approveVerificationAction(initial, form({ id: ID }));
     expect(res).toEqual({ ok: true, code: "admin.review.approved" });
     expect(calls()).toEqual(["review_start", "review_approve", "apply_account_upgrade"]);
-    expect(rpc).toHaveBeenCalledWith("review_approve", { p_verification_id: ID, p_grant_public_listing: true });
+    expect(rpc).toHaveBeenCalledWith("review_approve", { p_verification_id: ID, p_grant_public_listing: false });
     expect(revalidatePath).toHaveBeenCalledWith("/admin/users");
   });
 
-  describe("public listing is reviewer-set", () => {
-    it("lists a professional approval by default (the queue's historical behaviour)", async () => {
+  describe("public listing is reviewer-set and opt-in", () => {
+    it("does NOT list a professional approval by default (missing field)", async () => {
       target("under_review");
       await approveVerificationAction(initial, form({ id: ID }));
-      expect(rpc).toHaveBeenCalledWith("review_approve", { p_verification_id: ID, p_grant_public_listing: true });
-    });
-
-    it("withholds the listing when the reviewer declines it", async () => {
-      target("under_review");
-      await approveVerificationAction(initial, form({ id: ID, listingChoice: "1" }));
       expect(rpc).toHaveBeenCalledWith("review_approve", { p_verification_id: ID, p_grant_public_listing: false });
     });
 
-    it("lists only when the shown choice is ticked", async () => {
+    it("lists only when the box is explicitly ticked", async () => {
       target("under_review");
-      await approveVerificationAction(initial, form({ id: ID, listingChoice: "1", grantListing: "on" }));
+      await approveVerificationAction(initial, form({ id: ID, grantListing: "on" }));
       expect(rpc).toHaveBeenCalledWith("review_approve", { p_verification_id: ID, p_grant_public_listing: true });
+    });
+
+    it("ignores any other value for the field", async () => {
+      target("under_review");
+      await approveVerificationAction(initial, form({ id: ID, grantListing: "true" }));
+      expect(rpc).toHaveBeenCalledWith("review_approve", { p_verification_id: ID, p_grant_public_listing: false });
     });
 
     it("never requests a listing for a non-professional subject, whatever the form says", async () => {
       target("under_review", "organization");
-      await approveVerificationAction(initial, form({ id: ID, listingChoice: "1", grantListing: "on" }));
+      await approveVerificationAction(initial, form({ id: ID, grantListing: "on" }));
       expect(rpc).toHaveBeenCalledWith("review_approve", { p_verification_id: ID, p_grant_public_listing: false });
     });
   });

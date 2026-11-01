@@ -35,7 +35,7 @@ export function UserVerificationControls({
   const { t } = useI18n();
   // Public listing is the reviewer's explicit choice (ADR-0007 D14), only meaningful for a professional upgrade.
   // Ticked by default = the Verifications queue's behaviour; the dialog says what it does and nothing is hidden.
-  const [listPublicly, setListPublicly] = useState(true);
+  const [listPublicly, setListPublicly] = useState(false);
   const offersListing = pending?.verificationType === "professional";
 
   if (!pending) {
@@ -73,7 +73,6 @@ export function UserVerificationControls({
         {hidden}
         {offersListing ? (
           <>
-            <input type="hidden" name="listingChoice" value="1" />
             <Checkbox id={`list-publicly-${userId}`} name="grantListing" checked={listPublicly} onChange={setListPublicly}>
               {t("admin.review.listPublicly")}
             </Checkbox>
