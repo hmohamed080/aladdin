@@ -84,6 +84,18 @@ jobs:
       - name: Run pgTAP tenant-isolation / RLS tests
         run: pnpm exec supabase test db
 
+      - name: Held R2-only Storage write closure closes every application bucket, and its rollback restores the exact policies
+        run: |
+          run_sql() { docker exec -i supabase_db_aladdin psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q; }
+          { echo "begin;"; cat supabase/activation/r2-only-storage-write-closure.sql supabase/activation/verify-closure.sql; echo "rollback;"; } | run_sql
+          {
+            echo "begin;"
+            echo "create temp table before_closure as select policyname, cmd, roles::text r, qual, with_check from pg_policies where schemaname='storage' and tablename='objects';"
+            cat supabase/activation/r2-only-storage-write-closure.sql supabase/activation/r2-only-storage-write-closure-rollback.sql
+            echo "do \$\$ begin if exists (select policyname, cmd, roles::text, qual, with_check from pg_policies where schemaname='storage' and tablename='objects' except select * from before_closure) or exists (select * from before_closure except select policyname, cmd, roles::text, qual, with_check from pg_policies where schemaname='storage' and tablename='objects') then raise exception 'rollback did not restore the exact policies'; end if; end \$\$;"
+            echo "rollback;"
+          } | run_sql
+
       - name: Verify authoritative business-phone metadata matches the application
         run: node scripts/test-business-phone-parity.mjs --container supabase_db_aladdin --database postgres
 
