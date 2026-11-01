@@ -10,12 +10,12 @@ inlib() { ( export BACKUP_LABEL="$1"; shift; . "$HERE/lib.sh"; "$@" ) 2>&1; }
 
 # 1. One bucket per project.
 check "production bucket" "$(inlib production expected_bucket)" aladdin-production-db-backups
-check "acceptance bucket" "$(inlib acceptance expected_bucket)" aladdin-acceptance-backups
+check "acceptance bucket" "$(inlib acceptance expected_bucket)" aladdin-acceptance-backups-weur
 check "local-test has no hosted bucket" "$(inlib local-test expected_bucket)" ""
 chk() { ( export BACKUP_LABEL="$1" BACKUP_BUCKET="$2" R2_ENDPOINT=https://0123abcd.r2.cloudflarestorage.com AWS_ACCESS_KEY_ID=x AWS_SECRET_ACCESS_KEY=x; . "$HERE/lib.sh"; check_target ) >/dev/null 2>&1 && echo ok || echo refused; }
 check "acceptance cannot use the production bucket" "$(chk acceptance aladdin-production-db-backups)" refused
-check "production cannot use the acceptance bucket" "$(chk production aladdin-acceptance-backups)" refused
-check "acceptance uses its own bucket" "$(chk acceptance aladdin-acceptance-backups)" ok
+check "production cannot use the acceptance bucket" "$(chk production aladdin-acceptance-backups-weur)" refused
+check "acceptance uses its own bucket" "$(chk acceptance aladdin-acceptance-backups-weur)" ok
 check "production uses its own bucket" "$(chk production aladdin-production-db-backups)" ok
 check "the shared-bucket constant is gone" "$(grep -c HOSTED_BUCKET "$HERE/lib.sh")" 0
 

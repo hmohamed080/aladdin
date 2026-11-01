@@ -51,6 +51,6 @@
 
 ## Amendment 2026-10-31: buckets and the restore window
 
-- Each project has its own backup bucket (Production `aladdin-production-db-backups`, Acceptance `aladdin-acceptance-backups`), its own tokens, rule files and GitHub environments; no code path accepts the other project's bucket.
+- Each project has its own backup bucket (Production `aladdin-production-db-backups`, Acceptance `aladdin-acceptance-backups-weur`), its own tokens, rule files and GitHub environments; no code path accepts the other project's bucket.
 - Database snapshots live up to 366 days, R2 media copies 90 days after they are written. Copies can predate a snapshot by up to one monthly generation, so the guaranteed full-restore window is 59 days; older snapshots are database-only restores and are verified and reported as such.
 - The built `aladdin-backups` repo is inactive by default (no schedule trigger) until the owner's activation GO.

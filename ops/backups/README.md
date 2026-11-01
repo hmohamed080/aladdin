@@ -42,10 +42,10 @@ Each label is pinned to its project in `lib.sh`. Production is `kkpkgjrweysgvhvk
 - **Database URL:** user `postgres.<ref>` on `*.pooler.supabase.com:5432`, or `db.<ref>.supabase.co`. The transaction pooler (6543) is refused.
 - **`SUPABASE_URL`:** exactly `https://<ref>.supabase.co`.
 - **Service-role key:** a JWT key must name the same `ref` and role `service_role`. A newer `sb_secret_` key carries no project, so it is bound by the URL check.
-- **Bucket:** each label has its own, checked in `lib.sh` (`expected_bucket`): Production `aladdin-production-db-backups`, Acceptance `aladdin-acceptance-backups`, with an R2 endpoint. Acceptance and Production share no bucket, token, rule file or GitHub environment.
+- **Bucket:** each label has its own, checked in `lib.sh` (`expected_bucket`): Production `aladdin-production-db-backups`, Acceptance `aladdin-acceptance-backups-weur`, with an R2 endpoint. Acceptance and Production share no bucket, token, rule file or GitHub environment.
 - **Manifests:** every manifest records `label` and `project_ref`. The restore test refuses a backup of another label or project.
 
-## What is stored (one bucket per project: Production `aladdin-production-db-backups`, Acceptance `aladdin-acceptance-backups`; same layout in both)
+## What is stored (one bucket per project: Production `aladdin-production-db-backups`, Acceptance `aladdin-acceptance-backups-weur`; same layout in both)
 
 ```
 db/<label>/daily/YYYY/MM/DD/aladdin-<label>-<UTC stamp>.tar.age     kept 15 days (locked 14)
@@ -128,7 +128,7 @@ Part A is read-only preparation and changes nothing hosted. Part B changes hoste
    age-keygen -o aladdin-backup-restore-test.key # its private part goes ONLY into the restore-test environment
    ```
    The two `# public key: age1...` lines, space separated, become `AGE_RECIPIENTS`. Every backup is encrypted to both keys, so losing one of them is survivable.
-2. **Read the current bucket settings** (read-only) of `aladdin-production-db-backups` and send me the output; `aladdin-acceptance-backups` does not exist yet:
+2. **Read the current bucket settings** (read-only) of `aladdin-production-db-backups` and send me the output; `aladdin-acceptance-backups-weur` does not exist yet:
    ```sh
    pnpm exec wrangler r2 bucket lock list aladdin-production-db-backups
    pnpm exec wrangler r2 bucket lifecycle list aladdin-production-db-backups
@@ -142,15 +142,15 @@ Part A is read-only preparation and changes nothing hosted. Part B changes hoste
 
 4. **Create the Acceptance backup bucket, then rules** (one file set per bucket; `set` replaces every existing rule, so compare with step 2 first):
    ```sh
-   pnpm exec wrangler r2 bucket create aladdin-acceptance-backups                 # Acceptance only; new, private, no public access
-   pnpm exec wrangler r2 bucket lifecycle set aladdin-acceptance-backups --file r2/acceptance/lifecycle.json
+   pnpm exec wrangler r2 bucket create aladdin-acceptance-backups-weur --location weur   # done by the owner 2026-11-01 (WEUR, like the Acceptance media buckets)
+   pnpm exec wrangler r2 bucket lifecycle set aladdin-acceptance-backups-weur --file r2/acceptance/lifecycle.json
    # Production bucket: only at the Production GO
    pnpm exec wrangler r2 bucket lock set aladdin-production-db-backups --file r2/production/lock.json
    pnpm exec wrangler r2 bucket lifecycle set aladdin-production-db-backups --file r2/production/lifecycle.json
    ```
    Once a lock is on, nobody can delete or overwrite a locked object until it expires, not even you. Only Production database snapshots are locked; the Acceptance trial bucket has no lock (it is disposable), and media copies are never locked (R2 90 days, legacy 30). `phase-a/` is left as it is. The Production bucket has no lock rules and only the default 7-day multipart-abort rule, which its lifecycle file repeats.
 5. **R2 API tokens, per project** (dashboard: R2, Manage API tokens). Each token is limited to ONE backup bucket; create the Acceptance pair first and the Production pair only at the Production GO:
-   - `aladdin-acceptance-backup-write` / `-read` on `aladdin-acceptance-backups`, and `aladdin-production-backup-write` / `-read` on `aladdin-production-db-backups`. *Write* is Object Read & Write, *read* is Object Read only. They become `R2_BACKUP_WRITE_KEY_ID` / `R2_BACKUP_WRITE_SECRET` and `R2_BACKUP_READ_KEY_ID` / `R2_BACKUP_READ_SECRET` in that project's environments only.
+   - `aladdin-acceptance-backup-write` / `-read` on `aladdin-acceptance-backups-weur`, and `aladdin-production-backup-write` / `-read` on `aladdin-production-db-backups`. *Write* is Object Read & Write, *read* is Object Read only. They become `R2_BACKUP_WRITE_KEY_ID` / `R2_BACKUP_WRITE_SECRET` and `R2_BACKUP_READ_KEY_ID` / `R2_BACKUP_READ_SECRET` in that project's environments only.
    - `R2_MEDIA_READ_*`: *Object Read only* on that project's media bucket (Acceptance: `aladdin-r2-acceptance-20261011-private`). Never the backup bucket.
 6. **The private repo** `hmohamed080/aladdin-backups` exists. Its contents are built from this folder, which stays the only source (never edit the built repo by hand):
    ```sh
@@ -164,7 +164,7 @@ Part A is read-only preparation and changes nothing hosted. Part B changes hoste
    |---|---|---|
    | Repo variables | `PRODUCTION_BACKUP_ENABLED` | `false` |
    | | `ACCEPTANCE_BACKUP_SCHEDULE` | `daily` for the trial (`off` stops it) |
-   | Environment `backup-acceptance` | variables `BACKUP_BUCKET` = `aladdin-acceptance-backups`, `R2_ACCOUNT_ID`, `AGE_RECIPIENTS` (the two public keys from step 1), `SUPABASE_URL` = `https://nxossqhdfltcqdwvbewi.supabase.co`, `R2_MEDIA_BACKUP` = `1` once the media backup is wanted, `R2_MEDIA_SOURCE_BUCKET` = `aladdin-r2-acceptance-20261011-private`; `LEGACY_MEDIA_BACKUP` unset (off) | Acceptance only |
+   | Environment `backup-acceptance` | variables `BACKUP_BUCKET` = `aladdin-acceptance-backups-weur`, `R2_ACCOUNT_ID`, `AGE_RECIPIENTS` (the two public keys from step 1), `SUPABASE_URL` = `https://nxossqhdfltcqdwvbewi.supabase.co`, `R2_MEDIA_BACKUP` = `1` once the media backup is wanted, `R2_MEDIA_SOURCE_BUCKET` = `aladdin-r2-acceptance-20261011-private`; `LEGACY_MEDIA_BACKUP` unset (off) | Acceptance only |
    | | secrets `BACKUP_DB_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `R2_BACKUP_WRITE_KEY_ID`, `R2_BACKUP_WRITE_SECRET`, `R2_MEDIA_READ_KEY_ID`, `R2_MEDIA_READ_SECRET` | |
    | Environment `backup-check-acceptance` | variables `BACKUP_BUCKET`, `R2_ACCOUNT_ID`, `ALERT_EMAIL`, `R2_MEDIA_BACKUP`; secrets `R2_BACKUP_READ_KEY_ID`, `R2_BACKUP_READ_SECRET`, `RESEND_API_KEY` | |
    | Environment `restore-test-acceptance` | variables `BACKUP_BUCKET`, `R2_ACCOUNT_ID`, `R2_MEDIA_BACKUP`; secrets `R2_BACKUP_READ_KEY_ID`, `R2_BACKUP_READ_SECRET`, `AGE_RESTORE_TEST_IDENTITY` (the whole restore-test key file) | |

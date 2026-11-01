@@ -5,7 +5,7 @@
 # Required in the environment of every script:
 #   BACKUP_LABEL     production | acceptance | local-test (which project this backup is of)
 #   BACKUP_BUCKET    the R2 bucket of that label ONLY: production -> aladdin-production-db-backups,
-#                    acceptance -> aladdin-acceptance-backups (see expected_bucket; no bucket is shared)
+#                    acceptance -> aladdin-acceptance-backups-weur (see expected_bucket; no bucket is shared)
 #   R2_ENDPOINT      https://<account id>.r2.cloudflarestorage.com (local-test: http://127.0.0.1:<port>)
 #   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY   an R2 token scoped to BACKUP_BUCKET only
 export LC_ALL=C AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_PAGER=""
@@ -30,7 +30,7 @@ expected_ref() {
 expected_bucket() {
   case "$BACKUP_LABEL" in
     production) echo aladdin-production-db-backups;;
-    acceptance) echo aladdin-acceptance-backups;;
+    acceptance) echo aladdin-acceptance-backups-weur;;
     *) echo "";;
   esac
 }
